@@ -68,7 +68,7 @@ val close : unit -> unit Lwt.t
 val make_with_defaults :
   ?verbosity:Internal_event.level ->
   ?enable_default_daily_logs_at:string ->
-  ?daily_logs_section_prefixes:(string * Internal_event.level) list ->
+  ?daily_logs_section_prefixes:(string * Internal_event.level option) list ->
   ?log_cfg:Logs_simple_config.cfg ->
   unit ->
   Internal_event_config.t

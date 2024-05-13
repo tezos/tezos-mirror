@@ -38,13 +38,13 @@
 
 exception Incorrect_log_rules_syntax
 
-exception Incorrect_log_rules_not_a_level
+exception Incorrect_log_rules_not_a_level of string
 
 exception Incorrect_log_rules_missing_pattern
 
 exception Incorrect_log_rules_missing_level
 
-type rules = (string * Internal_event.Level.t) list
+type rules = (string * Internal_event.Level.t option) list
 
 (** [find_log_rules default] checks above environment variables for set of rules
     - returns the origin (environment variable or config file) and value if

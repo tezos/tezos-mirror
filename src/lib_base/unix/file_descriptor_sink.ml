@@ -351,9 +351,10 @@ end) : Internal_event.SINK with type t = t = struct
       match (Uri.get_query_param uri "level-at-least", section_prefixes) with
       | None, None -> return (`Level_at_least Internal_event.Level.default)
       | Some l, None -> (
-          match Internal_event.Level.of_string l with
+          match Internal_event.Level.of_string_exn l with
           | Some l -> return (`Level_at_least l)
-          | None -> fail_parsing uri "Wrong level: %S" l)
+          | None | (exception Internal_event.Level.Not_a_level _) ->
+              fail_parsing uri "Wrong level: %S" l)
       | base_level, Some l -> (
           try
             let sections =
@@ -365,17 +366,17 @@ end) : Internal_event.SINK with type t = t = struct
                       Some Internal_event.Level.default )
                 | [one; two] ->
                     let lvl =
-                      match String.lowercase_ascii two with
-                      | "none" -> None
-                      | s -> (
-                          match Internal_event.Level.of_string s with
-                          | Some s -> Some s
-                          | None ->
-                              Format.kasprintf
-                                Stdlib.failwith
-                                "Wrong level name: %S in argument %S"
-                                two
-                                s)
+                      match
+                        Internal_event.Level.of_string_exn
+                          (String.lowercase_ascii two)
+                      with
+                      | level -> level
+                      | exception Internal_event.Level.Not_a_level _ ->
+                          Format.kasprintf
+                            Stdlib.failwith
+                            "Wrong level name: %S in argument %S"
+                            two
+                            s
                     in
                     let section =
                       match one with
@@ -395,11 +396,11 @@ end) : Internal_event.SINK with type t = t = struct
               match base_level with
               | None -> pairs
               | Some lvl -> (
-                  match Internal_event.Level.of_string lvl with
-                  | Some l ->
+                  match Internal_event.Level.of_string_exn lvl with
+                  | level ->
                       (* establish default for all sections *)
-                      pairs @ [(Internal_event.Section.empty, Some l)]
-                  | None ->
+                      pairs @ [(Internal_event.Section.empty, level)]
+                  | exception Internal_event.Level.Not_a_level _ ->
                       Format.kasprintf
                         Stdlib.failwith
                         "Wrong level name %S in level-at-least argument"

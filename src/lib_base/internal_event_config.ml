@@ -28,7 +28,7 @@ open Error_monad
 type t = {active_sinks : Uri.t list}
 
 let make_section_prefix ~pattern level =
-  Format.sprintf "%s:%s" pattern (Internal_event.Level.to_string level)
+  Format.sprintf "%s:%s" pattern (Internal_event.Level.opt_to_string level)
 
 let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
     ?colors ?fresh ?(section_prefixes = []) kind =

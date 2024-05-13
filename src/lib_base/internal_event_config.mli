@@ -53,7 +53,7 @@ val make_config_uri :
   ?with_pid:bool ->
   ?colors:bool ->
   ?fresh:bool ->
-  ?section_prefixes:(string * Internal_event.level) list ->
+  ?section_prefixes:(string * Internal_event.level option) list ->
   [`Stdout | `Stderr | `Path of string | `Null | `Syslog of string] ->
   Uri.t
 
