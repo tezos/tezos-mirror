@@ -57,6 +57,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       mutable count_recv_valid_app_messages : int64;
       mutable count_recv_invalid_app_messages : int64;
       mutable count_recv_unknown_validity_app_messages : int64;
+      mutable count_recv_outdated_app_messages : int64;
       mutable count_recv_grafts : int64;
       mutable count_recv_prunes : int64;
       mutable count_recv_ihaves : int64;
@@ -75,6 +76,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         count_sent_iwants = 0L;
         count_recv_valid_app_messages = 0L;
         count_recv_invalid_app_messages = 0L;
+        count_recv_outdated_app_messages = 0L;
         count_recv_unknown_validity_app_messages = 0L;
         count_recv_grafts = 0L;
         count_recv_prunes = 0L;
@@ -119,6 +121,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let update_count_recv_unknown_validity_app_messages t delta =
       t.count_recv_unknown_validity_app_messages <-
         t.count_recv_unknown_validity_app_messages ++ counter_update delta
+
+    let update_count_recv_outdated_app_messages t delta =
+      t.count_recv_outdated_app_messages <-
+        t.count_recv_outdated_app_messages ++ counter_update delta
 
     let update_count_recv_valid_app_messages t delta =
       t.count_recv_valid_app_messages <-
@@ -315,6 +321,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         Introspection.update_count_recv_unknown_validity_app_messages
           state.stats
           `Incr ;
+        state
+    | state, GS.Outdated ->
+        Introspection.update_count_recv_outdated_app_messages state.stats `Incr ;
         state
     | state, GS.Invalid_message ->
         Introspection.update_count_recv_invalid_app_messages state.stats `Incr ;
