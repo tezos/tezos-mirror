@@ -65,7 +65,22 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-type threshold_encryption_sequencer = sequencer
+type threshold_encryption_sequencer =
+  | Threshold_encryption_sequencer of {
+      preimages : string;  (** Path to the preimages directory. *)
+      preimages_endpoint : Uri.t option;
+          (** Endpoint where pre-images can be fetched individually when missing. *)
+      time_between_blocks : time_between_blocks;
+          (** See {!time_between_blocks}. *)
+      max_number_of_chunks : int;
+          (** The maximum number of chunks per blueprints. *)
+      private_rpc_port : int option;  (** Port for internal RPC services *)
+      sequencer : Client_keys.sk_uri;
+          (** The key used to sign the blueprints. *)
+      blueprints_publisher_config : blueprints_publisher_config;
+      sidecar_endpoint : Uri.t;
+          (** Endpoint of the sequencer sidecar this sequencer connects to. *)
+    }
 
 type observer = {
   evm_node_endpoint : Uri.t;
@@ -155,6 +170,7 @@ val threshold_encryption_sequencer_config_dft :
   ?max_number_of_chunks:int ->
   ?private_rpc_port:int ->
   sequencer:Client_keys.sk_uri ->
+  ?sidecar_endpoint:Uri.t ->
   ?max_blueprints_lag:int ->
   ?max_blueprints_ahead:int ->
   ?max_blueprints_catchup:int ->
@@ -204,6 +220,7 @@ module Cli : sig
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
     ?proxy_read_only:bool ->
+    ?sequencer_sidecar_endpoint:Uri.t ->
     unit ->
     t
 
@@ -236,6 +253,7 @@ module Cli : sig
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
     ?proxy_read_only:bool ->
+    ?sequencer_sidecar_endpoint:Uri.t ->
     unit ->
     t tzresult Lwt.t
 end

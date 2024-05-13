@@ -305,6 +305,13 @@ let bundler_node_endpoint_arg =
        rollup."
     Params.endpoint
 
+let sequencer_sidecar_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"sequencer-sidecar-endpoint"
+    ~placeholder:"url"
+    ~doc:"The address of The sequencer sidecar to connect to."
+    Params.endpoint
+
 let time_between_blocks_arg =
   Tezos_clic.arg
     ~long:"time-between-blocks"
@@ -665,7 +672,8 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?genesis_timestamp ?kernel () =
+    ?log_filter_chunk_size ?genesis_timestamp ?kernel
+    ?sequencer_sidecar_endpoint () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -700,6 +708,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs
       ?log_filter_chunk_size
+      ?sequencer_sidecar_endpoint
       ()
   in
   let*! () =
@@ -1374,13 +1383,13 @@ let init_config_command =
       {|Create an initial config with default value.
 If the <rollup-node-endpoint> is set then adds the configuration for the proxy
 mode.
-If the  <sequencer-key> is set then adds the configuration for the sequencer
-mode.
+If the  <sequencer-key> is set,then adds the configuration for the sequencer and
+threshold encryption sequencer modes.
 If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args14
+       (args15
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1394,6 +1403,7 @@ mode.|}
           catchup_cooldown_arg
           evm_node_endpoint_arg
           bundler_node_endpoint_arg
+          sequencer_sidecar_endpoint_arg
           (* others option *)
           wallet_dir_arg
           (Tezos_clic.switch
@@ -1429,6 +1439,7 @@ mode.|}
              catchup_cooldown,
              evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
+             sequencer_sidecar_endpoint,
              wallet_dir,
              force ) )
          () ->
@@ -1463,6 +1474,7 @@ mode.|}
           ?sequencer_key
           ?evm_node_endpoint
           ?threshold_encryption_bundler_endpoint
+          ?sequencer_sidecar_endpoint
           ?max_blueprints_lag
           ?max_blueprints_ahead
           ?max_blueprints_catchup
@@ -1703,11 +1715,31 @@ let sequencer_simple_command =
         ?kernel
         ())
 
+let threshold_encryption_sequencer_config_args =
+  Tezos_clic.args15
+    preimages_arg
+    preimages_endpoint_arg
+    time_between_blocks_arg
+    max_number_of_chunks_arg
+    private_rpc_port_arg
+    sequencer_key_arg
+    maximum_blueprints_lag_arg
+    maximum_blueprints_ahead_arg
+    maximum_blueprints_catchup_arg
+    catchup_cooldown_arg
+    genesis_timestamp_arg
+    kernel_arg
+    wallet_dir_arg
+    sequencer_sidecar_endpoint_arg
+    (Client_config.password_filename_arg ())
+
 let threshold_encryption_sequencer_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (merge_options common_config_args sequencer_config_args)
+    (merge_options
+       common_config_args
+       threshold_encryption_sequencer_config_args)
     (prefixes ["run"; "threshold"; "encryption"; "sequencer"] stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1737,6 +1769,7 @@ let threshold_encryption_sequencer_command =
              genesis_timestamp,
              kernel,
              wallet_dir,
+             sequencer_sidecar_endpoint,
              password_filename ) )
          () ->
       start_threshold_encryption_sequencer
@@ -1768,6 +1801,7 @@ let threshold_encryption_sequencer_command =
         ?log_filter_max_nb_logs
         ?log_filter_chunk_size
         ?genesis_timestamp
+        ?sequencer_sidecar_endpoint
         ?kernel
         ())
 

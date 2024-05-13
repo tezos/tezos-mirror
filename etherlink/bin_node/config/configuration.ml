@@ -35,7 +35,18 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-type threshold_encryption_sequencer = sequencer
+(* Variant is needed to avoid type-checking errors. *)
+type threshold_encryption_sequencer =
+  | Threshold_encryption_sequencer of {
+      preimages : string;
+      preimages_endpoint : Uri.t option;
+      time_between_blocks : time_between_blocks;
+      max_number_of_chunks : int;
+      private_rpc_port : int option;
+      sequencer : Client_keys.sk_uri;
+      blueprints_publisher_config : blueprints_publisher_config;
+      sidecar_endpoint : Uri.t;
+    }
 
 type observer = {
   evm_node_endpoint : Uri.t;
@@ -88,6 +99,8 @@ let config_filename ~data_dir = Filename.concat data_dir "config.json"
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8545
+
+let default_sequencer_sidecar_endpoint = Uri.of_string "127.0.0.1:5303"
 
 let default_devmode = false
 
@@ -166,8 +179,8 @@ let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
 
 let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
     ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-    ?private_rpc_port ~sequencer ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown () =
+    ?private_rpc_port ~sequencer ?sidecar_endpoint ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown () =
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -188,17 +201,22 @@ let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
           catchup_cooldown;
     }
   in
-  {
-    preimages = Option.value ~default:(default_preimages data_dir) preimages;
-    preimages_endpoint;
-    time_between_blocks =
-      Option.value ~default:default_time_between_blocks time_between_blocks;
-    max_number_of_chunks =
-      Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-    private_rpc_port;
-    sequencer;
-    blueprints_publisher_config;
-  }
+  Threshold_encryption_sequencer
+    {
+      preimages = Option.value ~default:(default_preimages data_dir) preimages;
+      preimages_endpoint;
+      time_between_blocks =
+        Option.value ~default:default_time_between_blocks time_between_blocks;
+      max_number_of_chunks =
+        Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
+      private_rpc_port;
+      sequencer;
+      blueprints_publisher_config;
+      sidecar_endpoint =
+        Option.value
+          ~default:default_sequencer_sidecar_endpoint
+          sidecar_endpoint;
+    }
 
 let observer_config_dft ~data_dir ?preimages ?preimages_endpoint
     ~evm_node_endpoint ?threshold_encryption_bundler_endpoint
@@ -326,7 +344,69 @@ let sequencer_encoding data_dir =
           blueprints_publisher_config_encoding
           default_blueprints_publisher_config))
 
-let threshold_encryption_sequencer_encoding = sequencer_encoding
+let threshold_encryption_sequencer_encoding data_dir =
+  let open Data_encoding in
+  conv
+    (function
+      | Threshold_encryption_sequencer
+          {
+            preimages;
+            preimages_endpoint;
+            time_between_blocks;
+            max_number_of_chunks;
+            private_rpc_port;
+            sequencer;
+            blueprints_publisher_config;
+            sidecar_endpoint;
+          } ->
+          ( preimages,
+            preimages_endpoint,
+            time_between_blocks,
+            max_number_of_chunks,
+            private_rpc_port,
+            Client_keys.string_of_sk_uri sequencer,
+            blueprints_publisher_config,
+            sidecar_endpoint ))
+    (fun ( preimages,
+           preimages_endpoint,
+           time_between_blocks,
+           max_number_of_chunks,
+           private_rpc_port,
+           sequencer,
+           blueprints_publisher_config,
+           sidecar_endpoint ) ->
+      Threshold_encryption_sequencer
+        {
+          preimages;
+          preimages_endpoint;
+          time_between_blocks;
+          max_number_of_chunks;
+          private_rpc_port;
+          sequencer = Client_keys.sk_uri_of_string sequencer;
+          blueprints_publisher_config;
+          sidecar_endpoint;
+        })
+    (obj8
+       (dft "preimages" string (default_preimages data_dir))
+       (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
+       (dft
+          "time_between_blocks"
+          encoding_time_between_blocks
+          default_time_between_blocks)
+       (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
+       (opt
+          "private-rpc-port"
+          ~description:"RPC port for private server"
+          uint16)
+       (req "sequencer" string)
+       (dft
+          "blueprints_publisher_config"
+          blueprints_publisher_config_encoding
+          default_blueprints_publisher_config)
+       (dft
+          "sidecar_endpoint"
+          Tezos_rpc.Encoding.uri_encoding
+          default_sequencer_sidecar_endpoint))
 
 let observer_encoding data_dir =
   let open Data_encoding in
@@ -554,7 +634,8 @@ module Cli = struct
       ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?(proxy_read_only = false) () =
+      ?catchup_cooldown ?(proxy_read_only = false) ?sequencer_sidecar_endpoint
+      () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -588,6 +669,7 @@ module Cli = struct
             ?max_blueprints_catchup
             ?catchup_cooldown
             ~sequencer
+            ?sidecar_endpoint:sequencer_sidecar_endpoint
             ())
         sequencer_key
     in
@@ -647,7 +729,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?(proxy_read_only = false) configuration =
+      ?(proxy_read_only = false) ?sequencer_sidecar_endpoint configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -720,7 +802,9 @@ module Cli = struct
         configuration.threshold_encryption_sequencer
       in
       match threshold_encryption_sequencer_config with
-      | Some threshold_encryption_sequencer_config ->
+      | Some
+          (Threshold_encryption_sequencer threshold_encryption_sequencer_config)
+        ->
           let blueprints_publisher_config =
             let blueprints_publisher_config =
               threshold_encryption_sequencer_config.blueprints_publisher_config
@@ -745,35 +829,42 @@ module Cli = struct
             }
           in
           Some
-            {
-              preimages =
-                Option.value
-                  ~default:threshold_encryption_sequencer_config.preimages
-                  preimages;
-              preimages_endpoint =
-                Option.either
-                  preimages_endpoint
-                  threshold_encryption_sequencer_config.preimages_endpoint;
-              time_between_blocks =
-                Option.value
-                  ~default:
-                    threshold_encryption_sequencer_config.time_between_blocks
-                  time_between_blocks;
-              max_number_of_chunks =
-                Option.value
-                  ~default:
-                    threshold_encryption_sequencer_config.max_number_of_chunks
-                  max_number_of_chunks;
-              private_rpc_port =
-                Option.either
-                  private_rpc_port
-                  threshold_encryption_sequencer_config.private_rpc_port;
-              sequencer =
-                Option.value
-                  ~default:threshold_encryption_sequencer_config.sequencer
-                  sequencer_key;
-              blueprints_publisher_config;
-            }
+            (Threshold_encryption_sequencer
+               {
+                 preimages =
+                   Option.value
+                     ~default:threshold_encryption_sequencer_config.preimages
+                     preimages;
+                 preimages_endpoint =
+                   Option.either
+                     preimages_endpoint
+                     threshold_encryption_sequencer_config.preimages_endpoint;
+                 time_between_blocks =
+                   Option.value
+                     ~default:
+                       threshold_encryption_sequencer_config.time_between_blocks
+                     time_between_blocks;
+                 max_number_of_chunks =
+                   Option.value
+                     ~default:
+                       threshold_encryption_sequencer_config
+                         .max_number_of_chunks
+                     max_number_of_chunks;
+                 private_rpc_port =
+                   Option.either
+                     private_rpc_port
+                     threshold_encryption_sequencer_config.private_rpc_port;
+                 sequencer =
+                   Option.value
+                     ~default:threshold_encryption_sequencer_config.sequencer
+                     sequencer_key;
+                 blueprints_publisher_config;
+                 sidecar_endpoint =
+                   Option.value
+                     ~default:
+                       threshold_encryption_sequencer_config.sidecar_endpoint
+                     sequencer_sidecar_endpoint;
+               })
       | None ->
           Option.map
             (fun sequencer ->
@@ -789,6 +880,7 @@ module Cli = struct
                 ?max_blueprints_catchup
                 ?catchup_cooldown
                 ~sequencer
+                ?sidecar_endpoint:sequencer_sidecar_endpoint
                 ())
             sequencer_key
     in
@@ -887,7 +979,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?proxy_read_only () =
+      ?proxy_read_only ?sequencer_sidecar_endpoint () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -938,6 +1030,7 @@ module Cli = struct
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ?proxy_read_only
+          ?sequencer_sidecar_endpoint
           configuration
       in
       return configuration
@@ -977,6 +1070,7 @@ module Cli = struct
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ?proxy_read_only
+          ?sequencer_sidecar_endpoint
           ()
       in
       return config
