@@ -8498,3 +8498,12 @@ oc.build:homebrew:
   - apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev libprotobuf-dev
     libsqlite3-dev protobuf-compiler libhidapi-dev pkg-config zlib1g-dev
   - brew install -v scripts/packaging/Formula/octez.rb
+
+trigger:debian_repository:
+  stage: manual
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/debian_repository.yml

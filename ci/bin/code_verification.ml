@@ -1855,12 +1855,22 @@ let jobs pipeline_type =
             ~stage:Stages.manual
             ()
         in
+        (* Debian packages can only be built manually on the [Before_merging] pipelines *)
+        let job_debian_repository_trigger : tezos_job =
+          trigger_job
+            ~__POS__
+            ~rules:(make_rules ~manual:Yes ())
+            ~dependencies:(Dependent [])
+            ~stage:Stages.manual
+            debian_repository_child_pipeline
+        in
         [
           job_docker_amd64_test_manual;
           job_docker_arm64_test_manual;
           job_build_dpkg_amd64_manual;
           job_build_rpm_amd64_manual;
           job_build_homebrew_manual;
+          job_debian_repository_trigger;
         ]
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
