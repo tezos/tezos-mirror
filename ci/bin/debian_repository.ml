@@ -70,7 +70,7 @@ let jobs =
       ~__POS__
       ~name
       ~image:build_debian_packages_image
-      ~stage:Stages.manual
+      ~stage:Stages.packaging
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tags:["$TAGS"]
