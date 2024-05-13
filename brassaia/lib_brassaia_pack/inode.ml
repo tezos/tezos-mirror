@@ -323,7 +323,7 @@ struct
         conv
           (fun { index; vref } -> (index, vref))
           (fun (index, vref) -> { index; vref })
-          (tup2 uint8 vref_encoding))
+          (obj2 (req "index" uint8) (req "vref" vref_encoding)))
 
     type 'vref tree = {
       depth : int;

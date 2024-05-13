@@ -32,21 +32,34 @@ let list_partition_map f t =
   aux [] [] t
 
 module Events = struct
-  (* open Tezos_base.TzPervasives *)
   include Internal_event.Simple
 
   let section = [ "brassaia"; "object_graph" ]
 
   let object_graph_iter =
-    declare_5 ~section ~level:Debug ~name:"inode_save_values"
+    declare_5 ~section ~level:Debug ~name:"object_graph_iter"
       ~msg:
         "iter: depth: {depth}; rev: {rev}; min: {min}; max: {max}; cache_size: \
          {cache_size}"
       ("depth", Data_encoding.int64)
       ("rev", Data_encoding.bool)
-      ("min", Data_encoding.(list (option string)))
-      ("max", Data_encoding.(list (option string)))
+      ("min", Data_encoding.(list string))
+      ("max", Data_encoding.(list string))
       ("cache_size", Data_encoding.(option int64))
+
+  let treat_key =
+    declare_1 ~section ~level:Debug ~name:"treat_key" ~msg:"Treat key {key}"
+      ("key", Data_encoding.string)
+
+  let visit_key_level =
+    declare_2 ~section ~level:Debug ~name:"visit_key_level"
+      ~msg:"Visit key {key} at level {level}"
+      ("key", Data_encoding.string)
+      ("level", Data_encoding.int64)
+
+  let output =
+    declare_1 ~section ~level:Debug ~name:"output" ~msg:"Output {name}"
+      ("name", Data_encoding.string)
 end
 
 module Make
@@ -148,8 +161,8 @@ struct
       Events.(emit object_graph_iter)
         ( Int64.of_int depth,
           rev,
-          List.map (Data_encoding.Binary.to_string_opt X.encoding) min,
-          List.map (Data_encoding.Binary.to_string_opt X.encoding) max,
+          List.map (Logging.to_string_exn X.encoding) min,
+          List.map (Logging.to_string_exn X.encoding) max,
           Option.map Int64.of_int cache_size )
     in
     let marks = Table.create cache_size in
@@ -167,7 +180,9 @@ struct
     let has_mark key = Table.mem marks key in
     List.iter (fun k -> Stack.push (Visit (k, 0)) todo) max;
     let treat key =
-      [%log.debug "TREAT %a" Type.(pp X.t) key];
+      let* () =
+        Events.(emit treat_key) (Logging.to_string_exn X.encoding key)
+      in
       node key >>= fun () ->
       if not (Set.mem key min) then
         (* the edge function is optional to prevent an unnecessary computation
@@ -197,7 +212,10 @@ struct
         | true -> Lwt.return_unit
         | false ->
             let+ () =
-              [%log.debug "VISIT %a %d" Type.(pp X.t) key level];
+              let* () =
+                Events.(emit visit_key_level)
+                  (Logging.to_string_exn X.encoding key, Int64.of_int level)
+              in
               mark key level;
               if rev then Stack.push (Treat key) todo;
               match key with
@@ -224,7 +242,8 @@ struct
     let has_mark key = Table.mem marks key in
     List.iter (fun k -> Queue.push (Visit (k, 0)) todo) max;
     let treat key =
-      [%log.debug "TREAT %a" Type.(pp X.t) key];
+      Events.(emit__dont_wait__use_with_care treat_key)
+        (Logging.to_string_exn X.encoding key);
       node key
     in
     let visit_predecessors key level =
@@ -234,7 +253,8 @@ struct
     let visit key level =
       if has_mark key then Lwt.return_unit
       else (
-        [%log.debug "VISIT %a" Type.(pp X.t) key];
+        Events.(emit__dont_wait__use_with_care visit_key_level)
+          (Logging.to_string_exn X.encoding key, Int64.of_int level);
         mark key level;
         treat key >>= fun () -> visit_predecessors key level)
     in
@@ -306,7 +326,7 @@ struct
     g
 
   let output ppf vertex edges name =
-    [%log.debug "output %s" name];
+    Events.(emit__dont_wait__use_with_care output) name;
     let g = G.create ~size:(List.length vertex) () in
     List.iter (fun (v, _) -> G.add_vertex g v) vertex;
     List.iter (fun (v1, _, v2) -> G.add_edge g v1 v2) edges;
