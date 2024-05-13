@@ -55,6 +55,10 @@ val has_producer : t -> bool
     observer field of [operator] *)
 val has_observer : t -> bool
 
+(** [attester_only operator] returns true if [operator] has an attester role,
+    and no producer, not observer roles. *)
+val attester_only : t -> bool
+
 (** [producer_slot_out_of_bounds n op] returns the first slot index that for
     producer that is not between 0 and n - 1; it returns [None] if no slot
     index was outside these bounds *)
@@ -70,7 +74,7 @@ val get_all_slot_indexes : t -> int list
 
 (** [make ~attesters ~producers ~observers ()] returns an
     operator profile for a node that is an attester for the public keys in
-    [attesters], a producer for each slot indexes in [producers], and an 
+    [attesters], a producer for each slot indexes in [producers], and an
     observer for all slot indexes in [observer]. When a list is empty or not
     specified, no value for the corresponding role will be included in the
     result ; [make ()] returns [empty] *)

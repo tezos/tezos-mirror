@@ -401,6 +401,12 @@ module Handler = struct
         return_unit)
       commitments
 
+  let should_store_cells ctxt =
+    let profile = Node_context.get_profile_ctxt ctxt in
+    not
+      (Profile_manager.is_bootstrap_profile profile
+      || Profile_manager.is_attester_only_profile profile)
+
   let process_block ctxt cctxt (module Plugin : Dal_plugin.T) plugin_proto
       proto_parameters cryptobox skip_list_cells_store head_level block_level =
     let open Lwt_result_syntax in
@@ -424,7 +430,7 @@ module Handler = struct
     let*? block_round = Plugin.get_round shell_header.fitness in
     let* slot_headers = Plugin.get_published_slot_headers block_info in
     let* () =
-      if not (is_bootstrap_node ctxt) then
+      if should_store_cells ctxt then
         let* cells_of_level =
           Plugin.Skip_list.cells_of_level block_info cctxt
         in
@@ -439,12 +445,14 @@ module Handler = struct
                   cell ))
             cells_of_level
         in
-        let* () =
-          Skip_list_cells_store.insert
-            skip_list_cells_store
-            ~attested_level:head_level
-            cells_of_level
-        in
+        Skip_list_cells_store.insert
+          skip_list_cells_store
+          ~attested_level:head_level
+          cells_of_level
+      else return_unit
+    in
+    let* () =
+      if not (is_bootstrap_node ctxt) then
         Slot_manager.store_slot_headers
           ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
           ~block_level

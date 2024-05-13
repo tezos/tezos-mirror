@@ -38,6 +38,11 @@ val is_bootstrap_profile : t -> bool
     proofs. *)
 val is_prover_profile : t -> bool
 
+(** [is_attester_only_profile profile] returns [true] if the node has an
+    operator profile, with at least one attester role and no producer nor
+    observer roles. *)
+val is_attester_only_profile : t -> bool
+
 val encoding : t Data_encoding.t
 
 (** The empty profile manager context. *)

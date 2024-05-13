@@ -49,6 +49,11 @@ let is_prover_profile = function
   | Types.Random_observer -> true
   | Types.Operator p -> Operator_profile.(has_observer p || has_producer p)
 
+let is_attester_only_profile = function
+  | Types.Bootstrap -> false
+  | Types.Random_observer -> false
+  | Types.Operator p -> Operator_profile.(attester_only p)
+
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
   | Types.Bootstrap, Types.Bootstrap -> Types.Bootstrap
