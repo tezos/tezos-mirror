@@ -99,14 +99,30 @@ module Pipeline : sig
     Gitlab_ci.If.t ->
     unit
 
+  (** A child pipeline.
+
+      See {!register_child} and {!trigger_job} for more information. *)
+  type child_pipeline
+
+  (** Register a child pipeline.
+
+      [register_child name] will register a child pipeline called [name].
+
+      The [jobs] of the pipeline are generated to the file
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called.
+
+      Child pipelines cannot be launched without a trigger job that is
+      included in a regular pipeline (see {!trigger_job}). *)
+  val register_child : jobs:tezos_job list -> string -> child_pipeline
+
   (** Writes the set of registered pipelines.
 
       A top-level configuration is generated to [filename]. It
       contains a [workflow:] section that enables pipeline execution
-      for each registered pipeline and an [include:] section that
-      includes set of jobs for the given pipeline. If specified,
-      [default:], [variables:], and [stages:] sections are also
-      written to the top-level configuration.
+      for each registered, non-child pipeline and an [include:]
+      section that includes set of jobs for the given pipeline. If
+      specified, [default:], [variables:], and [stages:] sections are
+      also written to the top-level configuration.
 
       A [dummy_job] is written to the top-level configuration. This
       job is never enabled, but it works around a GitLab CI issue that

@@ -107,32 +107,53 @@ module Stage = struct
 end
 
 module Pipeline = struct
-  type t = {
+  type pipeline = {
     name : string;
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
     jobs : tezos_job list;
   }
 
+  type child_pipeline = {name : string; jobs : tezos_job list}
+
+  type t = Pipeline of pipeline | Child_pipeline of child_pipeline
+
   let pipelines : t list ref = ref []
+
+  let name = function Pipeline {name; _} | Child_pipeline {name; _} -> name
+
+  let jobs = function
+    | Child_pipeline {jobs; _} -> jobs
+    | Pipeline {jobs; _} -> jobs
 
   let path : name:string -> string =
    fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
 
-  let register ?variables ~jobs name if_ =
-    let pipeline : t = {variables; if_; name; jobs} in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
-       check that stages have not been crossed. *)
-    if List.exists (fun {name = name'; _} -> name' = name) !pipelines then
+  let register_raw pipeline =
+    if List.exists (fun pipeline' -> name pipeline = name pipeline') !pipelines
+    then
       failwith
         "[Pipeline.register] attempted to register pipeline %S twice"
-        name
+        (name pipeline)
     else pipelines := pipeline :: !pipelines
+
+  let register ?variables ~jobs name if_ =
+    register_raw (Pipeline {variables; if_; name; jobs})
+
+  let register_child ~jobs name =
+    let child_pipeline = {name; jobs} in
+    register_raw (Child_pipeline child_pipeline) ;
+    child_pipeline
 
   let all () = List.rev !pipelines
 
   (* Perform a set of static checks on the full pipeline before writing it. *)
-  let precheck {name = pipeline_name; jobs; _} =
+  let precheck pipeline =
+    let pipeline_name = name pipeline in
+    let jobs = jobs pipeline in
+    (* TODO: Have to figure out:
+       - is it possible to have a [needs:] on a trigger job?
+       - is it possible to get artifacts from a trigger job (i.e. like from it's child pipeline?) *)
     let job_by_name : (string, Gitlab_ci.Types.job) Hashtbl.t =
       Hashtbl.create 5
     in
@@ -247,7 +268,7 @@ module Pipeline = struct
   let workflow_includes () :
       Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list =
     let workflow_rule_of_pipeline = function
-      | {name; if_; variables; jobs = _} ->
+      | {name; if_; variables; _} ->
           (* Add [PIPELINE_TYPE] to the variables of the workflow rules, so
              that it can be added to the pipeline [name] *)
           let variables =
@@ -256,14 +277,19 @@ module Pipeline = struct
           workflow_rule ~if_ ~variables ~when_:Always ()
     in
     let include_of_pipeline = function
-      | {name; if_; variables = _; jobs = _} ->
+      | {name; if_; _} ->
           (* Note that variables associated to the pipeline are not
              set in the include rule, they are set in the workflow
              rule *)
           let rule = include_rule ~if_ ~when_:Always () in
           Gitlab_ci.Types.{local = path ~name; rules = [rule]}
     in
-    let pipelines = all () in
+    let pipelines =
+      all ()
+      |> List.filter_map (function
+             | Pipeline pipeline -> Some pipeline
+             | Child_pipeline _ -> None)
+    in
     let workflow =
       let rules = List.map workflow_rule_of_pipeline pipelines in
       Gitlab_ci.Types.{rules; name = Some "[$PIPELINE_TYPE] $CI_COMMIT_TITLE"}
@@ -273,7 +299,9 @@ module Pipeline = struct
 
   let write ?default ?variables ~stages ~filename () =
     (* Write all registered the pipelines *)
-    ( Fun.flip List.iter (all ()) @@ fun ({name; jobs; _} as pipeline) ->
+    ( Fun.flip List.iter (all ()) @@ fun pipeline ->
+      let jobs = jobs pipeline in
+      let name = name pipeline in
       if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
         precheck pipeline ;
       if jobs = [] then
@@ -290,7 +318,23 @@ module Pipeline = struct
             name
             filename)
         jobs ;
-      let config = List.concat_map tezos_job_to_config_elements jobs in
+      let prepend_config =
+        match pipeline with
+        | Pipeline _ -> []
+        | Child_pipeline _ ->
+            Gitlab_ci.Types.
+              [
+                Workflow
+                  {
+                    rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
+                    name = None;
+                  };
+                Stages (Stage.to_string_list ());
+              ]
+      in
+      let config =
+        prepend_config @ List.concat_map tezos_job_to_config_elements jobs
+      in
       to_file ~filename config ) ;
     (* Write top-level configuration. *)
     let workflow, includes = workflow_includes () in
