@@ -88,29 +88,36 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
         pred_shell_header
         ((hash, shell_header) :: acc)
   in
-  Crawler_lib.iter_heads
-    ~name
-    crawler_lib
-    (fun (hash, Block_header.{shell = shell_header; _}) ->
-      cache_shell_header headers_cache hash shell_header ;
-      if shell_header.level <= Int32.add !last_notified_level 1l then
-        return_unit
-      else
-        let* pred_hash, pred_level =
-          get_predecessor crawler_lib hash shell_header.level
-        in
-        let* finalized_hash, finalized_level =
-          get_predecessor crawler_lib pred_hash pred_level
-        in
-        let* finalized_shell_header =
-          fetch_tezos_shell_header cctxt headers_cache finalized_hash
-        in
-        let* delta_finalized =
-          catch_up_if_needed finalized_hash finalized_shell_header []
-        in
-        List.iter (fun header -> stream_push (Some header)) delta_finalized ;
-        last_notified_level := finalized_level ;
-        return_unit)
+  let process (hash, Block_header.{shell = shell_header; _}) =
+    cache_shell_header headers_cache hash shell_header ;
+    if shell_header.level <= !last_notified_level then return_unit
+    else if Int32.equal shell_header.level 1l then (
+      stream_push (Some (hash, shell_header)) ;
+      return_unit)
+    else
+      let* pred_hash, pred_level =
+        get_predecessor crawler_lib hash shell_header.level
+      in
+      let* finalized_hash, finalized_level =
+        get_predecessor crawler_lib pred_hash pred_level
+      in
+      let* finalized_shell_header =
+        fetch_tezos_shell_header cctxt headers_cache finalized_hash
+      in
+      let* delta_finalized =
+        catch_up_if_needed finalized_hash finalized_shell_header []
+      in
+      List.iter (fun header -> stream_push (Some header)) delta_finalized ;
+      last_notified_level := finalized_level ;
+      return_unit
+  in
+  let opt = Crawler_lib.get_latest_head crawler_lib in
+  let* () =
+    match opt with
+    | None -> return_unit
+    | Some hash_and_header -> process hash_and_header
+  in
+  Crawler_lib.iter_heads ~name crawler_lib process
 
 let start ~name ~chain ~reconnection_delay ~l1_blocks_cache_size
     ?last_notified_level cctxt =
