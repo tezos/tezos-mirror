@@ -155,6 +155,10 @@ val get_status : t -> status
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.t
 
+(** [get_last_processed_level_store ctxt] returns the last processed level
+    store. *)
+val get_last_processed_level_store : t -> Last_processed_level.t
+
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t
 

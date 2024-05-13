@@ -222,6 +222,8 @@ let get_config ctxt = ctxt.config
 
 let get_status ctxt = ctxt.status
 
+let get_last_processed_level_store ctxt = ctxt.last_processed_level_store
+
 let get_store ctxt = ctxt.store
 
 let get_gs_worker ctxt = ctxt.gs_worker

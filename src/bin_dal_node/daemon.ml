@@ -484,7 +484,9 @@ module Handler = struct
     let*! () =
       Event.(emit layer1_node_final_block (block_level, block_round))
     in
-    return_unit
+    Last_processed_level.save_last_processed_level
+      (Node_context.get_last_processed_level_store ctxt)
+      ~level:block_level
 
   (* Monitor finalized heads and store *finalized* published slot headers
      indexed by block hash. A slot header is considered finalized when it is in
