@@ -435,6 +435,29 @@ module Handler = struct
           slot_id)
       (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
+  (* [attestation_lag] levels after the publication of a commitment,
+     if it has not been attested it will never be so we can safely
+     remove it from the store. This function removes from the store
+     all the slots (and their shards) published at the given level and
+     which are not listed in the [attested] list. *)
+  let remove_unattested_slots_and_shards proto_parameters ctxt ~published_level
+      attested =
+    let open Lwt_syntax in
+    let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
+    let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+    let store = Node_context.get_store ctxt in
+    let module S = Set.Make (Int) in
+    let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
+    List.iter_s
+      (fun slot_index ->
+        if S.mem slot_index attested then return_unit
+        else
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
+          in
+          remove_slots_and_shards ~slot_size store slot_id)
+      (0 -- (number_of_slots - 1))
+
   let process_block ctxt cctxt proto_parameters skip_list_cells_store
       finalized_shell_header =
     let open Lwt_result_syntax in
@@ -533,6 +556,14 @@ module Handler = struct
             ~number_of_slots:proto_parameters.number_of_slots
             attested_slots
             (Node_context.get_store ctxt)
+        in
+        let*! () =
+          remove_unattested_slots_and_shards
+            proto_parameters
+            ctxt
+            ~published_level:
+              Int32.(sub block_level (of_int proto_parameters.attestation_lag))
+            attested_slots
         in
         let* committee = Node_context.fetch_committee ctxt ~level:block_level in
         let () =
