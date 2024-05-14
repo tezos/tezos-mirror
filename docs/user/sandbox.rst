@@ -135,3 +135,20 @@ can use the ``DATA_DIR`` environment variable.
 
 You can even provide a custom ``identity.json`` and ``config.json`` to the
 sandboxed node by placing them in the data directory.
+
+Baking multiple blocks
+~~~~~~~~~~~~~~~~~~~~~~
+
+To bake multiple blocks in a single command the ``-n <number_of_blocks>`` option can be used like
+
+::
+
+   $ octez-client bake for --minimal-timestamp -n 1_000
+
+Once the current timestamp is caught up, blocks are produced every second or every ``minimal_block_delay`` set in the parameters file. To speed up the process the protocol can be activated in the past with
+
+::
+
+   $ octez-activate-alpha --timestamp "2024-01-01T00:00:00Z"
+
+This increases the number of blocks needed to reach the current timestamp and speeds up the blocks production.
