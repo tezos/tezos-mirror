@@ -19,7 +19,7 @@ val default : ?image:image -> ?interruptible:bool -> unit -> default
     If [when_] is set to [Manual] then the default [allow_failure]
     will be overwritten to allow failure, to avoid blocking jobs.
     This typically makes sense unless you truly want a job to block
-    the execution of all later jobs (i.e. for a trigger-type job).  If
+    the execution of all later jobs (i.e. for a "start"-type job).  If
     you want to make such a job, set [~allow_failure] explicitly:
     [job_rule ~when_:Manual ~allow_failure:false ()]. *)
 val job_rule :
@@ -80,6 +80,16 @@ val job :
   script:string list ->
   unit ->
   job
+
+(** [trigger_job child_pipeline_path] constructs a {!trigger_job} job. *)
+val trigger_job :
+  ?needs:need list ->
+  ?rules:job_rule list ->
+  ?stage:string ->
+  ?when_:when_trigger_job ->
+  name:string ->
+  string ->
+  trigger_job
 
 (** [artifacts paths] Construct an [artifacts:] clause storing [paths].
 

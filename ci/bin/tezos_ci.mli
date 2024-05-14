@@ -68,16 +68,6 @@ module Stage : sig
 
       Fails if a stage of the same name has already been registered. *)
   val register : string -> t
-
-  (** Name of a stage *)
-  val name : t -> string
-
-  (** Returns the list of registered stages, in order of registration, as a list of strings.
-
-      This is appropriate to use with the [Stages] constructor of
-      {!Gitlab_ci.Types.config_element} generating a [stages:]
-      element. *)
-  val to_string_list : unit -> string list
 end
 
 (** A facility for registering pipelines. *)
@@ -91,9 +81,7 @@ module Pipeline : sig
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
 
       The [jobs] of the pipeline are generated to the file
-      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. To
-      construct a configuration using registered pipelines, see
-      {!workflow_includes}. *)
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     jobs:tezos_job list ->
@@ -101,18 +89,48 @@ module Pipeline : sig
     Gitlab_ci.If.t ->
     unit
 
-  (** Splits the set of registered pipelines into workflow rules and includes.
+  (** A child pipeline.
 
-      The result of this function is used in the top-level
-      [.gitlab-ci.yml] to filter pipelines (using [workflow:] rules)
-      and to include the select pipeline (using [include:]). *)
-  val workflow_includes :
-    unit -> Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list
+      See {!register_child} and {!trigger_job} for more information. *)
+  type child_pipeline
+
+  (** Register a child pipeline.
+
+      [register_child name] will register a child pipeline called [name].
+
+      The [jobs] of the pipeline are generated to the file
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called.
+
+      Child pipelines cannot be launched without a trigger job that is
+      included in a regular pipeline (see {!trigger_job}). *)
+  val register_child : jobs:tezos_job list -> string -> child_pipeline
 
   (** Writes the set of registered pipelines.
 
+      A top-level configuration is generated to [filename]. It
+      contains a [workflow:] section that enables pipeline execution
+      for each registered, non-child pipeline and an [include:]
+      section that includes the set of jobs for the given pipeline. If
+      specified, [default:] and [variables:] sections are also written
+      to the top-level configuration. The [stages:] section
+      automatically contains all the stages registered with
+      {!Stage.register} that are used in the given pipeline.
+
+      A [dummy_job] is written to the top-level configuration. This
+      job is never enabled, but it works around a GitLab CI issue that
+      occurs when the top-level configuration contains no visible
+      jobs.
+
+      Then, each registered pipeline is written to
+      [.gitlab/ci/pipelines/NAME.yml].
+
       The string {!header} will be prepended to each written file. *)
-  val write : unit -> unit
+  val write :
+    ?default:Gitlab_ci.Types.default ->
+    ?variables:Gitlab_ci.Types.variables ->
+    filename:string ->
+    unit ->
+    unit
 end
 
 (** A facility for registering images for [image:] keywords. *)
@@ -255,6 +273,17 @@ val job :
   stage:Stage.t ->
   name:string ->
   string list ->
+  tezos_job
+
+(** Define a trigger job for a child pipeline.
+
+    The trigger job will be named [trigger:CHILD_PIPELINE_NAME]. *)
+val trigger_job :
+  ?dependencies:dependencies ->
+  ?rules:Gitlab_ci.Types.job_rule list ->
+  __POS__:string * int * int * int ->
+  stage:Stage.t ->
+  Pipeline.child_pipeline ->
   tezos_job
 
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.

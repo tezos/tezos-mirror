@@ -1,6 +1,12 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
+stages:
+- build
+- prepare_release
+- publish_release_gitlab
+- publish_release
+
 oc.build:static-x86_64-linux-binaries:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: build

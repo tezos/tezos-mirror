@@ -50,4 +50,10 @@ val has_mr_label : string -> If.t
 val assigned_to_marge_bot : If.t
 
 (** A rule that is true if [CI_USER_LOGIN] equals [nomadic-margebot]. *)
-val triggered_by_marge_bot : If.t
+val started_by_marge_bot : If.t
+
+(** A rule that is never true. *)
+val never : If.t
+
+(** A rule that is always true. *)
+val always : If.t

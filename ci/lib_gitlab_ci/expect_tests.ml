@@ -44,12 +44,14 @@ let%expect_test _ =
           {local = "bar"; rules = [Util.include_rule ~changes:["src/**/*"] ()]};
         ];
       Variables [("k1", "v"); ("k2", "vv")];
-      Types.Job
-        (Util.job
-           ~stage:"first"
-           ~name:"jobbbbbbb"
-           ~script:["rm -rf /"; "echo it is all gone now"]
-           ());
+      Types.(
+        Generic_job
+          (Job
+             (Util.job
+                ~stage:"first"
+                ~name:"jobbbbbbb"
+                ~script:["rm -rf /"; "echo it is all gone now"]
+                ())));
     ] ;
   [%expect
     {|

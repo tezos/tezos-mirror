@@ -59,6 +59,11 @@ let enc_when_job : when_job -> value = function
   | On_success -> `String "on_success"
   | Manual -> `String "manual"
 
+let enc_when_trigger_job : when_trigger_job -> value = function
+  | Always -> `String "always"
+  | On_success -> `String "on_success"
+  | On_failure -> `String "on_failure"
+
 let enc_workflow_rule : workflow_rule -> value =
  fun {changes; if_; variables; when_} ->
   obj_flatten
@@ -255,6 +260,20 @@ let enc_job : job -> value =
       opt "parallel" enc_parallel parallel;
     ]
 
+let enc_trigger_job : trigger_job -> value =
+  let enc_trigger_include trigger_include =
+    `O [("include", `String trigger_include)]
+  in
+  fun {name = _; stage; when_; rules; needs; trigger_include} ->
+    obj_flatten
+      [
+        opt "stage" string stage;
+        opt "rules" enc_job_rules rules;
+        opt "needs" enc_needs needs;
+        opt "when" enc_when_trigger_job when_;
+        key "trigger" enc_trigger_include trigger_include;
+      ]
+
 let enc_includes : include_ list -> value =
  fun includes ->
   let enc_includes ({local; rules} : include_) =
@@ -273,7 +292,8 @@ let config_element : config_element -> (string * value) option = function
   | Stages ss -> Some ("stages", enc_stages ss)
   | Variables vars -> Some ("variables", enc_variables vars)
   | Default def -> Some ("default", enc_default def)
-  | Job j -> Some (j.name, enc_job j)
+  | Generic_job (Job j) -> Some (j.name, enc_job j)
+  | Generic_job (Trigger_job j) -> Some (j.name, enc_trigger_job j)
   | Include i -> Some ("include", enc_includes i)
   | Comment _ -> None
 
