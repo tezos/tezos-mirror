@@ -434,7 +434,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       kernel_root_hash = root_hash;
     }
 
-let register_test ~title ~tags ?additional_config ?admin ?uses
+let register_test ~title ~tags ?kernel ?additional_config ?admin ?uses
     ?commitment_period ?challenge_window ?bootstrap_accounts ?whitelist
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?rollup_operator_key
     ?maximum_allowed_ticks ~setup_mode f =
@@ -462,6 +462,7 @@ let register_test ~title ~tags ?additional_config ?admin ?uses
     (fun protocol ->
       let* evm_setup =
         setup_evm_kernel
+          ?kernel_installee:kernel
           ?additional_config
           ?whitelist
           ?commitment_period
@@ -477,12 +478,13 @@ let register_test ~title ~tags ?additional_config ?admin ?uses
       in
       f ~protocol ~evm_setup)
 
-let register_proxy ~title ~tags ?uses ?admin ?commitment_period
+let register_proxy ~title ~tags ?kernel ?uses ?admin ?commitment_period
     ?challenge_window ?bootstrap_accounts ?minimum_base_fee_per_gas
     ?maximum_allowed_ticks f protocols =
   register_test
     ~title
     ~tags
+    ?kernel
     ?uses
     ?admin
     ?commitment_period
@@ -494,7 +496,7 @@ let register_proxy ~title ~tags ?uses ?admin ?commitment_period
     protocols
     ~setup_mode:(Setup_proxy {devmode = true})
 
-let register_sequencer ~title ~tags ?uses ?additional_config ?admin
+let register_sequencer ~title ~tags ?kernel ?uses ?additional_config ?admin
     ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks f protocols =
@@ -502,6 +504,7 @@ let register_sequencer ~title ~tags ?uses ?additional_config ?admin
     register_test
       ~title
       ~tags
+      ?kernel
       ?uses
       ?additional_config
       ?admin
@@ -521,7 +524,7 @@ let register_sequencer ~title ~tags ?uses ?additional_config ?admin
       (Setup_sequencer
          {time_between_blocks; sequencer = Constant.bootstrap1; devmode = true})
 
-let register_both ~title ~tags ?uses ?additional_config ?admin
+let register_both ~title ~tags ?kernel ?uses ?additional_config ?admin
     ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks f protocols =
@@ -529,6 +532,7 @@ let register_both ~title ~tags ?uses ?additional_config ?admin
     register_test
       ~title
       ~tags
+      ?kernel
       ?uses
       ?additional_config
       ?admin
@@ -5617,6 +5621,34 @@ let test_unsupported_rpc =
     ~error_msg:"Expected unsupported method error." ;
   unit
 
+let test_validation_with_legacy_encoding =
+  register_both
+    ~title:"Transaction pool can read the legacy encodings of the validation"
+    ~tags:["evm"; "txpool"; "validation"; "legacy"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.ghostnet_evm_kernel;
+      ])
+    ~kernel:Constant.WASM.ghostnet_evm_kernel
+  @@ fun ~protocol:_ ~evm_setup ->
+  let* tx_hash =
+    send
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~receiver:Eth_account.bootstrap_accounts.(1)
+      ~value:Wei.one_eth
+      evm_setup
+  in
+  let* receipt = Rpc.get_transaction_receipt ~tx_hash evm_setup.evm_node in
+  match receipt with
+  | Ok _ -> unit
+  | Error _ ->
+      Test.fail
+        "The transaction should have been included, meaning the validation \
+         failed."
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5720,7 +5752,8 @@ let register_evm_node ~protocols =
   test_whitelist_is_executed protocols ;
   test_rpc_maxPriorityFeePerGas protocols ;
   test_proxy_read_only protocols ;
-  test_unsupported_rpc protocols
+  test_unsupported_rpc protocols ;
+  test_validation_with_legacy_encoding protocols
 
 let protocols = Protocol.all
 
