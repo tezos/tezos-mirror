@@ -218,14 +218,14 @@ let cost_ENCODING_BLS_G2 = S.safe_int 3900
 let cost_ENCODING_CHAIN_ID = S.safe_int 50
 
 (* model encoding/ENCODING_Chest *)
-(* fun size -> max 10 (6250. + (0.09375 * size)) *)
+(* fun size -> max 10 (3212. + (0.06577428255 * size)) *)
 let cost_ENCODING_Chest size =
   let size = S.safe_int size in
-  (size lsr 4) + (size lsr 5) + S.safe_int 6250
+  (size lsr 4) + (size lsr 8) + S.safe_int 3215
 
 (* model encoding/ENCODING_Chest_key *)
-(* max 10 15900. *)
-let cost_ENCODING_Chest_key = S.safe_int 15900
+(* max 10 7838. *)
+let cost_ENCODING_Chest_key = S.safe_int 7840
 
 (* model encoding/ENCODING_PUBLIC_KEY_HASH_bls *)
 (* max 10 80. *)
@@ -629,13 +629,12 @@ let cost_N_IBalance_synthesized = S.safe_int 15
 (* model interpreter/N_IBig_map_get *)
 (* fun size1 ->
      fun size2 ->
-       max 10
-         (822.930542675 + (2.84341564432 * (size1 * (log2 (1 + size2))))) *)
+       max 10 (822.930542675 + (1.361047057 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_get size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
+  w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
 
 (* model interpreter/N_IBig_map_get_alloc *)
 (* fun size1 -> fun size2 -> max 10 0. *)
@@ -644,13 +643,12 @@ let cost_N_IBig_map_get_alloc _size1 _size2 = S.safe_int 10
 (* model interpreter/N_IBig_map_get_and_update *)
 (* fun size1 ->
      fun size2 ->
-       max 10
-         (834.633876008 + (2.84264684858 * (size1 * (log2 (1 + size2))))) *)
+       max 10 (834.633876008 + (1.36181731 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_get_and_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 835
+  w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 835
 
 (* model interpreter/N_IBig_map_get_and_update_alloc *)
 (* fun size1 ->
@@ -664,8 +662,7 @@ let cost_N_IBig_map_get_and_update_alloc _size1 size2 =
 (* model interpreter/N_IBig_map_get_and_update_synthesized *)
 (* fun size1 ->
      fun size2 ->
-       let time =
-         834.633876008 + (2.84264684858 * (size1 * (log2 (1 + size2)))) in
+       let time = 834.633876008 + (1.36181731 * (size1 * (log2 (1 + size2)))) in
        let alloc = (25.084669453 * (log2 (1 + size2))) + 178.035218425 in
        max 10 (max time alloc) *)
 let cost_N_IBig_map_get_and_update_synthesized size1 size2 =
@@ -674,30 +671,30 @@ let cost_N_IBig_map_get_and_update_synthesized size1 size2 =
   let w1 = log2 (size2 + S.safe_int 1) in
   let w3 = w1 * size1 in
   S.max
-    ((w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 835)
+    (w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 835)
     ((w1 * S.safe_int 25) + (w1 lsr 1) + S.safe_int 180)
 
 (* model interpreter/N_IBig_map_get_synthesized *)
 (* fun size1 ->
      fun size2 ->
        let time =
-         822.930542675 + (2.84341564432 * (size1 * (log2 (1 + size2)))) in
+         822.930542675 + (1.361047057 * (size1 * (log2 (1 + size2)))) in
        let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IBig_map_get_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
+  w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
 
 (* model interpreter/N_IBig_map_mem *)
 (* fun size1 ->
      fun size2 ->
-       max 10 (824.703876008 + (2.8436528598 * (size1 * (log2 (1 + size2))))) *)
+       max 10 (824.703876008 + (1.3618848 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_mem size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
+  w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
 
 (* model interpreter/N_IBig_map_mem_alloc *)
 (* fun size1 -> fun size2 -> max 10 0. *)
@@ -706,25 +703,23 @@ let cost_N_IBig_map_mem_alloc _size1 _size2 = S.safe_int 10
 (* model interpreter/N_IBig_map_mem_synthesized *)
 (* fun size1 ->
      fun size2 ->
-       let time =
-         824.703876008 + (2.8436528598 * (size1 * (log2 (1 + size2)))) in
+       let time = 824.703876008 + (1.3618848 * (size1 * (log2 (1 + size2)))) in
        let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IBig_map_mem_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
+  w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
 
 (* model interpreter/N_IBig_map_update *)
 (* fun size1 ->
      fun size2 ->
-       max 10
-         (816.020542675 + (3.16181279998 * (size1 * (log2 (1 + size2))))) *)
+       max 10 (816.020542675 + (1.362228839 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 * S.safe_int 3) + (w3 lsr 3) + (w3 lsr 4) + S.safe_int 820
+  w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 820
 
 (* model interpreter/N_IBig_map_update_alloc *)
 (* fun size1 ->
@@ -739,7 +734,7 @@ let cost_N_IBig_map_update_alloc _size1 size2 =
 (* fun size1 ->
      fun size2 ->
        let time =
-         816.020542675 + (3.16181279998 * (size1 * (log2 (1 + size2)))) in
+         816.020542675 + (1.362228839 * (size1 * (log2 (1 + size2)))) in
        let alloc = (25.084669453 * (log2 (1 + size2))) + 166.035218425 in
        max 10 (max time alloc) *)
 let cost_N_IBig_map_update_synthesized size1 size2 =
@@ -748,7 +743,7 @@ let cost_N_IBig_map_update_synthesized size1 size2 =
   let w1 = log2 (size2 + S.safe_int 1) in
   let w3 = w1 * size1 in
   S.max
-    ((w3 * S.safe_int 3) + (w3 lsr 3) + (w3 lsr 4) + S.safe_int 820)
+    (w3 + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 820)
     ((w1 * S.safe_int 25) + (w1 lsr 1) + S.safe_int 170)
 
 (* model interpreter/N_IBlake2b *)
