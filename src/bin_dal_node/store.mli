@@ -68,32 +68,31 @@ module Slots : sig
 
   type t
 
-  (** [add_slot_by_commitment store ~slot_size slot_content commitment]
+  (** [add_slot store ~slot_size slot_content commitment]
       adds a mapping from the given commitment to the given slot
       content. *)
-  val add_slot_by_commitment :
+  val add_slot :
     t ->
     slot_size:int ->
     bytes ->
     commitment ->
     (unit, [> Errors.other]) result Lwt.t
 
-  (** [exists_slot_by_commitment store ~slot_size commitment] returns
+  (** [exists_slot store ~slot_size commitment] returns
       true IFF a slot is associated to the given commitment. *)
-  val exists_slot_by_commitment :
+  val exists_slot :
     t -> slot_size:int -> commitment -> (bool, [> Errors.other]) result Lwt.t
 
-  (** [find_slot_by_commitment store ~slot_size commitment] returns
+  (** [find_slot store ~slot_size commitment] returns
       the slot associated to some commitment or [Error `Not_found] if
       no slot is associated. *)
-  val find_slot_by_commitment :
+  val find_slot :
     t ->
     slot_size:int ->
     commitment ->
     (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 
-  val remove_slot_by_commitment :
-    t -> slot_size:int -> commitment -> unit tzresult Lwt.t
+  val remove_slot : t -> slot_size:int -> commitment -> unit tzresult Lwt.t
 end
 
 module Commitment_indexed_cache : sig

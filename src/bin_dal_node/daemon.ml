@@ -350,7 +350,7 @@ module Handler = struct
         let* () = Store.Shards.remove store.shards slot_id in
         let*! () = Event.(emit removed_slot commitment) in
         let* () =
-          Store.Slots.remove_slot_by_commitment
+          Store.Slots.remove_slot
             store.slots
             ~slot_size:proto_parameters.cryptobox_parameters.slot_size
             commitment

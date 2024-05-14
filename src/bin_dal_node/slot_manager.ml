@@ -188,13 +188,7 @@ let get_slot_content_from_shards cryptobox store slot_id commitment =
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () =
-    Store.Slots.add_slot_by_commitment
-      store.Store.slots
-      ~slot_size
-      slot
-      commitment
-  in
+  let* () = Store.Slots.add_slot store.Store.slots ~slot_size slot commitment in
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
@@ -203,7 +197,7 @@ let get_slot ~reconstruct_if_missing cryptobox store slot_id commitment =
   (* First attempt to get the slot from the slot store. *)
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
-    Store.Slots.find_slot_by_commitment store.Store.slots ~slot_size commitment
+    Store.Slots.find_slot store.Store.slots ~slot_size commitment
   in
   match res_slot_store with
   | Ok slot -> return slot
@@ -393,11 +387,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
       in
       let* () =
         let* exists =
-          Store.(
-            Slots.exists_slot_by_commitment
-              node_store.slots
-              ~slot_size
-              commitment)
+          Store.(Slots.exists_slot node_store.slots ~slot_size commitment)
           |> Errors.to_tzresult
         in
         let* () =
@@ -409,11 +399,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
                 commitment
             with
             | Some slot ->
-                Store.Slots.add_slot_by_commitment
-                  ~slot_size
-                  node_store.slots
-                  slot
-                  commitment
+                Store.Slots.add_slot ~slot_size node_store.slots slot commitment
                 |> Errors.to_tzresult
             | None -> return_unit
         in
