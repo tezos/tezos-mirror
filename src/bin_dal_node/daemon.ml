@@ -342,10 +342,15 @@ module Handler = struct
         (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
     in
     List.iter_es
-      (fun (commitment, slot_id) ->
-        let*! () = Event.(emit removed_slot_shards commitment) in
+      (fun (_commitment, (slot_id : Types.slot_id)) ->
+        let*! () =
+          Event.(
+            emit removed_slot_shards (slot_id.slot_level, slot_id.slot_index))
+        in
         let* () = Store.Shards.remove store.shards slot_id in
-        let*! () = Event.(emit removed_slot commitment) in
+        let*! () =
+          Event.(emit removed_slot (slot_id.slot_level, slot_id.slot_index))
+        in
         let* () =
           Store.Slots.remove_slot
             store.slots
