@@ -5,9 +5,11 @@
 ### Features
 
 - Support daily log files for the observer mode (!13101).
-- The RPC `eth_getBalance`, `eth_getCode`, `eth_getTransactionCount`
-  and `eth_getStorageAt` support the default block parameter (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block).
-  (!13039, !13056, !13058, !13124)
+- The RPC `eth_getBalance`, `eth_getCode`, `eth_getTransactionCount` and
+  `eth_getStorageAt` support the default block parameter
+  (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block).
+  (!13039, !13056, !13058, !13124) For now, the `latest` block is used when
+  `pending` is requested (except for `eth_getTransactionCount`). (!13298)
 - Support partially https://eips.ethereum.org/EIPS/eip-1898, the
   `requireCanonical` field is not yet supported. (!12345)
 - The RPC `eth_call` supports the default block parameter

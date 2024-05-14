@@ -1211,12 +1211,10 @@ let head_info () =
 let find_evm_state block =
   let open Lwt_result_syntax in
   match block with
-  | Ethereum_types.Block_parameter.Block_parameter Latest ->
+  | Ethereum_types.Block_parameter.Block_parameter (Latest | Pending) ->
       let*! {evm_state; _} = head_info () in
       return_some evm_state
   | Block_parameter Earliest -> worker_wait_for_request Earliest_state
-  | Block_parameter Pending ->
-      failwith "Block parameter pending is not supported"
   | Block_parameter (Number number) ->
       worker_wait_for_request (Evm_state_after (Number number))
   | Block_hash {hash; require_canonical = _} ->
@@ -1307,7 +1305,7 @@ let block_param_to_block_number
   let open Lwt_result_syntax in
   match block_param with
   | Block_parameter (Number n) -> return n
-  | Block_parameter Latest ->
+  | Block_parameter (Latest | Pending) ->
       let*! {next_blueprint_number = Qty next_number; _} = head_info () in
       return Ethereum_types.(Qty Z.(pred next_number))
   | Block_parameter Earliest -> (
@@ -1315,8 +1313,6 @@ let block_param_to_block_number
       match res with
       | Some res -> return res
       | None -> failwith "The EVM node does not have any state available")
-  | Block_parameter Pending ->
-      failwith "Pending block parameter is not supported"
   | Block_hash {hash; _} -> (
       let*! head_info = head_info () in
       let*! bytes =
