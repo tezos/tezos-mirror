@@ -51,19 +51,24 @@ module Cli = struct
 end
 
 module Stage = struct
-  type t = Stage of string
+  type t = Stage of {name : string; index : int}
 
   let stages : t list ref = ref []
 
   let register name =
-    let stage = Stage name in
-    if List.mem stage !stages then
-      failwith "[Stage.register] attempted to register stage %S twice" name
+    let stage = Stage {name; index = List.length !stages} in
+    if
+      List.exists
+        (fun (Stage {name = name'; index = _}) -> name' = name)
+        !stages
+    then failwith "[Stage.register] attempted to register stage %S twice" name
     else (
       stages := stage :: !stages ;
       stage)
 
-  let name (Stage name) = name
+  let name (Stage {name; index = _}) = name
+
+  let index (Stage {name = _; index}) = index
 
   let to_string_list () = List.map name (List.rev !stages)
 end
@@ -171,7 +176,8 @@ module Pipeline = struct
             failwith "[%s] the job '%s' is included twice" pipeline_name name)
       jobs ;
     (* Check usage of [needs:] & [depends:] *)
-    Fun.flip List.iter jobs @@ fun {job; _} ->
+    Fun.flip List.iter jobs @@ fun tezos_job ->
+    let job = tezos_job.job in
     let job_name = name_of_generic_job job in
     (* Get the [needs:] / [dependencies:] of job *)
     let needs =
@@ -234,26 +240,14 @@ module Pipeline = struct
     | None ->
         (* If the job has no needs, then it suffices that the dependency is in
            an anterior stage. *)
-        let stage_index =
-          let stage_names = Stage.to_string_list () in
-          fun stage_opt ->
-            let stage = Option.value ~default:"test" stage_opt in
-            List.assoc_opt
-              stage
-              (List.combine stage_names (range 1 (List.length stage_names)))
-        in
         String_set.iter
           (fun dependency ->
             (* We use [find] instead of [find_opt] *)
-            let dependency_job = (Hashtbl.find job_by_name dependency).job in
-            let stage (job : Gitlab_ci.Types.generic_job) =
-              match job with Trigger_job {stage; _} | Job {stage; _} -> stage
-            in
-            if stage_index (stage dependency_job) >= stage_index (stage job)
-            then
+            let dependency_job = Hashtbl.find job_by_name dependency in
+            if Stage.(index dependency_job.stage >= index tezos_job.stage) then
               failwith
                 "[%s] the job '%s' has a [dependency:] on '%s' which is not in \
-                 a anterior stage."
+                 an anterior stage."
                 pipeline_name
                 job_name
                 dependency)
