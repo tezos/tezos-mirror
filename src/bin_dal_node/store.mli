@@ -177,10 +177,10 @@ module Legacy : sig
     t ->
     unit Lwt.t
 
-  (** [get_commitment_by_published_level_and_index ~level ~slot_index
-      store] returns the commitment associated to the given slot
-      identifier in the bidirectional mapping. *)
-  val get_commitment_by_published_level_and_index :
+  (** [get_slot_commitment ~level ~slot_index store] returns the
+      commitment associated to the given slot identifier in the
+      bidirectional mapping. *)
+  val get_slot_commitment :
     level:int32 ->
     slot_index:int ->
     t ->

@@ -27,13 +27,14 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-let call_handler1 ctxt handler = handler (Node_context.get_store ctxt)
+let call_handler1 ctxt handler =
+  handler (Node_context.get_store ctxt) |> Errors.to_option_tzresult
 
 let call_handler2 ctxt handler =
   let open Lwt_result_syntax in
   let*? ready_ctxt = Node_context.get_ready ctxt in
   let store = Node_context.get_store ctxt in
-  handler store ready_ctxt
+  handler store ready_ctxt |> Errors.to_option_tzresult
 
 type error +=
   | Cryptobox_error of string * string
@@ -75,8 +76,11 @@ module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_content store cryptobox slot_id
-        |> Errors.to_option_tzresult)
+        Slot_manager.get_slot_content
+          ~reconstruct_if_missing:true
+          store
+          cryptobox
+          slot_id)
 
   (* This function assumes the slot is valid since we already have
      computed a commitment for it. *)
@@ -86,7 +90,7 @@ module Slots_handlers = struct
     | Error (`Slot_wrong_size msg) ->
         (* Storage consistency ensures we can always compute the
            polynomial from the slot. But let's returne an errror to be defensive. *)
-        tzfail (Cryptobox_error ("polynomial_from_slot", msg))
+        Error (Errors.other [Cryptobox_error ("polynomial_from_slot", msg)])
     | Ok polynomial -> (
         match Cryptobox.prove_commitment cryptobox polynomial with
         (* [polynomial] was produced with the parameters from
@@ -95,32 +99,35 @@ module Slots_handlers = struct
         | Error
             ( `Invalid_degree_strictly_less_than_expected _
             | `Prover_SRS_not_loaded ) ->
-            tzfail
-              (Cryptobox_error
-                 ( "prove_commitment",
-                   "Unexpected error. Maybe an issue with the SRS from the DAL \
-                    node." ))
+            Error
+              (Errors.other
+                 [
+                   Cryptobox_error
+                     ( "prove_commitment",
+                       "Unexpected error. Maybe an issue with the SRS from the \
+                        DAL node." );
+                 ])
         | Ok proof -> return proof)
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
+        let* content =
+          Slot_manager.get_slot_content
+            ~reconstruct_if_missing:true
+            store
+            cryptobox
+            slot_id
+        in
         let*! proof =
-          let* content =
-            Slot_manager.get_slot_content store cryptobox slot_id
-          in
           let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
           let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in
           return proof
         in
         match proof with
-        | (Ok _ | Error (`Not_found | `Other _)) as proof ->
-            Lwt.return proof |> Errors.to_option_tzresult
-        | Error
-            (( `Fail _ | `Page_index_out_of_range | `Slot_wrong_size _
-             | `Invalid_degree_strictly_less_than_expected _
-             | `Prover_SRS_not_loaded ) as e) ->
+        | Ok proof -> return proof
+        | Error e ->
             let msg =
               match e with
               | `Fail s -> "Fail " ^ s
@@ -130,7 +137,7 @@ module Slots_handlers = struct
                 | `Prover_SRS_not_loaded ) as commit_error ->
                   Cryptobox.string_of_commit_error commit_error
             in
-            tzfail (Cryptobox_error ("get_slot_page_proof", msg)))
+            fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 
   let post_slot ctxt query slot =
     call_handler2
@@ -142,59 +149,49 @@ module Slots_handlers = struct
         let slot_length = String.length slot in
         let*? slot =
           if slot_length > slot_size then
-            Result_syntax.tzfail
-              (Post_slot_too_large {expected = slot_size; got = slot_length})
+            Error
+              (Errors.other
+                 [Post_slot_too_large {expected = slot_size; got = slot_length}])
           else if slot_length = slot_size then Ok (Bytes.of_string slot)
           else
             let padding = String.make (slot_size - slot_length) query#padding in
             Ok (Bytes.of_string (slot ^ padding))
         in
-        let* commitment =
-          Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult
-        in
+        let* commitment = Slot_manager.add_slot store slot cryptobox in
         let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
-        (* Cannot return None *)
-        let* (_ : unit option) =
+        let* () =
           Slot_manager.add_commitment_shards
             ~shards_proofs_precomputation
             store
             cryptobox
             commitment
             ~with_proof:true
-          |> Errors.to_option_tzresult
         in
         return (commitment, commitment_proof))
 
-  let get_commitment_by_published_level_and_index ctxt level slot_index () () =
+  let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
-        Slot_manager.get_commitment_by_published_level_and_index
-          ~level
-          ~slot_index
-          store
-        |> Errors.to_option_tzresult)
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        Slot_manager.get_slot_commitment slot_id store)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_status ~slot_id store |> Errors.to_option_tzresult)
+        Slot_manager.get_slot_status ~slot_id store)
 
   let get_slot_shard ctxt slot_level slot_index shard_index () () =
     call_handler1 ctxt (fun node_store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_shard node_store slot_id shard_index
-        |> Errors.to_option_tzresult)
+        Slot_manager.get_slot_shard node_store slot_id shard_index)
 
-  let handle_slot_pages ctxt (((), level), slot_index) () () =
+  let get_slot_pages ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
-        (let open Lwt_result_syntax in
-        let* commitment =
-          Slot_manager.get_commitment_by_published_level_and_index
-            ~level
-            ~slot_index
-            node_store
-        in
-        Slot_manager.get_slot_pages cryptobox node_store commitment)
-        |> Errors.to_option_tzresult)
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        Slot_manager.get_slot_pages
+          ~reconstruct_if_missing:true
+          cryptobox
+          node_store
+          slot_id)
 end
 
 module Profile_handlers = struct
@@ -209,7 +206,7 @@ module Profile_handlers = struct
             gs_worker
             operator_profiles
         with
-        | None -> fail Errors.[Profile_incompatibility]
+        | None -> fail @@ Errors.(other [Profile_incompatibility])
         | Some pctxt ->
             let*! () = Node_context.set_profile_ctxt ctxt pctxt in
             return_unit)
@@ -238,12 +235,10 @@ module Profile_handlers = struct
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
         let are_shards_stored slot_index =
-          let*! r =
-            Slot_manager.get_commitment_by_published_level_and_index
-              ~level:published_level
-              ~slot_index
-              store
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
           in
+          let*! r = Slot_manager.get_slot_commitment slot_id store in
           let open Errors in
           match r with
           | Error `Not_found -> return_false
@@ -266,7 +261,7 @@ module Profile_handlers = struct
            at [attested_level - 1], because the (DAL) attestations in the blocks
            at level [attested_level] refer to the predecessor level. *)
         let attestation_level = Int32.pred attested_level in
-        (let open Lwt_result_syntax in
+        let open Lwt_result_syntax in
         let* shard_indices =
           Node_context.fetch_assigned_shard_indices
             ctxt
@@ -279,7 +274,6 @@ module Profile_handlers = struct
           store
           proto_parameters
           ~attested_level)
-        |> Errors.to_tzresult)
 end
 
 let version ctxt () () =
@@ -357,7 +351,7 @@ let register :
  fun ctxt directory ->
   directory
   |> add_service
-       Tezos_rpc.Directory.register0
+       Tezos_rpc.Directory.opt_register0
        Services.post_slot
        (Slots_handlers.post_slot ctxt)
   |> add_service
@@ -370,10 +364,10 @@ let register :
        (Slots_handlers.get_slot_page_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
-       Services.get_commitment_by_published_level_and_index
-       (Slots_handlers.get_commitment_by_published_level_and_index ctxt)
+       Services.get_slot_commitment
+       (Slots_handlers.get_slot_commitment ctxt)
   |> add_service
-       Tezos_rpc.Directory.register0
+       Tezos_rpc.Directory.opt_register0
        Services.patch_profiles
        (Profile_handlers.patch_profiles ctxt)
   |> add_service
@@ -389,13 +383,13 @@ let register :
        Services.get_assigned_shard_indices
        (Profile_handlers.get_assigned_shard_indices ctxt)
   |> add_service
-       Tezos_rpc.Directory.register2
+       Tezos_rpc.Directory.opt_register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
   |> add_service
-       Tezos_rpc.Directory.opt_register
+       Tezos_rpc.Directory.opt_register2
        Services.slot_pages
-       (Slots_handlers.handle_slot_pages ctxt)
+       (Slots_handlers.get_slot_pages ctxt)
   |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
   |> add_service
        Tezos_rpc.Directory.register0

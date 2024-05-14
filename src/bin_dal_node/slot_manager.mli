@@ -38,18 +38,25 @@
 
 type slot = bytes
 
-(** [get_slot_pages] behaves as [get_slot], except that it also
-    splits the slot into pages before returning them.
+(** [get_slot_pages ~reconstruct_if_missing cryptobox store
+    slot_id] fetches from the store the slot corresponding to the
+    given slot id and split it into pages. If the slot is not found
+    in the store and [reconstruct_if_missing] is true, the slot is
+    reconstructed from the stored shards.
 
-    Returns an [Error _] if the length of the slot associated to the
-    [Cryptobox.commitment] is ill-formed. Specifically, when its
-    length is not a multiple of the page-size specified in the
-    [Cryptobox.parameters] argument. *)
+    Returns an [Error _] if:
+    - the slot is not found in the store and [reconstruct_if_missing] is false,
+    - the slot is not found in the store, [reconstruct_if_missing] is
+      true, and too few shards are stored to reconstruct the slot,
+    - the length of the slot associated to the [Cryptobox.commitment]
+      is ill-formed. Specifically, when its length is not a multiple of
+      the page-size specified in the [Cryptobox.parameters] argument. *)
 val get_slot_pages :
+  reconstruct_if_missing:bool ->
   Cryptobox.t ->
   Store.t ->
-  Cryptobox.commitment ->
-  (bytes list, [> Errors.other]) result Lwt.t
+  Types.slot_id ->
+  (bytes list, [> Errors.not_found | Errors.other]) result Lwt.t
 
 (* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
    result. The argument [number_of_needed_shards] is used to cap the
@@ -64,35 +71,43 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | No_prover_SRS
 
-(** [add_commitment node_store slot cryptobox] computes the given [slot]'s
-    commitment and adds the association "commitment -> slot" in the DAL's
-    [node_store] if the commitment is not already bound to some data.
+(** [add_slot node_store slot cryptobox] computes the given [slot]'s
+    commitment and adds the association "commitment -> slot" in the
+    DAL's [node_store] if the commitment is not already bound to some
+    data.
 
     In addition to decoding errors, the function returns an error
     {!ref:Invalid_slot_size} if the [slot]'s size doesn't match the expected
     slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
 *)
-val add_commitment :
+val add_slot :
   Store.t ->
   Cryptobox.slot ->
   Cryptobox.t ->
-  (Cryptobox.commitment, Errors.other) result Lwt.t
+  (Cryptobox.commitment, [> Errors.other]) result Lwt.t
 
-(** [get_slot_content node_store cryptobox slot_id] returns the slot
-    content associated with the given [slot_id] in [node_store].
+(** [get_slot_content ~reconstruct_if_missing node_store cryptobox
+    slot_id] returns the slot content associated with the given
+    [slot_id] in [node_store].
+
+    If the slot is not found in the store and [reconstruct_if_missing]
+    is true, the slot is reconstructed from the stored shards.
 
     In addition to decoding errors, the function returns [`Not_found]
-    if there is no slot content for [slot_id] in [node_store].
+    if there is no slot content for [slot_id] in [node_store] or if
+    [reconstruct_if_missing] is true and not enough shards are stored
+    to reconstruct the slot.
 *)
 val get_slot_content :
+  reconstruct_if_missing:bool ->
   Store.t ->
   Cryptobox.t ->
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
-(** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
-    commitment ~with_proof] registers the shards of the slot whose commitment is
-    given.
+(** [add_commitment_shards ~shards_proofs_precomputation node_store
+    cryptobox commitment ~with_proof] registers the shards of the slot
+    whose commitment is given.
 
     If [with_proof] is true, proofs are generated for the computed
     shards using [shards_proofs_precomputation] and stored in a bounded
@@ -165,7 +180,7 @@ val update_selected_slot_headers_statuses :
   Store.t ->
   unit Lwt.t
 
-(** [get_commitment_by_published_level_and_index ~level ~slot_index node_store]
+(** [get_slot_commitment ~level ~slot_index node_store]
     returns the commitment associated with the accepted slot header of index
     [slot_index] published at level [level]. Returns [Error `Not_found] if no
     such commitment is found in [node_store].
@@ -174,9 +189,8 @@ val update_selected_slot_headers_statuses :
     if there is no commitment for the given [level] and [slot_index] in
     [node_store].
 *)
-val get_commitment_by_published_level_and_index :
-  level:Types.level ->
-  slot_index:Types.slot_index ->
+val get_slot_commitment :
+  Types.slot_id ->
   Store.t ->
   (Cryptobox.commitment, [Errors.other | Errors.not_found]) result Lwt.t
 

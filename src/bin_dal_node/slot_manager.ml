@@ -145,68 +145,58 @@ let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
   let*? polynomial = polynomial_from_shards cryptobox shards in
   return polynomial
 
-let get_slot cryptobox store commitment =
+let get_slot_content_from_shards cryptobox store commitment =
   let open Lwt_result_syntax in
   let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
+  let minimal_number_of_shards = number_of_shards / redundancy_factor in
+  let rec loop acc shard_id remaining =
+    if remaining <= 0 then return acc
+    else if shard_id >= number_of_shards then
+      let provided = minimal_number_of_shards - remaining in
+      fail
+        (Errors.other
+           [Missing_shards {provided; required = minimal_number_of_shards}])
+    else
+      let*! res = Store.Shards.read store.Store.shards commitment shard_id in
+      match res with
+      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
+      | Error _ -> loop acc (shard_id + 1) remaining
+  in
+  let* shards = loop Seq.empty 0 minimal_number_of_shards in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
+  let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
+  (* Store the slot so that next calls don't require a reconstruction. *)
+  let* () =
+    Store.Slots.add_slot_by_commitment
+      store.Store.slots
+      cryptobox
+      slot
+      commitment
+  in
+  let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
+  return slot
+
+let get_slot ~reconstruct_if_missing cryptobox store commitment =
+  let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
-  let*! res =
+  let*! res_slot_store =
     Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
   in
-  match res with
+  match res_slot_store with
   | Ok slot -> return slot
-  | Error (`Not_found | `Other _) ->
-      (* The slot could not be obtained from the slot store, attempt a
-         reconstruction. *)
-      let minimal_number_of_shards = number_of_shards / redundancy_factor in
-      let rec loop acc shard_id remaining =
-        if remaining <= 0 then return acc
-        else if shard_id >= number_of_shards then
-          let provided = minimal_number_of_shards - remaining in
-          fail
-            (Errors.other
-               [Missing_shards {provided; required = minimal_number_of_shards}])
-        else
-          let*! res =
-            Store.Shards.read store.Store.shards commitment shard_id
-          in
-          match res with
-          | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
-          | Error _ -> loop acc (shard_id + 1) remaining
-      in
-      let* shards = loop Seq.empty 0 minimal_number_of_shards in
-      let*? polynomial = polynomial_from_shards cryptobox shards in
-      let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-      (* Store the slot so that next calls don't require a reconstruction. *)
-      let* () =
-        Store.Slots.add_slot_by_commitment
-          store.Store.slots
-          cryptobox
-          slot
-          commitment
-      in
-      let*! () =
-        Event.(emit fetched_slot (Bytes.length slot, Seq.length shards))
-      in
-      return slot
-
-let get_slot_pages cryptobox store commitment =
-  let open Lwt_result_syntax in
-  let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot cryptobox store commitment in
-  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
-     If this is not the case, we throw an `Illformed_pages` error.
-  *)
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
-     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
-  let*? pages =
-    String.chunk_bytes
-      dal_parameters.page_size
-      slot
-      ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
-  in
-  return @@ List.map (fun page -> String.to_bytes page) pages
+  | Error _ ->
+      if reconstruct_if_missing then
+        (* The slot could not be obtained from the slot store, attempt a
+           reconstruction. *)
+        let*! res_shard_store =
+          get_slot_content_from_shards cryptobox store commitment
+        in
+        match res_shard_store with
+        | Ok slot -> return slot
+        | Error _ -> Lwt.return res_slot_store
+      else Lwt.return res_slot_store
 
 (* Used wrapper functions on top of Cryptobox. *)
 
@@ -232,7 +222,7 @@ let commit cryptobox polynomial =
 
 (* Main functions *)
 
-let add_commitment node_store slot cryptobox =
+let add_slot node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let*? commitment = commit cryptobox polynomial in
@@ -251,16 +241,15 @@ let add_commitment node_store slot cryptobox =
   in
   return commitment
 
-let get_commitment_slot node_store cryptobox commitment =
-  Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
-
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof =
   let open Lwt_result_syntax in
-  let* slot = get_commitment_slot node_store cryptobox commitment in
+  let* slot =
+    get_slot ~reconstruct_if_missing:false cryptobox node_store commitment
+  in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  let* () = Store.(Shards.write_all node_store.shards commitment shards) in
+  let* () = Store.Shards.write_all node_store.shards commitment shards in
   if with_proof then
     let*? precomputation =
       match shards_proofs_precomputation with
@@ -415,31 +404,41 @@ let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     attested_slots
     node_store
 
-let get_commitment_by_published_level_and_index ~level ~slot_index node_store =
-  Store.Legacy.get_commitment_by_published_level_and_index
-    ~level
-    ~slot_index
+let get_slot_commitment (slot_id : Types.slot_id) node_store =
+  Store.Legacy.get_slot_commitment
+    ~level:slot_id.slot_level
+    ~slot_index:slot_id.slot_index
     node_store
 
-let get_slot_content node_store cryptobox (slot_id : Types.slot_id) =
+let get_slot_content ~reconstruct_if_missing node_store cryptobox
+    (slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
-  let* commitment =
-    get_commitment_by_published_level_and_index
-      ~level:slot_id.slot_level
-      ~slot_index:slot_id.slot_index
-      node_store
-  in
-  get_commitment_slot node_store cryptobox commitment
+  let* commitment = get_slot_commitment slot_id node_store in
+  get_slot ~reconstruct_if_missing cryptobox node_store commitment
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   let open Lwt_result_syntax in
-  let* commitment =
-    get_commitment_by_published_level_and_index
-      ~level:slot_id.slot_level
-      ~slot_index:slot_id.slot_index
-      store
-  in
+  let* commitment = get_slot_commitment slot_id store in
   Store.Shards.read store.shards commitment shard_index
+
+let get_slot_pages ~reconstruct_if_missing cryptobox store slot_id =
+  let open Lwt_result_syntax in
+  let dal_parameters = Cryptobox.parameters cryptobox in
+  let* slot =
+    get_slot_content ~reconstruct_if_missing store cryptobox slot_id
+  in
+  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
+     If this is not the case, we throw an `Illformed_pages` error.
+  *)
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
+     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
+  let*? pages =
+    String.chunk_bytes
+      dal_parameters.page_size
+      slot
+      ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
+  in
+  return @@ List.map String.to_bytes pages
