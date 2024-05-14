@@ -6,11 +6,11 @@ usage() {
   cat << EOT
 Usage: $0 [image_base [image_tag [docker build args...]]]
 
-Creates the Rust toolchain from image/rust-toolchain/Dockerfile.  The
-built image is tagged with image_base:image_tag. If omitted, they
-default to 'registry.gitlab.com/tezos/tezos/rust-toolchain'
-respectively 'latest'.  Remaining arguments, if any, are passed on to
-'docker build'.
+Creates the Rust toolchain from image/rust-toolchain/Dockerfile. The
+built image is tagged with image_base:image_tag. If these arguments are omitted, then
+the image is tagged
+'us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain:master'.
+Remaining arguments, if any, are passed on to 'docker build'.
 EOT
   exit 1
 }
@@ -27,8 +27,8 @@ if [ $# -gt 0 ]; then
   image_tag="$1"
   shift
 fi
-image_base=${image_base:-registry.gitlab.com/tezos/tezos/rust-toolchain}
-image_tag=${image_tag:-latest}
+image_base=${image_base:-us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain}
+image_tag=${image_tag:-master}
 image_name="${image_base}:${image_tag}"
 
 images_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"

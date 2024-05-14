@@ -1,4 +1,4 @@
-ARG RUST_IMAGE=registry.gitlab.com/tezos/tezos/rust-toolchain
+ARG RUST_IMAGE=us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain
 ARG RUST_TAG=master
 ARG BASE_IMAGE=debian:sid-slim
 
