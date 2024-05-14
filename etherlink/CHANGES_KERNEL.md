@@ -8,6 +8,8 @@
 
 ### Breaking changes
 
+- Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
+
 ### Internal
 
 ## Version b9f6c9138719220db83086f0548e49c5c4c8421f
