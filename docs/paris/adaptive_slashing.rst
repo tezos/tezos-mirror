@@ -133,8 +133,28 @@ Given that slashing occurs with a delay, immediate action at
 denunciation time is necessary upon clear evidence of a baker's
 misbehavior to prevent further misconduct, or to protect the baker
 against their own faulty setup. Any double-signing denunciation
-immediately triggers the beginning of a forbidden period that lasts at
-least 2 cycles, to make sure the slashing occurs before accepting new
-attestations or blocks from the baker. Note that it is still possible
-for one baker to commit multiple double signings, but only if they all
-happen before any corresponding denunciation gets included in a block.
+immediately triggers the beginning of a **forbidden period** that
+lasts at least 2 cycles, to make sure the slashing occurs before
+accepting new attestations or blocks from the baker.
+
+Note that it is still possible for one baker to commit multiple double
+signings, but only if they all happen before any corresponding
+denunciation gets included in a block.
+
+This forbidding is lifted as soon as both following conditions are
+met:
+
+* all pending slashings for the delegate have occurred, and
+
+* the current total frozen stake for the delegate (sum of the
+  :ref:`staking balances<active_stake_paris>` of the delegate itself
+  and its stakers) is at least as high as the :ref:`active
+  stake<active_stake_paris>` that was used ``CONSENSUS_RIGHTS_DELAY``
+  cycles ago to compute the consensus rights for the next cycle.
+
+The second condition may be fulfilled when the delegate and/or stakers
+stake additional funds so that the total frozen stake grows back to
+its pre-slashing value, thus matching the rights computed before the
+slashing. Or it may be fulfilled ``CONSENSUS_RIGHTS_DELAY`` cycles
+after the slashing, when the rights for the next cycle are finally
+based on the post-slashing stake.
