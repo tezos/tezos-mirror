@@ -222,7 +222,7 @@ let dispatch_request (config : Configuration.t)
     | Method (Get_transaction_count.Method, module_) ->
         let f (address, block_param) =
           match block_param with
-          | Ethereum_types.Block_parameter.(Block_parameter Latest) ->
+          | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
               let* nonce = Tx_pool.nonce address in
               rpc_ok nonce
           | _ ->
