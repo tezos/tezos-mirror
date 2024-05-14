@@ -441,4 +441,4 @@ let get_slot_pages ~reconstruct_if_missing cryptobox store slot_id =
       slot
       ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
   in
-  return @@ List.map (fun page -> String.to_bytes page) pages
+  return @@ List.map String.to_bytes pages
