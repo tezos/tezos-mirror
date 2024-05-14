@@ -27,7 +27,7 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
-    next,
+    next, VersionedEncoding,
 };
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
@@ -44,6 +44,9 @@ pub const SIMULATION_CHUNK_TAG: u8 = 3;
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
+
+/// Version of the encoding in use.
+pub const SIMULATION_ENCODING_VERSION: u8 = 0x01;
 
 pub const OK_TAG: u8 = 0x1;
 pub const ERR_TAG: u8 = 0x2;
@@ -600,6 +603,10 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
         }
         _ => Err(Error::InvalidConversion),
     }
+}
+
+impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String> {
+    const VERSION: u8 = SIMULATION_ENCODING_VERSION;
 }
 
 pub fn start_simulation_mode<Host: Runtime>(

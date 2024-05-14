@@ -23,7 +23,7 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
-use tezos_ethereum::rlp_helpers::FromRlpBytes;
+use tezos_ethereum::rlp_helpers::{FromRlpBytes, VersionedEncoding};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt,
 };
@@ -337,11 +337,12 @@ pub fn store_current_block<Host: Runtime>(
         }
     }
 }
-pub fn store_simulation_result<Host: Runtime, T: Encodable>(
+
+pub fn store_simulation_result<Host: Runtime, T: Decodable + Encodable>(
     host: &mut Host,
     result: SimulationResult<T, String>,
 ) -> Result<(), anyhow::Error> {
-    let encoded = result.rlp_bytes();
+    let encoded = result.to_bytes();
     host.store_write(&SIMULATION_RESULT, &encoded, 0)
         .context("Failed to write the simulation result.")
 }
