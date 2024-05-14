@@ -323,7 +323,7 @@ module Handler = struct
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
-    let*! commitments =
+    let*! slot_ids =
       List.filter_map_s
         (fun slot_index ->
           let open Lwt_syntax in
@@ -338,11 +338,11 @@ module Handler = struct
                 Event.(emit decoding_data_failed Types.Store.Commitment)
               in
               return_none
-          | Ok commitment -> return_some (commitment, slot_id))
+          | Ok _commitment -> return_some slot_id)
         (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
     in
     List.iter_es
-      (fun (_commitment, (slot_id : Types.slot_id)) ->
+      (fun (slot_id : Types.slot_id) ->
         let*! () =
           Event.(
             emit removed_slot_shards (slot_id.slot_level, slot_id.slot_index))
@@ -358,7 +358,7 @@ module Handler = struct
             slot_id
         in
         return_unit)
-      commitments
+      slot_ids
 
   let should_store_cells ctxt =
     let profile = Node_context.get_profile_ctxt ctxt in
