@@ -30,12 +30,14 @@ open Alpha_context
 
 type t = B of Block.t | I of Incremental.t
 
-let get_alpha_ctxt ?(policy = Block.By_round 0) c =
+(* Begins the construction of a block with the first available baker.
+   Fails if no baker can bake the next block. *)
+let get_alpha_ctxt c =
   let open Lwt_result_syntax in
   match c with
   | I i -> return (Incremental.alpha_ctxt i)
   | B b ->
-      let* i = Incremental.begin_construction ~policy b in
+      let* i = Incremental.begin_construction ~policy:(Block.Excluding []) b in
       return (Incremental.alpha_ctxt i)
 
 let branch = function B b -> b.hash | I i -> (Incremental.predecessor i).hash
@@ -535,14 +537,11 @@ module Delegate = struct
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
-  let is_forbidden ?policy ctxt pkh =
-    let open Lwt_result_syntax in
-    let* ctxt = get_alpha_ctxt ?policy ctxt in
-    return (Delegate.is_forbidden_delegate ctxt pkh)
+  let is_forbidden ctxt pkh = Plugin.RPC.Staking.is_forbidden rpc_ctxt ctxt pkh
 
-  let stake_for_cycle ?policy ctxt cycle pkh =
+  let stake_for_cycle ctxt cycle pkh =
     let open Lwt_result_wrap_syntax in
-    let* alpha_ctxt = get_alpha_ctxt ?policy ctxt in
+    let* alpha_ctxt = get_alpha_ctxt ctxt in
     let*@ stakes =
       Protocol.Alpha_context.Stake_distribution.Internal_for_tests
       .get_selected_distribution

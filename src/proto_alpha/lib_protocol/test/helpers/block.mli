@@ -44,7 +44,7 @@ val rpc_ctxt : t Environment.RPC_context.simple
 (** Policies to select the next baker:
     - [By_round r] selects the baker at round [r]
     - [By_account pkh] selects the first slot for baker [pkh]
-    - [Excluding pkhs] selects the first baker that doesn't belong to [pkhs]
+    - [Excluding pkhs] selects the first valid baker that doesn't belong to [pkhs]
 
     Note that bakers can have active consensus keys different from
     their regular delegate keys. For the [By_account pkh] policy, [pkh]

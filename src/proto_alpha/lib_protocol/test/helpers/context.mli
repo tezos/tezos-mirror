@@ -31,7 +31,7 @@ open Environment
 
 type t = B of Block.t | I of Incremental.t
 
-val get_alpha_ctxt : ?policy:Block.baker_policy -> t -> context tzresult Lwt.t
+val get_alpha_ctxt : t -> context tzresult Lwt.t
 
 val branch : t -> Block_hash.t
 
@@ -305,17 +305,9 @@ module Delegate : sig
   val participation :
     t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
 
-  (** This function might begin constructing a block. Use [policy] to
-      specify a valid baker for the new block (default [By_round 0]) *)
-  val is_forbidden :
-    ?policy:Block.baker_policy -> t -> public_key_hash -> bool tzresult Lwt.t
+  val is_forbidden : t -> public_key_hash -> bool tzresult Lwt.t
 
-  val stake_for_cycle :
-    ?policy:Block.baker_policy ->
-    t ->
-    Cycle.t ->
-    public_key_hash ->
-    stake tzresult Lwt.t
+  val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t
 end
 
 module Sc_rollup : sig
