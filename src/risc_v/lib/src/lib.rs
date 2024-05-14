@@ -21,7 +21,7 @@ pub mod ocaml_api;
 use crate::{
     machine_state::{
         bus::main_memory::M1G, mode, registers::XRegister, MachineError, MachineState,
-        MachineStateLayout, StepManyResult,
+        StepManyResult,
     },
     program::Program,
     state_backend::{
@@ -32,29 +32,23 @@ use crate::{
 };
 use bits::Bits64;
 use derive_more::{Error, From};
-use exec_env::{
-    posix::{Posix, PosixState},
-    ExecutionEnvironment, ExecutionEnvironmentState,
-};
+use exec_env::{posix::Posix, ExecutionEnvironmentState};
 use machine_state::{
     bus::{Address, Addressable, OutOfBounds},
     csregisters::{satp::TranslationAlgorithm, CSRegister},
     registers::{FRegister, FValue},
     AccessType,
 };
+use pvm::{Pvm, PvmLayout};
 use state_backend::Elem;
 use std::collections::BTreeMap;
 use traps::Exception;
 use InterpreterResult::*;
 
-type StateLayout = (
-    <Posix as ExecutionEnvironment>::Layout,
-    MachineStateLayout<M1G>,
-);
+type PvmStateLayout = PvmLayout<Posix, M1G>;
 
 pub struct Interpreter<'a> {
-    posix_state: PosixState<SliceManager<'a>>,
-    machine_state: MachineState<M1G, SliceManager<'a>>,
+    pvm: Pvm<Posix, M1G, SliceManager<'a>>,
 }
 
 #[derive(Debug)]
@@ -77,38 +71,30 @@ pub enum InterpreterError {
 impl<'a> Interpreter<'a> {
     /// In order to create an [Interpreter], a memory backend must first be generated.
     /// Currently, the size of the main memory to be allocated is fixed at 1GB.
-    pub fn create_backend() -> InMemoryBackend<StateLayout> {
-        InMemoryBackend::<StateLayout>::new().0
+    pub fn create_backend() -> InMemoryBackend<PvmStateLayout> {
+        InMemoryBackend::<PvmStateLayout>::new().0
     }
 
     fn bind_states(
-        backend: &'a mut InMemoryBackend<StateLayout>,
-    ) -> (
-        PosixState<SliceManager<'a>>,
-        MachineState<M1G, SliceManager<'a>>,
-    ) {
-        let alloc = backend.allocate(StateLayout::placed().into_location());
-        let posix_state = PosixState::bind(alloc.0);
-        let machine_state = MachineState::<M1G, SliceManager<'a>>::bind(alloc.1);
-        (posix_state, machine_state)
+        backend: &'a mut InMemoryBackend<PvmStateLayout>,
+    ) -> Pvm<Posix, M1G, SliceManager<'a>> {
+        Pvm::bind(backend.allocate(PvmStateLayout::placed().into_location()))
     }
 
     /// Initialise an interpreter with a given [program], starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     pub fn new(
-        backend: &'a mut InMemoryBackend<StateLayout>,
+        backend: &'a mut InMemoryBackend<PvmStateLayout>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<Self, InterpreterError> {
-        let (mut posix_state, mut machine_state) = Self::bind_states(backend);
-        posix_state.set_exit_mode(mode);
+        let mut pvm = Self::bind_states(backend);
+        pvm.exec_env_state.set_exit_mode(mode);
         let elf_program = Program::<M1G>::from_elf(program)?;
-        machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
-        Ok(Self {
-            posix_state,
-            machine_state,
-        })
+        pvm.machine_state
+            .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
+        Ok(Self { pvm })
     }
 
     fn handle_step_result<F>(
@@ -121,14 +107,18 @@ impl<'a> Interpreter<'a> {
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
         match result.exception {
-            Some(exc) => match self.posix_state.handle_call(&mut self.machine_state, exc) {
+            Some(exc) => match self
+                .pvm
+                .exec_env_state
+                .handle_call(&mut self.pvm.machine_state, exc)
+            {
                 exec_env::EcallOutcome::Fatal => Exception(exc, result.steps),
                 exec_env::EcallOutcome::Handled { continue_eval } => {
                     // Handling the ECall marks the completion of a step
                     result.steps = result.steps.saturating_add(1);
 
                     let steps_left = max.saturating_sub(result.steps);
-                    if let Some(code) = self.posix_state.exit_code() {
+                    if let Some(code) = self.pvm.exec_env_state.exit_code() {
                         Exit {
                             code: code as usize,
                             steps: result.steps,
@@ -160,7 +150,7 @@ impl<'a> Interpreter<'a> {
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let mut result = self.machine_state.step_many(max, &mut should_continue);
+        let mut result = self.pvm.machine_state.step_many(max, &mut should_continue);
         result.steps = result.steps.saturating_add(steps_done);
         self.handle_step_result(result, max, should_continue)
     }
@@ -169,7 +159,7 @@ impl<'a> Interpreter<'a> {
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let result = self.machine_state.step_many(max, &mut should_continue);
+        let result = self.pvm.machine_state.step_many(max, &mut should_continue);
         self.handle_step_result(result, max, should_continue)
     }
 
@@ -177,7 +167,7 @@ impl<'a> Interpreter<'a> {
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let result = self.machine_state.step_some(max, &mut should_continue);
+        let result = self.pvm.machine_state.step_some(max, &mut should_continue);
         self.handle_step_result(result, max, should_continue)
     }
 
@@ -185,31 +175,33 @@ impl<'a> Interpreter<'a> {
         &self,
         access_type: &AccessType,
     ) -> Option<TranslationAlgorithm> {
-        self.machine_state.effective_translation_alg(access_type)
+        self.pvm
+            .machine_state
+            .effective_translation_alg(access_type)
     }
 
     pub fn read_bus<E: Elem>(&self, address: Address) -> Result<E, OutOfBounds> {
-        self.machine_state.bus.read(address)
+        self.pvm.machine_state.bus.read(address)
     }
 
     pub fn read_xregister(&self, reg: XRegister) -> u64 {
-        self.machine_state.hart.xregisters.read(reg)
+        self.pvm.machine_state.hart.xregisters.read(reg)
     }
 
     pub fn read_fregister(&self, reg: FRegister) -> FValue {
-        self.machine_state.hart.fregisters.read(reg)
+        self.pvm.machine_state.hart.fregisters.read(reg)
     }
 
     pub fn read_csregister<V: Bits64>(&self, reg: CSRegister) -> V {
-        self.machine_state.hart.csregisters.read::<V>(reg)
+        self.pvm.machine_state.hart.csregisters.read::<V>(reg)
     }
 
     pub fn read_pc(&self) -> u64 {
-        self.machine_state.hart.pc.read()
+        self.pvm.machine_state.hart.pc.read()
     }
 
     pub fn read_mode(&self) -> mode::Mode {
-        self.machine_state.hart.mode.read()
+        self.pvm.machine_state.hart.mode.read()
     }
 }
 
@@ -219,27 +211,24 @@ impl<'a> Interpreter<'a> {
     /// An initial ramdisk can also optionally be passed. Returns both the interpreter
     /// and the fully parsed program.
     pub fn new_with_parsed_program(
-        backend: &'a mut InMemoryBackend<StateLayout>,
+        backend: &'a mut InMemoryBackend<PvmStateLayout>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(Self, BTreeMap<u64, String>), InterpreterError> {
-        let (mut posix_state, mut machine_state) = Self::bind_states(backend);
-        posix_state.set_exit_mode(mode);
+        let mut pvm = Self::bind_states(backend);
+        pvm.exec_env_state.set_exit_mode(mode);
         let elf_program = Program::<M1G>::from_elf(program)?;
-        machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
-        Ok((
-            Self {
-                posix_state,
-                machine_state,
-            },
-            elf_program.parsed(),
-        ))
+        pvm.machine_state
+            .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
+        Ok((Self { pvm }, elf_program.parsed()))
     }
 
     /// Obtain the translated address of pc.
     pub fn translate_instruction_address(&self, pc: Address) -> Result<Address, Exception> {
-        self.machine_state.translate(pc, AccessType::Instruction)
+        self.pvm
+            .machine_state
+            .translate(pc, AccessType::Instruction)
     }
 }
 

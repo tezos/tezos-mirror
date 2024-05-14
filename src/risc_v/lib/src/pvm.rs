@@ -32,7 +32,7 @@ pub struct Pvm<
     pub(crate) machine_state: machine_state::MachineState<ML, M>,
 
     /// Execution environment state
-    pub syscall_state: EE::State<M>,
+    pub exec_env_state: EE::State<M>,
 }
 
 impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backend::Manager>
@@ -46,7 +46,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
-            syscall_state: EE::State::<M>::bind(space.2),
+            exec_env_state: EE::State::<M>::bind(space.2),
         }
     }
 
@@ -54,7 +54,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     pub fn reset(&mut self) {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
-        self.syscall_state.reset();
+        self.exec_env_state.reset();
     }
 
     /// Provide input. Returns `false` if the machine state is not in
@@ -78,7 +78,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             | EnvironException::EnvCallFromSMode
             | EnvironException::EnvCallFromMMode => {
                 match self
-                    .syscall_state
+                    .exec_env_state
                     .handle_call(&mut self.machine_state, exception)
                 {
                     exec_env::EcallOutcome::Fatal => {
