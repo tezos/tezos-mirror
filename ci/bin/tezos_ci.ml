@@ -1,5 +1,7 @@
 open Gitlab_ci.Util
 
+let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
+
 module Cli = struct
   type config = {
     mutable verbose : bool;
@@ -48,9 +50,28 @@ module Cli = struct
       (sf "Usage: %s [options]\n\nOptions are:" Sys.argv.(0))
 end
 
+module Stage = struct
+  type t = Stage of string
+
+  let stages : t list ref = ref []
+
+  let register name =
+    let stage = Stage name in
+    if List.mem stage !stages then
+      failwith "[Stage.register] attempted to register stage %S twice" name
+    else (
+      stages := stage :: !stages ;
+      stage)
+
+  let name (Stage name) = name
+
+  let to_string_list () = List.map name (List.rev !stages)
+end
+
 type tezos_job = {
   job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
+  stage : Stage.t;
 }
 
 let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
@@ -74,8 +95,6 @@ let tezos_job_to_config_elements (j : tezos_job) =
   in
   source_comment @ [Gitlab_ci.Types.Generic_job j.job]
 
-let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
-
 let header =
   {|# This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
@@ -92,24 +111,6 @@ let to_file ~filename config =
     Gitlab_ci.To_yaml.to_file ~header ~filename config)
 
 let () = Printexc.register_printer @@ function Failure s -> Some s | _ -> None
-
-module Stage = struct
-  type t = Stage of string
-
-  let stages : t list ref = ref []
-
-  let register name =
-    let stage = Stage name in
-    if List.mem stage !stages then
-      failwith "[Stage.register] attempted to register stage %S twice" name
-    else (
-      stages := stage :: !stages ;
-      stage)
-
-  let name (Stage name) = name
-
-  let to_string_list () = List.map name (List.rev !stages)
-end
 
 module Pipeline = struct
   type pipeline = {
@@ -505,7 +506,6 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
              job '%s'."
             name)
   in
-  let stage = Some (Stage.name stage) in
   (match (parallel : Gitlab_ci.Types.parallel option) with
   | Some (Vector n) when n < 2 ->
       failwith
@@ -553,7 +553,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       rules;
       script;
       services;
-      stage;
+      stage = Some (Stage.name stage);
       variables;
       timeout;
       tags;
@@ -563,7 +563,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job = Job job; source_position = __POS__}
+  {job = Job job; source_position = __POS__; stage}
 
 let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
     Pipeline.{name = child_pipeline_name; jobs = _} : tezos_job =
@@ -582,7 +582,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
-  {job = Trigger_job trigger_job; source_position = __POS__}
+  {job = Trigger_job trigger_job; source_position = __POS__; stage}
 
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
