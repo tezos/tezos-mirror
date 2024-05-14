@@ -13,7 +13,7 @@ purge)
   # display a warning before proceding
   db_get octez-node/purge_warning || true
   case "$RET" in
-  "yes, please")
+  "yes")
     rm -Rf "$DATADIR"
     deluser --quiet tezos || true
     delgroup --quiet --only-if-empty tezos || true
@@ -28,6 +28,12 @@ purge)
   # shellcheck disable=SC2119
   db_purge || true
   ;;
+remove)
+  # Purge debconf data for the package
+  # shellcheck disable=SC2119
+  db_purge || true
+  echo "Not purging DATADIR. Run apt purge instead. Octez-node data is intact"
+  ;;
 upgrade)
   # Check if the daemon was running before the upgrade
   if [ -f /var/lib/octez-node/daemon_was_running ] &&
@@ -36,7 +42,7 @@ upgrade)
     systemctl start octez-node.service
   fi
   ;;
-remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
   echo "postrm called with unknown argument \`$1'" >&2
   exit 1
