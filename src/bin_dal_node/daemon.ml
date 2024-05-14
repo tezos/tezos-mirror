@@ -330,15 +330,7 @@ module Handler = struct
           let slot_id : Types.slot_id =
             {slot_level = oldest_level; slot_index}
           in
-          let* result = Slot_manager.get_slot_commitment slot_id store in
-          match result with
-          | Error `Not_found -> return_none
-          | Error (`Other _) ->
-              let*! () =
-                Event.(emit decoding_data_failed Types.Store.Commitment)
-              in
-              return_none
-          | Ok _commitment -> return_some slot_id)
+          return_some slot_id)
         (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
     in
     List.iter_es
