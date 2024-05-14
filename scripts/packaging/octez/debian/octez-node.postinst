@@ -34,10 +34,8 @@ configure)
   no)
     db_get octez-node/network
     NETWORK=${RET}
-    echo "NETWORK=${RET}" >> /etc/default/octez-node
     db_get octez-node/history-mode
     HISTORY_MODE=${RET}
-    echo "HISTORY_MODE=${RET}" >> /etc/default/octez-node
 
     if [ ! -e $DATADIR/config.json ]; then
       su tezos -c "/usr/bin/octez-node config init --data-dir=$DATADIR            --network=\"$NETWORK\" \

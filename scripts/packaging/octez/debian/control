@@ -56,6 +56,7 @@ Depends:
  ${misc:Depends}, ${shlibs:Depends},
  octez-client (= ${source:Version}),
  octez-node (= ${source:Version}),
+ curl
 Recommends: octez-signer (= ${source:Version}),
 Description: Octez baker
  Octez baking software for the Tezos blockchain.

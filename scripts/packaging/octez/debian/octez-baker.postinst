@@ -14,10 +14,12 @@ case "${1}" in
 configure)
 
   db_get octez-baker/liquidity-vote
-  echo "LQVOTE=${RET}" > /etc/default/octez-baker
+  echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
+  echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
 
   db_get octez-baker/baker-key
-  echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
+  echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
+  echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
 
   db_get octez-baker/baker-active-protocol
   echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
