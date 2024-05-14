@@ -274,14 +274,6 @@ val extract_error_message : JSON.t -> JSON.t
     the given contract in the rollup. *)
 val fetch_contract_code : t -> string -> string Lwt.t
 
-(** A slot in the transaction pool associates an address to a mapping of nonces
-    to transactions. *)
-type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
-
-(** [txpool_content evm_node] returns the transaction hash and nonce
-    contained in the `pending` and `queued` pools. *)
-val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
-
 (** [upgrade_payload ~root_hash ~activation_timestamp] gives the
     upgrade payload to put in a upgrade message, it will upgrade to
     [root_hash] at the first block after [activation_timestamp] (in

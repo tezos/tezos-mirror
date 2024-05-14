@@ -1513,7 +1513,7 @@ let test_rpc_txpool_content =
 
   let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
   let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx2 evm_node in
-  let* txpool_pending, txpool_queued = Evm_node.txpool_content evm_node in
+  let*@ txpool_pending, txpool_queued = Rpc.txpool_content evm_node in
   Check.((List.length txpool_pending = 1) int)
     ~error_msg:
       "Expected number of addresses with pending transaction to be %%R, got \
@@ -1599,7 +1599,7 @@ let test_rpc_txpool_content =
       ~s:"0x45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
   in
   let* _level = next_evm_level ~evm_node ~sc_rollup_node ~client in
-  let* txpool_pending, txpool_queued = Evm_node.txpool_content evm_node in
+  let*@ txpool_pending, txpool_queued = Rpc.txpool_content evm_node in
 
   Check.((List.length txpool_pending = 1) int)
     ~error_msg:
