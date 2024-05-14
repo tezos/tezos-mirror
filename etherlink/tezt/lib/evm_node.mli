@@ -48,6 +48,7 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
       bundler_node_endpoint : string;
+      devmode : bool;
     }
   | Sequencer of {
       initial_kernel : string;
