@@ -27,6 +27,7 @@ pub mod handler;
 pub mod precompiles;
 pub mod storage;
 pub mod tick_model_opcodes;
+pub mod trace;
 pub mod transaction;
 pub mod transaction_layer_data;
 pub mod utilities;

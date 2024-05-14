@@ -12,6 +12,7 @@ use crate::simulation::SimulationResult;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use evm_execution::storage::blocks::add_new_block_hash;
+use evm_execution::trace::TracerInput;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -137,6 +138,9 @@ pub const WORD_SIZE: usize = 32usize;
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
 pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
+
+// Path where the input for the tracer is stored by the sequencer.
+const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,
@@ -1062,6 +1066,20 @@ pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u3
             default_min_levels
         );
         Ok(default_min_levels)
+    }
+}
+
+pub fn read_tracer_input<Host: Runtime>(
+    host: &mut Host,
+) -> anyhow::Result<Option<TracerInput>> {
+    if let Some(ValueType::Value) = host.store_has(&TRACER_INPUT).map_err(Error::from)? {
+        let bytes = host
+            .store_read_all(&TRACER_INPUT)
+            .context("Cannot read tracer input")?;
+
+        Ok(Some(FromRlpBytes::from_rlp_bytes(&bytes)?))
+    } else {
+        Ok(None)
     }
 }
 
