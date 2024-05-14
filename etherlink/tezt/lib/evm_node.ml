@@ -40,6 +40,7 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
       bundler_node_endpoint : string;
+      devmode : bool;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -716,6 +717,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           initial_kernel = _;
           rollup_node_endpoint;
           bundler_node_endpoint;
+          devmode;
         } ->
         [
           "--evm-node-endpoint";
@@ -727,6 +729,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
+        @ Cli_arg.optional_switch "devmode" devmode
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
