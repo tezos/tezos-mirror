@@ -127,10 +127,20 @@ let durable_state_value :
    / "value")
 
 let batcher_injection :
-    ([`POST], unit, unit, unit, string trace, string trace) Service.service =
+    ( [`POST],
+      unit,
+      unit,
+      bool option,
+      string trace,
+      string trace )
+    Service.service =
+  let query_unique : bool option Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query Fun.id |+ opt_field "drop_duplicate" Tezos_rpc.Arg.bool Fun.id |> seal
+  in
   Tezos_rpc.Service.post_service
     ~description:"Inject messages in the batcher's queue"
-    ~query:Tezos_rpc.Query.empty
+    ~query:query_unique
     ~input:
       Data_encoding.(
         def "messages" ~description:"Messages to inject" (list (string' Hex)))
@@ -239,11 +249,12 @@ let make_streamed_call ~rollup_node_endpoint =
   return (stream, close)
 
 let publish :
+    ?drop_duplicate:bool ->
     keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
     [< `External of string] list ->
     unit tzresult Lwt.t =
- fun ~keep_alive ~rollup_node_endpoint inputs ->
+ fun ?drop_duplicate ~keep_alive ~rollup_node_endpoint inputs ->
   let open Lwt_result_syntax in
   let inputs = List.map (function `External s -> s) inputs in
   let* _answer =
@@ -252,7 +263,7 @@ let publish :
       ~base:rollup_node_endpoint
       batcher_injection
       ()
-      ()
+      drop_duplicate
       inputs
   in
   return_unit

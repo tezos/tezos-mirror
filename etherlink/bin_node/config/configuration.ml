@@ -23,7 +23,10 @@ type blueprints_publisher_config = {
 
 type sqlite_journal_mode = Delete | Wal
 
-type experimental_features = {sqlite_journal_mode : sqlite_journal_mode}
+type experimental_features = {
+  sqlite_journal_mode : sqlite_journal_mode;
+  drop_duplicate_on_injection : bool;
+}
 
 type sequencer = {
   preimages : string;
@@ -90,7 +93,10 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
 let default_sqlite_journal_mode = Delete
 
 let default_experimental_features =
-  {sqlite_journal_mode = default_sqlite_journal_mode}
+  {
+    sqlite_journal_mode = default_sqlite_journal_mode;
+    drop_duplicate_on_injection = false;
+  }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
 
@@ -451,9 +457,13 @@ let sqlite_journal_mode_encoding =
 let experimental_features_encoding =
   let open Data_encoding in
   conv
-    (fun {sqlite_journal_mode} -> sqlite_journal_mode)
-    (fun sqlite_journal_mode -> {sqlite_journal_mode})
-    (obj1 (dft "sqlite_journal_mode" sqlite_journal_mode_encoding Delete))
+    (fun {sqlite_journal_mode; drop_duplicate_on_injection} ->
+      (sqlite_journal_mode, drop_duplicate_on_injection))
+    (fun (sqlite_journal_mode, drop_duplicate_on_injection) ->
+      {sqlite_journal_mode; drop_duplicate_on_injection})
+    (obj2
+       (dft "sqlite_journal_mode" sqlite_journal_mode_encoding Delete)
+       (dft "drop_duplicate_on_injection" bool false))
 
 let proxy_encoding =
   let open Data_encoding in

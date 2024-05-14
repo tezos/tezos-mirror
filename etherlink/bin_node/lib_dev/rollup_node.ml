@@ -34,6 +34,8 @@ module MakeBackend (Base : sig
 
   val keep_alive : bool
 
+  val drop_duplicate_on_injection : bool
+
   val smart_rollup_address : string
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
@@ -89,7 +91,10 @@ end) : Services_backend_sig.Backend = struct
           ~base:Base.base
           batcher_injection
           ()
-          ()
+          (* to be retro-compatible with rollup node version that does
+             not have yet the query in the injection rpc, don't add
+             the flag if the `drop_duplicate_on_injection` is false.*)
+          (if Base.drop_duplicate_on_injection then Some true else None)
           messages
       in
       return_unit
@@ -164,6 +169,8 @@ module Make (Base : sig
   val base : Uri.t
 
   val keep_alive : bool
+
+  val drop_duplicate_on_injection : bool
 
   val smart_rollup_address : string
 end) =
