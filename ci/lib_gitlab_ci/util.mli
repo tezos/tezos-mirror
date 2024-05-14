@@ -85,7 +85,8 @@ val job :
 
     - [expire_in:] is omitted if [expire_in] is [None].
     - [reports:] is omitted if [reports] is [None].
-    - [when:] is omitted if [when_] is [None].
+    - [when:] is omitted if [when_] is [None] (this is equivalent to
+      [~when_:On_success]).
     - [expose_as:] is omitted if [expose_as] is [None].
 
     At least one of [paths] or [reports] must be non-empty. *)
