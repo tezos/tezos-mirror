@@ -257,17 +257,13 @@ module Handler = struct
     let open Lwt_result_syntax in
     let handler stopper (block_hash, block_header) =
       let block = `Hash (block_hash, 0) in
-      let* protocols =
-        Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
+      let level = block_header.Block_header.shell.level in
+      let* (module Dal_plugin : Dal_plugin.T) =
+        Proto_plugins.resolve_plugin_for_level cctxt ~level
       in
-      let proto_hash = protocols.next_protocol in
-      let* plugin = Node_context.resolve_plugin proto_hash in
-      let (module Dal_plugin : Dal_plugin.T) = plugin in
       let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-
-
-         Instead of recompute those parameters, they could be stored
+         Instead of recomputing these parameters, they could be stored
          (for a given cryptobox). *)
       let* cryptobox, shards_proofs_precomputation =
         init_cryptobox config dal_config proto_parameters
@@ -299,7 +295,7 @@ module Handler = struct
           cryptobox
           shards_proofs_precomputation
           proto_parameters
-          ~level:block_header.Block_header.shell.level
+          ~level
       in
       let*! () = Event.(emit node_is_ready ()) in
       stopper () ;

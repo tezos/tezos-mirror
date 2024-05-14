@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The protocol plugins supported by the DAL node. *)
-type proto_plugins
-
 (** A [ready_ctx] value contains globally needed informations for a running dal
     node. It is available when both cryptobox is initialized and the plugin
     for dal has been loaded.
@@ -37,7 +34,7 @@ type proto_plugins
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  proto_plugins : proto_plugins;
+  proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
@@ -87,9 +84,6 @@ val set_ready :
   Dal_plugin.proto_parameters ->
   level:Int32.t ->
   unit tzresult Lwt.t
-
-(** [resolve_plugin proto_hash] loads [Dal_plugin.T] for [proto_hash]. *)
-val resolve_plugin : Protocol_hash.t -> (module Dal_plugin.T) tzresult Lwt.t
 
 (** Returns all the registered plugins *)
 val get_all_plugins : t -> (module Dal_plugin.T) list
