@@ -571,8 +571,6 @@ module Handler = struct
               loop ())
     in
     let*! () = Event.(emit layer1_node_tracking_started ()) in
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
-        If the layer1 node reboots, the rpc stream breaks.*)
     loop ()
 end
 
