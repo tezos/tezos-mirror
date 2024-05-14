@@ -118,7 +118,7 @@ module Images = struct
       ~name:"rust_toolchain"
       ~image_path:"${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
 
-  let nix = Image.register ~name:"nix" ~image_path:"nixos/nix"
+  let nix = Image.register ~name:"nix" ~image_path:"nixos/nix:2.22.1"
 
   (* Match GitLab executors version and directly use the Docker socket
      The Docker daemon is already configured, experimental features are enabled

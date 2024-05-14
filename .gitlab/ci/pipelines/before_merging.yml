@@ -60,7 +60,7 @@ docker:hadolint-before_merging:
   - hadolint Dockerfile
 
 nix:
-  image: nixos/nix
+  image: nixos/nix:2.22.1
   stage: sanity
   tags:
   - gcp
