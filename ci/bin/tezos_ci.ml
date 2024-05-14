@@ -159,13 +159,11 @@ module Pipeline = struct
     (* TODO: Have to figure out:
        - is it possible to have a [needs:] on a trigger job?
        - is it possible to get artifacts from a trigger job (i.e. like from it's child pipeline?) *)
-    let job_by_name : (string, Gitlab_ci.Types.generic_job) Hashtbl.t =
-      Hashtbl.create 5
-    in
+    let job_by_name : (string, tezos_job) Hashtbl.t = Hashtbl.create 5 in
     (* Populate [job_by_name] and check that no two different jobs have the same name. *)
     List.iter
-      (fun ({job; _} : tezos_job) ->
-        let name = name_of_generic_job job in
+      (fun (job : tezos_job) ->
+        let name = name_of_tezos_job job in
         match Hashtbl.find_opt job_by_name name with
         | None -> Hashtbl.add job_by_name name job
         | Some _ ->
@@ -246,7 +244,7 @@ module Pipeline = struct
         String_set.iter
           (fun dependency ->
             (* We use [find] instead of [find_opt] *)
-            let dependency_job = Hashtbl.find job_by_name dependency in
+            let dependency_job = (Hashtbl.find job_by_name dependency).job in
             let stage (job : Gitlab_ci.Types.generic_job) =
               match job with Trigger_job {stage; _} | Job {stage; _} -> stage
             in
@@ -261,31 +259,32 @@ module Pipeline = struct
           dependencies) ;
     (* Check that all [dependencies:] are on jobs that produce artifacts *)
     ( Fun.flip String_set.iter dependencies @@ fun dependency ->
-      match Hashtbl.find_opt job_by_name dependency with
-      | Some (Job {artifacts = Some {paths = Some (_ :: _); _}; _})
-      | Some
-          (Job {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _})
-        ->
+      let job =
+        match Hashtbl.find_opt job_by_name dependency with
+        | Some {job; _} -> job
+        | None ->
+            (* This case is precluded by the dependency analysis above. *)
+            assert false
+      in
+      match job with
+      | Job {artifacts = Some {paths = Some (_ :: _); _}; _}
+      | Job {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _} ->
           (* This is fine: we depend on a job that define non-report artifacts, or a dotenv file. *)
           ()
-      | Some (Job _) ->
+      | Job _ ->
           failwith
             "[%s] the job '%s' has a [dependency:] on a job '%s' which \
              produces neither regular, [paths:] artifacts or a dotenv report."
             pipeline_name
             job_name
             dependency
-      | Some (Trigger_job _) ->
+      | Trigger_job _ ->
           failwith
             "[%s] the job '%s' has a [dependency:] on a trigger job '%s', but \
              trigger jobs cannot produce artifacts."
             pipeline_name
             job_name
-            dependency
-      | None ->
-          (* This case is precluded by the dependency analysis above. *)
-          assert false ) ;
-
+            dependency ) ;
     ()
 
   (* Splits the set of registered non-child pipelines into workflow
