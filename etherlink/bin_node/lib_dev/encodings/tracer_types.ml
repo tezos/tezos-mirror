@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -101,3 +101,16 @@ let input_encoding =
     Ethereum_types.hash_encoding
     config_encoding
     default_config
+
+let input_rlp_encoder hash config =
+  let open Rlp in
+  (* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
+  let bool_encoding b =
+    if b then Value (Bytes.make 1 '\001') else Value Bytes.empty
+  in
+  let hash = Value (Ethereum_types.hash_to_bytes hash |> Bytes.of_string) in
+  let return_data = bool_encoding config.tracer_config.enable_return_data in
+  let memory = bool_encoding config.tracer_config.enable_memory in
+  let stack = bool_encoding config.tracer_config.disable_stack in
+  let storage = bool_encoding config.tracer_config.disable_storage in
+  List [hash; return_data; memory; stack; storage] |> encode |> Bytes.to_string

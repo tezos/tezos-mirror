@@ -40,3 +40,5 @@ val config_encoding : config Data_encoding.t
 type input = Ethereum_types.hash * config
 
 val input_encoding : (Ethereum_types.hash * config) Data_encoding.t
+
+val input_rlp_encoder : Ethereum_types.hash -> config -> string

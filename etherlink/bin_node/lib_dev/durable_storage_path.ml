@@ -115,3 +115,7 @@ module Evm_events = struct
 
   let nth_event i = events ^ "/" ^ string_of_int i
 end
+
+module Trace_transaction = struct
+  let input = EVM.make "/trace/input"
+end
