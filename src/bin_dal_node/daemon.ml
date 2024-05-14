@@ -323,18 +323,9 @@ module Handler = struct
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
-    let*! slot_ids =
-      List.filter_map_s
-        (fun slot_index ->
-          let open Lwt_syntax in
-          let slot_id : Types.slot_id =
-            {slot_level = oldest_level; slot_index}
-          in
-          return_some slot_id)
-        (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
-    in
     List.iter_es
-      (fun (slot_id : Types.slot_id) ->
+      (fun slot_index ->
+        let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
         let*! () =
           Event.(
             emit removed_slot_shards (slot_id.slot_level, slot_id.slot_index))
@@ -350,7 +341,7 @@ module Handler = struct
             slot_id
         in
         return_unit)
-      slot_ids
+      (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
   let should_store_cells ctxt =
     let profile = Node_context.get_profile_ctxt ctxt in
