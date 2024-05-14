@@ -1,6 +1,13 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
+stages:
+- sanity
+- build
+- test
+- packaging
+- doc
+
 sanity_ci:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: sanity

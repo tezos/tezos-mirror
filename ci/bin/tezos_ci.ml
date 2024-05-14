@@ -69,8 +69,6 @@ module Stage = struct
   let name (Stage {name; index = _}) = name
 
   let index (Stage {name = _; index}) = index
-
-  let to_string_list () = List.map name (List.rev !stages)
 end
 
 type tezos_job = {
@@ -316,7 +314,7 @@ module Pipeline = struct
     let includes = List.map include_of_pipeline pipelines in
     (workflow, includes)
 
-  let write ?default ?variables ~stages ~filename () =
+  let write ?default ?variables ~filename () =
     (* Write all registered the pipelines *)
     ( Fun.flip List.iter (all ()) @@ fun pipeline ->
       let jobs = jobs pipeline in
@@ -338,8 +336,21 @@ module Pipeline = struct
             name
             filename)
         jobs ;
+      let stages =
+        let stages : (string, int) Hashtbl.t = Hashtbl.create 5 in
+        List.iter
+          (fun job ->
+            Hashtbl.replace
+              stages
+              (Stage.name job.stage)
+              (Stage.index job.stage))
+          jobs ;
+        Hashtbl.to_seq stages |> List.of_seq
+        |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
+        |> List.map fst
+      in
       let prepend_config =
-        match pipeline with
+        (match pipeline with
         | Pipeline _ -> []
         | Child_pipeline _ ->
             Gitlab_ci.Types.
@@ -349,8 +360,8 @@ module Pipeline = struct
                     rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
                     name = None;
                   };
-                Stages (Stage.to_string_list ());
-              ]
+              ])
+        @ [Stages stages]
       in
       let config =
         prepend_config @ List.concat_map tezos_job_to_config_elements jobs
@@ -370,6 +381,13 @@ module Pipeline = struct
         Gitlab_ci.Util.job
           ~rules:[job_rule ~if_:Rules.never ()]
           ~name:"dummy_job"
+            (* The dummy job must be included in all pipelines. However,
+               we do not know which stages are included in a given
+               pipeline. The default stage ["test"] might not
+               exist. Therefore we put it in the special [.pre] stage
+               which always exists
+               ({{:https://docs.gitlab.com/ee/ci/yaml/#stage-pre}ref}). *)
+          ~stage:".pre"
           ~script:[{|echo "This job will never execute"|}]
           ()
       in
@@ -379,7 +397,7 @@ module Pipeline = struct
           ~none:[]
           ~some:(fun variables -> [Variables variables])
           variables
-      @ [Stages stages; Generic_job (Job job_dummy); Include includes]
+      @ [Generic_job (Job job_dummy); Include includes]
     in
     to_file ~filename config ;
     ()

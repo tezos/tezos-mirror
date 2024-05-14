@@ -68,16 +68,6 @@ module Stage : sig
 
       Fails if a stage of the same name has already been registered. *)
   val register : string -> t
-
-  (** Name of a stage *)
-  val name : t -> string
-
-  (** Returns the list of registered stages, in order of registration, as a list of strings.
-
-      This is appropriate to use with the [Stages] constructor of
-      {!Gitlab_ci.Types.config_element} generating a [stages:]
-      element. *)
-  val to_string_list : unit -> string list
 end
 
 (** A facility for registering pipelines. *)
@@ -120,9 +110,11 @@ module Pipeline : sig
       A top-level configuration is generated to [filename]. It
       contains a [workflow:] section that enables pipeline execution
       for each registered, non-child pipeline and an [include:]
-      section that includes set of jobs for the given pipeline. If
-      specified, [default:], [variables:], and [stages:] sections are
-      also written to the top-level configuration.
+      section that includes the set of jobs for the given pipeline. If
+      specified, [default:] and [variables:] sections are also written
+      to the top-level configuration. The [stages:] section
+      automatically contains all the stages registered with
+      {!Stage.register} that are used in the given pipeline.
 
       A [dummy_job] is written to the top-level configuration. This
       job is never enabled, but it works around a GitLab CI issue that
@@ -136,7 +128,6 @@ module Pipeline : sig
   val write :
     ?default:Gitlab_ci.Types.default ->
     ?variables:Gitlab_ci.Types.variables ->
-    stages:string list ->
     filename:string ->
     unit ->
     unit

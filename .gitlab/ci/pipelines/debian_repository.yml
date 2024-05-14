@@ -7,18 +7,8 @@ workflow:
     when: always
 
 stages:
-- start
-- sanity
 - build
-- test
-- test_coverage
 - packaging
-- doc
-- prepare_release
-- publish_release_gitlab
-- publish_release
-- publish_package_gitlab
-- manual
 
 oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0

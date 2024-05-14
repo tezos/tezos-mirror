@@ -75,21 +75,8 @@ variables:
   FF_USE_FASTZIP: "true"
   RUNTEZTALIAS: "false"
 
-stages:
-- start
-- sanity
-- build
-- test
-- test_coverage
-- packaging
-- doc
-- prepare_release
-- publish_release_gitlab
-- publish_release
-- publish_package_gitlab
-- manual
-
 dummy_job:
+  stage: .pre
   rules:
   - if: $foo == "bar" && $foo != "bar"
     when: on_success

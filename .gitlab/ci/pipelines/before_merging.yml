@@ -1,6 +1,16 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
+stages:
+- start
+- sanity
+- build
+- test
+- test_coverage
+- packaging
+- doc
+- manual
+
 trigger:
   image: alpine:3.18
   stage: start

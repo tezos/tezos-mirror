@@ -138,10 +138,5 @@ let () =
   (* If argument --verbose is set, then log generation info.
      If argument --inline-source, then print generation info in yml files. *)
   let filename = ".gitlab-ci.yml" in
-  Pipeline.write
-    ~default
-    ~variables
-    ~stages:(Stage.to_string_list ())
-    ~filename
-    () ;
+  Pipeline.write ~default ~variables ~filename () ;
   Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()
