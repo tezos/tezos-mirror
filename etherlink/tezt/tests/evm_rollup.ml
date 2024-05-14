@@ -5389,6 +5389,24 @@ let test_proxy_read_only =
     ~error_msg:"Unexpected error message" ;
   unit
 
+let test_unsupported_rpc =
+  register_both
+    ~tags:["evm"; "rpc"; "unsupported"]
+    ~title:"Unsupported RPC method"
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  let* protocol_version =
+    Evm_node.(
+      call_evm_rpc
+        evm_node
+        {method_ = "eth_protocolVersion"; parameters = `A []})
+  in
+  Check.(
+    (JSON.(protocol_version |-> "error" |-> "message" |> as_string)
+    = "Method not supported")
+      string)
+    ~error_msg:"Expected unsupported method error." ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5491,7 +5509,8 @@ let register_evm_node ~protocols =
   test_tx_pool_transaction_size_exceeded protocols ;
   test_whitelist_is_executed protocols ;
   test_rpc_maxPriorityFeePerGas protocols ;
-  test_proxy_read_only protocols
+  test_proxy_read_only protocols ;
+  test_unsupported_rpc protocols
 
 let protocols = Protocol.all
 
