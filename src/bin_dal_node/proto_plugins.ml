@@ -88,34 +88,34 @@ let initial_plugins cctxt ~current_level ~attestation_lag =
     Chain_services.Blocks.protocols cctxt ~block:(`Level last_level) ()
   in
   let last_proto = last_protocols.Chain_services.Blocks.next_protocol in
-    if Protocol_hash.equal first_proto last_proto then
-      (* There's no migration in between, we're done. *)
-      return proto_plugins
-    else
-      (* There was a migration in between; we search the migration level and then
-         we add the plugin *)
-      let rec find_migration_level level protocols =
-        if
-          Protocol_hash.equal
-            first_proto
-            protocols.Chain_services.Blocks.current_protocol
-        then return level
-        else
-          let block = `Level (Int32.pred level) in
-          let* protocols = Chain_services.Blocks.protocols cctxt ~block () in
-          find_migration_level (Int32.pred level) protocols
-      in
-      let* migration_level = find_migration_level last_level last_protocols in
-      let* plugin = resolve_plugin_by_hash last_proto in
-      let* header =
-        Shell_services.Blocks.Header.shell_header
-          cctxt
-          ~block:(`Level migration_level)
-          ()
-      in
-      let proto_level = header.proto_level in
-      Plugins.add proto_plugins ~first_level:migration_level ~proto_level plugin
-      |> return
+  if Protocol_hash.equal first_proto last_proto then
+    (* There's no migration in between, we're done. *)
+    return proto_plugins
+  else
+    (* There was a migration in between; we search the migration level and then
+       we add the plugin *)
+    let rec find_migration_level level protocols =
+      if
+        Protocol_hash.equal
+          first_proto
+          protocols.Chain_services.Blocks.current_protocol
+      then return level
+      else
+        let block = `Level (Int32.pred level) in
+        let* protocols = Chain_services.Blocks.protocols cctxt ~block () in
+        find_migration_level (Int32.pred level) protocols
+    in
+    let* migration_level = find_migration_level last_level last_protocols in
+    let* plugin = resolve_plugin_by_hash last_proto in
+    let* header =
+      Shell_services.Blocks.Header.shell_header
+        cctxt
+        ~block:(`Level migration_level)
+        ()
+    in
+    let proto_level = header.proto_level in
+    Plugins.add proto_plugins ~first_level:migration_level ~proto_level plugin
+    |> return
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
@@ -144,17 +144,17 @@ let () =
     (function No_plugin_for_level {level} -> Some level | _ -> None)
     (fun level -> No_plugin_for_level {level})
 
+(* Say that [plugins = [(level_1, plugin_1); ... ; (level_n, plugin_n)]]. We
+   have [level_1 > ... > level_n]. We return the plugin [plugin_i] with the
+   smallest [i] such that [level_i <= level]. *)
 let get_plugin_for_level plugins ~level =
   let open Result_syntax in
-  let plugins = Plugins.LevelMap.bindings plugins in
-  (* Say that [plugins = [(level_1, plugin_1); ... ; (level_n, plugin_n)]]. We
-     have [level_1 > ... > level_n]. We return the plugin [plugin_i] with the
-     smallest [i] such that [level_i <= level]. *)
-  let rec find = function
-    | [] -> tzfail @@ No_plugin_for_level {level}
-    | (plugin_first_level, Plugins.{plugin; proto_level = _}) :: rest ->
-        if level >= plugin_first_level then return plugin else find rest
+  let plugin_opt =
+    Plugins.LevelMap.to_seq plugins
+    |> Seq.find (fun (plugin_first_level, _) -> level >= plugin_first_level)
   in
-  find plugins
+  match plugin_opt with
+  | None -> tzfail @@ No_plugin_for_level {level}
+  | Some (_first_level, Plugins.{plugin; proto_level = _}) -> return plugin
 
 include Plugins
