@@ -98,5 +98,28 @@ Smart Rollup WASM Debugger
 Data Availability Committee (DAC)
 ---------------------------------
 
+Data Availability Layer (DAL)
+-----------------------------
+
+DAL node
+~~~~~~~~
+
+The following RPCs have been removed:
+
+- ``POST /commitments`` (MR :gl:`!12949`), use ``POST /slots`` instead,
+- ``GET /commitments/<c>/proof`` (MR :gl:`!13080`), also use ``POST /slots`` instead,
+- ``PATCH /commitments`` (MR :gl:`!12886`),
+- ``PUT /commitments/<c>/shards`` (MR :gl:`!12949`),
+- ``GET /levels/<int32>/headers`` (MR :gl:`!13044`),
+
+The paths or method of the following RPCs have been updated:
+- ``GET /commitments/<c>/slot`` is now ``GET /levels/<l>/slots/<i>/content``  (MR :gl:`!13075`),
+- ``GET /levels/<l>/slot_indices/<i>/commitment`` is now ``GET /levels/<l>/slots/<i>/commitment``  (MR :gl:`!13046`),
+- ``POST /pages/<p>/proof`` is now ``GET /levels/<l>/slots/<i>/pages/<p>/proof``  (MR :gl:`!13083`),
+- ``GET /shard/<c>/<s>`` is now ``GET /levels/<l>/slots/<i>/shards/<s>/content`` (MR :gl:`!13095`),
+- ``POST /slot`` is now ``POST /slots`` (MR :gl:`!12949`),
+- ``GET /slot/pages/<c>`` is now ``GET /levels/<l>/slots/<i>/pages`` (MR :gl:`!12880`),
+- ``GET /commitments/<c>/headers`` is now ``GET /levels/<l>/slots/<i>/status`` (MR :gl:`!13055`).
+
 Miscellaneous
 -------------
