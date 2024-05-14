@@ -341,9 +341,6 @@ module Handler = struct
           | Ok commitment -> return_some (commitment, slot_id))
         (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
     in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7124
-       In case of republication of the same commitment, the shards are removed
-       too early *)
     List.iter_es
       (fun (commitment, slot_id) ->
         let*! () = Event.(emit removed_slot_shards commitment) in
