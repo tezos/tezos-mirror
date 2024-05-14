@@ -83,6 +83,50 @@ module Levels_to_hashes =
     end))
     (Block_key)
 
+module Make_hash_index_key (H : Tezos_crypto.Intfs.HASH) =
+Indexed_store.Make_index_key (struct
+  include Indexed_store.Make_fixed_encodable (H)
+
+  let equal = H.equal
+end)
+
+module Messages =
+  Indexed_store.Make_indexed_file
+    (struct
+      let name = "messages"
+    end)
+    (Make_hash_index_key (Merkelized_payload_hashes_hash))
+    (struct
+      type t = string list
+
+      let name = "messages_list"
+
+      let encoding = Data_encoding.(list @@ dynamic_size (Variable.string' Hex))
+
+      module Header = struct
+        type t = Block_hash.t
+
+        let name = "messages_block"
+
+        let encoding = Block_hash.encoding
+
+        let fixed_size =
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ Data_encoding.Binary.fixed_length encoding
+      end
+    end)
+
+type history_mode = Archive | Full
+
+module History_mode = Indexed_store.Make_singleton (struct
+  type t = history_mode
+
+  let name = "history_mode"
+
+  let encoding =
+    Data_encoding.string_enum [("archive", Archive); ("full", Full)]
+end)
+
 (** [load ~rollup_node_data_dir] load the needed storage from the
     rollup node: last_finalized_level, levels_to_hashes, and
     l2_blocks.  default [index_buffer_size] is [10_000] an
@@ -111,3 +155,24 @@ let load ?(index_buffer_size = 10_000) ?(cache_size = 300_000)
       ~path:(Filename.concat store "l2_blocks")
   in
   return (last_finalized_level, levels_to_hashes, l2_blocks)
+
+let load_messages ?(index_buffer_size = 10_000) ?(cache_size = 300_000)
+    ~rollup_node_data_dir () =
+  let open Lwt_result_syntax in
+  let store = Filename.Infix.(rollup_node_data_dir // "storage") in
+  let path name = Filename.concat store name in
+  (* We need an archive mode to reconstruct the history. *)
+  let* () =
+    let* history_mode_store =
+      History_mode.load Read_only ~path:(path "history_mode")
+    in
+    let* history_mode = History_mode.read history_mode_store in
+    match history_mode with
+    | Some Archive -> return_unit
+    | Some Full ->
+        failwith
+          "The history cannot be reconstructed from a full rollup node, it \
+           needs an archive one."
+    | None -> failwith "The history mode of the rollup node cannot be found."
+  in
+  Messages.load ~index_buffer_size ~cache_size Read_only ~path:(path "messages")

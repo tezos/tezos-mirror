@@ -212,6 +212,13 @@ let keep_everything_arg =
     ~doc:"Do not filter out files outside of the `/evm` directory"
     ()
 
+let reconstruct_arg =
+  Tezos_clic.arg
+    ~long:"reconstruct"
+    ~placeholder:"boot-sector.wasm"
+    ~doc:{|/!\ DO NOT USE. /!\"|}
+    Params.string
+
 let verbose_arg =
   Tezos_clic.switch
     ~short:'v'
@@ -1237,15 +1244,22 @@ let init_from_rollup_node_command =
   command
     ~desc:
       "initialises the EVM node data-dir using the data-dir of a rollup node."
-    (args3 data_dir_arg devmode_arg omit_delayed_tx_events_arg)
+    (args4 data_dir_arg devmode_arg omit_delayed_tx_events_arg reconstruct_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
-    (fun (data_dir, devmode, omit_delayed_tx_events) rollup_node_data_dir () ->
+    (fun ( data_dir,
+           devmode,
+           omit_delayed_tx_events,
+           reconstruct_from_boot_sector )
+         rollup_node_data_dir
+         () ->
       if devmode then
         Evm_node_lib_dev.Evm_context.init_from_rollup_node
           ~omit_delayed_tx_events
           ~data_dir
           ~rollup_node_data_dir
+          ?reconstruct_from_boot_sector
+          ()
       else
         Evm_node_lib_prod.Evm_context.init_from_rollup_node
           ~omit_delayed_tx_events
