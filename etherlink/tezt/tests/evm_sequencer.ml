@@ -256,14 +256,29 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* mode =
-    return
-      (Evm_node.Observer
-         {
-           initial_kernel = output;
-           preimages_dir;
-           rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-           devmode;
-         })
+    if threshold_encryption then
+      let bundler =
+        Dsn_node.bundler ~endpoint:(Evm_node.endpoint sequencer) ()
+      in
+      let* () = Dsn_node.start bundler in
+      return
+        (Evm_node.Threshold_encryption_observer
+           {
+             initial_kernel = output;
+             preimages_dir;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             bundler_node_endpoint = Dsn_node.endpoint bundler;
+             devmode;
+           })
+    else
+      return
+        (Evm_node.Observer
+           {
+             initial_kernel = output;
+             preimages_dir;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             devmode;
+           })
   in
   let* observer = Evm_node.init ~mode (Evm_node.endpoint sequencer) in
   let* proxy =
