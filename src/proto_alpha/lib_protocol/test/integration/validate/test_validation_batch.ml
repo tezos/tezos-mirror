@@ -19,27 +19,9 @@
 open Protocol
 open Alpha_context
 open Manager_operation_helpers
+open Error_helpers
 
 (** {2 Tests on operation batches} *)
-
-(** Revelation should not occur elsewhere than in first position
-   in a batch.*)
-let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
-  let open Lwt_result_syntax in
-  let expect_failure errs =
-    match errs with
-    | [
-     Environment.Ecoproto_error
-       Validate_errors.Manager.Incorrect_reveal_position;
-    ] ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  validate_ko_diagnostic infos op expect_failure
 
 let batch_in_the_middle infos kind1 kind2 =
   let open Lwt_result_syntax in
@@ -85,25 +67,8 @@ let batch_in_the_middle infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [operation1; reveal; operation2]
   in
-  batch_reveal_in_the_middle_diagnostic infos [batch]
-
-(** A batch of manager operation contains at most one Revelation.*)
-let batch_two_reveals_diagnostic (infos : infos) op =
-  let open Lwt_result_syntax in
-  let expected_failure errs =
-    match errs with
-    | [
-     Environment.Ecoproto_error
-       Validate_errors.Manager.Incorrect_reveal_position;
-    ] ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  validate_ko_diagnostic infos op expected_failure
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
+  validate_ko_diagnostic infos [batch] expect_failure
 
 let batch_two_reveals infos kind =
   let open Lwt_result_syntax in
@@ -149,7 +114,8 @@ let batch_two_reveals infos kind =
       (Context.B infos.ctxt.block)
       [reveal; reveal1; operation]
   in
-  batch_two_reveals_diagnostic infos [batch]
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
+  validate_ko_diagnostic infos [batch] expect_failure
 
 let batch_two_sources infos kind1 kind2 =
   let open Lwt_result_syntax in

@@ -2089,7 +2089,8 @@ module Manager = struct
                        seen. *)
                     match current_guest_previous_counter with
                     | None -> (* Right after a [Host] op: OK *) return_unit
-                    | Some _ -> tzfail Incorrect_reveal_position)
+                    | Some _ -> tzfail (Guest_incorrect_reveal_position {guest})
+                    )
                 | _ -> return_unit
               in
               return
