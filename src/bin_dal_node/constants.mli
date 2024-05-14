@@ -36,10 +36,12 @@ val committee_cache_size : int
 (** [shards_proofs_cache_size] is the size of the cache for shards proofs per slot. *)
 val shards_proofs_cache_size : int
 
-(** [shard_cache_size] is the size of the cache of not-yet-published shards. *)
+(** [shard_cache_size] is the size (in number of slots) of the cache of
+    not-yet-published shards. *)
 val shard_cache_size : int
 
-(** [slot_cache_size] is the size of the cache of not-yet-published slots. *)
+(** [slot_cache_size] is the size (in number of slots) of the cache of
+    not-yet-published slots. *)
 val slot_cache_size : int
 
 (** The frequency at which we sample the time spent in shards crypto
