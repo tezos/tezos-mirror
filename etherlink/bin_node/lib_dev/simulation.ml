@@ -123,7 +123,7 @@ type execution_result = {value : hash option; gas_used : quantity option}
 
 type call_result = (execution_result, hash) result
 
-type validation_result = transaction_object
+type validation_result = (transaction_object, address) Either.t
 
 type 'a simulation_result = ('a, string) result
 
@@ -201,64 +201,102 @@ module Encodings = struct
                <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
                data directory of the rollup node.")
 
-  let decode_data =
-    let open Result_syntax in
-    function
-    | Rlp.Value v -> return (decode_hash v)
-    | Rlp.List _ -> error_with "The simulation returned an ill-encoded data"
+  module type RLP_DECODING = sig
+    val decode_validation_result :
+      Rlp.item -> (transaction_object, address) Either.t tzresult
 
-  let decode_gas_used =
-    let open Result_syntax in
-    function
-    | Rlp.Value v -> return (decode_number v)
-    | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
+    val decode_call_result :
+      Rlp.item -> (execution_result, hash) result tzresult
 
-  let decode_execution_result =
-    let open Result_syntax in
-    function
-    | Rlp.List [value; gas_used] ->
-        let* value = Rlp.decode_option decode_data value in
-        let* gas_used = Rlp.decode_option decode_gas_used gas_used in
-        return {value; gas_used}
-    | _ ->
-        error_with
-          "The simulation for eth_call/eth_estimateGas returned an ill-encoded \
-           format"
+    val simulation_result_from_rlp :
+      (Rlp.item -> 'a tzresult) ->
+      bytes ->
+      (('a, string) result, tztrace) result
+  end
 
-  let decode_call_result v =
-    let open Result_syntax in
-    let decode_revert = function
-      | Rlp.Value msg -> return (decode_hash msg)
-      | _ -> error_with "The revert message is ill-encoded"
-    in
-    Rlp.decode_result decode_execution_result decode_revert v
+  module Rlp_decoding = struct
+    module V0 = struct
+      let decode_data =
+        let open Result_syntax in
+        function
+        | Rlp.Value v -> return (decode_hash v)
+        | Rlp.List _ -> error_with "The simulation returned an ill-encoded data"
 
-  let decode_validation_result bytes =
-    let open Result_syntax in
-    try return (Ethereum_types.transaction_object_from_rlp_item None bytes)
-    with _ ->
-      error_with "The simulation returned an ill-encoded validation result"
+      let decode_gas_used =
+        let open Result_syntax in
+        function
+        | Rlp.Value v -> return (decode_number v)
+        | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
 
-  let simulation_result_from_rlp decode_payload bytes =
-    let open Result_syntax in
-    let decode_error_msg = function
-      | Rlp.Value msg -> return @@ Bytes.to_string msg
-      | rlp ->
-          error_with
-            "The simulation returned an unexpected error message: %a"
-            Rlp.pp
-            rlp
-    in
-    let* rlp = Rlp.decode bytes in
-    match Rlp.decode_result decode_payload decode_error_msg rlp with
-    | Ok v -> Ok v
-    | Error e ->
-        error_with
-          "The simulation returned an unexpected format: %a, with error %a"
-          Rlp.pp
-          rlp
-          pp_print_trace
-          e
+      let decode_execution_result =
+        let open Result_syntax in
+        function
+        | Rlp.List [value; gas_used] ->
+            let* value = Rlp.decode_option decode_data value in
+            let* gas_used = Rlp.decode_option decode_gas_used gas_used in
+            return {value; gas_used}
+        | _ ->
+            error_with
+              "The simulation for eth_call/eth_estimateGas returned an \
+               ill-encoded format"
+
+      let decode_call_result v =
+        let open Result_syntax in
+        let decode_revert = function
+          | Rlp.Value msg -> return (decode_hash msg)
+          | _ -> error_with "The revert message is ill-encoded"
+        in
+        Rlp.decode_result decode_execution_result decode_revert v
+
+      let decode_validation_result =
+        let open Result_syntax in
+        function
+        | Rlp.Value address -> return (Either.Right (decode_address address))
+        | rlp ->
+            error_with
+              "The simulation returned an ill-encoded validation result: %a"
+              Rlp.pp
+              rlp
+
+      let simulation_result_from_rlp decode_payload bytes =
+        let open Result_syntax in
+        let decode_error_msg = function
+          | Rlp.Value msg -> return @@ Bytes.to_string msg
+          | rlp ->
+              error_with
+                "The simulation returned an unexpected error message: %a"
+                Rlp.pp
+                rlp
+        in
+        let* rlp = Rlp.decode bytes in
+        match Rlp.decode_result decode_payload decode_error_msg rlp with
+        | Ok v -> Ok v
+        | Error e ->
+            error_with
+              "The simulation returned an unexpected format: %a, with error %a"
+              Rlp.pp
+              rlp
+              pp_print_trace
+              e
+    end
+
+    module V1 = struct
+      include V0
+
+      let decode_validation_result bytes =
+        let open Result_syntax in
+        try return (Either.Left (transaction_object_from_rlp_item None bytes))
+        with _ ->
+          error_with "The simulation returned an ill-encoded validation result"
+
+      let simulation_result_from_rlp decode_payload bytes =
+        let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
+        simulation_result_from_rlp decode_payload bytes
+    end
+
+    let select_rlp_decodings bytes : (module RLP_DECODING) =
+      match Bytes.get_uint8 bytes 0 with 1 -> (module V1) | _ -> (module V0)
+  end
 
   let eval_result =
     conv
@@ -293,10 +331,14 @@ module Encodings = struct
 end
 
 let simulation_result bytes =
+  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
+  in
   Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
 let gas_estimation bytes =
   let open Result_syntax in
+  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
+  in
   let* result =
     Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
   in
@@ -319,4 +361,6 @@ let gas_estimation bytes =
   | _ -> return result
 
 let is_tx_valid bytes =
+  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
+  in
   Encodings.simulation_result_from_rlp Encodings.decode_validation_result bytes
