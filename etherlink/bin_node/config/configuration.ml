@@ -87,7 +87,7 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
     chunk_size = Option.value ~default:10 chunk_size;
   }
 
-let default_sqlite_journal_mode = Wal
+let default_sqlite_journal_mode = Delete
 
 let default_experimental_features =
   {sqlite_journal_mode = default_sqlite_journal_mode}
