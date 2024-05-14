@@ -784,7 +784,8 @@ let run ~data_dir configuration_override =
     Crawler.start
       ~name:"dal_node_crawler"
       ~chain:`Main
-      ~reconnection_delay:crawler_l1_reconnection_delay
+      ~reconnection_delay:initial_l1_crawler_reconnection_delay
+      ~l1_blocks_cache_size:crawler_l1_blocks_cache_size
       cctxt
   in
   let ctxt =

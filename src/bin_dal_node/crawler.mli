@@ -14,16 +14,30 @@
 
 type t
 
-(** [start ~name ~chain ~reconnection_delay  ?protocols
-    cctxt] connects to a Tezos node and starts monitoring new
-    heads. [reconnection_delay] gives an initial delay for the reconnection
+(** [start ~name ~chain ~reconnection_delay ~l1_blocks_cache_size
+    ~last_notified_level cctxt] connects to a Tezos node and starts monitoring
+    new heads. [reconnection_delay] gives an initial delay for the reconnection
     which is used in an exponential backoff. The [name] is used to differentiate
-    events. If [protocols] is provided, only heads of these protocols will be
-    monitored. *)
+    events. [l1_blocks_cache_size] is the size of the block headers cache.
+
+    The [last_notified_level] parameter indicates the level of the last notified
+    finalized block, to start catching-up starting from that level. The function
+    enforces the value to be at least equal to 1. If no level is given, the
+    function starts catching-up from the current level - 2.*)
 val start :
   name:string ->
   chain:Shell_services.chain ->
   reconnection_delay:float ->
-  ?protocols:Protocol_hash.t list ->
+  l1_blocks_cache_size:int ->
+  ?last_notified_level:int32 ->
   Tezos_rpc.Context.generic ->
   t Lwt.t
+
+(** [finalized_heads_stream t] returns a clone of the current stream containing
+    finalized heads. *)
+val finalized_heads_stream :
+  t -> (Block_hash.t * Block_header.shell_header) Lwt_stream.t
+
+(** [finalized_heads_status t] returns the status of the current finalized heads
+    monitoring loop as an [Lwt.state] value. *)
+val finalized_heads_status : t -> unit tzresult Lwt.state

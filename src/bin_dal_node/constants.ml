@@ -63,4 +63,10 @@ let amplification_random_delay_max = 2.
 
 let amplification_timeout = 120.
 
-let crawler_l1_reconnection_delay = 5.
+(* Initial reconnection delay to L1 node from the DAL crawler in seconds. See
+   {!layer_1.start} in lib_crawler for more details. *)
+let initial_l1_crawler_reconnection_delay = 5.
+
+(* Controls the size of the blocks cache in the L1 crawler. It is used in
+   {!Crawler.start}. *)
+let crawler_l1_blocks_cache_size = 64
