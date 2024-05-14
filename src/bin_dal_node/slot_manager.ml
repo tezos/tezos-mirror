@@ -186,16 +186,17 @@ let get_slot ~reconstruct_if_missing cryptobox store commitment =
   in
   match res_slot_store with
   | Ok slot -> return slot
-  | Error _ when reconstruct_if_missing -> (
-      (* The slot could not be obtained from the slot store, attempt a
-         reconstruction. *)
-      let*! res_shard_store =
-        get_slot_content_from_shards cryptobox store commitment
-      in
-      match res_shard_store with
-      | Ok slot -> return slot
-      | Error _ -> Lwt.return res_slot_store)
-  | Error _ -> Lwt.return res_slot_store
+  | Error _ ->
+      if reconstruct_if_missing then
+        (* The slot could not be obtained from the slot store, attempt a
+           reconstruction. *)
+        let*! res_shard_store =
+          get_slot_content_from_shards cryptobox store commitment
+        in
+        match res_shard_store with
+        | Ok slot -> return slot
+        | Error _ -> Lwt.return res_slot_store
+      else Lwt.return res_slot_store
 
 (* Used wrapper functions on top of Cryptobox. *)
 
