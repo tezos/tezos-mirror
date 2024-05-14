@@ -493,8 +493,21 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
       ~verbose
-      ~proxy_read_only:read_only
       ()
+  in
+  (* We patch [config] to take into account the proxy-specific argument
+     [--read-only]. *)
+  let config =
+    {
+      config with
+      experimental_features =
+        {
+          config.experimental_features with
+          enable_send_raw_transaction =
+            (if read_only then false
+            else config.experimental_features.enable_send_raw_transaction);
+        };
+    }
   in
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
