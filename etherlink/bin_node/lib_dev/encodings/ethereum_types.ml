@@ -207,6 +207,10 @@ let encode_address (Address address) = encode_hex address
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
+let decode_number_be bytes =
+  Bytes.fold_left (fun acc c -> (acc lsl 8) + Char.code c) 0 bytes
+  |> Z.of_int |> quantity_of_z
+
 let decode_hash bytes = Hash (decode_hex bytes)
 
 let pad_to_n_bytes_le bytes length =
@@ -467,8 +471,8 @@ let transaction_receipt_encoding =
           (req "contractAddress" (option address_encoding))))
 
 type transaction_object = {
-  blockHash : block_hash;
-  blockNumber : quantity;
+  blockHash : block_hash option;
+  blockNumber : quantity option;
   from : address;
   gas : quantity;
   gasPrice : quantity;
@@ -476,34 +480,37 @@ type transaction_object = {
   input : hash;
   nonce : quantity;
   to_ : address option;
-  transactionIndex : quantity;
-      (* It can be null if it's in a pending block, but we don't have a notion of pending. *)
+  transactionIndex : quantity option;
+      (* It can be null if it's in a pending block. *)
   value : quantity;
   v : quantity;
   r : hash;
   s : hash;
 }
 
-let transaction_object_from_rlp block_hash bytes =
-  match Rlp.decode bytes with
-  | Ok
-      (Rlp.List
-        [
-          Value block_number;
-          Value from;
-          Value gas_used;
-          Value gas_price;
-          Value hash;
-          Value input;
-          Value nonce;
-          Value to_;
-          Value index;
-          Value value;
-          Value v;
-          Value r;
-          Value s;
-        ]) ->
-      let block_number = decode_number block_number in
+let transaction_object_from_rlp_item block_hash rlp_item =
+  let decode_optional_number bytes =
+    if block_hash == None then None else Some (decode_number bytes)
+  in
+
+  match rlp_item with
+  | Rlp.List
+      [
+        Value block_number;
+        Value from;
+        Value gas_used;
+        Value gas_price;
+        Value hash;
+        Value input;
+        Value nonce;
+        Value to_;
+        Value index;
+        Value value;
+        Value v;
+        Value r;
+        Value s;
+      ] ->
+      let block_number = decode_optional_number block_number in
       let from = decode_address from in
       let gas = decode_number gas_used in
       let gas_price = decode_number gas_price in
@@ -511,9 +518,11 @@ let transaction_object_from_rlp block_hash bytes =
       let input = decode_hash input in
       let nonce = decode_number nonce in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
-      let index = decode_number index in
+      let index = decode_optional_number index in
       let value = decode_number value in
-      let v = decode_number v in
+      (* The signature is taken from the raw transaction, that is encoded in big
+         endian. *)
+      let v = decode_number_be v in
       let r = decode_hash r in
       let s = decode_hash s in
       {
@@ -532,6 +541,11 @@ let transaction_object_from_rlp block_hash bytes =
         r;
         s;
       }
+  | _ -> raise (Invalid_argument "Expected a List of 13 elements")
+
+let transaction_object_from_rlp block_hash bytes =
+  match Rlp.decode bytes with
+  | Ok rlp_item -> transaction_object_from_rlp_item block_hash rlp_item
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
 let transaction_object_encoding =
@@ -593,8 +607,8 @@ let transaction_object_encoding =
       })
     (merge_objs
        (obj10
-          (req "blockHash" block_hash_encoding)
-          (req "blockNumber" quantity_encoding)
+          (req "blockHash" (option block_hash_encoding))
+          (req "blockNumber" (option quantity_encoding))
           (req "from" address_encoding)
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
@@ -602,7 +616,7 @@ let transaction_object_encoding =
           (req "input" hash_encoding)
           (req "nonce" quantity_encoding)
           (req "to" (option address_encoding))
-          (req "transactionIndex" quantity_encoding))
+          (req "transactionIndex" (option quantity_encoding)))
        (obj4
           (req "value" quantity_encoding)
           (req "v" quantity_encoding)
@@ -1035,6 +1049,7 @@ let hash_raw_tx str =
   str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
   |> Bytes.to_string
 
+(** [transaction_nonce bytes] returns the nonce of a given raw transaction. *)
 let transaction_nonce bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then

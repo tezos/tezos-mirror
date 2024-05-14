@@ -116,17 +116,22 @@ module Make (Reader : READER) = struct
     let* opt_object =
       inspect_durable_and_decode_opt
         (Durable_storage_path.Transaction_object.object_ tx_hash)
-        (Ethereum_types.transaction_object_from_rlp mock_block_hash)
+        (Ethereum_types.transaction_object_from_rlp (Some mock_block_hash))
     in
     match opt_object with
     | Some temp_object ->
+        let*? (blockNumber : quantity) =
+          match temp_object.blockNumber with
+          | None -> error_with "Unexpected null blockNumber in valid object"
+          | Some n -> Ok n
+        in
         let+ blockHash =
           inspect_durable_and_decode
             (Durable_storage_path.Indexes.block_by_number
-               (Nth (un_qty temp_object.blockNumber)))
+               (Nth (un_qty blockNumber)))
             decode_block_hash
         in
-        Some {temp_object with blockHash}
+        Some {temp_object with blockHash = Some blockHash}
     | None -> return_none
 
   let transaction_object_with_block_hash block_hash tx_hash =
@@ -149,7 +154,9 @@ module Make (Reader : READER) = struct
   let populate_tx_objects ~full_transaction_object block =
     let open Lwt_result_syntax in
     if full_transaction_object then
-      let* transactions = full_transactions block.hash block.transactions in
+      let* transactions =
+        full_transactions (Some block.hash) block.transactions
+      in
       return {block with transactions}
     else return block
 

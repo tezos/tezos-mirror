@@ -494,6 +494,33 @@ let register_proxy ~title ~tags ?uses ?admin ?commitment_period
     protocols
     ~setup_mode:(Setup_proxy {devmode = true})
 
+let register_sequencer ~title ~tags ?uses ?additional_config ?admin
+    ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
+    ?rollup_operator_key ?maximum_allowed_ticks f protocols =
+  let register =
+    register_test
+      ~title
+      ~tags
+      ?uses
+      ?additional_config
+      ?admin
+      ?commitment_period
+      ?challenge_window
+      ?bootstrap_accounts
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ?whitelist
+      ?rollup_operator_key
+      ?maximum_allowed_ticks
+      f
+      protocols
+  in
+  register
+    ~setup_mode:
+      (Setup_sequencer
+         {time_between_blocks; sequencer = Constant.bootstrap1; devmode = true})
+
 let register_both ~title ~tags ?uses ?additional_config ?admin
     ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
@@ -1395,15 +1422,198 @@ let test_chunked_transaction =
   register_both ~title ~tags ~da_fee_per_byte test_f
 
 let test_rpc_txpool_content =
-  register_both
+  register_sequencer
     ~tags:["evm"; "rpc"; "txpool_content"]
     ~title:"Check RPC txpool_content is available"
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  (* The content of the txpool is not relevant for now, this test only checks
-     the the RPC is correct, i.e. an object containing both the `pending` and
-     `queued` fields, containing the correct objects: addresses pointing to a
-     mapping of nonces to transactions. *)
-  let* _result = Evm_node.txpool_content evm_node in
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~time_between_blocks:Nothing
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
+  let get_transaction_field transaction_content field_name =
+    transaction_content |> JSON.get field_name |> JSON.as_string_opt
+    |> Option.value ~default:"null"
+  in
+  let check_transaction_content ~transaction_content ~blockHash ~blockNumber
+      ~from ~gas ~gasPrice ~hash ~input ~nonce ~to_ ~transactionIndex ~value ~v
+      ~r ~s =
+    Check.(
+      (get_transaction_field transaction_content "blockHash" = blockHash) string)
+      ~error_msg:"Expected block hash to be %%R, got %%L." ;
+    Check.(
+      (get_transaction_field transaction_content "blockNumber" = blockNumber)
+        string)
+      ~error_msg:"Expected block number to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "from" = from) string)
+      ~error_msg:"Expected caller to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "gas" = gas) string)
+      ~error_msg:"Expected gas to be %%R, got %%L." ;
+    Check.(
+      (get_transaction_field transaction_content "gasPrice" = gasPrice) string)
+      ~error_msg:"Expected gas price to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "hash" = hash) string)
+      ~error_msg:"Expected hash to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "input" = input) string)
+      ~error_msg:"Expected input to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "nonce" = nonce) string)
+      ~error_msg:"Expected nonce to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "to" = to_) string)
+      ~error_msg:"Expected callee to be %%R, got %%L." ;
+    Check.(
+      (get_transaction_field transaction_content "transactionIndex"
+      = transactionIndex)
+        string)
+      ~error_msg:"Expected transaction index to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "value" = value) string)
+      ~error_msg:"Expected value to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "v" = v) string)
+      ~error_msg:"Expected v to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "r" = r) string)
+      ~error_msg:"Expected r to be %%R, got %%L." ;
+    Check.((get_transaction_field transaction_content "s" = s) string)
+      ~error_msg:"Expected s to be %%R, got %%L."
+  in
+  let tx1 =
+    (* {
+         "chainId": "1337",
+         "type": "LegacyTransaction",
+         "valid": true,
+         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
+         "nonce": "0",
+         "gasPrice": "100000",
+         "gasLimit": "23300",
+         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
+         "to": "0x11D3C9168db9d12a3C591061D555870969b43dC9",
+         "v": "0a96",
+         "r": "4217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079",
+         "s": "23ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592",
+         "value": "100",
+         "data": ""
+       } *)
+    "f86480830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a96a04217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079a023ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592"
+  in
+
+  let tx2 =
+    (* {
+         "chainId": "1337",
+         "type": "LegacyTransaction",
+         "valid": true,
+         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
+         "nonce": "1",
+         "gasPrice": "100000",
+         "gasLimit": "23300",
+         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
+         "to": "0x11D3C9168db9d12a3C591061D555870969b43dC9",
+         "v": "0a95",
+         "r": "30d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970",
+         "s": "45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c",
+         "value": "100",
+         "data": ""
+       } *)
+    "f86401830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a95a030d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970a045ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
+  in
+
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx2 evm_node in
+  let* txpool_pending, txpool_queued = Evm_node.txpool_content evm_node in
+  Check.((List.length txpool_pending = 1) int)
+    ~error_msg:
+      "Expected number of addresses with pending transaction to be %%R, got \
+       %%L." ;
+  Check.((List.length txpool_queued = 1) int)
+    ~error_msg:
+      "Expected number of addresses with queued transaction to be %%R, got %%L." ;
+  let transaction_addr_pending = List.nth txpool_pending 0 in
+  let transaction_addr_queued = List.nth txpool_queued 0 in
+  Check.(
+    (transaction_addr_pending.address
+   = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
+      string)
+    ~error_msg:"Expected caller of transaction_1 to be %%R, got %%L." ;
+  Check.(
+    (transaction_addr_queued.address
+   = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
+      string)
+    ~error_msg:"Expected caller of transaction_2 to be %%R, got %%L." ;
+  let num_pending_transaction_addr_1 =
+    List.length transaction_addr_pending.transactions
+  in
+  let num_queued_transaction_addr_1 =
+    List.length transaction_addr_queued.transactions
+  in
+  Check.((num_pending_transaction_addr_1 = 1) int)
+    ~error_msg:"Expected number of pending transaction to be %%R, got %%L." ;
+  Check.((num_queued_transaction_addr_1 = 1) int)
+    ~error_msg:"Expected number of queued transaction to be %%R, got %%L." ;
+  let pending_transaction_addr_1_nonce, pending_transaction_addr_1_content =
+    List.nth transaction_addr_pending.transactions 0
+  in
+  let queued_transaction_addr_1_nonce, queued_transaction_addr_1_content =
+    List.nth transaction_addr_queued.transactions 0
+  in
+  Check.((pending_transaction_addr_1_nonce = 0L) int64)
+    ~error_msg:"Expected nonce pending transaction to be %%R, got %%L." ;
+
+  Check.((queued_transaction_addr_1_nonce = 1L) int64)
+    ~error_msg:"Expected nonce queued transaction to be %%R, got %%L." ;
+
+  let () =
+    check_transaction_content
+      ~transaction_content:pending_transaction_addr_1_content
+      ~blockHash:"null"
+      ~blockNumber:"null"
+      ~from:"0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
+      ~gas:"0x5b04"
+      ~gasPrice:"0x186a0"
+      ~hash:"0xed148f664807dfcb3c7095de22a6c63e72ae4f9d503549c525f5014327b51693"
+      ~input:"0x"
+      ~nonce:"0x0"
+      ~to_:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ~transactionIndex:"null"
+      ~value:"0x64"
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
+           v is currently incorrectly encoded as big-endian by the kernel,
+           causing the decoded value to be incorrect. Should be 0xa96 here *)
+      ~v:"0xa96"
+      ~r:"0x4217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079"
+      ~s:"0x23ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592"
+  in
+
+  let () =
+    check_transaction_content
+      ~transaction_content:queued_transaction_addr_1_content
+      ~blockHash:"null"
+      ~blockNumber:"null"
+      ~from:"0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
+      ~gas:"0x5b04"
+      ~gasPrice:"0x186a0"
+      ~hash:"0x38b2831803a0f9a82bcc68f79bf167311b0adfe9e3d111a7f9579cdfcbae0f0f"
+      ~input:"0x"
+      ~nonce:"0x1"
+      ~to_:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ~transactionIndex:"null"
+      ~value:"0x64"
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
+           v is currently incorrectly encoded as big-endian by the kernel,
+           causing the decoded value to be incorrect. Should be 0xa95 here *)
+      ~v:"0xa95"
+      ~r:"0x30d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970"
+      ~s:"0x45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
+  in
+  let* _level = next_evm_level ~evm_node ~sc_rollup_node ~client in
+  let* txpool_pending, txpool_queued = Evm_node.txpool_content evm_node in
+
+  Check.((List.length txpool_pending = 1) int)
+    ~error_msg:
+      "Expected number of addresses with pending transaction to be %%R, got \
+       %%L." ;
+  Check.((List.length txpool_queued = 0) int)
+    ~error_msg:
+      "Expected number of addresses with queued transaction to be %%R, got %%L." ;
+  let transaction_addr_pending = List.nth txpool_pending 0 in
+  let num_pending_transaction_addr_1 =
+    List.length transaction_addr_pending.transactions
+  in
+  Check.((num_pending_transaction_addr_1 = 1) int)
+    ~error_msg:"Expected number of pending transaction to be %%R, got %%L." ;
   unit
 
 let test_rpc_web3_clientVersion =
