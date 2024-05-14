@@ -222,6 +222,29 @@ let removed_slot =
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
 
+let removing_shards_failed =
+  declare_3
+    ~section
+    ~name:"removing_shards_failed"
+    ~level:Warning
+    ~msg:
+      "removing shards for level {published_level} and index {slot_index} \
+       failed"
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
+
+let removing_slot_failed =
+  declare_3
+    ~section
+    ~name:"removing_slot_failed"
+    ~level:Warning
+    ~msg:
+      "removing slot for level {published_level} and index {slot_index} failed"
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
+
 let decoding_data_failed =
   declare_1
     ~section

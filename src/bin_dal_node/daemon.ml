@@ -317,28 +317,34 @@ module Handler = struct
      all preceeding levels, not only this one. Also, removing could be
      done more efficiently than iterating on all the slots. *)
   let remove_old_level_slots_and_shards proto_parameters ctxt head_level =
-    let open Lwt_result_syntax in
+    let open Lwt_syntax in
     let oldest_level =
       Node_context.next_level_to_gc ctxt ~current_level:head_level
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
-    List.iter_es
+    List.iter_s
       (fun slot_index ->
         let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
-        let*! () =
-          Event.(
-            emit removed_slot_shards (slot_id.slot_level, slot_id.slot_index))
-        in
-        let* () = Store.Shards.remove store.shards slot_id in
-        let*! () =
-          Event.(emit removed_slot (slot_id.slot_level, slot_id.slot_index))
+        let* () =
+          let* res = Store.Shards.remove store.shards slot_id in
+          match res with
+          | Ok () -> Event.(emit removed_slot_shards (oldest_level, slot_index))
+          | Error err ->
+              Event.(
+                emit removing_shards_failed (oldest_level, slot_index, err))
         in
         let* () =
-          Store.Slots.remove_slot
-            store.slots
-            ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-            slot_id
+          let* res =
+            Store.Slots.remove_slot
+              store.slots
+              ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+              slot_id
+          in
+          match res with
+          | Ok () -> Event.(emit removed_slot (oldest_level, slot_index))
+          | Error err ->
+              Event.(emit removing_slot_failed (oldest_level, slot_index, err))
         in
         return_unit)
       (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
@@ -527,7 +533,7 @@ module Handler = struct
                cryptobox
                head_level
                proto_parameters.attestation_lag) ;
-          let* () =
+          let*! () =
             remove_old_level_slots_and_shards proto_parameters ctxt head_level
           in
           let process_block =
