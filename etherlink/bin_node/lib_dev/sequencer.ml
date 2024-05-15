@@ -29,6 +29,8 @@ end) : Services_backend_sig.Backend = struct
       assert false
   end
 
+  module Tracer = Tracer
+
   module SimulatorBackend = struct
     let simulate_and_read ?block ~input () =
       let open Lwt_result_syntax in

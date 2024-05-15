@@ -406,17 +406,24 @@ let dispatch_request (config : Configuration.t)
         let f (_ : unit option) = rpc_ok @@ Qty Z.zero in
         build ~f module_ parameters
     | Method (Trace_transaction.Method, module_) ->
-        let f (_ : Tracer_types.input option) =
-          return
-            (Error
-               JSONRPC.
-                 {
-                   code = -32000;
-                   message = "Method not implemented";
-                   data = Some (`String method_);
-                 })
+        let f ((hash, config) : Tracer_types.input) =
+          let*! trace = Backend_rpc.trace_transaction hash config in
+          match trace with
+          | Ok _ -> rpc_ok ()
+          | Error (Tracer_types.Not_supported :: _) ->
+              rpc_error
+                (Rpc_errors.method_not_supported Trace_transaction.method_)
+          | Error (Tracer_types.Transaction_not_found hash :: _) ->
+              rpc_error (Rpc_errors.trace_transaction_not_found hash)
+          | Error (Tracer_types.Block_not_found number :: _) ->
+              rpc_error (Rpc_errors.trace_block_not_found number)
+          | Error (Tracer_types.Trace_not_found :: _) ->
+              rpc_error Rpc_errors.trace_not_found
+          | Error e ->
+              let msg = Format.asprintf "%a" pp_print_trace e in
+              rpc_error (Rpc_errors.internal_error msg)
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (_, _) ->
         Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
