@@ -1,5 +1,5 @@
 [package]
-name = "risc-v-interpreter"
+name = "octez-risc-v-interpreter"
 version = "0.0.0"
 edition = "2021"
 
@@ -17,11 +17,22 @@ derive_more.workspace = true
 rvemu.workspace = true
 strum.workspace = true
 
+[dependencies.tezos-smart-rollup-constants]
+path = "../../kernel_sdk/constants"
+
+[dependencies.ocaml]
+workspace = true
+optional = true
+
+[build-dependencies]
+ocaml-build.workspace = true
+
 [dev-dependencies]
 hex.workspace = true
 rand.workspace = true
 proptest.workspace = true
 lazy_static.workspace = true
 
-[dependencies.tezos-smart-rollup-constants]
-path = "../../kernel_sdk/constants"
+[features]
+default = []
+ocaml-api = ["ocaml"]

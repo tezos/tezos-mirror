@@ -1,4 +1,4 @@
-use risc_v_interpreter::add;
+use crate::add;
 
 #[ocaml::func]
 #[ocaml::sig("int32 -> int32 -> int32")]

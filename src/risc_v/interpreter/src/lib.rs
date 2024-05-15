@@ -15,6 +15,9 @@ pub mod pvm;
 pub mod state_backend;
 pub mod traps;
 
+#[cfg(feature = "ocaml-api")]
+pub mod ocaml_api;
+
 use crate::{
     machine_state::{
         bus::main_memory::M1G, mode, registers::XRegister, MachineError, MachineState,

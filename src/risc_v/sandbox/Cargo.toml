@@ -38,6 +38,7 @@ version = "0.4.3"
 features = ["serde"]
 
 [dependencies.risc-v-interpreter]
+package = "octez-risc-v-interpreter"
 path = "../interpreter"
 
 [dependencies.rvemu]

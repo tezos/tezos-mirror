@@ -26,7 +26,7 @@
 //! We can describe the layout of this state using the following type.
 //!
 //! ```
-//! use risc_v_interpreter::state_backend::{Atom, Array};
+//! use octez_risc_v_interpreter::state_backend::{Atom, Array};
 //!
 //! type MyStateLayout = (
 //!     Atom<u64>,

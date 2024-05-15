@@ -12,4 +12,4 @@
   -w -9-27-66)
  (modules octez_risc_v_api))
 
-(copy_files ../../risc_v/api/octez_risc_v_api.*)
+(copy_files ../../risc_v/interpreter/octez_risc_v_api.*)
