@@ -389,7 +389,8 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                            "Wow wow wait! It seems an invariant is broken. \
                             Either on the test side, or on the DAL node side"
                    | Some (Some z) ->
-                       (* Attestation with DAL payload *) Z.popcount z * 100 / n
+                       (* Attestation with DAL payload *)
+                       if n = 0 then 100 else Z.popcount z * 100 / n
                    | Some None ->
                        (* Attestation without DAL payload: no DAL rights. *) 100
                  in
