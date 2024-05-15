@@ -66,6 +66,12 @@ impl Machine {
 		&self.position
 	}
 
+	/// ONLY USED FOR TRACING
+	/// Return a cloned value of the program counter.
+	pub fn trace_position(&self) -> Result<usize, ExitReason> {
+		self.position.clone()
+	}
+
 	/// Create a new machine with given code and data.
 	pub fn new(
 		code: Rc<Vec<u8>>,
