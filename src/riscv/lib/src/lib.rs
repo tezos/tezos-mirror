@@ -14,6 +14,7 @@ pub mod program;
 pub mod pvm;
 pub mod range_utils;
 pub mod state_backend;
+pub mod storage;
 pub mod traps;
 
 #[cfg(feature = "ocaml-api")]
