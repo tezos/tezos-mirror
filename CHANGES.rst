@@ -43,6 +43,11 @@ Node
 Client
 ------
 
+- The ``--extra-big-maps`` and ``--other-contracts`` command-line
+  parameters, which are used to specify contextual information in some
+  Michelson-related commands, now allow file names as argument. (MR
+  :gl:`!13311`)
+
 Baker
 -----
 
