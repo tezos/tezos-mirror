@@ -72,8 +72,25 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | No_prover_SRS
 
-(** [commit_slot slot cryptobox] computes the given [slot]'s commitment.
+(** [Cryptobox.polynomial_from_slot] but using the [Errors] module.
 
+    The function returns an error {!ref:Invalid_slot_size} if the
+    [slot]'s size doesn't match the expected slots' size given in
+    [cryptobox], or the [slot]'s polynomial otherwise. *)
+val polynomial_from_slot :
+  Cryptobox.t ->
+  Cryptobox.slot ->
+  (Cryptobox.polynomial, [> Errors.other]) result
+
+(** [commit cryptobox polynomial] computes the commitment of the given
+    [polynomial].
+*)
+val commit :
+  Cryptobox.t ->
+  Cryptobox.polynomial ->
+  (Cryptobox.commitment, [> Errors.other]) result
+
+(** [commit_slot slot cryptobox] computes the given [slot]'s commitment.
     In addition to decoding errors, the function returns an error
     {!ref:Invalid_slot_size} if the [slot]'s size doesn't match the expected
     slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
