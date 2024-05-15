@@ -18,6 +18,9 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
+.PHONY: build
+build: build-kernel inbox-bench
+
 .PHONY: build-kernel
 build-kernel:
 	@cargo build -p jstz --release
