@@ -183,8 +183,15 @@ module Manager : sig
         source : Signature.Public_key_hash.t;
         conflict : operation_conflict;
       }
-    | Inconsistent_sources
-    | Inconsistent_counters
+    | Inconsistent_sources of {
+        fee_payer : public_key_hash;
+        source : public_key_hash;
+      }
+    | Inconsistent_counters of {
+        source : public_key_hash;
+        previous_counter : Manager_counter.t;
+        counter : Manager_counter.t;
+      }
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
@@ -192,6 +199,12 @@ module Manager : sig
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
     | Sponsored_transaction_feature_disabled
+    | Guest_operation_wrong_source of {
+        guest : public_key_hash;
+        source : public_key_hash;
+      }
+    | Guest_hosted_twice of {guest : public_key_hash}
+    | Guest_is_sponsor of public_key_hash
 end
 
 type error += Failing_noop_error

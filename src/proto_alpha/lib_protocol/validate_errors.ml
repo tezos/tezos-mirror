@@ -1092,8 +1092,15 @@ module Manager = struct
         source : Signature.Public_key_hash.t;
         conflict : operation_conflict;
       }
-    | Inconsistent_sources
-    | Inconsistent_counters
+    | Inconsistent_sources of {
+        fee_payer : public_key_hash;
+        source : public_key_hash;
+      }
+    | Inconsistent_counters of {
+        source : public_key_hash;
+        previous_counter : Manager_counter.t;
+        counter : Manager_counter.t;
+      }
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
@@ -1101,6 +1108,12 @@ module Manager = struct
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
     | Sponsored_transaction_feature_disabled
+    | Guest_operation_wrong_source of {
+        guest : public_key_hash;
+        source : public_key_hash;
+      }
+    | Guest_hosted_twice of {guest : public_key_hash}
+    | Guest_is_sponsor of public_key_hash
 
   let () =
     register_error_kind
@@ -1126,33 +1139,58 @@ module Manager = struct
         | Manager_restriction {source; conflict} -> Some (source, conflict)
         | _ -> None)
       (fun (source, conflict) -> Manager_restriction {source; conflict}) ;
-    let inconsistent_sources_description =
-      "The operation batch includes operations from different sources."
-    in
     register_error_kind
       `Permanent
       ~id:"validate.operation.inconsistent_sources"
       ~title:"Inconsistent sources in operation batch"
-      ~description:inconsistent_sources_description
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "%s" inconsistent_sources_description)
-      Data_encoding.empty
-      (function Inconsistent_sources -> Some () | _ -> None)
-      (fun () -> Inconsistent_sources) ;
-    let inconsistent_counters_description =
-      "Inconsistent counters in operation. Counters of an operation must be \
-       successive."
-    in
+      ~description:
+        "Unexpected source encountered in a non-guest operation of a batch."
+      ~pp:(fun ppf (first_source, source) ->
+        Format.fprintf
+          ppf
+          "Unexpected source encountered in a non-guest operation. Expected %a \
+           (the source of the very first operation in the batch, who is the \
+           fee payer, a.k.a. the sponsor), but got %a."
+          Signature.Public_key_hash.pp
+          first_source
+          Signature.Public_key_hash.pp
+          source)
+      Data_encoding.(
+        obj2
+          (req "first_source" Signature.Public_key_hash.encoding)
+          (req "unexpected_source" Signature.Public_key_hash.encoding))
+      (function
+        | Inconsistent_sources {fee_payer; source} -> Some (fee_payer, source)
+        | _ -> None)
+      (fun (fee_payer, source) -> Inconsistent_sources {fee_payer; source}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.inconsistent_counters"
       ~title:"Inconsistent counters in operation"
-      ~description:inconsistent_counters_description
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "%s" inconsistent_counters_description)
-      Data_encoding.empty
-      (function Inconsistent_counters -> Some () | _ -> None)
-      (fun () -> Inconsistent_counters) ;
+      ~description:
+        "Inconsistent counters in operation batch. Counters for the same \
+         source must be consecutive."
+      ~pp:(fun ppf (source, previous_counter, counter) ->
+        Format.fprintf
+          ppf
+          "Non-consecutive counters for source %a: jumped from %a to %a."
+          Signature.Public_key_hash.pp
+          source
+          Manager_counter.pp
+          previous_counter
+          Manager_counter.pp
+          counter)
+      Data_encoding.(
+        obj3
+          (req "source" Signature.Public_key_hash.encoding)
+          (req "previous_counter" Manager_counter.encoding_for_errors)
+          (req "wrong_counter" Manager_counter.encoding_for_errors))
+      (function
+        | Inconsistent_counters {source; previous_counter; counter} ->
+            Some (source, previous_counter, counter)
+        | _ -> None)
+      (fun (source, previous_counter, counter) ->
+        Inconsistent_counters {source; previous_counter; counter}) ;
     let incorrect_reveal_description =
       "Incorrect reveal operation position in batch: only allowed in first \
        position."
@@ -1232,6 +1270,7 @@ module Manager = struct
       Data_encoding.unit
       (function Zk_rollup_feature_disabled -> Some () | _ -> None)
       (fun () -> Zk_rollup_feature_disabled) ;
+
     let sptx_disabled =
       "Sponsored transactions will be enabled in a future proposal."
     in
@@ -1243,7 +1282,60 @@ module Manager = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" sptx_disabled)
       Data_encoding.unit
       (function Sponsored_transaction_feature_disabled -> Some () | _ -> None)
-      (fun () -> Sponsored_transaction_feature_disabled)
+      (fun () -> Sponsored_transaction_feature_disabled) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.guest_operation_wrong_source"
+      ~title:"Wrong source in guest operation"
+      ~description:
+        "The source of an operation does not match the last hosted guest in \
+         the batch."
+      ~pp:(fun ppf (guest, source) ->
+        Format.fprintf
+          ppf
+          "Found an operation with source %a at a position where the source \
+           should be the last hosted guest: %a."
+          Signature.Public_key_hash.pp
+          source
+          Signature.Public_key_hash.pp
+          guest)
+      Data_encoding.(
+        obj2
+          (req "current_guest" Signature.Public_key_hash.encoding)
+          (req "wrong_source" Signature.Public_key_hash.encoding))
+      (function
+        | Guest_operation_wrong_source {guest; source} -> Some (guest, source)
+        | _ -> None)
+      (fun (guest, source) -> Guest_operation_wrong_source {guest; source}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.guest_hosted_twice"
+      ~title:"Guest hosted twice"
+      ~description:"The same guest is hosted twice in the same sponsored batch."
+      ~pp:(fun ppf guest ->
+        Format.fprintf
+          ppf
+          "Guest %a is hosted twice."
+          Signature.Public_key_hash.pp
+          guest)
+      Data_encoding.(obj1 (req "guest" Signature.Public_key_hash.encoding))
+      (function Guest_hosted_twice {guest} -> Some guest | _ -> None)
+      (fun guest -> Guest_hosted_twice {guest}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.guest_is_sponsor"
+      ~title:"Guest is sponsor"
+      ~description:"The sponsor also appears as a guest."
+      ~pp:(fun ppf pkh ->
+        Format.fprintf
+          ppf
+          "The sponsor %a also appears as a guest."
+          Signature.Public_key_hash.pp
+          pkh)
+      Data_encoding.(
+        obj1 (req "sponsor_and_guest" Signature.Public_key_hash.encoding))
+      (function Guest_is_sponsor pkh -> Some pkh | _ -> None)
+      (fun pkh -> Guest_is_sponsor pkh)
 end
 
 type error += Failing_noop_error
