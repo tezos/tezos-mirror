@@ -638,10 +638,10 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
              uninformative logs. *)
         ~daily_logs_section_prefixes:
           [
-            ("rpc_server", Notice);
-            ("rpc_server", Warning);
-            ("rpc_server", Error);
-            ("rpc_server", Fatal);
+            ("rpc_server", Some Notice);
+            ("rpc_server", Some Warning);
+            ("rpc_server", Some Error);
+            ("rpc_server", Some Fatal);
           ]
         ()
     in
@@ -723,10 +723,10 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
              uninformative logs. *)
         ~daily_logs_section_prefixes:
           [
-            ("rpc_server", Notice);
-            ("rpc_server", Warning);
-            ("rpc_server", Error);
-            ("rpc_server", Fatal);
+            ("rpc_server", Some Notice);
+            ("rpc_server", Some Warning);
+            ("rpc_server", Some Error);
+            ("rpc_server", Some Fatal);
           ]
         ()
     in
@@ -888,10 +888,10 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
              uninformative logs. *)
         ~daily_logs_section_prefixes:
           [
-            ("rpc_server", Notice);
-            ("rpc_server", Warning);
-            ("rpc_server", Error);
-            ("rpc_server", Fatal);
+            ("rpc_server", Some Notice);
+            ("rpc_server", Some Warning);
+            ("rpc_server", Some Error);
+            ("rpc_server", Some Fatal);
           ]
         ()
     in

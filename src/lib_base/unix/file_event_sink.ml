@@ -210,7 +210,10 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
       let level_o =
         let open Option_syntax in
         let* lal = Uri.get_query_param uri "level-at-least" in
-        let* lal = Internal_event.Level.of_string lal in
+        (* This should not raise an exception because the URI has been
+           created after parsing the rules and an exception would have been
+           raised earlier *)
+        let* lal = Internal_event.Level.of_string_exn lal in
         return (Event_filter.level_at_least lal)
       in
       let levels = Option.to_list level_o in

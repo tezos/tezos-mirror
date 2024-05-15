@@ -25,13 +25,13 @@
 
 exception Incorrect_log_rules_syntax
 
-exception Incorrect_log_rules_not_a_level
+exception Incorrect_log_rules_not_a_level of string
 
 exception Incorrect_log_rules_missing_level
 
 exception Incorrect_log_rules_missing_pattern
 
-type rules = (string * Internal_event.Level.t) list
+type rules = (string * Internal_event.Level.t option) list
 
 let find_log_rules default =
   match Sys.(getenv_opt "TEZOS_LOG", getenv_opt "LWT_LOG") with
@@ -69,9 +69,10 @@ let parse_rules s =
           | _ -> raise Incorrect_log_rules_syntax
         in
         let level =
-          match Internal_event.Level.of_string level with
-          | None -> raise Incorrect_log_rules_not_a_level
-          | Some lvl -> lvl
+          match Internal_event.Level.of_string_exn level with
+          | level -> level
+          | exception Internal_event.Level.Not_a_level s ->
+              raise (Incorrect_log_rules_not_a_level s)
         in
         Some (pattern, level))
     rules

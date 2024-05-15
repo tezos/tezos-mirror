@@ -45,6 +45,8 @@ type level = Debug | Info | Notice | Warning | Error | Fatal
 
 (** Module to manipulate values of type {!level}.  *)
 module Level : sig
+  exception Not_a_level of string
+
   (** Alias of {!level}. *)
   type t = level
 
@@ -53,7 +55,14 @@ module Level : sig
 
   val to_string : t -> string
 
-  val of_string : string -> t option
+  (** [opt_to_string o] will return [to_string o] if [t] is [Some o] and ["none"] otherwise  *)
+  val opt_to_string : t option -> string
+
+  (** [of_string_exn s] will
+      - return [Some level] if [s] represents a {!level},
+      - return [None] if [s] is ["none"]
+      - raise Not_a_level if [s] is not a proper level *)
+  val of_string_exn : string -> t option
 
   val encoding : t Data_encoding.t
 

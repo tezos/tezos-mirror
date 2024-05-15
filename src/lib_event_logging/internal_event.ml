@@ -61,6 +61,8 @@ let default_error_fallback_logger =
       Lwt.return_unit)
 
 module Level = struct
+  exception Not_a_level of string
+
   type t = level
 
   let default = Info
@@ -73,7 +75,9 @@ module Level = struct
     | Error -> "error"
     | Fatal -> "fatal"
 
-  let of_string str =
+  let opt_to_string = function Some l -> to_string l | None -> "none"
+
+  let of_string_exn str =
     let str = String.lowercase_ascii str in
     match str with
     | "debug" -> Some Debug
@@ -82,7 +86,8 @@ module Level = struct
     | "warning" -> Some Warning
     | "error" -> Some Error
     | "fatal" -> Some Fatal
-    | _ -> None
+    | "none" -> None
+    | _ -> raise (Not_a_level str)
 
   let encoding =
     let open Data_encoding in
