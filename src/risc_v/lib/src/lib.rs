@@ -12,6 +12,7 @@ pub mod machine_state;
 pub mod parser;
 pub mod program;
 pub mod pvm;
+pub mod range_utils;
 pub mod state_backend;
 pub mod traps;
 
@@ -40,8 +41,9 @@ use machine_state::{
     AccessType,
 };
 use pvm::{Pvm, PvmLayout};
+use range_utils::{is_null_range, range_bounds_saturating_sub};
 use state_backend::Elem;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::RangeBounds};
 use traps::Exception;
 use InterpreterResult::*;
 
@@ -104,7 +106,7 @@ impl<'a> Interpreter<'a> {
     fn handle_step_result<F>(
         &mut self,
         mut result: StepManyResult,
-        max: usize,
+        step_bounds: &impl RangeBounds<usize>,
         should_continue: F,
     ) -> InterpreterResult
     where
@@ -122,14 +124,14 @@ impl<'a> Interpreter<'a> {
                     // Handling the ECall marks the completion of a step
                     result.steps = result.steps.saturating_add(1);
 
-                    let steps_left = max.saturating_sub(result.steps);
+                    let new_step_bounds = range_bounds_saturating_sub(step_bounds, result.steps);
                     if let Some(code) = self.pvm.exec_env_state.exit_code() {
                         Exit {
                             code: code as usize,
                             steps: result.steps,
                         }
-                    } else if continue_eval && steps_left > 0 {
-                        self.run_accum(result.steps, steps_left, should_continue)
+                    } else if continue_eval && !is_null_range(&new_step_bounds) {
+                        self.run_accum(result.steps, &new_step_bounds, should_continue)
                     } else {
                         Running(result.steps)
                     }
@@ -141,7 +143,7 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn run(&mut self, max: usize) -> InterpreterResult {
-        self.run_accum(0, max, |_| true)
+        self.run_accum(0, &..=max, |_| true)
     }
 
     /// This function only exists to make the funneling of [steps_done]
@@ -149,31 +151,33 @@ impl<'a> Interpreter<'a> {
     fn run_accum<F>(
         &mut self,
         steps_done: usize,
-        max: usize,
+        step_bounds: &impl RangeBounds<usize>,
         mut should_continue: F,
     ) -> InterpreterResult
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let mut result = self.pvm.machine_state.step_many(max, &mut should_continue);
+        let mut result = self
+            .pvm
+            .machine_state
+            .step_range(step_bounds, &mut should_continue);
         result.steps = result.steps.saturating_add(steps_done);
-        self.handle_step_result(result, max, should_continue)
+        self.handle_step_result(result, step_bounds, should_continue)
     }
 
-    pub fn step_many<F>(&mut self, max: usize, mut should_continue: F) -> InterpreterResult
+    pub fn step_range<F>(
+        &mut self,
+        steps: impl RangeBounds<usize>,
+        mut should_continue: F,
+    ) -> InterpreterResult
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let result = self.pvm.machine_state.step_many(max, &mut should_continue);
-        self.handle_step_result(result, max, should_continue)
-    }
-
-    pub fn step_some<F>(&mut self, max: usize, mut should_continue: F) -> InterpreterResult
-    where
-        F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
-    {
-        let result = self.pvm.machine_state.step_some(max, &mut should_continue);
-        self.handle_step_result(result, max, should_continue)
+        let result = self
+            .pvm
+            .machine_state
+            .step_range(&steps, &mut should_continue);
+        self.handle_step_result(result, &steps, should_continue)
     }
 
     pub fn effective_translation_alg(
