@@ -60,8 +60,6 @@ let event_n = simple_event "notice" Notice
 
 let id = "TEST"
 
-let num = 52
-
 (* This should take around 1s per test *)
 let nb_repeat = 10_000_000
 
@@ -77,19 +75,11 @@ let test_simple_event_logging_time ~executors title simple_event =
     ~team:Team.infrastructure
     ~executors
   @@ fun () ->
-  Long_test.time_lwt title @@ fun () ->
+  (* Even with [nb_repeat = 10_000_000], the measurements are not very precise:
+     we observed some alerts where the duration was up to 33% longer than the average.
+     We thus use a threshold of [margin = 0.5] to avoid alert fatigue. *)
+  Long_test.time_lwt title ~margin:0.5 @@ fun () ->
   repeat nb_repeat @@ fun () -> Simple.emit simple_event (id, 52)
-
-let test_legacy_event_logging_time ~executors title f =
-  Long_test.register
-    ~__FILE__
-    ~title
-    ~tags:["legacy"; "event"; "logging"; "time"; title]
-    ~timeout:(Seconds 10)
-    ~team:Team.infrastructure
-    ~executors
-  @@ fun () ->
-  Long_test.time_lwt title @@ fun () -> repeat nb_repeat f
 
 module Test_sink : SINK = struct
   type t = unit
