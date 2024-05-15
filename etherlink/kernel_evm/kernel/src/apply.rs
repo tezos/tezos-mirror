@@ -22,6 +22,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::contract::Contract;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
@@ -38,7 +39,6 @@ use crate::configuration::Limits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::inbox::{Deposit, Transaction, TransactionContent};
-use crate::indexable_storage::IndexableStorage;
 use crate::storage::index_account;
 use crate::{tick_model, CONFIG};
 

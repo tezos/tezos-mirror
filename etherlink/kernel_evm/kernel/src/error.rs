@@ -11,6 +11,7 @@ use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_data_encoding::enc::BinError;
 use tezos_ethereum::tx_common::SigError;
+use tezos_indexable_storage::IndexableStorageError;
 use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
@@ -187,5 +188,18 @@ impl From<EntrypointError> for Error {
 impl From<BinError> for Error {
     fn from(e: BinError) -> Self {
         Self::Encoding(EncodingError::Bin(e))
+    }
+}
+
+impl From<IndexableStorageError> for Error {
+    fn from(e: IndexableStorageError) -> Self {
+        match e {
+            IndexableStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
+            IndexableStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
+            IndexableStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
+            IndexableStorageError::IndexOutOfBounds => {
+                Error::Storage(StorageError::IndexOutOfBounds)
+            }
+        }
     }
 }

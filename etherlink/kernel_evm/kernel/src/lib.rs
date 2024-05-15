@@ -52,7 +52,6 @@ mod fallback_upgrade;
 mod fees;
 mod gas_price;
 mod inbox;
-mod indexable_storage;
 mod internal_storage;
 mod linked_list;
 mod migration;

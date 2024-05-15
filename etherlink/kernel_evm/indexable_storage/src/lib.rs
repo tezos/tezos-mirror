@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
-use crate::error::StorageError;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Error;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_storage::StorageError;
+use thiserror::Error;
 
 const LENGTH: RefPath = RefPath::assert_from(b"/length");
 
@@ -40,17 +42,29 @@ pub struct IndexableStorage {
     pub path: OwnedPath,
 }
 
+#[derive(Error, Debug, Eq, PartialEq)]
+pub enum IndexableStorageError {
+    #[error(transparent)]
+    Path(#[from] PathError),
+    #[error(transparent)]
+    Runtime(#[from] RuntimeError),
+    #[error(transparent)]
+    Storage(#[from] StorageError),
+    #[error("Storage error: index out of bound")]
+    IndexOutOfBounds,
+}
+
 impl IndexableStorage {
     pub fn new(path: &RefPath<'_>) -> Result<Self, StorageError> {
         Ok(Self { path: path.into() })
     }
 
-    fn value_path(&self, index: u64) -> Result<OwnedPath, StorageError> {
+    fn value_path(&self, index: u64) -> Result<OwnedPath, PathError> {
         let index_as_path: Vec<u8> = format!("/{}", index).into();
         // The key being an integer value, it will always be valid as a path,
         // `assert_from` cannot fail.
         let index_subkey = RefPath::assert_from(&index_as_path);
-        concat(&self.path, &index_subkey).map_err(StorageError::from)
+        concat(&self.path, &index_subkey)
     }
 
     fn store_index<Host: Runtime>(
@@ -58,16 +72,16 @@ impl IndexableStorage {
         host: &mut Host,
         index: u64,
         value_repr: &[u8],
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), IndexableStorageError> {
         let key_path = self.value_path(index)?;
         host.store_write_all(&key_path, value_repr)
-            .map_err(StorageError::from)
+            .map_err(IndexableStorageError::from)
     }
 
     fn get_length_and_increment<Host: Runtime>(
         &self,
         host: &mut Host,
-    ) -> Result<u64, StorageError> {
+    ) -> Result<u64, IndexableStorageError> {
         let path = concat(&self.path, &LENGTH)?;
         let length = read_u64(host, &path).unwrap_or(0);
         store_u64(host, &path, length + 1)?;
@@ -109,17 +123,18 @@ impl IndexableStorage {
 
     /// Returns the value a the given index. Fails if the index is greater or
     /// equal to the length.
-    #[cfg(test)]
+    #[cfg(debug_assertions)]
     pub fn get_value<Host: Runtime>(
         &self,
         host: &Host,
         index: u64,
-    ) -> Result<Vec<u8>, StorageError> {
+    ) -> Result<Vec<u8>, IndexableStorageError> {
         let length = self.length(host)?;
         if index >= length {
-            return Err(StorageError::IndexOutOfBounds);
+            return Err(IndexableStorageError::IndexOutOfBounds);
         };
         self.unsafe_get_value(host, index)
+            .map_err(IndexableStorageError::from)
     }
 
     /// Push a value at index `length`, and increments the length.
@@ -127,7 +142,7 @@ impl IndexableStorage {
         &self,
         host: &mut Host,
         value: &[u8],
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), IndexableStorageError> {
         let new_index = self.get_length_and_increment(host)?;
         self.store_index(host, new_index, value)
     }
@@ -181,7 +196,7 @@ mod tests {
 
         assert_eq!(
             storage.get_value(&host, 1),
-            Err(StorageError::IndexOutOfBounds)
+            Err(IndexableStorageError::IndexOutOfBounds)
         )
     }
 }

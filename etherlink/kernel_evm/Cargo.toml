@@ -8,7 +8,15 @@
 
 [workspace]
 
-members = ["ethereum", "fa_bridge", "kernel", "evm_execution", "evm_evaluation", "logging"]
+members = [
+  "ethereum",
+  "fa_bridge",
+  "kernel",
+  "evm_execution",
+  "evm_evaluation",
+  "indexable_storage",
+  "logging",
+]
 
 [workspace.dependencies]
 
@@ -51,11 +59,12 @@ fa-bridge = { path = "./fa_bridge" }
 tezos_ethereum = { path = "./ethereum" }
 evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
+tezos-indexable-storage = { path = "./indexable_storage" }
 
 # SDK
 tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk" }
-tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core"}
-tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host"}
+tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
+tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
 tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
 tezos-smart-rollup-entrypoint = { path = "../../src/kernel_sdk/entrypoint" }
 tezos-smart-rollup-debug = { path = "../../src/kernel_sdk/debug" }
