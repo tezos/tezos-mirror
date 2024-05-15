@@ -44,13 +44,23 @@ let get_boot_sector (module Plugin : Protocol_plugin_sig.PARTIAL)
 let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
     ~genesis_block_hash (node_ctxt : _ Node_context.t) state =
   let open Lwt_result_syntax in
-  match (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list) with
+  match
+    (node_ctxt.unsafe_patches
+      :> (Pvm_patches.unsafe_patch * Pvm_patches.kind) list)
+  with
   | [] -> return state
   | patches ->
+      let has_user_provided_patches =
+        List.exists
+          (function
+            | _, Pvm_patches.User_provided -> true | _, Hardcoded -> false)
+          patches
+      in
       let*? () =
-        error_unless
-          node_ctxt.config.apply_unsafe_patches
-          (Rollup_node_errors.Needs_apply_unsafe_flag patches)
+        error_when
+          (has_user_provided_patches
+          && not node_ctxt.config.apply_unsafe_patches)
+          (Rollup_node_errors.Needs_apply_unsafe_flag (List.map fst patches))
       in
       let* whitelist =
         Plugin.Layer1_helpers.find_whitelist
@@ -65,7 +75,7 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
           Rollup_node_errors.Cannot_patch_pvm_of_public_rollup
       in
       List.fold_left_es
-        (fun state patch ->
+        (fun state (patch, _kind) ->
           let*! () = Interpreter_event.patching_genesis_state patch in
           Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind state patch)
         state
