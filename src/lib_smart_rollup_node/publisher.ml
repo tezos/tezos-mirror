@@ -131,7 +131,10 @@ let build_commitment (module Plugin : Protocol_plugin_sig.S)
 let genesis_pvm_state (module Plugin : Protocol_plugin_sig.S)
     (node_ctxt : _ Node_context.t) ctxt =
   let open Lwt_result_syntax in
-  match (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list) with
+  match
+    (node_ctxt.unsafe_patches
+      :> (Pvm_patches.unsafe_patch * Pvm_patches.kind) list)
+  with
   | [] -> (
       let*! pvm_state = Context.PVMState.find ctxt in
       match pvm_state with
