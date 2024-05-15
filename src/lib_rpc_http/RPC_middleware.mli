@@ -59,3 +59,12 @@ val rpc_metrics_transform_callback :
   unit Tezos_rpc.Directory.t ->
   RPC_server.callback ->
   RPC_server.callback
+
+(** A Resto middleware that adds Http cache headers to responses of any block 
+    query. These headers can be used to by Caches to invlidate responses. *)
+module Http_cache_headers : sig
+  val make :
+    get_estimated_time_to_next_level:(unit -> Ptime.span option Lwt.t) ->
+    RPC_server.callback ->
+    RPC_server.callback
+end

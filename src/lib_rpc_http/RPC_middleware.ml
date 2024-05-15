@@ -174,3 +174,8 @@ let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarding_endpoint
         ?forwarder_events
         forwarding_endpoint
   | None -> make_transform_callback ?ctx ?forwarder_events forwarding_endpoint
+
+module Http_cache_headers = struct
+  let make ~get_estimated_time_to_next_level:_ callback conn req body =
+    callback conn req body
+end
