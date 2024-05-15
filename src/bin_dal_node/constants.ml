@@ -67,6 +67,8 @@ let shard_cache_size =
   let number_of_slots = 5 in
   number_of_levels_to_keep * number_of_slots
 
+let slot_cache_size = shard_cache_size
+
 let shards_verification_sampling_frequency = 100
 
 let amplification_random_delay_min = 1.

@@ -274,6 +274,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     in
     Store.cache_shards node_store commitment share_array
   in
+  let () = Store.cache_slot node_store commitment slot in
   let* () = Store.(Shards.write_all node_store.shards commitment shards) in
   if with_proof then
     let*? precomputation =
