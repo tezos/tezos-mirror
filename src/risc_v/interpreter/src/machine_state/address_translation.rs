@@ -23,7 +23,7 @@ mod virtual_address;
 
 /// Offset of the `page offset` field in virtual and physical addresses.
 const PAGE_OFFSET_WIDTH: usize = 12;
-const PAGE_SIZE: u64 = 1 << PAGE_OFFSET_WIDTH;
+pub const PAGE_SIZE: u64 = 1 << PAGE_OFFSET_WIDTH;
 
 /// Access type that is used in the virtual address translation process.
 /// Section 5.3.2
