@@ -116,8 +116,8 @@ The life cycle of slots and shards is described by the following steps:
 
 #. Once the operation is included in a final block (that is, there are at least two blocks on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
 #. Attesters check, for all published slots, the availability of the shards they are assigned by interrogating their DAL node, via the RPC ``GET /profiles/<pkh>/attested_levels/<level>/attestable_slots``, where level is the level at which the slot was published plus ``attestation_lag``, and ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
-#. Attesters inject via their baker binary a DAL attestation operation containing the information received at step 6. (See also :doc:`dal_bakers`)
-#. The protocol aggregates the received DAL attestations, and declares each published slot as available or unavailable, depending on whether some threshold is reached, via the blocks metadata.
+#. Attesters attach a DAL payload containing the information received at step 6 to their attestation operation, via their baker binary. (See also :doc:`dal_bakers`)
+#. The protocol aggregates the received attestations, and declares each published slot as available or unavailable, depending on whether some threshold is reached, via the blocks metadata.
 #. Rollups and other users can request stored pages or shards for an attested slot from any DAL node via the RPCs ``GET /slot/pages/<commitment>`` or ``GET /shards/<commitment>`` respectively. Only nodes that store enough shards to reconstruct the slot can provide the requested pages.
 
 Step 2 can be done in parallel with steps 3-4, but before step 5.
