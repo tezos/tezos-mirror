@@ -374,6 +374,12 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                        account.Account.public_key_hash
                    with
                    | None -> (* No attestation in block *) 0
+                   | Some (Some z) when n = 0 ->
+                       if z = Z.zero then (* No slot were published. *) 100
+                       else
+                         Test.fail
+                           "Wow wow wait! It seems an invariant is broken. \
+                            Either on the test side, or on the DAL node side"
                    | Some (Some z) ->
                        (* Attestation with DAL payload *) Z.popcount z * 100 / n
                    | Some None ->
