@@ -33,7 +33,7 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.71.1 1.73.0 && \
+RUN rustup update 1.66.0 1.71.1 1.73.0 1.74.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" \
             wasm32-unknown-unknown \
@@ -48,6 +48,13 @@ RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.73
     && tar xf rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz \
     && rust-std-1.73.0-riscv64gc-unknown-hermit/install.sh \
     && rm -r rust-std-1.73.0-riscv64gc-unknown-hermit rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz
+
+# Install Rust 1.74.0 standard library for riscv64gc-unknown-hermit
+RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.74.0/rust-std-1.74.0-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.74.0-riscv64gc-unknown-hermit.tar.gz \
+    && (echo f0c330eb957dc1acf9a0f0acd6a0b7d97a475e924c2d8eaa85294b66d1156b62 rust-std-1.74.0-riscv64gc-unknown-hermit.tar.gz | sha256sum -c) \
+    && tar xf rust-std-1.74.0-riscv64gc-unknown-hermit.tar.gz \
+    && rust-std-1.74.0-riscv64gc-unknown-hermit/install.sh \
+    && rm -r rust-std-1.74.0-riscv64gc-unknown-hermit rust-std-1.74.0-riscv64gc-unknown-hermit.tar.gz
 
 # Install Taplo
 RUN cargo +stable install taplo-cli --version 0.8.1 && \

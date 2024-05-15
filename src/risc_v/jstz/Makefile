@@ -10,6 +10,14 @@ endif
 .PHONY: all
 all: build test check
 
+.PHONY: build-deps
+build-deps:
+	@exec ../scripts/install-rust-std-hermit.sh
+	@rustup component add rustfmt clippy
+ifneq ($(NATIVE_TARGET),)
+	@rustup target add $(NATIVE_TARGET)
+endif
+
 .PHONY: build
 build:
 	@cargo build --release

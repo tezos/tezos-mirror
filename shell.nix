@@ -144,4 +144,5 @@ in
     CC_wasm32_unknown_unknown = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_linux_gnu = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_none_elf = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_hermit = "${clangNoArch}/bin/clang";
   }
