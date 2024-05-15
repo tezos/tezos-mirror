@@ -6,8 +6,7 @@
 use super::{errors, tui};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
-use risc_v_interpreter::{
+use octez_riscv::{
     bits::Bits64,
     kernel_loader,
     machine_state::{
@@ -18,6 +17,7 @@ use risc_v_interpreter::{
     },
     Interpreter, InterpreterResult,
 };
+use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod render;

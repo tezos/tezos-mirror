@@ -31,6 +31,5 @@ tezos-smart-rollup-encoding.workspace = true
 tezos_crypto_rs.workspace = true
 vm-fdt.workspace = true
 
-[dependencies.risc-v-interpreter]
-package = "octez-risc-v-interpreter"
-path = "../interpreter"
+[dependencies.octez-riscv]
+path = "../lib"

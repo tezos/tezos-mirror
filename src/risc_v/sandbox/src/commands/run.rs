@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{cli::RunOptions, format_status, posix_exit_mode};
-use risc_v_interpreter::{Interpreter, InterpreterResult};
+use octez_riscv::{Interpreter, InterpreterResult};
 use std::error::Error;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {

@@ -1,5 +1,5 @@
 [package]
-name = "octez-risc-v-interpreter"
+name = "octez-riscv"
 version = "0.0.0"
 edition = "2021"
 

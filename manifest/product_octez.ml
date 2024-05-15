@@ -4626,8 +4626,7 @@ let octez_risc_v_api =
     ~deps:[octez_rust_deps]
     ~dep_globs_rec:["../risc_v/*"]
     ~modules:["octez_risc_v_api"]
-    ~dune:
-      Dune.[[S "copy_files"; S "../../risc_v/interpreter/octez_risc_v_api.*"]]
+    ~dune:Dune.[[S "copy_files"; S "../../risc_v/lib/octez_risc_v_api.*"]]
 
 let octez_risc_v_pvm =
   public_lib

@@ -10,11 +10,11 @@ use rvemu::{bus::DRAM_BASE, dram::DRAM_SIZE};
 use std::error::Error;
 
 /// Information about the initial ramdisk.
-pub use risc_v_interpreter::devicetree::InitialRamDisk;
+pub use octez_riscv::devicetree::InitialRamDisk;
 
 /// Generate a Flattened Device Tree for the current hardware configuration.
 pub fn generate(initrd: Option<InitialRamDisk>) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(risc_v_interpreter::devicetree::generate_custom(
+    Ok(octez_riscv::devicetree::generate_custom(
         DRAM_BASE, DRAM_SIZE, initrd,
     )?)
 }

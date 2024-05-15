@@ -1166,7 +1166,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "octez-risc-v-interpreter"
+name = "octez-riscv"
 version = "0.0.0"
 dependencies = [
  "derive_more",
@@ -1565,7 +1565,7 @@ dependencies = [
  "itertools",
  "meansd",
  "numfmt",
- "octez-risc-v-interpreter",
+ "octez-riscv",
  "quanta",
  "ratatui",
  "rvemu",
