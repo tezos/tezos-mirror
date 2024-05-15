@@ -40,10 +40,24 @@ val process_head :
   Octez_smart_rollup.Inbox.t * string list ->
   ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
 
+type original_genesis_state = Original of Context.pvmstate
+
+(** [genesis_state plugin ?genesis_block node_ctxt] returns a pair [s1, s2]
+    where [s1] is the PVM state at the genesis block and [s2] is the genesis
+    state without any patches applied. [s2] is meant to be used to compute the
+    genesis commitment. If there are no unsafe patches for the rollup [s2] is
+    the same as [s1]. *)
+val genesis_state :
+  (module Protocol_plugin_sig.PARTIAL) ->
+  ?genesis_block:Block_hash.t ->
+  _ Node_context.t ->
+  (Context.pvmstate * original_genesis_state) tzresult Lwt.t
+
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
-    (state, hash)] for a given [tick] if this [tick] happened before
-    [level]. Otherwise, returns [None]. If provided, the evaluation is resumed
-    from [start_state]. *)
+    state] for a given [tick] if this [tick] happened before [level] and where
+    [state] is the PVM evaluation state before [tick] happened. Otherwise,
+    returns [None]. If provided, the evaluation is resumed from
+    [start_state]. *)
 val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
   Node_context.rw ->
@@ -60,4 +74,4 @@ val state_of_head :
   'a Node_context.t ->
   'a Context.t ->
   Layer1.head ->
-  ('a Context.t * Context.pvmstate) tzresult Lwt.t
+  Context.pvmstate tzresult Lwt.t
