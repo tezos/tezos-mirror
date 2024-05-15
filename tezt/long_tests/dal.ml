@@ -181,7 +181,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
   let timeout = Long_test.Seconds (repeat * 10 * expected_running_time) in
   Long_test.register
     ~__FILE__
-    ~title:"DAL node produce and propagate shards"
+    ~title:measurement
     ~tags:["dal"]
     ~uses:[Constant.octez_dal_node]
     ~executors
