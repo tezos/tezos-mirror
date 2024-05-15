@@ -66,12 +66,12 @@ module Make (Args : Gc_args.S) = struct
       objects and parent commits from [commit_key] in [commit_store] and
       [node_store].
 
-      - If [parents] is true, then parents commits and their tree objects are
+      - If [recurse] is true, then parents commits and their tree objects are
         traversed recursively. Otherwise, only the immediate parent are included
         (but not their tree objects).
       - [min_offset] restricts the traversal to objects/commits with a larger or
         equal offset. *)
-  let iter_reachable ~parents ~min_offset commit_key commit_store node_store =
+  let iter_reachable ~recurse ~min_offset commit_key commit_store node_store =
     let live = Ranges.make () in
     let todos = Priority_queue.create 1024 in
     let schedule ~offset kind =
@@ -81,7 +81,7 @@ module Make (Args : Gc_args.S) = struct
       match Commit_store.get_offset commit_store key with
       | offset ->
           let kind =
-            if parents then Commit
+            if recurse then Commit
             else
               (* Include the commit parents in the reachable file, but not their children.
                  The parent(s) of [commit] must be included in the iteration
@@ -144,14 +144,14 @@ module Make (Args : Gc_args.S) = struct
       compacted [(offset, length)] of the reachable tree objects and its direct
       parent commits. *)
   let snapshot_commit commit_key commit_store node_store =
-    iter_reachable ~parents:false ~min_offset:Int63.zero commit_key commit_store
+    iter_reachable ~recurse:false ~min_offset:Int63.zero commit_key commit_store
       node_store
 
   (** [traverse_range ~min_offset commit_key commit_store node_store] returns
       the list of compacted [(offset, length)] of the recursively reachable tree
       objects and parent commits, such that [offset >= min_offset]. *)
   let traverse_range ~min_offset commit_key commit_store node_store =
-    iter_reachable ~parents:true ~min_offset commit_key commit_store node_store
+    iter_reachable ~recurse:true ~min_offset commit_key commit_store node_store
 
   (* Dangling_parent_commit are the parents of the gced commit. They are kept on
      disk in order to correctly deserialised the gced commit. *)
