@@ -4714,7 +4714,13 @@ let test_unsafe_genesis_patch ~private_ ~kind =
             (sf {| [ { "increase_max_nb_tick" : "%Ld"} ] |} max_nb_tick) )
         config) ;
   () ;
-  let* () = Sc_rollup_node.run ~wait_ready:false rollup_node rollup [] in
+  let* () =
+    Sc_rollup_node.run
+      ~wait_ready:false
+      rollup_node
+      rollup
+      [Apply_unsafe_patches]
+  in
   if should_fail then
     let msg =
       if unsupported_pvm then rex "Patch .* is not supported"
