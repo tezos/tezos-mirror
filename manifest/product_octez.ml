@@ -181,7 +181,8 @@ let octez_stdlib =
     ~js_of_ocaml:
       [[S "javascript_files"; G (Dune.of_atom_list ["tzBytes_js.js"])]]
     ~inline_tests:ppx_expect
-    ~foreign_stubs:{language = C; flags = []; names = ["tzBytes_c"]}
+    ~foreign_stubs:
+      {language = C; flags = []; names = ["tzBytes_c"]; include_dirs = []}
 
 let _octez_stdlib_tests =
   tezt
@@ -536,6 +537,93 @@ let octez_rpc =
       ]
     ~js_compatible:true
 
+let octez_rust_deps =
+  public_lib
+    "octez-rust-deps"
+    ~path:"src/rust_deps"
+    ~synopsis:"Octez Rust Dependencies"
+    ~js_compatible:true
+    ~foreign_archives:["octez_rust_deps"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "dirs";
+            S ":standard";
+            (* We need this stanza to ensure .cargo can be used as a
+               dependency via source_tree. *)
+            S ".cargo";
+            (* Do not track Cargo output directory. *)
+            [S "not"; S "target"];
+          ];
+          [
+            S "rule";
+            [
+              S "targets";
+              S "liboctez_rust_deps.a";
+              S "dlloctez_rust_deps.so";
+              S "wasmer.h";
+              S "wasm.h";
+            ];
+            [
+              S "deps";
+              [S "file"; S "Cargo.toml"];
+              [S "file"; S "Cargo.lock"];
+              [S "file"; S "../../rust-toolchain"];
+              [S "source_tree"; S ".cargo"];
+              [S "source_tree"; S "librustzcash"];
+              [S "source_tree"; S "wasmer-3.3.0"];
+              [S "source_tree"; S "src"];
+              [S "source_tree"; S "../risc_v"];
+              [S "source_tree"; S "../kernel_sdk"];
+            ];
+            [
+              S "action";
+              [
+                S "no-infer";
+                [
+                  S "progn";
+                  of_atom_list
+                    ["run"; "rm"; "-f"; "wasmer-3.3.0/lib/c-api/wasmer.h"];
+                  of_atom_list
+                    [
+                      "run";
+                      "cargo";
+                      "build";
+                      "--release";
+                      "-p";
+                      "octez-rust-deps";
+                    ];
+                  of_atom_list
+                    [
+                      "copy";
+                      "target/release/liboctez_rust_deps.a";
+                      "liboctez_rust_deps.a";
+                    ];
+                  of_atom_list
+                    [
+                      "bash";
+                      "test -r target/release/liboctez_rust_deps.so && cp -f \
+                       target/release/liboctez_rust_deps.so \
+                       dlloctez_rust_deps.so || true";
+                    ];
+                  of_atom_list
+                    [
+                      "bash";
+                      "test -r target/release/liboctez_rust_deps.dylib && cp \
+                       -f target/release/liboctez_rust_deps.dylib \
+                       dlloctez_rust_deps.so || true";
+                    ];
+                  of_atom_list
+                    ["copy"; "wasmer-3.3.0/lib/c-api/wasmer.h"; "wasmer.h"];
+                  of_atom_list
+                    ["copy"; "wasmer-3.3.0/lib/c-api/wasm.h"; "wasm.h"];
+                ];
+              ];
+            ];
+          ];
+        ]
+
 let bls12_381 =
   public_lib
     "bls12-381"
@@ -582,6 +670,7 @@ let bls12_381 =
             S ":standard";
             [S ":include"; S "c_flags_blst.sexp"];
           ];
+        include_dirs = [];
         names = ["blst_wrapper"; "blst_bindings_stubs"];
       }
     ~dune:
@@ -770,6 +859,7 @@ let octez_bls12_381_signature =
       {
         language = C;
         flags = [S "-Wall"; S "-Wextra"; S ":standard"];
+        include_dirs = [];
         names = ["blst_bindings_stubs"];
       }
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
@@ -906,6 +996,7 @@ let octez_bls12_381_hash =
       {
         language = C;
         flags = [];
+        include_dirs = [];
         names =
           [
             "caml_rescue_stubs";
@@ -1031,6 +1122,7 @@ let octez_bls12_381_polynomial =
       {
         language = C;
         flags = [];
+        include_dirs = [];
         names =
           [
             "caml_bls12_381_polynomial_polynomial_stubs";
@@ -2579,15 +2671,16 @@ let octez_wasmer =
     ~internal_name:"tezos_wasmer"
     ~path:"src/lib_wasmer"
     ~synopsis:"Wasmer bindings for SCORU WASM"
-    ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; tezos_rust_lib]
+    ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; octez_rust_deps]
+    ~dep_globs_rec:["../rust_deps/wasmer-3.3.0/*"]
     ~preprocess:[pps ppx_deriving_show]
     ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
     ~ctypes:
       Ctypes.
         {
-          external_library_name = "wasmer";
+          external_library_name = "octez_rust_deps";
           include_header = "wasmer.h";
-          extra_search_dir = "%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs";
+          extra_search_dir = "../rust_deps";
           type_description = {instance = "Types"; functor_ = "Api_types_desc"};
           function_description =
             {instance = "Functions"; functor_ = "Api_funcs_desc"};
@@ -2595,7 +2688,7 @@ let octez_wasmer =
           generated_entry_point = "Api";
           c_flags = ["-Wno-incompatible-pointer-types"];
           c_library_flags = [];
-          deps = [];
+          deps = ["../rust_deps/wasmer.h"; "../rust_deps/wasm.h"];
         }
 
 let _octez_wasmer_test =
@@ -3167,24 +3260,20 @@ let octez_sapling =
         octez_stdlib |> open_;
         octez_crypto;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        tezos_rust_lib;
         tezos_sapling_parameters;
         octez_lwt_result_stdlib;
+        octez_rust_deps;
       ]
+    ~dep_globs_rec:["../rust_deps/librustzcash/*"]
     ~js_of_ocaml:[[S "javascript_files"; S "runtime.js"]]
     ~foreign_stubs:
       {
         language = C;
-        flags =
-          [S ":standard"; S "-I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs"];
+        flags = [S ":standard"];
+        include_dirs = ["../rust_deps/librustzcash/include"];
         names = ["rustzcash_ctypes_c_stubs"];
       }
-    ~c_library_flags:
-      [
-        "-L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs";
-        "-lrustzcash";
-        "-lpthread";
-      ]
+    ~c_library_flags:["-lpthread"]
     ~dune:
       Dune.
         [
@@ -4343,7 +4432,12 @@ let octez_benchmark =
       "Tezos: library for writing benchmarks and performing simple parameter \
        inference"
     ~foreign_stubs:
-      {language = C; flags = [S ":standard"]; names = ["snoop_stubs"]}
+      {
+        language = C;
+        flags = [S ":standard"];
+        include_dirs = [];
+        names = ["snoop_stubs"];
+      }
     ~private_modules:["builtin_models"; "builtin_benchmarks"]
     ~deps:
       [
@@ -4440,7 +4534,8 @@ let octez_shell_benchmarks =
         octez_micheline;
       ]
     ~linkall:true
-    ~foreign_stubs:{language = C; flags = []; names = ["alloc_mmap"]}
+    ~foreign_stubs:
+      {language = C; flags = []; include_dirs = []; names = ["alloc_mmap"]}
 
 let octogram =
   public_lib
@@ -4522,149 +4617,15 @@ let _octez_embedded_protocol_packer =
     ~linkall:true
     ~modules:["Main_embedded_packer"]
 
-let octez_risc_v =
-  let base_name = "octez_risc_v_api" in
-  let archive_file = Format.sprintf "lib%s.a" base_name in
-  let dyn_archive_file = Format.sprintf "dll%s.so" base_name in
-  let archive_output_file = Format.sprintf "target/release/%s" archive_file in
-
-  let armerge =
-    let open Dune in
-    [
-      S "subdir";
-      S "helpers/bin";
-      [
-        S "rule";
-        [S "target"; S "armerge"];
-        [S "enabled_if"; of_atom_list ["="; "%{system}"; "macosx"]];
-        [
-          S "action";
-          [
-            S "chdir";
-            S "../..";
-            of_atom_list
-              [
-                "run";
-                "cargo";
-                "install";
-                "--locked";
-                "armerge";
-                "--version";
-                "2.0.0";
-                "--bins";
-                "--target-dir";
-                "target";
-                "--root";
-                "helpers";
-              ];
-          ];
-        ];
-      ];
-    ]
-  in
-  let make_rust_foreign_library_rule ?(extra_dep = Dune.E) ~enable_if ~transform
-      ~dyn_archive_output_file () =
-    let open Dune in
-    [
-      S "rule";
-      [S "targets"; S archive_file; S dyn_archive_file];
-      [
-        S "deps";
-        [S "file"; S "Cargo.lock"];
-        [S "file"; S "Cargo.toml"];
-        (* For the local dependent crates, these patterns only include files
-         * directly contained in the crate's directory, as well as the [src]
-         * directory, excluding all other directories in order to avoid
-         * copying any build artifacts. *)
-        [S "source_tree"; S ".cargo"];
-        [S "source_tree"; S "api"];
-        [S "source_tree"; S "interpreter"];
-        (* We have to include all the locally mentioned Cargo.toml files
-         * within the workspace (including transitively). *)
-        [S "file"; S "sandbox/Cargo.toml"];
-        [S "source_tree"; S "../kernel_sdk/constants"];
-        [S "file"; S "../kernel_sdk/constants/Cargo.toml"];
-        [S "file"; S "../kernel_sdk/core/Cargo.toml"];
-        [S "file"; S "../kernel_sdk/host/Cargo.toml"];
-        [S "file"; S "../kernel_sdk/encoding/Cargo.toml"];
-        extra_dep;
-      ];
-      [S "enabled_if"; enable_if];
-      [
-        S "action";
-        [
-          S "no-infer";
-          [
-            S "progn";
-            of_atom_list
-              ["run"; "cargo"; "build"; "--release"; "-p"; "octez-risc-v-api"];
-            transform archive_output_file archive_file;
-            of_atom_list ["copy"; dyn_archive_output_file; dyn_archive_file];
-          ];
-        ];
-      ];
-    ]
-  in
-  let rust_foreign_library_darwin =
-    let open Dune in
-    make_rust_foreign_library_rule (* Make sure armerge is built beforehand *)
-      ~extra_dep:(of_atom_list ["file"; "helpers/bin/armerge"])
-      ~enable_if:(of_atom_list ["="; "%{system}"; "macosx"])
-      ~dyn_archive_output_file:
-        (Format.sprintf "target/release/lib%s.dylib" base_name)
-      ~transform:(fun input output ->
-        (* We use armerge to keep only the essential symbols. This resolves
-           issues on Mac where the linker can't resolve duplicate symbols
-           when the resulting static library is linked with other static
-           Rust libraries. *)
-        of_atom_list
-          [
-            "run";
-            "helpers/bin/armerge";
-            "--keep-symbols=^_?octez_";
-            input;
-            "--output";
-            output;
-          ])
-      ()
-  in
-  let rust_foreign_library =
-    let open Dune in
-    make_rust_foreign_library_rule
-      ~enable_if:(of_atom_list ["<>"; "%{system}"; "macosx"])
-      ~transform:(fun input output -> of_atom_list ["copy"; input; output])
-      ~dyn_archive_output_file:
-        (Format.sprintf "target/release/lib%s.so" base_name)
-      ()
-  in
-  public_lib
-    "octez-risc-v"
-    ~path:"src/risc_v"
-    ~synopsis:"OCaml API of the RISC-V Rust components"
-    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
-    ~foreign_archives:[base_name]
-    ~dune:
-      Dune.
-        [
-          [
-            S "dirs";
-            S ":standard";
-            (* We need this stanza to ensure .cargo can be used as a
-               dependency via source_tree. *)
-            S ".cargo";
-          ];
-          armerge;
-          rust_foreign_library;
-          rust_foreign_library_darwin;
-        ]
-
 let octez_risc_v_api =
   public_lib
     "octez-risc-v-api"
     ~path:"src/lib_risc_v/api"
     ~synopsis:"OCaml API of the RISC-V Rust components"
     ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
-    ~deps:[octez_risc_v]
+    ~deps:[octez_rust_deps]
+    ~dep_globs_rec:["../risc_v/*"]
+    ~modules:["octez_risc_v_api"]
     ~dune:Dune.[[S "copy_files"; S "../../risc_v/api/octez_risc_v_api.*"]]
 
 let octez_risc_v_pvm =

@@ -99,13 +99,15 @@ module Dune : sig
 
       - [language] is the foreign language of the stubs.
       - [flags] is a list of flags to pass on compilation, such as [-I] flags.
+      - [include_dirs] is a list of directories where header files can be found.
       - [names] is the names of the stubs.
 
-      This becomes a [(foreign_stubs (language ...) (flags ...) (names ...))] stanza
+      This becomes a [(foreign_stubs (language ...) (flags ...) (include_dirs ...) (names ...))] stanza
       in the generated dune file. *)
   type foreign_stubs = {
     language : language;
     flags : s_expr;
+    include_dirs : string list;
     names : string list;
   }
 
@@ -540,8 +542,7 @@ module Ctypes : sig
             link against *)
     include_header : string;  (** Header file to include *)
     extra_search_dir : string;
-        (** The C compiler and linker will look in this directory to find header
-            files and libraries. *)
+        (** The C compiler will look in this directory to find header files. *)
     type_description : description;
         (** Module information for the type stub descriptions *)
     function_description : description;

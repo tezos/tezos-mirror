@@ -3,9 +3,6 @@ name = "octez-risc-v-api"
 version = "0.0.0"
 edition = "2021"
 
-[lib]
-crate-type = ["staticlib", "dylib"]
-
 [dependencies.ocaml]
 version = "^1.0.0-beta"
 

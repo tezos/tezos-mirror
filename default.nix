@@ -86,7 +86,7 @@ in
 
     hardeningDisable = ["stackprotector"];
 
-    buildInputs = packages ++ [pkgs.makeWrapper];
+    buildInputs = packages ++ (with pkgs; [makeWrapper cacert]);
 
     # Disable OPAM usage in Makefile.
     TEZOS_WITHOUT_OPAM = true;
@@ -97,7 +97,7 @@ in
     src = pkgs.lib.sources.cleanSourceWith {
       filter = name: type:
         if type == "directory"
-        then name != "_build" && name != "target"
+        then name != "_build" && name != "target" && name != ".direnv"
         else true;
       src = pkgs.lib.sources.cleanSource ./.;
     };
@@ -106,7 +106,7 @@ in
     dontCheck = true;
 
     buildPhase = ''
-      make experimental-release
+      CARGO_HOME=$TMPDIR/.cargo make experimental-release
     '';
 
     installPhase = ''
