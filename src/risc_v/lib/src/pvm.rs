@@ -70,31 +70,21 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         Status::Eval
     }
 
-    /// Defines how to handle exceptions in the PVM execution environment.
-    /// Returns `true` in case the PVM may continue evaluation afterwards.
-    fn handle_exception(&mut self, exception: EnvironException) -> bool {
+    /// Handle an exception using the defined Execution Environment.
+    pub fn handle_exception(&mut self, exception: EnvironException) -> exec_env::EcallOutcome {
         match exception {
             EnvironException::EnvCallFromUMode
             | EnvironException::EnvCallFromSMode
-            | EnvironException::EnvCallFromMMode => {
-                match self
-                    .exec_env_state
-                    .handle_call(&mut self.machine_state, exception)
-                {
-                    exec_env::EcallOutcome::Fatal { .. } => {
-                        // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
-                        unimplemented!("Fatal exceptions aren't implemented yet")
-                    }
-                    exec_env::EcallOutcome::Handled { continue_eval } => continue_eval,
-                }
-            }
+            | EnvironException::EnvCallFromMMode => self
+                .exec_env_state
+                .handle_call(&mut self.machine_state, exception),
         }
     }
 
     /// Perform one step. Returns `false` if the PVM is not in [`Status::Eval`] status.
     pub fn step(&mut self) -> bool {
         if let Err(exc) = self.machine_state.step() {
-            self.handle_exception(exc);
+            let _: exec_env::EcallOutcome = self.handle_exception(exc);
         }
 
         true
@@ -136,7 +126,10 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             steps = steps.saturating_add(1);
 
             // Exception was handled in a way that allows us to evaluate more.
-            if self.handle_exception(exc) {
+            if let exec_env::EcallOutcome::Handled {
+                continue_eval: true,
+            } = self.handle_exception(exc)
+            {
                 let steps_left = max_steps.saturating_sub(steps);
                 return self.step_many_accum(steps_left, total_steps);
             }
