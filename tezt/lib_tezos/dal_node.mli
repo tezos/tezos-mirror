@@ -166,7 +166,7 @@ module Config_file : sig
 end
 
 (** Read the peer id from the node's identity file. *)
-val read_identity : t -> string
+val read_identity : t -> string Lwt.t
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t

@@ -3215,11 +3215,10 @@ let check_expected expected found = if expected <> found then None else Some ()
 let ( let*?? ) a b = Option.bind a b
 
 let check_new_connection_event ~main_node ~other_node ~is_trusted =
+  let* other_node_id = Dal_node.read_identity other_node in
   wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
       let*?? () =
-        check_expected
-          (Dal_node.read_identity other_node)
-          JSON.(event |-> "peer" |> as_string)
+        check_expected other_node_id JSON.(event |-> "peer" |> as_string)
       in
       check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
 
@@ -3503,8 +3502,8 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     in addition to sending Subscribe messages. *)
 let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
   let profile1 = Dal_RPC.Attester pkh1 in
-  let peer_id1 = Dal_node.read_identity dal_node1 in
-  let peer_id2 = Dal_node.read_identity dal_node2 in
+  let* peer_id1 = Dal_node.read_identity dal_node1 in
+  let* peer_id2 = Dal_node.read_identity dal_node2 in
   (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
   let event_waiter =
     check_events_with_topic
@@ -3607,7 +3606,7 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
   let dal_node2 = Dal_node.create ~node () in
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
-  let peer_id = Dal_node.read_identity dal_node2 in
+  let* peer_id = Dal_node.read_identity dal_node2 in
   (* kill dal_node2 and check "disconnection" event in node1. *)
   let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
   let* () = Dal_node.kill dal_node2 in
@@ -3690,6 +3689,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       ~number_of_shards
   in
   let waiter_receive_shards =
+    let* from_peer = Dal_node.read_identity dal_node1 in
     waiter_receive_shards
       committee
       dal_node2
@@ -3697,7 +3697,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       ~publish_level
       ~slot_index
       ~pkh:pkh1
-      ~from_peer:(Dal_node.read_identity dal_node1)
+      ~from_peer
       ~number_of_shards
   in
   let waiter_app_notifs =
@@ -3840,8 +3840,8 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
   (* The two nodes join the same topics *)
   let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
 
-  let peer_id1 = Dal_node.read_identity dal_node1 in
-  let peer_id2 = Dal_node.read_identity dal_node2 in
+  let* peer_id1 = Dal_node.read_identity dal_node1 in
+  let* peer_id2 = Dal_node.read_identity dal_node2 in
   (* Once a block is baked and shards injected into GS, we expect dal_node1 to
      be pruned by dal_node2 because its score will become negative due to
      invalid messages. *)
@@ -4029,9 +4029,9 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
   (* Get the nodes' identities. *)
   let id dal_node = Dal_node.read_identity dal_node in
-  let id_dal_node1 = id dal_node1 in
-  let id_dal_node2 = id dal_node2 in
-  let id_dal_node3 = id dal_node3 in
+  let* id_dal_node1 = id dal_node1 in
+  let* id_dal_node2 = id dal_node2 in
+  let* id_dal_node3 = id dal_node3 in
 
   (* Prepare disconnection events to observe. *)
   let disconn_ev_in_node1_2 =
@@ -4332,7 +4332,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   in
   let peers = [Dal_node.listen_addr dal_bootstrap] in
   let peer_id dal_node = Dal_node.read_identity dal_node in
-  let bootstrap_peer_id = peer_id dal_bootstrap in
+  let* bootstrap_peer_id = peer_id dal_bootstrap in
 
   (* Check that the attestation threshold for this test is 100%. If
      not, this means that we forgot to register the test with
@@ -4348,7 +4348,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let producer = Dal_node.create ~name:"producer" ~node () in
   let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
   let* () = Dal_node.run ~wait_ready:true producer in
-  let producer_peer_id = peer_id producer in
+  let* producer_peer_id = peer_id producer in
   let* () =
     check_profiles
       ~__LOC__
@@ -4364,7 +4364,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let attester = Dal_node.create ~name:"attester" ~node () in
   let* () = Dal_node.init_config ~attester_profiles:all_pkhs ~peers attester in
   let* () = Dal_node.run ~wait_ready:true attester in
-  let attester_peer_id = peer_id attester in
+  let* attester_peer_id = peer_id attester in
 
   (* The connections between attesters and the slot producer have no
      reason to be grafted on other slot indices than the one the slot
@@ -4874,11 +4874,11 @@ module Amplification = struct
 
   let attester_peer_id (attester : attester) =
     match attester.peer_id with
-    | Some pid -> pid
+    | Some pid -> Lwt.return pid
     | None ->
-        let pid = Dal_node.read_identity attester.dal_node in
+        let* pid = Dal_node.read_identity attester.dal_node in
         attester.peer_id <- Some pid ;
-        pid
+        Lwt.return pid
 
   let test_amplification _protocol dal_parameters _cryptobox node client
       dal_bootstrap =
@@ -4956,7 +4956,7 @@ module Amplification = struct
         slot_producer
         ~expected:Dal_RPC.(Operator [Producer slot_index])
     in
-    let slot_producer_peer_id = Dal_node.read_identity slot_producer in
+    let* slot_producer_peer_id = Dal_node.read_identity slot_producer in
     info "Slot producer DAL node is running" ;
 
     let* () =
@@ -4965,7 +4965,7 @@ module Amplification = struct
         observer
         ~expected:Dal_RPC.(Operator [Observer slot_index])
     in
-    let observer_peer_id = Dal_node.read_identity observer in
+    let* observer_peer_id = Dal_node.read_identity observer in
     info "Observer DAL node is running" ;
 
     let* () =
@@ -4993,8 +4993,9 @@ module Amplification = struct
        producer the observer, in any direction. *)
     let check_graft_promise (producer_or_observer, peer_id) attester =
       let graft_from_attester_promise =
+        let* attester_peer_id = attester_peer_id attester in
         check_events_with_topic
-          ~event_with_topic:(Graft (attester_peer_id attester))
+          ~event_with_topic:(Graft attester_peer_id)
           producer_or_observer
           ~num_slots:number_of_slots
           ~already_seen_slots
@@ -5065,9 +5066,10 @@ module Amplification = struct
       Lwt.join
       @@ List.map
            (fun attester ->
+             let* attester_peer_id = attester_peer_id attester in
              ban_p2p_peer
                (slot_producer, slot_producer_peer_id)
-               ~peer:(attester.dal_node, attester_peer_id attester))
+               ~peer:(attester.dal_node, attester_peer_id))
            banned_attesters
     in
     info "DAL network is ready" ;
@@ -5294,7 +5296,7 @@ module Amplification = struct
     let producer = Dal_node.create ~name:"producer" ~node () in
     let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
     let* () = Dal_node.run ~wait_ready:true producer in
-    let producer_peer_id = peer_id producer in
+    let* producer_peer_id = peer_id producer in
     let* () =
       check_profiles
         ~__LOC__
@@ -5306,7 +5308,7 @@ module Amplification = struct
     let observer = Dal_node.create ~name:"observer" ~node () in
     let* () = Dal_node.init_config ~observer_profiles:[index] ~peers observer in
     let* () = Dal_node.run ~wait_ready:true observer in
-    let observer_peer_id = peer_id observer in
+    let* observer_peer_id = peer_id observer in
     let* () =
       check_profiles
         ~__LOC__
@@ -5631,8 +5633,9 @@ module Garbage_collection = struct
     (* Wait for a GRAFT message between all nodes. *)
     let check_graft node1 node2 attester_pkh =
       let check_graft ~from:node1 node2 =
+        let* node1_id = Dal_node.read_identity node1 in
         check_events_with_topic
-          ~event_with_topic:(Graft (Dal_node.read_identity node1))
+          ~event_with_topic:(Graft node1_id)
           node2
           ~num_slots:number_of_slots
           ~already_seen_slots

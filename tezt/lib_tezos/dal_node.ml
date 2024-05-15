@@ -166,7 +166,16 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
 
 let read_identity dal_node =
   let filename = sf "%s/identity.json" @@ data_dir dal_node in
-  JSON.(parse_file filename |-> "peer_id" |> as_string)
+  match dal_node.persistent_state.runner with
+  | None -> Lwt.return JSON.(parse_file filename |-> "peer_id" |> as_string)
+  | Some runner ->
+      let* content =
+        Process.spawn ~runner "cat" [filename] |> Process.check_and_read_stdout
+      in
+      JSON.(
+        parse ~origin:"Dal_node.read_identity" content
+        |-> "peer_id" |> as_string)
+      |> Lwt.return
 
 let check_event ?timeout ?where dal_node name promise =
   let* result =
