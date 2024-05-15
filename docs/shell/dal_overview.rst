@@ -55,7 +55,7 @@ network, retrieve these assigned shards (step 5). The bakers must
 download and verify these shards within a specific timeframe,
 precisely defined by the economic protocol as the ``attestation lag``
 period. At the end of the attestation lag period, bakers declare using
-another dedicated operation, whether they were able to download the
+an optional field of the consensus attestation operation, whether they were able to download the
 shards effectively (illustrated in step 6). The economic protocol
 collates these attestations and, if a sufficient number of bakers have
 successfully obtained the shards, the data is declared as available
