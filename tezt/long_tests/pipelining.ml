@@ -43,9 +43,9 @@ let manager_kind_to_string = function
    unit in a block without exceeding the `hard_gas_limit_per_block` from the
    protocol (1.73M gas unit since P). *)
 let number_of_operation_from_manager_kind = function
-  | `Transfer -> 1666 (* x1040 gas units *)
-  | `Origination -> 17 (* x100_000 gas units *)
-  | `Call -> 2 (* x850_000 gas units *)
+  | `Transfer -> 1333 (* x1040 gas units *)
+  | `Origination -> 13 (* x100_000 gas units *)
+  | `Call -> 2 (* x650_000 gas units *)
 
 let protocols = Protocol.all
 
@@ -246,7 +246,7 @@ let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
              ()
     | `Call -> (
         (* Magical constant that makes the contract consume around 850K gas unit *)
-        let arg = `O [("int", `String "8206473")] in
+        let arg = `O [("int", `String "6306473")] in
         match contract_hash with
         | None ->
             Test.fail "Contract hash should be given to craft Call operations"
@@ -254,8 +254,8 @@ let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
             Operation.Manager.make
               ~source
               ~counter
-              ~fee:850_000
-              ~gas_limit:850_000
+              ~fee:650_000
+              ~gas_limit:650_000
             @@ Operation.Manager.call
                  ~amount:0
                  ~entrypoint:"default"
