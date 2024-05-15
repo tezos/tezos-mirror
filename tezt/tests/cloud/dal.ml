@@ -836,7 +836,7 @@ let produce_slot t level i =
   in
   Lwt.return_unit
 
-let producers_ready t =
+let producers_not_ready t =
   (* If not all the producer nodes are ready, we do not publish the commitment
        for the current level. Another attempt will be done at the next level. *)
   let producer_ready producer =
@@ -850,7 +850,7 @@ let producers_ready t =
 let rec loop t level =
   let p = on_new_level t level in
   let _p2 =
-    if producers_ready t then Lwt.return_unit
+    if producers_not_ready t then Lwt.return_unit
     else
       Seq.ints 0
       |> Seq.take t.configuration.dal_node_producer
