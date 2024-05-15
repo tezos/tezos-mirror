@@ -163,6 +163,7 @@ module Slots_handlers = struct
             cryptobox
             commitment
             slot
+            polynomial
         in
         return (commitment, commitment_proof))
 

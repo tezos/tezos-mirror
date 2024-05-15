@@ -111,8 +111,8 @@ val get_slot_content :
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store
-    cryptobox commitment slot] registers the shards of the slot whose
-    commitment is given.
+    cryptobox commitment slot polynomial] registers the shards of the
+    slot whose commitment is given.
 
     Proofs are generated for the computed shards using
     [shards_proofs_precomputation] and stored in a bounded structure
@@ -129,6 +129,7 @@ val add_commitment_shards :
   Cryptobox.t ->
   Cryptobox.commitment ->
   Cryptobox.slot ->
+  Cryptobox.polynomial ->
   (unit, [> Errors.other]) result Lwt.t
 
 (** This function publishes the given shards and their proofs. *)
