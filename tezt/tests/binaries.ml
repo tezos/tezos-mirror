@@ -72,9 +72,9 @@ let test_versions commands =
       (Uses.path cmd)
       version_flag
       node_version ;
-    let* result = spawn_command cmd in
+    let* r = spawn_command cmd in
     let error_msg = "%s: expected version %L, got version %R" in
-    Check.((node_version = String.trim result) ~__LOC__ string ~error_msg) ;
+    Check.((node_version = String.trim r) ~__LOC__ string ~error_msg) ;
     unit
   in
   Lwt_list.iter_s loop commands
