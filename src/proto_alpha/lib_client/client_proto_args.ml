@@ -272,11 +272,13 @@ let init_arg =
     string_parameter
 
 let other_contracts_parameter =
-  Tezos_clic.parameter (fun _ source ->
+  file_or_text_parameter
+    ~from_text:(fun _ source ->
       let open Lwt_result_syntax in
       let* parsed = parse_micheline_parameter source in
       let*? l = Michelson_v1_stack.parse_other_contracts parsed in
       return l)
+    ()
 
 let other_contracts_arg =
   Tezos_clic.arg
@@ -287,11 +289,13 @@ let other_contracts_arg =
     other_contracts_parameter
 
 let extra_big_maps_parameter =
-  Tezos_clic.parameter (fun _ source ->
+  file_or_text_parameter
+    ~from_text:(fun _ source ->
       let open Lwt_result_syntax in
       let* parsed = parse_micheline_parameter source in
       let*? l = Michelson_v1_stack.parse_extra_big_maps parsed in
       return l)
+    ()
 
 let extra_big_maps_arg =
   Tezos_clic.arg
