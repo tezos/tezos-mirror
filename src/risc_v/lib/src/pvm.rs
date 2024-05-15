@@ -81,7 +81,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
                     .exec_env_state
                     .handle_call(&mut self.machine_state, exception)
                 {
-                    exec_env::EcallOutcome::Fatal => {
+                    exec_env::EcallOutcome::Fatal { .. } => {
                         // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
                         unimplemented!("Fatal exceptions aren't implemented yet")
                     }

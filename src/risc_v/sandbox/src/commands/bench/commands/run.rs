@@ -42,13 +42,21 @@ fn compose(
     use InterpreterResult::*;
     match current_state {
         Exit { .. } => current_state,
-        Exception(_, _) => current_state,
+        Exception { .. } => current_state,
         Running(prev_steps) => match following_result {
             Exit { code, steps } => Exit {
                 code,
                 steps: prev_steps + steps,
             },
-            Exception(exc, steps) => Exception(exc, prev_steps + steps),
+            Exception {
+                cause,
+                steps,
+                message,
+            } => Exception {
+                cause,
+                message,
+                steps: prev_steps + steps,
+            },
             Running(steps) => Running(prev_steps + steps),
         },
     }
@@ -74,7 +82,7 @@ fn bench_fine(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData {
         run_res = compose(run_res, step_res);
         match run_res {
             InterpreterResult::Exit { .. } => break,
-            InterpreterResult::Exception(_, _) => break,
+            InterpreterResult::Exception { .. } => break,
             InterpreterResult::Running(_) => (),
         }
     }
@@ -94,7 +102,7 @@ fn bench_simple(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData
     let steps = match res {
         Exit { steps, .. } => steps,
         Running(steps) => steps,
-        Exception(_exc, steps) => steps,
+        Exception { steps, .. } => steps,
     };
     let data = SimpleBenchData::new(duration, steps);
 

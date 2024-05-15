@@ -74,11 +74,15 @@ where
                     SBI_TEZOS_BLAKE2B_HASH256 => todo!(),
 
                     // Unimplemented
-                    _ => EcallOutcome::Fatal,
+                    _ => EcallOutcome::Fatal {
+                        message: format!("Unsupported Tezos SBI extension function {sbi_function}"),
+                    },
                 }
             }
             // Unimplemented
-            _ => EcallOutcome::Fatal,
+            _ => EcallOutcome::Fatal {
+                message: format!("Unsupported SBI extension {sbi_extension}"),
+            },
         }
     }
 }

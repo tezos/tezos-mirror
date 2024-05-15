@@ -18,7 +18,7 @@ fn format_status(result: &InterpreterResult) -> String {
         Exit { code: 0, .. } => "Ok (exit code = 0)".to_string(),
         Exit { code, .. } => format!("Failed with exit code = {}", code),
         Running(_) => "Timeout".to_string(),
-        Exception(exc, _) => format!("{}", exception_to_error(exc)),
+        Exception { cause, .. } => format!("{}", exception_to_error(cause)),
     }
 }
 
