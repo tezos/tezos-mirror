@@ -735,14 +735,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Outdated messages are dropped.
 
            We check the status of the first message to know whether we should
-           process more messages.
+           process more messages. Indeed, a message has an unknown validity only
+           if it is from a future level, and if the first message is from the
+           future, then all other messages are from the future as well (given
+           that the order used by `Bounded_message_map` is the order on levels),
+           so they do not need to be checked.
 
-           Two messages mey differ just from their sender. The content of the
-           message and the id might be the same. In that case, we may check the
-           validity of the same message id multiple times. This is ok because
-           this check should be almost free. However, the check of the message
-           will be done once since it will be added to the message cache of
-           gossipsub after being validated the first time.
+           The same message may have been sent by multiple senders, but it will
+           appear only once in the map. As a consequence, it will be handle by
+           the automaton only once. This is different from the case where the
+           validity of the message is known the first time it is received.
+
+           This also mean score-wise that only the first sender will be
+           impacted. This may introduce a small biais which should have a
+           relatively small impact on the positive case. If the message is
+           invalid, then only the first one will be punished. It is not that bad
+           since this state is transient.
         *)
         match GS.Message_id.valid message.message_id with
         | `Valid | `Invalid ->
