@@ -92,12 +92,17 @@ impl BlockConstants {
     /// Return the first block of the chain (genisis).
     /// TODO find suitable values for gas_limit et.c.
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
-    pub fn first_block(timestamp: U256, chain_id: U256, block_fees: BlockFees) -> Self {
+    pub fn first_block(
+        timestamp: U256,
+        chain_id: U256,
+        block_fees: BlockFees,
+        gas_limit: u64,
+    ) -> Self {
         Self {
             number: U256::zero(),
             coinbase: H160::zero(),
             timestamp,
-            gas_limit: 1u64,
+            gas_limit,
             block_fees,
             chain_id,
             prevrandao: None,
@@ -157,6 +162,7 @@ impl L2Block {
         state_root: OwnedHash,
         receipts_root: OwnedHash,
         gas_used: U256,
+        gas_limit: u64,
     ) -> Self {
         let hash = Self::hash(
             parent_hash,
@@ -182,7 +188,9 @@ impl L2Block {
             state_root,
             receipts_root,
             gas_used,
-            ..Self::default()
+            gas_limit: Some(gas_limit),
+            extra_data: None,
+            miner: None,
         }
     }
 

@@ -299,7 +299,7 @@ fn compute_bip<Host: KernelRuntime>(
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
-                .finalize_and_store(host)
+                .finalize_and_store(host, current_constants)
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
             *current_block_parent_hash = new_block.hash;
@@ -384,7 +384,7 @@ pub fn produce<Host: Runtime>(
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
                 (
-                    BlockConstants::first_block(timestamp, chain_id, block_fees),
+                    BlockConstants::first_block(timestamp, chain_id, block_fees, GAS_LIMIT),
                     U256::zero(),
                     H256::from_slice(&hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()),
                 )
@@ -1318,7 +1318,12 @@ mod tests {
         let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block fees should be defined");
-        BlockConstants::first_block(timestamp, chain_id.unwrap(), block_fees.unwrap())
+        BlockConstants::first_block(
+            timestamp,
+            chain_id.unwrap(),
+            block_fees.unwrap(),
+            crate::block::GAS_LIMIT,
+        )
     }
 
     #[test]

@@ -240,7 +240,12 @@ impl Evaluation {
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
-                BlockConstants::first_block(timestamp, chain_id, block_fees)
+                BlockConstants::first_block(
+                    timestamp,
+                    chain_id,
+                    block_fees,
+                    crate::block::GAS_LIMIT,
+                )
             }
         };
 
@@ -359,7 +364,12 @@ impl TxValidation {
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
-                BlockConstants::first_block(timestamp, chain_id, block_fees)
+                BlockConstants::first_block(
+                    timestamp,
+                    chain_id,
+                    block_fees,
+                    crate::block::GAS_LIMIT,
+                )
             }
         };
 
@@ -697,6 +707,7 @@ mod tests {
             timestamp,
             chain_id.unwrap(),
             block_fees.unwrap(),
+            crate::block::GAS_LIMIT,
         );
         let precompiles = precompiles::precompile_set::<Host>();
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();

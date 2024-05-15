@@ -286,7 +286,8 @@ mod test_helpers {
             U256::from(21000),
             U256::from(2_000_000_000_000u64),
         );
-        let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
+        let block =
+            BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
         let config = Config::shanghai();

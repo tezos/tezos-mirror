@@ -2350,7 +2350,7 @@ mod test {
             U256::from(12345),
             U256::from(2_000_000_000_000u64),
         );
-        BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
+        BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX)
     }
 
     #[test]

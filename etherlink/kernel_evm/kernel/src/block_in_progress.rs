@@ -18,7 +18,7 @@ use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::{BlockConstants, L2Block};
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
@@ -286,6 +286,7 @@ impl BlockInProgress {
     pub fn finalize_and_store<Host: KernelRuntime>(
         self,
         host: &mut Host,
+        block_constants: &BlockConstants,
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, Some(EVM_ACCOUNTS_PATH))?;
         let receipts_root =
@@ -302,6 +303,7 @@ impl BlockInProgress {
             state_root,
             receipts_root,
             self.cumulative_gas,
+            block_constants.gas_limit,
         );
         storage::store_current_block(host, &new_block)
             .context("Failed to store the current block")?;
