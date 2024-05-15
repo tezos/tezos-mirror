@@ -1,5 +1,5 @@
 [workspace]
-members = ["kernel"]
+members = ["bench", "kernel"]
 resolver = "2"
 
 [patch.crates-io]
@@ -34,5 +34,13 @@ features = [
 ]
 
 [workspace.dependencies.jstz_kernel]
+git = "https://github.com/trilitech/jstz.git"
+rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
+
+[workspace.dependencies.jstz_crypto]
+git = "https://github.com/trilitech/jstz.git"
+rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
+
+[workspace.dependencies.jstz_proto]
 git = "https://github.com/trilitech/jstz.git"
 rev = "d12faf23299b706f507e46a7aa517588fa93ec18"

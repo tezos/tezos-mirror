@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
 /// Single Inbox message
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Message {
     /// Already serialised inbox message
@@ -20,7 +20,7 @@ pub enum Message {
 }
 
 /// Inbox contents read from a file grouped by levels.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InboxFile(pub Vec<Vec<Message>>);
 
 impl InboxFile {
@@ -29,5 +29,13 @@ impl InboxFile {
         let contents = fs::read(path)?;
         let inbox = serde_json::de::from_slice(contents.as_slice())?;
         Ok(inbox)
+    }
+
+    /// Write the Inbox file to a file.
+    #[allow(unused)]
+    pub fn save(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = fs::File::create(path)?;
+        serde_json::ser::to_writer_pretty(&mut file, self)?;
+        Ok(())
     }
 }
