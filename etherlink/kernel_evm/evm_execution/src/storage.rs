@@ -3,12 +3,63 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Storage interface for EVM kernel
-//!
-//! This interfaces to the part of Ethereum world state we keep in durable
-//! storage. It does not contain any part of storage related to the tickets.
-//! This module (and transactions.rs module) should be refactored completely
-//! as part of milestone <https://gitlab.com/tezos/tezos/-/milestones/109>.
+pub mod tracer {
+    use host::{
+        path::RefPath,
+        runtime::{Runtime, RuntimeError},
+    };
+
+    use tezos_indexable_storage::IndexableStorage;
+    use thiserror::Error;
+
+    use crate::trace::StructLog;
+
+    const TRACE_GAS: RefPath = RefPath::assert_from(b"/evm/trace/gas");
+    const TRACE_FAILED: RefPath = RefPath::assert_from(b"/evm/trace/failed");
+    const TRACE_RETURN_VALUE: RefPath = RefPath::assert_from(b"/evm/trace/return_value");
+    const TRACE_STRUCT_LOGS: RefPath = RefPath::assert_from(b"/evm/trace/struct_logs");
+
+    #[derive(Error, Debug, PartialEq)]
+    pub enum Error {
+        #[error("Error while tracing.")]
+        TracerError,
+    }
+
+    pub fn store_trace_gas<Host: Runtime>(
+        host: &mut Host,
+        gas: u64,
+    ) -> Result<(), RuntimeError> {
+        host.store_write_all(&TRACE_GAS, gas.to_le_bytes().as_slice())
+    }
+
+    pub fn store_trace_failed<Host: Runtime>(
+        host: &mut Host,
+        status: u8,
+    ) -> Result<(), RuntimeError> {
+        host.store_write_all(&TRACE_FAILED, &[status])
+    }
+
+    pub fn store_return_value<Host: Runtime>(
+        host: &mut Host,
+        value: &[u8],
+    ) -> Result<(), RuntimeError> {
+        host.store_write_all(&TRACE_RETURN_VALUE, value)
+    }
+
+    pub fn store_struct_log<Host: Runtime>(
+        host: &mut Host,
+        struct_log: StructLog,
+    ) -> Result<(), Error> {
+        let logs = rlp::encode(&struct_log);
+
+        let struct_logs_storage =
+            IndexableStorage::new(&TRACE_STRUCT_LOGS).map_err(|_| Error::TracerError)?;
+
+        struct_logs_storage
+            .push_value(host, &logs)
+            .map_err(|_| Error::TracerError)
+    }
+}
 
 /// API to interact with blocks storage
 pub mod blocks {

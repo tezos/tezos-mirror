@@ -566,6 +566,7 @@ dependencies = [
  "sha3",
  "substrate-bn",
  "tezos-evm-logging",
+ "tezos-indexable-storage",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
