@@ -8,6 +8,50 @@
 module Cryptobox = Dal_common.Cryptobox
 module Helpers = Dal_common.Helpers
 
+module Disconnected = struct
+  (* The number of block during which the baker stays disconnected *)
+  let time_disconnected = 10
+
+  (* Each [disconnect_frequency] blocks, a baker is disconnected *)
+  let disconnect_frequency = 8
+
+  module IMap = Map.Make (Int)
+
+  (* The state contains bakers indexes that have been disconnected associated
+     with the level at where they have been disconnected *)
+  let state = ref IMap.empty
+
+  (* The next baker to disconnected is stored there *)
+  let next_to_disconnect = ref 0
+
+  (* This function only does something when a relevant level is reached. In
+     that case, the next baker to disconnect is added with the current level in
+     the state and [f] is applied that baker *)
+  let disconnect level f =
+    if level mod disconnect_frequency <> 0 then Lwt.return_unit
+    else
+      match IMap.find_opt !next_to_disconnect !state with
+      | Some _ -> Lwt.return_unit
+      | None ->
+          state := IMap.add !next_to_disconnect level !state ;
+          let res = f !next_to_disconnect in
+          next_to_disconnect := !next_to_disconnect + 1 ;
+          res
+
+  (* Applies [f] on the bakers DAL nodes that have been disconnected for long
+     enough *)
+  let reconnect level f =
+    let bakers_to_reconnect, bakers_to_keep_disconnected =
+      IMap.partition
+        (fun _ disco_level -> level >= disco_level + time_disconnected)
+        !state
+    in
+    state := bakers_to_keep_disconnected ;
+    IMap.to_seq bakers_to_reconnect
+    |> List.of_seq
+    |> Lwt_list.iter_p (fun (b, _) -> f b)
+end
+
 module Cli = struct
   let section =
     Clap.section
@@ -891,7 +935,39 @@ let init ~(configuration : configuration) cloud next_agent =
       metrics;
     }
 
-let on_new_level t level =
+let wait_for_gossipsub_worker_event ~name dal_node lambda =
+  Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
+
+let check_expected expected found = if expected <> found then None else Some ()
+
+let ( let*?? ) a b = Option.bind a b
+
+let check_new_connection_event ~main_node ~other_node ~is_trusted =
+  let* id = Dal_node.read_identity other_node in
+  wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
+      let*?? () = check_expected id JSON.(event |-> "peer" |> as_string) in
+      check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
+
+(** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
+    [dal_node2] will use [dal_node1] as a bootstrap peer.
+
+    For this to work, [dal_node1] must already be running. *)
+let connect_nodes_via_p2p dal_node1 dal_node2 =
+  (* We ensure that [dal_node1] connects to [dal_node2]. *)
+  let conn_ev_in_node1 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node2
+      ~is_trusted:false
+  in
+  let* () = Dal_node.run dal_node2 in
+  Log.info
+    "Node %s started. Waiting for connection with node %s"
+    (Dal_node.name dal_node2)
+    (Dal_node.name dal_node1) ;
+  conn_ev_in_node1
+
+let on_new_level ?(disconnect = false) t level =
   let node = t.bootstrap.node in
   let client = t.bootstrap.client in
   let* () =
@@ -907,7 +983,21 @@ let on_new_level t level =
   pp_metrics t metrics ;
   push_metrics t metrics ;
   Hashtbl.replace t.metrics level metrics ;
-  Lwt.return_unit
+  if not disconnect then Lwt.return_unit
+  else
+    let nb_bakers = List.length t.bakers in
+    let* () =
+      Disconnected.disconnect level (fun b ->
+          let baker_to_disconnect =
+            (List.nth t.bakers (b mod nb_bakers)).dal_node
+          in
+          Dal_node.terminate baker_to_disconnect)
+    in
+    Disconnected.reconnect level (fun b ->
+        let baker_to_reconnect =
+          (List.nth t.bakers (b mod nb_bakers)).dal_node
+        in
+        connect_nodes_via_p2p t.bootstrap.dal_node baker_to_reconnect)
 
 let produce_slot t level i =
   let producer = List.nth t.producers i in
@@ -943,7 +1033,7 @@ let producers_not_ready t =
   List.for_all producer_ready t.producers
 
 let rec loop t level =
-  let p = on_new_level t level in
+  let p = on_new_level ~disconnect:true t level in
   let _p2 =
     if producers_not_ready t then Lwt.return_unit
     else
