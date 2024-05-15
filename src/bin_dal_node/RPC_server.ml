@@ -159,7 +159,8 @@ module Slots_handlers = struct
             let padding = String.make (slot_size - slot_length) query#padding in
             Ok (Bytes.of_string (slot ^ padding))
         in
-        let* commitment = Slot_manager.commit_slot slot cryptobox in
+        let*? polynomial = Slot_manager.polynomial_from_slot cryptobox slot in
+        let*? commitment = Slot_manager.commit cryptobox polynomial in
         let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
         let* () =
           Slot_manager.add_commitment_shards
@@ -183,7 +184,11 @@ module Slots_handlers = struct
             cryptobox
             slot_id
         in
-        Slot_manager.commit_slot content cryptobox)
+        let*? polynomial =
+          Slot_manager.polynomial_from_slot cryptobox content
+        in
+        let*? commitment = Slot_manager.commit cryptobox polynomial in
+        return commitment)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->

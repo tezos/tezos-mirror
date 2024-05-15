@@ -90,16 +90,6 @@ val commit :
   Cryptobox.polynomial ->
   (Cryptobox.commitment, [> Errors.other]) result
 
-(** [commit_slot slot cryptobox] computes the given [slot]'s commitment.
-    In addition to decoding errors, the function returns an error
-    {!ref:Invalid_slot_size} if the [slot]'s size doesn't match the expected
-    slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
-*)
-val commit_slot :
-  Cryptobox.slot ->
-  Cryptobox.t ->
-  (Cryptobox.commitment, [> Errors.other]) result Lwt.t
-
 (** [get_slot_content ~reconstruct_if_missing node_ctxt node_store
     cryptobox slot_id] returns the slot content associated with the
     given [slot_id] in [node_store].
