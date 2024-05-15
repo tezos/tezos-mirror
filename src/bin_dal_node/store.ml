@@ -230,7 +230,7 @@ module Slots = struct
     KVS.remove_file t file_layout (commitment, slot_size)
 end
 
-module Shard_proofs_cache =
+module Commitment_indexed_cache =
   Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (struct
       type t = Cryptobox.Commitment.t
@@ -240,6 +240,9 @@ module Shard_proofs_cache =
       let hash = Hashtbl.hash
     end)
 
+module Shard_proofs_cache = Commitment_indexed_cache
+module Shard_cache = Commitment_indexed_cache
+
 (** Store context *)
 type t = {
   store : irmin;
@@ -247,16 +250,20 @@ type t = {
   slots : Slots.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
+  not_yet_published_shards : Cryptobox.share array Shard_cache.t;
 }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
 
    handle with_proof flag -> store proofs on disk? *)
-let save_shard_proofs node_store commitment shard_proofs =
+let cache_shard_proofs node_store commitment shard_proofs =
   Shard_proofs_cache.replace
     node_store.in_memory_shard_proofs
     commitment
     shard_proofs
+
+let cache_shards node_store commitment shards =
+  Shard_cache.replace node_store.not_yet_published_shards commitment shards
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
@@ -275,6 +282,7 @@ let init config =
       store;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
+      not_yet_published_shards = Shard_cache.create Constants.shard_cache_size;
     }
 
 let tztrace_of_read_error read_err =

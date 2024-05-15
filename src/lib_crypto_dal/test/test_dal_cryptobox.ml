@@ -164,6 +164,34 @@ module Test = struct
 
   let make params = Cryptobox.make (get_cryptobox_parameters params)
 
+  (* Tests that [shards_from_polynomial] returns all the shards in
+     increasing order of shard index. *)
+  let test_shards_from_polynomial =
+    let open QCheck2 in
+    let open Error_monad.Result_syntax in
+    Test.make
+      ~name:"shards_from_polynomial increasing order"
+      ~print:print_parameters
+      ~count:30
+      generate_parameters
+      (fun params ->
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
+        assert (ensure_validity params) ;
+        (let* t = make params in
+         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+         let shards = Cryptobox.shards_from_polynomial t polynomial in
+         let increasing =
+           Seq.fold_lefti
+             (fun acc i Cryptobox.{index; share = _} -> acc && i = index)
+             true
+             shards
+         in
+         let complete = Seq.length shards = params.number_of_shards in
+         return (increasing && complete))
+        |> function
+        | Ok check -> check
+        | Error _ -> false)
+
   (* Tests that with a fraction 1/redundancy_factor of the shards
      the decoding succeeds. Checks equality of polynomials. *)
   let test_erasure_code =
@@ -1172,6 +1200,7 @@ let () =
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
           Test.
             [
+              test_shards_from_polynomial;
               test_erasure_code;
               test_erasure_code_with_slot_conversion;
               test_erasure_code_failure_out_of_range;

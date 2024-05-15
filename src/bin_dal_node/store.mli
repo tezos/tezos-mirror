@@ -97,17 +97,23 @@ module Slots : sig
     t -> slot_size:int -> commitment -> unit tzresult Lwt.t
 end
 
-module Shard_proofs_cache : sig
-  (** Shard proofs are not stored on disk because we can recompute
-      them. This computation is quite costly though so we cache the
-      result in memory. *)
-
+module Commitment_indexed_cache : sig
   type 'a t
 
-  (** Returns the element associated to the commitment in the shard proofs cache, or [None] if
-      there is none. *)
+  (** Returns the element associated to the commitment in the cache,
+      or [None] if there is none. *)
   val find_opt : 'a t -> commitment -> 'a option
 end
+
+(** Shard proofs are not stored on disk because we can recompute
+    them. This computation is quite costly though so we cache the
+    result in memory. *)
+module Shard_proofs_cache = Commitment_indexed_cache
+
+(** A cache in which we keep the shards of the slots which we have
+    received via RPC but are not yet published so we cannot yet assign
+    a slot id to them. *)
+module Shard_cache = Commitment_indexed_cache
 
 type t = private {
   store : irmin;  (** The Irmin-based part of the store *)
@@ -115,12 +121,18 @@ type t = private {
   slots : Slots.t;  (** Slots store *)
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
+  not_yet_published_shards : Cryptobox.share array Shard_cache.t;
+      (** Cache of shards *)
 }
 
-(** [save_shard_proofs store commitment shard_proofs] replaces in
-      the shard proof cache all the shard proofs for the given
-      commitment with the given ones. *)
-val save_shard_proofs : t -> commitment -> shard_proof array -> unit
+(** [cache_shard_proofs store commitment shard_proofs] replaces in the
+    shard proof cache all the shard proofs for the given commitment
+    with the given ones. *)
+val cache_shard_proofs : t -> commitment -> shard_proof array -> unit
+
+(** [cache_shards store commitment shards] adds [shards] to the shard
+    cache with key [commitment]. *)
+val cache_shards : t -> commitment -> Cryptobox.share array -> unit
 
 val init : Configuration_file.t -> t tzresult Lwt.t
 

@@ -160,7 +160,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
         Store.(Shards.write_all node_store.shards commitment shards)
         |> Errors.to_tzresult
       in
-      Store.save_shard_proofs node_store commitment shard_proofs ;
+      Store.cache_shard_proofs node_store commitment shard_proofs ;
       let* () =
         Slot_manager.publish_proved_shards
           ~published_level
