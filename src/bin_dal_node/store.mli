@@ -88,6 +88,20 @@ module Slots : sig
   val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
 end
 
+module Statuses : sig
+  (** A store keeping the attestation status of slot ids. *)
+
+  type t
+
+  (** [get_slot_status ~slot_id store] returns the status associated
+      to the given accepted [slot_id], or [None] if no status is
+      associated to the [slot_id]. *)
+  val get_slot_status :
+    slot_id:Types.slot_id ->
+    t ->
+    (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
+end
+
 module Commitment_indexed_cache : sig
   type 'a t
 
@@ -97,6 +111,7 @@ module Commitment_indexed_cache : sig
 end
 
 type t = private {
+  slot_header_statuses : Statuses.t;
   store : irmin;  (** The Irmin-based part of the store *)
   shards : Shards.t;  (** Shards store *)
   slots : Slots.t;  (** Slots store *)

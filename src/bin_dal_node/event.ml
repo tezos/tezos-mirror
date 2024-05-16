@@ -205,6 +205,18 @@ let stored_slot_shard =
     ("slot_index", Data_encoding.int31)
     ("shard_index", Data_encoding.int31)
 
+let stored_slot_status =
+  declare_3
+    ~section
+    ~name:"stored_slot_status"
+    ~msg:
+      "stored slot status for level {published_level} and index {slot_index}: \
+       {status}"
+    ~level:Debug
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("status", Types.header_status_encoding)
+
 let removed_slot_shards =
   declare_2
     ~section

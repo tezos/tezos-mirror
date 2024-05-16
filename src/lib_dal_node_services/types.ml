@@ -360,6 +360,9 @@ let attestable_slots_encoding : attestable_slots Data_encoding.t =
         (function () -> Not_in_committee);
     ]
 
+(* Note: this encoding is used to store statuses on disk using the
+   [Key_value_store] module. As such, it's important that this is a
+   fixed-size encoding. *)
 let header_status_encoding : header_status Data_encoding.t =
   let open Data_encoding in
   union

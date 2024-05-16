@@ -37,7 +37,12 @@ let shards_store_lru_size =
   irmin_internals_entries_per_toplevel_entry * number_of_slots
   * number_of_remembered_levels
 
+(* There is no real rationale for the slot and status parts of the
+   store; we just put low-enough values to avoid consuming too many
+   file descriptors. *)
 let slots_store_lru_size = 64
+
+let status_store_lru_size = 64
 
 (* Fewer cache sizes should be enough in practice,
    but we cache 50 since each cache entry has quite a small memory footprint. *)
