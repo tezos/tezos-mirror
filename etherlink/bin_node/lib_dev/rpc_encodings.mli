@@ -157,6 +157,11 @@ module Get_block_by_hash :
     with type input = Ethereum_types.block_hash * bool
      and type output = Ethereum_types.block
 
+module Get_block_receipts :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.t
+     and type output = Ethereum_types.transaction_receipt list
+
 module Get_code :
   METHOD
     with type input =
