@@ -363,23 +363,25 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         gs_worker
 
 let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
-  Store.Legacy.add_slot_headers
-    ~number_of_slots
-    ~block_level
-    slot_headers
-    node_store
+  Store.(
+    Statuses.add_slot_headers
+      ~number_of_slots
+      ~block_level
+      slot_headers
+      node_store.slot_header_statuses)
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
-  Store.Legacy.update_selected_slot_headers_statuses
-    ~block_level
-    ~attestation_lag
-    ~number_of_slots
-    attested_slots
-    node_store
+  Store.(
+    Statuses.update_selected_slot_headers_statuses
+      ~block_level
+      ~attestation_lag
+      ~number_of_slots
+      attested_slots
+      node_store.slot_header_statuses)
 
 let get_slot_status ~slot_id node_store =
-  Store.Legacy.get_slot_status ~slot_id node_store
+  Store.(Statuses.get_slot_status ~slot_id node_store.slot_header_statuses)
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read store.shards slot_id shard_index

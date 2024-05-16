@@ -23,22 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
-   use another storage solution that irmin as we don't need backtracking *)
-
 module KVS = Key_value_store
-module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
-module Irmin = StoreMaker.Make (Irmin.Contents.String)
-
-type irmin = Irmin.t
-
-let trace_decoding_error ~data_kind ~tztrace_of_error r =
-  let open Result_syntax in
-  match r with
-  | Ok r -> return r
-  | Error err ->
-      let tztrace = tztrace_of_error err in
-      fail @@ Errors.decoding_failed data_kind tztrace
 
 module Stores_dirs = struct
   let shard = "shard_store"
@@ -47,13 +32,6 @@ module Stores_dirs = struct
 
   let status = "status_store"
 end
-
-let info message =
-  let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Irmin.Info.v ~author:"DAL Node" ~message date
-
-let set ~msg store path v =
-  Irmin.set_exn store path v ~info:(fun () -> info msg)
 
 module Value_size_hooks = struct
   (* The [value_size] required by [Tezos_key_value_store.directory] is known when
@@ -241,7 +219,7 @@ module Statuses = struct
     let root_dir = Filename.concat node_store_dir status_store_dir in
     KVS.init ~lru_size:Constants.status_store_lru_size ~root_dir
 
-  let _add_status t status (slot_id : Types.slot_id) =
+  let add_status t status (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
     let* () =
       KVS.write_value
@@ -270,6 +248,71 @@ module Statuses = struct
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
+  let add_slot_headers ~number_of_slots ~block_level slot_headers t =
+    let module SI = Set.Make (Int) in
+    let open Lwt_result_syntax in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
+       Handle reorgs. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
+             https://gitlab.com/tezos/tezos/-/issues/4528
+       Handle statuses evolution. *)
+    let* waiting =
+      List.fold_left_es
+        (fun waiting (slot_header, status) ->
+          let Dal_plugin.{slot_index; commitment = _; published_level} =
+            slot_header
+          in
+          (* This invariant should hold. *)
+          assert (Int32.equal published_level block_level) ;
+          let index =
+            Types.Slot_id.{slot_level = published_level; slot_index}
+          in
+          match status with
+          | Dal_plugin.Succeeded ->
+              let* () =
+                add_status t `Waiting_attestation index |> Errors.to_tzresult
+              in
+              return (SI.add slot_index waiting)
+          | Dal_plugin.Failed -> return waiting)
+        SI.empty
+        slot_headers
+    in
+    List.iter
+      (fun i ->
+        Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
+      (0 -- (number_of_slots - 1)) ;
+    return_unit
+
+  let update_slot_headers_attestation ~published_level ~number_of_slots t
+      attested =
+    let open Lwt_result_syntax in
+    let module S = Set.Make (Int) in
+    let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
+    List.iter_es
+      (fun slot_index ->
+        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
+        if S.mem slot_index attested then (
+          Dal_metrics.slot_attested ~set:true slot_index ;
+          add_status t `Attested index |> Errors.to_tzresult)
+        else
+          let* old_data_opt =
+            find_status t index |> Errors.to_option_tzresult
+          in
+          Dal_metrics.slot_attested ~set:false slot_index ;
+          if Option.is_some old_data_opt then
+            add_status t `Unattested index |> Errors.to_tzresult
+          else
+            (* There is no header that has been included in a block
+               and selected for this index. So, the slot cannot be
+               attested or unattested. *)
+            return_unit)
+      (0 -- (number_of_slots - 1))
+
+  let update_selected_slot_headers_statuses ~block_level ~attestation_lag
+      ~number_of_slots attested t =
+    let published_level = Int32.(sub block_level (of_int attestation_lag)) in
+    update_slot_headers_attestation ~published_level ~number_of_slots t attested
+
   let get_slot_status ~slot_id t = find_status t slot_id
 end
 
@@ -286,7 +329,6 @@ module Commitment_indexed_cache =
 (** Store context *)
 type t = {
   slot_header_statuses : Statuses.t;
-  store : irmin;
   shards : Shards.t;
   slots : Slots.t;
   cache :
@@ -309,8 +351,6 @@ let cache_entry node_store commitment slot shares shard_proofs =
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
-  let*! repo = Irmin.Repo.v (Irmin_pack.config base_dir) in
-  let*! store = Irmin.main repo in
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
@@ -320,158 +360,5 @@ let init config =
       shards;
       slots;
       slot_header_statuses;
-      store;
       cache = Commitment_indexed_cache.create Constants.cache_size;
     }
-
-let tztrace_of_read_error read_err =
-  [Exn (Data_encoding.Binary.Read_error read_err)]
-
-let encode_header_status =
-  Data_encoding.Binary.to_string_exn Types.header_status_encoding
-
-let decode_header_status v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Header_status
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Types.header_status_encoding v
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
-
-   DAL/Node: Replace Irmin storage for paths
-*)
-module Legacy = struct
-  module Path : sig
-    type t = string list
-
-    val to_string : ?prefix:string -> t -> string
-
-    module Level : sig
-      (**
-         Part of the storage for slots' headers where paths are indexed by slots
-         indices.
-
-         The status associated to a slot header is either
-         [`Waiting_attesattion], [`Attested], or [`Unattested]. *)
-
-      val status : Types.slot_id -> Irmin.Path.t
-    end
-  end = struct
-    type t = string list
-
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4457
-       Avoid the wasteful [List.append]s. *)
-    let ( / ) path suffix = path @ [suffix]
-
-    let to_string ?prefix p =
-      let s = String.concat "/" p in
-      Option.fold ~none:s ~some:(fun pr -> pr ^ s) prefix
-
-    module Level = struct
-      let root = ["levels"]
-
-      let slots_indices slot_level = root / Int32.to_string slot_level
-
-      let headers index =
-        let open Types.Slot_id in
-        slots_indices index.slot_level / Int.to_string index.slot_index
-
-      let status index =
-        let prefix = headers index in
-        prefix / "status"
-    end
-  end
-
-  let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
-    let module SI = Set.Make (Int) in
-    let open Lwt_result_syntax in
-    let slots_store = node_store.store in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
-       Handle reorgs. *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
-             https://gitlab.com/tezos/tezos/-/issues/4528
-       Handle statuses evolution. *)
-    let* waiting =
-      List.fold_left_es
-        (fun waiting (slot_header, status) ->
-          let Dal_plugin.{slot_index; commitment = _; published_level} =
-            slot_header
-          in
-          (* This invariant should hold. *)
-          assert (Int32.equal published_level block_level) ;
-          let index =
-            Types.Slot_id.{slot_level = published_level; slot_index}
-          in
-          match status with
-          | Dal_plugin.Succeeded ->
-              let status_path = Path.Level.status index in
-              let*! () =
-                set
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-                  slots_store
-                  status_path
-                  (encode_header_status `Waiting_attestation)
-              in
-              return (SI.add slot_index waiting)
-          | Dal_plugin.Failed -> return waiting)
-        SI.empty
-        slot_headers
-    in
-    List.iter
-      (fun i ->
-        Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
-      (0 -- (number_of_slots - 1)) ;
-    return_unit
-
-  let update_slot_headers_attestation ~published_level ~number_of_slots store
-      attested =
-    let open Lwt_result_syntax in
-    let module S = Set.Make (Int) in
-    let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
-    let attested_str = encode_header_status `Attested in
-    let unattested_str = encode_header_status `Unattested in
-    List.iter_es
-      (fun slot_index ->
-        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        let status_path = Path.Level.status index in
-        let msg =
-          Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
-        in
-        if S.mem slot_index attested then
-          let () = Dal_metrics.slot_attested ~set:true slot_index in
-          let*! () = set ~msg store status_path attested_str in
-          return_unit
-        else
-          let*! old_data_opt = Irmin.find store status_path in
-          let () = Dal_metrics.slot_attested ~set:false slot_index in
-          if Option.is_some old_data_opt then
-            let*! () = set ~msg store status_path unattested_str in
-            return_unit
-          else
-            (* There is no header that has been included in a block and selected
-               for  this index. So, the slot cannot be attested or
-               unattested. *)
-            return_unit)
-      (0 -- (number_of_slots - 1))
-
-  let update_selected_slot_headers_statuses ~block_level ~attestation_lag
-      ~number_of_slots attested node_store =
-    let store = node_store.store in
-    let published_level = Int32.(sub block_level (of_int attestation_lag)) in
-    update_slot_headers_attestation
-      ~published_level
-      ~number_of_slots
-      store
-      attested
-
-  let get_slot_status ~slot_id node_store =
-    let open Lwt_result_syntax in
-    let store = node_store.store in
-    let status_path = Path.Level.status slot_id in
-    let*! status_opt = Irmin.find store status_path in
-    match status_opt with
-    | None -> fail Errors.not_found
-    | Some status_str ->
-        let*? status = decode_header_status status_str in
-        return status
-end
