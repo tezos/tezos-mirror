@@ -14,12 +14,14 @@ let patch_kinds = function Increase_max_nb_ticks _ -> [Kind.Wasm_2_0_0]
 (* Patches for Etherlink PVM. *)
 let etherlink_patches = [Increase_max_nb_ticks 50_000_000_000_000L]
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7148
-   Add hardcoded etherlink addresses on various networks. *)
-let etherlink_addresses = []
+(* Add hardcoded etherlink addresses on various networks. *)
+let etherlink_addresses =
+  ["sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf" (* Etherlink on Mainnet *)]
 
 let hardcoded_patches_list =
-  List.map (fun addr -> (addr, etherlink_patches)) etherlink_addresses
+  List.map
+    (fun addr -> (Address.of_b58check_exn addr, etherlink_patches))
+    etherlink_addresses
 
 let unsafe_patch_encoding =
   let open Data_encoding in
