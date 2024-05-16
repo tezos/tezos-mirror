@@ -597,16 +597,10 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
 
-let job_docker_rust_toolchain ?(always_rebuild = false) ?rules ?dependencies
-    ~__POS__ () =
-  let variables =
-    if always_rebuild then Some [("RUST_TOOLCHAIN_ALWAYS_REBUILD", "true")]
-    else None
-  in
+let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
   job_docker_authenticated
     ?rules
     ?dependencies
-    ?variables
     ~__POS__
     ~skip_docker_initialization:true
     ~stage:Stages.build
@@ -669,25 +663,6 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
             "script-inputs/released-executables \
              script-inputs/experimental-executables" );
     ]
-    @
-    if with_evm_artifacts then
-      [
-        (* Always rebuild the rust-toolchain image before
-           building the Octez Docker image. *)
-        ("RUST_TOOLCHAIN_ALWAYS_REBUILD", "true");
-      ]
-    else
-      [
-        (* We have to set [rust_toolchain_image_tag] to some value.
-
-           If we're not using the rust-toolchain image, then point the
-           its tag to somewhere that shouldn't point to an image.
-           Note that since [with_evm_artifacts] is false, the
-           [DOCKER_BUILD_TARGET] is [without-evm-artifacts] and so the
-           [layer2-builder] stage of [build.Dockerfile] is never built. Hence,
-           build will not attempt to pull the [rust-toolchain] image. *)
-        ("rust_toolchain_image_tag", "is-never-pulled");
-      ]
   in
   let stage =
     match docker_build_type with
@@ -695,32 +670,16 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     | _ -> Stages.build
   in
   let name = "oc.docker:" ^ arch_string in
-  let script =
-    (if with_evm_artifacts then
-     [
-       "./scripts/ci/docker_rust_toolchain_build.sh";
-       (* Read the value of [rust_toolchain_image_tag] and make it
-          available to [./scripts/ci/docker_release.sh]. *)
-       "source rust_toolchain_image_tag.env";
-       "export rust_toolchain_image_tag";
-     ]
-    else [])
-    @ ["./scripts/ci/docker_release.sh"]
-  in
   job_docker_authenticated
     ?rules
     ?dependencies
-      (* Docker initialization will always be performed in
-         [docker_rust_toolchain_build.sh] if [with_evm_artifacts]
-         since then [RUST_TOOLCHAIN_ALWAYS_REBUILD] is [true]. *)
-    ~skip_docker_initialization:with_evm_artifacts
     ~ci_docker_hub
     ~__POS__
     ~stage
     ~arch
     ~name
     ~variables
-    script
+    ["./scripts/ci/docker_release.sh"]
 
 let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~job_docker_arm64 : tezos_job =

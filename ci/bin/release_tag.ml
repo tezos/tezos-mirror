@@ -46,11 +46,20 @@ type release_tag_pipeline_type =
     built of the [Test] type and are published to the GitLab registry
     instead of Docker hub. *)
 let octez_jobs ?(test = false) release_tag_pipeline_type =
+  let job_docker_rust_toolchain = job_docker_rust_toolchain ~__POS__ () in
   let job_docker_amd64 =
-    job_docker_build ~__POS__ ~arch:Amd64 (if test then Test else Release)
+    job_docker_build
+      ~__POS__
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~arch:Amd64
+      (if test then Test else Release)
   in
   let job_docker_arm64 =
-    job_docker_build ~__POS__ ~arch:Arm64 (if test then Test else Release)
+    job_docker_build
+      ~__POS__
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~arch:Arm64
+      (if test then Test else Release)
   in
   let job_docker_merge =
     job_docker_merge_manifests
@@ -114,6 +123,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ["./scripts/ci/opam-release.sh"]
   in
   [
+    job_docker_rust_toolchain;
     job_static_x86_64_release;
     job_static_arm64_release;
     job_docker_amd64;

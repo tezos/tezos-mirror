@@ -37,17 +37,23 @@ let jobs =
      GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
   let rules_always = [job_rule ~when_:Always ()] in
   let job_docker_rust_toolchain =
-    job_docker_rust_toolchain
-      ~__POS__ (* Always rebuild on master to reduce risk of tampering *)
-      ~always_rebuild:true
-      ~rules:rules_always
-      ()
+    job_docker_rust_toolchain ~__POS__ ~rules:rules_always ()
   in
   let job_docker_amd64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
+    job_docker_build
+      ~__POS__
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~rules:rules_always
+      ~arch:Amd64
+      Experimental
   in
   let job_docker_arm64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
+    job_docker_build
+      ~__POS__
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~rules:rules_always
+      ~arch:Arm64
+      Experimental
   in
   let job_docker_merge_manifests =
     job_docker_merge_manifests

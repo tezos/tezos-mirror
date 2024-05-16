@@ -6,6 +6,24 @@ stages:
 - prepare_release
 - publish_package_gitlab
 
+oc.docker:rust-toolchain:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: build
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
+
 oc.build:static-x86_64-linux-binaries:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: build
@@ -49,7 +67,10 @@ oc.docker:amd64:
   stage: build
   tags:
   - gcp
-  dependencies: []
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -62,14 +83,16 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables
-    rust_toolchain_image_tag: is-never-pulled
 
 oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp_arm64
-  dependencies: []
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -82,7 +105,6 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
-    rust_toolchain_image_tag: is-never-pulled
 
 oc.build:dpkg:amd64:
   image: $DISTRIBUTION

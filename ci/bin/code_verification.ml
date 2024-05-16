@@ -1801,7 +1801,7 @@ let jobs pipeline_type =
           job_docker_build
             ~__POS__
             ~arch:Amd64
-            ~dependencies:(Dependent [])
+            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
             ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
