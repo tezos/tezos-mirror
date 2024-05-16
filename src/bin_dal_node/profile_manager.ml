@@ -163,17 +163,18 @@ let get_profiles t =
         "Profile_manager.add_operator_profiles: random observer should have a \
          slot index assigned at this point"
 
+(* Returns the period relevant for a refutation game. With a block time of 10
+   seconds, this corresponds to about 42 days. *)
+let get_rollup_period proto_parameters =
+  proto_parameters.Dal_plugin.sc_rollup_challenge_window_in_blocks
+  + proto_parameters.commitment_period_in_blocks
+  + proto_parameters.dal_attested_slots_validity_lag
+
 let get_default_shard_store_period proto_parameters t =
   (* For each profile we double the period, to give some slack just in case
-     (finalisation period, off by one, attestation_lag, ...).
-     With current mainnet parameters, this total period is 3 months
-     for observer & slot producer *)
-  let rollup_period =
-    2
-    * (proto_parameters.Dal_plugin.sc_rollup_challenge_window_in_blocks
-     + proto_parameters.commitment_period_in_blocks
-     + proto_parameters.dal_attested_slots_validity_lag)
-  in
+     (finalisation period, off by one, attestation_lag, refutation games reset
+     after a protocol upgrade, ...). *)
+  let rollup_period = 2 * get_rollup_period proto_parameters in
   let attestation_period = 2 * proto_parameters.attestation_lag in
   match get_profiles t with
   (* For observer & Producer, we keep the shards long enough for rollup to work
