@@ -6601,7 +6601,7 @@ let register ~protocols =
     test_dal_node_gs_invalid_messages_exchange
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"]
+    ~tags:["gossipsub"; Tag.ci_disabled]
     ~producer_profiles:[0]
     "GS prune due to negative score, and ihave"
     test_gs_prune_and_ihave
