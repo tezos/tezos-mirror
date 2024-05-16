@@ -16,6 +16,7 @@ build_deps_image_name="registry.gitlab.com/tezos/opam-repository"
 build_deps_image_version=$opam_repository_tag
 executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
+variants="debug bare minimal"
 docker_target="without-evm-artifacts"
 rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
 rust_toolchain_image_tag="master"
@@ -30,6 +31,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--image-version <IMAGE_TAG> ]
   [--build-deps-image-name <IMAGE_NAME> ]
   [--build-deps-image-version <IMAGE_TAG> ]
+  [--variants VARIANTS]
   [--docker-target <TARGET> ]
   [--rust-toolchain-image <IMAGE_NAME> ]
   [--rust-toolchain-image-tag <IMAGE_TAG> ]
@@ -41,10 +43,10 @@ Usage:  $(basename "$0") [-h|--help]
 DESCRIPTION
     Builds the Octez Docker distribution.
 
-    The distribution is built in three variants, built under the names:
-     - IMAGE_NAME:IMAGE_TAG
-     - IMAGE_NAME-debug:IMAGE_TAG
-     - IMAGE_NAME-bare:IMAGE_TAG
+    By default, the distribution is built in three VARIANTS, built under the names:
+     - IMAGE_NAME-debug:IMAGE_TAG    (debug variant)
+     - IMAGE_NAME-bare:IMAGE_TAG     (bare variant)
+     - IMAGE_NAME:IMAGE_TAG          (minimal variant)
     For the default value of IMAGE_NAME, IMAGE_TAG and the other
     parameters, see below. The difference between the three variants
     of the distribution are documented at
@@ -101,6 +103,14 @@ OPTIONS
         --executables EXECUTABLES
             Set of executables to include.
 
+        --variants VARIANTS
+            Distribution variants to build. A space-separated list of
+            values from: "debug", "bare" and "minimal". If empty
+            (i.e. '--variants ""'), then only the "build image" of
+            'build.Dockerfile' is built. Default: "debug bare
+            minimal". The minimal variant is tagged IMAGE_NAME:IMAGE_TAG
+            whereas the others are tagged IMAGE_NAME-VARIANT:IMAGE_TAG.
+
         --docker-target TARGET
             'without-evm-artifacts' (default) or 'with-evm-artifacts'.
 
@@ -117,6 +127,7 @@ CURRENT VALUES
     IMAGE_VERSION: $image_version
     BUILD_DEPS_IMAGE_NAME: $build_deps_image_name
     BUILD_DEPS_IMAGE_VERSION: $build_deps_image_version
+    VARIANTS: $variants
     DOCKER_TARGET: $docker_target
     RUST_TOOLCHAIN_IMAGE: $rust_toolchain_image
     RUST_TOOLCHAIN_IMAGE_TAG: $rust_toolchain_image_tag
@@ -132,7 +143,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,build-deps-image-name:,build-deps-image-version:,executables:,commit-short-sha:,docker-target:,rust-toolchain-image:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
+  -l help,image-name:,image-version:,build-deps-image-name:,build-deps-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -160,6 +171,20 @@ while true; do
   --commit-short-sha)
     shift
     commit_short_sha="$1"
+    ;;
+  --variants)
+    shift
+    variants="$1"
+    for variant in $variants; do
+      case "$variant" in
+      debug | minimal | bare) ;;
+      *)
+        echo "Invalid variant '$variant'. Should be one of 'debug', 'minimal', or 'bare'. See --help."
+        exit 1
+        ;;
+      esac
+    done
+
     ;;
   --docker-target)
     shift
@@ -230,44 +255,54 @@ docker build \
 
 echo "### Successfully built docker image: $build_image_name:$image_version"
 
-docker build \
-  --network host \
-  -t "${image_name}debug:$image_version" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
-  --build-arg "BUILD_IMAGE=${build_image_name}" \
-  --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-  --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
-  --target=debug \
-  "$src_dir"
+for variant in $variants; do
+  case "$variant" in
+  debug)
+    docker build \
+      --network host \
+      -t "${image_name}debug:$image_version" \
+      --build-arg "BASE_IMAGE=$build_deps_image_name" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+      --build-arg "BUILD_IMAGE=${build_image_name}" \
+      --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
+      --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --target=debug \
+      "$src_dir"
 
-echo "### Successfully built docker image: ${image_name}debug:$image_version"
+    echo "### Successfully built docker image: ${image_name}debug:$image_version"
+    ;;
 
-docker build \
-  --network host \
-  -t "${image_name}bare:$image_version" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
-  --build-arg "BUILD_IMAGE=${build_image_name}" \
-  --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-  --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
-  --target=bare \
-  "$src_dir"
+  bare)
+    docker build \
+      --network host \
+      -t "${image_name}bare:$image_version" \
+      --build-arg "BASE_IMAGE=$build_deps_image_name" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+      --build-arg "BUILD_IMAGE=${build_image_name}" \
+      --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
+      --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --target=bare \
+      "$src_dir"
 
-echo "### Successfully built docker image: ${image_name}bare:$image_version"
+    echo "### Successfully built docker image: ${image_name}bare:$image_version"
+    ;;
 
-docker build \
-  --network host \
-  -t "${image_name%?}:$image_version" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
-  --build-arg "BUILD_IMAGE=${build_image_name}" \
-  --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-  --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
-  --target=minimal \
-  "$src_dir"
+  minimal)
+    docker build \
+      --network host \
+      -t "${image_name%?}:$image_version" \
+      --build-arg "BASE_IMAGE=$build_deps_image_name" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+      --build-arg "BUILD_IMAGE=${build_image_name}" \
+      --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
+      --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --target=minimal \
+      "$src_dir"
 
-echo "### Successfully built docker image: ${image_name%?}:$image_version"
+    echo "### Successfully built docker image: ${image_name%?}:$image_version"
+    ;;
+  esac
+done
