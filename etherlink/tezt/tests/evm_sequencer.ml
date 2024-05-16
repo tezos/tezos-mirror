@@ -152,7 +152,8 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(threshold_encryption = false) protocol =
+    ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
+    ?(drop_duplicate_when_injection = true) protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -201,6 +202,13 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let private_rpc_port = Some (Port.fresh ()) in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~wal_sqlite_journal_mode
+      ~drop_duplicate_when_injection
+    (* When adding new experimental feature please make sure it's a
+       good idea to activate it for all test or not. *)
+  in
   let* sequencer =
     if threshold_encryption then
       let sequencer_sidecar_port = Some (Port.fresh ()) in
@@ -230,7 +238,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
             sequencer_sidecar_endpoint = Dsn_node.endpoint sequencer_sidecar;
           }
       in
-      Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+      Evm_node.init ~patch_config ~mode (Sc_rollup_node.endpoint sc_rollup_node)
     else
       let mode =
         Evm_node.Sequencer
@@ -253,7 +261,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
             tx_pool_tx_per_addr_limit = None;
           }
       in
-      Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+      Evm_node.init ~patch_config ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* mode =
     if threshold_encryption then
@@ -280,9 +288,12 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              devmode;
            })
   in
-  let* observer = Evm_node.init ~mode (Evm_node.endpoint sequencer) in
+  let* observer =
+    Evm_node.init ~patch_config ~mode (Evm_node.endpoint sequencer)
+  in
   let* proxy =
     Evm_node.init
+      ~patch_config
       ~mode:(Proxy {devmode})
       (Sc_rollup_node.endpoint sc_rollup_node)
   in

@@ -792,11 +792,39 @@ let endpoint ?(private_ = false) (evm_node : t) =
   in
   Format.sprintf "http://%s:%d%s" addr port path
 
-let init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
+let patch_config_with_experimental_feature ?(wal_sqlite_journal_mode = false)
+    ?(drop_duplicate_when_injection = false) =
+  let conditional_json_put ~name cond value_json json =
+    if cond then
+      JSON.put
+        ( name,
+          JSON.annotate ~origin:"evm_node.experimental_config_patch"
+          @@ value_json )
+        json
+    else json
+  in
+  JSON.update "experimental_features" @@ fun json ->
+  conditional_json_put
+    wal_sqlite_journal_mode
+    ~name:"sqlite_journal_mode"
+    (`String "wal")
+    json
+  |> conditional_json_put
+       drop_duplicate_when_injection
+       ~name:"drop_duplicate_on_injection"
+       (`Bool true)
+
+let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+    rollup_node =
   let evm_node =
     create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
+  let* () =
+    match patch_config with
+    | Some patch_config -> Config_file.update evm_node patch_config
+    | None -> unit
+  in
   let* () = run evm_node in
   return evm_node
 

@@ -193,10 +193,22 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
-(** [init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    rollup_node_endpoint] creates an EVM node server with {!create},
-    init the config with {!spawn_init_config} runs it with {!run}. *)
+(** [patch_config_with_experimental_feature ?wal_sqlite_journal_mode
+    ?drop_duplicate_when_injection json_config] patch a config to add
+    experimental feature. Each optional argument add the correspondent
+    experimental feature. *)
+val patch_config_with_experimental_feature :
+  ?wal_sqlite_journal_mode:bool ->
+  ?drop_duplicate_when_injection:bool ->
+  JSON.t ->
+  JSON.t
+
+(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr
+    ?rpc_port rollup_node_endpoint] creates an EVM node server with
+    {!create}, init the config with {!spawn_init_config}, patch it
+    with [patch_config], then runs it with {!run}. *)
 val init :
+  ?patch_config:(JSON.t -> JSON.t) ->
   ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
