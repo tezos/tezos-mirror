@@ -244,11 +244,7 @@ val enc_git_strategy : git_strategy -> string
         field.
       - Setting both [arch] and [tags] throws an error.
       - Omitting both [arch] and [tags] is equivalent to setting
-        [~arch:Amd64] and omitting [tags].
-
-    - Throws a run-time error if both [rules] and [when_] are passed. A
-     [when_] field can always be represented by [rules] instead, so use
-     the latter for more complex conditions. *)
+        [~arch:Amd64] and omitting [tags]. *)
 val job :
   ?arch:arch ->
   ?after_script:string list ->
@@ -264,7 +260,6 @@ val job :
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?tags:string list ->
   ?git_strategy:git_strategy ->
-  ?when_:Gitlab_ci.Types.when_job ->
   ?coverage:string ->
   ?retry:int ->
   ?parallel:Gitlab_ci.Types.parallel ->

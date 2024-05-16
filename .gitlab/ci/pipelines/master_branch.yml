@@ -180,6 +180,8 @@ oc.unified_coverage:
   stage: test_coverage
   tags:
   - gcp
+  rules:
+  - when: always
   dependencies: []
   allow_failure: true
   before_script:
@@ -205,7 +207,6 @@ oc.unified_coverage:
         path: _coverage_report/cobertura.xml
     when: always
     expose_as: Coverage report
-  when: always
   coverage: '/Coverage: ([^%]+%)/'
 
 publish:documentation:

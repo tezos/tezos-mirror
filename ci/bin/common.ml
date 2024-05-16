@@ -526,7 +526,7 @@ let changeset_test_evm_compatibility =
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies ?arch ?tags
-    ?when_ ?allow_failure ?parallel ~__POS__ ~stage ~name script : tezos_job =
+    ?allow_failure ?parallel ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.6" in
   job
     ?rules
@@ -534,7 +534,6 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?artifacts
     ?arch
     ?tags
-    ?when_
     ?allow_failure
     ?parallel
     ~__POS__
@@ -631,10 +630,7 @@ let job_docker_rust_toolchain ?(always_rebuild = false) ?rules ?dependencies
       stage, run [on_success] and are not allowed to fail. *)
 type docker_build_type = Experimental | Release | Test | Test_manual
 
-(** Creates a Docker build job of the given [arch] and [docker_build_type].
-
-    If [external_] is set to true (default [false]), then the job is
-    also written to an external file. *)
+(** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
 let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     tezos_job =
   let arch_string = arch_to_string_alt arch in
@@ -683,10 +679,10 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
         ("rust_toolchain_image_tag", "is-never-pulled");
       ]
   in
-  let stage, when_, (allow_failure : allow_failure_job option) =
+  let stage =
     match docker_build_type with
-    | Test_manual -> (Stages.manual, Some Manual, Some Yes)
-    | _ -> (Stages.build, None, None)
+    | Test_manual -> Stages.manual
+    | _ -> Stages.build
   in
   let name = "oc.docker:" ^ arch_string in
   let script =
@@ -702,8 +698,6 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     @ ["./scripts/ci/docker_release.sh"]
   in
   job_docker_authenticated
-    ?when_
-    ?allow_failure
     ?rules
     ?dependencies
       (* Docker initialization will always be performed in

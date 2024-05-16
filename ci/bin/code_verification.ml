@@ -1815,6 +1815,7 @@ let jobs pipeline_type =
             ~__POS__
             ~arch:Amd64
             ~dependencies:(Dependent [])
+            ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
         let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
@@ -1822,6 +1823,7 @@ let jobs pipeline_type =
             ~__POS__
             ~arch:Arm64
             ~dependencies:(Dependent [])
+            ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
         let job_build_dpkg_amd64_manual =
@@ -1830,7 +1832,7 @@ let jobs pipeline_type =
             ~name:"oc.build:dpkg:amd64"
             ~target:Dpkg
             ~arch:Tezos_ci.Amd64
-            ~rules:[job_rule ~when_:Manual ()]
+            ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
@@ -1841,7 +1843,7 @@ let jobs pipeline_type =
             ~name:"oc.build:rpm:amd64"
             ~target:Rpm
             ~arch:Tezos_ci.Amd64
-            ~rules:[job_rule ~when_:Manual ()]
+            ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
@@ -1850,7 +1852,7 @@ let jobs pipeline_type =
           job_build_homebrew
             ~__POS__
             ~name:"oc.build:homebrew"
-            ~rules:[job_rule ~when_:Manual ()]
+            ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()

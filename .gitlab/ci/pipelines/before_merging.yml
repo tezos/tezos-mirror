@@ -8347,9 +8347,11 @@ oc.docker:amd64:
   stage: manual
   tags:
   - gcp
+  rules:
+  - when: manual
+    allow_failure: true
   needs: []
   dependencies: []
-  allow_failure: true
   before_script: []
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
@@ -8365,16 +8367,17 @@ oc.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     RUST_TOOLCHAIN_ALWAYS_REBUILD: "true"
-  when: manual
 
 oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: manual
   tags:
   - gcp_arm64
+  rules:
+  - when: manual
+    allow_failure: true
   needs: []
   dependencies: []
-  allow_failure: true
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -8388,7 +8391,6 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     rust_toolchain_image_tag: is-never-pulled
-  when: manual
 
 oc.build:dpkg:amd64:
   image: $DISTRIBUTION
