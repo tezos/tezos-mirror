@@ -50,6 +50,8 @@ module type T = sig
 
   type block_info
 
+  type attested_indices
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
@@ -72,8 +74,9 @@ module type T = sig
     level:int32 ->
     int list Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  val attested_slot_headers :
-    block_info -> number_of_slots:int -> slot_index list tzresult
+  val attested_slot_headers : block_info -> attested_indices tzresult
+
+  val is_attested : attested_indices -> slot_index -> bool
 
   val get_round : Fitness.t -> int32 tzresult
 

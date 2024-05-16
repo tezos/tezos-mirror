@@ -446,11 +446,9 @@ module Handler = struct
     let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
     let slot_size = proto_parameters.cryptobox_parameters.slot_size in
     let store = Node_context.get_store ctxt in
-    let module S = Set.Make (Int) in
-    let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
     List.iter_s
       (fun slot_index ->
-        if S.mem slot_index attested then return_unit
+        if attested slot_index then return_unit
         else
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
@@ -544,17 +542,13 @@ module Handler = struct
               | Dal_plugin.Failed -> return_unit)
             slot_headers
         in
-        let*? attested_slots =
-          Plugin.attested_slot_headers
-            block_info
-            ~number_of_slots:proto_parameters.number_of_slots
-        in
+        let*? attested_slots = Plugin.attested_slot_headers block_info in
         let* () =
           Slot_manager.update_selected_slot_headers_statuses
             ~block_level
             ~attestation_lag:proto_parameters.attestation_lag
             ~number_of_slots:proto_parameters.number_of_slots
-            attested_slots
+            (Plugin.is_attested attested_slots)
             (Node_context.get_store ctxt)
         in
         let*! () =
@@ -563,7 +557,7 @@ module Handler = struct
             ctxt
             ~published_level:
               Int32.(sub block_level (of_int proto_parameters.attestation_lag))
-            attested_slots
+            (Plugin.is_attested attested_slots)
         in
         let* committee = Node_context.fetch_committee ctxt ~level:block_level in
         let () =

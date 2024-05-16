@@ -294,12 +294,10 @@ module Statuses = struct
   let update_slot_headers_attestation ~published_level ~number_of_slots t
       attested =
     let open Lwt_result_syntax in
-    let module S = Set.Make (Int) in
-    let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
     List.iter_es
       (fun slot_index ->
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        if S.mem slot_index attested then (
+        if attested slot_index then (
           Dal_metrics.slot_attested ~set:true slot_index ;
           add_status t `Attested index |> Errors.to_tzresult)
         else

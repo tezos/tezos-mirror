@@ -184,7 +184,7 @@ val update_selected_slot_headers_statuses :
   block_level:int32 ->
   attestation_lag:int ->
   number_of_slots:int ->
-  Dal_plugin.slot_index list ->
+  (Dal_plugin.slot_index -> bool) ->
   Store.t ->
   unit tzresult Lwt.t
 
