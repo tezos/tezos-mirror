@@ -184,7 +184,7 @@ module Legacy : sig
     number_of_slots:int ->
     int list ->
     t ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 
   (** [get_slot_status ~slot_id store] returns the status associated
       to the given accepted [slot_id], or [None] if no status is

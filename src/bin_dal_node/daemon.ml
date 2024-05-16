@@ -455,7 +455,7 @@ module Handler = struct
             block_info
             ~number_of_slots:proto_parameters.number_of_slots
         in
-        let*! () =
+        let* () =
           Slot_manager.update_selected_slot_headers_statuses
             ~block_level
             ~attestation_lag:proto_parameters.attestation_lag

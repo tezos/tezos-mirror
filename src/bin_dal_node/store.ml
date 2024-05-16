@@ -425,26 +425,28 @@ module Legacy = struct
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
       attested =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let module S = Set.Make (Int) in
     let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
     let attested_str = encode_header_status `Attested in
     let unattested_str = encode_header_status `Unattested in
-    List.iter_s
+    List.iter_es
       (fun slot_index ->
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
         let status_path = Path.Level.status index in
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
         in
-        if S.mem slot_index attested then (
-          Dal_metrics.slot_attested ~set:true slot_index ;
-          set ~msg store status_path attested_str)
+        if S.mem slot_index attested then
+          let () = Dal_metrics.slot_attested ~set:true slot_index in
+          let*! () = set ~msg store status_path attested_str in
+          return_unit
         else
-          let* old_data_opt = Irmin.find store status_path in
-          Dal_metrics.slot_attested ~set:false slot_index ;
+          let*! old_data_opt = Irmin.find store status_path in
+          let () = Dal_metrics.slot_attested ~set:false slot_index in
           if Option.is_some old_data_opt then
-            set ~msg store status_path unattested_str
+            let*! () = set ~msg store status_path unattested_str in
+            return_unit
           else
             (* There is no header that has been included in a block and selected
                for  this index. So, the slot cannot be attested or
