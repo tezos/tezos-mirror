@@ -7,7 +7,7 @@ set -e
 
 db_version 2.0
 
-HOME=/var/tezos
+TEZOS_HOME=/var/tezos
 
 # work directory to store temporary files associated to this package
 mkdir -p /var/lib/octez-node
@@ -16,17 +16,25 @@ case "${1}" in
 configure)
   # these are the defaults for the package and only used
   # in the "configure" stage.
-  DATADIR="$HOME/.tezos-node"
+  DATADIR="$TEZOS_HOME/.tezos-node"
 
   # shellcheck disable=SC2119
   if ! id "tezos" > /dev/null 2>&1; then
-    sudo adduser --quiet --disabled-password \
-      --home $HOME --shell /bin/bash \
+    adduser --quiet --disabled-password \
+      --home $TEZOS_HOME --shell /bin/bash \
       --gecos "admin user for octez" tezos
+  else
+    # setup data directory in case the tezos user was already present
+    if [ ! -d "$TEZOS_HOME" ]; then
+      mkdir -p "$TEZOS_HOME"
+      chown tezos "$TEZOS_HOME"
+    fi
+  fi
+
+  # setup log directory
+  if [ ! -d /var/log/tezos ]; then
     mkdir -p /var/log/tezos
-    mkdir -p "$DATADIR"
     chown tezos /var/log/tezos
-    chown tezos "$DATADIR"
   fi
 
   db_get octez-node/configure
