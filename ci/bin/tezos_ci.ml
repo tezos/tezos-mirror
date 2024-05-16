@@ -72,14 +72,18 @@ module Stage = struct
 end
 
 type tezos_image =
-  | Internal of {image : Gitlab_ci.Types.image; builder : tezos_job}
+  | Internal of {
+      image : Gitlab_ci.Types.image;
+      builder_amd64 : tezos_job;
+      builder_arm64 : tezos_job option;
+    }
   | External of Gitlab_ci.Types.image
 
 and tezos_job = {
   job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
   stage : Stage.t;
-  image_dependencies : tezos_image list;
+  image_builders : tezos_job list;
 }
 
 let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
@@ -300,15 +304,12 @@ module Pipeline = struct
       in
       let image_dependencies =
         List.concat_map
-          (fun {image_dependencies; _} -> image_dependencies)
+          (fun {image_builders; _} -> image_builders)
           (jobs pipeline)
       in
-      ( Fun.flip List.iter image_dependencies @@ fun image_dep ->
-        match image_dep with
-        | Internal {image = _; builder} ->
-            let builder_name = name_of_tezos_job builder in
-            Hashtbl.replace image_builder_jobs builder_name builder
-        | External _ -> () ) ;
+      ( Fun.flip List.iter image_dependencies @@ fun builder ->
+        let builder_name = name_of_tezos_job builder in
+        Hashtbl.replace image_builder_jobs builder_name builder ) ;
       image_builder_jobs |> Hashtbl.to_seq_values |> List.of_seq
     in
     set_jobs (image_builders @ jobs pipeline) pipeline
@@ -440,23 +441,46 @@ end
 module Image = struct
   type t = tezos_image
 
+  (* Track image builders to avoid name collisions. *)
   let image_builders : (string, tezos_job) Hashtbl.t = Hashtbl.create 5
 
   let mk_external ~image_path : t = External (Image image_path)
 
-  let mk_internal ~image_builder ~image_path : t =
-    let builder_name = name_of_tezos_job image_builder in
-    let image = Internal {builder = image_builder; image = Image image_path} in
-    match Hashtbl.find_opt image_builders builder_name with
-    | None ->
-        Hashtbl.add image_builders builder_name image_builder ;
-        image
-    | Some image_builder' when image_builder = image_builder' -> image
-    | Some _ ->
+  let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
+    let image =
+      Internal
+        {
+          builder_amd64 = image_builder_amd64;
+          builder_arm64 = image_builder_arm64;
+          image = Image image_path;
+        }
+    in
+    let register_builder image_builder =
+      let builder_name = name_of_tezos_job image_builder in
+      match Hashtbl.find_opt image_builders builder_name with
+      | None -> Hashtbl.add image_builders builder_name image_builder
+      | Some image_builder' when image_builder = image_builder' -> ()
+      | Some _ ->
+          failwith
+            "The image builder '%s' for image '%s' was registered twice with \
+             differing definitions."
+            builder_name
+            image_path
+    in
+    (match
+       ( name_of_tezos_job image_builder_amd64,
+         Option.map name_of_tezos_job image_builder_arm64 )
+     with
+    | name, Some name' when name = name' ->
         failwith
-          "The image builder '%s' was registered twice with differing \
-           definitions"
-          builder_name
+          "The the image builders for multi-arch image '%s' must have distinct \
+           names (both are called '%s')."
+          image_path
+          name
+    | _ -> ()) ;
+    register_builder image_builder_amd64 ;
+    Option.iter register_builder image_builder_arm64 ;
+    image
 
   let image = function Internal {image; _} | External image -> image
 end
@@ -578,6 +602,17 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
            '%s'."
           name
   in
+  let arch = if Option.is_some arch then arch else arch_of_tag tag in
+  (match (image, arch) with
+  | Internal {image = Image image_path; _}, None ->
+      failwith
+        "[job] the job '%s' has tag '%s' whose architecture is not statically \
+         known cannot use the image '%s' since it is Internal. Set a static \
+         tag or use an external image."
+        name
+        (string_of_tag tag)
+        image_path
+  | _ -> ()) ;
   let tags = Some [string_of_tag tag] in
   (match (parallel : Gitlab_ci.Types.parallel option) with
   | Some (Vector n) when n < 2 ->
@@ -595,7 +630,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     (match image with Internal _ -> [image] | External _ -> [])
     @ image_dependencies
   in
-  let dependencies =
+  let dependencies, image_builders =
     (Fun.flip List.iter image_dependencies @@ function
      | External (Image image_path) ->
          failwith
@@ -604,16 +639,28 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
            name
            image_path
      | Internal _ -> ()) ;
-    let add_builder dependencies = function
-      | External _ -> dependencies
-      | Internal {builder; _} -> (
-          match dependencies with
-          | Staged artifact_dependencies ->
-              Staged (builder :: artifact_dependencies)
-          | Dependent dependencies ->
-              Dependent (Artifacts builder :: dependencies))
+    let add_builder (dependencies, image_builders) = function
+      | External _ -> (dependencies, image_builders)
+      | Internal {builder_amd64; builder_arm64; _} ->
+          let builder =
+            match (arch, builder_arm64) with
+            | Some Amd64, _ -> builder_amd64
+            | Some Arm64, Some builder_arm64 -> builder_arm64
+            | Some Arm64, None ->
+                failwith "requested arm64 image for which there is no builder"
+            | None, _ -> failwith "unknown arch"
+          in
+          let image_builders = builder :: image_builders in
+          let dependencies =
+            match dependencies with
+            | Staged artifact_dependencies ->
+                Staged (builder :: artifact_dependencies)
+            | Dependent dependencies ->
+                Dependent (Artifacts builder :: dependencies)
+          in
+          (dependencies, image_builders)
     in
-    List.fold_left add_builder dependencies image_dependencies
+    List.fold_left add_builder (dependencies, []) image_dependencies
   in
   let needs, dependencies = resolve_dependencies name dependencies in
   let variables =
@@ -669,7 +716,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job = Job job; source_position = __POS__; stage; image_dependencies}
+  {job = Job job; source_position = __POS__; stage; image_builders}
 
 let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
     Pipeline.{name = child_pipeline_name; jobs = _} : tezos_job =
@@ -692,7 +739,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
     job = Trigger_job trigger_job;
     source_position = __POS__;
     stage;
-    image_dependencies = [];
+    image_builders = [];
   }
 
 let map_non_trigger_job ~error_on_trigger (tezos_job : tezos_job)

@@ -153,14 +153,24 @@ module Image : sig
   (** Register an external image of the given [image_path]. *)
   val mk_external : image_path:string -> t
 
-  (** Register an internal image of the given [image_path] built by the job [image_builder].
+  (** Register internal image for [image_path] built by [image_builder_amd64].
 
-      Note: the name of the image builder must uniquely identify the
+      Optionally, a builder for an arm64 version of the image can be
+      registered by supplying [image_builder_arm64]. If
+      [image_builder_arm64] is supplied, then it must have a distinct
+      name from [image_builder_amd64].
+
+      Note: the name of the image builder(s) must uniquely identify the
       job definition. If two image builders with the same name but
       differing job definitions (as per polymorphic comparison of the
       underlying {!Gitlab_ci.Types.job}) are registered, then this
       function throws a run-time error. *)
-  val mk_internal : image_builder:tezos_job -> image_path:string -> t
+  val mk_internal :
+    ?image_builder_arm64:tezos_job ->
+    image_builder_amd64:tezos_job ->
+    image_path:string ->
+    unit ->
+    t
 end
 
 (** Changesets are used to specify [changes:] clauses in rules.
@@ -292,7 +302,12 @@ val enc_git_strategy : git_strategy -> string
       job uses indirectly, i.e. not in it's [image:] field. For
       instance, this can be used by a job that builds a Docker image
       with an internal image as input.  A run-time error will be thrown
-      if this list includes an external image. *)
+      if this list includes an external image.
+
+    - If the [image] used is {!Internal} and [tag] is set to
+    {!Dynamic} then a run-time error is generated as the required
+    architecture for the internal image cannot be statically
+    deduced. *)
 val job :
   ?arch:arch ->
   ?after_script:string list ->

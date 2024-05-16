@@ -535,7 +535,7 @@ module Images = struct
   include Images_external
 
   let client_libs_dependencies =
-    let image_builder =
+    let image_builder_amd64 =
       job_docker_authenticated
         ~__POS__
         ~stage:Stages.build
@@ -554,18 +554,19 @@ module Images = struct
     let image_path =
       "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
     in
-    Image.mk_internal ~image_builder ~image_path
+    Image.mk_internal ~image_builder_amd64 ~image_path ()
 
   (** The rust toolchain image *)
   let rust_toolchain =
     (* The job that builds the rust_toolchain image.
        This job is automatically included in any pipeline that uses this image. *)
-    let image_builder =
+    let image_builder arch =
       job_docker_authenticated
         ~__POS__
+        ~arch
         ~skip_docker_initialization:true
         ~stage:Stages.images
-        ~name:"oc.docker:rust-toolchain"
+        ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts
@@ -576,7 +577,11 @@ module Images = struct
     let image_path =
       "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
     in
-    Image.mk_internal ~image_builder ~image_path
+    Image.mk_internal
+      ~image_builder_amd64:(image_builder Amd64)
+      ~image_builder_arm64:(image_builder Arm64)
+      ~image_path
+      ()
 end
 
 (* This version of the job builds both released and experimental executables.
