@@ -283,6 +283,8 @@ val trigger_job :
 
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.
 
+    Throws error when applied to {!trigger_job}s.
+
     - If the job already has an artifact with [old_name] and [name] is given, then
       [name] is used.
     - If the job already has an artifact exposed as [old_exposed_as] and
@@ -311,10 +313,14 @@ val add_artifacts :
 
 (** Append the variables [variables] to the variables of [job].
 
+    Throws error when applied to {!trigger_job}s.
+
     Raises [Failure] if any of the [variables] is already defined for
     [job], unless [allow_overwrite] is true (default is [false]). *)
 val append_variables :
   ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
 
-(** Append to the [script:] section of a job. *)
+(** Append to the [script:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
 val append_script : string list -> tezos_job -> tezos_job

@@ -82,12 +82,6 @@ let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
 
 let name_of_tezos_job tezos_job = name_of_generic_job tezos_job.job
 
-let map_job (tezos_job : tezos_job)
-    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
-  match tezos_job.job with
-  | Job job -> {tezos_job with job = Job (f job)}
-  | _ -> assert false
-
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
     if Cli.config.inline_source_info then
@@ -589,9 +583,21 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
   in
   {job = Trigger_job trigger_job; source_position = __POS__; stage}
 
+let map_non_trigger_job ~error_on_trigger (tezos_job : tezos_job)
+    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
+  match tezos_job.job with
+  | Job job -> {tezos_job with job = Job (f job)}
+  | _ -> failwith "%s" error_on_trigger
+
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
-  map_job tezos_job @@ fun (job : Gitlab_ci.Types.job) ->
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[add_artifacts] attempting to add artifact to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun (job : Gitlab_ci.Types.job) ->
   match job.artifacts with
   | None ->
       {
@@ -667,7 +673,13 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
 
 let append_variables ?(allow_overwrite = false) new_variables
     (tezos_job : tezos_job) : tezos_job =
-  map_job tezos_job @@ fun job ->
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_variables] attempting to append variables to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
   let variables =
     let old_variables, new_variables =
       List.fold_left
@@ -750,4 +762,10 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
   if !Cli.has_error then exit 1
 
 let append_script script tezos_job =
-  map_job tezos_job @@ fun job -> {job with script = job.script @ script}
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[add_artifacts] attempting to append script to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job -> {job with script = job.script @ script}
