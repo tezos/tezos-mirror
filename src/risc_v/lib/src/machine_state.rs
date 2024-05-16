@@ -559,7 +559,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// Return the current [`Interrupt`] with highest priority to be handled
     /// or [`None`] if there isn't any available
     fn get_pending_interrupt(&self) -> Option<Interrupt> {
-        let current_mode = self.hart.mode.read();
+        let current_mode = self.hart.mode.read_default();
 
         let possible = match self.hart.csregisters.possible_interrupts(current_mode) {
             0 => return None,
@@ -923,7 +923,7 @@ mod tests {
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
             let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Machine);
+            assert_eq!(state.hart.mode.read_default(), Mode::Machine);
             assert_eq!(state.hart.pc.read(), mtvec_addr);
             assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
@@ -976,7 +976,7 @@ mod tests {
             state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
             state.step().expect("should not raise environment exception");
             let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Machine);
+            assert_eq!(state.hart.mode.read_default(), Mode::Machine);
             assert_eq!(state.hart.pc.read(), mtvec_addr + 4 * 11 + 4);
             // We are coming from the interrupt handler actually
             assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
@@ -1014,7 +1014,7 @@ mod tests {
             // pc should be stvec_addr since exceptions aren't offsetted
             // even in VECTORED mode, only interrupts
             let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Supervisor);
+            assert_eq!(state.hart.mode.read_default(), Mode::Supervisor);
             assert_eq!(state.hart.pc.read(), stvec_addr);
             assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), bad_address);
@@ -1085,7 +1085,7 @@ mod tests {
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
             let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Machine);
+            assert_eq!(state.hart.mode.read_default(), Mode::Machine);
             assert_eq!(state.hart.pc.read(), mtvec_addr);
             // We are coming from the interrupt handler actually
             assert_eq!(mstatus.mpp(), xstatus::MPPValue::Supervisor);

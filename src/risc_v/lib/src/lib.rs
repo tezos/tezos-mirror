@@ -210,7 +210,7 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn read_mode(&self) -> mode::Mode {
-        self.pvm.machine_state.hart.mode.read()
+        self.pvm.machine_state.hart.mode.read_default()
     }
 }
 

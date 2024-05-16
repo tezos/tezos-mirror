@@ -66,6 +66,9 @@ pub use alloc::*;
 mod region;
 pub use region::*;
 
+mod enums;
+pub use enums::*;
+
 /// Elements that may be stored using a [Backend]
 pub trait Elem: Copy + 'static {
     /// Copy from `source` and convert to stored representation.

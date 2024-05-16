@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::machine_state::{
-    backend::{self, Cell},
-    csregisters::Privilege,
+use crate::{
+    machine_state::csregisters::Privilege,
+    state_backend::{EnumCell, EnumCellLayout},
 };
 
 /// Modes the hardware state can be in when running code
@@ -42,38 +42,23 @@ impl TryFrom<u8> for Mode {
     }
 }
 
-/// Hart mode
-pub struct ModeCell<M: backend::Manager> {
-    cell: Cell<u8, M>,
-}
-
-impl<M: backend::Manager> ModeCell<M> {
-    #[inline(always)]
-    pub fn write(&mut self, mode: Mode) {
-        self.cell.write(mode as u8)
-    }
-
-    #[inline(always)]
-    pub fn read(&self) -> Mode {
-        let data = self.cell.read();
-        Mode::try_from(data).unwrap()
+impl Default for Mode {
+    fn default() -> Self {
+        Self::Machine
     }
 }
+
+impl From<Mode> for u8 {
+    fn from(value: Mode) -> Self {
+        value as u8
+    }
+}
+
+/// Hart mode cell
+pub type ModeCell<M> = EnumCell<Mode, u8, M>;
 
 /// Layout for [Mode]
-pub type ModeLayout = backend::Atom<u8>;
-
-impl<M: backend::Manager> ModeCell<M> {
-    /// Bind the mode cell to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<ModeLayout, M>) -> Self {
-        Self { cell: space }
-    }
-
-    /// Reset to the initial state.
-    pub fn reset(&mut self) {
-        self.write(Mode::Machine);
-    }
-}
+pub type ModeLayout = EnumCellLayout<u8>;
 
 /// Modes the hardware state can trap into, a sub-enum of [`Mode`]
 #[derive(Debug, PartialEq, PartialOrd, Eq, Copy, Clone, strum::EnumIter)]
@@ -122,7 +107,7 @@ mod tests {
                 let mut inst = ModeCell::bind(backend.allocate(loc));
 
                 inst.write(first_value);
-                assert_eq!(inst.read(), first_value);
+                assert_eq!(inst.read_default(), first_value);
 
                 offset
             };
