@@ -408,9 +408,6 @@ let jobs pipeline_type =
             ~name:"trigger"
             [
               "echo 'Trigger pipeline!'";
-              (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
-                 [scripts/version.sh]'s [opam_repository_tag] are the same. *)
-              "./scripts/ci/check_opam_repository_tag.sh";
               (* Check that the Alpine version of the trigger job's image
                  corresponds to the value in scripts/version.sh. *)
               "./scripts/ci/check_alpine_version.sh";

@@ -63,7 +63,6 @@ trigger:
   timeout: 10 minutes
   script:
   - echo 'Trigger pipeline!'
-  - ./scripts/ci/check_opam_repository_tag.sh
   - ./scripts/ci/check_alpine_version.sh
 
 sanity_ci:
