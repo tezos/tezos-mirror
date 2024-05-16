@@ -462,8 +462,19 @@ impl<'a> DebuggerApp<'a> {
                     virt_line,
                 ]
             }
-            InterpreterResult::Exception(exc, steps) => vec![
-                Line::from(vec![format!("   Exception: {:?}", exc).bold().fg(RED)]),
+            InterpreterResult::Exception {
+                cause,
+                message,
+                steps,
+                ..
+            } => vec![
+                Line::from(vec![format!("   Exception: {:?}", cause).bold().fg(RED)]),
+                Line::from(vec![format!(
+                    "   Message: {}",
+                    message.as_deref().unwrap_or("<none>")
+                )
+                .bold()
+                .fg(RED)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
                 virt_line,

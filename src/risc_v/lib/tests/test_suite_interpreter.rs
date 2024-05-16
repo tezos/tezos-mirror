@@ -40,7 +40,17 @@ fn interpret_test_with_check(contents: &[u8], exit_mode: Mode, check_xregs: &[(X
             panic!("Failed at test case: {} - Steps done: {}", code >> 1, steps)
         }
         Running(_) => panic!("Timeout"),
-        Exception(exc, _) => panic!("Unexpected exception: {:?}", exc),
+        Exception {
+            cause,
+            message,
+            steps,
+        } => match message {
+            Some(message) => panic!(
+                "Unexpected exception after {steps} steps: {message} (caused by {:?})",
+                cause
+            ),
+            None => panic!("Unexpected exception after {steps} steps: {:?}", cause),
+        },
     }
 }
 

@@ -23,7 +23,7 @@ pub trait ExecutionEnvironment {
 /// Outcome of handling an ECALL
 pub enum EcallOutcome {
     /// Handling the ECALL ended in a fatal error
-    Fatal,
+    Fatal { message: String },
 
     /// ECALL was handled successfully
     Handled { continue_eval: bool },

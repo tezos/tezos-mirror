@@ -59,7 +59,11 @@ pub enum InterpreterResult {
     Exit { code: usize, steps: usize },
     /// Execution finished because an unhandled environment exception has been thrown.
     /// Returns exception and number of steps executed.
-    Exception(EnvironException, usize),
+    Exception {
+        cause: EnvironException,
+        steps: usize,
+        message: Option<String>,
+    },
 }
 
 #[derive(Debug, From, Error, derive_more::Display)]
@@ -112,7 +116,12 @@ impl<'a> Interpreter<'a> {
                 .exec_env_state
                 .handle_call(&mut self.pvm.machine_state, exc)
             {
-                exec_env::EcallOutcome::Fatal => Exception(exc, result.steps),
+                exec_env::EcallOutcome::Fatal { message } => InterpreterResult::Exception {
+                    cause: exc,
+                    steps: result.steps,
+                    message: Some(message),
+                },
+
                 exec_env::EcallOutcome::Handled { continue_eval } => {
                     // Handling the ECall marks the completion of a step
                     result.steps = result.steps.saturating_add(1);

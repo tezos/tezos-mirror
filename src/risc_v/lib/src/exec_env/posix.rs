@@ -76,7 +76,9 @@ where
     ) -> EcallOutcome {
         if self.exited() {
             // Can't exit twice
-            return EcallOutcome::Fatal;
+            return EcallOutcome::Fatal {
+                message: "Machine has already exited".to_owned(),
+            };
         }
 
         let source_exception = env_exception.as_exception();
@@ -125,7 +127,9 @@ where
             (93, code) | (0, code) => handle_exit(code),
 
             // Unimplemented
-            _ => EcallOutcome::Fatal,
+            _ => EcallOutcome::Fatal {
+                message: format!("Unknown system call number {a7_val}"),
+            },
         }
     }
 }
