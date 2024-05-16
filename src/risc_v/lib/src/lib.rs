@@ -32,7 +32,7 @@ use crate::{
 };
 use bits::Bits64;
 use derive_more::{Error, From};
-use exec_env::{posix::Posix, ExecutionEnvironmentState};
+use exec_env::posix::Posix;
 use machine_state::{
     bus::{Address, Addressable, OutOfBounds},
     csregisters::{satp::TranslationAlgorithm, CSRegister},
@@ -111,11 +111,7 @@ impl<'a> Interpreter<'a> {
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
         match result.exception {
-            Some(exc) => match self
-                .pvm
-                .exec_env_state
-                .handle_call(&mut self.pvm.machine_state, exc)
-            {
+            Some(exc) => match self.pvm.handle_exception(exc) {
                 exec_env::EcallOutcome::Fatal { message } => InterpreterResult::Exception {
                     cause: exc,
                     steps: result.steps,
