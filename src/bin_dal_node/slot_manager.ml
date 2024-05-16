@@ -31,7 +31,6 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
-  | Missing_shards_in_cache of Types.slot_id
 
 let () =
   register_error_kind
@@ -107,26 +106,7 @@ let () =
          be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
-    (fun () -> No_prover_SRS) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.missing_shards_in_cache"
-    ~title:"Missing shards in cache"
-    ~description:"Missing shards in cache could not be published"
-    ~pp:(fun ppf (published_level, slot_index) ->
-      Format.fprintf
-        ppf
-        "Could not publish the shards at level %ld for slot index %d because \
-         they were not found in the cache."
-        published_level
-        slot_index)
-    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
-    (function
-      | Missing_shards_in_cache slot_id ->
-          Some (slot_id.slot_level, slot_id.slot_index)
-      | _ -> None)
-    (fun (slot_level, slot_index) ->
-      Missing_shards_in_cache {slot_level; slot_index})
+    (fun () -> No_prover_SRS)
 
 type slot = bytes
 
