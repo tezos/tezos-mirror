@@ -46,10 +46,11 @@ module Make (Pairing : Paring_G) = struct
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4192
      Generalize this function to pass the slot_size in parameter. *)
   let prove ~max_commit ~max_degree srs p =
+    let shift = max_commit - max_degree in
     (* Note: this reallocates a buffer of size (Srs_g1.size t.srs.raw.srs_g1)
-       (2^21 elements in practice), so roughly 100MB. We can get rid of the
-       allocation by giving an offset for the SRS in Pippenger. *)
-    Poly.mul_xn p (max_commit - max_degree) Scalar.zero |> Proof.commit srs
+       for the polynomial. Note that we could avoid this multiplication and some
+       SRS storage by only committing [p] with the relevant section of the SRS *)
+    Poly.mul_xn p shift Scalar.zero |> Proof.commit ~shift srs
 
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify srs_n_d cm proof =

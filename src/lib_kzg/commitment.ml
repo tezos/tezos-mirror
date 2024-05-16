@@ -51,8 +51,13 @@ module Single (G : Bls.G_sig) = struct
   let compare a b =
     if G.eq a b then 0 else Bytes.compare (G.to_bytes a) (G.to_bytes b)
 
-  let commit srs secret =
-    Commit.commit_single G.Srs.pippenger G.zero (G.Srs.size srs) srs secret
+  let commit ?(shift = 0) srs secret =
+    Commit.commit_single
+      (G.Srs.pippenger ~offset:shift)
+      G.zero
+      (G.Srs.size srs)
+      srs
+      secret
 
   let size = G.compressed_size_in_bytes
 

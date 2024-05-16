@@ -10,7 +10,10 @@ module type Commitment = sig
 
   type secret = Poly.t SMap.t
 
-  val commit_single : public_parameters -> Poly.t -> G1.t
+  (* The commitment will ignore polynomial and SRS coefficients before the
+     [shift]-th coefficients ([shift] is 0 by default, which means everything
+     is committed normally by default; [shift] must be positive) *)
+  val commit_single : ?shift:int -> public_parameters -> Poly.t -> G1.t
 
   (* [all_keys] is an optional argument that should only be used for
      partial commitments. It contains all the polynomial names that
