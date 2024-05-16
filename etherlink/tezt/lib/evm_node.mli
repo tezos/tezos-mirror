@@ -172,6 +172,23 @@ val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
 val wait_for_rollup_node_follower_connection_acquired :
   ?timeout:float -> t -> unit Lwt.t
 
+module Config_file : sig
+  (** Node configuration files. *)
+
+  (** Read the configuration file ([config.json]) of a node. *)
+  val read : t -> JSON.t Lwt.t
+
+  (** Write the configuration file of a node, replacing the existing one. *)
+  val write : t -> JSON.t -> unit Lwt.t
+
+  (** Update the configuration file of a node. If the node is already
+     running, it needs to be restarted manually.
+
+      Example: [Evm_node.Config_file.update evm_node (JSON.put
+      ("experimental_features", experimental_feature))] *)
+  val update : t -> (JSON.t -> JSON.t) -> unit Lwt.t
+end
+
 (** [spawn_init_config ?extra_arguments evm_node] runs "init config"
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t

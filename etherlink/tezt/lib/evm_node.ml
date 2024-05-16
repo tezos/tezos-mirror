@@ -556,6 +556,38 @@ let spawn_command evm_node args =
 let spawn_run ?(extra_arguments = []) evm_node =
   spawn_command evm_node (run_args evm_node @ extra_arguments)
 
+module Config_file = struct
+  let filename evm_node =
+    Filename.concat evm_node.persistent_state.data_dir "config.json"
+
+  let read evm_node =
+    match evm_node.persistent_state.runner with
+    | None -> Lwt.return (JSON.parse_file (filename evm_node))
+    | Some runner ->
+        let* content =
+          Process.spawn ~runner "cat" [filename evm_node]
+          |> Process.check_and_read_stdout
+        in
+        JSON.parse ~origin:"Evm_node.config_file.read" content |> Lwt.return
+
+  let write node config =
+    match node.persistent_state.runner with
+    | None -> Lwt.return (JSON.encode_to_file (filename node) config)
+    | Some runner ->
+        let content = JSON.encode config in
+        let cmd =
+          Runner.Shell.(
+            redirect_stdout (cmd [] "echo" [content]) (filename node))
+        in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run cmd args
+
+  let update node update =
+    let* config = read node in
+    let config = update config in
+    write node config
+end
+
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
   let mode_args =
