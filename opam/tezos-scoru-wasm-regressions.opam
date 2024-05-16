@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
-  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "octez-libs" {with-test}
   "octez-l2-libs" {with-test}
   "tezos-protocol-alpha" {with-test}
