@@ -314,15 +314,17 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  (* This function removes from the store all the slots (and their
-     shards) published at level exactly [Node_context.next_level_to_gc
-     ~head_level]. In the future we may want to remove the shards from
-     all preceeding levels, not only this one. Also, removing could be
-     done more efficiently than iterating on all the slots. *)
+  (* This function removes from the store all the slots (and their shards)
+     published at level exactly [Node_context.next_level_to_gc_slots_and_shards
+     ~head_level]. In the future we may want to remove the shards from all
+     preceding levels, not only this one. Also, removing could be done more
+     efficiently than iterating on all the slots. *)
   let remove_old_level_slots_and_shards proto_parameters ctxt head_level =
     let open Lwt_syntax in
     let oldest_level =
-      Node_context.next_level_to_gc ctxt ~current_level:head_level
+      Node_context.next_level_to_gc_slots_and_shards
+        ctxt
+        ~current_level:head_level
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
@@ -362,7 +364,23 @@ module Handler = struct
         return_unit)
       (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
-  let should_store_cells ctxt =
+  (* This function removes from the store all the skip list cells attested at
+     level exactly [Node_context.next_level_to_gc_skip_list_cells
+     ~head_level]. In the future we may want to remove the cells from all
+     preceding levels, not only this one. *)
+  let remove_old_level_skip_list_cells ctxt head_level =
+    let open Lwt_result_syntax in
+    let oldest_level =
+      Node_context.next_level_to_gc_skip_list_cells
+        ctxt
+        ~current_level:head_level
+    in
+    let*? ready_ctxt = Node_context.get_ready ctxt in
+    Skip_list_cells_store.remove
+      ready_ctxt.skip_list_cells_store
+      ~attested_level:oldest_level
+
+  let should_store_skip_list_cells ctxt =
     let profile = Node_context.get_profile_ctxt ctxt in
     not
       (Profile_manager.is_bootstrap_profile profile
@@ -389,7 +407,7 @@ module Handler = struct
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
-          if should_store_cells ctxt then
+          if should_store_skip_list_cells ctxt then
             let* cells_of_level =
               let pred_published_level =
                 Int32.sub
@@ -544,6 +562,13 @@ module Handler = struct
                   proto_parameters
                   ctxt
                   finalized_shell_header.level
+              in
+              let* () =
+                if should_store_skip_list_cells ctxt then
+                  remove_old_level_skip_list_cells
+                    ctxt
+                    finalized_shell_header.level
+                else return_unit
               in
               let* () =
                 if finalized_shell_header.level = 1l then

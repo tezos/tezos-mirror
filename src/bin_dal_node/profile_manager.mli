@@ -93,10 +93,16 @@ val on_new_head :
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles : t -> Types.profile
 
-(** Returns the number of previous blocks for which we want to keep the shards
-    in the storage, depending on the profile of the node (3 months for observer
-    & slot producer, twice attestation lag for attester) *)
+(** Returns the number of previous blocks for which the node should keep the
+    shards in the storage, depending on the profile of the node (3 months for
+    observer & slot producer, twice attestation lag for attester) *)
 val get_default_shard_store_period : Dal_plugin.proto_parameters -> t -> int
+
+(** Returns the number of previous blocks for which the node should keep the
+    skip list cells in the storage. This is currently the same for all profiles
+    that store such data, and thus does not take a profile context as a
+    parameter. *)
+val get_skip_list_cells_store_period : Dal_plugin.proto_parameters -> int
 
 (** Load the profile context from disk. The file where the context is loaded
     from is relative to the given [base_dir]. An error is returned in case of an

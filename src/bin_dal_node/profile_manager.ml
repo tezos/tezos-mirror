@@ -187,6 +187,10 @@ let get_default_shard_store_period proto_parameters t =
       else attestation_period
   | Bootstrap -> attestation_period
 
+let get_skip_list_cells_store_period proto_parameters =
+  (* We double the period, to give us a safety margin, just in case... *)
+  2 * get_rollup_period proto_parameters
+
 let profiles_filename = "profiles.json"
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/7033
