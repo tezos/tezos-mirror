@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,9 +34,8 @@
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  plugin : (module Dal_plugin.T);
+  proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  plugin_proto : int;  (** Protocol level of the plugin. *)
   last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
@@ -68,23 +68,49 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt dal_plugin skip_list_cells_store cryptobox proto_parameters
-    plugin_proto] updates in place the status value to [Ready], and initializes
-    the inner [ready_ctxt] value with the given parameters.
+(** [set_ready ctxt rpc_ctxt skip_list_cells_store cryptobox
+    shards_proofs_precomputation proto_parameters ~level] updates in place the
+    status value to [Ready], and initializes the inner [ready_ctxt] value with
+    the given parameters, except [level] which should represent the current
+    level of the L1 node and is used to determine the initial protocol plugins.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  (module Dal_plugin.T) ->
+  Rpc_context.t ->
   Skip_list_cells_store.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
-  int ->
-  unit tzresult
+  level:Int32.t ->
+  unit tzresult Lwt.t
 
-(** Updates the plugin and the protocol level. *)
-val update_plugin_in_ready : t -> (module Dal_plugin.T) -> int -> unit
+(** Returns all the registered plugins *)
+val get_all_plugins : t -> (module Dal_plugin.T) list
+
+(** Returns the plugin to be used for the given (block) level.
+    Recall that, for a migration level L:
+    * to retrieve the metadata of the block L, one should use the plugin for the
+      old protocol;
+    * to retrieve context-related information, one should use the plugin for the
+      new protocol.
+    This function returns the plugin of [metadata.protocols.next_protocol], so it is
+    tailored for the second use case. To get the plugin for the first use-case, just
+    get the plugin for the predecessor of the target level. *)
+val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
+
+(** Tries to add a new plugin for the protocol with level [proto_level] to be used
+    starting with the given [block_level].
+
+    It returns an error if the node is not ready, if the
+    [Chain_services.Blocks.protocols] RPC fails, or if the plugin is not
+    registered. *)
+val may_add_plugin :
+  t ->
+  Rpc_context.t ->
+  block_level:int32 ->
+  proto_level:int ->
+  unit tzresult Lwt.t
 
 type error += Node_not_ready
 

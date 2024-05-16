@@ -23,23 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [resolve_plugin protocols] tries to load [Dal_plugin.T] for
-    [protocols.next_protocol]. We use [next_protocol] because we use the
-    returned plugin to process the block at the next level, the block at the
-    previous level being processed by the previous plugin (if any). *)
-let resolve_plugin
-    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) =
-  let open Lwt_syntax in
-  let plugin_opt = Dal_plugin.get protocols.next_protocol in
-  let* () =
-    Option.iter_s
-      (fun plugin ->
-        let (module Plugin : Dal_plugin.T) = plugin in
-        Event.(emit protocol_plugin_resolved Plugin.Proto.hash))
-      plugin_opt
-  in
-  return plugin_opt
-
 type error += Cryptobox_initialisation_failed of string
 
 let () =
@@ -274,57 +257,49 @@ module Handler = struct
     let open Lwt_result_syntax in
     let handler stopper (block_hash, block_header) =
       let block = `Hash (block_hash, 0) in
-      let* protocols =
-        Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
+      let level = block_header.Block_header.shell.level in
+      let* (module Dal_plugin : Dal_plugin.T) =
+        Proto_plugins.resolve_plugin_for_level cctxt ~level
       in
-      let*! plugin_opt = resolve_plugin protocols in
-      match plugin_opt with
-      | Some plugin ->
-          let (module Dal_plugin : Dal_plugin.T) = plugin in
-          let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-
-             Instead of recompute those parameters, they could be stored
-             (for a given cryptobox). *)
-          let* cryptobox, shards_proofs_precomputation =
-            init_cryptobox config dal_config proto_parameters
-          in
-          Store.Value_size_hooks.set_share_size
-            (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-          let* () = set_profile_context ctxt config proto_parameters in
-          (* We support at most 64 back-pointers, each of which takes 32 bytes.
-             The cells content itself takes less than 64 bytes. *)
-          let padded_encoded_cell_size = 64 * (32 + 1) in
-          (* A pointer hash is 32 bytes length, but because of the double
-             encoding in Dal_proto_types and then in skip_list_cells_store, we
-             have an extra 4 bytes for encoding the size. *)
-          let encoded_hash_size = 32 + 4 in
-          let* skip_list_cells_store =
-            Skip_list_cells_store.init
-              ~node_store_dir:(Configuration_file.store_path config)
-              ~skip_list_store_dir:"skip_list"
-              ~padded_encoded_cell_size
-              ~encoded_hash_size
-              ~number_of_slots:
-                proto_parameters.cryptobox_parameters.number_of_shards
-          in
-          let*? () =
-            Node_context.set_ready
-              ctxt
-              plugin
-              skip_list_cells_store
-              cryptobox
-              shards_proofs_precomputation
-              proto_parameters
-              block_header.Block_header.shell.proto_level
-          in
-          let*! () = Event.(emit node_is_ready ()) in
-          stopper () ;
-          return_unit
-      | None ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
-             Handle situtation where plugin is not found *)
-          return_unit
+      let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
+         Instead of recomputing these parameters, they could be stored
+         (for a given cryptobox). *)
+      let* cryptobox, shards_proofs_precomputation =
+        init_cryptobox config dal_config proto_parameters
+      in
+      Store.Value_size_hooks.set_share_size
+        (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+      let* () = set_profile_context ctxt config proto_parameters in
+      (* We support at most 64 back-pointers, each of which takes 32 bytes.
+         The cells content itself takes less than 64 bytes. *)
+      let padded_encoded_cell_size = 64 * (32 + 1) in
+      (* A pointer hash is 32 bytes length, but because of the double
+         encoding in Dal_proto_types and then in skip_list_cells_store, we
+         have an extra 4 bytes for encoding the size. *)
+      let encoded_hash_size = 32 + 4 in
+      let* skip_list_cells_store =
+        Skip_list_cells_store.init
+          ~node_store_dir:(Configuration_file.store_path config)
+          ~skip_list_store_dir:"skip_list"
+          ~padded_encoded_cell_size
+          ~encoded_hash_size
+          ~number_of_slots:
+            proto_parameters.cryptobox_parameters.number_of_shards
+      in
+      let* () =
+        Node_context.set_ready
+          ctxt
+          cctxt
+          skip_list_cells_store
+          cryptobox
+          shards_proofs_precomputation
+          proto_parameters
+          ~level
+      in
+      let*! () = Event.(emit node_is_ready ()) in
+      stopper () ;
+      return_unit
     in
     let handler stopper el =
       match Node_context.get_status ctxt with
@@ -335,22 +310,6 @@ module Handler = struct
     make_stream_daemon
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
-
-  let may_update_plugin cctxt ctxt ~block ~current_proto ~block_proto =
-    let open Lwt_result_syntax in
-    if current_proto <> block_proto then
-      let* protocols =
-        Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
-      in
-      let*! plugin_opt = resolve_plugin protocols in
-      match plugin_opt with
-      | Some plugin ->
-          Node_context.update_plugin_in_ready ctxt plugin block_proto ;
-          return_unit
-      | None ->
-          let*! () = Event.(emit no_protocol_plugin ()) in
-          return_unit
-    else return_unit
 
   (* This function removes from the store all the slots (and their
      shards) published at level exactly [Node_context.next_level_to_gc
@@ -405,110 +364,127 @@ module Handler = struct
       (Profile_manager.is_bootstrap_profile profile
       || Profile_manager.is_attester_only_profile profile)
 
-  let process_block ctxt cctxt (module Plugin : Dal_plugin.T) plugin_proto
-      proto_parameters skip_list_cells_store head_level block_level =
+  let process_block ctxt cctxt proto_parameters skip_list_cells_store head_level
+      block_level =
     let open Lwt_result_syntax in
     let block = `Level block_level in
-    let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let shell_header = Plugin.block_shell_header block_info in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
-       Note that the first processed block is special: in contrast to
-       the general case, as implemented by this function, the plugin was
-       set before processing the block, by
-       [resolve_plugin_and_set_ready], not after processing the
-       block. *)
-    let* () =
-      may_update_plugin
-        cctxt
-        ctxt
-        ~block
-        ~current_proto:plugin_proto
-        ~block_proto:shell_header.proto_level
+    let pred_level = Int32.pred block_level in
+    let*? (module PluginPred) =
+      Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
-    let*? block_round = Plugin.get_round shell_header.fitness in
-    let* slot_headers = Plugin.get_published_slot_headers block_info in
-    let* () =
-      if should_store_cells ctxt then
-        let* cells_of_level =
-          Plugin.Skip_list.cells_of_level block_info cctxt
-        in
-        let cells_of_level =
-          List.map
-            (fun (hash, cell) ->
-              ( Dal_proto_types.Skip_list_hash.of_proto
-                  Plugin.Skip_list.hash_encoding
-                  hash,
-                Dal_proto_types.Skip_list_cell.of_proto
-                  Plugin.Skip_list.cell_encoding
-                  cell ))
-            cells_of_level
-        in
-        Skip_list_cells_store.insert
-          skip_list_cells_store
-          ~attested_level:head_level
-          cells_of_level
-      else return_unit
+    let* block_info = PluginPred.block_info cctxt ~block ~metadata:`Always in
+    let shell_header = PluginPred.block_shell_header block_info in
+    let* dal_constants =
+      let*? (module PluginCurr) =
+        Node_context.get_plugin_for_level ctxt ~level:block_level
+      in
+      PluginCurr.get_constants `Main (`Level block_level) cctxt
     in
     let* () =
-      if not (is_bootstrap_node ctxt) then
-        Slot_manager.store_slot_headers
-          ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
-          ~block_level
-          slot_headers
-          (Node_context.get_store ctxt)
-      else return_unit
-    in
-    let* () =
-      (* If a slot header was posted to the L1 and we have the corresponding
-             data, post it to gossipsub.
-
-         FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
-         Should we restrict published slot data to the slots for which
-         we have the producer role?
-      *)
-      List.iter_es
-        (fun (slot_header, status) ->
-          match status with
-          | Dal_plugin.Succeeded ->
-              let Dal_plugin.{slot_index; commitment; published_level} =
-                slot_header
+      if dal_constants.Dal_plugin.feature_enable then
+        let* slot_headers = PluginPred.get_published_slot_headers block_info in
+        let* () =
+          if should_store_cells ctxt then
+            let get_constants ~level =
+              let*? (module Plugin) =
+                Node_context.get_plugin_for_level ctxt ~level
               in
-              Slot_manager.publish_slot_data
-                ~level_committee:(Node_context.fetch_committee ctxt)
-                (Node_context.get_store ctxt)
-                (Node_context.get_gs_worker ctxt)
-                proto_parameters
-                commitment
-                published_level
-                slot_index
-          | Dal_plugin.Failed -> return_unit)
-        slot_headers
-    in
-    let*? attested_slots =
-      Plugin.attested_slot_headers
-        block_info
-        ~number_of_slots:proto_parameters.number_of_slots
-    in
-    let*! () =
-      Slot_manager.update_selected_slot_headers_statuses
-        ~block_level
-        ~attestation_lag:proto_parameters.attestation_lag
-        ~number_of_slots:proto_parameters.number_of_slots
-        attested_slots
-        (Node_context.get_store ctxt)
-    in
-    let* committee = Node_context.fetch_committee ctxt ~level:block_level in
-    let () =
-      Profile_manager.on_new_head
-        (Node_context.get_profile_ctxt ctxt)
-        proto_parameters
-        (Node_context.get_gs_worker ctxt)
-        committee
+              Plugin.get_constants `Main (`Level level) cctxt
+            in
+            let* cells_of_level =
+              let pred_published_level =
+                Int32.sub
+                  block_level
+                  (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
+              in
+              PluginPred.Skip_list.cells_of_level
+                block_info
+                cctxt
+                ~dal_constants
+                ~pred_publication_level_dal_constants:
+                  (lazy (get_constants ~level:pred_published_level))
+            in
+            let cells_of_level =
+              List.map
+                (fun (hash, cell) ->
+                  ( Dal_proto_types.Skip_list_hash.of_proto
+                      PluginPred.Skip_list.hash_encoding
+                      hash,
+                    Dal_proto_types.Skip_list_cell.of_proto
+                      PluginPred.Skip_list.cell_encoding
+                      cell ))
+                cells_of_level
+            in
+            Skip_list_cells_store.insert
+              skip_list_cells_store
+              ~attested_level:head_level
+              cells_of_level
+          else return_unit
+        in
+        let* () =
+          if not (is_bootstrap_node ctxt) then
+            Slot_manager.store_slot_headers
+              ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
+              ~block_level
+              slot_headers
+              (Node_context.get_store ctxt)
+          else return_unit
+        in
+        let* () =
+          (* If a slot header was posted to the L1 and we have the corresponding
+                 data, post it to gossipsub.
+
+             FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
+             Should we restrict published slot data to the slots for which
+             we have the producer role?
+          *)
+          List.iter_es
+            (fun (slot_header, status) ->
+              match status with
+              | Dal_plugin.Succeeded ->
+                  let Dal_plugin.{slot_index; commitment; published_level} =
+                    slot_header
+                  in
+                  Slot_manager.publish_slot_data
+                    ~level_committee:(Node_context.fetch_committee ctxt)
+                    (Node_context.get_store ctxt)
+                    (Node_context.get_gs_worker ctxt)
+                    proto_parameters
+                    commitment
+                    published_level
+                    slot_index
+              | Dal_plugin.Failed -> return_unit)
+            slot_headers
+        in
+        let*? attested_slots =
+          PluginPred.attested_slot_headers
+            block_info
+            ~number_of_slots:proto_parameters.number_of_slots
+        in
+        let*! () =
+          Slot_manager.update_selected_slot_headers_statuses
+            ~block_level
+            ~attestation_lag:proto_parameters.attestation_lag
+            ~number_of_slots:proto_parameters.number_of_slots
+            attested_slots
+            (Node_context.get_store ctxt)
+        in
+        let* committee = Node_context.fetch_committee ctxt ~level:block_level in
+        let () =
+          Profile_manager.on_new_head
+            (Node_context.get_profile_ctxt ctxt)
+            proto_parameters
+            (Node_context.get_gs_worker ctxt)
+            committee
+        in
+        return_unit
+      else return_unit
     in
     (* This should be the last modification of this node's (ready) context. *)
     let*? () =
       Node_context.update_last_processed_level ctxt ~level:block_level
     in
+    let*? block_round = PluginPred.get_round shell_header.fitness in
     Dal_metrics.layer1_block_finalized ~block_level ;
     Dal_metrics.layer1_block_finalized_round ~block_round ;
     let*! () =
@@ -529,11 +505,10 @@ module Handler = struct
       | Ready ready_ctxt -> (
           let Node_context.
                 {
-                  plugin = (module Plugin);
+                  proto_plugins = _;
                   proto_parameters;
                   cryptobox;
                   shards_proofs_precomputation = _;
-                  plugin_proto;
                   last_processed_level;
                   skip_list_cells_store;
                   ongoing_amplifications = _;
@@ -541,7 +516,17 @@ module Handler = struct
             ready_ctxt
           in
           let head_level = header.shell.level in
-          let*? head_round = Plugin.get_round header.shell.fitness in
+          let* () =
+            Node_context.may_add_plugin
+              ctxt
+              cctxt
+              ~proto_level:header.shell.proto_level
+              ~block_level:head_level
+          in
+          let*? (module PluginHead) =
+            Node_context.get_plugin_for_level ctxt ~level:head_level
+          in
+          let*? head_round = PluginHead.get_round header.shell.fitness in
           Dal_metrics.new_layer1_head ~head_level ;
           Dal_metrics.new_layer1_head_round ~head_round ;
           let*! () =
@@ -561,8 +546,6 @@ module Handler = struct
             process_block
               ctxt
               cctxt
-              (module Plugin)
-              plugin_proto
               proto_parameters
               skip_list_cells_store
               head_level

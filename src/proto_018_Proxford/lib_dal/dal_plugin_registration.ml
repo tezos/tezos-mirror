@@ -165,7 +165,9 @@ module Plugin = struct
     let cell_hash = Dal.Slots_history.hash
 
     (* We return the empty list here because DAL is not activated in Oxford2. *)
-    let cells_of_level _block_info _ctxt = Lwt_result_syntax.return []
+    let cells_of_level _block_info _ctxt ~dal_constants:_
+        ~pred_publication_level_dal_constants:_ =
+      Lwt_result_syntax.return []
   end
 
   module RPC = struct

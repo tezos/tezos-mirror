@@ -4492,20 +4492,18 @@ module History_rpcs = struct
             bool
             ~error_msg:
               "Unexpected non-existence of back_pointers: got %L, expected %R") ;
-        if cell_level > first_level then
-          Lwt_list.iter_s
-            (fun hash ->
-              let* cell =
-                Dal_RPC.(
-                  call dal_node
-                  @@ get_plugin_commitments_history_hash
-                       ~proto_hash:(Protocol.hash protocol)
-                       ~hash
-                       ())
-              in
-              check_cell cell ~check_level:None)
-            back_pointers
-        else unit)
+        Lwt_list.iter_s
+          (fun hash ->
+            let* cell =
+              Dal_RPC.(
+                call dal_node
+                @@ get_plugin_commitments_history_hash
+                     ~proto_hash:(Protocol.hash protocol)
+                     ~hash
+                     ())
+            in
+            check_cell cell ~check_level:None)
+          back_pointers)
     in
     let rec check_history level =
       if level > last_attested_level then unit
@@ -4542,7 +4540,7 @@ module History_rpcs = struct
       dal_node
 
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
+    let tags = ["rpc"; "skip_list"] in
     let description = "test commitments history with migration" in
     let slot_index = 3 in
     let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
@@ -4608,7 +4606,6 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset =
         Protocol.tag migrate_to;
         "migration";
         "plugin";
-        Tag.ci_disabled;
       ]
     ~uses:[Constant.octez_dal_node]
     ~title:

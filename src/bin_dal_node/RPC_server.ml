@@ -462,12 +462,13 @@ let register :
        (Slots_handlers.get_slot_shard ctxt)
 
 let register_plugin node_ctxt =
+  let open Lwt_syntax in
   Tezos_rpc.Directory.register_dynamic_directory
     Tezos_rpc.Directory.empty
     Tezos_rpc.Path.(open_root / "plugin")
     (fun () ->
       match Node_context.get_ready node_ctxt with
-      | Ok {plugin = (module Plugin); skip_list_cells_store; _} ->
+      | Ok {skip_list_cells_store; _} ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7069
 
              DAL: handle protocol plugins change in dynamic proto-related RPCs.
@@ -478,7 +479,13 @@ let register_plugin node_ctxt =
              previous protocol). A fix would be try answering the RPCs with the
              current protocol plugin, then with the previous one in case of
              failure. *)
-          Lwt.return (Plugin.RPC.directory skip_list_cells_store)
+          List.fold_left
+            (fun dir (module Plugin : Dal_plugin.T) ->
+              let crt_dir = Plugin.RPC.directory skip_list_cells_store in
+              Tezos_rpc.Directory.merge dir crt_dir)
+            Tezos_rpc.Directory.empty
+            (Node_context.get_all_plugins node_ctxt)
+          |> return
       | Error _ -> Lwt.return Tezos_rpc.Directory.empty)
 
 let start configuration ctxt =
