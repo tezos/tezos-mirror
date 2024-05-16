@@ -370,17 +370,8 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         |> Errors.to_tzresult
       in
       let* () =
-        let* exists =
-          Store.(Slots.exists_slot node_store.slots ~slot_size slot_id)
-          |> Errors.to_tzresult
-        in
-        let* () =
-          if exists then return_unit
-          else
-            Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
-            |> Errors.to_tzresult
-        in
-        return_unit
+        Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
+        |> Errors.to_tzresult
       in
       publish_proved_shards
         slot_id
