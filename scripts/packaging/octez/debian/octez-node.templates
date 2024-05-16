@@ -20,12 +20,12 @@ Description: The type of node you wish to install
 Template: octez-node/network
 Type: string
 Default: mainnet
-Description: The network you want to connect to
- - mainnet:
+Description: Choose the network you want to connect
+ - mainnet
  .
- - testnet:
+ - testnet
  .
- - ghostnet:
+ - ghostnet
 
 Template: octez-node/purge_warning
 Type: string
