@@ -77,11 +77,6 @@ module Slots : sig
     Types.slot_id ->
     (unit, [> Errors.other]) result Lwt.t
 
-  (** [exists_slot store ~slot_size slot_id] returns true IFF a slot is
-      associated to the given slot id. *)
-  val exists_slot :
-    t -> slot_size:int -> Types.slot_id -> (bool, [> Errors.other]) result Lwt.t
-
   (** [find_slot store ~slot_size slot_id] returns the slot associated to some
       slot id or [Error `Not_found] if no slot is associated. *)
   val find_slot :

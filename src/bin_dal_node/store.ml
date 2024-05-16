@@ -204,14 +204,6 @@ module Slots = struct
     in
     return_unit
 
-  let exists_slot t ~slot_size slot_id =
-    let open Lwt_syntax in
-    let+ res = KVS.value_exists t file_layout (slot_id, slot_size) () in
-    trace_decoding_error
-      ~data_kind:Types.Store.Slot
-      ~tztrace_of_error:Fun.id
-      res
-
   let find_slot t ~slot_size slot_id =
     let open Lwt_result_syntax in
     let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
