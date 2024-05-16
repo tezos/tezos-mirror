@@ -90,14 +90,6 @@ module Cli = struct
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
       Protocol.Alpha
-
-  let producer_spreading_factor =
-    Clap.default_int
-      ~long:"producer-spreading-factor"
-      ~description:
-        "Per producer, slot are produced every n blocks where n is the \
-         spreading factor"
-      1
 end
 
 type configuration = {
@@ -105,7 +97,6 @@ type configuration = {
   stake_machine_type : string list option;
   dal_node_producer : int;
   protocol : Protocol.t;
-  producer_spreading_factor : int;
   producer_machine_type : string option;
 }
 
@@ -298,19 +289,14 @@ let update_total_published_commitments _t per_level_info metrics =
   metrics.total_published_commitments
   + Hashtbl.length per_level_info.published_commitments
 
-let update_expected_published_commitments t per_level_info metrics =
+let update_expected_published_commitments t metrics =
   match metrics.level_first_commitment_published with
   | None -> 0
   | Some _ ->
       (* -1 since we are looking at level n operation submitted at the previous
          level. *)
-      let k =
-        (per_level_info.level - 1) mod t.configuration.producer_spreading_factor
-      in
       let producers =
-        t.configuration.dal_node_producer - (k * t.parameters.number_of_slots)
-        |> min t.parameters.number_of_slots
-        |> max 0
+        min t.configuration.dal_node_producer t.parameters.number_of_slots
       in
       metrics.expected_published_commitments + producers
 
@@ -419,7 +405,7 @@ let get_metrics t infos_per_level metrics =
     update_total_published_commitments t infos_per_level metrics
   in
   let expected_published_commitments =
-    update_expected_published_commitments t infos_per_level metrics
+    update_expected_published_commitments t metrics
   in
   let total_attested_commitments =
     update_total_attested_commitments t infos_per_level metrics
@@ -804,30 +790,24 @@ let on_new_level t level =
 let produce_slot t level i =
   let producer = List.nth t.producers i in
   let index = i mod t.parameters.number_of_slots in
-  let should_publish =
-    level mod t.configuration.producer_spreading_factor
-    = i / t.parameters.number_of_slots
+  let content =
+    Format.asprintf "%d:%d" level index
+    |> Helpers.make_slot
+         ~padding:false
+         ~slot_size:t.parameters.cryptobox.slot_size
   in
-  if not should_publish then Lwt.return_unit
-  else
-    let content =
-      Format.asprintf "%d:%d" level index
-      |> Helpers.make_slot
-           ~padding:false
-           ~slot_size:t.parameters.cryptobox.slot_size
-    in
-    let* _ = Node.wait_for_level producer.node level in
-    let* _ =
-      Dal_common.Helpers.publish_and_store_slot
-        ~dont_wait:true
-        producer.client
-        producer.dal_node
-        producer.account
-        ~force:true
-        ~index
-        content
-    in
-    Lwt.return_unit
+  let* _ = Node.wait_for_level producer.node level in
+  let* _ =
+    Dal_common.Helpers.publish_and_store_slot
+      ~dont_wait:true
+      producer.client
+      producer.dal_node
+      producer.account
+      ~force:true
+      ~index
+      content
+  in
+  Lwt.return_unit
 
 let producers_ready t =
   (* If not all the producer nodes are ready, we do not publish the commitment
@@ -858,14 +838,12 @@ let configuration =
   let stake_machine_type = Cli.stake_machine_type in
   let dal_node_producer = Cli.producers in
   let protocol = Cli.protocol in
-  let producer_spreading_factor = Cli.producer_spreading_factor in
   let producer_machine_type = Cli.producer_machine_type in
   {
     stake;
     stake_machine_type;
     dal_node_producer;
     protocol;
-    producer_spreading_factor;
     producer_machine_type;
   }
 
