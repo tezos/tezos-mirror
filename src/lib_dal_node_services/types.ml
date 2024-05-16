@@ -102,6 +102,11 @@ module Message_id = struct
   }
 
   let compare id {level; slot_index; commitment; shard_index; pkh} =
+    (* If you change the semantics of this function, consider the effect it can
+       have on handling shards in the future. Currently, this ordering is used to
+       know the priority of when a shard should be handled. Shards with a lower
+       level should be handled first when handling shards that were received in the
+       future. *)
     let c = Int32.compare id.level level in
     if c <> 0 then c
     else

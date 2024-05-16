@@ -535,6 +535,8 @@ module type AUTOMATON = sig
 
     (** Computes the topic of the given message id. *)
     val get_topic : t -> Topic.t
+
+    val valid : t -> [`Valid | `Unknown | `Outdated | `Invalid]
   end
 
   (** Module for message *)
@@ -1152,6 +1154,7 @@ module type WORKER = sig
     | Heartbeat
     | P2P_input of p2p_input
     | App_input of app_input
+    | Check_unknown_messages
 
   (** [make ~events_logging ~bootstrap_points rng limits parameters] initializes
       a new Gossipsub automaton with the given arguments. Then, it initializes
