@@ -26,7 +26,7 @@ export alpine_version='3.19'
 
 ## full_opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
+export full_opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
 
 ## `opam_repository_tag` is a commit hash of the
 ## https://gitlab.com/tezos/opam-repository repository. This
