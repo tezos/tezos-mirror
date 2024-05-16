@@ -1,10 +1,11 @@
 Template: octez-baker/liquidity-vote
 Type: string
-Default: on
 Description: Your choice for the liquidity vote
  Vote to continue or end the liquidity baking subsidy. The possible values for
  this option are: "off" to request ending the subsidy, "on" to request
  continuing or restarting the subsidy, and "pass" to abstain.
+ .
+ This option is mandatory to start the baker.
 
 Template: octez-baker/baker-key
 Type: string
