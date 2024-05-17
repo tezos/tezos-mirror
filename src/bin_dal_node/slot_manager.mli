@@ -38,7 +38,7 @@
 
 type slot = bytes
 
-(** [get_slot_pages ~reconstruct_if_missing cryptobox store
+(** [get_slot_pages ~reconstruct_if_missing cryptobox node_ctxt store
     slot_id] fetches from the store the slot corresponding to the
     given slot id and split it into pages. If the slot is not found
     in the store and [reconstruct_if_missing] is true, the slot is
@@ -54,6 +54,7 @@ type slot = bytes
 val get_slot_pages :
   reconstruct_if_missing:bool ->
   Cryptobox.t ->
+  Node_context.ready_ctxt ->
   Store.t ->
   Types.slot_id ->
   (bytes list, [> Errors.not_found | Errors.other]) result Lwt.t
@@ -82,9 +83,9 @@ val commit_slot :
   Cryptobox.t ->
   (Cryptobox.commitment, [> Errors.other]) result Lwt.t
 
-(** [get_slot_content ~reconstruct_if_missing node_store cryptobox
-    slot_id] returns the slot content associated with the given
-    [slot_id] in [node_store].
+(** [get_slot_content ~reconstruct_if_missing node_ctxt node_store
+    cryptobox slot_id] returns the slot content associated with the
+    given [slot_id] in [node_store].
 
     If the slot is not found in the store and [reconstruct_if_missing]
     is true, the slot is reconstructed from the stored shards.
@@ -96,6 +97,7 @@ val commit_slot :
 *)
 val get_slot_content :
   reconstruct_if_missing:bool ->
+  Node_context.ready_ctxt ->
   Store.t ->
   Cryptobox.t ->
   Types.slot_id ->

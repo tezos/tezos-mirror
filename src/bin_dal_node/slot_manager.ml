@@ -192,7 +192,8 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot ~reconstruct_if_missing cryptobox store slot_id =
+let get_slot ~reconstruct_if_missing cryptobox (_ : Node_context.ready_ctxt)
+    store slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -430,9 +431,9 @@ let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     attested_slots
     node_store
 
-let get_slot_content ~reconstruct_if_missing node_store cryptobox
+let get_slot_content ~reconstruct_if_missing node_store node_context cryptobox
     (slot_id : Types.slot_id) =
-  get_slot ~reconstruct_if_missing cryptobox node_store slot_id
+  get_slot ~reconstruct_if_missing cryptobox node_store node_context slot_id
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store
@@ -440,11 +441,17 @@ let get_slot_status ~slot_id node_store =
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read store.shards slot_id shard_index
 
-let get_slot_pages ~reconstruct_if_missing cryptobox store slot_id =
+let get_slot_pages ~reconstruct_if_missing cryptobox store node_context slot_id
+    =
   let open Lwt_result_syntax in
   let dal_parameters = Cryptobox.parameters cryptobox in
   let* slot =
-    get_slot_content ~reconstruct_if_missing store cryptobox slot_id
+    get_slot_content
+      ~reconstruct_if_missing
+      store
+      node_context
+      cryptobox
+      slot_id
   in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
