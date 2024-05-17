@@ -36,7 +36,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
       (** The slot identifiers of the commitments currently being
@@ -119,11 +118,6 @@ val may_add_plugin :
   unit tzresult Lwt.t
 
 type error += Node_not_ready
-
-(** Updates the [last_processed_level] field of the "ready context" with the given
-    info. Assumes the node's status is ready. Otherwise it returns
-    [Node_not_ready]. *)
-val update_last_processed_level : t -> level:int32 -> unit tzresult
 
 (** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
     propagates [Node_not_ready] if status is not ready yet. If called multiple

@@ -474,16 +474,13 @@ module Handler = struct
         return_unit
       else return_unit
     in
-    (* This should be the last modification of this node's (ready) context. *)
-    let*? () =
-      Node_context.update_last_processed_level ctxt ~level:block_level
-    in
     let*? block_round = PluginPred.get_round finalized_shell_header.fitness in
     Dal_metrics.layer1_block_finalized ~block_level ;
     Dal_metrics.layer1_block_finalized_round ~block_round ;
     let*! () =
       Event.(emit layer1_node_final_block (block_level, block_round))
     in
+    (* This should be done at the end of the function. *)
     Last_processed_level.save_last_processed_level
       (Node_context.get_last_processed_level_store ctxt)
       ~level:block_level
@@ -511,7 +508,6 @@ module Handler = struct
                   proto_parameters;
                   cryptobox;
                   shards_proofs_precomputation = _;
-                  last_processed_level = _;
                   skip_list_cells_store;
                   ongoing_amplifications = _;
                 } =

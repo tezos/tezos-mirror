@@ -31,7 +31,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
 }
@@ -138,7 +137,6 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
             cryptobox;
             proto_parameters;
             shards_proofs_precomputation;
-            last_processed_level = None;
             skip_list_cells_store;
             ongoing_amplifications = Types.Slot_id.Set.empty;
           } ;
@@ -186,14 +184,6 @@ let next_level_to_gc ctxt ~current_level =
               ctxt.profile_ctxt
           in
           Int32.(max zero (sub current_level (of_int n))))
-
-let update_last_processed_level ctxt ~level =
-  let open Result_syntax in
-  match ctxt.status with
-  | Ready ready_ctxt ->
-      ctxt.status <- Ready {ready_ctxt with last_processed_level = Some level} ;
-      return_unit
-  | Starting _ -> fail [Node_not_ready]
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
