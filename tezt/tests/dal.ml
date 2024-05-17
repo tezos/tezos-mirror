@@ -5290,9 +5290,13 @@ module Garbage_collection = struct
   (* Test the GC feature: once a period (set by history_mode) is passed after
      receiving the shards, each node deletes them from its storage. *)
 
-  let wait_remove_shards commitment node =
+  let wait_remove_shards ~published_level ~slot_index node =
     Dal_node.wait_for node "removed_slot_shards.v0" (fun event ->
-        if commitment = JSON.(event |> as_string) then Some () else None)
+        if
+          (published_level = JSON.(event |-> "published_level" |> as_int))
+          && slot_index = JSON.(event |-> "slot_index" |> as_int)
+        then Some ()
+        else None)
 
   let wait_for_first_shard ~published_level ~slot_index node =
     Dal_node.wait_for node "stored_slot_shard.v0" (fun event ->
@@ -5345,7 +5349,7 @@ module Garbage_collection = struct
     in
     Log.info "Producer DAL node is running" ;
 
-    let* publication_level, commitment, () =
+    let* published_level, _commitment, () =
       publish_store_and_wait_slot
         node
         client
@@ -5363,14 +5367,14 @@ module Garbage_collection = struct
       Dal_RPC.(
         call slot_producer
         @@ get_level_slot_shard_content
-             ~slot_level:publication_level
+             ~slot_level:published_level
              ~slot_index
              ~shard_index:0)
     in
 
     let wait_remove_shards_promise =
       Log.info "Waiting for the shards of the commitment to be removed" ;
-      wait_remove_shards commitment slot_producer
+      wait_remove_shards ~published_level ~slot_index slot_producer
     in
 
     Log.info "Every shard published for the commitment; baking blocks" ;
@@ -5383,7 +5387,7 @@ module Garbage_collection = struct
     Log.info "RPC deleted shard producer" ;
     let* () =
       get_shard_rpc_failure_expected
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         slot_producer
     in
@@ -5539,8 +5543,8 @@ module Garbage_collection = struct
       return (shard_index_observer, shard_index_attester)
     in
 
-    let* ( publication_level,
-           commitment,
+    let* ( published_level,
+           _commitment,
            (shard_index_observer, shard_index_attester) ) =
       publish_store_and_wait_slot
         node
@@ -5556,7 +5560,7 @@ module Garbage_collection = struct
     Log.info "RPC first shard observer" ;
     let* _shard_observer =
       get_shard_rpc
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         ~shard_index:shard_index_observer
         observer
@@ -5564,7 +5568,7 @@ module Garbage_collection = struct
     Log.info "RPC first shard producer" ;
     let* _shard_producer =
       get_shard_rpc
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         ~shard_index:0
         slot_producer
@@ -5572,7 +5576,7 @@ module Garbage_collection = struct
     Log.info "RPC first shard attester" ;
     let* _shard_attester =
       get_shard_rpc
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         ~shard_index:shard_index_attester
         attester
@@ -5580,7 +5584,7 @@ module Garbage_collection = struct
 
     let wait_remove_shards_attester_promise =
       Log.info "Waiting for first shard to be removed by the attester" ;
-      wait_remove_shards commitment attester
+      wait_remove_shards ~published_level ~slot_index attester
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
@@ -5593,7 +5597,7 @@ module Garbage_collection = struct
     Log.info "RPC deleted shard attester" ;
     let* () =
       get_shard_rpc_failure_expected
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         attester
     in
@@ -5601,7 +5605,7 @@ module Garbage_collection = struct
     Log.info "RPC shard still stored observer" ;
     let* _shard_observer =
       get_shard_rpc
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         ~shard_index:0
         observer
@@ -5609,7 +5613,7 @@ module Garbage_collection = struct
     Log.info "RPC shard still stored producer" ;
     let* _shard_producer =
       get_shard_rpc
-        ~slot_level:publication_level
+        ~slot_level:published_level
         ~slot_index
         ~shard_index:0
         slot_producer
