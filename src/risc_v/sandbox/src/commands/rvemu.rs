@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{cli::RvemuOptions, inbox};
+use crate::{cli::RvemuOptions, console::Console, inbox};
 use rvemu::emulator::Emulator;
 use std::error::Error;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -59,6 +59,7 @@ pub fn rvemu(opts: RvemuOptions) -> Result<(), Box<dyn Error>> {
             emu: &mut Emulator,
             _: &rvemu_syscall::RollupMetadata,
             _: &mut inbox::Inbox,
+            _: &mut impl std::io::Write,
         ) -> Result<(), Box<dyn Error>> {
             rvemu_syscall::handle_posix(emu)
         }
@@ -68,6 +69,11 @@ pub fn rvemu(opts: RvemuOptions) -> Result<(), Box<dyn Error>> {
     };
 
     let mut prev_pc = emu.cpu.pc;
+    let mut console = if opts.common.timings {
+        Console::with_timings()
+    } else {
+        Console::new()
+    };
 
     while inbox.none_count() < 2 || inbox_opt.keep_going {
         emu.cpu.devices_increment();
@@ -87,7 +93,7 @@ pub fn rvemu(opts: RvemuOptions) -> Result<(), Box<dyn Error>> {
                 match exception {
                     rvemu::exception::Exception::EnvironmentCallFromSMode
                     | rvemu::exception::Exception::EnvironmentCallFromUMode => {
-                        handle_syscall(&mut emu, &meta, &mut inbox).map_err(
+                        handle_syscall(&mut emu, &meta, &mut inbox, &mut console).map_err(
                             |err| -> Box<dyn Error> {
                                 format!("Failed to handle environment call at {prev_pc:x}: {}", err)
                                     .as_str()

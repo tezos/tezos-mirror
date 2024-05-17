@@ -156,6 +156,9 @@ pub struct CommonOptions {
 
     #[command(flatten)]
     pub inbox: InboxOptions,
+
+    #[arg(long, default_value_t = false)]
+    pub timings: bool,
 }
 
 #[derive(Debug, Clone, Parser)]
