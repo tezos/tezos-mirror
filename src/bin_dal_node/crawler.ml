@@ -89,20 +89,22 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
         ((hash, shell_header) :: acc)
   in
   let process (hash, Block_header.{shell = shell_header; _}) =
+    let shell_header_level = shell_header.level in
     let*! () =
       Event.(
         emit
           layer1_node_new_head
-          (hash, shell_header.level, shell_header.fitness))
+          (hash, shell_header_level, shell_header.fitness))
     in
+    Dal_metrics.new_layer1_head ~head_level:shell_header_level ;
     cache_shell_header headers_cache hash shell_header ;
-    if shell_header.level <= !last_notified_level then return_unit
-    else if Int32.equal shell_header.level 1l then (
+    if shell_header_level <= !last_notified_level then return_unit
+    else if Int32.equal shell_header_level 1l then (
       stream_push (Some (hash, shell_header)) ;
       return_unit)
     else
       let* pred_hash, pred_level =
-        get_predecessor crawler_lib hash shell_header.level
+        get_predecessor crawler_lib hash shell_header_level
       in
       let* finalized_hash, finalized_level =
         get_predecessor crawler_lib pred_hash pred_level
