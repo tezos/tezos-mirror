@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use clap::{Parser, Subcommand, ValueEnum};
-use std::path::Path;
+use std::{error::Error, path::Path};
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Mode {
@@ -65,6 +65,20 @@ pub enum BenchMode {
 
 #[derive(Debug, Clone, Parser)]
 pub struct BenchOptions {
+    #[command(subcommand)]
+    pub bench_command: BenchSubcommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum BenchSubcommand {
+    /// Runs a benchmark (alias for default bench command)
+    Run(BenchRunOptions),
+    /// Loads and compares runs from given json files
+    Compare(BenchCompareOptions),
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct BenchRunOptions {
     /// Type of benchmark
     #[arg(long)]
     pub mode: BenchMode,
@@ -97,6 +111,34 @@ pub fn validate_output(output: &str) -> Result<String, &'static str> {
         Err("Output filename can not be empty")
     } else {
         Ok(output.to_string())
+    }
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct BenchCompareOptions {
+    #[arg(long, num_args = 1..)]
+    comp_file: Vec<Box<Path>>,
+}
+
+impl BenchCompareOptions {
+    pub fn comparison_files(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        let x = self
+            .comp_file
+            .iter()
+            .map(|p| {
+                if let Some(p) = p.to_str() {
+                    Ok(p.to_string())
+                } else {
+                    Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Invalid path to benchmark file",
+                    )))
+                }
+            })
+            // If any of the items is `Err`, it will fail with `Err`
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(x)
     }
 }
 

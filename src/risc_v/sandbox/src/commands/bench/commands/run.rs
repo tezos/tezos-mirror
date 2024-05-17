@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    cli::{BenchMode, BenchOptions},
+    cli::{BenchMode, BenchRunOptions},
     commands::bench::{
         data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
         save_to_file, show_results, BenchStats,
@@ -62,7 +62,7 @@ fn compose(
     }
 }
 
-fn bench_fine(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData {
+fn bench_fine(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchData {
     let mut run_res = InterpreterResult::Running(0);
     let mut bench_data = FineBenchData::new();
     let bench_start = quanta::Instant::now();
@@ -93,7 +93,7 @@ fn bench_fine(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData {
 
 /// A single run of the given `interpreter`.
 /// Provides basic benchmark data and interpreter result.
-fn bench_simple(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData {
+fn bench_simple(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchData {
     let start = quanta::Instant::now();
     let res = interpreter.run(opts.common.max_steps);
     let duration = start.elapsed();
@@ -109,7 +109,7 @@ fn bench_simple(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData
     BenchData::from_simple(data, res)
 }
 
-fn bench_iteration(opts: &BenchOptions) -> Result<BenchData, Box<dyn Error>> {
+fn bench_iteration(opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
     let contents = std::fs::read(&opts.common.input)?;
     let mut backend = Interpreter::create_backend();
     let mut interpreter = Interpreter::new(
@@ -127,7 +127,7 @@ fn bench_iteration(opts: &BenchOptions) -> Result<BenchData, Box<dyn Error>> {
     Ok(data)
 }
 
-pub fn run(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
+pub fn run(opts: BenchRunOptions) -> Result<(), Box<dyn Error>> {
     let stats = match opts.repeat {
         0 | 1 => BenchStats::from_data(bench_iteration(&opts)?)?,
         iterations => {
@@ -138,7 +138,6 @@ pub fn run(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
             BenchStats::from_data_list(data_list)?
         }
     };
-
     save_to_file(&stats, &opts)?;
     show_results(&stats, &opts);
     Ok(())

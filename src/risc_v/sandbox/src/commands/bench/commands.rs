@@ -2,6 +2,5 @@
 //
 // SPDX-License-Identifier: MIT
 
-mod run;
-
-pub use run::run as bench_run;
+pub mod compare;
+pub mod run;

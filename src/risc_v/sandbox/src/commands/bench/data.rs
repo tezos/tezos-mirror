@@ -70,7 +70,7 @@ impl Display for SimpleBenchData {
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
-pub(super) enum InstrGetError {
+pub enum InstrGetError {
     Translation,
     Parse,
 }
@@ -79,7 +79,7 @@ type InstrTag = <Instr as EnumTag>::Tag;
 
 /// Instruction classification type for grouping instruction for further stats.
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
-pub(super) enum InstrType {
+pub enum InstrType {
     Instr(InstrTag),
     FetchErr(InstrGetError),
 }

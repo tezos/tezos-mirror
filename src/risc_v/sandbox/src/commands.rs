@@ -8,6 +8,7 @@ mod debug;
 mod run;
 mod rvemu;
 
+pub use bench::bench;
 pub use debug::debug;
 pub use run::run;
 pub use rvemu::rvemu;
