@@ -427,6 +427,29 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
     ~title:(sf "%s (te_sequencer)" title)
     ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags)
 
+module Protocol = struct
+  include Protocol
+
+  let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
+      ?uses_admin_client ?supports _body protocols =
+    Protocol.register_test
+      ~__FILE__
+      ~title
+      ~tags
+      ?uses
+      ?uses_node
+      ?uses_client
+      ?uses_admin_client
+      ?supports
+      (fun _protocol ->
+        Test.fail
+          ~loc:__LOC__
+          "Do not call Protocol.register_test directly. Use register_test, or \
+           register_both instead.")
+      protocols
+    [@@warning "-unused-value-declaration"]
+end
+
 let test_remove_sequencer =
   register_both
     ~time_between_blocks:Nothing
