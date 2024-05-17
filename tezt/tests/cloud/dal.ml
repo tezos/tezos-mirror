@@ -137,6 +137,7 @@ type metrics = {
   total_attested_commitments : int;
   ratio_published_commitments : int;
   ratio_attested_commitments : int;
+  ratio_published_commitments_last_level : int;
   ratio_attested_commitments_per_baker : (public_key_hash, int) Hashtbl.t;
 }
 
@@ -149,6 +150,7 @@ let default_metrics =
     total_attested_commitments = 0;
     ratio_published_commitments = 0;
     ratio_attested_commitments = 0;
+    ratio_published_commitments_last_level = 0;
     ratio_attested_commitments_per_baker = Hashtbl.create 0;
   }
 
@@ -172,6 +174,7 @@ let pp_metrics t
       total_attested_commitments;
       ratio_published_commitments;
       ratio_attested_commitments;
+      ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
     } =
   (match level_first_commitment_published with
@@ -191,6 +194,9 @@ let pp_metrics t
   Log.info "Total attested commitments: %d" total_attested_commitments ;
   Log.info "Ratio published commitments: %d" ratio_published_commitments ;
   Log.info "Ratio attested commitments: %d" ratio_attested_commitments ;
+  Log.info
+    "Ratio published commitments last level: %d"
+    ratio_published_commitments_last_level ;
   t.bakers |> List.to_seq
   |> Seq.iter (fun {account; stake; _} ->
          match
@@ -215,6 +221,7 @@ let push_metrics t
       total_attested_commitments;
       ratio_published_commitments;
       ratio_attested_commitments;
+      ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
     } =
   (* There are three metrics grouped by labels. *)
@@ -250,6 +257,11 @@ let push_metrics t
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "attested")]
     ratio_attested_commitments ;
+  Cloud.push_metric
+    t.cloud
+    ~name:"tezt_commitments_ratio"
+    ~labels:[("kind", "published_last_level")]
+    ratio_published_commitments_last_level ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments"
@@ -309,6 +321,16 @@ let update_ratio_published_commitments _t _per_level_info metrics =
   else
     metrics.total_published_commitments * 100
     / metrics.expected_published_commitments
+
+let update_ratio_published_commitments_last_level t per_level_info metrics =
+  match metrics.level_first_commitment_published with
+  | None -> 0
+  | Some _ ->
+      let producers =
+        min t.configuration.dal_node_producer t.parameters.number_of_slots
+      in
+      if producers = 0 then 100
+      else Hashtbl.length per_level_info.published_commitments * 100 / producers
 
 let update_ratio_attested_commitments t per_level_info metrics =
   match metrics.level_first_commitment_attested with
@@ -407,6 +429,9 @@ let get_metrics t infos_per_level metrics =
   let expected_published_commitments =
     update_expected_published_commitments t metrics
   in
+  let ratio_published_commitments_last_level =
+    update_ratio_published_commitments_last_level t infos_per_level metrics
+  in
   let total_attested_commitments =
     update_total_attested_commitments t infos_per_level metrics
   in
@@ -419,6 +444,7 @@ let get_metrics t infos_per_level metrics =
       total_published_commitments;
       expected_published_commitments;
       total_attested_commitments;
+      ratio_published_commitments_last_level;
     }
   in
   let ratio_published_commitments =
@@ -438,6 +464,7 @@ let get_metrics t infos_per_level metrics =
     total_attested_commitments;
     ratio_published_commitments;
     ratio_attested_commitments;
+    ratio_published_commitments_last_level;
     ratio_attested_commitments_per_baker;
   }
 
