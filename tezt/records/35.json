@@ -1641,12 +1641,12 @@
     }
   },
   {
-    "file": "tezt/tests/risc_v_sandbox.ml",
+    "file": "tezt/tests/riscv_sandbox.ml",
     "title": "Run inline asm tests",
     "tags": [
       "regression",
       "inline_asm",
-      "risc_v_sandbox",
+      "riscv_sandbox",
       "riscv",
       "sandbox"
     ],

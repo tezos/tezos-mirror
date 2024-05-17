@@ -1,0 +1,3 @@
+
+./src/riscv/riscv-sandbox rvemu --input src/riscv/tests/inline_asm/rv64-inline-asm-tests --posix
+Received request to exit with code 0

@@ -2,20 +2,21 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Protocol
 open Alpha_context
 module Context = Riscv_context
-module Storage = Octez_risc_v_pvm.Storage
+module Storage = Octez_riscv_pvm.Storage
 
 type repo = Context.repo
 
 type tree = Context.tree
 
 module State = Riscv_context.PVMState
-module Backend = Octez_risc_v_pvm.Backend
+module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
 module type Serializable_state_S = sig

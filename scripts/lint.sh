@@ -42,8 +42,8 @@ license_check_exclude=$(
   cat << EOF
 .*_generated.ml
 src/lib_protocol_environment/sigs/.*
-src/risc_v/lib/octez_risc_v_api.ml
-src/risc_v/lib/octez_risc_v_api.mli
+src/riscv/lib/octez_riscv_api.ml
+src/riscv/lib/octez_riscv_api.mli
 EOF
 )
 

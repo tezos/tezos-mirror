@@ -1673,11 +1673,11 @@
     }
   },
   {
-    "file": "tezt/tests/risc_v_sandbox.ml",
-    "title": "Run risc-v unit tests (ud)",
+    "file": "tezt/tests/riscv_sandbox.ml",
+    "title": "Run riscv unit tests (ud)",
     "tags": [
       "regression",
-      "risc_v_sandbox",
+      "riscv_sandbox",
       "riscv",
       "sandbox",
       "ud",

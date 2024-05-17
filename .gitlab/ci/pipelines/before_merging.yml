@@ -381,8 +381,8 @@ oc.build_kernels:
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
-  - make -C src/risc_v risc-v-sandbox risc-v-dummy.elf
-  - make -C src/risc_v/tests/ build
+  - make -C src/riscv riscv-sandbox riscv-dummy.elf
+  - make -C src/riscv/tests/ build
   variables:
     CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo
@@ -399,9 +399,9 @@ oc.build_kernels:
     - tx_kernel.wasm
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
-    - src/risc_v/risc-v-sandbox
-    - src/risc_v/risc-v-dummy.elf
-    - src/risc_v/tests/inline_asm/rv64-inline-asm-tests
+    - src/riscv/riscv-sandbox
+    - src/riscv/riscv-dummy.elf
+    - src/riscv/tests/inline_asm/rv64-inline-asm-tests
     when: on_success
 
 oc.tezt:fetch-records:
@@ -3273,7 +3273,7 @@ opam:octez-proxy-server:
     when: always
   retry: 2
 
-opam:octez-risc-v-api:
+opam:octez-riscv-api:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -3323,7 +3323,7 @@ opam:octez-risc-v-api:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: octez-risc-v-api
+    package: octez-riscv-api
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
@@ -3336,7 +3336,7 @@ opam:octez-risc-v-api:
     when: always
   retry: 2
 
-opam:octez-risc-v-pvm:
+opam:octez-riscv-pvm:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -3386,7 +3386,7 @@ opam:octez-risc-v-pvm:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: octez-risc-v-pvm
+    package: octez-riscv-pvm
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
@@ -7065,7 +7065,7 @@ test_etherlink_firehose:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
-test_risc_v_kernels:
+test_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -7076,7 +7076,7 @@ test_risc_v_kernels:
     - .gitlab/**/*
     - images/**/*
     - src/kernel_sdk/**/*
-    - src/risc_v/**/*
+    - src/riscv/**/*
     when: on_success
   needs:
   - oc.docker:rust-toolchain
@@ -7087,9 +7087,9 @@ test_risc_v_kernels:
     paths:
     - cargo/
   script:
-  - make -C src/risc_v check
-  - make -C src/risc_v test
-  - make -C src/risc_v audit
+  - make -C src/riscv check
+  - make -C src/riscv test
+  - make -C src/riscv audit
   variables:
     CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo

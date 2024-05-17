@@ -74,7 +74,7 @@ let exclude filename =
   | "opam-repository" :: _ -> true
   (* We need to tell Dune about excluding directories without defining targets
      in those directories. Therefore we hand write some Dune in these. *)
-  | "src" :: "risc_v" :: _ -> true
+  | "src" :: "riscv" :: _ -> true
   | _ -> false
 
 let () =
@@ -91,7 +91,7 @@ let () =
       str;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-      Octez.tezt_risc_v_sandbox;
+      Octez.tezt_riscv_sandbox;
       tezt_tx_kernel;
       Data_encoding.data_encoding;
       octez_base;

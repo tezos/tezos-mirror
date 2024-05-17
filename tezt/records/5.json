@@ -12,7 +12,7 @@
     }
   },
   {
-    "file": "src/risc_v/pvm/test/test_main.ml",
+    "file": "src/riscv/pvm/test/test_main.ml",
     "title": "RISC-V interpreter: Main (add)",
     "tags": [
       "alcotezt",

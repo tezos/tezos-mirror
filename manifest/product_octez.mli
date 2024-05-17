@@ -69,7 +69,7 @@ val registered_octez_proto_libs : Manifest.Sub_lib.container
 
 val registered_octez_shell_libs : Manifest.Sub_lib.container
 
-val tezt_risc_v_sandbox : Manifest.target
+val tezt_riscv_sandbox : Manifest.target
 
 val tezt_performance_regression : Manifest.target
 

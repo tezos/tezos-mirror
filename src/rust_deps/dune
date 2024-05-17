@@ -20,7 +20,7 @@
   (source_tree librustzcash)
   (source_tree wasmer-3.3.0)
   (source_tree src)
-  (source_tree ../risc_v)
+  (source_tree ../riscv)
   (source_tree ../kernel_sdk))
  (action
   (no-infer

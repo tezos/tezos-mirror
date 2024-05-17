@@ -61,8 +61,8 @@ __pycache__
 /simulation-scenario
 /safety-checker
 
-/src/risc_v/risc-v-sandbox
-/src/risc_v/risc-v-dummy.elf
+/src/riscv/riscv-sandbox
+/src/riscv/riscv-dummy.elf
 
 /src/proto_*/parameters/*-parameters.json
 

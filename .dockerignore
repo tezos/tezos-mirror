@@ -138,5 +138,5 @@ terraform.rc
 *.lock.hcl
 
 # RISC-V
-/src/risc_v/risc-v-sandbox
-/src/risc_v/risc-v-dummy.elf
+/src/riscv/riscv-sandbox
+/src/riscv/riscv-dummy.elf

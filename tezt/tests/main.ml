@@ -61,7 +61,7 @@ let register_protocol_independent_tests () =
   Snoop_codegen.register_protocol_independent () ;
   Snoop_protocol_codegen.register_protocol_independent () ;
   Sc_rollup.register_protocol_independent () ;
-  Risc_v_sandbox.register ()
+  Riscv_sandbox.register ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =

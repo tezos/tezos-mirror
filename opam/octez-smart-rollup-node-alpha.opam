@@ -26,7 +26,7 @@ depends: [
   "aches-lwt" { >= "1.0.0" }
   "octez-injector" { = version }
   "octez-smart-rollup-node-lib" { = version }
-  "octez-risc-v-pvm" { = version }
+  "octez-riscv-pvm" { = version }
   "octez-version" { = version }
 ]
 conflicts: [

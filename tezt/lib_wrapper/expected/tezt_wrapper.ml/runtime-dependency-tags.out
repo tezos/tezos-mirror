@@ -27,8 +27,8 @@ wasm_debugger: octez-smart-rollup-wasm-debugger
 snoop: octez-snoop
 smart_rollup_installer: smart-rollup-installer
 echo: src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm
-risc_v_sandbox: src/risc_v
-risc_v_sandbox: src/risc_v/risc-v-sandbox
-risc_v_sandbox: tezt/tests/riscv-tests/generated
+riscv_sandbox: src/riscv
+riscv_sandbox: src/riscv/riscv-sandbox
+riscv_sandbox: tezt/tests/riscv-tests/generated
 tx_kernel: tx_kernel.wasm
 tx_kernel_dal: tx_kernel_dal.wasm
