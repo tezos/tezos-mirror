@@ -314,6 +314,8 @@ module Statuses = struct
     update_slot_headers_attestation ~published_level ~number_of_slots t attested
 
   let get_slot_status ~slot_id t = find_status t slot_id
+
+  let remove_level_status ~level t = KVS.remove_file t file_layout level
 end
 
 module Commitment_indexed_cache =

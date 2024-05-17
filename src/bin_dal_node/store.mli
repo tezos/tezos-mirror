@@ -124,6 +124,10 @@ module Statuses : sig
     slot_id:Types.slot_id ->
     t ->
     (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
+
+  (** [remove_level_status ~level store] removes the status of all the
+      slot ids published at the given level. *)
+  val remove_level_status : level:int32 -> t -> unit tzresult Lwt.t
 end
 
 module Commitment_indexed_cache : sig

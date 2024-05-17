@@ -235,6 +235,14 @@ let removed_slot =
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
 
+let removed_status =
+  declare_1
+    ~section
+    ~name:"removed_status"
+    ~msg:"removed statuses for level {level}"
+    ~level:Info
+    ("level", Data_encoding.int32)
+
 let removing_shards_failed =
   declare_3
     ~section
@@ -256,6 +264,15 @@ let removing_slot_failed =
       "removing slot for level {published_level} and index {slot_index} failed"
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
+
+let removing_status_failed =
+  declare_2
+    ~section
+    ~name:"removing_status_failed"
+    ~level:Warning
+    ~msg:"removing status file for level {level} failed"
+    ("level", Data_encoding.int32)
     ("error", Error_monad.trace_encoding)
 
 let decoding_data_failed =

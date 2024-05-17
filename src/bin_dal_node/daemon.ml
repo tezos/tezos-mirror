@@ -323,6 +323,16 @@ module Handler = struct
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
+    let* () =
+      let* res =
+        Store.Statuses.remove_level_status
+          ~level:oldest_level
+          store.slot_header_statuses
+      in
+      match res with
+      | Ok () -> Event.(emit removed_status oldest_level)
+      | Error err -> Event.(emit removing_status_failed (oldest_level, err))
+    in
     List.iter_s
       (fun slot_index ->
         let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
