@@ -195,15 +195,6 @@ module Legacy : sig
     t ->
     unit Lwt.t
 
-  (** [get_slot_commitment ~level ~slot_index store] returns the
-      commitment associated to the given slot identifier in the
-      bidirectional mapping. *)
-  val get_slot_commitment :
-    level:int32 ->
-    slot_index:int ->
-    t ->
-    (commitment, [> Errors.other | Errors.not_found]) result Lwt.t
-
   (** [get_slot_status ~slot_id store] returns the status associated
       to the given accepted [slot_id], or [None] if no status is
       associated to the [slot_id]. *)

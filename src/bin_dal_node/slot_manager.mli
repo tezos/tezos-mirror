@@ -180,20 +180,6 @@ val update_selected_slot_headers_statuses :
   Store.t ->
   unit Lwt.t
 
-(** [get_slot_commitment ~level ~slot_index node_store]
-    returns the commitment associated with the accepted slot header of index
-    [slot_index] published at level [level]. Returns [Error `Not_found] if no
-    such commitment is found in [node_store].
-
-    In addition to decoding errors, the function returns [`Not_found]
-    if there is no commitment for the given [level] and [slot_index] in
-    [node_store].
-*)
-val get_slot_commitment :
-  Types.slot_id ->
-  Store.t ->
-  (Cryptobox.commitment, [Errors.other | Errors.not_found]) result Lwt.t
-
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently
     stored for that slot id.
