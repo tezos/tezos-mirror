@@ -11,3 +11,4 @@ script-inputs
 scripts
 irmin
 brassaia
+rust-toolchain
