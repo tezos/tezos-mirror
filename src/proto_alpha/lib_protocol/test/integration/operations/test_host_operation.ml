@@ -411,6 +411,152 @@ let test_no_sponsor_operation_in_guest_subbatch () =
   in
   return_unit
 
+(** Counter consistency for sponsor counters *)
+
+(** Wrong counter in hosts operations
+
+    Tests that unexpected host counters make the operation invalid.
+
+    Expects: [Counter_in_the_future, Counter_in_the_past, Inconsistent_counters].
+ *)
+let test_wrong_counter_in_hosts () =
+  let open Lwt_result_syntax in
+  let* b, (host, guest, guest') = context_init_3 () in
+  let* b, fact = originate_contract ~b host in
+  let* host_counter = Context.Contract.counter (B b) host in
+  let* guest'_counter = Context.Contract.counter (B b) guest' in
+  let* op =
+    Op.transaction (B b) guest fact Tez.zero ~fee:Tez_helpers.one_mutez
+  in
+  let mk_host ~guest ~op counter =
+    Op.host (B b) ~counter ~host ~guest ~ops:[op]
+  in
+  let* single_host_batch_counter_ahead =
+    mk_host ~guest ~op (Manager_counter.succ host_counter)
+  in
+  let*! r = validate_single_operation (B b) single_host_batch_counter_ahead in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ r (function
+        | Contract_storage.Counter_in_the_future _ -> true
+        | _ -> false)
+  in
+  let* single_host_batch_counter_in_the_past =
+    mk_host ~guest ~op (Manager_counter.Internal_for_tests.of_int 0)
+  in
+  let*! r =
+    validate_single_operation (B b) single_host_batch_counter_in_the_past
+  in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ r (function
+        | Contract_storage.Counter_in_the_past _ -> true
+        | _ -> false)
+  in
+  (* Test an invalid counter on the second host operation *)
+  let* op2 =
+    Op.transaction
+      (B b)
+      guest'
+      ~counter:(Manager_counter.succ guest'_counter)
+      fact
+      Tez.zero
+      ~fee:Tez_helpers.one_mutez
+  in
+  let* host1 = mk_host ~guest ~op host_counter in
+  let* host2 =
+    mk_host ~guest:guest' ~op:op2 Manager_counter.(succ (succ host_counter))
+  in
+  let* batch = Op.batch_operations (B b) ~source:host [host1; host2] in
+  let* (_ : Incremental.t) =
+    let expect_failure =
+      Error_helpers.expect_inconsistent_counters
+        ~loc:__LOC__
+        ~source:host
+        ~previous_counter:(Manager_counter.succ host_counter)
+        ~counter:Manager_counter.(succ (succ (succ host_counter)))
+    in
+    validate_single_operation ~expect_failure (B b) batch
+  in
+  return_unit
+
+(** Wrong counter in host operations after sponsor tx
+
+    Expects: [Inconsistent_counters].
+ *)
+let test_bad_host_counter_after_sponsor_tx () =
+  let open Lwt_result_syntax in
+  let* b, (host, guest, guest') = context_init_3 () in
+  let* b, fact = originate_contract ~b host in
+  let* op_host =
+    Op.transaction (B b) host fact Tez.zero ~fee:Tez_helpers.one_mutez
+  in
+  let* op_guest =
+    Op.transaction (B b) guest fact Tez.zero ~fee:Tez_helpers.one_mutez
+  in
+  let bad_counter = Manager_counter.Internal_for_tests.(of_int 1000) in
+  let* host1 =
+    Op.host (B b) ~counter:bad_counter ~host ~guest ~ops:[op_guest]
+  in
+  let* op_guest' =
+    Op.transaction (B b) guest' fact Tez.zero ~fee:Tez_helpers.one_mutez
+  in
+  let* host2 =
+    Op.host
+      (B b)
+      ~counter:Manager_counter.(succ bad_counter)
+      ~host
+      ~guest:guest'
+      ~ops:[op_guest']
+  in
+  let* batched_op =
+    Op.batch_operations (B b) ~source:host [op_host; host1; host2]
+  in
+  let* (_ : Incremental.t) =
+    let* host_counter = Context.Contract.counter (B b) host in
+    let expect_failure =
+      Error_helpers.expect_inconsistent_counters
+        ~loc:__LOC__
+        ~source:host
+        ~previous_counter:(Manager_counter.succ host_counter)
+        ~counter:(Manager_counter.succ bad_counter)
+    in
+    validate_single_operation ~expect_failure (B b) batched_op
+  in
+  return_unit
+
+(** Counter consistency for guest counters *)
+
+(** Test guest counters for consistency
+
+    Expects: [Inconsistent_counters].
+ *)
+let test_wrong_counter_in_guest_operations () =
+  let open Lwt_result_syntax in
+  let* b, (host, guest) = context_init_2 () in
+  let* b, fact = originate_contract ~b host in
+  let* guest_counter = Context.Contract.counter (B b) guest in
+  let* op1 = Op.transaction (B b) guest fact Tez.zero ~fee:Tez.one_cent in
+  let* op2 =
+    Op.transaction
+      ~counter:Manager_counter.(succ (succ guest_counter))
+      (B b)
+      guest
+      fact
+      Tez.zero
+      ~fee:Tez.one_mutez
+  in
+  let* batch = Op.host (B b) ~host ~guest ~ops:[op1; op2] in
+  let* (_ : Incremental.t) =
+    let expect_failure =
+      Error_helpers.expect_inconsistent_counters
+        ~loc:__LOC__
+        ~source:guest
+        ~previous_counter:(Manager_counter.succ guest_counter)
+        ~counter:Manager_counter.(succ (succ (succ guest_counter)))
+    in
+    validate_single_operation ~expect_failure (B b) batch
+  in
+  return_unit
+
 let tests =
   let open Tztest in
   List.map
@@ -431,6 +577,11 @@ let tests =
         test_unexpected_guest_in_batch );
       ( "Validation KO: no sponsor operation in guest subbatch",
         test_no_sponsor_operation_in_guest_subbatch );
+      ("Validation KO: wrong counter in hosts", test_wrong_counter_in_hosts);
+      ( "Validation KO: bad host counter after sponsor tx",
+        test_bad_host_counter_after_sponsor_tx );
+      ( "Validation KO: wrong counter in guest operations",
+        test_wrong_counter_in_guest_operations );
     ]
 
 let () =
