@@ -72,53 +72,45 @@ let alpine_version =
          sourcing [scripts/version.sh] before running."
   | Some v -> v
 
-(* Register images.
+(* Register external images.
+
+   Use this module to register images that are as built outside the
+   [tezos/tezos] CI.
 
    For documentation on the [runtime_X_dependencies] and the
    [rust_toolchain] images, refer to
    {{:https://gitlab.com/tezos/opam-repository/}
    tezos/opam-repository}. *)
-module Images = struct
+module Images_external = struct
   let runtime_e2etest_dependencies =
-    Image.register
-      ~name:"runtime_e2etest_dependencies"
+    Image.mk_external
       ~image_path:
         "${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}"
 
   let runtime_build_test_dependencies =
-    Image.register
-      ~name:"runtime_build_test_dependencies"
+    Image.mk_external
       ~image_path:
         "${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}"
 
   let runtime_build_dependencies =
-    Image.register
-      ~name:"runtime_build_dependencies"
+    Image.mk_external
       ~image_path:
         "${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}"
 
   let runtime_prebuild_dependencies =
-    Image.register
-      ~name:"runtime_prebuild_dependencies"
+    Image.mk_external
       ~image_path:
         "${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}"
-
-  let client_libs_dependencies =
-    Image.register
-      ~name:"client_libs_dependencies"
-      ~image_path:
-        "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
 
   let rust_toolchain =
     (* Warning: we are relying on ill-specified behavior from GitLab that allows
        the expansion of dotenv variables (here: $rust_toolchain_image_tag) in
        the image field.
        See: https://gitlab.com/gitlab-org/gitlab-runner/-/issues/37361. *)
-    Image.register
-      ~name:"rust_toolchain"
+    Image.mk_external
       ~image_path:"${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
 
-  let nix = Image.register ~name:"nix" ~image_path:"nixos/nix"
+  let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
 
   (* Match GitLab executors version and directly use the Docker socket
      The Docker daemon is already configured, experimental features are enabled
@@ -130,59 +122,43 @@ module Images = struct
 
      This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
   let docker =
-    Image.register
-      ~name:"docker"
+    Image.mk_external
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
 
   (* The Alpine version should be kept up to date with the version
      used for the [build_deps_image_name] images and specified in the
      variable [alpine_version] in [scripts/version.sh]. This is
      checked by the jobs [start] and [sanity_ci]. *)
-  let alpine =
-    Image.register ~name:"alpine" ~image_path:("alpine:" ^ alpine_version)
+  let alpine = Image.mk_external ~image_path:("alpine:" ^ alpine_version)
 
-  let debian_bookworm =
-    Image.register ~name:"debian_bookworm" ~image_path:"debian:bookworm"
+  let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
 
-  let debian_bullseye =
-    Image.register ~name:"debian_bullseye" ~image_path:"debian:bullseye"
+  let debian_bullseye = Image.mk_external ~image_path:"debian:bullseye"
 
   let ubuntu_focal =
-    Image.register
-      ~name:"ubuntu_focal"
-      ~image_path:"public.ecr.aws/lts/ubuntu:20.04_stable"
+    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:20.04_stable"
 
   let ubuntu_jammy =
-    Image.register
-      ~name:"ubuntu_jammy"
-      ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
+    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
 
-  let fedora_37 = Image.register ~name:"fedora_37" ~image_path:"fedora:37"
+  let fedora_37 = Image.mk_external ~image_path:"fedora:37"
 
-  let fedora_39 = Image.register ~name:"fedora_39" ~image_path:"fedora:39"
+  let fedora_39 = Image.mk_external ~image_path:"fedora:39"
 
   let opam_ubuntu_focal =
-    Image.register
-      ~name:"opam_ubuntu_focal"
-      ~image_path:"ocaml/opam:ubuntu-20.04"
+    Image.mk_external ~image_path:"ocaml/opam:ubuntu-20.04"
 
   let opam_ubuntu_mantic =
-    Image.register
-      ~name:"opam_ubuntu_mantic"
-      ~image_path:"ocaml/opam:ubuntu-23.10"
+    Image.mk_external ~image_path:"ocaml/opam:ubuntu-23.10"
 
   let opam_debian_bullseye =
-    Image.register
-      ~name:"opam_debian_bullseye"
-      ~image_path:"ocaml/opam:debian-11"
+    Image.mk_external ~image_path:"ocaml/opam:debian-11"
 
   let ci_release =
-    Image.register
-      ~name:"ci_release"
+    Image.mk_external
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0"
 
-  let hadolint =
-    Image.register ~name:"hadolint" ~image_path:"hadolint/hadolint:2.9.3-debian"
+  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.9.3-debian"
 
   (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
      latest release, then an update in the parser or analyser could result in new
@@ -193,9 +169,7 @@ module Images = struct
      Update the hash in scripts/semgrep/README.md too when updating it here
      Last update: 2022-01-03 *)
   let semgrep_agent =
-    Image.register
-      ~name:"semgrep_agent"
-      ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
+    Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
 end
 
 (** {2 Helpers} *)
@@ -537,7 +511,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?allow_failure
     ?parallel
     ~__POS__
-    ~image:Images.docker
+    ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", docker_version)]
       @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
@@ -550,6 +524,42 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ~stage
     ~name
     script
+
+(** A set of internally and externally built images.
+
+    Use this module to register images built in the CI of
+    [tezos/tezos] that are also used in the same pipelines.See
+    {!Images_external} for external images.
+
+    To make the distinction between internal and external images
+    transparent to job definitions, this module also includes
+    {!Images_external}. *)
+module Images = struct
+  (* Include external images here for convenience. *)
+  include Images_external
+
+  let client_libs_dependencies =
+    let image_builder =
+      job_docker_authenticated
+        ~__POS__
+        ~stage:Stages.build
+        ~name:"oc.docker:client-libs-dependencies"
+          (* These image are not built for external use. *)
+        ~ci_docker_hub:false
+          (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
+        ~skip_docker_initialization:true
+        ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
+        ~artifacts:
+          (artifacts
+             ~reports:
+               (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
+             [])
+    in
+    let image_path =
+      "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
+    in
+    Image.mk_internal ~image_builder ~image_path
+end
 
 (* This version of the job builds both released and experimental executables.
    It is used in the following pipelines:
@@ -727,8 +737,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
 
 type bin_package_target = Dpkg | Rpm
 
-let bin_package_image =
-  Image.register ~name:"generic" ~image_path:"$DISTRIBUTION"
+let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
 let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ?(stage = Stages.build) ~arch ~target () : tezos_job =

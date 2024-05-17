@@ -71,22 +71,21 @@ module Stage = struct
   let index (Stage {name = _; index}) = index
 end
 
-type tezos_job = {
+type tezos_image =
+  | Internal of {image : Gitlab_ci.Types.image; builder : tezos_job}
+  | External of Gitlab_ci.Types.image
+
+and tezos_job = {
   job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
   stage : Stage.t;
+  image_dependencies : tezos_image list;
 }
 
 let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
   match generic_job with Job {name; _} | Trigger_job {name; _} -> name
 
 let name_of_tezos_job tezos_job = name_of_generic_job tezos_job.job
-
-let map_job (tezos_job : tezos_job)
-    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
-  match tezos_job.job with
-  | Job job -> {tezos_job with job = Job (f job)}
-  | _ -> assert false
 
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
@@ -134,6 +133,10 @@ module Pipeline = struct
   let jobs = function
     | Child_pipeline {jobs; _} -> jobs
     | Pipeline {jobs; _} -> jobs
+
+  let set_jobs jobs = function
+    | Child_pipeline pl -> Child_pipeline {pl with jobs}
+    | Pipeline pl -> Pipeline {pl with jobs}
 
   let path : name:string -> string =
    fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
@@ -280,6 +283,36 @@ module Pipeline = struct
             dependency ) ;
     ()
 
+  (* Pre-process the pipeline:
+
+     - Find usage of internal images. For each internal image
+       dependency, add the appropriate builder job to the pipeline. *)
+  let add_image_builders (pipeline : t) =
+    (* Note: one job can create many different image paths.
+
+       If two different image paths are required that are built by the
+       same job, then make sure it is only include once. *)
+    let image_builders =
+      (* TODO: we currently do not support image_builders that use internal images *)
+      (* [image_builder_jobs] maps image builder job names to the actual job. *)
+      let image_builder_jobs : (string, tezos_job) Hashtbl.t =
+        Hashtbl.create 5
+      in
+      let image_dependencies =
+        List.concat_map
+          (fun {image_dependencies; _} -> image_dependencies)
+          (jobs pipeline)
+      in
+      ( Fun.flip List.iter image_dependencies @@ fun image_dep ->
+        match image_dep with
+        | Internal {image = _; builder} ->
+            let builder_name = name_of_tezos_job builder in
+            Hashtbl.replace image_builder_jobs builder_name builder
+        | External _ -> () ) ;
+      image_builder_jobs |> Hashtbl.to_seq_values |> List.of_seq
+    in
+    set_jobs (image_builders @ jobs pipeline) pipeline
+
   (* Splits the set of registered non-child pipelines into workflow
      rules and includes. Used by the function [write]. *)
   let workflow_includes () :
@@ -317,6 +350,7 @@ module Pipeline = struct
   let write ?default ?variables ~filename () =
     (* Write all registered the pipelines *)
     ( Fun.flip List.iter (all ()) @@ fun pipeline ->
+      let pipeline = add_image_builders pipeline in
       let jobs = jobs pipeline in
       let name = name pipeline in
       if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
@@ -404,21 +438,27 @@ module Pipeline = struct
 end
 
 module Image = struct
-  type t = Gitlab_ci.Types.image
+  type t = tezos_image
 
-  let images : t String_map.t ref = ref String_map.empty
+  let image_builders : (string, tezos_job) Hashtbl.t = Hashtbl.create 5
 
-  let register ~name ~image_path =
-    let image : t = Image image_path in
-    if String_map.mem name !images then
-      failwith "[Image.register] attempted to register image %S twice" name
-    else (
-      images := String_map.add name image !images ;
-      image)
+  let mk_external ~image_path : t = External (Image image_path)
 
-  let name (Gitlab_ci.Types.Image name) = name
+  let mk_internal ~image_builder ~image_path : t =
+    let builder_name = name_of_tezos_job image_builder in
+    let image = Internal {builder = image_builder; image = Image image_path} in
+    match Hashtbl.find_opt image_builders builder_name with
+    | None ->
+        Hashtbl.add image_builders builder_name image_builder ;
+        image
+    | Some image_builder' when image_builder = image_builder' -> image
+    | Some _ ->
+        failwith
+          "The image builder '%s' was registered twice with differing \
+           definitions"
+          builder_name
 
-  let all () = String_map.bindings !images
+  let image = function Internal {image; _} | External image -> image
 end
 
 module Changeset = struct
@@ -523,6 +563,29 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
          in job '%s'."
         name
   | _ -> ()) ;
+  let image_dependencies =
+    match image with Internal _ -> [image] | External _ -> []
+  in
+  let dependencies =
+    (Fun.flip List.iter image_dependencies @@ function
+     | External (Image image_path) ->
+         failwith
+           "It doesn't make any sense for job %s to depend on the external \
+            image %s"
+           name
+           image_path
+     | Internal _ -> ()) ;
+    let add_builder dependencies = function
+      | External _ -> dependencies
+      | Internal {builder; _} -> (
+          match dependencies with
+          | Staged artifact_dependencies ->
+              Staged (builder :: artifact_dependencies)
+          | Dependent dependencies ->
+              Dependent (Artifacts builder :: dependencies))
+    in
+    List.fold_left add_builder dependencies image_dependencies
+  in
   let needs, dependencies = resolve_dependencies name dependencies in
   let variables =
     match git_strategy with
@@ -547,7 +610,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       artifacts;
       before_script;
       cache;
-      image = Some image;
+      image = Some (Image.image image);
       interruptible;
       needs;
       (* Note that [dependencies] is always filled, because we want to
@@ -568,7 +631,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job = Job job; source_position = __POS__; stage}
+  {job = Job job; source_position = __POS__; stage; image_dependencies}
 
 let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
     Pipeline.{name = child_pipeline_name; jobs = _} : tezos_job =
@@ -587,11 +650,28 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
-  {job = Trigger_job trigger_job; source_position = __POS__; stage}
+  {
+    job = Trigger_job trigger_job;
+    source_position = __POS__;
+    stage;
+    image_dependencies = [];
+  }
+
+let map_non_trigger_job ~error_on_trigger (tezos_job : tezos_job)
+    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
+  match tezos_job.job with
+  | Job job -> {tezos_job with job = Job (f job)}
+  | _ -> failwith "%s" error_on_trigger
 
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
-  map_job tezos_job @@ fun (job : Gitlab_ci.Types.job) ->
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[add_artifacts] attempting to add artifact to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun (job : Gitlab_ci.Types.job) ->
   match job.artifacts with
   | None ->
       {
@@ -667,7 +747,13 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
 
 let append_variables ?(allow_overwrite = false) new_variables
     (tezos_job : tezos_job) : tezos_job =
-  map_job tezos_job @@ fun job ->
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_variables] attempting to append variables to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
   let variables =
     let old_variables, new_variables =
       List.fold_left
@@ -750,4 +836,10 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
   if !Cli.has_error then exit 1
 
 let append_script script tezos_job =
-  map_job tezos_job @@ fun job -> {job with script = job.script @ script}
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[add_artifacts] attempting to append script to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job -> {job with script = job.script @ script}

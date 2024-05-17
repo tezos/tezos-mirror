@@ -133,19 +133,34 @@ module Pipeline : sig
     unit
 end
 
-(** A facility for registering images for [image:] keywords. *)
+(** A facility for registering images for [image:] keywords.
+
+    Images can be registered in two manners:
+     - {i External} images are built outside the [tezos/tezos] CI and are
+       registered with their path (e.g. [alpine:3.18]).
+
+     - {i Internal} images are built in the pipeline they are
+       used. They are registered an [image_path] and an
+       [image_builder]. The [script:] of an [image_builder]
+       must build the image and push it to [image_path].
+
+    Pipelines with jobs using internal images automatically include
+    corresponding image builder jobs with appropriate dependencies. *)
 module Image : sig
-  (** Represents an image *)
-  type t = Gitlab_ci.Types.image
+  (** A registered Docker image in which a job can execute. *)
+  type t
 
-  (** Register an image of the given [name] and [image_path]. *)
-  val register : name:string -> image_path:string -> t
+  (** Register an external image of the given [image_path]. *)
+  val mk_external : image_path:string -> t
 
-  (** The [name] of an image *)
-  val name : t -> string
+  (** Register an internal image of the given [image_path] built by the job [image_builder].
 
-  (** Returns the set of registered images as [name, image_path] tuples. *)
-  val all : unit -> (string * t) list
+      Note: the name of the image builder must uniquely identify the
+      job definition. If two image builders with the same name but
+      differing job definitions (as per polymorphic comparison of the
+      underlying {!Gitlab_ci.Types.job}) are registered, then this
+      function throws a run-time error. *)
+  val mk_internal : image_builder:tezos_job -> image_path:string -> t
 end
 
 (** Changesets are used to specify [changes:] clauses in rules.
@@ -283,6 +298,8 @@ val trigger_job :
 
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.
 
+    Throws error when applied to {!trigger_job}s.
+
     - If the job already has an artifact with [old_name] and [name] is given, then
       [name] is used.
     - If the job already has an artifact exposed as [old_exposed_as] and
@@ -311,10 +328,14 @@ val add_artifacts :
 
 (** Append the variables [variables] to the variables of [job].
 
+    Throws error when applied to {!trigger_job}s.
+
     Raises [Failure] if any of the [variables] is already defined for
     [job], unless [allow_overwrite] is true (default is [false]). *)
 val append_variables :
   ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
 
-(** Append to the [script:] section of a job. *)
+(** Append to the [script:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
 val append_script : string list -> tezos_job -> tezos_job
