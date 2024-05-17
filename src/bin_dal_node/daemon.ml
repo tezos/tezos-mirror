@@ -492,7 +492,7 @@ module Handler = struct
      Tenderbake. Note that this means that shard propagation is delayed by two
      levels with respect to the publication level of the corresponding slot
      header. *)
-  let new_head ctxt cctxt crawler =
+  let new_finalized_head ctxt cctxt crawler =
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
     let rec loop () =
@@ -507,7 +507,7 @@ module Handler = struct
                   proto_parameters;
                   cryptobox;
                   shards_proofs_precomputation = _;
-                  last_processed_level;
+                  last_processed_level = _;
                   skip_list_cells_store;
                   ongoing_amplifications = _;
                 } =
@@ -540,37 +540,19 @@ module Handler = struct
                   ctxt
                   head_level
               in
-              let process_block =
-                process_block
-                  ctxt
-                  cctxt
-                  proto_parameters
-                  skip_list_cells_store
-                  head_level
-              in
               let* () =
-                match last_processed_level with
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/6849
-                   Depending on the profile, also process blocks in the past, that is,
-                   when [last_processed_level < head_level - 3]. *)
-                | Some last_processed_level
-                  when Int32.(sub head_level last_processed_level = 3l) ->
-                    (* Then the block at level [last_processed_level + 1] is final
-                       (not only its payload), therefore its DAL attestations are
-                       final. *)
-                    process_block (Int32.succ last_processed_level)
-                | None ->
-                    (* This is the first time we process a block. *)
-                    if head_level > 3l then
-                      process_block (Int32.sub head_level 2l)
-                    else
-                      (* We do not process the block at level 1, as it will not contain DAL
-                         information, and it has no round. *)
-                      return_unit
-                | Some _ ->
-                    (* This case is unreachable, assuming [Monitor_services.heads] does not
-                       skip levels. *)
-                    return_unit
+                if finalized_shell_header.level = 1l then
+                  (* We do not process the block at level 1, as it will not
+                     contain DAL information, and it has no round. *)
+                  return_unit
+                else
+                  process_block
+                    ctxt
+                    cctxt
+                    proto_parameters
+                    skip_list_cells_store
+                    (Int32.add finalized_shell_header.level 2l)
+                    finalized_shell_header.level
               in
               loop ())
     in
@@ -796,5 +778,5 @@ let run ~data_dir configuration_override =
       [Handler.resolve_plugin_and_set_ready config dal_config ctxt cctxt]
   in
   (* Start never-ending monitoring daemons *)
-  let* () = daemonize [Handler.new_head ctxt cctxt crawler] in
+  let* () = daemonize [Handler.new_finalized_head ctxt cctxt crawler] in
   return_unit
