@@ -355,7 +355,7 @@ module Handler = struct
       (Profile_manager.is_bootstrap_profile profile
       || Profile_manager.is_attester_only_profile profile)
 
-  let process_block ctxt cctxt proto_parameters skip_list_cells_store head_level
+  let process_block ctxt cctxt proto_parameters skip_list_cells_store
       block_level =
     let open Lwt_result_syntax in
     let block = `Level block_level in
@@ -408,7 +408,7 @@ module Handler = struct
             in
             Skip_list_cells_store.insert
               skip_list_cells_store
-              ~attested_level:head_level
+              ~attested_level:block_level
               cells_of_level
           else return_unit
         in
@@ -551,7 +551,6 @@ module Handler = struct
                     cctxt
                     proto_parameters
                     skip_list_cells_store
-                    (Int32.add finalized_shell_header.level 2l)
                     finalized_shell_header.level
               in
               loop ())
