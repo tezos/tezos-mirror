@@ -1,13 +1,15 @@
-Version 20.0~rc1
-================
+Version 20.0
+============
 
 Version 20 contains a new version (V12) of the protocol environment,
 which is the set of functions that a protocol can call.
-This new version is used by the :doc:`Paris <../protocols/019_paris>`,
-protocol proposal for the successor of Oxford.
-This release contains the Paris B protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
+This new version is used by the :doc:`ParisB 2<../protocols/019_paris>`,
+protocol, which is the successor of :doc:`Oxford  <../protocols/018_oxford>`.
+This release contains the ParisB 2 protocol, a patched protocol upgrade for ParisB  as well as its associated protocol-specific executable binaries (baker, accuser, etc).
 
-Note that the binaries associated to the Nairobi protocol have been removed as this protocol is now unactive.
+Note ParisB 2 is included in v20.0 as a *User-Activated Protocol Override* (UAPO). This means that nodes running v20.0 will activate ParisB 2, ``PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ`` instead of the original ParisB proposal before block #5,726,209.
+
+The binaries associated to the Nairobi protocol have been removed as this protocol is now unactive.
 
 Version v20 introduces the following changes or new features:
 
@@ -17,9 +19,17 @@ Node
 Since Octez version 18, RPCs accept both ``endorsements`` and ``attestations`` as input and/or output, with endorsement as default value but deprecated.
 Starting from version 20, ``attestation`` output is now the default. ``endorsement`` is still available, but it is deprecated and will be removed in a future version.
 
-Some deprecated RPCs have been removed. Please check `the changelog <../CHANGES.html#version-20-0-rc1>`_ to see the list of removed RPCs.
+Some deprecated RPCs have been removed. Please check `the changelog <../CHANGES.html#version-20-0>`__ to see the list of removed RPCs.
 
 The RPC ``/health/ready`` has been introduced to get the status of the RPC server.
+
+Starting from Octez v20, we strongly advise nodes and bakers operators to synchronise their clocks using NTP as issued in `the node section of getting started <https://tezos.gitlab.io/introduction/howtouse.html#node>`__
+
+Regarding the minimal hardware, we advise nodes and bakers operators to run on at least the following hardware requierements:
+- 3 cores, 2 needed by the node and 1 needed by the baker (arm64 or amd64/x86-64)
+- 8GB of RAM + 8GB of swap or 16GB of RAM
+- 100GB SSD storage (or similar I/O performance)
+- A low-latency reliable internet connection
 
 Smart rollup
 ~~~~~~~~~~~~
@@ -44,14 +54,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v20.0-rc1
+  git checkout octez-v20.0
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v20.0~rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``v20.0`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
