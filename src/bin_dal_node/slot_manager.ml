@@ -165,7 +165,7 @@ let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
   let*? polynomial = polynomial_from_shards cryptobox shards in
   return polynomial
 
-let get_slot_content_from_shards cryptobox store slot_id commitment =
+let get_slot_content_from_shards cryptobox store slot_id =
   let open Lwt_result_syntax in
   let {Cryptobox.number_of_shards; redundancy_factor; slot_size; _} =
     Cryptobox.parameters cryptobox
@@ -188,22 +188,16 @@ let get_slot_content_from_shards cryptobox store slot_id commitment =
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () =
-    Store.Slots.add_slot_by_commitment
-      store.Store.slots
-      ~slot_size
-      slot
-      commitment
-  in
+  let* () = Store.Slots.add_slot store.Store.slots ~slot_size slot slot_id in
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot ~reconstruct_if_missing cryptobox store slot_id commitment =
+let get_slot ~reconstruct_if_missing cryptobox store slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
-    Store.Slots.find_slot_by_commitment store.Store.slots ~slot_size commitment
+    Store.Slots.find_slot store.Store.slots ~slot_size slot_id
   in
   match res_slot_store with
   | Ok slot -> return slot
@@ -212,7 +206,7 @@ let get_slot ~reconstruct_if_missing cryptobox store slot_id commitment =
         (* The slot could not be obtained from the slot store, attempt a
            reconstruction. *)
         let*! res_shard_store =
-          get_slot_content_from_shards cryptobox store slot_id commitment
+          get_slot_content_from_shards cryptobox store slot_id
         in
         match res_shard_store with
         | Ok slot -> return slot
@@ -393,11 +387,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
       in
       let* () =
         let* exists =
-          Store.(
-            Slots.exists_slot_by_commitment
-              node_store.slots
-              ~slot_size
-              commitment)
+          Store.(Slots.exists_slot node_store.slots ~slot_size slot_id)
           |> Errors.to_tzresult
         in
         let* () =
@@ -409,11 +399,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
                 commitment
             with
             | Some slot ->
-                Store.Slots.add_slot_by_commitment
-                  ~slot_size
-                  node_store.slots
-                  slot
-                  commitment
+                Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
                 |> Errors.to_tzresult
             | None -> return_unit
         in
@@ -452,9 +438,7 @@ let get_slot_commitment (slot_id : Types.slot_id) node_store =
 
 let get_slot_content ~reconstruct_if_missing node_store cryptobox
     (slot_id : Types.slot_id) =
-  let open Lwt_result_syntax in
-  let* commitment = get_slot_commitment slot_id node_store in
-  get_slot ~reconstruct_if_missing cryptobox node_store slot_id commitment
+  get_slot ~reconstruct_if_missing cryptobox node_store slot_id
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store

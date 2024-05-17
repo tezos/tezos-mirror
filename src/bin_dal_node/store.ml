@@ -169,15 +169,17 @@ module Shards = struct
 end
 
 module Slots = struct
-  type t = (Cryptobox.Commitment.t * int, unit, bytes) KVS.t
+  type t = (Types.slot_id * int, unit, bytes) KVS.t
 
-  let file_layout ~root_dir (commitment, slot_size) =
+  let file_layout ~root_dir ((slot_id : Types.slot_id), slot_size) =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
 
        Make Key-Value store layout resilient to crypto parameters change. *)
     let number_of_slots = 1 in
-    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-    let filename = Format.sprintf "%s_%d" commitment_string slot_size in
+    let slot_id_string =
+      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    in
+    let filename = Format.sprintf "%s_%d" slot_id_string slot_size in
     let filepath = Filename.concat root_dir filename in
     Key_value_store.layout
       ~encoding:(Data_encoding.Fixed.bytes slot_size)
@@ -191,40 +193,36 @@ module Slots = struct
     let root_dir = Filename.concat node_store_dir slot_store_dir in
     KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
 
-  let add_slot_by_commitment t ~slot_size slot commitment =
+  let add_slot t ~slot_size slot (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
     let* () =
-      KVS.write_value
-        ~override:true
-        t
-        file_layout
-        (commitment, slot_size)
-        ()
-        slot
+      KVS.write_value ~override:true t file_layout (slot_id, slot_size) () slot
       |> Errors.other_lwt_result
     in
-    let*! () = Event.(emit stored_slot_content commitment) in
+    let*! () =
+      Event.(emit stored_slot_content (slot_id.slot_level, slot_id.slot_index))
+    in
     return_unit
 
-  let exists_slot_by_commitment t ~slot_size commitment =
+  let exists_slot t ~slot_size slot_id =
     let open Lwt_syntax in
-    let+ res = KVS.value_exists t file_layout (commitment, slot_size) () in
+    let+ res = KVS.value_exists t file_layout (slot_id, slot_size) () in
     trace_decoding_error
       ~data_kind:Types.Store.Slot
       ~tztrace_of_error:Fun.id
       res
 
-  let find_slot_by_commitment t ~slot_size commitment =
+  let find_slot t ~slot_size slot_id =
     let open Lwt_result_syntax in
-    let*! res = KVS.read_value t file_layout (commitment, slot_size) () in
+    let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
     let data_kind = Types.Store.Slot in
     match res with
     | Ok slot -> return slot
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
-  let remove_slot_by_commitment t ~slot_size commitment =
-    KVS.remove_file t file_layout (commitment, slot_size)
+  let remove_slot t ~slot_size slot_id =
+    KVS.remove_file t file_layout (slot_id, slot_size)
 end
 
 module Commitment_indexed_cache =
