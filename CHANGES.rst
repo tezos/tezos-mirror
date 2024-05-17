@@ -40,11 +40,6 @@ Node
   that returns the consumed output's indexes for the given outbox
   level. (MR :gl:`!12776`)
 
-- Reduced the maximum allowed timestamp drift to 1 seconds. It is recommended to
-  use NTP to sync the clock of the node. (MR :gl:`!13198`)
-
-- Removed ``ghostnet.kaml.fr`` from ghostnet bootstrap peers. (MR :gl:`!13435`)
-
 Client
 ------
 
@@ -87,9 +82,6 @@ Smart Rollup node
 - RPC ``/health`` now returns meaningful health related data to asses if the
   rollup node operates correctly. Old ``/health`` RPC is renamed to ``/ping``.
   (MR :gl:`!12940`)
-
-- Support for unsafely increasing the WASM PVM's tick limit of a rollup.
-  (MRs :gl:`!12907`, :gl:`!12957`, :gl:`!12983`, :gl:`!13357`)
 
 - Use a local cache per game for intermediate states of dissections. (MR
   :gl:`!12899`)
