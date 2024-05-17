@@ -303,7 +303,7 @@ module Handler = struct
     in
     let handler stopper el =
       match Node_context.get_status ctxt with
-      | Starting -> handler stopper el
+      | Starting _ -> handler stopper el
       | Ready _ -> return_unit
     in
     let*! () = Event.(emit layer1_node_tracking_started_for_plugin ()) in
@@ -495,11 +495,13 @@ module Handler = struct
   let new_finalized_head ctxt cctxt crawler =
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
+    let*! () = Node_context.wait_for_ready_state ctxt in
     let rec loop () =
       match Node_context.get_status ctxt with
-      | Starting ->
-          let*! () = Lwt_unix.sleep 1. in
-          loop ()
+      | Starting _ ->
+          (* The node is supposed to be ready thanks to [wait_for_ready_state]
+             above. *)
+          assert false
       | Ready ready_ctxt -> (
           let Node_context.
                 {
