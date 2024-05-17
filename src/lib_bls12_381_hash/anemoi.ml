@@ -33,7 +33,8 @@ module Stubs = struct
     int ->
     int ->
     ctxt
-    = "caml_bls12_381_hash_anemoi_allocate_ctxt_stubs_bytecode" "caml_bls12_381_hash_anemoi_allocate_ctxt_stubs"
+    = "caml_bls12_381_hash_anemoi_allocate_ctxt_stubs_bytecode"
+      "caml_bls12_381_hash_anemoi_allocate_ctxt_stubs"
 end
 
 module Parameters = struct

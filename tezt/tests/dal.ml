@@ -4591,14 +4591,14 @@ module History_rpcs = struct
                   ~error_msg:"Unexpected slot index: got %L, expected %R")
         in
         (if cell_index > 0 then
-         let expected_cell_index =
-           ((cell_level - 1 - first_cell_level) * number_of_slots)
-           + cell_slot_index
-         in
-         Check.(
-           (cell_index = expected_cell_index)
-             int
-             ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
+           let expected_cell_index =
+             ((cell_level - 1 - first_cell_level) * number_of_slots)
+             + cell_slot_index
+           in
+           Check.(
+             (cell_index = expected_cell_index)
+               int
+               ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
         let expected_kind =
           if cell_level <= first_level || cell_slot_index != slot_index then
@@ -4612,11 +4612,11 @@ module History_rpcs = struct
             string
             ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
         (if cell_kind = "attested" then
-         let commitment = JSON.(content |-> "commitment" |> as_string) in
-         Check.(
-           (commitment = commitments.(cell_level - (first_level + 1)))
-             string
-             ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
+           let commitment = JSON.(content |-> "commitment" |> as_string) in
+           Check.(
+             (commitment = commitments.(cell_level - (first_level + 1)))
+               string
+               ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
         let back_pointers =
           JSON.(skip_list |-> "back_pointers" |> as_list)
           |> List.map JSON.as_string

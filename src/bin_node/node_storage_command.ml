@@ -128,77 +128,77 @@ module Term = struct
   let integrity_check config_file data_dir auto_repair block =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* data_dir, node_config =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let ({genesis; _} : Config_file.blockchain_network) =
-        node_config.blockchain_network
-      in
-      let chain_id = Chain_id.of_block_hash genesis.block in
-      let* () = Data_version.ensure_data_dir genesis data_dir in
-      let context_dir = Data_version.context_dir data_dir in
-      let store_dir = Data_version.store_dir data_dir in
-      let* store =
-        Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
-      in
-      let* chain_store = Store.get_chain_store store chain_id in
-      let* block = resolve_block chain_store block in
-      let context_hash = Store.Block.context_hash block in
-      let context_hash_str = Context_hash.to_b58check context_hash in
-      let*! exists = Store.Block.context_exists chain_store block in
-      let* () =
-        when_ (not exists) (fun () ->
-            tzfail
-              (Data_version.Invalid_data_dir
-                 {
-                   data_dir = context_dir;
-                   msg =
-                     Some
-                       (Format.sprintf
-                          "cannot find context hash %s"
-                          context_hash_str);
-                 }))
-      in
-      let*! () = Store.close_store store in
-      let*! () =
-        Event.(
-          emit
-            integrity_check
-            (Store.Block.hash block, Store.Block.level block, context_hash))
-      in
-      let*! () =
-        Tezos_context.Context.Checks.Pack.Integrity_check.run
-          ~ppf:Format.std_formatter
-          ~root:context_dir
-          ~auto_repair
-          ~always:false
-          ~heads:(Some [context_hash_str])
-          ()
-      in
-      return_unit)
+       let*! () = Tezos_base_unix.Internal_event_unix.init () in
+       let* data_dir, node_config =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let ({genesis; _} : Config_file.blockchain_network) =
+         node_config.blockchain_network
+       in
+       let chain_id = Chain_id.of_block_hash genesis.block in
+       let* () = Data_version.ensure_data_dir genesis data_dir in
+       let context_dir = Data_version.context_dir data_dir in
+       let store_dir = Data_version.store_dir data_dir in
+       let* store =
+         Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+       in
+       let* chain_store = Store.get_chain_store store chain_id in
+       let* block = resolve_block chain_store block in
+       let context_hash = Store.Block.context_hash block in
+       let context_hash_str = Context_hash.to_b58check context_hash in
+       let*! exists = Store.Block.context_exists chain_store block in
+       let* () =
+         when_ (not exists) (fun () ->
+             tzfail
+               (Data_version.Invalid_data_dir
+                  {
+                    data_dir = context_dir;
+                    msg =
+                      Some
+                        (Format.sprintf
+                           "cannot find context hash %s"
+                           context_hash_str);
+                  }))
+       in
+       let*! () = Store.close_store store in
+       let*! () =
+         Event.(
+           emit
+             integrity_check
+             (Store.Block.hash block, Store.Block.level block, context_hash))
+       in
+       let*! () =
+         Tezos_context.Context.Checks.Pack.Integrity_check.run
+           ~ppf:Format.std_formatter
+           ~root:context_dir
+           ~auto_repair
+           ~always:false
+           ~heads:(Some [context_hash_str])
+           ()
+       in
+       return_unit)
 
   let stat_index config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* data_dir, _ =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let root = Data_version.context_dir data_dir in
-      let* () = ensure_context_dir root in
-      Tezos_context.Context.Checks.Index.Stat.run ~root ;
-      return_unit)
+       let* data_dir, _ =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let root = Data_version.context_dir data_dir in
+       let* () = ensure_context_dir root in
+       Tezos_context.Context.Checks.Index.Stat.run ~root ;
+       return_unit)
 
   let stat_pack config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* data_dir, _ =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let root = Data_version.context_dir data_dir in
-      let* () = ensure_context_dir root in
-      let*! () = Tezos_context.Context.Checks.Pack.Stat.run ~root in
-      return_unit)
+       let* data_dir, _ =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let root = Data_version.context_dir data_dir in
+       let* () = ensure_context_dir root in
+       let*! () = Tezos_context.Context.Checks.Pack.Stat.run ~root in
+       return_unit)
 
   let index_dir_exists context_dir output =
     let open Lwt_result_syntax in
@@ -209,94 +209,94 @@ module Term = struct
   let reconstruct_index config_file data_dir output index_log_size =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* data_dir, _ =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let root = Data_version.context_dir data_dir in
-      let* () = ensure_context_dir root in
-      let* () = index_dir_exists root output in
-      Tezos_context.Context.Checks.Pack.Reconstruct_index.run
-        ~root
-        ~output
-        ~index_log_size
-        () ;
-      return_unit)
+       let* data_dir, _ =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let root = Data_version.context_dir data_dir in
+       let* () = ensure_context_dir root in
+       let* () = index_dir_exists root output in
+       Tezos_context.Context.Checks.Pack.Reconstruct_index.run
+         ~root
+         ~output
+         ~index_log_size
+         () ;
+       return_unit)
 
   let integrity_check_inodes config_file data_dir block =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* data_dir, node_config =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let ({genesis; _} : Config_file.blockchain_network) =
-        node_config.blockchain_network
-      in
-      let chain_id = Chain_id.of_block_hash genesis.block in
-      let* () = Data_version.ensure_data_dir genesis data_dir in
-      let context_dir = Data_version.context_dir data_dir in
-      let store_dir = Data_version.store_dir data_dir in
-      let* store =
-        Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
-      in
-      let* chain_store = Store.get_chain_store store chain_id in
-      let* block = resolve_block chain_store block in
-      let*! () = Store.close_store store in
-      let context_hash = Store.Block.context_hash block in
-      let context_hash_str = Context_hash.to_b58check context_hash in
-      let*! () =
-        Event.(
-          emit
-            integrity_check_inodes
-            (Store.Block.hash block, Store.Block.level block, context_hash))
-      in
-      let*! () =
-        Tezos_context.Context.Checks.Pack.Integrity_check_inodes.run
-          ~root:context_dir
-          ~heads:(Some [context_hash_str])
-      in
-      return_unit)
+       let*! () = Tezos_base_unix.Internal_event_unix.init () in
+       let* data_dir, node_config =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let ({genesis; _} : Config_file.blockchain_network) =
+         node_config.blockchain_network
+       in
+       let chain_id = Chain_id.of_block_hash genesis.block in
+       let* () = Data_version.ensure_data_dir genesis data_dir in
+       let context_dir = Data_version.context_dir data_dir in
+       let store_dir = Data_version.store_dir data_dir in
+       let* store =
+         Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+       in
+       let* chain_store = Store.get_chain_store store chain_id in
+       let* block = resolve_block chain_store block in
+       let*! () = Store.close_store store in
+       let context_hash = Store.Block.context_hash block in
+       let context_hash_str = Context_hash.to_b58check context_hash in
+       let*! () =
+         Event.(
+           emit
+             integrity_check_inodes
+             (Store.Block.hash block, Store.Block.level block, context_hash))
+       in
+       let*! () =
+         Tezos_context.Context.Checks.Pack.Integrity_check_inodes.run
+           ~root:context_dir
+           ~heads:(Some [context_hash_str])
+       in
+       return_unit)
 
   let check_index config_file data_dir auto_repair =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* data_dir, _ =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let root = Data_version.context_dir data_dir in
-      let* () = ensure_context_dir root in
-      Tezos_context.Context.Checks.Pack.Integrity_check_index.run
-        ~root
-        ~auto_repair
-        () ;
-      return_unit)
+       let* data_dir, _ =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let root = Data_version.context_dir data_dir in
+       let* () = ensure_context_dir root in
+       Tezos_context.Context.Checks.Pack.Integrity_check_index.run
+         ~root
+         ~auto_repair
+         () ;
+       return_unit)
 
   let find_head config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* data_dir, node_config =
-        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-      in
-      let ({genesis; _} : Config_file.blockchain_network) =
-        node_config.blockchain_network
-      in
-      let chain_id = Chain_id.of_block_hash genesis.block in
-      let* () = Data_version.ensure_data_dir genesis data_dir in
-      let context_dir = Data_version.context_dir data_dir in
-      let store_dir = Data_version.store_dir data_dir in
-      let* store =
-        Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
-      in
-      let* chain_store = Store.get_chain_store store chain_id in
-      let*! head = Store.Chain.current_head chain_store in
-      let*! () = Store.close_store store in
-      let head_context_hash = Store.Block.context_hash head in
-      (* This output isn't particularly useful for most users,
-          it will typically be used to inspect context
-          directories using Irmin tooling *)
-      let () = Format.printf "%a@." Context_hash.pp head_context_hash in
-      return_unit)
+       let*! () = Tezos_base_unix.Internal_event_unix.init () in
+       let* data_dir, node_config =
+         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       in
+       let ({genesis; _} : Config_file.blockchain_network) =
+         node_config.blockchain_network
+       in
+       let chain_id = Chain_id.of_block_hash genesis.block in
+       let* () = Data_version.ensure_data_dir genesis data_dir in
+       let context_dir = Data_version.context_dir data_dir in
+       let store_dir = Data_version.store_dir data_dir in
+       let* store =
+         Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+       in
+       let* chain_store = Store.get_chain_store store chain_id in
+       let*! head = Store.Chain.current_head chain_store in
+       let*! () = Store.close_store store in
+       let head_context_hash = Store.Block.context_hash head in
+       (* This output isn't particularly useful for most users,
+           it will typically be used to inspect context
+           directories using Irmin tooling *)
+       let () = Format.printf "%a@." Context_hash.pp head_context_hash in
+       return_unit)
 
   let auto_repair =
     let open Cmdliner.Arg in

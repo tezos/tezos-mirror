@@ -136,7 +136,8 @@ module MinPk = struct
       Bytes.t ->
       Unsigned.Size_t.t ->
       int
-      = "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g1_stubs_bytecode" "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g1_stubs"
+      = "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g1_stubs_bytecode"
+        "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g1_stubs"
   end
 
   type pk = Bytes.t
@@ -442,7 +443,8 @@ module MinSig = struct
       Bytes.t ->
       Unsigned.Size_t.t ->
       int
-      = "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g2_stubs_bytecode" "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g2_stubs"
+      = "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g2_stubs_bytecode"
+        "caml_bls12_381_signature_blst_pairing_chk_n_mul_n_aggr_pk_in_g2_stubs"
   end
 
   type pk = Bytes.t

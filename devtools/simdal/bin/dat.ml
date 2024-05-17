@@ -66,13 +66,13 @@ let append ?(sep = default_sep) ~into src =
   let* src = load ~sep src in
   let into_exists = Sys.file_exists into in
   (if into_exists then
-   (* Check that header match *)
-   match load_header ~sep into with
-   | None -> invalid_arg "append: could not load header"
-   | Some into_header -> (
-       match Array.for_all2 String.equal into_header src.header with
-       | (exception _) | false -> invalid_arg "append: header mismatch"
-       | true -> ())) ;
+     (* Check that header match *)
+     match load_header ~sep into with
+     | None -> invalid_arg "append: could not load header"
+     | Some into_header -> (
+         match Array.for_all2 String.equal into_header src.header with
+         | (exception _) | false -> invalid_arg "append: header mismatch"
+         | true -> ())) ;
   Out_channel.with_open_gen
     [Open_wronly; Open_creat; Open_text; Open_append]
     0o666

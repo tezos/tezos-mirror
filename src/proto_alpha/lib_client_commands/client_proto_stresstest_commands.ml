@@ -743,8 +743,8 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
          included). Note that the operations injected during the last block \
          are ignored because they should not be currently included."
         (if Int.equal injected_ops_count 0 then "N/A"
-        else
-          Format.sprintf "%d%%" (included_ops_count * 100 / injected_ops_count))
+         else
+           Format.sprintf "%d%%" (included_ops_count * 100 / injected_ops_count))
         injected_ops_count
         included_ops_count
     in

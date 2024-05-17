@@ -2559,7 +2559,7 @@ module Make (C : AUTOMATON_CONFIG) :
         List.concat
           [
             (if Topic.Set.is_empty c.topics then []
-            else [Fmt.field "topics" (fun c -> c.topics) pp_topic_set]);
+             else [Fmt.field "topics" (fun c -> c.topics) pp_topic_set]);
             [Fmt.field "direct" (fun c -> c.direct) Fmt.bool];
             [Fmt.field "outbound" (fun c -> c.outbound) Fmt.bool];
           ]

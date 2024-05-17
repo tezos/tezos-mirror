@@ -101,8 +101,8 @@ module Sc_rollup = struct
       add_all_messages
         ~protocol_migration_message:
           (if first_block then
-           Some Inbox_message.protocol_migration_internal_message
-          else None)
+             Some Inbox_message.protocol_migration_internal_message
+           else None)
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests

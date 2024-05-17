@@ -162,8 +162,8 @@ let () =
         Version.pp
         exp
         (if Version.compare got exp < 0 then
-         "incompatible and cannot be automatically upgraded."
-        else "too recent for this node version."))
+           "incompatible and cannot be automatically upgraded."
+         else "too recent for this node version."))
     Data_encoding.(
       obj2
         (req "expected_version" Version.encoding)

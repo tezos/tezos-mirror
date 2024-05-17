@@ -244,8 +244,9 @@ module Inode_permutations_generator = struct
     let max_brute_force_iterations = 100 in
     let letters_per_step = (max_brute_force_iterations + 25) / 26 in
     fun inter indices ->
-      let module Inter = (val inter : Brassaia_pack.Inode.Internal
-                            with type Val.step = Path.step)
+      let module Inter =
+        (val inter
+            : Brassaia_pack.Inode.Internal with type Val.step = Path.step)
       in
       let rec aux i =
         if i > max_brute_force_iterations then

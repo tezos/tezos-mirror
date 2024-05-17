@@ -39,7 +39,7 @@ let realistic_cfg ?(flat_stake = false) ?(nproducers = 256) ?(nconsumers = 256)
   let shards =
     Array.to_seq
       (if flat_stake then Stake.uniform_shard_assignment
-      else Stake.mainnet_shard_assignment)
+       else Stake.mainnet_shard_assignment)
   in
   let shard_assignment =
     shards

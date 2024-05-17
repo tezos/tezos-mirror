@@ -40,11 +40,11 @@ let curl_params ?(progress_meter = false) ?(fail_on_http_errors = true)
     | None -> [])
   @ (if location then ["--location"] else [])
   @ (if
-     progress_meter
-     || Sys.getenv_opt "MY_CURL_VERSION_IS"
-        |> Option.value ~default:"" = "very_very_old"
-    then []
-    else ["--no-progress-meter"])
+       progress_meter
+       || Sys.getenv_opt "MY_CURL_VERSION_IS"
+          |> Option.value ~default:"" = "very_very_old"
+     then []
+     else ["--no-progress-meter"])
   @ [Uri.to_string uri]
 
 let get ?fail_on_http_errors uri =

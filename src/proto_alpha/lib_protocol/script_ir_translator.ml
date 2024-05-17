@@ -1359,13 +1359,13 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
     | None ->
         return
           ( (if reachable then acc
-            else
-              match ty with
-              | Or_t _ -> acc
-              | _ -> (
-                  match first_unreachable with
-                  | None -> (Some (List.rev path), all)
-                  | Some _ -> acc)),
+             else
+               match ty with
+               | Or_t _ -> acc
+               | _ -> (
+                   match first_unreachable with
+                   | None -> (Some (List.rev path), all)
+                   | Some _ -> acc)),
             reachable )
     | Some {name; original_type_expr = _} ->
         if Entrypoint.Set.mem name all then tzfail (Duplicate_entrypoint name)
@@ -5338,17 +5338,17 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
     match entrypoints.at_node with
     | None ->
         ( (if reachable then acc
-          else
-            match ty with
-            | Or_t _ -> acc
-            | _ -> (List.rev path :: unreachables, all)),
+           else
+             match ty with
+             | Or_t _ -> acc
+             | _ -> (List.rev path :: unreachables, all)),
           reachable )
     | Some {name; original_type_expr} ->
         ( (if Entrypoint.Map.mem name all then
-           (List.rev path :: unreachables, all)
-          else
-            ( unreachables,
-              Entrypoint.Map.add name (Ex_ty ty, original_type_expr) all )),
+             (List.rev path :: unreachables, all)
+           else
+             ( unreachables,
+               Entrypoint.Map.add name (Ex_ty ty, original_type_expr) all )),
           true )
   in
   let rec fold_tree :

@@ -477,8 +477,7 @@ let test_migration_transfer ?migration_spec () =
       in
       let* () = Client.transfer ~amount ~giver ~receiver client in
       return (giver_balance_before, receiver_balance_before))
-    ~post_migration:
-      (fun client (giver_balance_before, receiver_balance_before) ->
+    ~post_migration:(fun client (giver_balance_before, receiver_balance_before) ->
       let* giver_balance_after = Client.get_balance_for ~account:giver client in
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client
@@ -1190,11 +1189,11 @@ let test_create_mockup_config_show_init_roundtrip protocols =
             ("consensus_threshold", `Float 0.0)
            ::
            (if Protocol.number protocol >= 019 then
-            [
-              (* Constraint: 0 <= max_slashing_per_block <= 10_000 *)
-              ("max_slashing_per_block", `Float 10_000.0);
-            ]
-           else []))
+              [
+                (* Constraint: 0 <= max_slashing_per_block <= 10_000 *)
+                ("max_slashing_per_block", `Float 10_000.0);
+              ]
+            else []))
     in
     (* To fulfill the requirement that [blocks_per_epoch], present in protocols
        up to O, divides [blocks_per_cycle], we set [blocks_per_cycle] to 1, for

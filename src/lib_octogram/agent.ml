@@ -84,8 +84,7 @@ let run ~input ~output state =
         in
         let* _ =
           Lwt.both
-            (if Agent_builtins.agent_should_continue state then run ()
-            else unit)
+            (if Agent_builtins.agent_should_continue state then run () else unit)
             p
         in
         unit

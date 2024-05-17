@@ -116,10 +116,10 @@ module Helpers = struct
     in
     Lwt_main.run
       (let open Lwt_syntax in
-      let* context, index =
-        random_contents rng_state base_dir index context keys commit_batch_size
-      in
-      Io_helpers.commit_and_reload base_dir index context)
+       let* context, index =
+         random_contents rng_state base_dir index context keys commit_batch_size
+       in
+       Io_helpers.commit_and_reload base_dir index context)
 end
 
 module Context_size_dependent_shared = struct
@@ -314,8 +314,8 @@ module Context_size_dependent_read_bench = struct
         Gc.compact () ;
         Lwt_main.run
           (let open Lwt_syntax in
-          let* () = Tezos_context.Context.close index in
-          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
+           let* () = Tezos_context.Context.close index in
+           Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -386,8 +386,8 @@ module Context_size_dependent_write_bench = struct
     let closure context =
       Lwt_main.run
         (let open Lwt_syntax in
-        let* _ = Io_helpers.commit context in
-        Lwt.return_unit)
+         let* _ = Io_helpers.commit context in
+         Lwt.return_unit)
     in
     let workload =
       Random_context_random_access
@@ -417,8 +417,8 @@ module Context_size_dependent_write_bench = struct
         Gc.compact () ;
         Lwt_main.run
           (let open Lwt_syntax in
-          let* () = Tezos_context.Context.close index in
-          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
+           let* () = Tezos_context.Context.close index in
+           Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -691,8 +691,8 @@ module Irmin_pack_read_bench = struct
         Gc.compact () ;
         Lwt_main.run
           (let open Lwt_syntax in
-          let* () = Tezos_context.Context.close index in
-          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
+           let* () = Tezos_context.Context.close index in
+           Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -863,8 +863,8 @@ module Irmin_pack_write_bench = struct
         Gc.compact () ;
         Lwt_main.run
           (let open Lwt_syntax in
-          let* () = Tezos_context.Context.close index in
-          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
+           let* () = Tezos_context.Context.close index in
+           Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -878,8 +878,8 @@ module Irmin_pack_write_bench = struct
     let closure context =
       Lwt_main.run
         (let open Lwt_syntax in
-        let* _ = Io_helpers.commit context in
-        Lwt.return_unit)
+         let* _ = Io_helpers.commit context in
+         Lwt.return_unit)
     in
     let workload =
       Irmin_pack_write
@@ -1161,8 +1161,8 @@ module Write_random_keys_bench = struct
         Gc.compact () ;
         Lwt_main.run
           (let open Lwt_syntax in
-          let* () = Tezos_context.Context.close index in
-          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir)
+           let* () = Tezos_context.Context.close index in
+           Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir)
       in
       let result =
         try f context
@@ -1177,8 +1177,8 @@ module Write_random_keys_bench = struct
     let closure context =
       Lwt_main.run
         (let open Lwt_syntax in
-        let* _context_hash = Io_helpers.commit context in
-        Lwt.return_unit)
+         let* _context_hash = Io_helpers.commit context in
+         Lwt.return_unit)
     in
     let workload =
       Write_random_keys

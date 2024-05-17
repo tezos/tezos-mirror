@@ -46,7 +46,7 @@ let check_message (cctxt : #full) ~block ~key_locator ~quiet ~message ~signature
     =
   let json, bytes = to_json_and_bytes block message in
   (if quiet then Lwt.return_unit
-  else cctxt#message "checked content: @[%a@]" Data_encoding.Json.pp json)
+   else cctxt#message "checked content: @[%a@]" Data_encoding.Json.pp json)
   >>= fun () ->
   Client_keys.check
     ~watermark:Signature.Generic_operation

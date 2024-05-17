@@ -101,8 +101,8 @@ let () =
       Format.fprintf
         ppf
         (if List.compare_length_with args 1 = 0 then
-         "Option %s is in conflict with %s"
-        else "Options %s are in conflict with %s")
+           "Option %s is in conflict with %s"
+         else "Options %s are in conflict with %s")
         (String.concat " and " args)
         by)
     Data_encoding.(obj2 (req "suppressed" (list string)) (req "by" string))

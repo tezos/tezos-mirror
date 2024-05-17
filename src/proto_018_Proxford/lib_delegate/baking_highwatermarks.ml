@@ -134,11 +134,11 @@ let encoding ~use_legacy_attestation_name =
        (req "blocks" highwatermark_delegate_map_encoding)
        (req
           (if use_legacy_attestation_name then "preendorsements"
-          else "preattestations")
+           else "preattestations")
           highwatermark_delegate_map_encoding)
        (req
           (if use_legacy_attestation_name then "endorsements"
-          else "attestations")
+           else "attestations")
           highwatermark_delegate_map_encoding))
 
 let load_encoding =

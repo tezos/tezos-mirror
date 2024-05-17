@@ -382,13 +382,13 @@ let compute_next_potential_baking_time_at_next_level state =
                  compute the round from the current timestamp. This
                  possibly means the baker has been late. *)
               (if Time.Protocol.(now < min_possible_time) then Ok Round.zero
-              else
-                Environment.wrap_tzresult
-                @@ Round.round_of_timestamp
-                     round_durations
-                     ~predecessor_timestamp
-                     ~predecessor_round
-                     ~timestamp:now)
+               else
+                 Environment.wrap_tzresult
+                 @@ Round.round_of_timestamp
+                      round_durations
+                      ~predecessor_timestamp
+                      ~predecessor_round
+                      ~timestamp:now)
               |> function
               | Error _ -> return_none
               | Ok earliest_round -> (

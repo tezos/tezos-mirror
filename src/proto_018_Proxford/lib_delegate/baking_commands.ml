@@ -152,14 +152,15 @@ let per_block_vote_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (let open Protocol.Alpha_context.Per_block_votes in
-    fun _ctxt -> function
-      | "on" -> return Per_block_vote_on
-      | "off" -> return Per_block_vote_off
-      | "pass" -> return Per_block_vote_pass
-      | s ->
-          failwith
-            "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
-            s)
+     fun _ctxt -> function
+       | "on" -> return Per_block_vote_on
+       | "off" -> return Per_block_vote_off
+       | "pass" -> return Per_block_vote_pass
+       | s ->
+           failwith
+             "unexpected vote: %s, expected either \"on\", \"off\", or \
+              \"pass\"."
+             s)
 
 let liquidity_baking_toggle_vote_arg =
   Tezos_clic.arg

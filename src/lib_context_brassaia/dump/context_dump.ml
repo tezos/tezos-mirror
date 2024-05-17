@@ -261,8 +261,8 @@ module Make (I : Dump_interface) = struct
               (nb_context_elements / 1_000)
               (100 * i / nb_context_elements)
               (if !read > 1_048_576 then
-               Format.asprintf "%dMiB" (!read / 1_048_576)
-              else Format.asprintf "%dKiB" (!read / 1_024)))
+                 Format.asprintf "%dMiB" (!read / 1_048_576)
+               else Format.asprintf "%dKiB" (!read / 1_024)))
           (fun notify ->
             I.batch index (fun batch ->
                 second_pass

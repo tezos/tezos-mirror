@@ -73,9 +73,9 @@ let build_rpc_directory net =
       (fun peer_id () () ->
         return
           (let open Option_syntax in
-          let* pool = P2p.pool net in
-          let+ conn = P2p_pool.Connection.find_by_peer_id pool peer_id in
-          P2p_conn.info conn))
+           let* pool = P2p.pool net in
+           let+ conn = P2p_pool.Connection.find_by_peer_id pool peer_id in
+           P2p_conn.info conn))
   in
   let dir =
     Tezos_rpc.Directory.lwt_register1

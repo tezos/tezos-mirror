@@ -1815,29 +1815,29 @@ let list_solvers, list_models =
   let result =
     Lwt_main.run
       (let open Lwt_result_syntax in
-      let* list_flags, args =
-        Tezos_clic.parse_global_options Global_options.options () original_args
-      in
-      match autocomplete with
-      | Some (prev_arg, cur_arg, script) ->
-          let* completions =
-            Tezos_clic.autocompletion
-              ~script
-              ~cur_arg
-              ~prev_arg
-              ~args:original_args
-              ~global_options:Global_options.options
-              commands_with_man
-              ()
-          in
-          List.iter print_endline completions ;
-          return list_flags
-      | None -> (
-          match args with
-          | [] -> return list_flags
-          | _ ->
-              let* () = Tezos_clic.dispatch commands_with_man () args in
-              return list_flags))
+       let* list_flags, args =
+         Tezos_clic.parse_global_options Global_options.options () original_args
+       in
+       match autocomplete with
+       | Some (prev_arg, cur_arg, script) ->
+           let* completions =
+             Tezos_clic.autocompletion
+               ~script
+               ~cur_arg
+               ~prev_arg
+               ~args:original_args
+               ~global_options:Global_options.options
+               commands_with_man
+               ()
+           in
+           List.iter print_endline completions ;
+           return list_flags
+       | None -> (
+           match args with
+           | [] -> return list_flags
+           | _ ->
+               let* () = Tezos_clic.dispatch commands_with_man () args in
+               return list_flags))
   in
   match result with
   | Ok global_options -> global_options

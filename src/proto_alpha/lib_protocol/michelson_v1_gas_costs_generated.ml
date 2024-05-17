@@ -3448,8 +3448,8 @@ let cost_N_KList_enter_body_alloc size_xs size_ys =
   S.max
     (S.safe_int 10)
     (if size_xs = S.safe_int 0 then
-     (size_ys lsr 2) + (size_ys * S.safe_int 12) + S.safe_int 25
-    else S.safe_int 0)
+       (size_ys lsr 2) + (size_ys * S.safe_int 12) + S.safe_int 25
+     else S.safe_int 0)
 
 (* model interpreter/N_KList_enter_body_synthesized *)
 (* fun size_xs ->
@@ -3467,10 +3467,9 @@ let cost_N_KList_enter_body_synthesized size_xs size_ys =
     (S.max
        (S.safe_int 10)
        (if w2 then
-        (size_ys lsr 1) + w1 + (size_ys lsr 4) + size_ys + S.safe_int 30
-       else S.safe_int 30))
-    (if w2 then w1 + (size_ys * S.safe_int 12) + S.safe_int 25
-    else S.safe_int 0)
+          (size_ys lsr 1) + w1 + (size_ys lsr 4) + size_ys + S.safe_int 30
+        else S.safe_int 30))
+    (if w2 then w1 + (size_ys * S.safe_int 12) + S.safe_int 25 else S.safe_int 0)
 
 (* model interpreter/N_KList_exit_body *)
 (* max 10 10. *)

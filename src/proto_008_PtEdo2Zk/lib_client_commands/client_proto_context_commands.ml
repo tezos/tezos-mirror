@@ -266,7 +266,7 @@ let commands network () =
           ()
         >>=? fun {timestamp = v; _} ->
         (if seconds then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
-        else cctxt#message "%s" (Time.Protocol.to_notation v))
+         else cctxt#message "%s" (Time.Protocol.to_notation v))
         >>= fun () -> return_unit);
     command
       ~group
@@ -1420,8 +1420,8 @@ let commands network () =
                     error
                       "There %s: %a."
                       (if Compare.List_length_with.(dups = 1) then
-                       "is a duplicate proposal"
-                      else "are duplicate proposals")
+                         "is a duplicate proposal"
+                       else "are duplicate proposals")
                       Format.(
                         pp_print_list
                           ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
@@ -1458,8 +1458,8 @@ let commands network () =
                   cctxt#message
                     "There %s with the submission:%t"
                     (if Compare.List_length_with.(!errors = 1) then
-                     "is an issue"
-                    else "are issues")
+                       "is an issue"
+                     else "are issues")
                     Format.(
                       fun ppf ->
                         pp_print_cut ppf () ;
@@ -1478,10 +1478,11 @@ let commands network () =
               in
               check_proposals proposals >>=? fun all_valid ->
               (if all_valid then cctxt#message "All proposals are valid."
-              else if force then
-                cctxt#message
-                  "Some proposals are not valid, but `--force` was used."
-              else cctxt#error "Submission failed because of invalid proposals.")
+               else if force then
+                 cctxt#message
+                   "Some proposals are not valid, but `--force` was used."
+               else
+                 cctxt#error "Submission failed because of invalid proposals.")
               >>= fun () ->
               submit_proposals
                 ~dry_run
@@ -1618,8 +1619,8 @@ let commands network () =
                           p
                           w
                           (if List.mem ~equal:Protocol_hash.equal p known_protos
-                          then ""
-                          else "not "))
+                           then ""
+                           else "not "))
                       ranks ;
                     pp_close_box ppf ())
               >>= fun () -> return_unit

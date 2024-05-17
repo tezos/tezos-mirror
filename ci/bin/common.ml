@@ -515,8 +515,8 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
       @ variables)
     ~before_script:
       (if not skip_docker_initialization then
-       ["./scripts/ci/docker_initialize.sh"]
-      else [])
+         ["./scripts/ci/docker_initialize.sh"]
+       else [])
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~stage
     ~name

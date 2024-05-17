@@ -75,11 +75,11 @@ let pp_supported_version fmt ~complete {supported; latest; default} =
          | false, true -> "(deprecated)"
          | false, false -> "")
          (if complete then
-          if use_legacy_attestation_name then
-            " that will output attestation operations as \"endorsement\" in \
-             the \"kind\" field"
-          else " that will output \"attestation\" in the \"kind\" field"
-         else "")))
+            if use_legacy_attestation_name then
+              " that will output attestation operations as \"endorsement\" in \
+               the \"kind\" field"
+            else " that will output \"attestation\" in the \"kind\" field"
+          else "")))
     fmt
     supported
 
@@ -563,8 +563,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let block_metadata_encoding ~use_legacy_attestation_name =
     def
       (if use_legacy_attestation_name then
-       "block_header_metadata_with_legacy_attestation_name"
-      else "block_header_metadata")
+         "block_header_metadata_with_legacy_attestation_name"
+       else "block_header_metadata")
     @@ conv
          (fun {
                 protocol_data;
@@ -610,8 +610,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                   "max_operation_list_length"
                   (dynamic_size (list operation_list_quota_encoding))))
             (if use_legacy_attestation_name then
-             Proto.block_header_metadata_encoding_with_legacy_attestation_name
-            else Proto.block_header_metadata_encoding))
+               Proto.block_header_metadata_encoding_with_legacy_attestation_name
+             else Proto.block_header_metadata_encoding))
 
   let next_operation_encoding_with_legacy_attestation_name =
     let open Data_encoding in
@@ -696,8 +696,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let operation_encoding ~use_legacy_attestation_name =
     def
       (if use_legacy_attestation_name then
-       "operation_with_legacy_attestation_name"
-      else "operation")
+         "operation_with_legacy_attestation_name"
+       else "operation")
     @@
     let open Data_encoding in
     conv
@@ -1371,9 +1371,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                             Operation.shell_header_encoding)
                          (dynamic_size
                             (if use_legacy_name then
-                             Next_proto
-                             .operation_data_encoding_with_legacy_attestation_name
-                            else Next_proto.operation_data_encoding))))))
+                               Next_proto
+                               .operation_data_encoding_with_legacy_attestation_name
+                             else Next_proto.operation_data_encoding))))))
              (operations_with_error_encoding "refused")
              (operations_with_error_encoding "outdated")
              (operations_with_error_encoding "branch_refused")
@@ -1616,8 +1616,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (merge_objs
              (obj1 (req "hash" Operation_hash.encoding))
              (if use_legacy_name then
-              next_operation_encoding_with_legacy_attestation_name
-             else next_operation_encoding))
+                next_operation_encoding_with_legacy_attestation_name
+              else next_operation_encoding))
           (obj1 (dft "error" Tezos_rpc.Error.opt_encoding None))
 
       let processed_operation_encoding =

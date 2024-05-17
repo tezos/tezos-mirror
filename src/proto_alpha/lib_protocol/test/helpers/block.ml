@@ -893,17 +893,17 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
       List.fold_left_es
         (fun (vstate, contents_result) op ->
           (if check_size then
-           let operation_size =
-             Data_encoding.Binary.length Operation.encoding op
-           in
-           if operation_size > Constants_repr.max_operation_data_length then
-             raise
-               (invalid_arg
-                  (Format.sprintf
-                     "The operation size is %d, it exceeds the constant \
-                      maximum size %d"
-                     operation_size
-                     Constants_repr.max_operation_data_length))) ;
+             let operation_size =
+               Data_encoding.Binary.length Operation.encoding op
+             in
+             if operation_size > Constants_repr.max_operation_data_length then
+               raise
+                 (invalid_arg
+                    (Format.sprintf
+                       "The operation size is %d, it exceeds the constant \
+                        maximum size %d"
+                       operation_size
+                       Constants_repr.max_operation_data_length))) ;
           let* state, result = validate_and_apply_operation vstate op in
           if allow_manager_failures then
             return (state, result :: contents_result)

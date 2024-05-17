@@ -252,8 +252,8 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
   in
   def
     (if use_legacy_attestation_name then
-     "operation_metadata_with_legacy_attestation_name.alpha.balance_and_update"
-    else "operation_metadata.alpha.balance_and_update")
+       "operation_metadata_with_legacy_attestation_name.alpha.balance_and_update"
+     else "operation_metadata.alpha.balance_and_update")
   @@ union
        [
          tez_case
@@ -295,14 +295,14 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (Tag 7)
            ~title:
              (if use_legacy_attestation_name then "Endorsing_rewards"
-             else "Attesting_rewards")
+              else "Attesting_rewards")
            (obj2
               (req "kind" (constant "minted"))
               (req
                  "category"
                  (constant
                     (if use_legacy_attestation_name then "endorsing rewards"
-                    else "attesting rewards"))))
+                     else "attesting rewards"))))
            (function Attesting_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Attesting_rewards);
          tez_case
@@ -341,15 +341,15 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (Tag 13)
            ~title:
              (if use_legacy_attestation_name then "Lost_endorsing_rewards"
-             else "Lost_attesting_rewards")
+              else "Lost_attesting_rewards")
            (obj5
               (req "kind" (constant "burned"))
               (req
                  "category"
                  (constant
                     (if use_legacy_attestation_name then
-                     "lost endorsing rewards"
-                    else "lost attesting rewards")))
+                       "lost endorsing rewards"
+                     else "lost attesting rewards")))
               (req "delegate" Signature.Public_key_hash.encoding)
               (req "participation" Data_encoding.bool)
               (req "revelation" Data_encoding.bool))

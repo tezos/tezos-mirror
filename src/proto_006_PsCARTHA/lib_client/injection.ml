@@ -241,10 +241,10 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
         | _ -> Tezos_crypto.Signature.V0.Generic_operation
       in
       (if verbose_signing then
-       cctxt#message
-         "Pre-signature information (verbose signing):@.%t%!"
-         (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
-      else Lwt.return_unit)
+         cctxt#message
+           "Pre-signature information (verbose signing):@.%t%!"
+           (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
+       else Lwt.return_unit)
       >>= fun () ->
       Client_keys_v0.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
       return_some signature)
@@ -535,30 +535,30 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
    fun first -> function
     | Manager_operation c, (Manager_operation_result _ as result) ->
         (if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
-         Lwt.return (estimated_gas_single result) >>=? fun gas ->
-         if Z.equal gas Z.zero then
-           cctxt#message "Estimated gas: none" >>= fun () -> return Z.zero
-         else
-           cctxt#message
-             "Estimated gas: %s units (will add 100 for safety)"
-             (Z.to_string gas)
-           >>= fun () -> return (Z.min (Z.add gas (Z.of_int 100)) gas_limit)
-        else return c.gas_limit)
+           Lwt.return (estimated_gas_single result) >>=? fun gas ->
+           if Z.equal gas Z.zero then
+             cctxt#message "Estimated gas: none" >>= fun () -> return Z.zero
+           else
+             cctxt#message
+               "Estimated gas: %s units (will add 100 for safety)"
+               (Z.to_string gas)
+             >>= fun () -> return (Z.min (Z.add gas (Z.of_int 100)) gas_limit)
+         else return c.gas_limit)
         >>=? fun gas_limit ->
         (if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
-         Lwt.return
-           (estimated_storage_single (Z.of_int origination_size) result)
-         >>=? fun storage ->
-         if Z.equal storage Z.zero then
-           cctxt#message "Estimated storage: no bytes added" >>= fun () ->
-           return Z.zero
-         else
-           cctxt#message
-             "Estimated storage: %s bytes added (will add 20 for safety)"
-             (Z.to_string storage)
-           >>= fun () ->
-           return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
-        else return c.storage_limit)
+           Lwt.return
+             (estimated_storage_single (Z.of_int origination_size) result)
+           >>=? fun storage ->
+           if Z.equal storage Z.zero then
+             cctxt#message "Estimated storage: no bytes added" >>= fun () ->
+             return Z.zero
+           else
+             cctxt#message
+               "Estimated storage: %s bytes added (will add 20 for safety)"
+               (Z.to_string storage)
+             >>= fun () ->
+             return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
+         else return c.storage_limit)
         >>=? fun storage_limit ->
         let c = Manager_operation {c with gas_limit; storage_limit} in
         if compute_fee then return (patch_fee first c) else return c

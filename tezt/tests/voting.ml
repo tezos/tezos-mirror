@@ -265,7 +265,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          (Protocol.tag from_protocol)
          (target_protocol_tag to_protocol)
          (if loser_protocols = [] then "none"
-         else String.concat ", " (List.map Protocol.tag loser_protocols)))
+          else String.concat ", " (List.map Protocol.tag loser_protocols)))
     ~tags:
       (team :: "amendment"
        :: ("from_" ^ Protocol.tag from_protocol)

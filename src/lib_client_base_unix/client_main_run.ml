@@ -533,7 +533,7 @@ let main (module C : M) ~select_commands =
               ~executable_name
               ~global_options
               (if Unix.isatty Unix.stdout then Tezos_clic.Ansi
-              else Tezos_clic.Plain)
+               else Tezos_clic.Plain)
               Format.std_formatter
               (C.clic_commands
                  ~base_dir

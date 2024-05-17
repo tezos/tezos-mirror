@@ -71,21 +71,21 @@ let assert_computation_status ?(info = false) ?(assert_is_not = false)
   in
   let* current_status = get_seed_computation_status ~info client level.level in
   (if current_status = Nonce_revelation_stage then
-   (* For levels in the nonce revelation stage, we also check the consistency
-    * of [Vdf.Helpers.is_in_nonce_revelation_stage] with
-    * the [Seed_computation] RPC. *)
-   let nonce_revelation_threshold = Int32.of_int nonce_revelation_threshold in
-   if
-     not
-       (Vdf.Helpers.is_in_nonce_revelation_stage
-          ~nonce_revelation_threshold
-          ~level)
-   then
-     failwith
-       (Printf.sprintf
-          "Vdf.Helpers.is_in_nonce_revelation_stage is inconsistent with the \
-           Seed_computation RPC: returned false on level %d"
-          level.level)) ;
+     (* For levels in the nonce revelation stage, we also check the consistency
+      * of [Vdf.Helpers.is_in_nonce_revelation_stage] with
+      * the [Seed_computation] RPC. *)
+     let nonce_revelation_threshold = Int32.of_int nonce_revelation_threshold in
+     if
+       not
+         (Vdf.Helpers.is_in_nonce_revelation_stage
+            ~nonce_revelation_threshold
+            ~level)
+     then
+       failwith
+         (Printf.sprintf
+            "Vdf.Helpers.is_in_nonce_revelation_stage is inconsistent with the \
+             Seed_computation RPC: returned false on level %d"
+            level.level)) ;
   return @@ assert (comp current_status status)
 
 let assert_not_computation_status =

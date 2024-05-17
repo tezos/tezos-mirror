@@ -111,12 +111,12 @@ let test_transfer_json_to_entrypoint_with_args =
     let* new_balance_source = Client.get_balance_for ~account:source client in
     let* new_balance_payer = Client.get_balance_for ~account:payer client in
     (if payer <> source then
-     Check.(
-       (balance_source = new_balance_source)
-         Tez.typ
-         ~__LOC__
-         ~error_msg:
-           "Expected source's balance to be unchanged from %R, but got %L")) ;
+       Check.(
+         (balance_source = new_balance_source)
+           Tez.typ
+           ~__LOC__
+           ~error_msg:
+             "Expected source's balance to be unchanged from %R, but got %L")) ;
     Check.(
       (Tez.(balance_payer - fee) = new_balance_payer)
         Tez.typ

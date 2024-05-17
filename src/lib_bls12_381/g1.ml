@@ -83,7 +83,8 @@ module Stubs = struct
     Bytes.t ->
     Unsigned.Size_t.t ->
     int
-    = "caml_blst_p1_hash_to_curve_stubs_bytecode" "caml_blst_p1_hash_to_curve_stubs"
+    = "caml_blst_p1_hash_to_curve_stubs_bytecode"
+      "caml_blst_p1_hash_to_curve_stubs"
 
   external memcpy : jacobian -> jacobian -> int = "caml_blst_p1_memcpy_stubs"
 
@@ -344,18 +345,18 @@ module G1 = struct
     if start < 0 || len < 1 || start + len > n then
       raise @@ Invalid_argument (Format.sprintf "start %i len %i" start len) ;
     (if len = 1 then (
-     ignore @@ Stubs.continuous_array_get buffer ps start ;
-     mul_inplace buffer ss.(start))
-    else
-      let res =
-        Stubs.pippenger_with_affine_array
-          buffer
-          ps
-          ss
-          (Unsigned.Size_t.of_int start)
-          (Unsigned.Size_t.of_int len)
-      in
-      assert (res = 0)) ;
+       ignore @@ Stubs.continuous_array_get buffer ps start ;
+       mul_inplace buffer ss.(start))
+     else
+       let res =
+         Stubs.pippenger_with_affine_array
+           buffer
+           ps
+           ss
+           (Unsigned.Size_t.of_int start)
+           (Unsigned.Size_t.of_int len)
+       in
+       assert (res = 0)) ;
     buffer
 end
 

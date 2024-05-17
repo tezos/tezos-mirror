@@ -370,13 +370,13 @@ module Generated = struct
           baking_reward_fixed_portion_weight =
             (* 1/4 or 1/2 *)
             (if Compare.Int.(bonus_committee_size <= 0) then
-             (* a fortiori, consensus_committee_size < 4 *)
-             reward_parts_half
-            else reward_parts_quarter);
+               (* a fortiori, consensus_committee_size < 4 *)
+               reward_parts_half
+             else reward_parts_quarter);
           baking_reward_bonus_weight =
             (* 1/4 or 0 *)
             (if Compare.Int.(bonus_committee_size <= 0) then 0
-            else reward_parts_quarter);
+             else reward_parts_quarter);
           attesting_reward_weight = reward_parts_half;
           (* 1/2 *)
           (* All block (baking + attesting)rewards sum to 1 ( *256*80 ) *)

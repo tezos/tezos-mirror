@@ -341,7 +341,7 @@ module Inner = struct
       in
       let srs_verifier =
         (if is_fake then Srs.Internal_for_tests.get_verifier_srs2
-        else Srs.get_verifier_srs2)
+         else Srs.get_verifier_srs2)
           ~max_polynomial_length
           ~page_length_domain
           ~shard_length

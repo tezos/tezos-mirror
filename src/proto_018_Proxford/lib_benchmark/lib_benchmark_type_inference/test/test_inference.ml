@@ -142,33 +142,33 @@ module Test3 = struct
     try
       ignore
         ((let open Inference in
-         let open M in
-         M.uf_lift Uf.UF.show >>= fun uf_state ->
-         Inference.M.repr_lift (fun s -> (Inference.Repr_store.to_string s, s))
-         >>= fun repr_state ->
-         Printf.printf "uf_state:\n%s\n" uf_state ;
-         Printf.printf "repr_state:\n%s\n" repr_state ;
-         let path =
-           Path.(at_index 2 (at_index 0 (at_index 0 (at_index 3 root))))
-         in
-         let subterm = Rewriter.get_subterm ~term:program ~path in
-         Format.printf
-           "subterm at path %s:\n%a\n"
-           (Path.to_string path)
-           Mikhailsky.pp
-           subterm ;
-         Inference.M.annot_instr_lift (Inference.Annot_instr_sm.get path)
-         >>= fun typ ->
-         (match typ with
-         | None -> assert false
-         | Some {bef; aft} ->
-             Inference.instantiate bef >>= fun bef ->
-             Inference.instantiate aft >>= fun aft ->
-             Format.printf "Type of subterm:\n" ;
-             Format.printf "bef: %a@." Type.Stack.pp bef ;
-             Format.printf "aft: %a@." Type.Stack.pp aft ;
-             return ())
-         >>= fun () -> return ())
+          let open M in
+          M.uf_lift Uf.UF.show >>= fun uf_state ->
+          Inference.M.repr_lift (fun s -> (Inference.Repr_store.to_string s, s))
+          >>= fun repr_state ->
+          Printf.printf "uf_state:\n%s\n" uf_state ;
+          Printf.printf "repr_state:\n%s\n" repr_state ;
+          let path =
+            Path.(at_index 2 (at_index 0 (at_index 0 (at_index 3 root))))
+          in
+          let subterm = Rewriter.get_subterm ~term:program ~path in
+          Format.printf
+            "subterm at path %s:\n%a\n"
+            (Path.to_string path)
+            Mikhailsky.pp
+            subterm ;
+          Inference.M.annot_instr_lift (Inference.Annot_instr_sm.get path)
+          >>= fun typ ->
+          (match typ with
+          | None -> assert false
+          | Some {bef; aft} ->
+              Inference.instantiate bef >>= fun bef ->
+              Inference.instantiate aft >>= fun aft ->
+              Format.printf "Type of subterm:\n" ;
+              Format.printf "bef: %a@." Type.Stack.pp bef ;
+              Format.printf "aft: %a@." Type.Stack.pp aft ;
+              return ())
+          >>= fun () -> return ())
            state)
     with Inference.Ill_typed_script error ->
       let s = Mikhailsky.to_string program in

@@ -441,11 +441,11 @@ let make_raw_block ?min_lpbl ?(max_operations_ttl = default_max_operations_ttl)
             (if Random.bool () then Some Block_metadata_hash.zero else None);
           operations_metadata_hashes =
             (if Random.bool () then
-             Some
-               (List.map
-                  (List.map (fun _ -> Operation_metadata_hash.zero))
-                  operations)
-            else None);
+               Some
+                 (List.map
+                    (List.map (fun _ -> Operation_metadata_hash.zero))
+                    operations)
+             else None);
         };
       metadata;
     }

@@ -204,9 +204,9 @@ let assert_success ?(loc = __LOC__) : ('a, 'b) scenarios -> ('a, 'a) scenarios =
   | [(sc, _, _)] ->
       exec
         (let open Lwt_result_syntax in
-        fun input ->
-          let* _ = run_scenario sc input in
-          return input)
+         fun input ->
+           let* _ = run_scenario sc input in
+           return input)
   | _ ->
       exec (fun _ ->
           failwith "%s: Error: assert_success used with branching scenario" loc)

@@ -55,8 +55,8 @@ let write_debug ~version ~debug ~init ~values memories =
        ~version
        ~write_debug:
          (if debug then
-          Printer (fun str -> Lwt.return @@ Format.printf "%s" str)
-         else Noop))
+            Printer (fun str -> Lwt.return @@ Format.printf "%s" str)
+          else Noop))
     ~input
     ~init
     Host_funcs.Internal_for_tests.write_debug

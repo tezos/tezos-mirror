@@ -362,12 +362,12 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         may_register_my_id_point t.pool err ;
         t.log (Authentication_failed point) ;
         (if not incoming then
-         let timestamp = Time.System.now () in
-         Option.iter
-           (P2p_point_state.set_disconnected
-              ~timestamp
-              t.config.reconnection_config)
-           point_info) ;
+           let timestamp = Time.System.now () in
+           Option.iter
+             (P2p_point_state.set_disconnected
+                ~timestamp
+                t.config.reconnection_config)
+             point_info) ;
         Lwt.return_error err)
   in
   (* Authentication correct! *)

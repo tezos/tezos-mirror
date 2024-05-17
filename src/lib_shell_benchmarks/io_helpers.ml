@@ -98,9 +98,9 @@ let with_context ~base_dir ~context_hash f =
   let context, index = load_context_from_disk base_dir context_hash in
   Lwt_main.run
     (let open Lwt_syntax in
-    let* res = f context in
-    let* () = Tezos_context.Context.close index in
-    Lwt.return res)
+     let* res = f context in
+     let* () = Tezos_context.Context.close index in
+     Lwt.return res)
 
 let prepare_base_dir base_dir = Unix.unlink base_dir
 

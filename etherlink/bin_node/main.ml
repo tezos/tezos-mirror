@@ -505,7 +505,7 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
           config.experimental_features with
           enable_send_raw_transaction =
             (if read_only then false
-            else config.experimental_features.enable_send_raw_transaction);
+             else config.experimental_features.enable_send_raw_transaction);
         };
     }
   in

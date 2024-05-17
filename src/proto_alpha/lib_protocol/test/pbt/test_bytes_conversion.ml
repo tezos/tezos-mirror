@@ -161,9 +161,9 @@ let test_bytes_of_int_random () =
   (* [bytes_of_int] must return the shortest encoding: at most 1 char of zero
      or '\255's at the head. *)
   (if Bytes.length bytes >= 2 then
-   match (Bytes.get bytes 0, Bytes.get bytes 1) with
-   | '\000', '\000' | '\255', '\255' -> assert false
-   | _ -> ()) ;
+     match (Bytes.get bytes 0, Bytes.get bytes 1) with
+     | '\000', '\000' | '\255', '\255' -> assert false
+     | _ -> ()) ;
   (* [int_of_bytes @@ bytes_of_int z = z] *)
   (let z' = to_zint @@ int_of_bytes_be bytes in
    Z.Compare.(z = z'))

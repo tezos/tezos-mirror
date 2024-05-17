@@ -384,8 +384,8 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   let sk = Signature.Of_V0.secret_key sk in
   Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
-   Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
-  else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return)
+     Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
+   else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return)
   >>=? fun sk_uri ->
   Client_keys_v0.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->

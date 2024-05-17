@@ -104,7 +104,7 @@ module Wasm = struct
              (* If [is_stop_chunk_aligned] is false, we allocate one
                 sections for the surplus. *)
              (if is_stop_chunk_aligned then default_number_of_sections
-             else default_number_of_sections - 1))
+              else default_number_of_sections - 1))
           max_number_of_sections
       in
 

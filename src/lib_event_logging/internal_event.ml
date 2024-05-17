@@ -285,12 +285,11 @@ module All_sinks = struct
       ~id:"internal-event-activation-error"
       ~title
       ~description
-      ~pp:
-        (fun ppf -> function
-          | Missing_uri_scheme uri ->
-              Format.fprintf ppf "%s: Missing URI scheme %S" title uri
-          | Uri_scheme_not_registered uri ->
-              Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
+      ~pp:(fun ppf -> function
+            | Missing_uri_scheme uri ->
+                Format.fprintf ppf "%s: Missing URI scheme %S" title uri
+            | Uri_scheme_not_registered uri ->
+                Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
       Data_encoding.(
         union
           [

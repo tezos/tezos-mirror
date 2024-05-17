@@ -2368,7 +2368,7 @@ let module_step ~allow_floats bytes state =
                fbs,
                vec,
                (if no_datas_in_func then Some (LazyVec {offset; vector})
-               else None),
+                else None),
                no_datas_in_func )
   | MKBuild (funcs, no_datas_in_func) ->
       let {

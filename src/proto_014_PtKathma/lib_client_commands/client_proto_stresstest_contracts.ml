@@ -121,8 +121,8 @@ let init (cctxt : Protocol_client_context.full)
       contract_parameters
   in
   (if sum_of_probabilities > 1.0 then
-   failwith "sum of smart contract call probabilities is greater than 1.0!"
-  else return_unit)
+     failwith "sum of smart contract call probabilities is greater than 1.0!"
+   else return_unit)
   >>=? fun () ->
   let init_one (alias, params) =
     Client_proto_contracts.Contract_alias.get_contract cctxt alias
