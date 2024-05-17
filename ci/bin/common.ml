@@ -60,18 +60,6 @@ module Stages = struct
   let manual = Stage.register "manual"
 end
 
-(* Get the [build_deps_image_version] from the environment, which is
-   typically set by sourcing [scripts/version.sh]. This is used to write
-   [build_deps_image_version] in the top-level [variables:], used to
-   specify the versions of the [build_deps] images. *)
-let build_deps_image_version =
-  match Sys.getenv_opt "opam_repository_tag" with
-  | None ->
-      failwith
-        "Please set the environment variable [opam_repository_tag], by e.g. \
-         sourcing [scripts/version.sh] before running."
-  | Some v -> v
-
 (* Get the [alpine_version] from the environment, which is typically
    set by sourcing [scripts/version.sh]. This is used to set the tag
    of the image {!Images.alpine}. *)
@@ -93,26 +81,6 @@ let alpine_version =
    {{:https://gitlab.com/tezos/opam-repository/}
    tezos/opam-repository}. *)
 module Images_external = struct
-  let runtime_e2etest_dependencies =
-    Image.mk_external
-      ~image_path:
-        "${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}"
-
-  let runtime_build_test_dependencies =
-    Image.mk_external
-      ~image_path:
-        "${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}"
-
-  let runtime_build_dependencies =
-    Image.mk_external
-      ~image_path:
-        "${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}"
-
-  let runtime_prebuild_dependencies =
-    Image.mk_external
-      ~image_path:
-        "${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}"
-
   let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
 
   (* Match GitLab executors version and directly use the Docker socket
@@ -638,6 +606,61 @@ module Images = struct
       ~image_builder_arm64:(image_builder Arm64)
       ~image_path
       ()
+
+  (* The job that builds the opam repo images.
+     This job is automatically included in any pipeline that uses this image. *)
+  let job_docker_opam_repository arch =
+    let variables = Some [("ARCH", arch_to_string_alt arch)] in
+    job_docker_authenticated
+      ?variables
+      ~__POS__
+      ~arch
+      ~skip_docker_initialization:true
+      ~stage:Stages.images
+      ~name:("oc.docker:opam-repository:" ^ arch_to_string_alt arch)
+      ~ci_docker_hub:false
+      ~artifacts:
+        (artifacts
+           ~reports:(reports ~dotenv:"opam_repository_image_tag.env" ())
+           [])
+      ["./images/ci_create_opam_repository_images.sh"]
+
+  let mk_opam_repository_image ~image_path =
+    Image.mk_internal
+      ~image_builder_amd64:(job_docker_opam_repository Amd64)
+      ~image_builder_arm64:(job_docker_opam_repository Arm64)
+      ~image_path
+      ()
+
+  (* Reuse the same image_builder job [job_docker_opam_repository] for all
+     the below images, since they're all produced in that same job.
+
+     Depending on any of these images ensures that the job
+     [job_docker_opam_repository] is included exactly once in the pipeline. *)
+  let runtime_dependencies =
+    mk_opam_repository_image
+      ~image_path:
+        "${opam_repository_image_name}/runtime-dependencies:${opam_repository_image_tag}"
+
+  let runtime_prebuild_dependencies =
+    mk_opam_repository_image
+      ~image_path:
+        "${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}"
+
+  let runtime_build_dependencies =
+    mk_opam_repository_image
+      ~image_path:
+        "${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}"
+
+  let runtime_build_test_dependencies =
+    mk_opam_repository_image
+      ~image_path:
+        "${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}"
+
+  let runtime_e2etest_dependencies =
+    mk_opam_repository_image
+      ~image_path:
+        "${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}"
 end
 
 (* This version of the job builds both released and experimental executables.

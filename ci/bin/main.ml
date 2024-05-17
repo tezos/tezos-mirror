@@ -23,8 +23,6 @@ let default = default ~interruptible:true ()
 (* Top-level [variables:] *)
 let variables : variables =
   [
-    (* /!\ This value MUST be the same as `opam_repository_tag` in `scripts/version.sh` *)
-    ("build_deps_image_version", Common.build_deps_image_version);
     (* /!\ [GCP_PUBLIC_REGISTRY] contains the name of the PUBLIC
        registry to and from which Docker images are produced and
        consumed. This variable is defined at the tezos-group level and
@@ -32,7 +30,8 @@ let variables : variables =
        (unlike [GCP_REGISTRY], see below). This is used to locate the
        [tezos/opam-repository] images, which are always pushed to the
        public repository. *)
-    ("build_deps_image_name", "${GCP_PUBLIC_REGISTRY}/tezos/opam-repository");
+    ( "opam_repository_image_name",
+      "${GCP_PUBLIC_REGISTRY}/${CI_PROJECT_PATH}/opam-repository" );
     (* /!\ GCP_REGISTRY is the variable containing the name of the registry to and from
        which docker images are produced and consumed. This variable is defined at tezos
        level with the value unprotected registry and at tezos/tezos level in its protected

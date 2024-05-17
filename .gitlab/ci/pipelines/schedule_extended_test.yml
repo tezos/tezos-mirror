@@ -10,6 +10,25 @@ stages:
 - doc
 - manual
 
+oc.docker:opam-repository:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./images/ci_create_opam_repository_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: opam_repository_image_tag.env
+
 oc.docker:client-libs-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
@@ -27,6 +46,25 @@ oc.docker:client-libs-dependencies:
   artifacts:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
+
+oc.docker:opam-repository:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp_arm64
+  dependencies: []
+  before_script: []
+  script:
+  - ./images/ci_create_opam_repository_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+    ARCH: arm64
+  artifacts:
+    reports:
+      dotenv: opam_repository_image_tag.env
 
 oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -47,11 +85,12 @@ oc.docker:rust-toolchain:amd64:
       dotenv: rust_toolchain_image_tag.env
 
 sanity_ci:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: sanity
   tags:
   - gcp
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -74,13 +113,14 @@ docker:hadolint-schedule_extended_test:
   - hadolint Dockerfile
 
 oc.build_arm64-released:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -107,13 +147,14 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_arm64-exp-dev-extra:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -142,13 +183,14 @@ oc.build_arm64-exp-dev-extra:
     when: on_success
 
 oc.build:static-x86_64-linux-binaries:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -167,13 +209,14 @@ oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_x86_64-released:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -201,13 +244,14 @@ oc.build_x86_64-released:
     when: on_success
 
 oc.build_x86_64-exp-dev-extra:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -237,13 +281,14 @@ oc.build_x86_64-exp-dev-extra:
     when: on_success
 
 ocaml-check:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -300,13 +345,14 @@ oc.build_kernels:
     when: on_success
 
 oc.tezt:fetch-records:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   allow_failure: true
   before_script:
   - ./scripts/ci/take_ownership.sh
@@ -326,11 +372,12 @@ oc.tezt:fetch-records:
     when: always
 
 select_tezts:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   allow_failure:
     exit_codes: 17
   before_script:
@@ -434,11 +481,12 @@ oc.build:rpm:amd64:
       - rockylinux:9.3
 
 build_octez_source:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -460,7 +508,7 @@ build_octez_source:
     CARGO_NET_OFFLINE: "false"
 
 opam:prepare:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -486,7 +534,8 @@ opam:prepare:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - eval $(opam env)
   script:
@@ -499,7 +548,7 @@ opam:prepare:
     - _opam-repo-for-release/
 
 opam:bls12-381:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -526,8 +575,10 @@ opam:bls12-381:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -565,7 +616,7 @@ opam:bls12-381:
   retry: 2
 
 opam:octez-accuser-Proxford:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -592,8 +643,10 @@ opam:octez-accuser-Proxford:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -631,7 +684,7 @@ opam:octez-accuser-Proxford:
   retry: 2
 
 opam:octez-accuser-PtParisB:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -658,8 +711,10 @@ opam:octez-accuser-PtParisB:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -697,7 +752,7 @@ opam:octez-accuser-PtParisB:
   retry: 2
 
 opam:octez-alcotezt:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -724,8 +779,10 @@ opam:octez-alcotezt:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -763,7 +820,7 @@ opam:octez-alcotezt:
   retry: 2
 
 opam:octez-baker-Proxford:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -790,8 +847,10 @@ opam:octez-baker-Proxford:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -829,7 +888,7 @@ opam:octez-baker-Proxford:
   retry: 2
 
 opam:octez-baker-PtParisB:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -856,8 +915,10 @@ opam:octez-baker-PtParisB:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -895,7 +956,7 @@ opam:octez-baker-PtParisB:
   retry: 2
 
 opam:octez-client:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -922,8 +983,10 @@ opam:octez-client:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -961,7 +1024,7 @@ opam:octez-client:
   retry: 2
 
 opam:octez-codec:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -988,8 +1051,10 @@ opam:octez-codec:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1027,7 +1092,7 @@ opam:octez-codec:
   retry: 2
 
 opam:octez-crawler:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1054,8 +1119,10 @@ opam:octez-crawler:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1093,7 +1160,7 @@ opam:octez-crawler:
   retry: 2
 
 opam:octez-dac-client:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1120,8 +1187,10 @@ opam:octez-dac-client:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1159,7 +1228,7 @@ opam:octez-dac-client:
   retry: 2
 
 opam:octez-dac-node:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1186,8 +1255,10 @@ opam:octez-dac-node:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1225,7 +1296,7 @@ opam:octez-dac-node:
   retry: 2
 
 opam:octez-dal-node:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1252,8 +1323,10 @@ opam:octez-dal-node:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1291,7 +1364,7 @@ opam:octez-dal-node:
   retry: 2
 
 opam:octez-distributed-internal:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1318,8 +1391,10 @@ opam:octez-distributed-internal:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1357,7 +1432,7 @@ opam:octez-distributed-internal:
   retry: 2
 
 opam:octez-distributed-lwt-internal:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1384,8 +1459,10 @@ opam:octez-distributed-lwt-internal:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1423,7 +1500,7 @@ opam:octez-distributed-lwt-internal:
   retry: 2
 
 opam:octez-evm-node:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1450,8 +1527,10 @@ opam:octez-evm-node:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1489,7 +1568,7 @@ opam:octez-evm-node:
   retry: 2
 
 opam:octez-evm-node-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1516,8 +1595,10 @@ opam:octez-evm-node-libs:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1555,7 +1636,7 @@ opam:octez-evm-node-libs:
   retry: 2
 
 opam:octez-injector:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1582,8 +1663,10 @@ opam:octez-injector:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1621,7 +1704,7 @@ opam:octez-injector:
   retry: 2
 
 opam:octez-internal-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1648,8 +1731,10 @@ opam:octez-internal-libs:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1687,7 +1772,7 @@ opam:octez-internal-libs:
   retry: 2
 
 opam:octez-l2-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1714,8 +1799,10 @@ opam:octez-l2-libs:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1753,7 +1840,7 @@ opam:octez-l2-libs:
   retry: 2
 
 opam:octez-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1780,8 +1867,10 @@ opam:octez-libs:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1819,7 +1908,7 @@ opam:octez-libs:
   retry: 2
 
 opam:octez-node:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1846,8 +1935,10 @@ opam:octez-node:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1885,7 +1976,7 @@ opam:octez-node:
   retry: 2
 
 opam:octez-node-config:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1912,8 +2003,10 @@ opam:octez-node-config:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -1951,7 +2044,7 @@ opam:octez-node-config:
   retry: 2
 
 opam:octez-proto-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1978,8 +2071,10 @@ opam:octez-proto-libs:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2017,7 +2112,7 @@ opam:octez-proto-libs:
   retry: 2
 
 opam:octez-protocol-000-Ps9mPmXa-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2044,8 +2139,10 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2083,7 +2180,7 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   retry: 2
 
 opam:octez-protocol-001-PtCJ7pwo-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2110,8 +2207,10 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2149,7 +2248,7 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   retry: 2
 
 opam:octez-protocol-002-PsYLVpVv-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2176,8 +2275,10 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2215,7 +2316,7 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   retry: 2
 
 opam:octez-protocol-003-PsddFKi3-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2242,8 +2343,10 @@ opam:octez-protocol-003-PsddFKi3-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2281,7 +2384,7 @@ opam:octez-protocol-003-PsddFKi3-libs:
   retry: 2
 
 opam:octez-protocol-004-Pt24m4xi-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2308,8 +2411,10 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2347,7 +2452,7 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   retry: 2
 
 opam:octez-protocol-005-PsBabyM1-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2374,8 +2479,10 @@ opam:octez-protocol-005-PsBabyM1-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2413,7 +2520,7 @@ opam:octez-protocol-005-PsBabyM1-libs:
   retry: 2
 
 opam:octez-protocol-006-PsCARTHA-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2440,8 +2547,10 @@ opam:octez-protocol-006-PsCARTHA-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2479,7 +2588,7 @@ opam:octez-protocol-006-PsCARTHA-libs:
   retry: 2
 
 opam:octez-protocol-007-PsDELPH1-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2506,8 +2615,10 @@ opam:octez-protocol-007-PsDELPH1-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2545,7 +2656,7 @@ opam:octez-protocol-007-PsDELPH1-libs:
   retry: 2
 
 opam:octez-protocol-008-PtEdo2Zk-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2572,8 +2683,10 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2611,7 +2724,7 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   retry: 2
 
 opam:octez-protocol-009-PsFLoren-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2638,8 +2751,10 @@ opam:octez-protocol-009-PsFLoren-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2677,7 +2792,7 @@ opam:octez-protocol-009-PsFLoren-libs:
   retry: 2
 
 opam:octez-protocol-010-PtGRANAD-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2704,8 +2819,10 @@ opam:octez-protocol-010-PtGRANAD-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2743,7 +2860,7 @@ opam:octez-protocol-010-PtGRANAD-libs:
   retry: 2
 
 opam:octez-protocol-011-PtHangz2-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2770,8 +2887,10 @@ opam:octez-protocol-011-PtHangz2-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2809,7 +2928,7 @@ opam:octez-protocol-011-PtHangz2-libs:
   retry: 2
 
 opam:octez-protocol-012-Psithaca-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2836,8 +2955,10 @@ opam:octez-protocol-012-Psithaca-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2875,7 +2996,7 @@ opam:octez-protocol-012-Psithaca-libs:
   retry: 2
 
 opam:octez-protocol-013-PtJakart-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2902,8 +3023,10 @@ opam:octez-protocol-013-PtJakart-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -2941,7 +3064,7 @@ opam:octez-protocol-013-PtJakart-libs:
   retry: 2
 
 opam:octez-protocol-014-PtKathma-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2968,8 +3091,10 @@ opam:octez-protocol-014-PtKathma-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3007,7 +3132,7 @@ opam:octez-protocol-014-PtKathma-libs:
   retry: 2
 
 opam:octez-protocol-015-PtLimaPt-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3034,8 +3159,10 @@ opam:octez-protocol-015-PtLimaPt-libs:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3073,7 +3200,7 @@ opam:octez-protocol-015-PtLimaPt-libs:
   retry: 2
 
 opam:octez-protocol-016-PtMumbai-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3100,8 +3227,10 @@ opam:octez-protocol-016-PtMumbai-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3139,7 +3268,7 @@ opam:octez-protocol-016-PtMumbai-libs:
   retry: 2
 
 opam:octez-protocol-017-PtNairob-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3166,8 +3295,10 @@ opam:octez-protocol-017-PtNairob-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3205,7 +3336,7 @@ opam:octez-protocol-017-PtNairob-libs:
   retry: 2
 
 opam:octez-protocol-018-Proxford-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3232,8 +3363,10 @@ opam:octez-protocol-018-Proxford-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3271,7 +3404,7 @@ opam:octez-protocol-018-Proxford-libs:
   retry: 2
 
 opam:octez-protocol-019-PtParisB-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3298,8 +3431,10 @@ opam:octez-protocol-019-PtParisB-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3337,7 +3472,7 @@ opam:octez-protocol-019-PtParisB-libs:
   retry: 2
 
 opam:octez-protocol-alpha-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3364,8 +3499,10 @@ opam:octez-protocol-alpha-libs:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3403,7 +3540,7 @@ opam:octez-protocol-alpha-libs:
   retry: 2
 
 opam:octez-protocol-compiler:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3430,8 +3567,10 @@ opam:octez-protocol-compiler:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3469,7 +3608,7 @@ opam:octez-protocol-compiler:
   retry: 2
 
 opam:octez-proxy-server:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3496,8 +3635,10 @@ opam:octez-proxy-server:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3535,7 +3676,7 @@ opam:octez-proxy-server:
   retry: 2
 
 opam:octez-riscv-api:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3562,8 +3703,10 @@ opam:octez-riscv-api:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3601,7 +3744,7 @@ opam:octez-riscv-api:
   retry: 2
 
 opam:octez-riscv-pvm:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3628,8 +3771,10 @@ opam:octez-riscv-pvm:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3667,7 +3812,7 @@ opam:octez-riscv-pvm:
   retry: 2
 
 opam:octez-rpc-process:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3694,8 +3839,10 @@ opam:octez-rpc-process:
     when: delayed
     start_in: 3 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3733,7 +3880,7 @@ opam:octez-rpc-process:
   retry: 2
 
 opam:octez-rust-deps:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3760,8 +3907,10 @@ opam:octez-rust-deps:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3799,7 +3948,7 @@ opam:octez-rust-deps:
   retry: 2
 
 opam:octez-shell-libs:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3826,8 +3975,10 @@ opam:octez-shell-libs:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3865,7 +4016,7 @@ opam:octez-shell-libs:
   retry: 2
 
 opam:octez-signer:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3892,8 +4043,10 @@ opam:octez-signer:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3931,7 +4084,7 @@ opam:octez-signer:
   retry: 2
 
 opam:octez-smart-rollup-node:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3958,8 +4111,10 @@ opam:octez-smart-rollup-node:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -3997,7 +4152,7 @@ opam:octez-smart-rollup-node:
   retry: 2
 
 opam:octez-smart-rollup-node-Proxford:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4024,8 +4179,10 @@ opam:octez-smart-rollup-node-Proxford:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4063,7 +4220,7 @@ opam:octez-smart-rollup-node-Proxford:
   retry: 2
 
 opam:octez-smart-rollup-node-PtNairob:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4090,8 +4247,10 @@ opam:octez-smart-rollup-node-PtNairob:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4129,7 +4288,7 @@ opam:octez-smart-rollup-node-PtNairob:
   retry: 2
 
 opam:octez-smart-rollup-node-PtParisB:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4156,8 +4315,10 @@ opam:octez-smart-rollup-node-PtParisB:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4195,7 +4356,7 @@ opam:octez-smart-rollup-node-PtParisB:
   retry: 2
 
 opam:octez-smart-rollup-node-alpha:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4222,8 +4383,10 @@ opam:octez-smart-rollup-node-alpha:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4261,7 +4424,7 @@ opam:octez-smart-rollup-node-alpha:
   retry: 2
 
 opam:octez-smart-rollup-node-lib:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4288,8 +4451,10 @@ opam:octez-smart-rollup-node-lib:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4327,7 +4492,7 @@ opam:octez-smart-rollup-node-lib:
   retry: 2
 
 opam:octez-smart-rollup-wasm-debugger:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4354,8 +4519,10 @@ opam:octez-smart-rollup-wasm-debugger:
     when: delayed
     start_in: 1 minute
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4393,7 +4560,7 @@ opam:octez-smart-rollup-wasm-debugger:
   retry: 2
 
 opam:octez-smart-rollup-wasm-debugger-lib:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4420,8 +4587,10 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4459,7 +4628,7 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   retry: 2
 
 opam:octez-smart-rollup-wasm-debugger-plugin:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4486,8 +4655,10 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     when: delayed
     start_in: 7 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4525,7 +4696,7 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   retry: 2
 
 opam:octez-version:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4552,8 +4723,10 @@ opam:octez-version:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4591,7 +4764,7 @@ opam:octez-version:
   retry: 2
 
 opam:tezos-benchmark:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4618,8 +4791,10 @@ opam:tezos-benchmark:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4657,7 +4832,7 @@ opam:tezos-benchmark:
   retry: 2
 
 opam:tezos-client-demo-counter:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4684,8 +4859,10 @@ opam:tezos-client-demo-counter:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4723,7 +4900,7 @@ opam:tezos-client-demo-counter:
   retry: 2
 
 opam:tezos-client-genesis:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4750,8 +4927,10 @@ opam:tezos-client-genesis:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4789,7 +4968,7 @@ opam:tezos-client-genesis:
   retry: 2
 
 opam:tezos-dac-client-lib:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4816,8 +4995,10 @@ opam:tezos-dac-client-lib:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4855,7 +5036,7 @@ opam:tezos-dac-client-lib:
   retry: 2
 
 opam:tezos-dac-lib:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4882,8 +5063,10 @@ opam:tezos-dac-lib:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4921,7 +5104,7 @@ opam:tezos-dac-lib:
   retry: 2
 
 opam:tezos-dac-node-lib:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4948,8 +5131,10 @@ opam:tezos-dac-node-lib:
     when: delayed
     start_in: 2 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -4987,7 +5172,7 @@ opam:tezos-dac-node-lib:
   retry: 2
 
 opam:tezos-dal-node-lib:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5014,8 +5199,10 @@ opam:tezos-dal-node-lib:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5053,7 +5240,7 @@ opam:tezos-dal-node-lib:
   retry: 2
 
 opam:tezos-dal-node-services:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5080,8 +5267,10 @@ opam:tezos-dal-node-services:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5119,7 +5308,7 @@ opam:tezos-dal-node-services:
   retry: 2
 
 opam:tezos-openapi:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5146,8 +5335,10 @@ opam:tezos-openapi:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5185,7 +5376,7 @@ opam:tezos-openapi:
   retry: 2
 
 opam:tezos-protocol-000-Ps9mPmXa:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5212,8 +5403,10 @@ opam:tezos-protocol-000-Ps9mPmXa:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5251,7 +5444,7 @@ opam:tezos-protocol-000-Ps9mPmXa:
   retry: 2
 
 opam:tezos-protocol-001-PtCJ7pwo:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5278,8 +5471,10 @@ opam:tezos-protocol-001-PtCJ7pwo:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5317,7 +5512,7 @@ opam:tezos-protocol-001-PtCJ7pwo:
   retry: 2
 
 opam:tezos-protocol-002-PsYLVpVv:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5344,8 +5539,10 @@ opam:tezos-protocol-002-PsYLVpVv:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5383,7 +5580,7 @@ opam:tezos-protocol-002-PsYLVpVv:
   retry: 2
 
 opam:tezos-protocol-003-PsddFKi3:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5410,8 +5607,10 @@ opam:tezos-protocol-003-PsddFKi3:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5449,7 +5648,7 @@ opam:tezos-protocol-003-PsddFKi3:
   retry: 2
 
 opam:tezos-protocol-004-Pt24m4xi:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5476,8 +5675,10 @@ opam:tezos-protocol-004-Pt24m4xi:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5515,7 +5716,7 @@ opam:tezos-protocol-004-Pt24m4xi:
   retry: 2
 
 opam:tezos-protocol-005-PsBABY5H:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5542,8 +5743,10 @@ opam:tezos-protocol-005-PsBABY5H:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5581,7 +5784,7 @@ opam:tezos-protocol-005-PsBABY5H:
   retry: 2
 
 opam:tezos-protocol-005-PsBabyM1:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5608,8 +5811,10 @@ opam:tezos-protocol-005-PsBabyM1:
     when: delayed
     start_in: 4 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5647,7 +5852,7 @@ opam:tezos-protocol-005-PsBabyM1:
   retry: 2
 
 opam:tezos-protocol-006-PsCARTHA:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5674,8 +5879,10 @@ opam:tezos-protocol-006-PsCARTHA:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5713,7 +5920,7 @@ opam:tezos-protocol-006-PsCARTHA:
   retry: 2
 
 opam:tezos-protocol-007-PsDELPH1:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5740,8 +5947,10 @@ opam:tezos-protocol-007-PsDELPH1:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5779,7 +5988,7 @@ opam:tezos-protocol-007-PsDELPH1:
   retry: 2
 
 opam:tezos-protocol-008-PtEdo2Zk:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5806,8 +6015,10 @@ opam:tezos-protocol-008-PtEdo2Zk:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5845,7 +6056,7 @@ opam:tezos-protocol-008-PtEdo2Zk:
   retry: 2
 
 opam:tezos-protocol-008-PtEdoTez:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5872,8 +6083,10 @@ opam:tezos-protocol-008-PtEdoTez:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5911,7 +6124,7 @@ opam:tezos-protocol-008-PtEdoTez:
   retry: 2
 
 opam:tezos-protocol-009-PsFLoren:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5938,8 +6151,10 @@ opam:tezos-protocol-009-PsFLoren:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -5977,7 +6192,7 @@ opam:tezos-protocol-009-PsFLoren:
   retry: 2
 
 opam:tezos-protocol-010-PtGRANAD:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6004,8 +6219,10 @@ opam:tezos-protocol-010-PtGRANAD:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6043,7 +6260,7 @@ opam:tezos-protocol-010-PtGRANAD:
   retry: 2
 
 opam:tezos-protocol-011-PtHangz2:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6070,8 +6287,10 @@ opam:tezos-protocol-011-PtHangz2:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6109,7 +6328,7 @@ opam:tezos-protocol-011-PtHangz2:
   retry: 2
 
 opam:tezos-protocol-012-Psithaca:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6136,8 +6355,10 @@ opam:tezos-protocol-012-Psithaca:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6175,7 +6396,7 @@ opam:tezos-protocol-012-Psithaca:
   retry: 2
 
 opam:tezos-protocol-013-PtJakart:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6202,8 +6423,10 @@ opam:tezos-protocol-013-PtJakart:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6241,7 +6464,7 @@ opam:tezos-protocol-013-PtJakart:
   retry: 2
 
 opam:tezos-protocol-014-PtKathma:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6268,8 +6491,10 @@ opam:tezos-protocol-014-PtKathma:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6307,7 +6532,7 @@ opam:tezos-protocol-014-PtKathma:
   retry: 2
 
 opam:tezos-protocol-015-PtLimaPt:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6334,8 +6559,10 @@ opam:tezos-protocol-015-PtLimaPt:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6373,7 +6600,7 @@ opam:tezos-protocol-015-PtLimaPt:
   retry: 2
 
 opam:tezos-protocol-016-PtMumbai:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6400,8 +6627,10 @@ opam:tezos-protocol-016-PtMumbai:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6439,7 +6668,7 @@ opam:tezos-protocol-016-PtMumbai:
   retry: 2
 
 opam:tezos-protocol-017-PtNairob:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6466,8 +6695,10 @@ opam:tezos-protocol-017-PtNairob:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6505,7 +6736,7 @@ opam:tezos-protocol-017-PtNairob:
   retry: 2
 
 opam:tezos-protocol-018-Proxford:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6532,8 +6763,10 @@ opam:tezos-protocol-018-Proxford:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6571,7 +6804,7 @@ opam:tezos-protocol-018-Proxford:
   retry: 2
 
 opam:tezos-protocol-019-PtParisB:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6598,8 +6831,10 @@ opam:tezos-protocol-019-PtParisB:
     when: delayed
     start_in: 5 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6637,7 +6872,7 @@ opam:tezos-protocol-019-PtParisB:
   retry: 2
 
 opam:tezos-protocol-alpha:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6664,8 +6899,10 @@ opam:tezos-protocol-alpha:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6703,7 +6940,7 @@ opam:tezos-protocol-alpha:
   retry: 2
 
 opam:tezos-protocol-demo-counter:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6730,8 +6967,10 @@ opam:tezos-protocol-demo-counter:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6769,7 +7008,7 @@ opam:tezos-protocol-demo-counter:
   retry: 2
 
 opam:tezos-protocol-demo-noops:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6796,8 +7035,10 @@ opam:tezos-protocol-demo-noops:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6835,7 +7076,7 @@ opam:tezos-protocol-demo-noops:
   retry: 2
 
 opam:tezos-protocol-genesis:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6862,8 +7103,10 @@ opam:tezos-protocol-genesis:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6901,7 +7144,7 @@ opam:tezos-protocol-genesis:
   retry: 2
 
 opam:tezos-proxy-server-config:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6928,8 +7171,10 @@ opam:tezos-proxy-server-config:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -6967,7 +7212,7 @@ opam:tezos-proxy-server-config:
   retry: 2
 
 opam:tezt-tezos:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6994,8 +7239,10 @@ opam:tezt-tezos:
     when: delayed
     start_in: 6 minutes
   needs:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   dependencies:
+  - oc.docker:opam-repository:amd64
   - opam:prepare
   cache:
   - key: opam-sccache
@@ -7033,13 +7280,14 @@ opam:tezt-tezos:
   retry: 2
 
 kaitai_checks:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7080,13 +7328,14 @@ kaitai_e2e_checks:
     2>/dev/null
 
 oc.check_lift_limits_patch:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7103,13 +7352,14 @@ oc.check_lift_limits_patch:
     CARGO_NET_OFFLINE: "false"
 
 oc.misc_checks:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -7121,13 +7371,14 @@ oc.misc_checks:
   - etherlink/scripts/check_evm_store_migrations.sh check
 
 oc.python_check:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -7136,13 +7387,14 @@ oc.python_check:
   - ./scripts/ci/lint_misc_python_check.sh
 
 oc.ocaml_fmt:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -7152,13 +7404,14 @@ oc.ocaml_fmt:
   - dune build --profile=dev @fmt
 
 misc_opam_checks:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -7180,16 +7433,18 @@ oc.semgrep:
   - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 oc.integration:compiler-rejections:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7203,13 +7458,14 @@ oc.integration:compiler-rejections:
     CARGO_NET_OFFLINE: "false"
 
 oc.script:test-gen-genesis:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - eval $(opam env)
   - cd scripts/gen-genesis
@@ -7217,13 +7473,14 @@ oc.script:test-gen-genesis:
   - dune build gen_genesis.exe
 
 oc.script:snapshot_alpha_and_link:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7238,16 +7495,18 @@ oc.script:snapshot_alpha_and_link:
     CARGO_NET_OFFLINE: "false"
 
 oc.script:test_octez_release_versions:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -7256,13 +7515,14 @@ oc.script:test_octez_release_versions:
   - ./scripts/test_octez_release_version.sh
 
 oc.script:b58_prefix:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
@@ -7272,16 +7532,18 @@ oc.script:b58_prefix:
   - poetry run pytest scripts/b58_prefix/test_b58_prefix.py
 
 oc.test-liquidity-baking-scripts:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   dependencies:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   before_script:
@@ -7417,16 +7679,18 @@ test_evm_compatibility:
     CARGO_NET_OFFLINE: "false"
 
 oc.unit:non-proto-x86_64:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7455,16 +7719,18 @@ oc.unit:non-proto-x86_64:
   retry: 2
 
 oc.unit:other-x86_64:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7493,16 +7759,18 @@ oc.unit:other-x86_64:
   retry: 2
 
 oc.unit:proto-x86_64:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7531,16 +7799,18 @@ oc.unit:proto-x86_64:
   retry: 2
 
 oc.unit:non-proto-arm64:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_arm64
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:arm64
   - oc.build_arm64-released
   - oc.build_arm64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7567,16 +7837,18 @@ oc.unit:non-proto-arm64:
   parallel: 2
 
 oc.unit:webassembly-x86_64:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   timeout: 20 minutes
   before_script:
   - . ./scripts/version.sh
@@ -7585,16 +7857,18 @@ oc.unit:webassembly-x86_64:
   - make test-webassembly
 
 oc.unit:js_components:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -7607,16 +7881,18 @@ oc.unit:js_components:
   retry: 2
 
 oc.unit:protocol_compiles:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -7630,32 +7906,36 @@ oc.unit:protocol_compiles:
     CARGO_NET_OFFLINE: "false"
 
 de.unit:x86_64:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: always
   needs:
+  - oc.docker:opam-repository:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - eval $(opam env)
   script:
   - dune runtest data-encoding
 
 de.unit:arm64:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_arm64
   rules:
   - when: always
   needs:
+  - oc.docker:opam-repository:arm64
   - oc.build_arm64-released
   - oc.build_arm64-exp-dev-extra
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   before_script:
   - eval $(opam env)
   script:
@@ -7786,19 +8066,21 @@ oc.compile_sources_mantic:
     CARGO_NET_OFFLINE: "false"
 
 tezt:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_tezt
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
@@ -7843,19 +8125,21 @@ tezt:
   parallel: 60
 
 tezt-memory-3k:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_tezt
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
@@ -7900,19 +8184,21 @@ tezt-memory-3k:
   parallel: 6
 
 tezt-memory-4k:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_tezt
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
@@ -7957,19 +8243,21 @@ tezt-memory-4k:
   parallel: 4
 
 tezt-time-sensitive:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_tezt
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
@@ -8013,19 +8301,21 @@ tezt-time-sensitive:
   retry: 2
 
 tezt-slow:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_tezt
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
@@ -8066,19 +8356,21 @@ tezt-slow:
   parallel: 10
 
 tezt-flaky:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp_tezt
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
@@ -8122,18 +8414,20 @@ tezt-flaky:
   retry: 2
 
 tezt:static-binaries:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-exp-dev-extra
   - oc.build:static-x86_64-linux-binaries
   - oc.tezt:fetch-records
   dependencies:
+  - oc.docker:opam-repository:amd64
   - select_tezts
   - oc.build_x86_64-exp-dev-extra
   - oc.build:static-x86_64-linux-binaries
@@ -8206,13 +8500,14 @@ oc.install_python_bullseye:
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
 documentation:odoc:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: doc
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -8231,13 +8526,14 @@ documentation:odoc:
     when: always
 
 documentation:manuals:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: doc
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -8257,13 +8553,14 @@ documentation:manuals:
     - docs/user/node-config.json
 
 documentation:docgen:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: doc
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -8284,17 +8581,19 @@ documentation:docgen:
     - docs/shell/p2p_api.rst
 
 documentation:build_all:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: doc
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - documentation:odoc
   - documentation:manuals
   - documentation:docgen
   dependencies:
+  - oc.docker:opam-repository:amd64
   - documentation:odoc
   - documentation:manuals
   - documentation:docgen
@@ -8310,17 +8609,19 @@ documentation:build_all:
     expose_as: Documentation - excluding old protocols
 
 documentation:linkcheck:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: doc
   tags:
   - gcp
   rules:
   - when: on_success
   needs:
+  - oc.docker:opam-repository:amd64
   - documentation:manuals
   - documentation:docgen
   - documentation:build_all
   dependencies:
+  - oc.docker:opam-repository:amd64
   - documentation:manuals
   - documentation:docgen
   - documentation:build_all
