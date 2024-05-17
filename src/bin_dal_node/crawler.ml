@@ -146,5 +146,6 @@ let start ~name ~chain ~reconnection_delay ~l1_blocks_cache_size
 let finalized_heads_stream {finalized_heads; _} =
   Lwt_stream.clone finalized_heads.stream
 
-let finalized_heads_status {finalized_heads; _} =
-  Lwt.state finalized_heads.iter_heads_promise
+let shutdown {finalized_heads = {stream_push; iter_heads_promise; _}; _} =
+  stream_push None ;
+  Lwt.cancel iter_heads_promise

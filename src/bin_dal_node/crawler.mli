@@ -22,7 +22,7 @@ type t
 
     The [last_notified_level] parameter indicates the level of the last notified
     finalized block, to start catching-up starting from that level. The function
-    enforces the value to be at least equal to 1. If no level is given, the
+    enforces the value to be at least equal to 0. If no level is given, the
     function starts catching-up from the current level - 2.*)
 val start :
   name:string ->
@@ -38,6 +38,6 @@ val start :
 val finalized_heads_stream :
   t -> (Block_hash.t * Block_header.shell_header) Lwt_stream.t
 
-(** [finalized_heads_status t] returns the status of the current finalized heads
-    monitoring loop as an [Lwt.state] value. *)
-val finalized_heads_status : t -> unit tzresult Lwt.state
+(** [shutdown t] shuts down the stream of finalized heads and cancels the monad
+    instance of {!iter_heads} that populates the stream. *)
+val shutdown : t -> unit
