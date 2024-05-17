@@ -1,14 +1,28 @@
+# FIXME: the release stage will download the artifacts from all of the build matrix jobs
+# If GitLab CI end up allowing variable expansion in needs:parallel:matrix we will be able to specify:
+#  needs:
+#    - job: build
+#      artifacts: true
+#      parallel:
+#        matrix:
+#          - ARCH: ${ARCH}
+#            OCTEZ_BRANCH: ${OCTEZ_BRANCH}
+# Until then, we rename artifacts so that {archiver,server}/main.exe are located under a ${ARCH}-${OCTEZ_BRANCH}
+# Jobs that need artifacts from build will have to download artifacts from ALL build jobs
+# but use only the files located in the right ${ARCH}-${OCTEZ_BRANCH} directory.
+
 stages:
   - build
   - deploy
   - docker
   - manifest
 
+.supported-OCTEZ_BRANCH: &supported-OCTEZ_BRANCH ["octez-v20.0-rc1", "master"]
+
 .default_matrix: &default_matrix
-    matrix:
-      # - ARCH: ["amd64", "arm64"]
-      - ARCH: ["amd64"]
-        OCTEZ_BRANCH: ["octez-v20.0-rc1", "master"]
+  matrix:
+    - ARCH: ["amd64"]
+      OCTEZ_BRANCH: *supported-OCTEZ_BRANCH
 
 fmt:
   stage: build
@@ -20,8 +34,7 @@ fmt:
 build:
   stage: build
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
-  parallel:
-    *default_matrix
+  parallel: *default_matrix
   tags:
     - ${ARCH}
   variables:
@@ -35,311 +48,90 @@ build:
   script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
-    # why ledgerwallet.0.3.0 - see https://gitlab.com/tezos/tezos/-/merge_requests/11656
-    # - if [ "$OCTEZ_BRANCH" == "v19.0" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
-    # - if [ "$OCTEZ_BRANCH" == "v18.1" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
-    - opam-2.1 install -y caqti.2.0.1 caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
+    - opam-2.1 install -y caqti caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
     - dune build archiver/main.exe server/main.exe
-
-
+    - mkdir -p ./${ARCH}-${OCTEZ_BRANCH}/{archiver,server}
+    - cp --parents {archiver,server}/main.exe ./${ARCH}-${OCTEZ_BRANCH}/
   artifacts:
     name: binaries-${ARCH}-${OCTEZ_BRANCH}
     expire_in: 1 week
     paths:
-      - archiver/main.exe
-      - server/main.exe
+      - ./${ARCH}-${OCTEZ_BRANCH}/archiver/main.exe
+      - ./${ARCH}-${OCTEZ_BRANCH}/server/main.exe
+
+.needs-build:
+  parallel: *default_matrix
+  needs:
+    - job: build
+      artifacts: true
+  before_script:
+    - ls -R ./${ARCH}-${OCTEZ_BRANCH}
+    - mv ./${ARCH}-${OCTEZ_BRANCH}/archiver/main.exe ./archiver/
+    - mv ./${ARCH}-${OCTEZ_BRANCH}/server/main.exe ./server/
 
 # to release specific package version, create a (gitlab) tag on branch main
-.release:
+release:
+  stage: deploy
   image: alpine
+  extends: .needs-build
+  before_script:
+    - !reference [.needs-build, before_script]
+    - apk add zip
+    - apk add curl
   script:
-    - 'apk add zip'
-    - 'apk add curl'
-    - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:=latest}/${ARCHIVE}"'
+    - zip ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip archiver/main.exe server/main.exe
+    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:=latest}/${ARCHIVE}"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG != null
 
-# TODO requires differentiating artifacts, left for later
-# release:
-#   stage: deploy
-#   extends: .release
-#   parallel:
-#     *default_matrix
-#   needs: 
-#     - job: build
-#       artifacts: true
-#       parallel:
-#         *default_matrix       
-#   variables:
-#     ARCHIVE: "binaries-${ARCH}-${OCTEZ_BRANCH}.zip"
+.docker-rules:
+  rules:
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_REGISTRY_IMAGE
+      when: manual
+      allow_failure: true
 
-
-# release:amd64:v18.1:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [amd64, v18.1]"]
-#   variables:
-#     ARCHIVE: "binaries-amd64-v18.1.zip"
-
-# release:amd64:v19.0:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [amd64, v19.0]"]
-#   variables:
-#     ARCHIVE: "binaries-amd64-v19.0.zip"
-
-release:amd64:octez-v20.0-rc1:
-  stage: deploy
-  extends: .release
-  dependencies: ["build: [amd64, octez-v20.0-rc1]"]
-  variables:
-    ARCHIVE: "binaries-amd64-octez-v20.0-rc1.zip"
-
-
-
-release:amd64:master:
-  stage: deploy
-  extends: .release
-  dependencies: ["build: [amd64, master]"]
-  variables:
-    ARCHIVE: "binaries-amd64-master.zip"
-
-# release:amd64:v19.1:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [amd64, v19.1]"]
-#   variables:
-#     ARCHIVE: "binaries-amd64-v19.1.zip"
-
-# release:arm64:v18.1:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [arm64, v18.1]"]
-#   variables:
-#     ARCHIVE: "binaries-arm64-v18.1.zip"
-
-# release:arm64:v19.0:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [arm64, v19.0]"]
-#   variables:
-#     ARCHIVE: "binaries-arm64-v19.0.zip"
-
-# release:arm64:octez-v20.0-rc1:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [arm64, octez-v20.0-rc1]"]
-#   variables:
-#     ARCHIVE: "binaries-arm64-octez-v20.0-rc1.zip"
-
-# release:arm64:v19.1:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [arm64, v19.1]"]
-#   variables:
-#     ARCHIVE: "binaries-arm64-v19.1.zip"
-
-
-# release:arm64:master:
-#   stage: deploy
-#   extends: .release
-#   dependencies: ["build: [arm64, master]"]
-#   variables:
-#     ARCHIVE: "binaries-arm64-master.zip"
-
-
-.docker:
+docker:
   image: docker
   stage: docker
+  extends:
+    - .needs-build
+    - .docker-rules
   tags:
     - devops
     - ${ARCH}
   before_script:
+    - !reference [.needs-build, before_script]
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - echo ${CI_REGISTRY_IMAGE}/{server,archiver}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
   script:
     - docker build -t ${CI_REGISTRY_IMAGE}/server-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} -f Dockerfile.server .
     - docker build -t ${CI_REGISTRY_IMAGE}/archiver-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} -f Dockerfile.archiver .
-
-.docker-push:
-  extends: .docker
-  script:
-    - !reference [.docker, script]
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker push ${CI_REGISTRY_IMAGE}/server-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
     - docker push ${CI_REGISTRY_IMAGE}/archiver-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-  rules:
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: never
-    - if: $CI_REGISTRY_IMAGE
-      when: manual
-      allow_failure: true
 
-# TODO requires differentiating artifacts, left for later
-# docker:
-#   extends: .docker-push
-#   parallel:
-#     *default_matrix
-#   needs: 
-#     - job: build
-#       artifacts: true
-#       parallel:
-#         *default_matrix
-
-# docker:amd64:v18.1:
-#   extends: .docker-push
-#   dependencies: ["build: [amd64, v18.1]"]
-#   variables:
-#     ARCH: "amd64"
-#     OCTEZ_BRANCH: "v18.1"
-
-# docker:amd64:v19.0:
-#   extends: .docker-push
-#   dependencies: ["build: [amd64, v19.0]"]
-#   variables:
-#     ARCH: "amd64"
-#     OCTEZ_BRANCH: "v19.0"
-
-docker:amd64:octez-v20.0-rc1:
-  extends: .docker-push
-  dependencies: ["build: [amd64, octez-v20.0-rc1]"]
-  variables:
-    ARCH: "amd64"
-    OCTEZ_BRANCH: "octez-v20.0-rc1"
-
-# docker:amd64:v19.1:
-#   extends: .docker-push
-#   dependencies: ["build: [amd64, v19.1]"]
-#   variables:
-#     ARCH: "amd64"
-#     OCTEZ_BRANCH: "v19.1"
-
-docker:amd64:master:
-  extends: .docker-push
-  dependencies: ["build: [amd64, master]"]
-  variables:
-    ARCH: "amd64"
-    OCTEZ_BRANCH: "master"
-
-# docker:arm64:v18.1:
-#   extends: .docker-push
-#   dependencies: ["build: [arm64, v18.1]"]
-#   variables:
-#     ARCH: "arm64"
-#     OCTEZ_BRANCH: "v18.1"
-
-# docker:arm64:v19.0:
-#   extends: .docker-push
-#   dependencies: ["build: [arm64, v19.0]"]
-#   variables:
-#     ARCH: "arm64"
-#     OCTEZ_BRANCH: "v19.0"
-
-# docker:arm64:octez-v20.0-rc1:
-#   extends: .docker-push
-#   dependencies: ["build: [arm64, octez-v20.0-rc1]"]
-#   variables:
-#     ARCH: "arm64"
-#     OCTEZ_BRANCH: "octez-v20.0-rc1"
-
-# docker:arm64:v19.1:
-#   extends: .docker-push
-#   dependencies: ["build: [arm64, v19.1]"]
-#   variables:
-#     ARCH: "arm64"
-#     OCTEZ_BRANCH: "v19.1"
-
-# docker:arm64:master:
-#   extends: .docker-push
-#   dependencies: ["build: [arm64, master]"]
-#   variables:
-#     ARCH: "arm64"
-#     OCTEZ_BRANCH: "master"
-
-# Create multiarch manifest 
-.manifest:
-  stage: manifest
+# Create multiarch manifest
+manifest:
+  stage: docker
   image: docker
+  parallel:
+    matrix:
+      - OCTEZ_BRANCH: *supported-OCTEZ_BRANCH
+  extends:
+    - .docker-rules
   tags:
     - devops
+  needs:
+    - job: docker
+      artifacts: false
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    # - docker manifest create ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 arm64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/server-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest create ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/server-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest push ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-    # - docker manifest create ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 arm64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/archiver-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest create ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/archiver-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest push ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-  rules:
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: never
-    - if: $CI_REGISTRY_IMAGE
-      when: manual
-      allow_failure: true
-
-# TODO requires differentiating artifacts, left for later
-# manifest:
-#   extends: .manifest
-#   parallel:
-#     *default_matrix
-#   needs: 
-#     - job: build
-#       artifacts: true
-#       parallel:
-#         *default_matrix
-
-# manifest:v18.1:
-#   extends: .manifest
-#   needs:
-#     - job: "docker:amd64:v18.1"
-#       artifacts: false
-#     - job: "docker:arm64:v18.1"
-#       artifacts: false
-#   variables:
-#     OCTEZ_BRANCH: "v18.1"
-
-# manifest:v19.0:
-#   extends: .manifest
-#   needs:
-#     - job: "docker:amd64:v19.0"
-#       artifacts: false
-#     - job: "docker:arm64:v19.0"
-#       artifacts: false
-#   variables:
-#     OCTEZ_BRANCH: "v19.0"
-
-manifest:octez-v20.0-rc1:
-  extends: .manifest
-  needs:
-    - job: "docker:amd64:octez-v20.0-rc1"
-      artifacts: false
-    # - job: "docker:arm64:octez-v20.0-rc1"
-    #   artifacts: false
-  variables:
-    OCTEZ_BRANCH: "octez-v20.0-rc1"
-
-# manifest:v19.1:
-#   extends: .manifest
-#   needs:
-#     - job: "docker:amd64:v19.1"
-#       artifacts: false
-#     - job: "docker:arm64:v19.1"
-#       artifacts: false
-#   variables:
-#     OCTEZ_BRANCH: "v19.1"
-
-manifest:master:
-  extends: .manifest
-  needs:
-    - job: "docker:amd64:master"
-      artifacts: false
-    # - job: "docker:arm64:master"
-    #   artifacts: false
-  variables:
-    OCTEZ_BRANCH: "master"
