@@ -68,29 +68,27 @@ module Slots : sig
 
   type t
 
-  (** [add_slot_by_commitment store cryptobox slot_content commitment]
+  (** [add_slot_by_commitment store ~slot_size slot_content commitment]
       adds a mapping from the given commitment to the given slot
-      content. The given cryptobox is only used to get the size of the
-      slot content, no cryptographic verification is performed by this
-      function. *)
+      content. *)
   val add_slot_by_commitment :
     t ->
-    Cryptobox.t ->
+    slot_size:int ->
     bytes ->
     commitment ->
     (unit, [> Errors.other]) result Lwt.t
 
-  (** [exists_slot_by_commitment store cryptobox commitment] returns
+  (** [exists_slot_by_commitment store ~slot_size commitment] returns
       true IFF a slot is associated to the given commitment. *)
   val exists_slot_by_commitment :
-    t -> Cryptobox.t -> commitment -> (bool, [> Errors.other]) result Lwt.t
+    t -> slot_size:int -> commitment -> (bool, [> Errors.other]) result Lwt.t
 
-  (** [find_slot_by_commitment store cryptobox commitment] returns the
-      slot associated to some commitment or [Error `Not_found] if no
-      slot is associated. *)
+  (** [find_slot_by_commitment store ~slot_size commitment] returns
+      the slot associated to some commitment or [Error `Not_found] if
+      no slot is associated. *)
   val find_slot_by_commitment :
     t ->
-    Cryptobox.t ->
+    slot_size:int ->
     commitment ->
     (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 

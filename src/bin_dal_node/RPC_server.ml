@@ -157,7 +157,7 @@ module Slots_handlers = struct
             let padding = String.make (slot_size - slot_length) query#padding in
             Ok (Bytes.of_string (slot ^ padding))
         in
-        let* commitment = Slot_manager.add_slot store slot cryptobox in
+        let* commitment = Slot_manager.commit_slot slot cryptobox in
         let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
         let* () =
           Slot_manager.add_commitment_shards

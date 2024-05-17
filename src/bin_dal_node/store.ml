@@ -191,9 +191,8 @@ module Slots = struct
     let root_dir = Filename.concat node_store_dir slot_store_dir in
     KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
 
-  let add_slot_by_commitment t cryptobox slot commitment =
+  let add_slot_by_commitment t ~slot_size slot commitment =
     let open Lwt_result_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let* () =
       KVS.write_value
         ~override:true
@@ -207,18 +206,16 @@ module Slots = struct
     let*! () = Event.(emit stored_slot_content commitment) in
     return_unit
 
-  let exists_slot_by_commitment t cryptobox commitment =
+  let exists_slot_by_commitment t ~slot_size commitment =
     let open Lwt_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let+ res = KVS.value_exists t file_layout (commitment, slot_size) () in
     trace_decoding_error
       ~data_kind:Types.Store.Slot
       ~tztrace_of_error:Fun.id
       res
 
-  let find_slot_by_commitment t cryptobox commitment =
+  let find_slot_by_commitment t ~slot_size commitment =
     let open Lwt_result_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let*! res = KVS.read_value t file_layout (commitment, slot_size) () in
     let data_kind = Types.Store.Slot in
     match res with

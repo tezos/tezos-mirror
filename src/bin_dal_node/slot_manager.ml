@@ -167,7 +167,7 @@ let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
 
 let get_slot_content_from_shards cryptobox store slot_id commitment =
   let open Lwt_result_syntax in
-  let {Cryptobox.number_of_shards; redundancy_factor; _} =
+  let {Cryptobox.number_of_shards; redundancy_factor; slot_size; _} =
     Cryptobox.parameters cryptobox
   in
   let minimal_number_of_shards = number_of_shards / redundancy_factor in
@@ -191,7 +191,7 @@ let get_slot_content_from_shards cryptobox store slot_id commitment =
   let* () =
     Store.Slots.add_slot_by_commitment
       store.Store.slots
-      cryptobox
+      ~slot_size
       slot
       commitment
   in
@@ -201,8 +201,9 @@ let get_slot_content_from_shards cryptobox store slot_id commitment =
 let get_slot ~reconstruct_if_missing cryptobox store slot_id commitment =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
+  let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
-    Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
+    Store.Slots.find_slot_by_commitment store.Store.slots ~slot_size commitment
   in
   match res_slot_store with
   | Ok slot -> return slot
@@ -242,23 +243,10 @@ let commit cryptobox polynomial =
 
 (* Main functions *)
 
-let add_slot node_store slot cryptobox =
+let commit_slot slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let*? commitment = commit cryptobox polynomial in
-  let* exists =
-    Store.(
-      Slots.exists_slot_by_commitment node_store.slots cryptobox commitment)
-  in
-  let* () =
-    if exists then return_unit
-    else
-      Store.Slots.add_slot_by_commitment
-        node_store.slots
-        cryptobox
-        slot
-        commitment
-  in
   return commitment
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
@@ -365,8 +353,8 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
 (** This function publishes the shards of a commitment that is waiting
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
-    proto_parameters commitment slot_id =
+let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
+    gs_worker proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
   match
     Store.Shard_proofs_cache.find_opt
@@ -402,6 +390,34 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
       let* () =
         Store.(Shards.write_all node_store.shards slot_id shards)
         |> Errors.to_tzresult
+      in
+      let* () =
+        let* exists =
+          Store.(
+            Slots.exists_slot_by_commitment
+              node_store.slots
+              ~slot_size
+              commitment)
+          |> Errors.to_tzresult
+        in
+        let* () =
+          if exists then return_unit
+          else
+            match
+              Store.Slot_cache.find_opt
+                node_store.not_yet_published_slots
+                commitment
+            with
+            | Some slot ->
+                Store.Slots.add_slot_by_commitment
+                  ~slot_size
+                  node_store.slots
+                  slot
+                  commitment
+                |> Errors.to_tzresult
+            | None -> return_unit
+        in
+        return_unit
       in
       publish_proved_shards
         slot_id
