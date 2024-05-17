@@ -48,3 +48,32 @@ export dal_srsu_g2_sha=e7fbe747ae3648a5b664d8f8bd7c524996f7ed07f3331f905d2e73767
 
 ## Other variables, used both in Makefile and scripts
 export COVERAGE_OUTPUT=_coverage_output
+
+##
+## Image artifact repositories
+##
+
+# GCP registry
+#
+#  - Locally, it will point to the protected registry.
+#  - In the CI, on protected (resp. unprotected) refs, it will point
+#    to the protected (resp. unprotected) registry.
+#
+# See also the description of this variable in 'ci/bin/main.ml'.
+export GCP_REGISTRY="${GCP_REGISTRY:-us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry}"
+
+# Unprotected GCP Artifact Registry
+export GCP_PUBLIC_REGISTRY='us-central1-docker.pkg.dev/nl-gitlab-runner/registry'
+
+##
+## Image names
+##
+
+# By default, points to the versions in GCP_REGISTRY. Thus by default,
+# local image builds use images produced either locally, or on the
+# CI's protected refs. CI image builds pushes to and pulls from protected
+# (resp. unprotected) images on protected (resp. unprotected) refs.
+
+export build_deps_image_name="${GCP_REGISTRY}/tezos/tezos/opam-repository"
+
+export rust_toolchain_image_name="${GCP_REGISTRY}/tezos/tezos/rust-toolchain"
