@@ -60,20 +60,20 @@ let proved_shards_encoding =
   obj2 (req "shards" shards_encoding) (req "proofs" shards_proofs_encoding)
 
 let amplify node_store node_ctxt cryptobox commitment precomputation
-    ~published_level ~slot_index ~number_of_already_stored_shards
+    (slot_id : Types.slot_id) ~number_of_already_stored_shards
     ~number_of_needed_shards ~number_of_shards gs_worker proto_parameters =
   let open Lwt_result_syntax in
   let*! () =
     Event.(
       emit
         reconstruct_started
-        ( published_level,
-          slot_index,
+        ( slot_id.slot_level,
+          slot_id.slot_index,
           number_of_already_stored_shards,
           number_of_shards ))
   in
   let shards =
-    Store.(Shards.read_all node_store.shards commitment ~number_of_shards)
+    Store.(Shards.read_all node_store.shards slot_id ~number_of_shards)
     |> Seq_s.filter_map (function
            | _, index, Ok share -> Some Cryptobox.{index; share}
            | _ -> None)
@@ -157,14 +157,13 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
       let*! () = Lwt_io.close oc_parent in
       let*? shards, shard_proofs = res in
       let* () =
-        Store.(Shards.write_all node_store.shards commitment shards)
+        Store.(Shards.write_all node_store.shards slot_id shards)
         |> Errors.to_tzresult
       in
       Store.cache_shard_proofs node_store commitment shard_proofs ;
       let* () =
         Slot_manager.publish_proved_shards
-          ~published_level
-          ~slot_index
+          slot_id
           ~level_committee:(Node_context.fetch_committee node_ctxt)
           proto_parameters
           commitment
@@ -173,12 +172,13 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
           gs_worker
       in
       let*! () =
-        Event.(emit reconstruct_finished (published_level, slot_index))
+        Event.(
+          emit reconstruct_finished (slot_id.slot_level, slot_id.slot_index))
       in
       return_unit
 
-let try_amplification (node_store : Store.t) commitment ~published_level
-    ~slot_index gs_worker node_ctxt =
+let try_amplification (node_store : Store.t) commitment
+    (slot_id : Types.slot_id) gs_worker node_ctxt =
   let open Lwt_result_syntax in
   match Node_context.get_status node_ctxt with
   | Starting ->
@@ -190,7 +190,9 @@ let try_amplification (node_store : Store.t) commitment ~published_level
          yet. *)
       let*! () =
         Event.(
-          emit reconstruct_missing_prover_srs (published_level, slot_index))
+          emit
+            reconstruct_missing_prover_srs
+            (slot_id.slot_level, slot_id.slot_index))
       in
       return_unit
   | Ready
@@ -205,10 +207,7 @@ let try_amplification (node_store : Store.t) commitment ~published_level
       let redundancy_factor = dal_parameters.redundancy_factor in
       let number_of_needed_shards = number_of_shards / redundancy_factor in
       let* number_of_already_stored_shards =
-        Store.Shards.count_values node_store.shards commitment
-      in
-      let slot_id : Types.slot_id =
-        {slot_level = published_level; slot_index}
+        Store.Shards.count_values node_store.shards slot_id
       in
       (* There are two situations where we don't want to reconstruct:
          if we don't have enough shards or if we already have all the
@@ -225,7 +224,9 @@ let try_amplification (node_store : Store.t) commitment ~published_level
           ~on_error:
             Event.(
               fun err ->
-                emit reconstruct_error (published_level, slot_index, err))
+                emit
+                  reconstruct_error
+                  (slot_id.slot_level, slot_id.slot_index, err))
         @@ fun () ->
         (* Wait a random delay between 1 and 2 seconds before starting
            the reconstruction; this is to give some slack to receive
@@ -242,20 +243,22 @@ let try_amplification (node_store : Store.t) commitment ~published_level
           Event.(
             emit
               reconstruct_starting_in
-              (published_level, slot_index, random_delay))
+              (slot_id.slot_level, slot_id.slot_index, random_delay))
         in
         let*! () = Lwt_unix.sleep random_delay in
         (* Count again the stored shards because we may have received
            more shards during the random delay. *)
         let* number_of_already_stored_shards =
-          Store.Shards.count_values node_store.shards commitment
+          Store.Shards.count_values node_store.shards slot_id
         in
         (* If we have received all the shards while waiting the random
            delay, there is no point in reconstructing anymore *)
         if number_of_already_stored_shards = number_of_shards then
           let*! () =
             Event.(
-              emit reconstruct_no_missing_shard (published_level, slot_index))
+              emit
+                reconstruct_no_missing_shard
+                (slot_id.slot_level, slot_id.slot_index))
           in
           return_unit
         else
@@ -265,8 +268,7 @@ let try_amplification (node_store : Store.t) commitment ~published_level
             cryptobox
             commitment
             precomputation
-            ~published_level
-            ~slot_index
+            slot_id
             ~number_of_already_stored_shards
             ~number_of_needed_shards
             ~number_of_shards

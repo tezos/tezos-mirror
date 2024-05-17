@@ -21,45 +21,46 @@ module Value_size_hooks : sig
 end
 
 module Shards : sig
-  (** A shard of some commitment consist in a shard index (a number
+  (** A shard of some slot id consist in a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a
       share. The shard store is a mapping associating 0 or 1 share to
-      each (commitment, shard index) pair.  *)
+      each (slot_id, shard index) pair.  *)
 
   type t
 
-  (** [are_shards_available store commitment shard_indices] returns
+  (** [are_shards_available store slot_id shard_indices] returns
       true IFF a share is stored for each given shard index of the
-      given commitment.  *)
-  val are_shards_available : t -> commitment -> int list -> bool tzresult Lwt.t
+      given slot id.  *)
+  val are_shards_available :
+    t -> Types.slot_id -> int list -> bool tzresult Lwt.t
 
-  (** [write_all store commitment shards] adds to the shard store all the given
-      shards of the given commitment. *)
+  (** [write_all store slot_id shards] adds to the shard store all the given
+      shards of the given slot id. *)
   val write_all :
-    t -> commitment -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
+    t -> Types.slot_id -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
-  (** [read store commitment shard_id] gets the shard associated to
-    [commitment] at the range [shard_id]. *)
+  (** [read store slot_id shard_id] gets the shard associated to
+    [slot_id] at the range [shard_id]. *)
   val read :
     t ->
-    Cryptobox.commitment ->
+    Types.slot_id ->
     int ->
     (Cryptobox.shard, [> Errors.not_found | Errors.other]) result Lwt.t
 
-  (** Same as [read_values] but for all possible shards of the given commitment. *)
+  (** Same as [read_values] but for all possible shards of the given slot id. *)
   val read_all :
     t ->
-    commitment ->
+    Types.slot_id ->
     number_of_shards:int ->
-    (commitment * int * share tzresult) Seq_s.t
+    (Types.slot_id * int * share tzresult) Seq_s.t
 
-  (** [count_values store commitment] returns the number of shards
-      which are stored for the given commitment. *)
-  val count_values : t -> commitment -> int tzresult Lwt.t
+  (** [count_values store slot_id] returns the number of shards
+      which are stored for the given slot id. *)
+  val count_values : t -> Types.slot_id -> int tzresult Lwt.t
 
-  (** [remove store commitment] removes the shards associated to the given
-      commitment from the store *)
-  val remove : t -> commitment -> unit tzresult Lwt.t
+  (** [remove store slot_id] removes the shards associated to the given
+      slot id from the store *)
+  val remove : t -> Types.slot_id -> unit tzresult Lwt.t
 end
 
 module Slots : sig

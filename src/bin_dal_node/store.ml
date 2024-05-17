@@ -93,17 +93,19 @@ module Value_size_hooks = struct
 end
 
 module Shards = struct
-  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
+  type nonrec t = (Types.slot_id, int, Cryptobox.share) KVS.t
 
-  let file_layout ~root_dir commitment =
+  let file_layout ~root_dir (slot_id : Types.slot_id) =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
 
        Make Key-Value store layout resilient to crypto parameters change.  Also,
        putting a value not far from the real number of shards allows saving disk
        storage. *)
     let number_of_shards = 4096 in
-    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-    let filepath = Filename.concat root_dir commitment_string in
+    let slot_id_string =
+      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    in
+    let filepath = Filename.concat root_dir slot_id_string in
     Key_value_store.layout
       ~encoded_value_size:(Value_size_hooks.share_size ())
       ~encoding:Cryptobox.share_encoding
@@ -115,17 +117,13 @@ module Shards = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
-  let are_shards_available store commitment shard_indexes =
-    List.for_all_es
-      (KVS.value_exists store file_layout commitment)
-      shard_indexes
+  let are_shards_available store slot_id shard_indexes =
+    List.for_all_es (KVS.value_exists store file_layout slot_id) shard_indexes
 
-  let write_all shards_store commitment shards =
+  let write_all shards_store slot_id shards =
     let open Lwt_result_syntax in
     let shards =
-      Seq.map
-        (fun {Cryptobox.index; share} -> (commitment, index, share))
-        shards
+      Seq.map (fun {Cryptobox.index; share} -> (slot_id, index, share)) shards
     in
     let* () =
       KVS.write_values shards_store file_layout shards
@@ -133,9 +131,12 @@ module Shards = struct
     in
     let*! () =
       List.of_seq shards
-      |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
+      |> Lwt_list.iter_s (fun (_slot_id, index, _share) ->
              Dal_metrics.shard_stored () ;
-             Event.(emit stored_slot_shard (commitment, index)))
+             Event.(
+               emit
+                 stored_slot_shard
+                 (slot_id.slot_level, slot_id.slot_index, index)))
     in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
 
@@ -143,25 +144,24 @@ module Shards = struct
     *)
     return_unit
 
-  let read_all shards_store commitment ~number_of_shards =
+  let read_all shards_store slot_id ~number_of_shards =
     Seq.ints 0
     |> Seq.take_while (fun x -> x < number_of_shards)
-    |> Seq.map (fun shard_index -> (commitment, shard_index))
+    |> Seq.map (fun shard_index -> (slot_id, shard_index))
     |> KVS.read_values shards_store file_layout
 
-  let read store commitment shard_id =
+  let read store slot_id shard_id =
     let open Lwt_result_syntax in
-    let*! res = KVS.read_value store file_layout commitment shard_id in
+    let*! res = KVS.read_value store file_layout slot_id shard_id in
     let data_kind = Types.Store.Shard in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
-  let count_values store commitment =
-    KVS.count_values store file_layout commitment
+  let count_values store slot_id = KVS.count_values store file_layout slot_id
 
-  let remove store commitment = KVS.remove_file store file_layout commitment
+  let remove store slot_id = KVS.remove_file store file_layout slot_id
 
   let init node_store_dir shard_store_dir =
     let root_dir = Filename.concat node_store_dir shard_store_dir in

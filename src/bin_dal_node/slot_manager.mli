@@ -130,8 +130,7 @@ val add_commitment_shards :
 
 (** This function publishes the given shards and their proofs. *)
 val publish_proved_shards :
-  published_level:int32 ->
-  slot_index:int ->
+  Types.slot_id ->
   level_committee:
     (level:int32 ->
     Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
@@ -153,8 +152,7 @@ val publish_slot_data :
   Gossipsub.Worker.t ->
   Dal_plugin.proto_parameters ->
   Cryptobox.commitment ->
-  int32 ->
-  int ->
+  Types.slot_id ->
   unit tzresult Lwt.t
 
 (** [store_slot_headers ~number_of_slots ~block_level ~block_hash slot_headers

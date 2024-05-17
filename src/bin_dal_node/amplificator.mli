@@ -32,8 +32,7 @@
 val try_amplification :
   Store.t ->
   Cryptobox.Commitment.t ->
-  published_level:int32 ->
-  slot_index:int ->
+  Types.slot_id ->
   Gossipsub.Worker.t ->
   Node_context.t ->
   unit tzresult Lwt.t
