@@ -25,35 +25,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Transaction hash size is 32 bytes. *)
 let transaction_hash_size = 32
 
-(** Translate an int in a binary string of two bytes (little endian).
-    Ints greater than 2 bytes are truncated. *)
 let u16_to_bytes n =
   let bytes = Bytes.make 2 'a' in
   Bytes.set_uint16_le bytes 0 n ;
   Bytes.to_string bytes
 
-(** Ethereum data, as Hex-encoded strings *)
 type hex = Hex of string [@@ocaml.unboxed]
 
 (** Appends the [0x] prefix to a string. *)
 let hex_to_string (Hex s) = "0x" ^ s
 
-(** Strips the [0x] prefix of a string. *)
 let hex_of_string s =
   if String.starts_with ~prefix:"0x" s then
     let n = String.length s in
     Hex (String.sub s 2 (n - 2))
   else Hex s
 
-(** [hex_to_bytes hex] transforms the [hex] to binary format. *)
 let hex_to_bytes (Hex h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
 let hex_encoding = Data_encoding.(conv hex_to_string hex_of_string string)
 
-(** Ethereum address (20 bytes) *)
 type address = Address of hex [@@ocaml.unboxed]
 
 let address_of_string s = Address (hex_of_string (String.lowercase_ascii s))
@@ -63,8 +56,6 @@ let address_to_string (Address a) = hex_to_string a
 let address_encoding =
   Data_encoding.(conv address_to_string address_of_string string)
 
-(** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
-    compatible with the kernel. *)
 let timestamp_to_bytes timestamp =
   let seconds = Time.Protocol.to_seconds timestamp in
   let buffer = Bytes.make 8 '\000' in
@@ -75,7 +66,6 @@ let timestamp_of_bytes timestamp_bytes =
   let timestamp_64 = Bytes.get_int64_le timestamp_bytes 0 in
   Time.Protocol.of_seconds timestamp_64
 
-(** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
 
 let quantity_of_z z = Qty z
@@ -90,7 +80,6 @@ let quantity_encoding =
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
-(** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
 let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
@@ -106,7 +95,6 @@ let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
 let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
 module Block_parameter = struct
-  (** Ethereum block params in RPCs. *)
   type t = Number of quantity | Earliest | Latest | Pending
 
   let pp fmt = function
@@ -149,7 +137,6 @@ module Block_parameter = struct
            (fun () -> Pending));
       ]
 
-  (** Extended block parameter defined in https://eips.ethereum.org/EIPS/eip-1898. *)
   type extended =
     | Block_parameter of t
     | Block_hash of {hash : block_hash; require_canonical : bool}
@@ -194,19 +181,12 @@ module Block_parameter = struct
       ]
 end
 
-(** Ethereum hash, that would encoded with a 0x prefix. *)
 type hash = Hash of hex [@@ocaml.unboxed]
 
-(** [hash_of_string s] takes a string [s] representing a hash in
-    hexadecimal format, e.g. [0xFFFFFFF]. Strips the prefix and keeps the
-    hash value, e.g. [FFFFFFF]. *)
 let hash_of_string s = Hash (hex_of_string s)
 
-(** [hash_to_string h] constructs a valid hash encoded in hexadecimal format,
-    e.g. [0xFFFFFFF]. *)
 let hash_to_string (Hash h) = hex_to_string h
 
-(** [hash_to_bytes hash] transforms the [hash] to binary format. *)
 let hash_to_bytes (Hash h) = hex_to_bytes h
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
@@ -215,27 +195,17 @@ let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
 
 let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
 
-let empty_hash = Hash (Hex "")
-
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 
 let encode_hex (Hex hex) = Hex.to_bytes_exn (`Hex hex)
 
 let decode_block_hash bytes = Block_hash (decode_hex bytes)
 
-let encode_block_hash (Block_hash hash) = encode_hex hash
-
 let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
-
-let decode_number_be bytes =
-  Bytes.fold_left (fun acc c -> (acc lsl 8) + Char.code c) 0 bytes
-  |> Z.of_int |> quantity_of_z
-
-let encode_number (Qty v) = Z.to_bits v |> Bytes.of_string
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
@@ -250,10 +220,6 @@ let pad_to_n_bytes_le bytes length =
 let encode_u256_le (Qty n) =
   let bits = Z.to_bits n |> Bytes.of_string in
   pad_to_n_bytes_le bits 32
-
-let encode_u16_le (Qty n) =
-  let bits = Z.to_bits n |> Bytes.of_string in
-  pad_to_n_bytes_le bits 2
 
 type transaction_log = {
   address : address;
@@ -665,7 +631,6 @@ let block_transactions_encoding =
         (fun txs -> TxFull txs);
     ]
 
-(** Ethereum block hash representation from RPCs. *)
 type block = {
   number : quantity;
   hash : block_hash;
@@ -1046,8 +1011,6 @@ module Address = struct
   let to_string = address_to_string
 
   let of_string = address_of_string
-
-  let encoding = address_encoding
 end
 
 module AddressMap = MapMake (Address)
@@ -1072,7 +1035,6 @@ let hash_raw_tx str =
   str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
   |> Bytes.to_string
 
-(** [transaction_nonce bytes] returns the nonce of a given raw transaction. *)
 let transaction_nonce bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
@@ -1099,7 +1061,6 @@ let transaction_nonce bytes =
         nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
-(** [transaction_data bytes] returns the data of a given raw transaction. *)
 let transaction_data bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
@@ -1122,7 +1083,6 @@ let transaction_data bytes =
     | Ok (Rlp.List [_; _; _; _; _; Value data; _; _; _]) -> return data
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
-(** [transaction_gas_limit bytes] returns the gas limit of a given raw transaction. *)
 let transaction_gas_limit bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
@@ -1149,8 +1109,6 @@ let transaction_gas_limit bytes =
         gas_limit
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
-(** [transaction_gas_price base_fee bytes] returns the maximum gas price the
-    user can pay for the tx. *)
 let transaction_gas_price bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
@@ -1185,8 +1143,6 @@ let transaction_gas_price bytes =
         return gas_price
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9")
 
-(* Event filter, see
-   https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs *)
 type filter_topic = One of hash | Or of hash list
 
 let filter_topic_encoding =
@@ -1287,8 +1243,6 @@ module Delayed_transaction = struct
     raw : string;
         (* Binary string, so that it integrates smoothly with the tx-pool. *)
   }
-
-  let hash t = t.hash
 
   let encoding_kind =
     let open Data_encoding in
@@ -1444,14 +1398,6 @@ module Blueprint_applied = struct
         let hash = decode_block_hash hash in
         Some {number; hash}
     | _ -> None
-
-  let of_bytes bytes =
-    match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
-
-  let to_bytes {number; hash} =
-    let number = encode_number number in
-    let hash = encode_block_hash hash in
-    Rlp.(encode (List [Value number; Value hash]))
 
   let encoding =
     let open Data_encoding in
