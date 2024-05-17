@@ -7,6 +7,7 @@ stages:
 - test
 - packaging
 - doc
+- manual
 
 oc.docker:client-libs-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -7760,3 +7761,11 @@ documentation:linkcheck:
   script:
   - make -C docs redirectcheck
   - make -C docs linkcheck
+
+trigger:debian_repository:
+  stage: manual
+  rules:
+  - when: always
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/debian_repository.yml
