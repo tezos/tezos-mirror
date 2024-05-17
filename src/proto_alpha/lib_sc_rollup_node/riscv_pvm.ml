@@ -14,6 +14,8 @@ type repo = Context.repo
 
 type tree = Context.tree
 
+module State = Riscv_context.PVMState
+module Backend = Octez_risc_v_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
 module type Serializable_state_S = sig
@@ -160,31 +162,31 @@ let kind = Sc_rollup.Kind.Riscv
 
 let get_tick state =
   let open Lwt_syntax in
-  let* state = decode state in
-  Lwt.return (Sc_rollup.Tick.of_z state.Sc_rollup_riscv.tick)
+  let* tick = Backend.get_tick state in
+  Lwt.return (Sc_rollup.Tick.of_z tick)
 
-type status = Riscv_dummy_status
+type status = Backend.status
 
-let get_status ~is_reveal_enabled:_ _state = Lwt.return Riscv_dummy_status
+let get_status ~is_reveal_enabled:_ state = Backend.get_status state
 
-let string_of_status Riscv_dummy_status = "riscv_dummy_status"
+let string_of_status status = Backend.string_of_status status
 
 let get_outbox _level _state = Lwt.return []
 
-(* It is safe to pass the [is_reveal_enabled_predicate]:
-   [eval_many] always stops at the beginning of a new Tezos block,
-   so no execution of several Tezos block inboxes is possible. *)
-(* Copied from [arith_pvm.ml]. *)
-let eval_many ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled
+let eval_many ~reveal_builtins:_ ~write_debug ~is_reveal_enabled:_
     ?stop_at_snapshot ~max_steps initial_state =
-  ignore stop_at_snapshot ;
-  ignore max_steps ;
-  ignore is_reveal_enabled ;
-  Lwt.return (initial_state, 0L)
+  let debug_printer =
+    match write_debug with
+    | Tezos_scoru_wasm.Builtins.Noop -> None
+    | Tezos_scoru_wasm.Builtins.Printer p -> Some p
+  in
+  Backend.compute_step_many
+    ?stop_at_snapshot
+    ?write_debug:debug_printer
+    ~max_steps
+    initial_state
 
 let new_dissection = Game_helpers.default_new_dissection
-
-module State = Riscv_context.PVMState
 
 module Inspect_durable_state = struct
   let lookup _state _keys =
