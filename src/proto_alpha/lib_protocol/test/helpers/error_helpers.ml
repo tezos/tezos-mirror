@@ -53,3 +53,14 @@ let expect_inconsistent_counters_int ~loc ~source ~previous_counter ~counter
     Manager_counter.Internal_for_tests.of_int previous_counter
   in
   expect_inconsistent_counters ~loc ~source ~previous_counter ~counter errs
+
+(** To be used as the [expect_failure] argument of
+    {!Incremental.add_operation} when expecting the
+    [Guest_operation_wrong_source] error. *)
+let expect_guest_operation_wrong_source ~loc ~guest ~unexpected_source errs =
+  Assert.expect_error ~loc errs (function
+      | [Guest_operation_wrong_source {guest = g; source}] ->
+          Signature.Public_key_hash.(
+            g = Account.pkh_of_contract_exn guest
+            && source = Account.pkh_of_contract_exn unexpected_source)
+      | _ -> false)
