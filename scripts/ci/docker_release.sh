@@ -6,8 +6,13 @@ set -eu
 # 'before_script'.
 . scripts/ci/docker.env
 
-build_deps_image_name=${build_deps_image_name:?"build_deps_image_name is unset"}
-build_deps_image_version=${build_deps_image_version:?"build_deps_image_version is unset"}
+# Note: 'opam_repository_image_name' is set in the variables section
+# of the top-level .gitlab-ci.yml.
+build_deps_image_name=${opam_repository_image_name:?"opam_repository_image_name: is unset"}
+# Note: 'opam_repository_image_tag' is dynamically set by an incoming
+# dotenv file from the job that produces the build_deps_image image
+# (currently: 'oc.docker:opam-repository:*')
+build_deps_image_version=${opam_repository_image_tag:?"opam_repository_image_tag: is unset"}
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
