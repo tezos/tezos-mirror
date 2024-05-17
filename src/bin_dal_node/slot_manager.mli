@@ -136,7 +136,8 @@ val publish_proved_shards :
     (level:int32 ->
     Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
   Dal_plugin.proto_parameters ->
-  (Cryptobox.commitment * int * Cryptobox.share tzresult) Seq_s.t ->
+  Cryptobox.commitment ->
+  Cryptobox.shard Seq.t ->
   Cryptobox.shard_proof array ->
   Gossipsub.Worker.t ->
   unit tzresult Lwt.t
