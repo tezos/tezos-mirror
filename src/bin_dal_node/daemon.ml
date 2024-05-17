@@ -486,16 +486,20 @@ module Handler = struct
     in
     return_unit
 
-  (* Monitor heads and store *finalized* published slot headers indexed by block
-     hash. A slot header is considered finalized when it is in a block with at
-     least two other blocks on top of it, as guaranteed by Tenderbake. Note that
-     this means that shard propagation is delayed by two levels with respect to
-     the publication level of the corresponding slot header. *)
-  let new_head ctxt cctxt =
+  (* Monitor finalized heads and store *finalized* published slot headers
+     indexed by block hash. A slot header is considered finalized when it is in
+     a block with at least two other blocks on top of it, as guaranteed by
+     Tenderbake. Note that this means that shard propagation is delayed by two
+     levels with respect to the publication level of the corresponding slot
+     header. *)
+  let new_head ctxt cctxt crawler =
     let open Lwt_result_syntax in
-    let handler _stopper (_head_hash, (header : Tezos_base.Block_header.t)) =
+    let stream = Crawler.finalized_heads_stream crawler in
+    let rec loop () =
       match Node_context.get_status ctxt with
-      | Starting -> return_unit
+      | Starting ->
+          let*! () = Lwt_unix.sleep 1. in
+          loop ()
       | Ready ready_ctxt -> (
           let Node_context.
                 {
@@ -509,65 +513,72 @@ module Handler = struct
                 } =
             ready_ctxt
           in
-          let head_level = header.shell.level in
-          let* () =
-            Node_context.may_add_plugin
-              ctxt
-              cctxt
-              ~proto_level:header.shell.proto_level
-              ~block_level:head_level
-          in
-          let*? (module PluginHead) =
-            Node_context.get_plugin_for_level ctxt ~level:head_level
-          in
-          let*? head_round = PluginHead.get_round header.shell.fitness in
-          Dal_metrics.new_layer1_head ~head_level ;
-          Dal_metrics.new_layer1_head_round ~head_round ;
-          Gossipsub.Worker.Validate_message_hook.set
-            (gossipsub_app_messages_validation
-               ctxt
-               cryptobox
-               head_level
-               proto_parameters.attestation_lag) ;
-          let*! () =
-            remove_old_level_slots_and_shards proto_parameters ctxt head_level
-          in
-          let process_block =
-            process_block
-              ctxt
-              cctxt
-              proto_parameters
-              skip_list_cells_store
-              head_level
-          in
-          match last_processed_level with
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6849
-             Depending on the profile, also process blocks in the past, that is,
-             when [last_processed_level < head_level - 3]. *)
-          | Some last_processed_level
-            when Int32.(sub head_level last_processed_level = 3l) ->
-              (* Then the block at level [last_processed_level + 1] is final
-                 (not only its payload), therefore its DAL attestations are
-                 final. *)
-              process_block (Int32.succ last_processed_level)
-          | None ->
-              (* This is the first time we process a block. *)
-              if head_level > 3l then process_block (Int32.sub head_level 2l)
-              else
-                (* We do not process the block at level 1, as it will not contain DAL
-                   information, and it has no round. *)
-                return_unit
-          | Some _ ->
-              (* This case is unreachable, assuming [Monitor_services.heads] does not
-                 skip levels. *)
-              return_unit)
+          let*! next_final_head = Lwt_stream.get stream in
+          match next_final_head with
+          | None -> Lwt.fail_with "L1 crawler lib shut down"
+          | Some (_finalized__hash, finalized_shell_header) ->
+              let head_level = Int32.add finalized_shell_header.level 2l in
+              let* () =
+                Node_context.may_add_plugin
+                  ctxt
+                  cctxt
+                  ~proto_level:finalized_shell_header.proto_level
+                  ~block_level:finalized_shell_header.level
+              in
+              let*? (module PluginHead) =
+                Node_context.get_plugin_for_level ctxt ~level:head_level
+              in
+              Dal_metrics.new_layer1_head ~head_level ;
+              Gossipsub.Worker.Validate_message_hook.set
+                (gossipsub_app_messages_validation
+                   ctxt
+                   cryptobox
+                   head_level
+                   proto_parameters.attestation_lag) ;
+              let*! () =
+                remove_old_level_slots_and_shards
+                  proto_parameters
+                  ctxt
+                  head_level
+              in
+              let process_block =
+                process_block
+                  ctxt
+                  cctxt
+                  proto_parameters
+                  skip_list_cells_store
+                  head_level
+              in
+              let* () =
+                match last_processed_level with
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/6849
+                   Depending on the profile, also process blocks in the past, that is,
+                   when [last_processed_level < head_level - 3]. *)
+                | Some last_processed_level
+                  when Int32.(sub head_level last_processed_level = 3l) ->
+                    (* Then the block at level [last_processed_level + 1] is final
+                       (not only its payload), therefore its DAL attestations are
+                       final. *)
+                    process_block (Int32.succ last_processed_level)
+                | None ->
+                    (* This is the first time we process a block. *)
+                    if head_level > 3l then
+                      process_block (Int32.sub head_level 2l)
+                    else
+                      (* We do not process the block at level 1, as it will not contain DAL
+                         information, and it has no round. *)
+                      return_unit
+                | Some _ ->
+                    (* This case is unreachable, assuming [Monitor_services.heads] does not
+                       skip levels. *)
+                    return_unit
+              in
+              loop ())
     in
     let*! () = Event.(emit layer1_node_tracking_started ()) in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
         If the layer1 node reboots, the rpc stream breaks.*)
-    make_stream_daemon
-      handler
-      (Tezos_shell_services.Monitor_services.heads cctxt `Main)
+    loop ()
 end
 
 let daemonize handlers =
@@ -786,5 +797,5 @@ let run ~data_dir configuration_override =
       [Handler.resolve_plugin_and_set_ready config dal_config ctxt cctxt]
   in
   (* Start never-ending monitoring daemons *)
-  let* () = daemonize [Handler.new_head ctxt cctxt] in
+  let* () = daemonize [Handler.new_head ctxt cctxt crawler] in
   return_unit
