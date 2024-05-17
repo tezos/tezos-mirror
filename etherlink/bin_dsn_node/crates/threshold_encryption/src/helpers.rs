@@ -10,6 +10,7 @@ use chacha20::{
     ChaCha20,
 };
 use ff::Field;
+use rand::{CryptoRng, RngCore};
 use rlp::DecoderError;
 use sha3::{Digest, Keccak256};
 
@@ -48,6 +49,15 @@ pub fn elgamal_apply(input: &Bytes32, key: &G1Affine) -> Bytes32 {
 /// Hash to curve (H2C) for multiple inputs
 pub fn hash_to_g2(inputs: &[&[u8]]) -> G2Affine {
     G2Projective::hash_to_curve(&inputs.concat(), DOMAIN_SEPARATOR_TAG, &[]).into()
+}
+
+pub(crate) fn random_non_zero_scalar<R: RngCore + CryptoRng>(rng: &mut R) -> Scalar {
+    loop {
+        let alpha = Scalar::random(&mut *rng);
+        if (!alpha.is_zero()).into() {
+            return alpha;
+        }
+    }
 }
 
 /// Calculate Keccak256 hash digest (EVM compatible)
