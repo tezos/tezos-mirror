@@ -356,15 +356,15 @@ module Handler = struct
       || Profile_manager.is_attester_only_profile profile)
 
   let process_block ctxt cctxt proto_parameters skip_list_cells_store
-      block_level =
+      finalized_shell_header =
     let open Lwt_result_syntax in
+    let block_level = finalized_shell_header.Block_header.level in
     let block = `Level block_level in
     let pred_level = Int32.pred block_level in
     let*? (module PluginPred) =
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = PluginPred.block_info cctxt ~block ~metadata:`Always in
-    let shell_header = PluginPred.block_shell_header block_info in
     let* dal_constants =
       let*? (module PluginCurr) =
         Node_context.get_plugin_for_level ctxt ~level:block_level
@@ -478,7 +478,7 @@ module Handler = struct
     let*? () =
       Node_context.update_last_processed_level ctxt ~level:block_level
     in
-    let*? block_round = PluginPred.get_round shell_header.fitness in
+    let*? block_round = PluginPred.get_round finalized_shell_header.fitness in
     Dal_metrics.layer1_block_finalized ~block_level ;
     Dal_metrics.layer1_block_finalized_round ~block_round ;
     let*! () =
@@ -516,7 +516,7 @@ module Handler = struct
           let*! next_final_head = Lwt_stream.get stream in
           match next_final_head with
           | None -> Lwt.fail_with "L1 crawler lib shut down"
-          | Some (_finalized__hash, finalized_shell_header) ->
+          | Some (_finalized_hash, finalized_shell_header) ->
               let head_level = Int32.add finalized_shell_header.level 2l in
               let* () =
                 Node_context.may_add_plugin
@@ -551,7 +551,7 @@ module Handler = struct
                     cctxt
                     proto_parameters
                     skip_list_cells_store
-                    finalized_shell_header.level
+                    finalized_shell_header
               in
               loop ())
     in
