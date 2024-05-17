@@ -33,6 +33,7 @@ COPY --chown=tezos:nogroup dune tezos/dune
 COPY --chown=tezos:nogroup dune-workspace tezos/dune-workspace
 COPY --chown=tezos:nogroup dune-project tezos/dune-project
 COPY --chown=tezos:nogroup vendors tezos/vendors
+COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 ENV GIT_VERSION=${GIT_VERSION}
