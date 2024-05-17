@@ -50,7 +50,7 @@ but that you installed *development* dependencies
 Local work
 ----------
 
-The simplest way of using a new dependency on the Octez codebase when working 
+The simplest way of using a new dependency on the Octez codebase when working
 locally (i.e., on your own machine) is to install it using ``opam``.
 
 Because you have used ``make build-dev-deps`` in order to install the
@@ -132,12 +132,13 @@ In order to create the opam repository MR:
 - Push your branch.
 - Create the opam repository MR from this branch.
 
-You can test the MR locally using the command
+You can test the result by running the following command in your local copy of Octez:
 ``OPAM_REPOSITORY_TAG=<commit-id> make build-deps``. This will rebuild the
 dependencies locally using the ``<commit_id>`` of the opam-repository.
 
-Fourth, back in your local copy of Octez, **update the** ``opam_repository_tag``
-**variable in the** :src:`scripts/version.sh` **file**. Specifically, set it
+Fourth, in your local copy of Octez, **update the** ``opam_repository_tag``
+**variable in the** :src:`scripts/version.sh` **file**. (**NB**: do not confuse this variable with the ``full_opam_repository_tag`` variable.)
+Specifically, set it
 to the hash of your commit on the opam repository MR.
 Afterwards, you will also need to regenerate the GitLab CI configuration
 by running ``make -C ci`` from the root of the repository.
