@@ -108,7 +108,7 @@ the initial block. We talk about a *re-proposal* in this case.
 .. _finality_alpha:
 
 Transaction and block finality
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 A transaction is final as soon as the block including it has a confirmation (that is, a block on top of it).
 Indeed, as hinted above, a block contains the certification (that is, the attestation quorum) for the previous
@@ -123,7 +123,7 @@ confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
 Time between blocks
-~~~~~~~~~~~~~~~~~~~~~~~
+-------------------
 
 The time between blocks represents the difference between the timestamps of the blocks. The timestamp of a block is given by the beginning of the round at which the block has been agreed upon. Thus, the time between blocks depends on the round at which decisions are taken. For
 example, if the decision at the previous level was taken at round 4 and at the current level at round 2, then the current block's delay relative to
@@ -141,7 +141,7 @@ should be taken at round 0, meaning that the time between blocks would be
 .. _active_stake_alpha:
 
 Validator selection: staking balance, active stake, and frozen deposits
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------------------------------------------
 
 Validator selection is based on the stake, as in Emmy*, with the exception that
 it is based on the delegate's *active stake* instead of its *staking
@@ -254,7 +254,7 @@ deposit. However, a delegate can still be over-delegated, and it will be
 rewarded based on its active stake, not on its staking balance.
 
 Economic Incentives
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 As Emmy*, Tenderbake rewards participation in consensus and punishes bad
 behavior. Notable changes however are as follows:
@@ -411,6 +411,47 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _fitness_alpha:
+
+Fitness
+-------
+
+The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
+The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
+The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_alpha>`.
+In Emmy*, only the level mattered.
+But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
+Therefore the fitness also includes the block's round (as the fifth component).
+Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_alpha>`.
+Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
+Finally, to (partially) enforce :ref:`the rule on
+re-proposals<quorum_alpha>`, the fitness also includes, as the third
+component, the round at which a preattestation quorum was observed by
+the baker, if any (this component can therefore be empty). By the way,
+preattestations are present in a block if and only if the locked round
+component is non-empty and if so, the locked round has to match the
+round of the included preattestations.
+
+Next, we provide two examples of fitness values:
+``02::00001000::::ffffffff::00000000`` and
+``02::00001000::00000000::fffffffe::00000001`` (in the hexadecimal
+format that one may observe in the node's logs). These two values have
+the following components:
+
+- the 1st component, ``02``, is the fitness version;
+- the 2nd component, ``00001000``, is the block's level (level 4096);
+- the 3rd component is the block's locked round: empty in the first case, 0 in the second;
+- the 4th component is the round of the predecessor block, here 0 in the first case and 1 in the second case;
+- the 5th component is the block's round: 0 in the first case, 1 in the second case.
+
+We recall (see :ref:`shell_header`) that the fitness is, from the
+shell's perspective, a sequence of sequences of unsigned bytes and
+comparison is done first by the length of the sequence and then
+lexicographically (both for the outer sequence, and for each of the
+inner sequences). So the first fitness is smaller than the second one,
+because of the third component, the empty bitstring being smaller than
+any other bitstring.
+
 .. _cs_constants_alpha:
 
 Consensus related protocol parameters
@@ -449,68 +490,7 @@ Consensus related protocol parameters
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
      - 5
 
-These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
-
-.. _shell_proto_revisit_alpha:
-
-Shell-protocol interaction revisited
-------------------------------------
-
-.. FIXME tezos/tezos#3914:
-
-   Integrate protocol-specific block parts in the blocks and ops
-   entry.
-
-:ref:`Recall<shell_proto_interact_alpha>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
-Namely, these two notions are the protocol-specific header and the fitness.
-As in Emmy*, the protocol-specific header contains the fields:
-
-- ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
-- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_alpha>`, used to generate entropy on the chain
-- ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
-- ``liquidity_baking_toggle_vote``: :ref:`a vote<toggle_alpha>` to continue the Liquidity Baking Subsidy, stop it, or abstain.
-
-There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_alpha>`.
-
-.. _fitness_alpha:
-
-The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
-The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
-The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_alpha>`.
-In Emmy*, only the level mattered.
-But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
-Therefore the fitness also includes the block's round (as the fifth component).
-Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_alpha>`.
-Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
-Finally, to (partially) enforce :ref:`the rule on
-re-proposals<quorum_alpha>`, the fitness also includes, as the third
-component, the round at which a preattestation quorum was observed by
-the baker, if any (this component can therefore be empty). By the way,
-preattestations are present in a block if and only if the locked round
-component is non-empty and if so, the locked round has to match the
-round of the included preattestations.
-
-Next, we provide two examples of fitness values:
-``02::00001000::::ffffffff::00000000`` and
-``02::00001000::00000000::fffffffe::00000001`` (in the hexadecimal
-format that one may observe in the node's logs). These two values have
-the following components:
-
-- the 1st component, ``02``, is the fitness version;
-- the 2nd component, ``00001000``, is the block's level (level 4096);
-- the 3rd component is the block's locked round: empty in the first case, 0 in the second;
-- the 4th component is the round of the predecessor block, here 0 in the first case and 1 in the second case;
-- the 5th component is the block's round: 0 in the first case, 1 in the second case.
-
-We recall (see :ref:`shell_header`) that the fitness is, from the
-shell's perspective, a sequence of sequences of unsigned bytes and
-comparison is done first by the length of the sequence and then
-lexicographically (both for the outer sequence, and for each of the
-inner sequences). So the first fitness is smaller than the second one,
-because of the third component, the empty bitstring being smaller than
-any other bitstring.
-
-
+The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
 Further External Resources
 --------------------------
