@@ -1354,15 +1354,11 @@ let test_observer_applies_blueprint_when_restarted =
   unit
 
 let test_get_balance_block_param =
-  Protocol.register_test
-    ~__FILE__
+  register_both
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
-    ~uses
-  @@ fun protocol ->
-  let* {sequencer; sc_rollup_node; proxy; client; _} =
-    setup_sequencer ~time_between_blocks:Nothing protocol
-  in
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; sc_rollup_node; proxy; client; _} _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* _tx_hash =
@@ -1450,16 +1446,12 @@ let test_get_balance_block_param =
   unit
 
 let test_get_block_by_number_block_param =
-  Protocol.register_test
-    ~__FILE__
+  register_both
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
-    ~uses
-  @@ fun protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; observer; sc_rollup_node; proxy; client; _} _protocols ->
   let observer_offset = 3l in
-  let* {sequencer; observer; sc_rollup_node; proxy; client; _} =
-    setup_sequencer ~time_between_blocks:Nothing protocol
-  in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
     next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
@@ -1525,12 +1517,11 @@ let test_get_block_by_number_block_param =
   unit
 
 let test_extended_block_param =
-  Protocol.register_test
-    ~__FILE__
+  register_both
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
-    ~uses
-  @@ fun protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocols ->
   (*
      In this test we will deploy a counter contract, increments its counter
      at multiple consecutives blocks, and check the counter using block
@@ -1539,7 +1530,6 @@ let test_extended_block_param =
      both for read only RPCs such as [eth_getStorageAt] and simulation
      such as [eth_call].
   *)
-  let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
   let* () =
     Eth_cli.add_abi
       ~label:Solidity_contracts.counter.label
