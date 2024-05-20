@@ -18,9 +18,13 @@ pub trait ExecutionEnvironment {
 
     /// EE state type
     type State<M: Manager>: ExecutionEnvironmentState<M, ExecutionEnvironment = Self>;
+
+    /// Runtime configuration
+    type Config<'a>: Default;
 }
 
 /// Outcome of handling an ECALL
+#[derive(Debug)]
 pub enum EcallOutcome {
     /// Handling the ECALL ended in a fatal error
     Fatal { message: String },
@@ -46,6 +50,7 @@ pub trait ExecutionEnvironmentState<M: Manager> {
     fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
+        config: &mut <Self::ExecutionEnvironment as ExecutionEnvironment>::Config<'_>,
         exception: EnvironException,
     ) -> EcallOutcome;
 }

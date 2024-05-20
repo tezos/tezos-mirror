@@ -64,20 +64,25 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     }
 
     /// Handle an exception using the defined Execution Environment.
-    pub fn handle_exception(&mut self, exception: EnvironException) -> exec_env::EcallOutcome {
+    pub fn handle_exception(
+        &mut self,
+        config: &mut EE::Config<'_>,
+        exception: EnvironException,
+    ) -> exec_env::EcallOutcome {
         match exception {
             EnvironException::EnvCallFromUMode
             | EnvironException::EnvCallFromSMode
-            | EnvironException::EnvCallFromMMode => self
-                .exec_env_state
-                .handle_call(&mut self.machine_state, exception),
+            | EnvironException::EnvCallFromMMode => {
+                self.exec_env_state
+                    .handle_call(&mut self.machine_state, config, exception)
+            }
         }
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self) {
+    pub fn eval_one(&mut self, config: &mut EE::Config<'_>) {
         if let Err(exc) = self.machine_state.step() {
-            let _: exec_env::EcallOutcome = self.handle_exception(exc);
+            let _: exec_env::EcallOutcome = self.handle_exception(config, exc);
         }
     }
 
@@ -95,12 +100,21 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
-    pub fn eval_range(&mut self, step_bounds: &impl RangeBounds<usize>) -> usize {
-        self.eval_range_accum(step_bounds, 0)
+    pub fn eval_range(
+        &mut self,
+        config: &mut EE::Config<'_>,
+        step_bounds: &impl RangeBounds<usize>,
+    ) -> usize {
+        self.eval_range_accum(config, step_bounds, 0)
     }
 
     // Tail-recursive helper function for [step_many]
-    fn eval_range_accum(&mut self, step_bounds: &impl RangeBounds<usize>, accum: usize) -> usize {
+    fn eval_range_accum(
+        &mut self,
+        config: &mut EE::Config<'_>,
+        step_bounds: &impl RangeBounds<usize>,
+        accum: usize,
+    ) -> usize {
         let StepManyResult {
             mut steps,
             exception,
@@ -119,10 +133,10 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             // Exception was handled in a way that allows us to evaluate more.
             if let exec_env::EcallOutcome::Handled {
                 continue_eval: true,
-            } = self.handle_exception(exc)
+            } = self.handle_exception(config, exc)
             {
                 let steps_left = range_bounds_saturating_sub(step_bounds, steps);
-                return self.eval_range_accum(&steps_left, total_steps);
+                return self.eval_range_accum(config, &steps_left, total_steps);
             }
         }
 
@@ -148,6 +162,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<PvmSbi, M
 mod tests {
     use super::*;
     use crate::{
+        exec_env::pvm::PvmSbiConfig,
         machine_state::{
             bus::{main_memory::M1M, start_of_main_memory, Addressable},
             registers::{a0, a1, a2, a6, a7},
@@ -155,7 +170,10 @@ mod tests {
         state_backend::{memory_backend::InMemoryBackend, Backend},
     };
     use rand::{thread_rng, Fill};
-    use tezos_smart_rollup_constants::riscv::{SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT};
+    use std::mem;
+    use tezos_smart_rollup_constants::riscv::{
+        SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
+    };
 
     #[test]
     fn test_read_input() {
@@ -190,7 +208,8 @@ mod tests {
         assert_eq!(pvm.status(), PvmStatus::Evaluating);
 
         // Handle the ECALL successfully
-        let outcome = pvm.handle_exception(EnvironException::EnvCallFromUMode);
+        let outcome =
+            pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
         assert!(matches!(
             outcome,
             exec_env::EcallOutcome::Handled {
@@ -236,5 +255,52 @@ mod tests {
                 pvm.machine_state.bus.read(addr).unwrap()
             })
             .all(|b: u8| b == 0));
+    }
+
+    #[test]
+    fn test_write_debug() {
+        type ML = M1M;
+        type L = PvmLayout<PvmSbi, ML>;
+
+        let mut buffer = Vec::new();
+        let mut pvm_config = PvmSbiConfig::new(|c| buffer.push(c));
+
+        // Setup PVM
+        let (mut backend, placed) = InMemoryBackend::<L>::new();
+        let space = backend.allocate(placed);
+        let mut pvm = Pvm::<PvmSbi, ML, _>::bind(space);
+        pvm.reset();
+
+        // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
+        pvm.machine_state
+            .hart
+            .xregisters
+            .write(a7, SBI_CONSOLE_PUTCHAR);
+
+        // Write characters
+        let mut written = Vec::new();
+        for _ in 0..10 {
+            let char: u8 = rand::random();
+            pvm.machine_state.hart.xregisters.write(a0, char as u64);
+            written.push(char);
+
+            let outcome = pvm.handle_exception(&mut pvm_config, EnvironException::EnvCallFromUMode);
+            assert!(
+                matches!(
+                    outcome,
+                    exec_env::EcallOutcome::Handled {
+                        continue_eval: true
+                    }
+                ),
+                "Unexpected outcome: {outcome:?}"
+            );
+        }
+
+        // Drop `pvm_config` to regain access to the mutable references it kept
+        mem::drop(pvm_config);
+
+        // Compare what characters have been passed to the hook verrsus what we
+        // intended to write
+        assert_eq!(written, buffer);
     }
 }
