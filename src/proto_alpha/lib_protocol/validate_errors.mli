@@ -205,6 +205,7 @@ module Manager : sig
       }
     | Guest_hosted_twice of {guest : public_key_hash}
     | Guest_is_sponsor of public_key_hash
+    | Guest_incorrect_reveal_position of {guest : public_key_hash}
 end
 
 type error += Failing_noop_error

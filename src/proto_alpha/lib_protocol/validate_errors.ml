@@ -1114,6 +1114,7 @@ module Manager = struct
       }
     | Guest_hosted_twice of {guest : public_key_hash}
     | Guest_is_sponsor of public_key_hash
+    | Guest_incorrect_reveal_position of {guest : public_key_hash}
 
   let () =
     register_error_kind
@@ -1192,8 +1193,8 @@ module Manager = struct
       (fun (source, previous_counter, counter) ->
         Inconsistent_counters {source; previous_counter; counter}) ;
     let incorrect_reveal_description =
-      "Incorrect reveal operation position in batch: only allowed in first \
-       position."
+      "Incorrect reveal operation position in batch: revelation of the fee \
+       payer's public key is only allowed in first position."
     in
     register_error_kind
       `Permanent
@@ -1335,7 +1336,29 @@ module Manager = struct
       Data_encoding.(
         obj1 (req "sponsor_and_guest" Signature.Public_key_hash.encoding))
       (function Guest_is_sponsor pkh -> Some pkh | _ -> None)
-      (fun pkh -> Guest_is_sponsor pkh)
+      (fun pkh -> Guest_is_sponsor pkh) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.guest_incorrect_reveal_position"
+      ~title:"Incorrect guest reveal position"
+      ~description:
+        "Incorrect position of a Reveal operation for a guest in the sponsored \
+         batch. A guest Reveal operation is only allowed as the first \
+         operation from this guest, that is, right after the Host operation \
+         introducing this guest."
+      ~pp:(fun ppf guest ->
+        Format.fprintf
+          ppf
+          "Incorrect position of a Reveal operation for guest %a in the \
+           sponsored batch. A guest Reveal operation is only allowed as the \
+           first operation from this guest, that is, right after the Host \
+           operation introducing this guest."
+          Signature.Public_key_hash.pp
+          guest)
+      Data_encoding.(obj1 (req "guest" Signature.Public_key_hash.encoding))
+      (function
+        | Guest_incorrect_reveal_position {guest} -> Some guest | _ -> None)
+      (fun guest -> Guest_incorrect_reveal_position {guest})
 end
 
 type error += Failing_noop_error

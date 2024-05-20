@@ -1923,7 +1923,13 @@ module Manager = struct
 
       {b Reveal position}
 
-      Only the very first operation in the batch may be a [Reveal].
+      A [Reveal] operation must always be either the very first
+      operation of the whole batch (in which case its source is the
+      [fee_payer] as specified above), or must come immediately after
+      a [Host] operation (in which case its source is the [Host]
+      operation's [guest]).
+
+      All other [Reveal] positions are forbidden.
 
       ---
 
@@ -1946,7 +1952,8 @@ module Manager = struct
       (whether it be the first source or a guest) are not consecutive.
 
       - [Incorrect_reveal_position] when a [Reveal] operation is
-      encountered after the first operation of the batch.
+      neither the first operation of the whole batch, nor right after
+      a [Host] operation.
   *)
   let check_consistency batch =
     let open Result_syntax in
@@ -2014,12 +2021,22 @@ module Manager = struct
               let* () =
                 match operation with
                 | Reveal _ -> (
-                    (* Only the first operation in a batch is allowed to be a
-                       [Reveal]. Invariants of {!consistency_state} guarantee
-                       that [fee_payer] is [None] when checking the first
-                       operation, then [Some _] for other operations. *)
+                    (* A [Reveal] operation is only allowed as either
+                       the first operation of the whole batch, or
+                       immediately after a [Host] operation.
+
+                       But we know that no [Host] operations have been
+                       encountered yet, so this [Reveal] isn't right
+                       after a [Host] operation.
+
+                       To check whether it is the first operation of
+                       the whole batch, we look at the [fee_payer]
+                       field. Indeed, the invariants of
+                       {!consistency_state} guarantee that [fee_payer]
+                       is [None] when checking the first operation,
+                       then [Some _] for other operations. *)
                     match fee_payer with
-                    | None -> return_unit
+                    | None -> (* First op in the whole batch: OK *) return_unit
                     | Some _ -> tzfail Incorrect_reveal_position)
                 | _ -> return_unit
               in
@@ -2054,11 +2071,26 @@ module Manager = struct
               in
               let* () =
                 match operation with
-                | Reveal _ ->
-                    (* A [Host] operation has already been
-                       encountered, so this operation is not the first
-                       in the batch and cannot be a [Reveal]. *)
-                    tzfail Incorrect_reveal_position
+                | Reveal _ -> (
+                    (* A [Reveal] operation is only allowed as either
+                       the first operation of the whole batch, or
+                       immediately after a [Host] operation.
+
+                       A [Host] operation has already been
+                       encountered, so this [Reveal] is not the first
+                       operation in the batch.
+
+                       To know whether it is right after a [Host]
+                       operation, we look at the
+                       [current_guest_previous_counter] field. Indeed,
+                       it is reset to [None] when a [Host] operation
+                       is encountered, then set to [Some _] after
+                       operations from the new guest have been
+                       seen. *)
+                    match current_guest_previous_counter with
+                    | None -> (* Right after a [Host] op: OK *) return_unit
+                    | Some _ -> tzfail (Guest_incorrect_reveal_position {guest})
+                    )
                 | _ -> return_unit
               in
               return
