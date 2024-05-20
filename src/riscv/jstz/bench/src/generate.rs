@@ -28,7 +28,7 @@ pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
     let accounts = accounts_for_transfers(transfers);
 
     if accounts == 0 {
-        return Err("--accounts must be greater than zero".into());
+        return Err("--transfers must be greater than zero".into());
     }
 
     let mut accounts = gen_keys(accounts)?;
@@ -44,7 +44,7 @@ pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
     let mut transfers = Vec::with_capacity(transfers);
 
     'outer: for token_id in 0..len {
-        for (from, amount) in (token_id..(token_id + len)).zip(0..len) {
+        for (from, amount) in (token_id..(token_id + len)).zip(1..len) {
             if transfers.capacity() == transfers.len() {
                 break 'outer;
             }
@@ -159,7 +159,7 @@ fn balance(
 }
 
 fn batch_mint(accounts: &mut [Account], fa2: &Address) -> Result<Message> {
-    let amount = accounts.len();
+    let amount = accounts.len() + 1;
     let mints: Vec<_> = accounts
         .iter()
         .enumerate()
@@ -248,5 +248,5 @@ impl Account {
 /// The generation strategy supports up to `num_accounts ^ 2` transfers,
 /// find the smallest number of accounts which will allow for this.
 fn accounts_for_transfers(transfers: usize) -> usize {
-    f64::sqrt(transfers as f64).ceil() as usize
+    f64::sqrt(transfers as f64).ceil() as usize + 1
 }

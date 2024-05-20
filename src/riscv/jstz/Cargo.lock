@@ -1031,6 +1031,7 @@ dependencies = [
  "http",
  "jstz_crypto",
  "jstz_proto",
+ "regex",
  "serde",
  "serde_json",
 ]
