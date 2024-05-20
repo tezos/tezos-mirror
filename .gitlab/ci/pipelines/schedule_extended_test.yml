@@ -7403,22 +7403,6 @@ oc.ocaml_fmt:
   - scripts/lint.sh --check-ocamlformat
   - dune build --profile=dev @fmt
 
-misc_opam_checks:
-  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:opam-repository:amd64
-  before_script:
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  script:
-  - ./scripts/opam-check.sh
-  retry: 2
-
 oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: test

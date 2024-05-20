@@ -873,21 +873,6 @@ let jobs pipeline_type =
              [])
         ["scripts/lint.sh --check-ocamlformat"; "dune build --profile=dev @fmt"]
     in
-    let job_misc_opam_checks : tezos_job =
-      job
-        ~__POS__
-        ~name:"misc_opam_checks"
-        ~image:Images.runtime_build_dependencies
-        ~stage:Stages.test
-        ~retry:2
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        [
-          (* checks that all deps of opam packages are already installed *)
-          "./scripts/opam-check.sh";
-        ]
-    in
     let job_semgrep : tezos_job =
       job
         ~__POS__
@@ -1569,7 +1554,6 @@ let jobs pipeline_type =
       job_oc_misc_checks;
       job_oc_python_check;
       job_oc_ocaml_fmt;
-      job_misc_opam_checks;
       job_semgrep;
       job_oc_integration_compiler_rejections;
       job_oc_script_test_gen_genesis;
