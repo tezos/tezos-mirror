@@ -480,6 +480,34 @@ let arch_to_string = function Amd64 -> "x86_64" | Arm64 -> "arm64"
 
 let arch_to_string_alt = function Amd64 -> "amd64" | Arm64 -> "arm64"
 
+let dynamic_tag_var = Gitlab_ci.Var.make "TAGS"
+
+type tag =
+  | Gcp
+  | Gcp_arm64
+  | Gcp_dev
+  | Gcp_dev_arm64
+  | Gcp_tezt
+  | Gcp_tezt_dev
+  | Aws_specific
+  | Dynamic
+
+let string_of_tag = function
+  | Gcp -> "gcp"
+  | Gcp_arm64 -> "gcp_arm64"
+  | Gcp_dev -> "gcp_dev"
+  | Gcp_dev_arm64 -> "gcp_dev_arm64"
+  | Gcp_tezt -> "gcp_tezt"
+  | Gcp_tezt_dev -> "gcp_tezt_dev"
+  | Aws_specific -> "aws_specific"
+  | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
+
+(** The architecture of the runner associated to a tag . *)
+let arch_of_tag = function
+  | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
+  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Aws_specific -> Some Amd64
+  | Dynamic -> None
+
 type dependency =
   | Job of tezos_job
   | Optional of tezos_job
@@ -534,23 +562,23 @@ let enc_git_strategy = function
 
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?services ?variables ?rules
-    ?timeout ?tags ?git_strategy ?coverage ?retry ?parallel ~__POS__ ~image
+    ?timeout ?tag ?git_strategy ?coverage ?retry ?parallel ~__POS__ ~image
     ~stage ~name script : tezos_job =
-  let tags =
-    Some
-      (match (arch, tags) with
-      | Some arch, None ->
-          [(match arch with Amd64 -> "gcp" | Arm64 -> "gcp_arm64")]
-      | None, Some tags -> tags
-      | None, None ->
-          (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
-          ["gcp"]
-      | Some _, Some _ ->
-          failwith
-            "[job] cannot specify both [arch] and [tags] at the same time in \
-             job '%s'."
-            name)
+  (* The tezos/tezos CI uses singleton tags for its runners. *)
+  let tag =
+    match (arch, tag) with
+    | Some arch, None -> ( match arch with Amd64 -> Gcp | Arm64 -> Gcp_arm64)
+    | None, Some tag -> tag
+    | None, None ->
+        (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
+        Gcp
+    | Some _, Some _ ->
+        failwith
+          "[job] cannot specify both [arch] and [tags] at the same time in job \
+           '%s'."
+          name
   in
+  let tags = Some [string_of_tag tag] in
   (match (parallel : Gitlab_ci.Types.parallel option) with
   | Some (Vector n) when n < 2 ->
       failwith
@@ -600,6 +628,15 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       failwith
         "Invalid [retry] value '%d' for job '%s': must be 0, 1 or 2."
         retry
+        name
+  | _ -> ()) ;
+  (match
+     (Sys.getenv_opt Gitlab_ci.Predefined_vars.(show gitlab_user_login), tag)
+   with
+  | Some "nomadic-margebot", (Gcp_dev | Gcp_dev_arm64) ->
+      failwith
+        "[job] Attempting to merge a CI configuration using development \
+         runners (job: %s)"
         name
   | _ -> ()) ;
   let job : Gitlab_ci.Types.job =

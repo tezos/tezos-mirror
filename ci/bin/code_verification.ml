@@ -160,7 +160,7 @@ let image_of_distribution = function
   | Ubuntu_jammy -> Images.ubuntu_jammy
   | Fedora_37 -> Images.fedora_37
 
-let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
+let job_tezt ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
     ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
     ?(tezt_parallel = 1) ?(tezt_variant = "")
     ?(before_script = before_script ~source_version:true ~eval_opam:true [])
@@ -217,7 +217,7 @@ let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
     ~image:Images.runtime_e2etest_dependencies
     ~name
     ?parallel
-    ~tags
+    ~tag
     ~stage:Stages.test
     ?rules
     ~artifacts
@@ -1432,7 +1432,7 @@ let jobs pipeline_type =
       let tezt_static_binaries : tezos_job =
         job_tezt
           ~__POS__
-          ~tags:["gcp"]
+          ~tag:Gcp
           ~name:"tezt:static-binaries"
           ~tezt_tests:(tezt_tests [Has_tag "cli"; Not (Has_tag "flaky")])
           ~tezt_parallel:3

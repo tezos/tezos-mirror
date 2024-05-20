@@ -194,6 +194,33 @@ val arch_to_string : arch -> string
 (** Alternative string representation of architectures ([Amd64] is ["amd64"]) *)
 val arch_to_string_alt : arch -> string
 
+(** The list of available runner tags. *)
+type tag =
+  | Gcp  (** GCP prod AMD64 runner, general purpose. *)
+  | Gcp_arm64  (** GCP prod ARM64 runner, general purpose. *)
+  | Gcp_dev  (** GCP dev AMD64 runner, general purpose. *)
+  | Gcp_dev_arm64  (** GCP dev ARM64 runner, general purpose. *)
+  | Gcp_tezt
+      (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+  | Gcp_tezt_dev
+      (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+  | Aws_specific
+      (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
+  | Dynamic
+      (** The runner is dynamically set through the CI variable {!dynamic_tag_var}. *)
+
+(** The variable to set enabling dynamic runner selection.
+
+    To dynamically set the runner of a job through a CI/CD variable,
+    assign to this variable using [variables:] or [parallel:matrix:]. *)
+val dynamic_tag_var : Gitlab_ci.Var.t
+
+(** The architecture of the runner associated to a tag if statically known. *)
+val arch_of_tag : tag -> arch option
+
+(** The string representation of a tag. *)
+val string_of_tag : tag -> string
+
 (** A job dependency.
 
     - A job that depends on [Job j] will not start until [j] finishes.
@@ -251,15 +278,15 @@ val enc_git_strategy : git_strategy -> string
 
     - Translates each {!dependency} to [needs:] and [dependencies:]
     keywords as detailed in the documentation of {!dependency}.
-    - Adds [tags:] based on [arch] and [tags]:
+    - Adds [tag:] based on [arch] and [tag]:
 
-      - If only [arch] is set to [Amd64] (resp. [Arm64]) then the tag
-        ["gcp"] (resp ["gcp_arm64"]) is set.
-      - If only [tags] is set, then it is passed as is to the job's [tags:]
-        field.
-      - Setting both [arch] and [tags] throws an error.
-      - Omitting both [arch] and [tags] is equivalent to setting
-        [~arch:Amd64] and omitting [tags]. *)
+      - If only [tag] is set, then it is passed as is to the job's [tags:]
+        field. The runners of the tezos/tezos CI all use singleton tags,
+        hence we only allow one tag per job.
+      - Setting both [arch] and [tag] throws an error.
+      - Omitting both [arch] and [tag] is equivalent to setting
+        [~tag:Gcp] or, equivalently, omitting tag and setting
+        [~arch:Amd64].*)
 val job :
   ?arch:arch ->
   ?after_script:string list ->
@@ -273,7 +300,7 @@ val job :
   ?variables:Gitlab_ci.Types.variables ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?timeout:Gitlab_ci.Types.time_interval ->
-  ?tags:string list ->
+  ?tag:tag ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:int ->
