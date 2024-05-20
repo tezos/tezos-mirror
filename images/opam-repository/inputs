@@ -4,3 +4,4 @@ images/ci_create_opam_repository_images.sh
 pyproject.toml
 poetry.lock
 opam/virtual/octez-deps.opam.locked
+images/common/install-nvm.sh
