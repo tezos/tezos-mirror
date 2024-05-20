@@ -322,14 +322,18 @@ module Statuses = struct
 end
 
 module Commitment_indexed_cache =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (struct
-      type t = Cryptobox.Commitment.t
+  (* The commitment-indexed cache is where slots, shards, and
+     shard proofs are kept before being associated to some slot id. The
+     policy is not LRU to avoid prioritizing slots when they are accessed
+     from the cache to be stored and published on the DAL network. *)
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = Cryptobox.Commitment.t
 
-      let equal = Cryptobox.Commitment.equal
+        let equal = Cryptobox.Commitment.equal
 
-      let hash = Hashtbl.hash
-    end)
+        let hash = Hashtbl.hash
+      end)
 
 (** Store context *)
 type t = {
