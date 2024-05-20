@@ -5,3 +5,4 @@ pyproject.toml
 poetry.lock
 opam/virtual/octez-deps.opam.locked
 images/common/install-nvm.sh
+scripts/install_dal_trusted_setup.sh
