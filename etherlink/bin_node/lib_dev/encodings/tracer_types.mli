@@ -42,3 +42,18 @@ type input = Ethereum_types.hash * config
 val input_encoding : (Ethereum_types.hash * config) Data_encoding.t
 
 val input_rlp_encoder : Ethereum_types.hash -> config -> string
+
+(* This is a temporary type, it should be filled in a follow up patch. *)
+type opcode_log
+
+type output = {
+  gas : int64;
+  failed : bool;
+  return_value : Ethereum_types.hash;
+  struct_logs : opcode_log list;
+}
+
+val output_encoding : output Data_encoding.t
+
+val output_binary_decoder :
+  gas:bytes -> failed:bytes -> return_value:bytes -> output
