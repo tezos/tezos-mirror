@@ -29,10 +29,12 @@ use crate::{
     },
     parser::{instruction::Instr, parse},
     program::Program,
+    range_utils::{range_max, range_min},
     state_backend as backend,
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
 pub use address_translation::AccessType;
+use std::{cmp, ops::RangeBounds};
 use twiddle::Twiddle;
 
 /// Layout for the machine state
@@ -673,16 +675,32 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         Ok(())
     }
 
-    /// Perform at most `max` instructions. Returns the number of retired instructions.
+    /// Perform many steps such that the range bounds for the number of
+    /// performed steps are satisfied. The given predicate `should_continue`
+    /// allows the caller to stop within the given step range. Returns the
+    /// number of retired instructions.
     ///
     /// See `octez_risc_v_pvm::state::Pvm`
-    pub fn step_many<F>(&mut self, max: usize, mut should_continue: F) -> StepManyResult
+    #[inline]
+    pub fn step_range<F>(
+        &mut self,
+        steps: &impl RangeBounds<usize>,
+        mut should_continue: F,
+    ) -> StepManyResult
     where
         F: FnMut(&Self) -> bool,
     {
         let mut steps_done = 0;
 
-        while steps_done < max && should_continue(self) {
+        let min_steps = range_min(steps);
+        let max_steps = range_max(steps);
+
+        let (min_steps, max_steps) = (
+            cmp::min(min_steps, max_steps),
+            cmp::max(min_steps, max_steps),
+        );
+
+        while steps_done < min_steps || (steps_done < max_steps && should_continue(self)) {
             match self.step() {
                 Ok(_) => {}
                 Err(e) => {
@@ -693,39 +711,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
                 }
             };
             steps_done += 1;
-        }
-
-        StepManyResult {
-            steps: steps_done,
-            exception: None,
-        }
-    }
-
-    /// Perform at most `max` instructions. Returns the number of retired instructions.
-    /// Will run at least one step.
-    ///
-    /// See `octez_risc_v_pvm::state::Pvm`
-    pub fn step_some<F>(&mut self, max: usize, mut should_continue: F) -> StepManyResult
-    where
-        F: FnMut(&Self) -> bool,
-    {
-        let mut steps_done = 0;
-
-        loop {
-            match self.step() {
-                Ok(_) => {}
-                Err(e) => {
-                    return StepManyResult {
-                        steps: steps_done,
-                        exception: Some(e),
-                    }
-                }
-            };
-            steps_done += 1;
-
-            if !(steps_done < max && should_continue(self)) {
-                break;
-            }
         }
 
         StepManyResult {

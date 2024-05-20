@@ -8,9 +8,11 @@
 use crate::{
     exec_env::{self, ExecutionEnvironment, ExecutionEnvironmentState},
     machine_state::{self, bus::main_memory, StepManyResult},
+    range_utils::range_bounds_saturating_sub,
     state_backend,
     traps::EnvironException,
 };
+use std::ops::RangeBounds;
 
 /// PVM state layout
 pub type PvmLayout<EE, ML> = (
@@ -90,8 +92,8 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         true
     }
 
-    /// Perform at most `max_steps` steps. Returns the actual number of steps
-    /// performed (retired instructions)
+    /// Perform a range of evaluation steps. Returns the actual number of steps
+    /// performed.
     ///
     /// If an environment trap is raised, handle it and
     /// return the number of retired instructions until the raised trap
@@ -104,16 +106,16 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
-    pub fn step_many(&mut self, max_steps: usize) -> usize {
-        self.step_many_accum(max_steps, 0)
+    pub fn step_range(&mut self, step_bounds: &impl RangeBounds<usize>) -> usize {
+        self.step_range_accum(step_bounds, 0)
     }
 
     // Tail-recursive helper function for [step_many]
-    fn step_many_accum(&mut self, max_steps: usize, accum: usize) -> usize {
+    fn step_range_accum(&mut self, step_bounds: &impl RangeBounds<usize>, accum: usize) -> usize {
         let StepManyResult {
             mut steps,
             exception,
-        } = self.machine_state.step_many(max_steps, |_| true);
+        } = self.machine_state.step_range(step_bounds, |_| true);
 
         // Total steps done
         let mut total_steps = accum.saturating_add(steps);
@@ -130,8 +132,8 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
                 continue_eval: true,
             } = self.handle_exception(exc)
             {
-                let steps_left = max_steps.saturating_sub(steps);
-                return self.step_many_accum(steps_left, total_steps);
+                let steps_left = range_bounds_saturating_sub(step_bounds, steps);
+                return self.step_range_accum(&steps_left, total_steps);
             }
         }
 
