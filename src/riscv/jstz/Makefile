@@ -33,6 +33,8 @@ test:
 run:
 	@cargo run --no-default-features
 
+export INBOX_FILE = $(shell mktemp)
+
 .PHONY: check
 check:
 	@cargo check --all-features --workspace --locked

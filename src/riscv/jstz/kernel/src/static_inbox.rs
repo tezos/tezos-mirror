@@ -7,19 +7,36 @@ use tezos_smart_rollup::core_unsafe::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup::host::{Runtime, RuntimeError, ValueType};
 use tezos_smart_rollup::storage::path::Path;
 use tezos_smart_rollup::types::{Message, RollupDalParameters, RollupMetadata};
-pub struct StaticInbox {}
+use tezos_smart_rollup::utils::inbox::{file::InboxFile, Inbox, InboxBuilder};
+
+pub struct StaticInbox {
+    inbox: Inbox,
+}
 
 impl StaticInbox {
+    pub fn new_from_json(inbox: &str) -> Self {
+        let messages: InboxFile = serde_json::from_str(inbox).unwrap();
+        let mut builder = InboxBuilder::new();
+        builder.add_inbox_messages(messages);
+        let inbox = builder.build();
+
+        Self { inbox }
+    }
+
     pub fn wrap_runtime<'runtime, R: Runtime>(
         &'runtime mut self,
         host: &'runtime mut R,
     ) -> StaticInputHost<'runtime, R> {
-        StaticInputHost { host }
+        StaticInputHost {
+            host,
+            inbox: &mut self.inbox,
+        }
     }
 }
 
 pub struct StaticInputHost<'runtime, R: Runtime> {
     host: &'runtime mut R,
+    inbox: &'runtime mut Inbox,
 }
 
 impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
@@ -33,12 +50,16 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
         self.host.write_debug(msg)
     }
 
-    #[inline(always)]
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.read_input()
+        let message = if let Some((level, id, bytes)) = self.inbox.next() {
+            Some(Message::new(level, id, bytes))
+        } else {
+            panic!("STATIC INBOX: out of input");
+        };
+
+        Ok(message)
     }
 
-    #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.host.store_has(path)
     }

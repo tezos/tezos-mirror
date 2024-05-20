@@ -21,6 +21,13 @@ boa_macros = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago
 boa_parser = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
 boa_profiler = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
 
+[workspace.dependencies]
+base64 = "0.22.0"
+http = "1.1.0"
+bincode = "1.3.3"
+regex = "1.10.4"
+serde_json = "1.0.115"
+
 [workspace.dependencies.tezos-smart-rollup]
 version = "0.2.2"
 default-features = false
@@ -45,3 +52,19 @@ rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
 [workspace.dependencies.jstz_proto]
 git = "https://github.com/trilitech/jstz.git"
 rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
+
+[workspace.dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
+
+[workspace.dependencies.hex]
+version = "0.4.3"
+features = ["serde"]
+
+[workspace.dependencies.clap]
+version = "4.4.6"
+features = ["derive"]
+
+[workspace.dependencies.tezos_crypto_rs]
+version = "0.5.2"
+default-features = false

@@ -1083,8 +1083,12 @@ dependencies = [
 name = "jstz"
 version = "0.0.0"
 dependencies = [
+ "hex",
  "jstz_kernel",
+ "serde",
+ "serde_json",
  "tezos-smart-rollup",
+ "tezos_crypto_rs",
 ]
 
 [[package]]
