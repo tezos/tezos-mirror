@@ -251,7 +251,8 @@ module Handler = struct
         let*! () = Node_context.set_profile_ctxt ctxt pctxt in
         return_unit
 
-  let resolve_plugin_and_set_ready config dal_config ctxt cctxt =
+  let resolve_plugin_and_set_ready config dal_config ctxt cctxt
+      ?last_notified_level () =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
     let open Lwt_result_syntax in
@@ -286,6 +287,9 @@ module Handler = struct
           ~encoded_hash_size
           ~number_of_slots:
             proto_parameters.cryptobox_parameters.number_of_shards
+      in
+      let level =
+        match last_notified_level with None -> level | Some level -> level
       in
       let* () =
         Node_context.set_ready
@@ -793,7 +797,15 @@ let run ~data_dir configuration_override =
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize
-      [Handler.resolve_plugin_and_set_ready config dal_config ctxt cctxt]
+      [
+        Handler.resolve_plugin_and_set_ready
+          config
+          dal_config
+          ctxt
+          cctxt
+          ?last_notified_level
+          ();
+      ]
   in
   (* Start never-ending monitoring daemons *)
   let* () = daemonize [Handler.new_finalized_head ctxt cctxt crawler] in
