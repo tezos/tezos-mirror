@@ -30,6 +30,8 @@ enum Commands {
     Generate {
         #[arg(long)]
         transfers: usize,
+        #[arg(long, default_value = "inbox.json")]
+        inbox_file: Box<Path>,
     },
     #[command(about = "Extract results from inbox.json & log file")]
     Results {
@@ -42,7 +44,10 @@ enum Commands {
 
 fn main() -> Result<()> {
     match Cli::parse().command {
-        Commands::Generate { transfers } => handle_generate(transfers)?,
+        Commands::Generate {
+            inbox_file,
+            transfers,
+        } => handle_generate(&inbox_file, transfers)?,
         Commands::Results {
             inbox_file,
             log_file,
