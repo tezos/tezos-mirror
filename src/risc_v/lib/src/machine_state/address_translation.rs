@@ -201,7 +201,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         {
             mstatus.mpp().into()
         } else {
-            self.hart.mode.read()
+            self.hart.mode.read_default()
         }
     }
 

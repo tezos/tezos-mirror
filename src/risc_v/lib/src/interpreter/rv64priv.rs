@@ -23,7 +23,7 @@ where
     /// If successful, returns next instruction address to be executed from `MEPC`
     pub fn run_mret(&mut self) -> Result<Address, Exception> {
         // Only M-mode (and Debug) can run mret
-        match self.mode.read() {
+        match self.mode.read_default() {
             Mode::User | Mode::Supervisor => return Err(Exception::IllegalInstruction),
             Mode::Machine => (),
         }
@@ -64,7 +64,7 @@ where
     /// If successful, returns next instruction address to be executed from `SEPC`
     pub fn run_sret(&mut self) -> Result<Address, Exception> {
         // Only M and S mode (and Debug) can run SRET
-        match self.mode.read() {
+        match self.mode.read_default() {
             Mode::User => return Err(Exception::IllegalInstruction),
             Mode::Supervisor | Mode::Machine => (),
         }
@@ -123,7 +123,7 @@ where
     /// Section 5.2.1: It is always legal to over-fence.
     #[inline(always)]
     pub fn sfence_vma(&self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
-        let mode = self.hart.mode.read();
+        let mode = self.hart.mode.read_default();
         let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
         let tvm = mstatus.tvm();
 
