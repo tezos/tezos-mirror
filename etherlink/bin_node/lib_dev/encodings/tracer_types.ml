@@ -460,12 +460,87 @@ let uint53_encoding =
   let json_encoding = conv uint53_to_json json_to_uint53 json in
   splitted ~json:json_encoding ~binary:z
 
-(* This is a temporary type, it should be filled in a follow up patch. Int and
-   not unit, so that the encoding doesn't fail with: "Cannot insert potentially
-   zero-sized element in a list." Making it a list ensures it is encoded as an
-   (empty) array and compatible with the specification until the correct
-   type. *)
-type opcode_log = int
+type opcode_log = {
+  pc : uint53;
+  op : Opcode.t;
+  gas : uint53;
+  gas_cost : uint53;
+  memory : Hex.t list option;
+  mem_size : int32 option;
+  stack : Hex.t list option;
+  return_data : Hex.t option;
+  storage : (Hex.t * Hex.t) list option;
+  depth : uint53;
+  refund : uint53;
+  error : string option;
+}
+
+let opcode_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           pc;
+           op;
+           gas;
+           gas_cost;
+           memory;
+           mem_size;
+           stack;
+           return_data;
+           storage;
+           depth;
+           refund;
+           error;
+         } ->
+      ( ( pc,
+          op,
+          gas,
+          gas_cost,
+          memory,
+          mem_size,
+          stack,
+          return_data,
+          storage,
+          depth ),
+        (refund, error) ))
+    (fun ( ( pc,
+             op,
+             gas,
+             gas_cost,
+             memory,
+             mem_size,
+             stack,
+             return_data,
+             storage,
+             depth ),
+           (refund, error) ) ->
+      {
+        pc;
+        op;
+        gas;
+        gas_cost;
+        memory;
+        mem_size;
+        stack;
+        return_data;
+        storage;
+        depth;
+        refund;
+        error;
+      })
+    (merge_objs
+       (obj10
+          (req "pc" uint53_encoding)
+          (req "op" Opcode.encoding)
+          (req "gas" uint53_encoding)
+          (req "gasCost" uint53_encoding)
+          (req "memory" (option (list hex_encoding)))
+          (req "memSize" (option int32))
+          (req "stack" (option (list hex_encoding)))
+          (req "returnData" (option hex_encoding))
+          (req "storage" (option (list (tup2 hex_encoding hex_encoding))))
+          (req "depth" uint53_encoding))
+       (obj2 (req "refund" uint53_encoding) (req "error" (option string))))
 
 type output = {
   gas : int64;
@@ -485,7 +560,7 @@ let output_encoding =
        (req "gas" int64)
        (req "failed" bool)
        (req "returnValue" Ethereum_types.hash_encoding)
-       (req "structLogs" (list int31)))
+       (req "structLogs" (list opcode_encoding)))
 
 let output_binary_decoder ~gas ~failed ~return_value =
   let gas =

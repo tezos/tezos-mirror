@@ -55,8 +55,20 @@ type uint53 = Z.t
 
 val uint53_encoding : uint53 Data_encoding.t
 
-(* This is a temporary type, it should be filled in a follow up patch. *)
-type opcode_log
+type opcode_log = {
+  pc : uint53;
+  op : Opcode.t;
+  gas : uint53;
+  gas_cost : uint53;
+  memory : Hex.t list option;
+  mem_size : int32 option;
+  stack : Hex.t list option;
+  return_data : Hex.t option;
+  storage : (Hex.t * Hex.t) list option;
+  depth : uint53;
+  refund : uint53;
+  error : string option;
+}
 
 type output = {
   gas : int64;
