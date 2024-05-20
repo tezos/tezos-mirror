@@ -209,61 +209,63 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
     (* When adding new experimental feature please make sure it's a
        good idea to activate it for all test or not. *)
   in
-  let* sequencer =
+  let* sequencer_mode =
     if threshold_encryption then
       let sequencer_sidecar_port = Some (Port.fresh ()) in
       let sequencer_sidecar =
         Dsn_node.sequencer ?rpc_port:sequencer_sidecar_port ()
       in
       let* () = Dsn_node.start sequencer_sidecar in
-      let mode =
-        Evm_node.Threshold_encryption_sequencer
-          {
-            initial_kernel = output;
-            preimage_dir = Some preimages_dir;
-            private_rpc_port;
-            time_between_blocks;
-            sequencer = sequencer.alias;
-            genesis_timestamp;
-            max_blueprints_lag;
-            max_blueprints_ahead;
-            max_blueprints_catchup;
-            catchup_cooldown;
-            max_number_of_chunks;
-            devmode;
-            wallet_dir = Some (Client.base_dir client);
-            tx_pool_timeout_limit = None;
-            tx_pool_addr_limit = None;
-            tx_pool_tx_per_addr_limit = None;
-            sequencer_sidecar_endpoint = Dsn_node.endpoint sequencer_sidecar;
-          }
-      in
-      Evm_node.init ~patch_config ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+      return
+      @@ Evm_node.Threshold_encryption_sequencer
+           {
+             initial_kernel = output;
+             preimage_dir = Some preimages_dir;
+             private_rpc_port;
+             time_between_blocks;
+             sequencer = sequencer.alias;
+             genesis_timestamp;
+             max_blueprints_lag;
+             max_blueprints_ahead;
+             max_blueprints_catchup;
+             catchup_cooldown;
+             max_number_of_chunks;
+             devmode;
+             wallet_dir = Some (Client.base_dir client);
+             tx_pool_timeout_limit = None;
+             tx_pool_addr_limit = None;
+             tx_pool_tx_per_addr_limit = None;
+             sequencer_sidecar_endpoint = Dsn_node.endpoint sequencer_sidecar;
+           }
     else
-      let mode =
-        Evm_node.Sequencer
-          {
-            initial_kernel = output;
-            preimage_dir = Some preimages_dir;
-            private_rpc_port;
-            time_between_blocks;
-            sequencer = sequencer.alias;
-            genesis_timestamp;
-            max_blueprints_lag;
-            max_blueprints_ahead;
-            max_blueprints_catchup;
-            catchup_cooldown;
-            max_number_of_chunks;
-            devmode;
-            wallet_dir = Some (Client.base_dir client);
-            tx_pool_timeout_limit = None;
-            tx_pool_addr_limit = None;
-            tx_pool_tx_per_addr_limit = None;
-          }
-      in
-      Evm_node.init ~patch_config ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+      return
+      @@ Evm_node.Sequencer
+           {
+             initial_kernel = output;
+             preimage_dir = Some preimages_dir;
+             private_rpc_port;
+             time_between_blocks;
+             sequencer = sequencer.alias;
+             genesis_timestamp;
+             max_blueprints_lag;
+             max_blueprints_ahead;
+             max_blueprints_catchup;
+             catchup_cooldown;
+             max_number_of_chunks;
+             devmode;
+             wallet_dir = Some (Client.base_dir client);
+             tx_pool_timeout_limit = None;
+             tx_pool_addr_limit = None;
+             tx_pool_tx_per_addr_limit = None;
+           }
   in
-  let* mode =
+  let* sequencer =
+    Evm_node.init
+      ~patch_config
+      ~mode:sequencer_mode
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* observer_mode =
     if threshold_encryption then
       let bundler =
         Dsn_node.bundler ~endpoint:(Evm_node.endpoint sequencer) ()
@@ -289,7 +291,10 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
            })
   in
   let* observer =
-    Evm_node.init ~patch_config ~mode (Evm_node.endpoint sequencer)
+    Evm_node.init
+      ~patch_config
+      ~mode:observer_mode
+      (Evm_node.endpoint sequencer)
   in
   let* proxy =
     Evm_node.init
