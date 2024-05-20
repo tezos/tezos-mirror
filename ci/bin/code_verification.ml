@@ -564,8 +564,8 @@ let jobs pipeline_type =
       [
         "make -f kernels.mk build";
         "make -f etherlink.mk evm_kernel.wasm";
-        "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
-        "make -C src/risc_v/tests/ build";
+        "make -C src/riscv riscv-sandbox riscv-dummy.elf";
+        "make -C src/riscv/tests/ build";
       ]
       ~artifacts:
         (artifacts
@@ -579,9 +579,9 @@ let jobs pipeline_type =
              "tx_kernel.wasm";
              "tx_kernel_dal.wasm";
              "dal_echo_kernel.wasm";
-             "src/risc_v/risc-v-sandbox";
-             "src/risc_v/risc-v-dummy.elf";
-             "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
+             "src/riscv/riscv-sandbox";
+             "src/riscv/riscv-dummy.elf";
+             "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
            ])
       ~cache:[cache_kernels; {key = "kernels-sccache"; paths = ["_sccache"]}]
     |> enable_kernels |> enable_sccache
@@ -1493,15 +1493,15 @@ let jobs pipeline_type =
           ~changes:changeset_test_etherlink_firehose
           ["make -C etherlink/firehose check"]
       in
-      let job_test_risc_v_kernels : tezos_job =
+      let job_test_riscv_kernels : tezos_job =
         make_job_kernel
           ~__POS__
-          ~name:"test_risc_v_kernels"
-          ~changes:changeset_test_risc_v_kernels
+          ~name:"test_riscv_kernels"
+          ~changes:changeset_test_riscv_kernels
           [
-            "make -C src/risc_v check";
-            "make -C src/risc_v test";
-            "make -C src/risc_v audit";
+            "make -C src/riscv check";
+            "make -C src/riscv test";
+            "make -C src/riscv audit";
           ]
       in
       let job_test_evm_compatibility : tezos_job =
@@ -1522,7 +1522,7 @@ let jobs pipeline_type =
         job_test_kernels;
         job_test_etherlink_kernel;
         job_test_etherlink_firehose;
-        job_test_risc_v_kernels;
+        job_test_riscv_kernels;
         job_test_evm_compatibility;
       ]
     in

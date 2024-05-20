@@ -1601,12 +1601,12 @@
     }
   },
   {
-    "file": "tezt/tests/risc_v_sandbox.ml",
-    "title": "Run risc-v unit tests (mzicbo)",
+    "file": "tezt/tests/riscv_sandbox.ml",
+    "title": "Run riscv unit tests (mzicbo)",
     "tags": [
       "regression",
       "mzicbo",
-      "risc_v_sandbox",
+      "riscv_sandbox",
       "riscv",
       "sandbox",
       "unit"

@@ -468,11 +468,11 @@ let changeset_test_etherlink_firehose =
           "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
         ])
 
-let changeset_test_risc_v_kernels =
+let changeset_test_riscv_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["src/kernel_sdk/**/*"; "src/risc_v/**/*"])
+    @ make ["src/kernel_sdk/**/*"; "src/riscv/**/*"])
 
 let changeset_test_evm_compatibility =
   Changeset.(

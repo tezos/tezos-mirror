@@ -1670,12 +1670,12 @@
     }
   },
   {
-    "file": "tezt/tests/risc_v_sandbox.ml",
+    "file": "tezt/tests/riscv_sandbox.ml",
     "title": "Run the dummy kernel",
     "tags": [
       "regression",
       "dummy",
-      "risc_v_sandbox",
+      "riscv_sandbox",
       "riscv",
       "sandbox"
     ],

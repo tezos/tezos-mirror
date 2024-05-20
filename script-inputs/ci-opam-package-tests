@@ -42,8 +42,8 @@ octez-protocol-019-PtParisB-libs	all	2
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
 octez-proxy-server	exec	1
-octez-risc-v-api	all	7
-octez-risc-v-pvm	all	6
+octez-riscv-api	all	7
+octez-riscv-pvm	all	6
 octez-rpc-process	all	4
 octez-rust-deps	all	7
 octez-shell-libs	all	6

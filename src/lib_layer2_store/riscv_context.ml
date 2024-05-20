@@ -7,7 +7,7 @@
 
 open Store_sigs
 open Context_sigs
-open Octez_risc_v_pvm
+open Octez_riscv_pvm
 
 type repo = Storage.repo
 

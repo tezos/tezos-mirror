@@ -574,7 +574,7 @@ let octez_rust_deps =
               [S "source_tree"; S "librustzcash"];
               [S "source_tree"; S "wasmer-3.3.0"];
               [S "source_tree"; S "src"];
-              [S "source_tree"; S "../risc_v"];
+              [S "source_tree"; S "../riscv"];
               [S "source_tree"; S "../kernel_sdk"];
             ];
             [
@@ -4617,31 +4617,31 @@ let _octez_embedded_protocol_packer =
     ~linkall:true
     ~modules:["Main_embedded_packer"]
 
-let octez_risc_v_api =
+let octez_riscv_api =
   public_lib
-    "octez-risc-v-api"
-    ~path:"src/lib_risc_v/api"
+    "octez-riscv-api"
+    ~path:"src/lib_riscv/api"
     ~synopsis:"OCaml API of the RISC-V Rust components"
     ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
     ~deps:[octez_rust_deps]
-    ~dep_globs_rec:["../risc_v/*"]
-    ~modules:["octez_risc_v_api"]
-    ~dune:Dune.[[S "copy_files"; S "../../risc_v/lib/octez_risc_v_api.*"]]
+    ~dep_globs_rec:["../riscv/*"]
+    ~modules:["octez_riscv_api"]
+    ~dune:Dune.[[S "copy_files"; S "../../riscv/lib/octez_riscv_api.*"]]
 
-let octez_risc_v_pvm =
+let octez_riscv_pvm =
   public_lib
-    "octez-risc-v-pvm"
-    ~path:"src/lib_risc_v/pvm"
+    "octez-riscv-pvm"
+    ~path:"src/lib_riscv/pvm"
     ~synopsis:"RISC-V PVM"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_risc_v_api]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_riscv_api]
 
-let _octez_risc_v_pvm_test =
+let _octez_riscv_pvm_test =
   tezt
     ["test_main"]
-    ~path:"src/lib_risc_v/pvm/test"
-    ~opam:"octez-risc-v-pvm-test"
+    ~path:"src/lib_riscv/pvm/test"
+    ~opam:"octez-riscv-pvm-test"
     ~synopsis:"Tests for RISC-V OCaml API"
-    ~deps:[alcotezt; octez_risc_v_pvm]
+    ~deps:[alcotezt; octez_riscv_pvm]
 
 let octez_layer2_store =
   octez_l2_lib
@@ -4661,7 +4661,7 @@ let octez_layer2_store =
         octez_context_encoding;
         octez_context_sigs;
         octez_context_helpers;
-        octez_risc_v_pvm;
+        octez_riscv_pvm;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
@@ -6978,7 +6978,7 @@ let hash = Protocol.hash
             octez_smart_rollup_node_lib |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
-            octez_risc_v_pvm |> if_ N.(number >= 020);
+            octez_riscv_pvm |> if_ N.(number >= 020);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             octez_version_value;
           ]
@@ -8517,11 +8517,11 @@ let _octez_scoru_wasm_regressions =
 let tezos_time_measurement =
   external_lib ~opam:"" "tezos-time-measurement" V.True
 
-let tezt_risc_v_sandbox =
+let tezt_riscv_sandbox =
   private_lib
-    "tezt_risc_v_sandbox"
-    ~path:"tezt/lib_risc_v_sandbox"
-    ~opam:"tezt-risc-v-sandbox"
+    "tezt_riscv_sandbox"
+    ~path:"tezt/lib_riscv_sandbox"
+    ~opam:"tezt-riscv-sandbox"
     ~synopsis:"Test framework for RISC-V sandbox"
     ~bisect_ppx:No
     ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"; tezt_tezos]
