@@ -427,6 +427,29 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
     ~title:(sf "%s (te_sequencer)" title)
     ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags)
 
+module Protocol = struct
+  include Protocol
+
+  let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
+      ?uses_admin_client ?supports _body protocols =
+    Protocol.register_test
+      ~__FILE__
+      ~title
+      ~tags
+      ?uses
+      ?uses_node
+      ?uses_client
+      ?uses_admin_client
+      ?supports
+      (fun _protocol ->
+        Test.fail
+          ~loc:__LOC__
+          "Do not call Protocol.register_test directly. Use register_test, or \
+           register_both instead.")
+      protocols
+    [@@warning "-unused-value-declaration"]
+end
+
 let test_remove_sequencer =
   register_both
     ~time_between_blocks:Nothing
@@ -1354,15 +1377,11 @@ let test_observer_applies_blueprint_when_restarted =
   unit
 
 let test_get_balance_block_param =
-  Protocol.register_test
-    ~__FILE__
+  register_both
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
-    ~uses
-  @@ fun protocol ->
-  let* {sequencer; sc_rollup_node; proxy; client; _} =
-    setup_sequencer ~time_between_blocks:Nothing protocol
-  in
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; sc_rollup_node; proxy; client; _} _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* _tx_hash =
@@ -1450,16 +1469,12 @@ let test_get_balance_block_param =
   unit
 
 let test_get_block_by_number_block_param =
-  Protocol.register_test
-    ~__FILE__
+  register_both
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
-    ~uses
-  @@ fun protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; observer; sc_rollup_node; proxy; client; _} _protocols ->
   let observer_offset = 3l in
-  let* {sequencer; observer; sc_rollup_node; proxy; client; _} =
-    setup_sequencer ~time_between_blocks:Nothing protocol
-  in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
     next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
@@ -1525,12 +1540,11 @@ let test_get_block_by_number_block_param =
   unit
 
 let test_extended_block_param =
-  Protocol.register_test
-    ~__FILE__
+  register_both
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
-    ~uses
-  @@ fun protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocols ->
   (*
      In this test we will deploy a counter contract, increments its counter
      at multiple consecutives blocks, and check the counter using block
@@ -1539,7 +1553,6 @@ let test_extended_block_param =
      both for read only RPCs such as [eth_getStorageAt] and simulation
      such as [eth_call].
   *)
-  let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
   let* () =
     Eth_cli.add_abi
       ~label:Solidity_contracts.counter.label
