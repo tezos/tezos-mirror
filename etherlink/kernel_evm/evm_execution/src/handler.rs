@@ -4289,4 +4289,160 @@ mod test {
             ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Returned))
         );
     }
+
+    // eip-161
+    #[test]
+    fn eip161_gas_consumption_rules_for_suicide() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(111_u64);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 10000,
+            gas_price,
+            false,
+        );
+
+        // SUICIDE would charge 25,000 gas when the destination is non-existent,
+        // now the charge SHALL only be levied if the operation transfers more than zero value
+        // and the destination account is dead.
+
+        let cases = [
+            (100_u32, 100_u8, 51003_u64), // transfer > 0 && non-existent destination
+            (100, 100, 26003),            // transfer > 0 && touched destination
+            (0, 101, 26003),              // transfer == 0 && non-existent destination
+            (0, 101, 26003),              // transfer == 0 && touched destination
+        ];
+
+        for (balance, destination, expected_gas) in cases {
+            let address = H160::from_low_u64_be(110_u64);
+            set_balance(&mut handler, &address, U256::from(balance));
+            set_code(
+                &mut handler,
+                &address,
+                vec![
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    destination,
+                    Opcode::SUICIDE.as_u8(), // 5000(BASE) + (25000 gas if transfer > 0 && destination is dead)
+                ],
+            );
+
+            let result = handler
+                .call_contract(
+                    caller,
+                    address,
+                    Some(U256::zero()),
+                    vec![],
+                    Some(1000000),
+                    false,
+                )
+                .unwrap();
+
+            assert_eq!(result.gas_used, expected_gas);
+
+            assert_eq!(
+                result.reason,
+                ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Suicided))
+            );
+
+            // At the end of the transaction, any account touched by the execution of that transaction
+            // which is now empty SHALL instead become non-existent (i.e. deleted).
+            assert!(!handler.exists(address));
+        }
+    }
+
+    #[test]
+    fn eip161_gas_consumption_rules_for_call() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(111_u64);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 10000,
+            gas_price,
+            false,
+        );
+
+        // CALL would charge 25,000 gas when the destination is non-existent,
+        // now the charge SHALL only be levied if the operation transfers more than zero value
+        // and the destination account is dead.
+
+        let address = H160::from_low_u64_be(110_u64);
+
+        let cases = [
+            (100_u32, 10_u8, 100_u8, 52821_u64), // transfer > 0 && non-existent destination
+            (100, 10, 100, 27821),               // transfer > 0 && touched destination
+            (100, 0, 101, 21121), // transfer == 0 && non-existent destination
+            (100, 0, 101, 21121), // transger == 0 && touched destination
+            (0, 10, 102, 52821), // unsufficient balance && transfer > 0 && non-existent destination
+            (0, 10, 100, 27821), // unsufficient balance && transfer > 0 && touched destination
+        ];
+
+        for (balance, value, destination, expected_gas) in cases {
+            set_balance(&mut handler, &address, U256::from(balance));
+            set_code(
+                &mut handler,
+                &address,
+                vec![
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    0,                     // return size
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    0,                     // return offset
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    0,                     // arg size
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    0,                     // arg offset
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    value,                 // non-zero value
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    destination,           // address
+                    Opcode::PUSH1.as_u8(), // 3 gas
+                    0,
+                    // 100(BASE) + 9000(non-zero value cost)
+                    // + (25000 gas if transfer > 0 && destination is dead) - 2300(call stipend)
+                    Opcode::CALL.as_u8(),
+                ],
+            );
+
+            let result = handler
+                .call_contract(
+                    caller,
+                    address,
+                    Some(U256::zero()),
+                    vec![],
+                    Some(1000000),
+                    false,
+                )
+                .unwrap();
+
+            assert_eq!(result.gas_used, expected_gas);
+
+            assert_eq!(
+                result.reason,
+                ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped))
+            );
+        }
+    }
 }
