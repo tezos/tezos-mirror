@@ -5399,7 +5399,7 @@ module Amplification = struct
       in
       Log.info
         "Waiting for reconstruction to be canceled because all shards were \
-         received, or for the reconstruction to finish" ;
+         received, fail if the reconstruction finishes" ;
       let promise_reconstruction_cancelled =
         Dal_node.wait_for
           observer
@@ -5409,7 +5409,7 @@ module Amplification = struct
               JSON.(
                 event |-> "level" |> as_int = publication_level
                 && event |-> "slot_index" |> as_int = index)
-            then Some ()
+            then Some true
             else None)
       in
       let promise_reconstruction_finished =
@@ -5418,11 +5418,15 @@ module Amplification = struct
               JSON.(
                 event |-> "level" |> as_int = publication_level
                 && event |-> "slot_index" |> as_int = index)
-            then Some ()
+            then Some false
             else None)
       in
-      Lwt.pick
-        [promise_reconstruction_cancelled; promise_reconstruction_finished]
+      let* success =
+        Lwt.pick
+          [promise_reconstruction_cancelled; promise_reconstruction_finished]
+      in
+      if success then unit
+      else Test.fail ~__LOC__ "Reconstruction was not cancelled."
     in
     let* publication_level_bis, _commitment, () =
       publish_store_and_wait_slot
