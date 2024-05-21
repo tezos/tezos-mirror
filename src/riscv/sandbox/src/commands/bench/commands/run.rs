@@ -8,7 +8,7 @@ use crate::{
         data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
         save_to_file, show_results, BenchStats,
     },
-    posix_exit_mode,
+    format_status, posix_exit_mode,
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
@@ -17,7 +17,12 @@ use octez_riscv::{
     parser::{instruction::Instr, parse},
     stepper::test::{TestStepper, TestStepperResult},
 };
-use std::{error::Error, path::Path};
+use std::{
+    collections::HashSet,
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
@@ -111,7 +116,7 @@ fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchD
 }
 
 fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
-    let contents = std::fs::read(path)?;
+    let contents = fs::read(path)?;
     let mut backend = TestStepper::<'_, Posix>::create_backend();
     let mut interpreter = TestStepper::new(
         &mut backend,
@@ -127,11 +132,28 @@ fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box
     Ok(data)
 }
 
+fn transform_folders(inputs: &[Box<Path>]) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let mut binary_paths = vec![];
+    for path in inputs {
+        if fs::metadata(path)?.is_dir() {
+            for sub_path in fs::read_dir(path)? {
+                let sub_path = sub_path?.path();
+                if fs::metadata(&sub_path)?.is_file() {
+                    binary_paths.push(sub_path)
+                }
+            }
+        } else {
+            binary_paths.push(path.to_path_buf())
+        }
+    }
+    Ok(binary_paths)
+}
+
 pub fn run(opts: BenchRunOptions) -> Result<(), Box<dyn Error>> {
-    let mut stats = opts
-        .inputs
-        .iter()
-        .filter_map(|path| run_binary(path, &opts).ok())
+    let paths = transform_folders(&opts.inputs)?;
+    let mut stats = paths
+        .into_iter()
+        .filter_map(|path| run_binary(&path, &opts).ok())
         .reduce(|acc, e| e.combine(acc))
         .ok_or("Could not combine benchmark results".to_string())?;
     stats.normalize_instr_data();
@@ -141,15 +163,39 @@ pub fn run(opts: BenchRunOptions) -> Result<(), Box<dyn Error>> {
 }
 
 fn run_binary(path: &Path, opts: &BenchRunOptions) -> Result<BenchStats, Box<dyn Error>> {
+    let get_warning_from_iteration = |iteration: &BenchData| match &iteration.run_result {
+        TestStepperResult::Exit { code: 0, steps: _ } => None,
+        result => Some(format_status(result)),
+    };
+
+    let mut warnings = HashSet::<String>::new();
+    let mut consider_iteration = |iteration: &BenchData| {
+        if let Some(w) = get_warning_from_iteration(iteration) {
+            warnings.insert(w);
+        }
+    };
+
     let stats = match opts.repeat {
-        0 | 1 => BenchStats::from_data(bench_iteration(path, opts)?)?,
+        0 | 1 => {
+            let iteration = bench_iteration(path, opts)?;
+            consider_iteration(&iteration);
+            BenchStats::from_data(iteration)?
+        }
         iterations => {
             let mut data_list = vec![];
             for _ in 0..iterations {
-                data_list.push(bench_iteration(path, opts)?)
+                let iteration = bench_iteration(path, opts)?;
+                consider_iteration(&iteration);
+                data_list.push(iteration);
             }
             BenchStats::from_data_list(data_list)?
         }
     };
+    if !warnings.is_empty() {
+        eprintln!("Warning: Binary {:?} exited with:", path);
+        for w in warnings {
+            eprintln!(" - {}", w);
+        }
+    }
     Ok(stats)
 }
