@@ -4,12 +4,12 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{cli::RunOptions, format_status, posix_exit_mode};
-use octez_riscv::{Interpreter, InterpreterResult};
+use octez_riscv::{exec_env::posix::Posix, Interpreter, InterpreterResult};
 use std::error::Error;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let contents = std::fs::read(&opts.common.input)?;
-    let mut backend = Interpreter::create_backend();
+    let mut backend = Interpreter::<'_, Posix>::create_backend();
     let mut interpreter = Interpreter::new(
         &mut backend,
         &contents,
