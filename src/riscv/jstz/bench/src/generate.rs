@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::inbox::{InboxFile, Message};
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use http::{HeaderMap, Method, Uri};
 use jstz_crypto::{keypair_from_passphrase, public_key::PublicKey, secret_key::SecretKey};
@@ -10,11 +11,6 @@ use jstz_proto::operation::{Content, DeployFunction, Operation, RunFunction, Sig
 use serde::{Serialize, Serializer};
 use std::error::Error;
 use std::path::Path;
-
-#[allow(unused)]
-#[path = "../../../sandbox/src/inbox/file.rs"]
-mod inbox;
-use inbox::{InboxFile, Message};
 
 const FA2: &str = include_str!("../../fa2.js");
 
@@ -188,7 +184,7 @@ fn batch_mint(accounts: &mut [Account], fa2: &Address) -> Result<Message> {
     account.operation_to_message(content)
 }
 
-fn deploy_fa2(account: &mut Account) -> Result<(Address, inbox::Message)> {
+fn deploy_fa2(account: &mut Account) -> Result<(Address, Message)> {
     let code: ParsedCode = FA2.to_string().try_into()?;
 
     let address = Address::digest(

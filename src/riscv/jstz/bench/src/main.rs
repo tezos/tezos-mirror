@@ -4,9 +4,16 @@
 
 use clap::{Parser, Subcommand};
 use generate::handle_generate;
+use results::handle_results;
 use std::error::Error;
+use std::path::Path;
 
 mod generate;
+mod results;
+
+#[allow(unused)]
+#[path = "../../../sandbox/src/inbox/file.rs"]
+mod inbox;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -24,11 +31,22 @@ enum Commands {
         #[arg(long)]
         transfers: usize,
     },
+    #[command(about = "Extract results from inbox.json & log file")]
+    Results {
+        #[arg(long)]
+        inbox_file: Box<Path>,
+        #[arg(long)]
+        log_file: Box<Path>,
+    },
 }
 
 fn main() -> Result<()> {
     match Cli::parse().command {
         Commands::Generate { transfers } => handle_generate(transfers)?,
+        Commands::Results {
+            inbox_file,
+            log_file,
+        } => handle_results(inbox_file, log_file)?,
     }
 
     Ok(())
