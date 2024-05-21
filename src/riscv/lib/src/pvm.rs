@@ -80,10 +80,17 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, config: &mut EE::Config<'_>) {
+    pub fn eval_one(&mut self, config: &mut EE::Config<'_>) -> Result<(), EvalError> {
         if let Err(exc) = self.machine_state.step() {
-            let _: exec_env::EcallOutcome = self.handle_exception(config, exc);
+            if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(config, exc) {
+                return Err(EvalError {
+                    cause: exc,
+                    message,
+                });
+            }
         }
+
+        Ok(())
     }
 
     /// Perform a range of evaluation steps. Returns the actual number of steps
@@ -104,7 +111,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         &mut self,
         config: &mut EE::Config<'_>,
         step_bounds: &impl RangeBounds<usize>,
-    ) -> usize {
+    ) -> EvalManyResult {
         self.eval_range_accum(config, step_bounds, 0)
     }
 
@@ -114,7 +121,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         config: &mut EE::Config<'_>,
         step_bounds: &impl RangeBounds<usize>,
         accum: usize,
-    ) -> usize {
+    ) -> EvalManyResult {
         let StepManyResult {
             mut steps,
             exception,
@@ -130,17 +137,37 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             total_steps = total_steps.saturating_add(1);
             steps = steps.saturating_add(1);
 
-            // Exception was handled in a way that allows us to evaluate more.
-            if let exec_env::EcallOutcome::Handled {
-                continue_eval: true,
-            } = self.handle_exception(config, exc)
-            {
-                let steps_left = range_bounds_saturating_sub(step_bounds, steps);
-                return self.eval_range_accum(config, &steps_left, total_steps);
+            match self.handle_exception(config, exc) {
+                // EE encountered an error.
+                exec_env::EcallOutcome::Fatal { message } => {
+                    return EvalManyResult {
+                        steps: total_steps,
+                        error: Some(EvalError {
+                            cause: exc,
+                            message,
+                        }),
+                    }
+                }
+
+                // EE hints we may continue evaluation.
+                exec_env::EcallOutcome::Handled {
+                    continue_eval: true,
+                } => {
+                    let steps_left = range_bounds_saturating_sub(step_bounds, steps);
+                    return self.eval_range_accum(config, &steps_left, total_steps);
+                }
+
+                // EE suggests to stop evaluation.
+                exec_env::EcallOutcome::Handled {
+                    continue_eval: false,
+                } => {}
             }
         }
 
-        total_steps
+        EvalManyResult {
+            steps: total_steps,
+            error: None,
+        }
     }
 }
 
@@ -156,6 +183,19 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<PvmSbi, M
     pub fn status(&self) -> PvmStatus {
         self.exec_env_state.status()
     }
+}
+
+/// Error during evaluation
+#[derive(Debug)]
+pub struct EvalError {
+    pub cause: EnvironException,
+    pub message: String,
+}
+
+/// Result of [`Pvm::eval_range`]
+pub struct EvalManyResult {
+    pub steps: usize,
+    pub error: Option<EvalError>,
 }
 
 #[cfg(test)]
