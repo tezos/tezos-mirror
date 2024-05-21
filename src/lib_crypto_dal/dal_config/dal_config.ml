@@ -52,7 +52,7 @@ let encoding : t Data_encoding.t =
   conv
     (fun {activated; bootstrap_peers} -> (activated, bootstrap_peers))
     (fun (activated, bootstrap_peers) -> {activated; bootstrap_peers})
-    (obj2 (req "activated" bool) (req "bootstrap_peers" (list string)))
+    (obj2 (dft "activated" bool true) (req "bootstrap_peers" (list string)))
   [@@coverage off]
 
 let default = {activated = true; bootstrap_peers = []}
