@@ -37,7 +37,7 @@ pub enum StorageError {
 
 pub type Hash = [u8; DIGEST_SIZE];
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Store {
     path: Box<Path>,
 }
@@ -101,7 +101,7 @@ impl Store {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Repo<T> {
     backend: Store,
     _pd: PhantomData<T>,

@@ -4,4 +4,15 @@ open! Bigarray
 
 (* file: ocaml_api.rs *)
 
-external octez_riscv_add: int32 -> int32 -> int32 = "octez_riscv_add"
+type repo
+type state
+type id
+external octez_riscv_id_unsafe_of_raw_string: string -> id = "octez_riscv_id_unsafe_of_raw_string"
+external octez_riscv_storage_id_to_raw_string: id -> string = "octez_riscv_storage_id_to_raw_string"
+external octez_riscv_storage_id_equal: id -> id -> bool = "octez_riscv_storage_id_equal"
+external octez_riscv_storage_state_equal: state -> state -> bool = "octez_riscv_storage_state_equal"
+external octez_riscv_storage_state_empty: unit -> state = "octez_riscv_storage_state_empty"
+external octez_riscv_storage_load: string -> repo = "octez_riscv_storage_load"
+external octez_riscv_storage_close: repo -> unit = "octez_riscv_storage_close"
+external octez_riscv_storage_commit: repo -> state -> id = "octez_riscv_storage_commit"
+external octez_riscv_storage_checkout: repo -> id -> state option = "octez_riscv_storage_checkout"

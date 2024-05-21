@@ -11,7 +11,7 @@ type write_debug = string -> unit Lwt.t
 
 type input_info
 
-type state = Storage.tree
+type state = Storage.State.t
 
 let compute_step_many ?reveal_builtins:_ ?write_debug:_ ?stop_at_snapshot:_
     ~max_steps:_ state =

@@ -5,9 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type repo
+module Repo : sig
+  type t
+end
 
-type tree
+module State : sig
+  type t
+
+  val equal : t -> t -> bool
+end
 
 module Id : sig
   type t
@@ -15,32 +21,34 @@ module Id : sig
   val unsafe_of_raw_string : string -> t
 
   val to_raw_string : t -> string
+
+  val equal : t -> t -> bool
 end
 
-val load : cache_size:int -> readonly:bool -> string -> repo Lwt.t
+val load : cache_size:int -> readonly:bool -> string -> Repo.t Lwt.t
 
-val close : repo -> unit Lwt.t
+val close : Repo.t -> unit Lwt.t
 
-val checkout : repo -> Id.t -> tree option Lwt.t
+val checkout : Repo.t -> Id.t -> State.t option Lwt.t
 
-val empty : unit -> tree
+val empty : unit -> State.t
 
-val commit : ?message:string -> repo -> tree -> Id.t Lwt.t
+val commit : ?message:string -> Repo.t -> State.t -> Id.t Lwt.t
 
-val is_gc_finished : repo -> bool
+val is_gc_finished : Repo.t -> bool
 
-val split : repo -> unit
+val split : Repo.t -> unit
 
-val gc : repo -> ?callback:(unit -> unit Lwt.t) -> Id.t -> unit Lwt.t
+val gc : Repo.t -> ?callback:(unit -> unit Lwt.t) -> Id.t -> unit Lwt.t
 
-val wait_gc_completion : repo -> unit Lwt.t
+val wait_gc_completion : Repo.t -> unit Lwt.t
 
-val export_snapshot : repo -> Id.t -> string -> unit tzresult Lwt.t
+val export_snapshot : Repo.t -> Id.t -> string -> unit tzresult Lwt.t
 
-val find : tree -> string list -> tree option Lwt.t
+val find : State.t -> string list -> State.t option Lwt.t
 
-val lookup : tree -> string list -> bytes option Lwt.t
+val lookup : State.t -> string list -> bytes option Lwt.t
 
-val set : tree -> string list -> tree -> tree Lwt.t
+val set : State.t -> string list -> State.t -> State.t Lwt.t
 
-val add : tree -> string list -> bytes -> tree Lwt.t
+val add : State.t -> string list -> bytes -> State.t Lwt.t

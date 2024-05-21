@@ -60,3 +60,17 @@ fn test_repo() {
 
     tmp_dir.close().unwrap()
 }
+
+// Mirrors `src/lib_riscv/pvm/test/test_storage.ml`
+#[test]
+fn test_simple() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let empty = octez_riscv::pvm::dummy_pvm::DummyPvm::empty();
+    let mut repo = Repo::<octez_riscv::pvm::dummy_pvm::DummyPvm>::load(tmp_dir.path()).unwrap();
+    let id = repo.commit(&empty).unwrap();
+    let checked_out_empty = repo.checkout(&id).unwrap();
+    assert_eq!(empty, checked_out_empty);
+    let id2 = repo.commit(&empty).unwrap();
+    assert_eq!(id, id2);
+    repo.close()
+}
