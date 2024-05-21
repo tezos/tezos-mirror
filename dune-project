@@ -3,6 +3,7 @@
 (cram enable)
 (using ctypes 0.3)
 (using menhir 2.1)
+(package (name RPC-toy))
 (package (name bls12-381))
 (package (name data-encoding))
 (package (name gitlab_ci))
