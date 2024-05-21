@@ -65,14 +65,14 @@ module Simple = struct
   let starting =
     declare_0
       ~name:"lib_crawler_layer_1_starting"
-      ~msg:"Starting layer 1 tracker of the smart rollup node"
+      ~msg:"Starting layer 1 tracker"
       ~level:Notice
       ()
 
   let stopping =
     declare_0
       ~name:"lib_crawler_layer_1_stopping"
-      ~msg:"Stopping layer 1 tracker of the smart rollup node"
+      ~msg:"Stopping layer 1 tracker"
       ~level:Notice
       ()
 
