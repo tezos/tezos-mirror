@@ -21,6 +21,8 @@ impl ExecutionEnvironment for Posix {
     type Layout = (Atom<u64>, Atom<u8>, ModeLayout);
 
     type State<M: Manager> = PosixState<M>;
+
+    type Config<'a> = ();
 }
 
 /// Posix execution environment state
@@ -72,6 +74,7 @@ where
     fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
+        _config: &mut (),
         env_exception: EnvironException,
     ) -> EcallOutcome {
         if self.exited() {

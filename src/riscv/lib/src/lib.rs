@@ -114,7 +114,7 @@ impl<'a> Interpreter<'a> {
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
         match result.exception {
-            Some(exc) => match self.pvm.handle_exception(exc) {
+            Some(exc) => match self.pvm.handle_exception(&mut Default::default(), exc) {
                 exec_env::EcallOutcome::Fatal { message } => InterpreterResult::Exception {
                     cause: exc,
                     steps: result.steps,

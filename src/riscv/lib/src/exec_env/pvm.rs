@@ -12,7 +12,10 @@ use crate::{
     state_backend::{AllocatedOf, EnumCell, EnumCellLayout, Manager},
     traps::EnvironException,
 };
-use std::cmp;
+use std::{
+    cmp,
+    io::{stdout, Write},
+};
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
@@ -54,6 +57,31 @@ impl From<PvmStatus> for u8 {
     }
 }
 
+/// PVM configuration
+pub struct PvmSbiConfig<'a> {
+    putchar_hook: Box<dyn FnMut(u8) + 'a>,
+}
+
+impl<'a> PvmSbiConfig<'a> {
+    /// Create a new configuration.
+    pub fn new<F: FnMut(u8) + 'a>(putchar: F) -> Self {
+        Self {
+            putchar_hook: Box::new(putchar),
+        }
+    }
+}
+
+/// The default PVM configuration prints all debug information from the kernel
+/// to the standard output.
+impl<'a> Default for PvmSbiConfig<'a> {
+    fn default() -> Self {
+        fn putchar(char: u8) {
+            stdout().lock().write_all(&[char]).unwrap();
+        }
+        Self::new(putchar)
+    }
+}
+
 /// PVM execution environment
 pub enum PvmSbi {}
 
@@ -61,6 +89,8 @@ impl ExecutionEnvironment for PvmSbi {
     type Layout = EnumCellLayout<u8>;
 
     type State<M: Manager> = PvmSbiState<M>;
+
+    type Config<'a> = PvmSbiConfig<'a>;
 }
 
 /// PVM execution environment state
@@ -162,6 +192,23 @@ impl<M: Manager> PvmSbiState<M> {
             continue_eval: true,
         }
     }
+
+    /// Handle a [SBI_CONSOLE_PUTCHAR] call.
+    fn handle_console_putchar<ML: MainMemoryLayout>(
+        &self,
+        machine: &mut MachineState<ML, M>,
+        config: &mut PvmSbiConfig,
+    ) -> EcallOutcome {
+        let char = machine.hart.xregisters.read(a0) as u8;
+        (config.putchar_hook)(char);
+
+        // This call always succeeds.
+        machine.hart.xregisters.write(a0, 0);
+
+        EcallOutcome::Handled {
+            continue_eval: true,
+        }
+    }
 }
 
 /// TODO: Implement a PVM execution environment.
@@ -184,6 +231,7 @@ where
     fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
+        config: &mut PvmSbiConfig,
         env_exception: EnvironException,
     ) -> EcallOutcome {
         // All calls from machine mode are fatal (according to rvemu sbi)
@@ -197,7 +245,7 @@ where
         let sbi_extension = machine.hart.xregisters.read(a7);
 
         match sbi_extension {
-            SBI_CONSOLE_PUTCHAR => todo!(),
+            SBI_CONSOLE_PUTCHAR => self.handle_console_putchar(machine, config),
             SBI_SHUTDOWN => self.handle_shutdown(),
             SBI_FIRMWARE_TEZOS => {
                 let sbi_function = machine.hart.xregisters.read(a6);
