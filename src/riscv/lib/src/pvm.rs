@@ -6,7 +6,11 @@
 #![allow(dead_code)]
 
 use crate::{
-    exec_env::{self, ExecutionEnvironment, ExecutionEnvironmentState},
+    exec_env::{
+        self,
+        pvm::{PvmSbi, PvmStatus},
+        ExecutionEnvironment, ExecutionEnvironmentState,
+    },
     machine_state::{self, bus::main_memory, StepManyResult},
     range_utils::range_bounds_saturating_sub,
     state_backend,
@@ -59,19 +63,6 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         self.exec_env_state.reset();
     }
 
-    /// Provide input. Returns `false` if the machine state is not in
-    /// `Status::Input` status.
-    pub fn provide_input(&mut self, _level: u64, _counter: u64, _payload: &[u8]) -> bool {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6945
-        // Implement input provider
-        todo!("Input function is not implemented")
-    }
-
-    /// Get the current machine status.
-    pub fn status(&self) -> Status {
-        Status::Eval
-    }
-
     /// Handle an exception using the defined Execution Environment.
     pub fn handle_exception(&mut self, exception: EnvironException) -> exec_env::EcallOutcome {
         match exception {
@@ -83,13 +74,11 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         }
     }
 
-    /// Perform one step. Returns `false` if the PVM is not in [`Status::Eval`] status.
-    pub fn step(&mut self) -> bool {
+    /// Perform one evaluation step.
+    pub fn eval_one(&mut self) {
         if let Err(exc) = self.machine_state.step() {
             let _: exec_env::EcallOutcome = self.handle_exception(exc);
         }
-
-        true
     }
 
     /// Perform a range of evaluation steps. Returns the actual number of steps
@@ -106,12 +95,12 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
-    pub fn step_range(&mut self, step_bounds: &impl RangeBounds<usize>) -> usize {
-        self.step_range_accum(step_bounds, 0)
+    pub fn eval_range(&mut self, step_bounds: &impl RangeBounds<usize>) -> usize {
+        self.eval_range_accum(step_bounds, 0)
     }
 
     // Tail-recursive helper function for [step_many]
-    fn step_range_accum(&mut self, step_bounds: &impl RangeBounds<usize>, accum: usize) -> usize {
+    fn eval_range_accum(&mut self, step_bounds: &impl RangeBounds<usize>, accum: usize) -> usize {
         let StepManyResult {
             mut steps,
             exception,
@@ -133,7 +122,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             } = self.handle_exception(exc)
             {
                 let steps_left = range_bounds_saturating_sub(step_bounds, steps);
-                return self.step_range_accum(&steps_left, total_steps);
+                return self.eval_range_accum(&steps_left, total_steps);
             }
         }
 
@@ -141,11 +130,111 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     }
 }
 
-/// Machine status
-pub enum Status {
-    /// Evaluating normally
-    Eval,
+impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<PvmSbi, ML, M> {
+    /// Provide input. Returns `false` if the machine state is not expecting
+    /// input.
+    pub fn provide_input(&mut self, level: u64, counter: u64, payload: &[u8]) -> bool {
+        self.exec_env_state
+            .provide_input(&mut self.machine_state, level, counter, payload)
+    }
 
-    /// Input has been requested by the PVM
-    Input,
+    /// Get the current machine status.
+    pub fn status(&self) -> PvmStatus {
+        self.exec_env_state.status()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        machine_state::{
+            bus::{main_memory::M1M, start_of_main_memory, Addressable},
+            registers::{a0, a1, a2, a6, a7},
+        },
+        state_backend::{memory_backend::InMemoryBackend, Backend},
+    };
+    use rand::{thread_rng, Fill};
+    use tezos_smart_rollup_constants::riscv::{SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT};
+
+    #[test]
+    fn test_read_input() {
+        type ML = M1M;
+        type L = PvmLayout<PvmSbi, ML>;
+
+        // Setup PVM
+        let (mut backend, placed) = InMemoryBackend::<L>::new();
+        let space = backend.allocate(placed);
+        let mut pvm = Pvm::<PvmSbi, ML, _>::bind(space);
+        pvm.reset();
+
+        let buffer_addr = start_of_main_memory::<ML>();
+        const BUFFER_LEN: usize = 1024;
+
+        // Configure machine for 'sbi_tezos_inbox_next'
+        pvm.machine_state.hart.xregisters.write(a0, buffer_addr);
+        pvm.machine_state
+            .hart
+            .xregisters
+            .write(a1, BUFFER_LEN as u64);
+        pvm.machine_state
+            .hart
+            .xregisters
+            .write(a7, SBI_FIRMWARE_TEZOS);
+        pvm.machine_state
+            .hart
+            .xregisters
+            .write(a6, SBI_TEZOS_INBOX_NEXT);
+
+        // Should be in evaluating mode
+        assert_eq!(pvm.status(), PvmStatus::Evaluating);
+
+        // Handle the ECALL successfully
+        let outcome = pvm.handle_exception(EnvironException::EnvCallFromUMode);
+        assert!(matches!(
+            outcome,
+            exec_env::EcallOutcome::Handled {
+                continue_eval: false
+            }
+        ));
+
+        // After the ECALL we should be waiting for input
+        assert_eq!(pvm.status(), PvmStatus::WaitingForInput);
+
+        // Respond to the request for input
+        let level = rand::random();
+        let counter = rand::random();
+        let mut payload = [0u8; BUFFER_LEN + 10];
+        payload.try_fill(&mut thread_rng()).unwrap();
+        assert!(pvm.provide_input(level, counter, &payload));
+
+        // The status should switch from WaitingForInput to Evaluating
+        assert_eq!(pvm.status(), PvmStatus::Evaluating);
+
+        // Returned meta data is as expected
+        assert_eq!(pvm.machine_state.hart.xregisters.read(a0), level);
+        assert_eq!(pvm.machine_state.hart.xregisters.read(a1), counter);
+        assert_eq!(
+            pvm.machine_state.hart.xregisters.read(a2) as usize,
+            BUFFER_LEN
+        );
+
+        // Payload in memory should be as expected
+        for (offset, &byte) in payload[..BUFFER_LEN].iter().enumerate() {
+            let addr = buffer_addr + offset as u64;
+            let byte_written: u8 = pvm.machine_state.bus.read(addr).unwrap();
+            assert_eq!(
+                byte, byte_written,
+                "Byte at {addr:x} (offset {offset}) is not the same"
+            );
+        }
+
+        // Data after the buffer should be untouched
+        assert!((BUFFER_LEN..4096)
+            .map(|offset| {
+                let addr = buffer_addr + offset as u64;
+                pvm.machine_state.bus.read(addr).unwrap()
+            })
+            .all(|b: u8| b == 0));
+    }
 }
