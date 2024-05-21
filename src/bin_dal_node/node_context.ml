@@ -31,7 +31,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
 }
@@ -55,9 +54,11 @@ type t = {
   mutable profile_ctxt : Profile_manager.t;
   metrics_server : Metrics.t;
   crawler : Crawler.t;
+  last_processed_level_store : Last_processed_level.t;
 }
 
-let init config store gs_worker transport_layer cctxt metrics_server crawler =
+let init config store gs_worker transport_layer cctxt metrics_server crawler
+    last_processed_level_store =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -81,6 +82,7 @@ let init config store gs_worker transport_layer cctxt metrics_server crawler =
     profile_ctxt = Profile_manager.empty;
     metrics_server;
     crawler;
+    last_processed_level_store;
   }
 
 type error += Node_not_ready
@@ -135,7 +137,6 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
             cryptobox;
             proto_parameters;
             shards_proofs_precomputation;
-            last_processed_level = None;
             skip_list_cells_store;
             ongoing_amplifications = Types.Slot_id.Set.empty;
           } ;
@@ -184,14 +185,6 @@ let next_level_to_gc ctxt ~current_level =
           in
           Int32.(max zero (sub current_level (of_int n))))
 
-let update_last_processed_level ctxt ~level =
-  let open Result_syntax in
-  match ctxt.status with
-  | Ready ready_ctxt ->
-      ctxt.status <- Ready {ready_ctxt with last_processed_level = Some level} ;
-      return_unit
-  | Starting _ -> fail [Node_not_ready]
-
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
 let load_profile_ctxt ctxt =
@@ -218,6 +211,8 @@ let set_profile_ctxt ctxt ?(save = true) pctxt =
 let get_config ctxt = ctxt.config
 
 let get_status ctxt = ctxt.status
+
+let get_last_processed_level_store ctxt = ctxt.last_processed_level_store
 
 let get_store ctxt = ctxt.store
 

@@ -36,7 +36,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
       (** The slot identifiers of the commitments currently being
@@ -55,10 +54,11 @@ type status = Ready of ready_ctxt | Starting of starting_status
     field are available through accessors *)
 type t
 
-(** [init config store gs_worker transport_layer cctx crawler] creates a [t] with a
-    status set to [Starting] using the given dal node configuration [config],
-    node store [store], gossipsub worker instance [gs_worker], transport layer
-    instance [transport_layer], and tezos node client context [cctx]. *)
+(** [init config store gs_worker transport_layer cctx crawler
+    last_processed_level_store] creates a [t] with a status set to [Starting]
+    using the given dal node configuration [config], node store [store],
+    gossipsub worker instance [gs_worker], transport layer instance
+    [transport_layer], and tezos node client context [cctx]. *)
 val init :
   Configuration_file.t ->
   Store.t ->
@@ -67,6 +67,7 @@ val init :
   Tezos_rpc.Context.generic ->
   Metrics.t ->
   Crawler.t ->
+  Last_processed_level.t ->
   t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
@@ -118,11 +119,6 @@ val may_add_plugin :
 
 type error += Node_not_ready
 
-(** Updates the [last_processed_level] field of the "ready context" with the given
-    info. Assumes the node's status is ready. Otherwise it returns
-    [Node_not_ready]. *)
-val update_last_processed_level : t -> level:int32 -> unit tzresult
-
 (** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
     propagates [Node_not_ready] if status is not ready yet. If called multiple
     times, it replaces current values for [ready_ctxt] with new ones *)
@@ -152,6 +148,10 @@ val get_status : t -> status
 
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.t
+
+(** [get_last_processed_level_store ctxt] returns the last processed level
+    store. *)
+val get_last_processed_level_store : t -> Last_processed_level.t
 
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t
