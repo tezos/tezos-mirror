@@ -139,8 +139,74 @@ let check_block_data_and_get_content (store : _ Store.t) context hash =
   let*? head_ctxt = check_some hash "context" head_ctxt in
   return (header, inbox, commitment, head_ctxt)
 
-let check_block_data_consistency (metadata : Metadata.t) (store : _ Store.t)
-    context hash next_commitment =
+let get_pvm_state_from_store head_ctxt hash =
+  let open Lwt_result_syntax in
+  let*! pvm_state = Context.PVMState.find head_ctxt in
+  let*? pvm_state = check_some hash "pvm_state" pvm_state in
+  return pvm_state
+
+let compute_pvm_state_for_genenis cctxt dest (store : _ Store.t) context
+    (header : Sc_rollup_block.header) plugin =
+  let open Lwt_result_syntax in
+  let* current_protocol =
+    Node_context.protocol_of_level_with_store store header.level
+  in
+  let (module Plugin : Protocol_plugin_sig.PARTIAL) = plugin in
+  let* constants =
+    Plugin.Layer1_helpers.retrieve_constants cctxt ~block:(`Level header.level)
+  in
+  let current_protocol =
+    {
+      Node_context.hash = current_protocol.protocol;
+      proto_level = current_protocol.proto_level;
+      constants;
+    }
+  in
+  let* node_context =
+    Node_context_loader.For_snapshots.create_node_context
+      cctxt
+      current_protocol
+      store
+      context
+      ~data_dir:dest
+  in
+  Interpreter.genesis_state plugin node_context
+
+let check_genesis_pvm_state_and_return cctxt dest store context header
+    (module Plugin : Protocol_plugin_sig.PARTIAL) (metadata : Metadata.t)
+    head_ctxt hash =
+  let open Lwt_result_syntax in
+  let* patched_pvm_state, Original pvm_state =
+    compute_pvm_state_for_genenis
+      cctxt
+      dest
+      store
+      context
+      header
+      (module Plugin)
+  in
+  let* context_pvm_state = get_pvm_state_from_store head_ctxt hash in
+  let*! context_state_hash =
+    Plugin.Pvm.state_hash metadata.kind context_pvm_state
+  in
+  let*! patched_state_hash =
+    Plugin.Pvm.state_hash metadata.kind patched_pvm_state
+  in
+  let*? () =
+    error_unless State_hash.(context_state_hash = patched_state_hash)
+    @@ error_of_fmt
+         "Erroneous state hash %a for originated rollup (level %ld) instead of \
+          %a."
+         State_hash.pp
+         context_state_hash
+         header.level
+         State_hash.pp
+         patched_state_hash
+  in
+  return pvm_state
+
+let check_block_data_consistency cctxt dest (metadata : Metadata.t)
+    (store : _ Store.t) context hash next_commitment =
   let open Lwt_result_syntax in
   let* header, inbox, commitment, head_ctxt =
     check_block_data_and_get_content store context hash
@@ -148,9 +214,23 @@ let check_block_data_consistency (metadata : Metadata.t) (store : _ Store.t)
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store header.level
   in
-  let*! pvm_state = Context.PVMState.find head_ctxt in
-  let*? pvm_state = check_some hash "pvm_state" pvm_state in
-  let*! state_hash = Plugin.Pvm.state_hash metadata.kind pvm_state in
+  let* pvm_state_of_commitment =
+    if metadata.genesis_info.level = header.level then
+      check_genesis_pvm_state_and_return
+        cctxt
+        dest
+        store
+        context
+        header
+        (module Plugin)
+        metadata
+        head_ctxt
+        hash
+    else get_pvm_state_from_store head_ctxt hash
+  in
+  let*! state_hash =
+    Plugin.Pvm.state_hash metadata.kind pvm_state_of_commitment
+  in
   let* () =
     match (commitment, header.commitment_hash) with
     | None, None -> return_unit
@@ -511,7 +591,7 @@ let post_checks ~action ~message snapshot_metadata ~dest =
         | Some metadata ->
             let*? () = check_last_commitment head snapshot_metadata in
             let* () = check_lcc metadata cctxt store head (module Plugin) in
-            return (check_block_data_consistency metadata))
+            return (check_block_data_consistency cctxt dest metadata))
   in
   let* () =
     check_l2_chain ~message ~data_dir:dest store context head check_block_data
