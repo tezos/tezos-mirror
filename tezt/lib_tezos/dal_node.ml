@@ -381,3 +381,30 @@ module Agent = struct
       ()
     |> Lwt.return
 end
+
+let load_last_finalized_processed_level dal_node =
+  let open Tezos_stdlib_unix in
+  let aux () =
+    let open Lwt_result.Syntax in
+    let open Lwt_result in
+    let last_processed_level_filename = "last_processed_level" in
+    let root_dir = sf "%s/store" (data_dir dal_node) in
+    let* kvs =
+      Key_value_store.Internal_for_tests.init ~lru_size:1 ~root_dir ()
+    in
+    let file_layout ~root_dir () =
+      let filepath = Filename.concat root_dir last_processed_level_filename in
+      Key_value_store.layout
+        ~encoding:Data_encoding.int32
+        ~filepath
+        ~eq:Stdlib.( = )
+        ~index_of:(fun () -> 0)
+        ~number_of_keys_per_file:1
+        ()
+    in
+    let* value_res = Key_value_store.read_value kvs file_layout () () in
+    let* () = Key_value_store.close kvs in
+    Int32.to_int value_res |> return
+  in
+  let* v_res = aux () in
+  match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none

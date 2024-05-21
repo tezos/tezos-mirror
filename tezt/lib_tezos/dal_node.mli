@@ -204,3 +204,8 @@ module Agent : sig
 
   val create : ?path:string -> ?name:string -> node:Node.t -> Agent.t -> t Lwt.t
 end
+
+(** Load and return the current value of the last finalized level processed by
+    the crawler and stored in store/last_processed_level KVS file. The function
+    returns [None] in case of error (e.g. file not found, file locked, ...). *)
+val load_last_finalized_processed_level : t -> int option Lwt.t
