@@ -207,6 +207,28 @@ module Make (Reader : READER) = struct
     | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
     | Some block -> populate_tx_objects ~full_transaction_object block
 
+  let block_receipts n =
+    let number = Durable_storage_path.Block.(Nth n) in
+    let open Lwt_result_syntax in
+    let* block = blocks_by_number ~full_transaction_object:false ~number in
+    let get_receipt_from_hash tx_hash =
+      Lwt.map
+        (function Ok receipt -> receipt | _ -> None)
+        (transaction_receipt tx_hash)
+    in
+    let tx_hashes : hash list =
+      match block.transactions with
+      | TxHash tx_hashes -> tx_hashes
+      | TxFull tx_objects ->
+          (* This case should never happen, because there is no ways
+             to ask for full objects when requestion block receipts. *)
+          List.map
+            (fun (tx_object : transaction_object) -> tx_object.hash)
+            tx_objects
+    in
+    let*! receipts = Lwt_list.filter_map_s get_receipt_from_hash tx_hashes in
+    Lwt.return_ok receipts
+
   let chain_id () =
     inspect_durable_and_decode Durable_storage_path.chain_id decode_number
 
