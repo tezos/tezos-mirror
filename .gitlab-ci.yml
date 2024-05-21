@@ -15,7 +15,6 @@ stages:
   - build
   - deploy
   - docker
-  - manifest
 
 .supported-OCTEZ_BRANCH: &supported-OCTEZ_BRANCH ["octez-v20.0-rc1", "master"]
 
