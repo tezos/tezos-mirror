@@ -26,7 +26,7 @@ export alpine_version='3.19'
 
 ## full_opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
+export full_opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
 
 ## `opam_repository_tag` is a commit hash of the
 ## https://gitlab.com/tezos/opam-repository repository. This
@@ -35,7 +35,7 @@ export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
 ## distribution.
 ## The value of `opam_repository_tag` MUST be reflected in the `build_deps_image_version` variable
 ## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-a921e49555556ab83b6dad58ef18ec83a8a2b7c1}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-7294c2c92922a4cde48fc2f4cd9582935ff8ce90}"
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.

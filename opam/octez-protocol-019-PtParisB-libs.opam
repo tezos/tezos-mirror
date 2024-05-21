@@ -15,7 +15,7 @@ depends: [
   "tezos-protocol-019-PtParisB" { = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "tezt" { >= "4.0.0" & < "5.0.0" }
+  "tezt" { >= "4.1.0" & < "5.0.0" }
   "octez-alcotezt" { = version }
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs" { = version }

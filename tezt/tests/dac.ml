@@ -1391,11 +1391,11 @@ let test_observer_times_out_when_page_cannot_be_fetched _protocol node client
   in
   let request_time = Float.sub !end_time !start_time in
   let observer_timeout = Float.of_int observer_timeout in
-  let result =
+  let r =
     request_time >= observer_timeout && request_time < sleeping_node_timeout
   in
   Check.(
-    (result = true)
+    (r = true)
       bool
       ~__LOC__
       ~error_msg:

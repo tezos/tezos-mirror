@@ -3041,10 +3041,9 @@ let test_rpc_sendRawTransaction_nonce_too_high =
   let raw_tx =
     "0xf86c01825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a95a0a349864bedc9b84aea88cda197e96538c62c242286ead58eb7180a611f850237a01206525ff16ae5b708ee02b362f9b4d7565e0d7e9b4c536d7ef7dec81cda3ac7"
   in
-  let* result = Rpc.send_raw_transaction ~raw_tx evm_node in
+  let* r = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(
-    ((Result.is_ok result = true) bool)
-      ~error_msg:"The transaction should succeed") ;
+    ((Result.is_ok r = true) bool) ~error_msg:"The transaction should succeed") ;
   unit
 
 let test_deposit_before_and_after_migration =
