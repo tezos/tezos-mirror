@@ -102,8 +102,8 @@ val address_encoding : address Data_encoding.t
 val decode_address : bytes -> address
 
 type transaction_object = {
-  blockHash : block_hash;
-  blockNumber : quantity;
+  blockHash : block_hash option;
+  blockNumber : quantity option;
   from : address;
   gas : quantity;
   gasPrice : quantity;
@@ -111,7 +111,7 @@ type transaction_object = {
   input : hash;
   nonce : quantity;
   to_ : address option;
-  transactionIndex : quantity;
+  transactionIndex : quantity option;
   value : quantity;
   v : quantity;
   r : hash;
@@ -120,7 +120,11 @@ type transaction_object = {
 
 val transaction_object_encoding : transaction_object Data_encoding.t
 
-val transaction_object_from_rlp : block_hash -> bytes -> transaction_object
+val transaction_object_from_rlp_item :
+  block_hash option -> Rlp.item -> transaction_object
+
+val transaction_object_from_rlp :
+  block_hash option -> bytes -> transaction_object
 
 type block_transactions =
   | TxHash of hash list

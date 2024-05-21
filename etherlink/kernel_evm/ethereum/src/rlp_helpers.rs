@@ -348,6 +348,29 @@ pub fn decode_public_key(decoder: &Rlp<'_>) -> Result<PublicKey, DecoderError> {
     Ok(pk)
 }
 
+pub trait VersionedEncoding: Encodable + Decodable {
+    const VERSION: u8;
+
+    /// from_bytes is never used outside of tests. If needed, it needs to be
+    /// implemented explicitly outside of the trait.
+    #[cfg(test)]
+    fn from_bytes(vec: &[u8]) -> Result<Self, DecoderError> {
+        let tag = vec[0];
+        if tag == Self::VERSION {
+            let decoder = Rlp::new(&vec[1..]);
+            Self::decode(&decoder)
+        } else {
+            Err(DecoderError::Custom("Decoding on unknown version"))
+        }
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes: Vec<u8> = self.rlp_bytes().into();
+        bytes.insert(0, Self::VERSION);
+        bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::rlp_helpers::decode_h160;

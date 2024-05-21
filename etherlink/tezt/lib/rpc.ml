@@ -135,6 +135,8 @@ module Request = struct
       method_ = "tez_replayBlock";
       parameters = `String (string_of_int blockNumber);
     }
+
+  let txpool_content = {method_ = "txpool_content"; parameters = `A []}
 end
 
 let net_version evm_node =
@@ -326,4 +328,32 @@ let replay_block blockNumber evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> Block.of_json)
+       response
+
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+let txpool_content evm_node =
+  let* response = Evm_node.call_evm_rpc evm_node Request.txpool_content in
+  let parse txpool field =
+    let open JSON in
+    let pool = txpool |-> field in
+
+    (* `|->` returns `Null if the field does not exists, and `Null is
+       interpreted as the empty list by `as_object`. As such, we must ensure the
+       field exists. *)
+    if is_null pool then Test.fail "%s must exists" field
+    else
+      pool |> as_object
+      |> List.map (fun (address, transactions) ->
+             let transactions =
+               transactions |> as_object
+               |> List.map (fun (nonce, tx) -> (Int64.of_string nonce, tx))
+             in
+             {address; transactions})
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         let txpool = Evm_node.extract_result response in
+         (parse txpool "pending", parse txpool "queued"))
        response

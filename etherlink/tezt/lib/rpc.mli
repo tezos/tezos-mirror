@@ -43,6 +43,8 @@ module Request : sig
   val net_version : Evm_node.request
 
   val eth_maxPriorityFeePerGas : Evm_node.request
+
+  val txpool_content : Evm_node.request
 end
 
 (** [net_version evm_node] calls [net_version]. *)
@@ -150,3 +152,12 @@ val get_max_priority_fee_per_gas : Evm_node.t -> Int32.t Lwt.t
 (** [replay_block number evm_node] replays the block [number] and returns its
     representation. *)
 val replay_block : int -> Evm_node.t -> (Block.t, error) result Lwt.t
+
+(** A slot in the transaction pool associates an address to a mapping of nonces
+    to transactions. *)
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+(** [txpool_content evm_node] returns the transaction hash and nonce
+    contained in the `pending` and `queued` pools. *)
+val txpool_content :
+  Evm_node.t -> (txpool_slot list * txpool_slot list, error) result Lwt.t
