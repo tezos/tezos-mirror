@@ -80,4 +80,8 @@ type output = {
 val output_encoding : output Data_encoding.t
 
 val output_binary_decoder :
-  gas:bytes -> failed:bytes -> return_value:bytes -> output
+  gas:bytes ->
+  failed:bytes ->
+  return_value:bytes ->
+  struct_logs:bytes list ->
+  output tzresult

@@ -475,6 +475,105 @@ type opcode_log = {
   error : string option;
 }
 
+let decode_value decode =
+  let open Result_syntax in
+  function
+  | Rlp.Value b -> decode b
+  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected value")
+
+let decode_list decode =
+  let open Result_syntax in
+  function
+  | Rlp.List l -> return (decode l)
+  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected list")
+
+let opcode_rlp_decoder bytes =
+  let open Result_syntax in
+  let* rlp = Rlp.decode bytes in
+  match rlp with
+  | Rlp.List
+      [
+        Value pc;
+        Value op;
+        Value gas;
+        Value gas_cost;
+        Value depth;
+        error;
+        stack;
+        return_data;
+        raw_memory;
+        storage;
+      ] ->
+      let pc = Bytes.to_string pc |> Z.of_bits in
+      let* op =
+        if Bytes.length op > 1 then
+          tzfail
+            (error_of_fmt
+               "Invalid opcode encoding: %a"
+               Hex.pp
+               (Hex.of_bytes op))
+        else if Bytes.length op = 0 then return '\x00'
+        else return (Bytes.get op 0)
+      in
+      let gas = Bytes.to_string gas |> Z.of_bits in
+      let gas_cost = Bytes.to_string gas_cost |> Z.of_bits in
+      let depth = Bytes.to_string depth |> Z.of_bits in
+      let* error =
+        Rlp.decode_option
+          (decode_value (fun e -> return @@ Bytes.to_string e))
+          error
+      in
+      let* return_data =
+        Rlp.decode_option
+          (decode_value (fun d -> return @@ Hex.of_bytes d))
+          return_data
+      in
+      let* stack =
+        Rlp.decode_option
+          (decode_list
+          @@ List.filter_map (function
+                 | Rlp.List _ -> None
+                 | Rlp.Value v -> Some (Hex.of_bytes v)))
+          stack
+      in
+      let* raw_memory = Rlp.decode_option (decode_value return) raw_memory in
+      let mem_size =
+        Option.map (fun m -> Bytes.length m |> Int32.of_int) raw_memory
+      in
+      let* memory =
+        Option.map_e
+          (fun memory ->
+            let* chunks = TzString.chunk_bytes 32 memory in
+            return @@ List.map Hex.of_string chunks)
+          raw_memory
+      in
+      let* storage =
+        let parse_storage_index = function
+          | Rlp.List [Value _; Value index; Value value] ->
+              Some (Hex.of_bytes index, Hex.of_bytes value)
+          | _ -> None
+        in
+        Rlp.decode_option
+          (decode_list (List.filter_map parse_storage_index))
+          storage
+      in
+      return
+        {
+          pc;
+          op;
+          gas;
+          gas_cost;
+          memory;
+          mem_size;
+          stack;
+          return_data;
+          storage;
+          depth;
+          refund = Z.zero;
+          error;
+        }
+  | _ -> tzfail (error_of_fmt "Invalid rlp encoding for opcode: %a" Rlp.pp rlp)
+
 let opcode_encoding =
   let open Data_encoding in
   conv
@@ -562,7 +661,8 @@ let output_encoding =
        (req "returnValue" Ethereum_types.hash_encoding)
        (req "structLogs" (list opcode_encoding)))
 
-let output_binary_decoder ~gas ~failed ~return_value =
+let output_binary_decoder ~gas ~failed ~return_value ~struct_logs =
+  let open Result_syntax in
   let gas =
     Ethereum_types.decode_number gas |> fun (Ethereum_types.Qty z) ->
     Z.to_int64 z
@@ -574,4 +674,5 @@ let output_binary_decoder ~gas ~failed ~return_value =
     let (`Hex hex_value) = Hex.of_bytes return_value in
     Ethereum_types.hash_of_string hex_value
   in
-  {gas; failed; return_value; struct_logs = []}
+  let* struct_logs = List.map_e opcode_rlp_decoder struct_logs in
+  return {gas; failed; return_value; struct_logs}
