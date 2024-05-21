@@ -1,0 +1,16 @@
+[Unit]
+Description=Octez Smart Rollup Node
+Documentation=https://tezos.gitlab.io/
+After=network.target octez-node.service
+
+[Service]
+EnvironmentFile=-/etc/default/octez-smart-rollup-node
+WorkingDirectory=/var/tezos
+Restart=on-failure
+User=tezos
+ExecStart=/usr/bin/octez-smart-rollup-node run $RUNTIME_OPTS
+StandardOutput=append:/var/log/tezos/smart-rollup-node.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

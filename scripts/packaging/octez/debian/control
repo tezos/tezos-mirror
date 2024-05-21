@@ -94,3 +94,14 @@ Description: Octez experimental binaries
    make it easier to test and observe them.
  - octez-protocol-compiler: used by the node to compile new protocols on
    the fly, and that can be used for developing new protocols.
+
+Package: octez-smart-rollup-node
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}, octez-node (= ${source:Version}),
+Recommends: octez-client (= ${source:Version})
+Description: Octez Smart Rollup node
+ This package enables rollup deployment, managing progress through commitment
+ publication and refutation games. Similar to the Octez node, it offers an
+ HTTP-accessible RPC interface.
+ .
+ This package installs the Octez rollup node.
