@@ -372,6 +372,11 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
     ?bootstrap_profile ?producer_profiles ?history_mode variant scenario =
   let description = "Testing DAL node" in
+  let tags =
+    match producer_profiles with
+    | None | Some [] -> tags
+    | _ -> Tag.memory_3k :: tags
+  in
   test
     ?regression
     ~__FILE__
@@ -401,13 +406,18 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
-    ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
+    ?redundancy_factor ?attestation_lag ?(tags = [team]) ?(uses = fun _ -> [])
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
     ?smart_rollup_timeout_period_in_blocks ?(regression = true) variant scenario
     =
   let description = "Testing DAL rollup and node with L1" in
+  let tags =
+    match producer_profiles with
+    | None | Some [] -> tags
+    | _ -> Tag.memory_3k :: tags
+  in
   test
     ~regression
     ~__FILE__
@@ -4664,7 +4674,7 @@ module History_rpcs = struct
       dal_node
 
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"] in
+    let tags = ["rpc"; "skip_list"; "memory_3k"] in
     let description = "test commitments history with migration" in
     let slot_index = 3 in
     let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
@@ -6789,14 +6799,14 @@ let register ~protocols =
     test_baker_registers_profiles
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"]
+    ~tags:["bootstrap"; "memory_3k"]
     ~bootstrap_profile:true
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
     protocols ;
 
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; "trusted"; "connection"]
+    ~tags:["bootstrap"; "trusted"; "connection"; "memory_3k"]
     ~bootstrap_profile:true
     "trusted peers reconnection"
     test_peers_reconnection
@@ -6820,7 +6830,7 @@ let register ~protocols =
     History_rpcs.test_commitments_history_rpcs
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"]
+    ~tags:["amplification"; "memory_3k"]
     ~bootstrap_profile:true
     ~redundancy_factor:2
       (* With a redundancy factor of 4 or more, not much luck is
@@ -6834,7 +6844,7 @@ let register ~protocols =
     Amplification.test_amplification
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "simple"]
+    ~tags:["amplification"; "simple"; "memory_3k"]
     ~bootstrap_profile:true
     "observer triggers amplification (without lost shards)"
     Amplification.test_amplification_without_lost_shards

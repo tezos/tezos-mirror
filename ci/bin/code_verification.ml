@@ -1338,6 +1338,7 @@ let jobs pipeline_type =
           ~name:"tezt-memory-3k"
           ~tezt_tests:(tezt_tests ~memory_3k:true [])
           ~tezt_variant:"-memory_3k"
+          ~parallel:(Vector 4)
           ~dependencies
           ~rules
           ()
