@@ -44,8 +44,12 @@ type ready_ctxt = {
      of the same slot. *)
 }
 
+(** A promise that is fullfilled only when the status of the node evolves from
+    [Starting] to [Ready] state. *)
+type starting_status
+
 (** The status of the dal node *)
-type status = Ready of ready_ctxt | Starting
+type status = Ready of ready_ctxt | Starting of starting_status
 
 (** A [t] value contains both the status and the dal node configuration. It's
     field are available through accessors *)
@@ -123,6 +127,11 @@ val update_last_processed_level : t -> level:int32 -> unit tzresult
     propagates [Node_not_ready] if status is not ready yet. If called multiple
     times, it replaces current values for [ready_ctxt] with new ones *)
 val get_ready : t -> ready_ctxt tzresult
+
+(** returns a promise that resolves when the ready state evolves from [Starting]
+    to [Ready]. The returned promise is already resolved if the node is already
+    in [Ready] state. *)
+val wait_for_ready_state : t -> unit Lwt.t
 
 (** [get_profile_ctxt ctxt] returns the profile context.  *)
 val get_profile_ctxt : t -> Profile_manager.t

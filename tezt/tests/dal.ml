@@ -5588,7 +5588,20 @@ module Garbage_collection = struct
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
-    let* () = bake_for ~count:25 client in
+    let rec bake_loop n =
+      if n <= 0 then unit
+      else
+        let* level = Client.level client in
+        let wait_block_p =
+          List.map
+            (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
+            [attester; observer; dal_bootstrap; slot_producer]
+        in
+        let* () = bake_for client in
+        let* () = Lwt.join wait_block_p in
+        bake_loop (n - 1)
+    in
+    let* () = bake_loop 25 in
     Log.info "Blocks baked !" ;
 
     Log.info "Wait for first shard attester" ;

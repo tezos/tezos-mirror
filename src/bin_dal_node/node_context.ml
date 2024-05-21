@@ -36,7 +36,12 @@ type ready_ctxt = {
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
 }
 
-type status = Ready of ready_ctxt | Starting
+type starting_status = {
+  started_promise : unit Lwt.t;
+  started_resolver : unit Lwt.u;
+}
+
+type status = Ready of ready_ctxt | Starting of starting_status
 
 type t = {
   mutable status : status;
@@ -62,8 +67,9 @@ let init config store gs_worker transport_layer cctxt metrics_server crawler =
         Dal_node_client.make_unix_cctxt endpoint)
       config.Configuration_file.neighbors
   in
+  let started_promise, started_resolver = Lwt.task () in
   {
-    status = Starting;
+    status = Starting {started_promise; started_resolver};
     config;
     store;
     tezos_node_cctxt = cctxt;
@@ -97,13 +103,19 @@ let get_ready ctxt =
   let open Result_syntax in
   match ctxt.status with
   | Ready ctxt -> Ok ctxt
-  | Starting -> fail [Node_not_ready]
+  | Starting _ -> fail [Node_not_ready]
+
+let wait_for_ready_state ctxt =
+  let open Lwt_syntax in
+  match ctxt.status with
+  | Ready _ -> return_unit
+  | Starting s -> s.started_promise
 
 let set_ready ctxt cctxt skip_list_cells_store cryptobox
     shards_proofs_precomputation proto_parameters ~level =
   let open Lwt_result_syntax in
   match ctxt.status with
-  | Starting ->
+  | Starting starting_status ->
       let*? () =
         Profile_manager.validate_slot_indexes
           ctxt.profile_ctxt
@@ -127,13 +139,14 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
             skip_list_cells_store;
             ongoing_amplifications = Types.Slot_id.Set.empty;
           } ;
+      Lwt.wakeup starting_status.started_resolver () ;
       return_unit
   | Ready _ -> raise Status_already_ready
 
 let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
   match ctxt.status with
-  | Starting -> return_unit
+  | Starting _ -> return_unit
   | Ready ready_ctxt ->
       let* proto_plugins =
         Proto_plugins.may_add
@@ -152,7 +165,7 @@ let get_plugin_for_level ctxt ~level =
 
 let get_all_plugins ctxt =
   match ctxt.status with
-  | Starting -> []
+  | Starting _ -> []
   | Ready {proto_plugins; _} -> Proto_plugins.to_list proto_plugins
 
 let next_level_to_gc ctxt ~current_level =
@@ -162,7 +175,7 @@ let next_level_to_gc ctxt ~current_level =
       Int32.(max zero (sub current_level (of_int n)))
   | Rolling {blocks = `Auto} -> (
       match ctxt.status with
-      | Starting -> Int32.zero
+      | Starting _ -> Int32.zero
       | Ready {proto_parameters; _} ->
           let n =
             Profile_manager.get_default_shard_store_period
@@ -177,7 +190,7 @@ let update_last_processed_level ctxt ~level =
   | Ready ready_ctxt ->
       ctxt.status <- Ready {ready_ctxt with last_processed_level = Some level} ;
       return_unit
-  | Starting -> fail [Node_not_ready]
+  | Starting _ -> fail [Node_not_ready]
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 

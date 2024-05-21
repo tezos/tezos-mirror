@@ -180,11 +180,12 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
 let try_amplification (node_store : Store.t) commitment
     (slot_id : Types.slot_id) gs_worker node_ctxt =
   let open Lwt_result_syntax in
+  let*! () = Node_context.wait_for_ready_state node_ctxt in
   match Node_context.get_status node_ctxt with
-  | Starting ->
-      (* The cryptobox is not yet available so we cannot reconstruct
-         slots yet. *)
-      return_unit
+  | Starting _ ->
+      (* The node is supposed to be ready thanks to [wait_for_ready_state]
+         above. *)
+      assert false
   | Ready {shards_proofs_precomputation = None; _} ->
       (* The prover SRS is not loaded so we cannot reconstruct slots
          yet. *)
