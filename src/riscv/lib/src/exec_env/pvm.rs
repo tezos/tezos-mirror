@@ -154,6 +154,14 @@ impl<M: Manager> PvmSbiState<M> {
             continue_eval: false,
         }
     }
+
+    /// Handle a [SBI_SHUTDOWN] call.
+    fn handle_shutdown(&self) -> EcallOutcome {
+        // Shutting down in the PVM does nothing at the moment.
+        EcallOutcome::Handled {
+            continue_eval: true,
+        }
+    }
 }
 
 /// TODO: Implement a PVM execution environment.
@@ -190,7 +198,7 @@ where
 
         match sbi_extension {
             SBI_CONSOLE_PUTCHAR => todo!(),
-            SBI_SHUTDOWN => todo!(),
+            SBI_SHUTDOWN => self.handle_shutdown(),
             SBI_FIRMWARE_TEZOS => {
                 let sbi_function = machine.hart.xregisters.read(a6);
 
