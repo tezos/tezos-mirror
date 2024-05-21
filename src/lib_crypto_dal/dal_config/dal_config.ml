@@ -59,8 +59,8 @@ let encoding : t Data_encoding.t =
     (fun (activated, use_mock_srs_for_testing, bootstrap_peers) ->
       {activated; use_mock_srs_for_testing; bootstrap_peers})
     (obj3
-       (req "activated" bool)
-       (req "use_mock_srs_for_testing" bool)
+       (dft "activated" bool true)
+       (dft "use_mock_srs_for_testing" bool false)
        (req "bootstrap_peers" (list string)))
   [@@coverage off]
 
