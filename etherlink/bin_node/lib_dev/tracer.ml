@@ -15,6 +15,30 @@ let read_value ?default state path =
       | Some d -> return d
       | None -> tzfail Tracer_types.Trace_not_found)
 
+let read_logs_length state =
+  let open Lwt_result_syntax in
+  let* value =
+    read_value
+      ~default:(Bytes.of_string "\000")
+      state
+      Durable_storage_path.Trace_transaction.logs_length
+  in
+  return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
+
+let read_opcode state opcode_index =
+  read_value state (Durable_storage_path.Trace_transaction.opcode opcode_index)
+
+let read_logs state =
+  let open Lwt_result_syntax in
+  let* length = read_logs_length state in
+  let*? opcodes =
+    List.init
+      ~when_negative_length:(TzTrace.make (error_of_fmt "Invalid length"))
+      length
+      Fun.id
+  in
+  List.map_es (read_opcode state) opcodes
+
 let read_output state =
   let open Lwt_result_syntax in
   let* gas =
@@ -30,7 +54,9 @@ let read_output state =
       state
       Durable_storage_path.Trace_transaction.output_return_value
   in
-  return @@ Tracer_types.output_binary_decoder ~gas ~failed ~return_value
+  let* struct_logs = read_logs state in
+  Lwt.return
+  @@ Tracer_types.output_binary_decoder ~gas ~failed ~return_value ~struct_logs
 
 let trace_transaction ~block_number ~transaction_hash ~config =
   let open Lwt_result_syntax in
