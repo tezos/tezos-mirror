@@ -133,11 +133,12 @@ module Shards = struct
   let read store slot_id shard_id =
     let open Lwt_result_syntax in
     let*! res = KVS.read_value store file_layout slot_id shard_id in
-    let data_kind = Types.Store.Shard in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
-    | Error err -> fail @@ Errors.decoding_failed data_kind err
+    | Error err ->
+        let data_kind = Types.Store.Shard in
+        fail @@ Errors.decoding_failed data_kind err
 
   let count_values store slot_id = KVS.count_values store file_layout slot_id
 
@@ -187,11 +188,12 @@ module Slots = struct
   let find_slot t ~slot_size slot_id =
     let open Lwt_result_syntax in
     let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
-    let data_kind = Types.Store.Slot in
     match res with
     | Ok slot -> return slot
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
-    | Error err -> fail @@ Errors.decoding_failed data_kind err
+    | Error err ->
+        let data_kind = Types.Store.Slot in
+        fail @@ Errors.decoding_failed data_kind err
 
   let remove_slot t ~slot_size slot_id =
     KVS.remove_file t file_layout (slot_id, slot_size)
@@ -242,11 +244,12 @@ module Statuses = struct
     let*! res =
       KVS.read_value t file_layout slot_id.slot_level slot_id.slot_index
     in
-    let data_kind = Types.Store.Header_status in
     match res with
     | Ok slot -> return slot
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
-    | Error err -> fail @@ Errors.decoding_failed data_kind err
+    | Error err ->
+        let data_kind = Types.Store.Header_status in
+        fail @@ Errors.decoding_failed data_kind err
 
   let add_slot_headers ~number_of_slots ~block_level slot_headers t =
     let module SI = Set.Make (Int) in
