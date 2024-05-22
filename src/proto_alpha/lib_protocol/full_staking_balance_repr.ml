@@ -189,6 +189,37 @@ let current_total
   let* total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
   Tez_repr.(total_frozen +? delegated)
 
+let allowed_staked_frozen ~adaptive_issuance_global_limit_of_staking_over_baking
+    ~delegate_limit_of_staking_over_baking_millionth
+    {
+      own_frozen;
+      staked_frozen;
+      delegated = _;
+      min_delegated_in_cycle = _;
+      level_of_min_delegated = _;
+    } =
+  let global_limit_of_staking_over_baking_millionth =
+    Int64.(
+      mul
+        1_000_000L
+        (of_int adaptive_issuance_global_limit_of_staking_over_baking))
+  in
+  let limit_of_staking_over_baking_millionth =
+    Compare.Int64.min
+      global_limit_of_staking_over_baking_millionth
+      (Int64.of_int32 delegate_limit_of_staking_over_baking_millionth)
+  in
+  match
+    Tez_repr.mul_ratio
+      ~rounding:`Down
+      own_frozen
+      ~num:limit_of_staking_over_baking_millionth
+      ~den:1_000_000L
+  with
+  | Ok max_allowed_staked_frozen ->
+      Tez_repr.min staked_frozen max_allowed_staked_frozen
+  | Error _max_allowed_staked_frozen_overflows -> staked_frozen
+
 let own_ratio
     {
       own_frozen;
