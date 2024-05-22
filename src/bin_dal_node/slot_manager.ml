@@ -192,7 +192,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot ~reconstruct_if_missing cryptobox ctxt store slot_id =
+let get_slot_content ~reconstruct_if_missing ctxt store cryptobox slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -432,10 +432,6 @@ let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots
     attested_slots
     node_store
-
-let get_slot_content ~reconstruct_if_missing node_store node_context cryptobox
-    (slot_id : Types.slot_id) =
-  get_slot ~reconstruct_if_missing cryptobox node_store node_context slot_id
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store
