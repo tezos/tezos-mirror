@@ -49,6 +49,8 @@ module Block_store_status = struct
 
   let is_merging = function Idle _ -> false | Merging _ -> true
 
+  let get_status_value = function Idle v | Merging v -> v
+
   let create_idle_status = Idle 0
 
   let equal s1 s2 =

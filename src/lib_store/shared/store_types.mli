@@ -29,9 +29,6 @@ module Block_store_status : sig
   (** The type used to describe the status of the store. *)
   type t
 
-  (* Getters *)
-  val get_value : t Stored_data.t -> int Lwt.t
-
   (* Setters *)
 
   val set_idle_status : t Stored_data.t -> unit tzresult Lwt.t
@@ -43,6 +40,8 @@ module Block_store_status : sig
   val is_idle : t -> bool
 
   val is_merging : t -> bool
+
+  val get_status_value : t -> int
 
   (* Initialisers *)
 
