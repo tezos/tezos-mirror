@@ -220,20 +220,28 @@ let allowed_staked_frozen ~adaptive_issuance_global_limit_of_staking_over_baking
       Tez_repr.min staked_frozen max_allowed_staked_frozen
   | Error _max_allowed_staked_frozen_overflows -> staked_frozen
 
-let own_ratio
-    {
-      own_frozen;
-      staked_frozen;
-      delegated = _;
-      min_delegated_in_cycle = _;
-      level_of_min_delegated = _;
-    } =
-  if Tez_repr.(staked_frozen = zero) then (1L, 1L)
-  else if Tez_repr.(own_frozen = zero) then (0L, 1L)
+let own_ratio ~adaptive_issuance_global_limit_of_staking_over_baking
+    ~delegate_limit_of_staking_over_baking_millionth
+    ({
+       own_frozen;
+       staked_frozen = _;
+       delegated = _;
+       min_delegated_in_cycle = _;
+       level_of_min_delegated = _;
+     } as t) =
+  if Tez_repr.(own_frozen = zero) then (0L, 1L)
   else
-    let own_frozen = Tez_repr.to_mutez own_frozen in
-    let staked_frozen = Tez_repr.to_mutez staked_frozen in
-    (own_frozen, Int64.add own_frozen staked_frozen)
+    let allowed_staked_frozen =
+      allowed_staked_frozen
+        ~adaptive_issuance_global_limit_of_staking_over_baking
+        ~delegate_limit_of_staking_over_baking_millionth
+        t
+    in
+    if Tez_repr.(allowed_staked_frozen = zero) then (1L, 1L)
+    else
+      let own_frozen = Tez_repr.to_mutez own_frozen in
+      let allowed_staked_frozen = Tez_repr.to_mutez allowed_staked_frozen in
+      (own_frozen, Int64.add own_frozen allowed_staked_frozen)
 
 let has_minimal_frozen_stake ~minimal_frozen_stake full_staking_balance =
   let own_frozen = own_frozen full_staking_balance in

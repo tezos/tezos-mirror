@@ -59,10 +59,17 @@ val allowed_staked_frozen :
   t ->
   Tez_repr.t
 
-(** [own_ratio full_staking_balance] returns [(num, den)] representing the
-ratio of [own_frozen] over [total_frozen] for [full_staking_balance].
-If [total_frozen] is zero, the returned ratio is [(1L, 1L)]. *)
-val own_ratio : t -> Int64.t * Int64.t
+(** Computes [(num, den)] representing the ratio of [own_frozen] over
+    [own_frozen + allowed_staked_frozen].
+
+    If [allowed_staked_frozen] is zero, returns [(1L, 1L)].
+
+    If [own_frozen] is zero, returns [(0L, 1L)]. *)
+val own_ratio :
+  adaptive_issuance_global_limit_of_staking_over_baking:int ->
+  delegate_limit_of_staking_over_baking_millionth:int32 ->
+  t ->
+  int64 * int64
 
 val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
 
