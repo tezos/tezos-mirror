@@ -254,7 +254,7 @@ Install OPAM
 ~~~~~~~~~~~~
 
 First, you need to install the `OPAM <https://opam.ocaml.org/>`__
-package manager, at least version 2.0, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
+package manager, at least version 2.1, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
 
 After the first install of OPAM, use ``opam init --bare`` to set it up
 while avoiding to compile an OCaml compiler now, as this will be done in
@@ -283,7 +283,7 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
 .. literalinclude:: install-opam.sh
   :language: shell
   :start-after: [install ocaml compiler]
-  :end-before: [get system dependencies]
+  :end-before: [install tezos]
 
 .. note::
 
@@ -300,13 +300,6 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
    env --switch $ocaml_version)`` (replace ``$ocaml_version`` with its value
    in ``scripts/version.sh``) to see if it fixes the problem.
 
-In order to get the system dependencies of the binaries, do:
-
-.. literalinclude:: install-opam.sh
-  :language: shell
-  :start-after: [get system dependencies]
-  :end-before: [install tezos]
-
 .. note::
 
    If an OPAM commands times out, you may allocate it more time for its
@@ -322,9 +315,7 @@ Now, install all the binaries by:
   :end-before: [test executables]
 
 You can be more specific and only ``opam install octez-node``, ``opam
-install octez-baker-alpha``, ... In that case, it is enough to install
-the system dependencies of this package only by running ``opam depext
-octez-node`` for example instead of ``opam depext tezos``.
+install octez-baker-alpha``, ...
 
 .. warning::
 
@@ -346,7 +337,6 @@ released, you can update by:
 ::
 
    opam update
-   opam depext
    opam upgrade
 
 It is recommended to also run the command ``opam remove -a`` in order
