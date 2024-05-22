@@ -113,6 +113,9 @@ module Protocol : sig
 
   val name_dash : t -> string
 
+  (** E.g. ["src/proto_007_PsDELPH1"]. *)
+  val base_path : t -> string
+
   val short_hash : t -> string
 
   (** Get packages to link.

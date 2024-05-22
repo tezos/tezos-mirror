@@ -5145,6 +5145,8 @@ module Protocol : sig
 
   val name_underscore : t -> string
 
+  val base_path : t -> string
+
   val main : t -> target
 
   val embedded : t -> target
@@ -5345,6 +5347,8 @@ end = struct
   let name_dash p = Name.name_dash p.name
 
   let name_underscore p = Name.name_underscore p.name
+
+  let base_path p = Name.base_path p.name
 
   let main p = p.main
 
