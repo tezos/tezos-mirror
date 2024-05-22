@@ -271,6 +271,10 @@ module Config_file : sig
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
 
+type unsafe_pvm_patch = Increase_max_nb_ticks of int
+
+val patch_config_unsafe_pvm_patches : unsafe_pvm_patch list -> JSON.t -> JSON.t
+
 (** Wait until the sc node is ready.
 
     More precisely, wait until a [node_is_ready] event occurs.

@@ -374,6 +374,19 @@ module Config_file = struct
   let update sc_node update = read sc_node |> update |> write sc_node
 end
 
+type unsafe_pvm_patch = Increase_max_nb_ticks of int
+
+let patch_config_unsafe_pvm_patches pvm_patches =
+  JSON.put
+    ( "unsafe-pvm-patches",
+      JSON.annotate ~origin:"sc_rollup_node.unsafe_pvm_patches"
+      @@ `O
+           (List.map
+              (function
+                | Increase_max_nb_ticks i ->
+                    ("increase_max_nb_tick", `String (string_of_int i)))
+              pvm_patches) )
+
 let trigger_ready sc_node value =
   let pending = sc_node.persistent_state.pending_ready in
   sc_node.persistent_state.pending_ready <- [] ;
