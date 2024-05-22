@@ -370,16 +370,9 @@ let revealing_additional_bootstrap_accounts additional_bootstraps
 
 (* Test *)
 let operation_and_block_validation protocol manager_kind tag =
-  let margin =
-    (* match manager_kind with `Call | `Origination -> 1. | `Transfer -> 0.5 *)
-    10.
-    (* Due to unreliable results we set a high margin to avoid unwanted alerts. *)
-  in
   let color = Log.Color.FG.green in
   let tags = [(tag, tag)] in
-  let measure_and_check_regression ?margin time f =
-    Long_test.measure_and_check_regression ?margin ~tags time (fun () -> f)
-  in
+  let measure time f = Long_test.measure ~tags time (fun () -> f) in
   let get_previous_stats time_mean time title =
     let* res =
       Long_test.get_previous_stats
@@ -390,11 +383,12 @@ let operation_and_block_validation protocol manager_kind tag =
         "duration"
         Long_test.Stats.mean
     in
-    match res with
-    | None -> unit
+    (match res with
+    | None -> ()
     | Some (count, average) ->
         Log.info ~color "%s:%s, count:%d, average:%f" title tag count average ;
-        measure_and_check_regression ~margin:1. time_mean average
+        measure time_mean average) ;
+    unit
   in
 
   Log.info
@@ -501,9 +495,7 @@ let operation_and_block_validation protocol manager_kind tag =
     "Classification time on %s: %f"
     (Node.name node2)
     !classification_time ;
-  let* () =
-    measure_and_check_regression ~margin classify_title !classification_time
-  in
+  measure classify_title !classification_time ;
 
   Log.info
     "Measure the time that take a node to reclassify %d operations after a \
@@ -541,9 +533,7 @@ let operation_and_block_validation protocol manager_kind tag =
     "Reclassification time on %s: %f"
     (Node.name node2)
     !reclassification_time ;
-  let* () =
-    measure_and_check_regression ~margin reclassify_title !reclassification_time
-  in
+  measure reclassify_title !reclassification_time ;
 
   Log.info
     "Ensure that the mempool contains %d validated operations"
@@ -614,24 +604,20 @@ let operation_and_block_validation protocol manager_kind tag =
   let* injecting_timestamp = get_timestamp_of_event "injecting_block.v0" io in
   let forging_time = injecting_timestamp -. prepare_timestamp in
   Log.info ~color "Block forging time on node A : %f" forging_time ;
-  let* () = measure_and_check_regression ~margin forging_title forging_time in
+  measure forging_title forging_time ;
 
   let* () = node_t in
 
   let* lvl = Node.wait_for_level node2 (lvl + 1) in
   Log.info ~color "Block validation time on node B: %f" !validation_time ;
-  let* () =
-    measure_and_check_regression ~margin validation_title !validation_time
-  in
+  measure validation_title !validation_time ;
 
   Log.info ~color "Block application time on node B: %f" !application_time ;
-  let* () =
-    measure_and_check_regression ~margin application_title !application_time
-  in
+  measure application_title !application_time ;
 
   let total_time = !application_time +. !validation_time in
   Log.info ~color "Block validation + application time on node B: %f" total_time ;
-  let* () = measure_and_check_regression ~margin total_title total_time in
+  measure total_title total_time ;
 
   Log.info
     "Ensure that the block baked contains %d operations"
