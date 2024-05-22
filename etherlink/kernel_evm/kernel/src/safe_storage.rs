@@ -19,6 +19,8 @@ use tezos_smart_rollup_host::{
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 pub const WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/evm/world_state");
 pub const TMP_WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/world_state");
+pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/evm/trace");
+pub const TMP_TRACE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/trace");
 
 // The kernel runtime requires both the standard Runtime and the
 // new Extended one.
@@ -230,6 +232,15 @@ impl<Host: Runtime, Internal> SafeStorage<&mut Host, &mut Internal> {
     pub fn promote(&mut self) -> Result<(), RuntimeError> {
         self.host
             .store_move(&TMP_WORLD_STATE_PATH, &WORLD_STATE_PATH)
+    }
+
+    // Only used in tracing mode, so that the trace doesn't polute the world
+    // state but is still promoted at the end and accessible from the node.
+    pub fn promote_trace(&mut self) -> Result<(), RuntimeError> {
+        if let Ok(Some(_)) = self.host.store_has(&TMP_TRACE_PATH) {
+            self.host.store_move(&TMP_TRACE_PATH, &TRACE_PATH)?
+        }
+        Ok(())
     }
 
     pub fn revert(&mut self) -> Result<(), RuntimeError> {

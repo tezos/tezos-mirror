@@ -349,6 +349,7 @@ fn promote_block<Host: Runtime>(
         storage::delete_block_in_progress(safe_host)?;
     }
     safe_host.promote()?;
+    safe_host.promote_trace()?;
     drop_blueprint(safe_host.host, number)?;
 
     let number = storage::read_current_block_number(safe_host.host)?;
