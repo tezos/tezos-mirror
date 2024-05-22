@@ -115,7 +115,7 @@ let env_version_encoding =
          | 11 -> V11
          | 12 -> V12
          | 13 -> V13
-         | _ -> failwith "unexpected environment version")
+         | x -> failwith (Format.sprintf "unexpected environment version: %d" x))
        uint16
 
 let encoding =
