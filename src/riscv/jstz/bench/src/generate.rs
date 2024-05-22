@@ -24,7 +24,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 /// The transfers are generated with a 'follow on' strategy. For example 'account 0' will
 /// have `num_accounts` minted of 'token 0'. It will then transfer all of them to 'account 1',
 /// which will transfer `num_accounts - 1` to the next account, etc.
-pub fn handle_generate(transfers: usize) -> Result<()> {
+pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
     let accounts = accounts_for_transfers(transfers);
 
     if accounts == 0 {
@@ -72,7 +72,7 @@ pub fn handle_generate(transfers: usize) -> Result<()> {
 
     // Output inbox file
     let inbox = InboxFile(vec![level1, transfers, balances]);
-    inbox.save(Path::new("./inbox.json"))?;
+    inbox.save(inbox_file)?;
     Ok(())
 }
 
