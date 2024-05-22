@@ -383,6 +383,4 @@ let trace_transaction ~transaction_hash ?tracer ?tracer_config evm_node =
       (Request.trace_transaction ~transaction_hash ?tracer ?tracer_config ())
   in
   return
-  @@ decode_or_error
-       (fun response -> Evm_node.extract_result response |> ignore)
-       response
+  @@ decode_or_error (fun response -> Evm_node.extract_result response) response

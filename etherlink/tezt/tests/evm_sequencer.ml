@@ -3529,7 +3529,7 @@ let check_trace expect_null expected_returned_value receipt trace =
             json_u
             ~error_msg:
               (Format.sprintf
-                 "Field %s was expected to be null, but gor %%L instead"
+                 "Field %s was expected to be null, but got %%L instead"
                  field))
       else
         Check.(
@@ -3583,6 +3583,113 @@ let check_trace expect_null expected_returned_value receipt trace =
     JSON.(trace |-> "structLogs" |> as_list) ;
   unit
 
+let test_trace_transaction_call =
+  register_both
+    ~tags:["evm"; "rpc"; "trace"; "call"]
+    ~title:"Sequencer can run debug_traceTransaction and return a valid log"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  (* Transfer funds to a random address. *)
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+
+  (* deploy contract *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:Solidity_contracts.simple_storage.label
+      ~abi:Solidity_contracts.simple_storage.abi
+      ()
+  in
+  let* contract_address, _tx_deployment =
+    send_transaction
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:Solidity_contracts.simple_storage.label
+          ~bin:Solidity_contracts.simple_storage.bin)
+      sequencer
+  in
+  (* Block few levels to ensure we are replaying on an old block. *)
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+
+  (* We will first trace with every options enabled, and check that we have the
+     logs as complete as possible. We call the function `set` from the contract,
+     which isn't expected to fail and doesn't return any result. *)
+  let value_in_storage = 10 in
+  let* transaction_hash =
+    send_transaction
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:Solidity_contracts.simple_storage.label
+         ~address:contract_address
+         ~method_call:(Format.sprintf "set(%d)" value_in_storage))
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  (* We will use the receipt to check that the results from the trace are
+     consistent with the result from the transaction once applied in the
+     block. *)
+  let*@ transaction_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:transaction_hash sequencer
+  in
+  let transaction_receipt = Option.get transaction_receipt in
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash
+      ~tracer_config:
+        [("enableMemory", `Bool true); ("enableReturnData", `Bool true)]
+      sequencer
+  in
+  let* () =
+    match trace_result with
+    | Ok trace -> check_trace false None transaction_receipt trace
+    | Error _ -> Test.fail "Trace transaction shouldn't have failed"
+  in
+
+  (* The second test will disable every tracing options and call `get`, thats
+     returns a value, so that we can check that it returns the correct value in
+     the end. *)
+  let* transaction_hash =
+    send_transaction
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:Solidity_contracts.simple_storage.label
+         ~address:contract_address
+         ~method_call:"get()")
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ transaction_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:transaction_hash sequencer
+  in
+  let transaction_receipt = Option.get transaction_receipt in
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash
+      ~tracer_config:
+        [("disableStack", `Bool true); ("disableStorage", `Bool true)]
+      sequencer
+  in
+  match trace_result with
+  | Ok trace ->
+      check_trace true (Some value_in_storage) transaction_receipt trace
+  | Error _ -> Test.fail "Trace transaction shouldn't have failed"
+
 let protocols = Protocol.all
 
 let () =
@@ -3633,4 +3740,5 @@ let () =
   test_replay_rpc protocols ;
   test_txpool_content_empty_with_legacy_encoding protocols ;
   test_trace_transaction protocols ;
-  test_trace_transaction_on_invalid_transaction protocols
+  test_trace_transaction_on_invalid_transaction protocols ;
+  test_trace_transaction_call protocols

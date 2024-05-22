@@ -169,4 +169,4 @@ val trace_transaction :
   ?tracer:string ->
   ?tracer_config:(string * JSON.u) list ->
   Evm_node.t ->
-  (unit, error) result Lwt.t
+  (JSON.t, error) result Lwt.t
