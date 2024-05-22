@@ -15,7 +15,7 @@ type t = string
 let verbosity : level ref = ref FATAL
 
 let level_of_string = function
-  | "FATAL" -> Some DEBUG
+  | "FATAL" -> Some FATAL
   | "ERROR" -> Some ERROR
   | "WARNING" -> Some WARNING
   | "INFO" -> Some INFO
