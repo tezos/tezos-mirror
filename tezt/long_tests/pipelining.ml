@@ -31,6 +31,8 @@
    validator time and the baker forging time.
 *)
 
+let team = Team.layer1
+
 (** {2 Test parameters} *)
 let manager_kinds = [`Transfer; `Origination; `Call]
 
@@ -659,6 +661,7 @@ let operation_and_block_validation ~executors =
       [
         "flush"; "classification"; "prevalidator"; "block"; "baker"; "pipelining";
       ]
+    ~team
     ~executors
     ~timeout:(Hours 2)
   @@ fun () ->

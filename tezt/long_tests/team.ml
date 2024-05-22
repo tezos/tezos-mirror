@@ -6,3 +6,5 @@
 (*****************************************************************************)
 
 let infrastructure = "infrastructure"
+
+let layer1 = "layer1"

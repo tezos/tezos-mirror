@@ -30,6 +30,8 @@
    Subject: check regressions in the duration it takes for the client to load.
 *)
 
+let team = Team.layer1
+
 let load_time = "client load time"
 
 let response_time_test = "get blocks time"
@@ -56,6 +58,7 @@ let client_load_time ~executors () =
     ~__FILE__
     ~title:load_time
     ~tags:["client"; "load"]
+    ~team
     ~timeout:(Minutes 2)
     ~uses_node:true
     ~executors
@@ -69,6 +72,7 @@ let get_blocks_response_time ~executors ~protocol =
     ~__FILE__
     ~title:response_time_test
     ~tags:["rpc"]
+    ~team
     ~timeout:(Minutes 3)
     ~uses_node:true
     ~executors
