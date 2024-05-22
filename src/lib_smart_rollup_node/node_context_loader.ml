@@ -225,7 +225,8 @@ let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
   return_unit
 
 module For_snapshots = struct
-  let create_node_context cctxt current_protocol store context ~data_dir =
+  let create_node_context cctxt current_protocol store context ~data_dir
+      ~apply_unsafe_patches =
     let open Lwt_result_syntax in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
@@ -245,41 +246,48 @@ module For_snapshots = struct
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in
-    let config =
-      Configuration.
-        {
-          sc_rollup_address = metadata.rollup_address;
-          boot_sector_file = None;
-          operators;
-          rpc_addr = Configuration.default_rpc_addr;
-          rpc_port = Configuration.default_rpc_port;
-          acl = Configuration.default_acl;
-          metrics_addr = None;
-          reconnection_delay = 1.;
-          fee_parameters = Configuration.default_fee_parameters;
-          mode;
-          loser_mode;
-          apply_unsafe_patches = true;
-          unsafe_pvm_patches = [];
-          dal_node_endpoint = None;
-          dac_observer_endpoint = None;
-          dac_timeout = None;
-          batcher = Configuration.default_batcher;
-          injector = Configuration.default_injector;
-          l1_blocks_cache_size;
-          l2_blocks_cache_size;
-          index_buffer_size = Some index_buffer_size;
-          irmin_cache_size = Some irmin_cache_size;
-          prefetch_blocks = None;
-          log_kernel_debug = false;
-          no_degraded = false;
-          gc_parameters = Configuration.default_gc_parameters;
-          history_mode = None;
-          cors = Resto_cohttp.Cors.default;
-          l1_rpc_timeout;
-          loop_retry_delay = 10.;
-          pre_images_endpoint = None;
-        }
+    let* config =
+      let config_file = Configuration.config_filename ~data_dir in
+      let*! exists_config = Lwt_unix.file_exists config_file in
+      if exists_config then
+        let* config = Configuration.load ~data_dir in
+        return {config with apply_unsafe_patches}
+      else
+        return
+        @@ Configuration.
+             {
+               sc_rollup_address = metadata.rollup_address;
+               boot_sector_file = None;
+               operators;
+               rpc_addr = Configuration.default_rpc_addr;
+               rpc_port = Configuration.default_rpc_port;
+               acl = Configuration.default_acl;
+               metrics_addr = None;
+               reconnection_delay = 1.;
+               fee_parameters = Configuration.default_fee_parameters;
+               mode;
+               loser_mode;
+               apply_unsafe_patches;
+               unsafe_pvm_patches = [];
+               dal_node_endpoint = None;
+               dac_observer_endpoint = None;
+               dac_timeout = None;
+               batcher = Configuration.default_batcher;
+               injector = Configuration.default_injector;
+               l1_blocks_cache_size;
+               l2_blocks_cache_size;
+               index_buffer_size = Some index_buffer_size;
+               irmin_cache_size = Some irmin_cache_size;
+               prefetch_blocks = None;
+               log_kernel_debug = false;
+               no_degraded = false;
+               gc_parameters = Configuration.default_gc_parameters;
+               history_mode = None;
+               cors = Resto_cohttp.Cors.default;
+               l1_rpc_timeout;
+               loop_retry_delay = 10.;
+               pre_images_endpoint = None;
+             }
     in
     let*? l1_ctxt =
       Layer1.create
@@ -305,8 +313,10 @@ module For_snapshots = struct
     let global_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
     let*? unsafe_patches =
-      (* Only consider hardcoded patches for snapshot validation. *)
-      Pvm_patches.make metadata.kind metadata.rollup_address []
+      Pvm_patches.make
+        metadata.kind
+        metadata.rollup_address
+        config.unsafe_pvm_patches
     in
     return
       {

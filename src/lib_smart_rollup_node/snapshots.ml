@@ -138,7 +138,7 @@ let get_pvm_state_from_store head_ctxt hash =
   return pvm_state
 
 let compute_pvm_state_for_genenis cctxt dest (store : _ Store.t) context
-    (header : Sc_rollup_block.header) plugin =
+    (header : Sc_rollup_block.header) plugin ~apply_unsafe_patches =
   let open Lwt_result_syntax in
   let* current_protocol =
     Node_context.protocol_of_level_with_store store header.level
@@ -161,12 +161,13 @@ let compute_pvm_state_for_genenis cctxt dest (store : _ Store.t) context
       store
       context
       ~data_dir:dest
+      ~apply_unsafe_patches
   in
   Interpreter.genesis_state plugin node_context
 
 let check_genesis_pvm_state_and_return cctxt dest store context header
     (module Plugin : Protocol_plugin_sig.PARTIAL) (metadata : Metadata.t)
-    head_ctxt hash =
+    head_ctxt hash ~apply_unsafe_patches =
   let open Lwt_result_syntax in
   let* patched_pvm_state, Original pvm_state =
     compute_pvm_state_for_genenis
@@ -176,6 +177,7 @@ let check_genesis_pvm_state_and_return cctxt dest store context header
       context
       header
       (module Plugin)
+      ~apply_unsafe_patches
   in
   let* context_pvm_state = get_pvm_state_from_store head_ctxt hash in
   let*! context_state_hash =
@@ -188,7 +190,9 @@ let check_genesis_pvm_state_and_return cctxt dest store context header
     error_unless State_hash.(context_state_hash = patched_state_hash)
     @@ error_of_fmt
          "Erroneous state hash %a for originated rollup (level %ld) instead of \
-          %a."
+          %a. You might be missing unsafe pvm patches and/or the cli argument \
+          to activate them, or the pvm state of the snapshot is corrupted for \
+          the rollup genesis block."
          State_hash.pp
          context_state_hash
          header.level
@@ -197,8 +201,8 @@ let check_genesis_pvm_state_and_return cctxt dest store context header
   in
   return pvm_state
 
-let check_block_data_consistency cctxt dest (metadata : Metadata.t)
-    (store : _ Store.t) context hash next_commitment =
+let check_block_data_consistency ~apply_unsafe_patches cctxt dest
+    (metadata : Metadata.t) (store : _ Store.t) context hash next_commitment =
   let open Lwt_result_syntax in
   let* header, inbox, commitment, head_ctxt =
     check_block_data_and_get_content store context hash
@@ -209,6 +213,7 @@ let check_block_data_consistency cctxt dest (metadata : Metadata.t)
   let* pvm_state_of_commitment =
     if metadata.genesis_info.level = header.level then
       check_genesis_pvm_state_and_return
+        ~apply_unsafe_patches
         cctxt
         dest
         store
@@ -444,7 +449,7 @@ let reconstruct_level_context rollup_ctxt ~predecessor
   assert (Smart_rollup_context_hash.(context_hash = block.header.context)) ;
   return (block, ctxt)
 
-let with_modify_data_dir cctxt ~data_dir
+let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
     ?(skip_condition = fun _ _ ~head:_ -> Lwt_result.return false) f =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
@@ -498,6 +503,7 @@ let with_modify_data_dir cctxt ~data_dir
       store
       context
       ~data_dir
+      ~apply_unsafe_patches
   in
   let* () = f node_ctxt ~head in
   let*! () = Context.close context in
@@ -535,17 +541,19 @@ let reconstruct_context_from_first_available_level
   in
   reconstruct_chain_from first_block first_ctxt
 
-let maybe_reconstruct_context cctxt ~data_dir =
+let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches =
   with_modify_data_dir
     cctxt
     ~data_dir
+    ~apply_unsafe_patches
     ~skip_condition:(fun _store context ~head ->
       let open Lwt_result_syntax in
       let*! head_ctxt = Context.checkout context head.header.context in
       return (Option.is_some head_ctxt))
     reconstruct_context_from_first_available_level
 
-let post_checks ~action ~message snapshot_metadata ~dest =
+let post_checks ?(apply_unsafe_patches = false) ~action ~message
+    snapshot_metadata ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
   let context_dir = Configuration.default_context_dir dest in
@@ -586,7 +594,12 @@ let post_checks ~action ~message snapshot_metadata ~dest =
         | Some metadata ->
             let*? () = check_last_commitment head snapshot_metadata in
             let* () = check_lcc metadata cctxt store head (module Plugin) in
-            return (check_block_data_consistency cctxt dest metadata))
+            return
+              (check_block_data_consistency
+                 ~apply_unsafe_patches
+                 cctxt
+                 dest
+                 metadata))
   in
   let* () =
     check_l2_chain ~message ~data_dir:dest store context head check_block_data
@@ -880,7 +893,10 @@ let maybe_gc_after_import cctxt ~data_dir snapshot_metadata
       assert false
   | Some Archive, Archive | Some Full, Full -> return_unit
   | Some Full, Archive ->
-      with_modify_data_dir cctxt ~data_dir @@ fun node_ctxt ~head ->
+      (* no need to apply unsafe patche here because gc don't run the
+         rollup *)
+      with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches:false
+      @@ fun node_ctxt ~head ->
       let* () =
         Node_context.Node_store.check_and_set_history_mode
           Read_write
@@ -902,7 +918,8 @@ let maybe_gc_after_import cctxt ~data_dir snapshot_metadata
       Format.eprintf "Done (%a)@." Ptime.Span.pp elapsed ;
       return_unit
 
-let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
+let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
+    ~snapshot_file =
   let open Lwt_result_syntax in
   let* () = unless force (check_data_dir_unpopulated data_dir) in
   let*! () = Lwt_utils_unix.create_dir data_dir in
@@ -922,7 +939,7 @@ let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
       ~snapshot_file
       ~dest:data_dir
   in
-  let* () = maybe_reconstruct_context cctxt ~data_dir in
+  let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
     maybe_gc_after_import
       cctxt
@@ -932,6 +949,7 @@ let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
   in
   unless no_checks @@ fun () ->
   post_checks
+    ~apply_unsafe_patches
     ~action:(`Import cctxt)
     ~message:"Checking imported data"
     snapshot_metadata
