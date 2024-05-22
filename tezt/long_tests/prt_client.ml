@@ -61,7 +61,8 @@ let client_load_time ~executors () =
     ~executors
   @@ fun () ->
   let client = Client.create () in
-  Long_test.time_lwt ~repeat:20 load_time @@ fun () -> Client.version client
+  Long_test.time_and_check_regression_lwt ~repeat:20 load_time @@ fun () ->
+  Client.version client
 
 let get_blocks_response_time ~executors ~protocol =
   Long_test.register
@@ -73,7 +74,8 @@ let get_blocks_response_time ~executors ~protocol =
     ~executors
   @@ fun () ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
-  Long_test.time_lwt ~repeat:20 response_time_measurement @@ fun () ->
+  Long_test.time_and_check_regression_lwt ~repeat:20 response_time_measurement
+  @@ fun () ->
   let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
   unit
 

@@ -306,19 +306,27 @@ val check_regression :
     Usage: [time measurement f]
 
     This executes [f], measures the [time] it takes to run, adds
-    a data point for [measurement] with field ["duration"] equal to [time],
-    and uses [check_regression] to compare with previous values.
+    a data point for [measurement] with field ["duration"] equal to [time].
     If [f] raises an exception, data points are not pushed and the
     exception is propagated.
 
     If [repeat] is specified, call [f] [repeat] times to obtain as many
     data points.
 
-    See {!check_regression} for documentation about other optional parameters.
-
     @raise Invalid_arg if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
 val time :
+  ?repeat:int ->
+  ?tags:(string * string) list ->
+  InfluxDB.measurement ->
+  (unit -> unit) ->
+  unit
+
+(** Same as {time} but uses [check_regression] to compare with previous
+    values.
+
+    See {!check_regression} for documentation about optional parameters. *)
+val time_and_check_regression :
   ?previous_count:int ->
   ?minimum_previous_count:int ->
   ?margin:float ->
@@ -330,7 +338,15 @@ val time :
   (unit -> unit) ->
   unit Lwt.t
 
-(** Same as {!time}, but instead of measuring the duration taken
+(** Same as {!time}, but only record the duration returned by [f]. *)
+val measure :
+  ?repeat:int ->
+  ?tags:(string * string) list ->
+  InfluxDB.measurement ->
+  (unit -> float) ->
+  unit
+
+(** Same as {!time_and_check_regression}, but instead of measuring the duration taken
     by [f ()] execution, delegates this responsability to [f] itself.
 
     In this case, [f] represents a thunk that executes an expression
@@ -352,6 +368,17 @@ val measure_and_check_regression :
     Note that other concurrent promises may slow down the measured function
     and result in inaccurate measurements. *)
 val time_lwt :
+  ?repeat:int ->
+  ?tags:(string * string) list ->
+  InfluxDB.measurement ->
+  (unit -> unit Lwt.t) ->
+  unit Lwt.t
+
+(** Same as {!time_lwt}, but uses [check_regression] to compare with previous
+    values.
+
+    See {!check_regression} for documentation about optional parameters. *)
+val time_and_check_regression_lwt :
   ?previous_count:int ->
   ?minimum_previous_count:int ->
   ?margin:float ->
@@ -363,8 +390,16 @@ val time_lwt :
   (unit -> unit Lwt.t) ->
   unit Lwt.t
 
-(** Same as {!time_lwt}, but instead of measuring the duration taken
-    by [f ()] execution, delegates to [f] itself.
+(** Same as {!time_lwt}, but only record the duration returned by [f]. *)
+val measure_lwt :
+  ?repeat:int ->
+  ?tags:(string * string) list ->
+  InfluxDB.measurement ->
+  (unit -> float Lwt.t) ->
+  unit Lwt.t
+
+(** Same as {!time_and_check_regression_lwt}, but instead of measuring the
+    duration taken by [f ()] execution, delegates to [f] itself.
 
     In this case, [f] represents a thunk that executes an expression
     or a program and evaluates in the duration taken by its execution.*)

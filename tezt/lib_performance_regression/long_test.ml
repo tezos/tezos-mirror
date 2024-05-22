@@ -784,20 +784,24 @@ let check_time_preconditions measurement =
   if String.contains measurement '\n' then
     invalid_arg "Long_test.time: newline character in measurement"
 
+let measure_data_points ~repeat ~tags measurement f =
+  let data_points = ref [] in
+  for _ = 1 to repeat do
+    let duration = f () in
+    let data_point =
+      InfluxDB.data_point ~tags measurement ("duration", Float duration)
+    in
+    add_data_point data_point ;
+    data_points := data_point :: !data_points
+  done ;
+  !data_points
+
 let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
     ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
-    let data_points = ref [] in
-    for _ = 1 to repeat do
-      let duration = f () in
-      let data_point =
-        InfluxDB.data_point ~tags measurement ("duration", Float duration)
-      in
-      add_data_point data_point ;
-      data_points := data_point :: !data_points
-    done ;
+    let data_points = measure_data_points ~repeat ~tags measurement f in
     check_regression
       ?previous_count
       ?minimum_previous_count
@@ -805,12 +809,23 @@ let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
       ?check
       ?stddev
       ~tags
-      ~data_points:!data_points
+      ~data_points
       measurement
       "duration"
 
-let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
-    ?tags measurement f =
+let measure ?(repeat = 1) ?(tags = []) measurement f =
+  let _data_points = measure_data_points ~repeat ~tags measurement f in
+  ()
+
+let time ?repeat ?tags measurement f =
+  measure ?repeat ?tags measurement (fun () ->
+      let start = Unix.gettimeofday () in
+      f () ;
+      let stop = Unix.gettimeofday () in
+      stop -. start)
+
+let time_and_check_regression ?previous_count ?minimum_previous_count ?margin
+    ?check ?stddev ?repeat ?tags measurement f =
   measure_and_check_regression
     ?previous_count
     ?minimum_previous_count
@@ -826,22 +841,26 @@ let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
       let stop = Unix.gettimeofday () in
       stop -. start)
 
+let measure_data_points_lwt ~repeat ~tags measurement f =
+  let data_points = ref [] in
+  let* () =
+    Base.repeat repeat @@ fun () ->
+    let* duration = f () in
+    let data_point =
+      InfluxDB.data_point ~tags measurement ("duration", Float duration)
+    in
+    add_data_point data_point ;
+    data_points := data_point :: !data_points ;
+    unit
+  in
+  return !data_points
+
 let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
     ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
-    let data_points = ref [] in
-    let* () =
-      Base.repeat repeat @@ fun () ->
-      let* duration = f () in
-      let data_point =
-        InfluxDB.data_point ~tags measurement ("duration", Float duration)
-      in
-      add_data_point data_point ;
-      data_points := data_point :: !data_points ;
-      unit
-    in
+    let* data_points = measure_data_points_lwt ~repeat ~tags measurement f in
     check_regression
       ?previous_count
       ?minimum_previous_count
@@ -849,12 +868,23 @@ let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
       ?check
       ?stddev
       ~tags
-      ~data_points:!data_points
+      ~data_points
       measurement
       "duration"
 
-let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
-    ?repeat ?tags measurement f =
+let measure_lwt ?(repeat = 1) ?(tags = []) measurement f =
+  let* _data_points = measure_data_points_lwt ~repeat ~tags measurement f in
+  Lwt.return_unit
+
+let time_lwt ?repeat ?tags measurement f =
+  measure_lwt ?repeat ?tags measurement (fun () ->
+      let start = Unix.gettimeofday () in
+      let* () = f () in
+      let stop = Unix.gettimeofday () in
+      Lwt.return (stop -. start))
+
+let time_and_check_regression_lwt ?previous_count ?minimum_previous_count
+    ?margin ?check ?stddev ?repeat ?tags measurement f =
   measure_and_check_regression_lwt
     ?previous_count
     ?minimum_previous_count

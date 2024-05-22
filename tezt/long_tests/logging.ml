@@ -78,7 +78,7 @@ let test_simple_event_logging_time ~executors title simple_event =
   (* Even with [nb_repeat = 10_000_000], the measurements are not very precise:
      we observed some alerts where the duration was up to 33% longer than the average.
      We thus use a threshold of [margin = 0.5] to avoid alert fatigue. *)
-  Long_test.time_lwt title ~margin:0.5 @@ fun () ->
+  Long_test.time_and_check_regression_lwt title ~margin:0.5 @@ fun () ->
   repeat nb_repeat @@ fun () -> Simple.emit simple_event (id, 52)
 
 module Test_sink : SINK = struct
