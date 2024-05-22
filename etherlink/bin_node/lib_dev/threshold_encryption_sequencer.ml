@@ -156,8 +156,12 @@ let start_server
       return (server, private_server))
     (fun _ -> return (server, private_server))
 
+(* https://gitlab.com/tezos/tezos/-/issues/7244
+   Refactor this in a separate module to react to multiple
+   events simultaneously. *)
 let loop_sequencer
-    (Configuration.Threshold_encryption_sequencer sequencer_config) =
+    (Configuration.Threshold_encryption_sequencer sequencer_config)
+    preblocks_monitor =
   let open Lwt_result_syntax in
   let time_between_blocks = sequencer_config.time_between_blocks in
   let rec loop last_produced_block =
@@ -175,16 +179,51 @@ let loop_sequencer
           let diff = Time.Protocol.(diff now last_produced_block) in
           diff >= Int64.of_float time_between_blocks
         in
+        (* Submit a proposal request. *)
+        let* () =
+          Threshold_encryption_proposals_handler.add_proposal_request now force
+        in
+        (* Wait until a preblock is available, or a decision that no preblock will be produced
+           has been made. *)
+        let* preblock_opt =
+          Threshold_encryption_preblocks_monitor.next preblocks_monitor
+        in
         let* nb_transactions =
-          Threshold_encryption_block_producer.produce_block
-            ~force
-            ~timestamp:now
-        and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
-        if nb_transactions > 0 || force then loop now
+          match preblock_opt with
+          | No_preblock ->
+              let*! () = Lwt_unix.sleep 0.5 in
+              return 0
+          | Preblock preblock ->
+              Threshold_encryption_block_producer.produce_block preblock
+        in
+        let* timestamp =
+          Threshold_encryption_proposals_handler.notify_proposal_processed ()
+        in
+        if nb_transactions > 0 || force then loop timestamp
         else loop last_produced_block
   in
   let now = Helpers.now () in
   loop now
+
+let produce_block ~force ~timestamp preblocks_monitor =
+  let open Lwt_result_syntax in
+  let* preblock_opt =
+    Threshold_encryption_preblocks_monitor.submit_and_fetch
+      ~force
+      ~timestamp
+      preblocks_monitor
+  in
+  let* n =
+    match preblock_opt with
+    | No_preblock -> return 0
+    | Preblock preblock ->
+        let* n = Threshold_encryption_block_producer.produce_block preblock in
+        return n
+  in
+  let* _timestamp =
+    Threshold_encryption_proposals_handler.notify_proposal_processed ()
+  in
+  return n
 
 let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
@@ -262,8 +301,17 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
           Some threshold_encryption_sequencer_config.max_number_of_chunks;
       }
   in
+  (* Start the preblocks monitor, and obtain a channel for notifying the
+     monitor when a proposal will not make it into a preblock.
+     This is necessary to avoid the threshold encryption sequencer loop to
+     hang waiting for a preblock, when none will ever be produced.
+  *)
+  let* preblocks_monitor, notify_no_preblock =
+    Threshold_encryption_preblocks_monitor.init
+      threshold_encryption_sequencer_config.sidecar_endpoint
+  in
   let* () =
-    Threshold_encryption_blueprint_producer.start
+    Threshold_encryption_proposals_handler.start
       {
         cctxt;
         smart_rollup_address;
@@ -271,13 +319,17 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
         sidecar_endpoint =
           threshold_encryption_sequencer_config.sidecar_endpoint;
         keep_alive = configuration.keep_alive;
+        maximum_number_of_chunks =
+          threshold_encryption_sequencer_config.max_number_of_chunks;
+        notify_no_preblock;
       }
   in
   let* () =
     Threshold_encryption_block_producer.start
       {
-        maximum_number_of_chunks =
-          threshold_encryption_sequencer_config.max_number_of_chunks;
+        sequencer_key = threshold_encryption_sequencer_config.sequencer;
+        smart_rollup_address;
+        cctxt;
       }
   in
   let* () =
@@ -288,7 +340,9 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
     Rollup_node_follower.start ~keep_alive ~proxy:false ~rollup_node_endpoint ()
   in
   let module Sequencer_rpc : Services.Sequencer_backend = struct
-    let produce_block = Threshold_encryption_block_producer.produce_block
+    (* https://gitlab.com/tezos/tezos/-/issues/7243.
+       Make the produceBlock RPC non-blocking. *)
+    let produce_block = produce_block preblocks_monitor
 
     let replay_block = Replay.rpc
   end in
@@ -318,6 +372,7 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
   in
   let* () =
     loop_sequencer
-    @@ Threshold_encryption_sequencer threshold_encryption_sequencer_config
+      (Threshold_encryption_sequencer threshold_encryption_sequencer_config)
+      preblocks_monitor
   in
   return_unit
