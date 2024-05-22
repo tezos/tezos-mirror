@@ -33,7 +33,8 @@ fn show_results(stats: &BenchStats, opts: &BenchRunOptions) {
     match opts.pretty {
         false => println!("{stats}"),
         true => {
-            let table = table::table_from_stats([(stats, &opts.output)].as_slice());
+            let table =
+                table::table_from_stats(&opts.sort_args, [(stats, &opts.output)].as_slice());
             println!("{table}")
         }
     }

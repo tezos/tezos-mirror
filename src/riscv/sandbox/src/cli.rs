@@ -83,26 +83,27 @@ pub struct BenchRunOptions {
     #[arg(long)]
     pub mode: BenchMode,
 
-    #[arg(
-        help = "How often to repeat the benchmark run",
-        long = "iter",
-        default_value_t = 1
-    )]
+    /// How often to repeat the benchmark run
+    #[arg(long = "iter", default_value_t = 1)]
     pub repeat: usize,
 
+    /// Name of the file to save the benchmark stats
     #[arg(
-        help = "Name of the file to save the benchmark stats",
         long,
         default_value = "benchmark.json",
         value_parser = validate_output,
     )]
     pub output: String,
 
-    #[arg(long, help = "Pretty print the benchmark results in a table")]
+    /// Pretty print the benchmark results in a table
+    #[arg(long)]
     pub pretty: bool,
 
     #[command(flatten)]
     pub common: CommonOptions,
+
+    #[command(flatten)]
+    pub sort_args: TableSortArgs,
 }
 
 /// Validator for `--output <filename>` option
@@ -114,10 +115,36 @@ pub fn validate_output(output: &str) -> Result<String, &'static str> {
     }
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+pub enum SortRuns {
+    /// Keep the input order for runs
+    Input,
+    /// Order runs alphabetically
+    Alphabetic,
+    /// Order instructions / s speed
+    Speed,
+    /// Order by total count of the instruction
+    Total,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum SortInstr {
+    /// Order instruction groups by the maximum average
+    MaxAvg,
+    /// Order sum of total count of instructions in the whole group
+    TotalCount,
+    /// Order instruction groups alphabetically by instruction name
+    Alphabetic,
+}
+
 #[derive(Debug, Clone, Parser)]
 pub struct BenchCompareOptions {
+    /// List of .json files for comparison
     #[arg(long, num_args = 1..)]
     comp_file: Vec<Box<Path>>,
+
+    #[command(flatten)]
+    pub sort_args: TableSortArgs,
 }
 
 impl BenchCompareOptions {
@@ -140,6 +167,17 @@ impl BenchCompareOptions {
 
         Ok(x)
     }
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct TableSortArgs {
+    /// Order of benchmarks in the context of a single instruction
+    #[arg(long, value_enum, default_value_t = SortRuns::Input)]
+    pub sort_runs: SortRuns,
+
+    /// Order of instruction data groups
+    #[arg(long, value_enum, default_value_t = SortInstr::MaxAvg)]
+    pub sort_instr: SortInstr,
 }
 
 #[derive(Debug, Clone, Parser)]

@@ -28,30 +28,43 @@ pub fn prepend_cell(first_cell: Cell, mut rest_of_cells: Vec<Cell>) -> Vec<Cell>
     rest_of_cells
 }
 
-/// Return an array r[i][j] = the stats for the i-th instruction and j-th benchmark
-pub fn tableify_bench_stats<'a>(data: &[&'a BenchStats]) -> Vec<Vec<Option<&'a NamedStats>>> {
+/// Type holding (Name of benchmark, Option<Named Single instruction stats>)
+pub type NamedBenchInstrStats<'a, 'b> = (&'a str, Option<&'b NamedStats>);
+
+/// Return an array r[i][j] = the stats for the i-th instruction and j-th benchmark & benchmark_name
+pub fn tableify_bench_stats<'a, 'b>(
+    data: &[(&'a BenchStats, &'b String)],
+) -> Vec<Vec<NamedBenchInstrStats<'b, 'a>>> {
     // Collect all the instructions sorted by name
-    let names = data
+    let instr_names = data
         .iter()
-        .flat_map(|s| s.instr_stats.iter().flatten().map(|i_s| &i_s.name))
+        .flat_map(|s| s.0.instr_stats.iter().flatten().map(|i_s| &i_s.name))
         .collect::<BTreeSet<_>>();
 
-    // Transform each BenchStats instruction data into a HashMap by instruction name
+    // Transform each BenchStats instruction data into a (BenchName, HashMap by instruction name)
     // Note: BenchStats with None on instruction-level data will just be an empty hashmap
-    let maps: Vec<HashMap<_, _>> = data
+    let stats_by_instr: Vec<(&String, HashMap<_, _>)> = data
         .iter()
         .map(|s| {
-            s.instr_stats
-                .iter()
-                .flatten()
-                .map(|i_s| (&i_s.name, i_s))
-                .collect()
+            (
+                s.1,
+                s.0.instr_stats
+                    .iter()
+                    .flatten()
+                    .map(|i_s| (&i_s.name, i_s))
+                    .collect(),
+            )
         })
         .collect();
 
     // For each instruction name, get the corresponding NamedStats or None for that benchmark
-    names
+    instr_names
         .into_iter()
-        .map(|name| maps.iter().map(|map| map.get(name).copied()).collect())
+        .map(|instr_name| {
+            stats_by_instr
+                .iter()
+                .map(|(bench_name, map)| (bench_name.as_str(), map.get(instr_name).copied()))
+                .collect()
+        })
         .collect_vec()
 }
