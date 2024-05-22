@@ -1541,7 +1541,7 @@ module Target = struct
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ?(with_macos_security_framework = false) ~path names =
+      ?(with_macos_security_framework = false) ?(source = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1861,25 +1861,23 @@ module Target = struct
     let dune =
       List.fold_right (fun x dune -> Dune.(x :: dune)) runtest_rules dune
     in
-    let prefixes =
-      ["src/"; "tezt/"; "etherlink/"; "irmin/"; "brassaia/"; "data-encoding/"]
-    in
     if
       match release_status with
       | Unreleased -> false
       | Experimental | Released | Auto_opam -> true
     then
       if
-        not
-          (List.exists (fun prefix -> String.starts_with ~prefix path) prefixes)
+        not (List.exists (fun prefix -> String.starts_with ~prefix path) source)
       then
         invalid_argf
           "A target has the release status %s but is located at %s which is \
-           outside of %s. This is not supported. Move the code to `src/` or \
-           set the release status to %s."
+           outside of the source of %s: %s. This is not supported. Move the \
+           code to the source of %s or set the release status to %s."
           (show_release_status release_status)
           path
-          (String.concat ", " prefixes)
+          product
+          (String.concat ", " source)
+          product
           (show_release_status Unreleased) ;
     register_internal
       {
@@ -2185,7 +2183,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
     ?synopsis ?opam_with_test ?dune_with_test
     ?(with_macos_security_framework = false) ?flags ?(dune = Dune.[])
-    ?(preprocess = []) ?(preprocessor_deps = []) ~product modules =
+    ?(preprocess = []) ?(preprocessor_deps = []) ?source ~product modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -2208,6 +2206,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
         ~preprocess
         ~preprocessor_deps
         ~product
+        ?source
         tezt_local_test_lib_name)
   in
   let tezt_target =
@@ -2303,6 +2302,7 @@ let register_tezt_targets ~make_tezt_exe =
                     ];
               ]
           ~product:"tezt-tests"
+          ~source:["src/"; "brassaia/"; "etherlink/"; "irmin/"; "tezt/"]
       in
       ()
     in
@@ -2391,8 +2391,7 @@ module Sub_lib = struct
         (* In case it's a sub_lib, we don't link anything *) ()
 
   (* Prints all the registered libs of a container package. *)
-  let pp_documentation_of_container ~header fmt
-      {content = registered_libs; product = _} =
+  let pp_documentation_of_container ~header fmt {content = registered_libs; _} =
     Format.fprintf
       fmt
       "%s%a"
@@ -2407,7 +2406,7 @@ module Sub_lib = struct
 
   type maker = ?internal_name:string -> string Target.maker
 
-  let sub_lib ~package_synopsis ~container ~package : maker =
+  let sub_lib ~package_synopsis ~container ~package ?source : maker =
    fun ?internal_name
        ?all_modules_except
        ?bisect_ppx
@@ -2549,33 +2548,7 @@ module Sub_lib = struct
       ?license
       ?extra_authors
       ?with_macos_security_framework
-end
-
-module Product (M : sig
-  val name : string
-end) =
-struct
-  let public_lib = Target.public_lib ~product:M.name
-
-  let private_lib = Target.private_lib ~product:M.name
-
-  let public_exe = Target.public_exe ~product:M.name
-
-  let public_exes = Target.public_exes ~product:M.name
-
-  let private_exe = Target.private_exe ~product:M.name
-
-  let private_exes = Target.private_exes ~product:M.name
-
-  let test = Target.test ~product:M.name
-
-  let tests = Target.tests ~product:M.name
-
-  module Sub_lib = struct
-    include Sub_lib
-
-    let make_container () = make_container ~product:M.name
-  end
+      ?source
 end
 
 (*****************************************************************************)
@@ -2617,6 +2590,44 @@ let write filename f =
       (filename ^ " is generated twice; did you declare the same library twice?") ;
   generated_files := String_set.add filename !generated_files ;
   write_raw filename f
+
+let generate_content_input ~product ~source =
+  let filename = Format.sprintf "script-inputs/%s-source-content" product in
+  write_raw filename @@ fun fmt -> List.iter (Format.fprintf fmt "%s\n") source
+
+module Product (M : sig
+  val name : string
+
+  val source : string list
+end) =
+struct
+  let public_lib = Target.public_lib ~product:M.name ~source:M.source
+
+  let private_lib = Target.private_lib ~product:M.name ~source:M.source
+
+  let public_exe = Target.public_exe ~product:M.name ~source:M.source
+
+  let public_exes = Target.public_exes ~product:M.name ~source:M.source
+
+  let private_exe = Target.private_exe ~product:M.name ~source:M.source
+
+  let private_exes = Target.private_exes ~product:M.name ~source:M.source
+
+  let test = Target.test ~product:M.name ~source:M.source
+
+  let tests = Target.tests ~product:M.name ~source:M.source
+
+  let generate_content_input () =
+    generate_content_input ~product:M.name ~source:M.source
+
+  module Sub_lib = struct
+    include Sub_lib
+
+    let sub_lib = sub_lib ~source:M.source
+
+    let make_container () = make_container ~product:M.name
+  end
+end
 
 let generate_dune (internal : Target.internal) =
   let libraries, ppx_runtime_libraries, empty_files_to_create =

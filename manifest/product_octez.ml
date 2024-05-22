@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -14,6 +14,26 @@ open Product_data_encoding
 
 include Product (struct
   let name = "octez"
+
+  (** This source will be used to generate the Octez tarball,
+      This should include everything required to run [make octez]. *)
+  let source =
+    [
+      "src/";
+      "tezt/";
+      "Makefile";
+      "dune";
+      "dune-project";
+      "dune-workspace";
+      "CHANGES.rst";
+      "LICENSES";
+      "opam";
+      "script-inputs";
+      "scripts";
+      "irmin/";
+      "brassaia/";
+      "rust-toolchain";
+    ]
 end)
 
 module String_set = Set.Make (String)
@@ -8641,3 +8661,5 @@ let _docs_doc_gen_errors =
         data_encoding |> open_;
         Protocol.(client_exn alpha) |> open_;
       ]
+
+let () = generate_content_input ()

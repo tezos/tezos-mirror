@@ -1,5 +1,5 @@
-src
-tezt
+src/
+tezt/
 Makefile
 dune
 dune-project
@@ -9,6 +9,6 @@ LICENSES
 opam
 script-inputs
 scripts
-irmin
-brassaia
+irmin/
+brassaia/
 rust-toolchain

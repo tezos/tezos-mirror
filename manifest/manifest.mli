@@ -998,6 +998,7 @@ val tezt :
   ?dune:Dune.s_expr ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
+  ?source:string list ->
   product:string ->
   string list ->
   target
@@ -1215,6 +1216,11 @@ end
     product name passed as a functor parameter is used for all the made targets. *)
 module Product (M : sig
   val name : string
+
+  (** The list of the files and folders corresponding to the source of the product.
+
+      The meaning and the content of [source] is product-dependent. *)
+  val source : string list
 end) : sig
   (** Register and return an internal public library.
 
@@ -1294,6 +1300,12 @@ end) : sig
     for a single container package. See
     [https://dune.readthedocs.io/en/stable/concepts/package-spec.html#libraries]
     for the corresponding dune feature. *)
+
+  (** Generates the content of [script-inputs/NAME-source-content] with [NAME = M.name].
+
+      The content of the file is the values of [M.source]. *)
+  val generate_content_input : unit -> unit
+
   module Sub_lib : sig
     (** Create a container *)
     val make_container : unit -> Sub_lib.container

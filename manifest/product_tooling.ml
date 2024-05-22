@@ -12,6 +12,8 @@ open Externals
 
 include Product (struct
   let name = "tooling"
+
+  let source = ["src/"; "devtools/"]
 end)
 
 let _octez_tooling =
