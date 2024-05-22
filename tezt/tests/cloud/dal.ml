@@ -135,10 +135,10 @@ type metrics = {
   total_published_commitments : int;
   expected_published_commitments : int;
   total_attested_commitments : int;
-  ratio_published_commitments : int;
-  ratio_attested_commitments : int;
-  ratio_published_commitments_last_level : int;
-  ratio_attested_commitments_per_baker : (public_key_hash, int) Hashtbl.t;
+  ratio_published_commitments : float;
+  ratio_attested_commitments : float;
+  ratio_published_commitments_last_level : float;
+  ratio_attested_commitments_per_baker : (public_key_hash, float) Hashtbl.t;
 }
 
 let default_metrics =
@@ -148,9 +148,9 @@ let default_metrics =
     total_published_commitments = 0;
     expected_published_commitments = 0;
     total_attested_commitments = 0;
-    ratio_published_commitments = 0;
-    ratio_attested_commitments = 0;
-    ratio_published_commitments_last_level = 0;
+    ratio_published_commitments = 0.;
+    ratio_attested_commitments = 0.;
+    ratio_published_commitments_last_level = 0.;
     ratio_attested_commitments_per_baker = Hashtbl.create 0;
   }
 
@@ -192,10 +192,10 @@ let pp_metrics t
   Log.info "Total published commitments: %d" total_published_commitments ;
   Log.info "Expected published commitments: %d" expected_published_commitments ;
   Log.info "Total attested commitments: %d" total_attested_commitments ;
-  Log.info "Ratio published commitments: %d" ratio_published_commitments ;
-  Log.info "Ratio attested commitments: %d" ratio_attested_commitments ;
+  Log.info "Ratio published commitments: %f" ratio_published_commitments ;
+  Log.info "Ratio attested commitments: %f" ratio_attested_commitments ;
   Log.info
-    "Ratio published commitments last level: %d"
+    "Ratio published commitments last level: %f"
     ratio_published_commitments_last_level ;
   t.bakers |> List.to_seq
   |> Seq.iter (fun {account; stake; _} ->
@@ -207,7 +207,7 @@ let pp_metrics t
          | None -> Log.info "No ratio for %s" account.Account.public_key_hash
          | Some ratio ->
              Log.info
-               "Ratio for %s (with stake %d): %d"
+               "Ratio for %s (with stake %d): %f"
                account.Account.public_key_hash
                stake
                ratio)
@@ -239,29 +239,29 @@ let push_metrics t
                ratio_attested_commitments_per_baker
                account.Account.public_key_hash
            with
-           | None -> 0
+           | None -> 0.
            | Some d -> d
          in
          Cloud.push_metric
            t.cloud
            ~labels:[("attester", name)]
            ~name:"tezt_attested_ratio_per_baker"
-           value) ;
+           (int_of_float value)) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "published")]
-    ratio_published_commitments ;
+    (int_of_float ratio_published_commitments) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "attested")]
-    ratio_attested_commitments ;
+    (int_of_float ratio_attested_commitments) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "published_last_level")]
-    ratio_published_commitments_last_level ;
+    (int_of_float ratio_published_commitments_last_level) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments"
@@ -317,24 +317,27 @@ let update_total_attested_commitments _t per_level_info metrics =
   + Z.popcount per_level_info.attested_commitments
 
 let update_ratio_published_commitments _t _per_level_info metrics =
-  if metrics.expected_published_commitments = 0 then 0
+  if metrics.expected_published_commitments = 0 then 0.
   else
-    metrics.total_published_commitments * 100
-    / metrics.expected_published_commitments
+    float_of_int metrics.total_published_commitments
+    *. 100.
+    /. float_of_int metrics.expected_published_commitments
 
 let update_ratio_published_commitments_last_level t per_level_info metrics =
   match metrics.level_first_commitment_published with
-  | None -> 0
+  | None -> 0.
   | Some _ ->
       let producers =
         min t.configuration.dal_node_producer t.parameters.number_of_slots
       in
-      if producers = 0 then 100
-      else Hashtbl.length per_level_info.published_commitments * 100 / producers
+      if producers = 0 then 100.
+      else
+        float_of_int (Hashtbl.length per_level_info.published_commitments)
+        *. 100. /. float_of_int producers
 
 let update_ratio_attested_commitments t per_level_info metrics =
   match metrics.level_first_commitment_attested with
-  | None -> 0
+  | None -> 0.
   | Some level_first_commitment_attested -> (
       let published_level =
         published_level_of_attested_level t per_level_info.level
@@ -344,16 +347,22 @@ let update_ratio_attested_commitments t per_level_info metrics =
           Log.warn
             "Unexpected error: The level %d is missing in the infos table"
             published_level ;
-          0
+          0.
       | Some old_per_level_info ->
           let n = Hashtbl.length old_per_level_info.published_commitments in
-          let weight = per_level_info.level - level_first_commitment_attested in
+          let weight =
+            per_level_info.level - level_first_commitment_attested
+            |> float_of_int
+          in
           if n = 0 then metrics.ratio_attested_commitments
           else
+            let bitset =
+              Z.popcount per_level_info.attested_commitments * 100 / n
+              |> float_of_int
+            in
             let ratio =
-              ((metrics.ratio_attested_commitments * weight)
-              + (Z.popcount per_level_info.attested_commitments * 100 / n))
-              / (weight + 1)
+              ((metrics.ratio_attested_commitments *. weight) +. bitset)
+              /. (weight +. 1.)
             in
             ratio)
 
@@ -372,10 +381,15 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
           Hashtbl.create 0
       | Some old_per_level_info ->
           let n = Hashtbl.length old_per_level_info.published_commitments in
-          let weight = per_level_info.level - level_first_commitment_attested in
+          let weight =
+            per_level_info.level - level_first_commitment_attested
+            |> float_of_int
+          in
           t.bakers |> List.to_seq
           |> Seq.map (fun ({account; _} : baker) ->
                  let bitset =
+                   float_of_int
+                   @@
                    match
                      Hashtbl.find_opt
                        per_level_info.attestations
@@ -400,13 +414,13 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                        metrics.ratio_attested_commitments_per_baker
                        account.Account.public_key_hash
                    with
-                   | None -> 0
+                   | None -> 0.
                    | Some ratio -> ratio
                  in
                  if n = 0 then (account.Account.public_key_hash, old_ratio)
                  else
                    ( account.Account.public_key_hash,
-                     ((old_ratio * weight) + bitset) / (weight + 1) ))
+                     ((old_ratio *. weight) +. bitset) /. (weight +. 1.) ))
           |> Hashtbl.of_seq)
 
 let get_metrics t infos_per_level metrics =
