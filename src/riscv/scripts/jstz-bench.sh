@@ -18,7 +18,7 @@ echo "[INFO]: building deps"
 make riscv-sandbox &> /dev/null
 make -C jstz build &> /dev/null
 
-DATA_DIR=$(mktemp -d)
+DATA_DIR=${DATA_DIR:=$(mktemp -d)}
 
 echo "[INFO]: generating $1 transfers"
 INBOX_FILE="${DATA_DIR}/inbox.json"
