@@ -149,8 +149,14 @@ module Frozen_tez = struct
       String.Map.map f co_current
 
   (* For rewards, distribute equally *)
-  let add_tez_to_all_current ~edge tez a =
-    let self_portion = Tez.ratio a.self_current (total_current a) in
+  let add_tez_to_all_current ~edge ~limit tez a =
+    let total_current = total_current a in
+    let total_current_with_limit =
+      Tez.(
+        mul_q a.self_current Q.(add one limit)
+        |> of_q ~round:`Up |> min total_current)
+    in
+    let self_portion = Tez.ratio a.self_current total_current_with_limit in
     (* Baker's advantage for the mutez *)
     let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
     let remains = Tez.(tez -! self_quantity) in
@@ -163,8 +169,14 @@ module Frozen_tez = struct
     {a with co_current; self_current = Tez.(a.self_current +! self_quantity)}
 
   (* For slashing, slash equally *)
-  let sub_tez_from_all_current tez a =
-    let self_portion = Tez.ratio a.self_current (total_current a) in
+  let sub_tez_from_all_current ~limit tez a =
+    let total_current = total_current a in
+    let total_current_with_limit =
+      Tez.(
+        mul_q a.self_current Q.(add one limit)
+        |> of_q ~round:`Up |> min total_current)
+    in
+    let self_portion = Tez.ratio a.self_current total_current_with_limit in
     let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
     let self_current =
       if Tez.(self_quantity >= a.self_current) then Tez.zero
@@ -173,14 +185,18 @@ module Frozen_tez = struct
     let co_quantity = Tez.(tez -! self_quantity) in
     let s = total_co_current_q a.co_current in
     if Partial_tez.(geq (of_tez co_quantity) s) then
-      {a with self_current; co_current = String.Map.empty}
+      ( {a with self_current; co_current = String.Map.empty},
+        self_quantity,
+        co_quantity )
     else
       let f p_amount =
         let q = Q.div p_amount s in
         Partial_tez.sub p_amount (Tez.mul_q co_quantity q)
         (* > 0 *)
       in
-      {a with self_current; co_current = String.Map.map f a.co_current}
+      ( {a with self_current; co_current = String.Map.map f a.co_current},
+        self_quantity,
+        co_quantity )
 
   (* Adds frozen to account. Happens each stake in frozen deposits *)
   let add_current_q amount account a =
@@ -251,7 +267,7 @@ module Frozen_tez = struct
     let a, amount = sub_current amount account a in
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
-  let slash cst base_amount (pct : Protocol.Percentage.t) a =
+  let slash ~limit cst base_amount (pct : Protocol.Percentage.t) a =
     Log.info
       "Slashing frozen tez for delegate %s with percentage %a"
       a.delegate
@@ -263,14 +279,28 @@ module Frozen_tez = struct
       Tez.mul_q base_amount pct_q
       |> Tez.of_q ~round:`Down |> Tez.min total_current
     in
-    let rat =
-      cst.Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
-        .global_limit_of_staking_over_baking + 2
+    let a, burnt_amount, rewarded_amount =
+      if total_current > Tez.zero then
+        let a, slashed_baker, slashed_staker =
+          sub_tez_from_all_current slashed_amount ~limit a
+        in
+        let rat =
+          cst.Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
+            .global_limit_of_staking_over_baking + 2
+        in
+        let rewarded_baker =
+          Tez.mul_q slashed_baker Q.(1 // rat) |> Tez.of_q ~round:`Down
+        in
+
+        let rewarded_staker =
+          Tez.mul_q slashed_staker Q.(1 // rat) |> Tez.of_q ~round:`Down
+        in
+        let rewarded_amount = Tez.(rewarded_baker +! rewarded_staker) in
+
+        let burnt_amount = Tez.(slashed_amount -! rewarded_amount) in
+        (a, burnt_amount, rewarded_amount)
+      else (a, Tez.zero, Tez.zero)
     in
-    let rewarded_amount =
-      Tez.mul_q slashed_amount Q.(1 // rat) |> Tez.of_q ~round:`Down
-    in
-    let burnt_amount = Tez.(slashed_amount -! rewarded_amount) in
     Log.info
       "Total current: %a, slashed amount: %a, rewarded amount: %a, burnt \
        amount: %a"
@@ -282,11 +312,7 @@ module Frozen_tez = struct
       rewarded_amount
       Tez.pp
       burnt_amount ;
-    if total_current > Tez.zero then
-      let a = sub_tez_from_all_current burnt_amount a in
-      let a = sub_tez_from_all_current rewarded_amount a in
-      (a, burnt_amount, rewarded_amount)
-    else (a, Tez.zero, Tez.zero)
+    (a, burnt_amount, rewarded_amount)
 end
 
 (** Representation of Unstaked frozen deposits *)

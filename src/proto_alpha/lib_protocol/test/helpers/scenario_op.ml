@@ -17,6 +17,31 @@ open Scenario_base
 open Scenario_bake
 open Tez_helpers.Ez_tez
 
+let normalize_parameters
+    {limit_of_staking_over_baking; edge_of_baking_over_staking} state =
+  let actual_limit =
+    Q.(
+      mul limit_of_staking_over_baking (1_000_000 // 1)
+      |> to_int |> of_int
+      |> mul (1 // 1_000_000))
+    |> Q.max Q.zero
+    |> Q.min
+         (Q.of_int
+            state.State.constants.adaptive_issuance
+              .global_limit_of_staking_over_baking)
+  in
+  let actual_edge =
+    Q.(
+      mul edge_of_baking_over_staking (1_000_000_000 // 1)
+      |> to_int |> of_int
+      |> mul (1 // 1_000_000_000))
+    |> Q.max Q.zero |> Q.min Q.one
+  in
+  {
+    limit_of_staking_over_baking = actual_limit;
+    edge_of_baking_over_staking = actual_edge;
+  }
+
 (** Set delegate parameters for the given delegate *)
 let set_delegate_params delegate_name parameters : (t, t) scenarios =
   exec_op (fun (block, state) ->
@@ -32,12 +57,13 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
         set_delegate_parameters (B block) delegate.contract ~parameters
       in
       (* Update state *)
+      let norm_parameters = normalize_parameters parameters state in
       let wait = state.constants.delegate_parameters_activation_delay in
       let state =
         {
           state with
           param_requests =
-            (delegate_name, parameters, wait) :: state.param_requests;
+            (delegate_name, norm_parameters, wait) :: state.param_requests;
         }
       in
       (* Return both *)
