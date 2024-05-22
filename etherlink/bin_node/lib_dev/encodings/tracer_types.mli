@@ -43,6 +43,14 @@ val input_encoding : (Ethereum_types.hash * config) Data_encoding.t
 
 val input_rlp_encoder : Ethereum_types.hash -> config -> string
 
+module Opcode : sig
+  type t = Char.t
+
+  val opcode_to_string : t -> string
+
+  val encoding : t Data_encoding.t
+end
+
 (* This is a temporary type, it should be filled in a follow up patch. *)
 type opcode_log
 
