@@ -556,6 +556,38 @@ let spawn_command evm_node args =
 let spawn_run ?(extra_arguments = []) evm_node =
   spawn_command evm_node (run_args evm_node @ extra_arguments)
 
+module Config_file = struct
+  let filename evm_node =
+    Filename.concat evm_node.persistent_state.data_dir "config.json"
+
+  let read evm_node =
+    match evm_node.persistent_state.runner with
+    | None -> Lwt.return (JSON.parse_file (filename evm_node))
+    | Some runner ->
+        let* content =
+          Process.spawn ~runner "cat" [filename evm_node]
+          |> Process.check_and_read_stdout
+        in
+        JSON.parse ~origin:"Evm_node.config_file.read" content |> Lwt.return
+
+  let write node config =
+    match node.persistent_state.runner with
+    | None -> Lwt.return (JSON.encode_to_file (filename node) config)
+    | Some runner ->
+        let content = JSON.encode config in
+        let cmd =
+          Runner.Shell.(
+            redirect_stdout (cmd [] "echo" [content]) (filename node))
+        in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run cmd args
+
+  let update node update =
+    let* config = read node in
+    let config = update config in
+    write node config
+end
+
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
   let mode_args =
@@ -760,11 +792,39 @@ let endpoint ?(private_ = false) (evm_node : t) =
   in
   Format.sprintf "http://%s:%d%s" addr port path
 
-let init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
+let patch_config_with_experimental_feature ?(wal_sqlite_journal_mode = false)
+    ?(drop_duplicate_when_injection = false) =
+  let conditional_json_put ~name cond value_json json =
+    if cond then
+      JSON.put
+        ( name,
+          JSON.annotate ~origin:"evm_node.experimental_config_patch"
+          @@ value_json )
+        json
+    else json
+  in
+  JSON.update "experimental_features" @@ fun json ->
+  conditional_json_put
+    wal_sqlite_journal_mode
+    ~name:"sqlite_journal_mode"
+    (`String "wal")
+    json
+  |> conditional_json_put
+       drop_duplicate_when_injection
+       ~name:"drop_duplicate_on_injection"
+       (`Bool true)
+
+let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+    rollup_node =
   let evm_node =
     create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
+  let* () =
+    match patch_config with
+    | Some patch_config -> Config_file.update evm_node patch_config
+    | None -> unit
+  in
   let* () = run evm_node in
   return evm_node
 
