@@ -205,3 +205,57 @@ gitlab:release:
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
+
+apt_repo_debian_bookworm:
+  image: debian:bookworm
+  stage: prepare_release
+  tags:
+  - gcp
+  needs:
+  - oc.build:dpkg:amd64
+  dependencies:
+  - oc.build:dpkg:amd64
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh debian bookworm
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+apt_repo_ubuntu_focal:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  stage: prepare_release
+  tags:
+  - gcp
+  needs:
+  - oc.build:dpkg:amd64
+  dependencies:
+  - oc.build:dpkg:amd64
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh ubuntu focal
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+apt_repo_ubuntu_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  stage: prepare_release
+  tags:
+  - gcp
+  needs:
+  - oc.build:dpkg:amd64
+  dependencies:
+  - oc.build:dpkg:amd64
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh ubuntu jammy
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
