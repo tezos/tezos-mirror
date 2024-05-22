@@ -238,13 +238,12 @@ let wait_for_application ~evm_node ~sc_rollup_node ~client apply =
         "Baked more than %d blocks and the operation's application is still \
          pending"
         max_iteration ;
-    if Lwt.state application_result = Lwt.Sleep then loop (current_iteration + 1)
-    else unit
+    match Lwt.state application_result with
+    | Lwt.Return value -> Lwt.return value
+    | Lwt.Fail exn -> raise exn
+    | Lwt.Sleep -> loop (current_iteration + 1)
   in
-  (* Using [Lwt.both] ensures that any exception thrown in [tx_hash] will be
-     thrown by [Lwt.both] as well. *)
-  let* result, () = Lwt.both application_result (loop 0) in
-  return result
+  Lwt.pick [application_result; loop 0]
 
 let batch_n_transactions ~evm_node txs =
   let requests =
