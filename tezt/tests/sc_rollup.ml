@@ -991,19 +991,28 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
    - we import the snapshot in the second and a fresh rollup node
    - we ensure they are all synchronized
    - we also try to import invalid snapshots to make sure they are rejected. *)
-let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
-    ~compact =
+let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
+    ~commitment_period ~history_mode ~compact =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
+
+  let whitelist =
+    if unsafe_pvm_patches then Some [Constant.bootstrap1.public_key_hash]
+    else None
+  in
   test_full_scenario
+    ?whitelist
     {
       tags =
-        (["snapshot"; history_mode_str] @ if compact then ["compact"] else []);
+        (["snapshot"; history_mode_str]
+        @ (if compact then ["compact"] else [])
+        @ if unsafe_pvm_patches then ["unsafe_pvm_patches"] else []);
       variant = None;
       description =
         sf
-          "snapshot can be exported and checked (%s%s)"
+          "snapshot can be exported and checked (%s%s%s)"
           history_mode_str
-          (if compact then " compact" else "");
+          (if compact then " compact" else "")
+          (if unsafe_pvm_patches then " unsafe_pvm_patches" else "");
     }
     ~kind
     ~challenge_window
@@ -1019,8 +1028,29 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
      additional commitments). *)
   let total_blocks = level_snapshot + (4 * commitment_period) in
   let stop_rollup_node_2_levels = challenge_window + 2 in
+  let maybe_add_unsafe_pvm_patches_in_config sc_rollup_node =
+    if unsafe_pvm_patches then
+      let* () =
+        Process.check
+        @@ Sc_rollup_node.spawn_config_init sc_rollup_node sc_rollup
+      in
+      return
+      @@ Sc_rollup_node.Config_file.update
+           sc_rollup_node
+           (Sc_rollup_node.patch_config_unsafe_pvm_patches
+              (* arbitrary value *)
+              [Increase_max_nb_ticks 55_000_000_000_000])
+    else unit
+  in
+  let maybe_add_apply_unsafe_patches_arg l =
+    if unsafe_pvm_patches then Sc_rollup_node.Apply_unsafe_patches :: l else l
+  in
+  let* () = maybe_add_unsafe_pvm_patches_in_config sc_rollup_node in
   let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup [History_mode history_mode]
+    Sc_rollup_node.run
+      sc_rollup_node
+      sc_rollup
+      (maybe_add_apply_unsafe_patches_arg [History_mode history_mode])
   in
   (* We run the other nodes in mode observer because we only care if they can
      catch up. *)
@@ -1036,11 +1066,21 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
   let rollup_node_5 =
     Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
   in
+  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_2 in
+  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_3 in
+  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_4 in
+  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_5 in
   let* () =
-    Sc_rollup_node.run rollup_node_2 sc_rollup [History_mode history_mode]
+    Sc_rollup_node.run
+      rollup_node_2
+      sc_rollup
+      (maybe_add_apply_unsafe_patches_arg [History_mode history_mode])
   in
   let* () =
-    Sc_rollup_node.run rollup_node_4 other_rollup [History_mode history_mode]
+    Sc_rollup_node.run
+      rollup_node_4
+      other_rollup
+      (maybe_add_apply_unsafe_patches_arg [History_mode history_mode])
   in
   let* () =
     match history_mode with
@@ -1049,14 +1089,17 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
         (* Run another rollup node in full mode, to check that it can import
            archive snapshots (it needs to register its mode on disk). *)
         let* () =
-          Sc_rollup_node.run rollup_node_5 sc_rollup [History_mode Full]
+          Sc_rollup_node.run
+            rollup_node_5
+            sc_rollup
+            (maybe_add_apply_unsafe_patches_arg [History_mode Full])
         in
         let* (_ : int) = Sc_rollup_node.wait_sync rollup_node_5 ~timeout:3. in
         Sc_rollup_node.terminate rollup_node_5
   in
   let rollup_node_processing =
     let* () = bake_levels stop_rollup_node_2_levels client in
-    Log.info "Stopping rollup node 2 before snapshot is made." ;
+    Log.info "Stopping rollup node 2 and 4 before snapshot is made." ;
     let* () = Sc_rollup_node.terminate rollup_node_2 in
     let* () = Sc_rollup_node.terminate rollup_node_4 in
     let* () = bake_levels (total_blocks - stop_rollup_node_2_levels) client in
@@ -1115,7 +1158,12 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
       process_other
   in
   Log.info "Importing snapshot in empty rollup node." ;
-  let*! () = Sc_rollup_node.import_snapshot rollup_node_3 ~snapshot_file in
+  let*! () =
+    Sc_rollup_node.import_snapshot
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      rollup_node_3
+      ~snapshot_file
+  in
   (* rollup_node_2 was stopped before so it has data but is late with respect to
      sc_rollup_node. *)
   Log.info "Try importing snapshot in already populated rollup node." ;
@@ -1125,7 +1173,11 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
   let* () = Process.check_error ~msg:(rex "is already populated") populated in
   Log.info "Importing snapshot in late rollup node." ;
   let*! () =
-    Sc_rollup_node.import_snapshot ~force:true rollup_node_2 ~snapshot_file
+    Sc_rollup_node.import_snapshot
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      ~force:true
+      rollup_node_2
+      ~snapshot_file
   in
   let* () =
     match history_mode with
@@ -1135,6 +1187,7 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
         let*! () =
           Sc_rollup_node.import_snapshot
             ~force:true
+            ~apply_unsafe_patches:unsafe_pvm_patches
             rollup_node_5
             ~snapshot_file
         in
@@ -6098,6 +6151,14 @@ let register_protocol_independent () =
     ~compact:true
     protocols ;
   test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Archive
+    ~compact:false
+    protocols ;
+  test_snapshots
+    ~unsafe_pvm_patches:true
     ~kind
     ~challenge_window:10
     ~commitment_period:5

@@ -342,10 +342,15 @@ val export_snapshot :
   string ->
   string Runnable.process
 
-(** [import_snapshot ?force rollup_node ~snapshot_file] imports the snapshot
-    [snapshot_file] in the rollup node [rollup_node].  *)
+(** [import_snapshot ?apply_unsafe_patches ?force rollup_node
+    ~snapshot_file] imports the snapshot [snapshot_file] in the rollup
+    node [rollup_node].  *)
 val import_snapshot :
-  ?force:bool -> t -> snapshot_file:string -> unit Runnable.process
+  ?apply_unsafe_patches:bool ->
+  ?force:bool ->
+  t ->
+  snapshot_file:string ->
+  unit Runnable.process
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
