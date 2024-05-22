@@ -41,6 +41,10 @@ type ready_ctxt = {
       (** The slot identifiers of the commitments currently being
      amplified. This set is used to prevent concurrent amplifications
      of the same slot. *)
+  mutable slots_under_reconstruction :
+    (bytes, Errors.other) result Lwt.t Types.Slot_id.Map.t;
+      (** Promises kept in a map to avoid parallel reconstructions in
+     the [Slot_manager] module. *)
 }
 
 (** A promise that is fullfilled only when the status of the node evolves from
@@ -116,6 +120,15 @@ val may_add_plugin :
   block_level:int32 ->
   proto_level:int ->
   unit tzresult Lwt.t
+
+(** Reconstruct the given slot id by calling the [reconstruct]
+    function unless a reconstruction for the given slot id is alredy
+    ongoing in which case the ongoing promise is returned instead. *)
+val may_reconstruct :
+  reconstruct:(Types.slot_id -> (bytes, Errors.other) result Lwt.t) ->
+  Types.slot_id ->
+  ready_ctxt ->
+  (bytes, Errors.other) result Lwt.t
 
 type error += Node_not_ready
 

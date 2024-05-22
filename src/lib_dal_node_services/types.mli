@@ -41,6 +41,8 @@ module Slot_id : sig
   module Comparable : Stdlib.Set.OrderedType with type t = t
 
   module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
 end
 
 type slot_id = Slot_id.t

@@ -295,6 +295,7 @@ module Slot_id = struct
   end
 
   module Set = Set.Make (Comparable)
+  module Map = Map.Make (Comparable)
 end
 
 type slot_id = Slot_id.t

@@ -33,6 +33,8 @@ type ready_ctxt = {
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
+  mutable slots_under_reconstruction :
+    (bytes, Errors.other) result Lwt.t Types.Slot_id.Map.t;
 }
 
 type starting_status = {
@@ -139,10 +141,29 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
             shards_proofs_precomputation;
             skip_list_cells_store;
             ongoing_amplifications = Types.Slot_id.Set.empty;
+            slots_under_reconstruction = Types.Slot_id.Map.empty;
           } ;
       Lwt.wakeup starting_status.started_resolver () ;
       return_unit
   | Ready _ -> raise Status_already_ready
+
+let may_reconstruct ~reconstruct slot_id t =
+  let open Lwt_result_syntax in
+  let p =
+    (* If a reconstruction is already ongoing, reuse the
+       promise. *)
+    match Types.Slot_id.Map.find slot_id t.slots_under_reconstruction with
+    | Some promise -> promise
+    | None ->
+        let promise = reconstruct slot_id in
+        t.slots_under_reconstruction <-
+          Types.Slot_id.Map.add slot_id promise t.slots_under_reconstruction ;
+        promise
+  in
+  let*! res = p in
+  t.slots_under_reconstruction <-
+    Types.Slot_id.Map.remove slot_id t.slots_under_reconstruction ;
+  Lwt.return res
 
 let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in

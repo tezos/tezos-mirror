@@ -74,10 +74,11 @@ let () =
 
 module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
-    call_handler2 ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_content
           ~reconstruct_if_missing:true
+          ctxt
           store
           cryptobox
           slot_id)
@@ -110,12 +111,13 @@ module Slots_handlers = struct
         | Ok proof -> return proof)
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
-    call_handler2 ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
         let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         let* content =
           Slot_manager.get_slot_content
             ~reconstruct_if_missing:true
+            ctxt
             store
             cryptobox
             slot_id
@@ -171,12 +173,13 @@ module Slots_handlers = struct
         return (commitment, commitment_proof))
 
   let get_slot_commitment ctxt slot_level slot_index () () =
-    call_handler2 ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
         let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         let* content =
           Slot_manager.get_slot_content
             ~reconstruct_if_missing:true
+            ctxt
             store
             cryptobox
             slot_id
@@ -194,11 +197,12 @@ module Slots_handlers = struct
         Slot_manager.get_slot_shard node_store slot_id shard_index)
 
   let get_slot_pages ctxt slot_level slot_index () () =
-    call_handler2 ctxt (fun node_store {cryptobox; _} ->
+    call_handler2 ctxt (fun node_store ({cryptobox; _} as ctxt) ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_pages
           ~reconstruct_if_missing:true
           cryptobox
+          ctxt
           node_store
           slot_id)
 end
