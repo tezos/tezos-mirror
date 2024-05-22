@@ -10,7 +10,7 @@ module Repo : sig
 end
 
 module State : sig
-  type t
+  type t = Octez_riscv_api.state
 
   val equal : t -> t -> bool
 end

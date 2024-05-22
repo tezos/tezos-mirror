@@ -7,6 +7,7 @@ open! Bigarray
 type repo
 type state
 type id
+type status
 external octez_riscv_id_unsafe_of_raw_string: string -> id = "octez_riscv_id_unsafe_of_raw_string"
 external octez_riscv_storage_id_to_raw_string: id -> string = "octez_riscv_storage_id_to_raw_string"
 external octez_riscv_storage_id_equal: id -> id -> bool = "octez_riscv_storage_id_equal"
@@ -16,3 +17,8 @@ external octez_riscv_storage_load: string -> repo = "octez_riscv_storage_load"
 external octez_riscv_storage_close: repo -> unit = "octez_riscv_storage_close"
 external octez_riscv_storage_commit: repo -> state -> id = "octez_riscv_storage_commit"
 external octez_riscv_storage_checkout: repo -> id -> state option = "octez_riscv_storage_checkout"
+external octez_riscv_get_status: state -> status = "octez_riscv_get_status"
+external octez_riscv_string_of_status: status -> string = "octez_riscv_string_of_status"
+external octez_riscv_compute_step: state -> state = "octez_riscv_compute_step"
+external octez_riscv_compute_step_many: int64 -> state -> (state * int64) = "octez_riscv_compute_step_many"
+external octez_riscv_get_tick: state -> int64 = "octez_riscv_get_tick"

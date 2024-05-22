@@ -13,6 +13,8 @@ type input_info
 
 type state = Storage.State.t
 
+type status = Octez_riscv_api.status
+
 val compute_step_many :
   ?reveal_builtins:reveals ->
   ?write_debug:write_debug ->
@@ -26,8 +28,6 @@ val compute_step : state -> state Lwt.t
 val compute_step_with_debug : ?write_debug:write_debug -> state -> state Lwt.t
 
 val get_tick : state -> Z.t Lwt.t
-
-type status
 
 val get_status : state -> status Lwt.t
 

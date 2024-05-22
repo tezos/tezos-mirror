@@ -16,9 +16,13 @@ pub struct State(DummyPvm);
 #[ocaml::sig]
 pub struct Id(storage::Hash);
 
+#[ocaml::sig]
+pub struct Status(String);
+
 ocaml::custom!(Repo);
 ocaml::custom!(State);
 ocaml::custom!(Id);
+ocaml::custom!(Status);
 
 #[ocaml::func]
 #[ocaml::sig("string -> id")]
@@ -90,4 +94,37 @@ pub fn octez_riscv_storage_checkout(
         Err(StorageError::NotFound(_)) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> status")]
+pub fn octez_riscv_get_status(_state: Pointer<State>) -> Pointer<Status> {
+    Status("dummy_value".to_string()).into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("status -> string")]
+pub fn octez_riscv_string_of_status(_status: Pointer<Status>) -> String {
+    unimplemented!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> state")]
+pub fn octez_riscv_compute_step(_state: Pointer<State>) -> Pointer<State> {
+    unimplemented!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("int64 -> state -> (state * int64)")]
+pub fn octez_riscv_compute_step_many(
+    _max_steps: usize,
+    _state: Pointer<State>,
+) -> (Pointer<State>, i64) {
+    unimplemented!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> int64")]
+pub fn octez_riscv_get_tick(_state: Pointer<State>) -> i64 {
+    unimplemented!()
 }
