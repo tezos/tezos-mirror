@@ -75,8 +75,7 @@ release:
   extends: .needs-build
   before_script:
     - !reference [.needs-build, before_script]
-    - apk add zip
-    - apk add curl
+    - apk add zip curl
   script:
     - zip ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip archiver/main.exe server/main.exe
     - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:=latest}/${ARCHIVE}"
