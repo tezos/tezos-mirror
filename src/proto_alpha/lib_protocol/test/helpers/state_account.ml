@@ -23,15 +23,10 @@ let add_liquid_rewards amount account_name account_map =
 
 let add_frozen_rewards amount account_name account_map =
   let f account =
-    let actual_edge =
-      Q.(
-        mul account.parameters.edge_of_baking_over_staking (1_000_000_000 // 1)
-        |> to_int |> of_int
-        |> mul (1 // 1_000_000_000))
-    in
     let frozen_deposits =
       Frozen_tez.add_tez_to_all_current
-        ~edge:actual_edge
+        ~edge:account.parameters.edge_of_baking_over_staking
+        ~limit:account.parameters.limit_of_staking_over_baking
         amount
         account.frozen_deposits
     in

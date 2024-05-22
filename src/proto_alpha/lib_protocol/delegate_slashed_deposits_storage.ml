@@ -96,12 +96,8 @@ let compute_punishing_amount slashing_percentage frozen_deposits =
   in
   Tez_repr.min punish_value frozen_deposits.Deposits_repr.current_amount
 
-let compute_reward_and_burn slashing_percentage frozen_deposits
-    global_limit_of_staking_over_baking =
+let split_reward_and_burn punishing_amount global_limit_of_staking_over_baking =
   let open Result_syntax in
-  let punishing_amount =
-    compute_punishing_amount slashing_percentage frozen_deposits
-  in
   let global_limit_of_staking_over_baking_plus_two =
     Int64.add (Int64.of_int global_limit_of_staking_over_baking) 2L
   in
@@ -110,6 +106,13 @@ let compute_reward_and_burn slashing_percentage frozen_deposits
   in
   let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
   {reward; amount_to_burn}
+
+let compute_reward_and_burn slashing_percentage frozen_deposits
+    global_limit_of_staking_over_baking =
+  let punishing_amount =
+    compute_punishing_amount slashing_percentage frozen_deposits
+  in
+  split_reward_and_burn punishing_amount global_limit_of_staking_over_baking
 
 let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
     ~misbehaviour_cycle =
@@ -294,42 +297,108 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
               in
               return Deposits_repr.{initial_amount; current_amount}
             in
-            let*? staked =
-              compute_reward_and_burn
-                slashing_percentage
-                frozen_deposits
+            let punishing_amount =
+              compute_punishing_amount slashing_percentage frozen_deposits
+              (* Ensures: [punishing_amount <= current_amount]
+
+                 where [current_amount = frozen_deposits.current_amount
+                                       = own_frozen + staked_frozen]
+              *)
+            in
+            let* {baker_part; stakers_part = _} =
+              Shared_stake.share
+                ~rounding:`Towards_baker
+                ctxt
+                delegate
+                punishing_amount
+              (* Ensures:
+
+                 - [baker_part + stakers_part = punishing_amount]
+
+                 - [baker_part / punishing_amount = own_frozen / (own_frozen + allowed_staked_frozen)]
+
+                 where [allowed_staked_frozen] is [staked_frozen]
+                 capped by the delegate's [limit_of_staking_over_baking],
+                 which notably means that [allowed_staked_frozen <= staked_frozen]
+                 i.e. [own_frozen + allowed_staked_frozen <= own_frozen + staked_frozen = current_amount]
+
+                 Combining all of the above:
+
+                 [baker_part / punishing_amount >= own_frozen / current_amount]
+
+                 [(punishing_amount - stakers_part) / punishing_amount >= (current_amount - staked_frozen) / current_amount]
+
+                 [1 - (stakers_part / punishing_amount) >= 1 - (staked_frozen / current_amount)]
+
+                 [stakers_part / punishing_amount <= staked_frozen / current_amount]
+
+                 [stakers_part <= staked_frozen * punishing_amount / current_amount]
+
+                 Moreover, we know from above that [punishing_amount <= current_amount] so:
+
+                 [stakers_part <= staked_frozen]
+              *)
+            in
+            let* full_staking_balance =
+              Stake_storage.get_full_staking_balance ctxt delegate
+            in
+            let own_frozen =
+              Full_staking_balance_repr.own_frozen full_staking_balance
+            in
+            let actual_baker_part = Tez_repr.min baker_part own_frozen in
+            let*? actual_stakers_part =
+              Tez_repr.(punishing_amount -? actual_baker_part)
+            in
+            (* To avoid underflows, we need to guarantee that:
+               - [actual_baker_part <= own_frozen] and
+               - [actual_stakers_part <= staked_frozen]
+
+               The [min] ensures that [actual_baker_part <= own_frozen].
+
+               For [actual_stakers_part], let's examine two cases
+               based on the [min]:
+
+               - Case 1: [actual_baker_part = baker_part]
+
+               [actual_stakers_part = punishing_amount - actual_baker_part
+                 = punishing_amount - baker_part
+                 = stakers_part
+                 <= staked_frozen] as proven above
+
+               - Case 2: [actual_baker_part = own_frozen]
+
+               [actual_stakers_part = punishing_amount - actual_baker_part
+                 = punishing_amount - own_frozen
+                 <= current_amount - own_frozen
+                     = own_frozen + staked_frozen - own_frozen
+                     = staked_frozen]
+            *)
+            let*? {amount_to_burn = to_burn_baker; reward = to_reward_baker} =
+              split_reward_and_burn
+                actual_baker_part
                 global_limit_of_staking_over_baking
             in
-            let* init_to_burn_to_reward =
-              let giver_baker =
-                `Frozen_deposits (Frozen_staker_repr.baker delegate)
-              in
-              let giver_stakers =
-                `Frozen_deposits
-                  (Frozen_staker_repr.shared_between_stakers ~delegate)
-              in
-              let {amount_to_burn; reward} = staked in
-              let* to_burn =
-                let+ {baker_part; stakers_part} =
-                  Shared_stake.share
-                    ~rounding:`Towards_baker
-                    ctxt
-                    delegate
-                    amount_to_burn
-                in
-                [(giver_baker, baker_part); (giver_stakers, stakers_part)]
-              in
-              let* to_reward =
-                let+ {baker_part; stakers_part} =
-                  Shared_stake.share
-                    ~rounding:`Towards_baker
-                    ctxt
-                    delegate
-                    reward
-                in
-                [(giver_baker, baker_part); (giver_stakers, stakers_part)]
-              in
-              return (to_burn, to_reward)
+            let*? {amount_to_burn = to_burn_stakers; reward = to_reward_stakers}
+                =
+              split_reward_and_burn
+                actual_stakers_part
+                global_limit_of_staking_over_baking
+            in
+            let giver_baker =
+              `Frozen_deposits (Frozen_staker_repr.baker delegate)
+            in
+            let giver_stakers =
+              `Frozen_deposits
+                (Frozen_staker_repr.shared_between_stakers ~delegate)
+            in
+            let init_to_burn =
+              [(giver_baker, to_burn_baker); (giver_stakers, to_burn_stakers)]
+            in
+            let init_to_reward =
+              [
+                (giver_baker, to_reward_baker);
+                (giver_stakers, to_reward_stakers);
+              ]
             in
             let* to_burn, to_reward =
               let oldest_slashable_cycle =
@@ -357,7 +426,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                   return
                     ( (giver, amount_to_burn) :: to_burn,
                       (giver, reward) :: to_reward ))
-                init_to_burn_to_reward
+                (init_to_burn, init_to_reward)
                 slashable_cycles
             in
             let origin = Receipt_repr.Delayed_operation {operation_hash} in

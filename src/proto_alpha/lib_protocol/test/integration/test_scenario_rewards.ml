@@ -176,6 +176,57 @@ let test_wait_rewards_with_ai_staker_variation =
   --> set_delegate "delegate" (Some "delegate")
   --> wait_n_cycles 4 --> set_baker "delegate" --> wait_n_cycles 10
 
+(** Tests reward distribution under AI for one baker and two stakers,
+    and the baker changes its limit parameter while being overstaked.
+    We expect the rewards for the stakers to change accordingly with the limit.
+*)
+let test_overstake_different_limits =
+  let set_limit l =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.of_float l;
+        edge_of_baking_over_staking = Q.zero;
+      }
+    in
+    set_delegate_params "delegate" params
+  in
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
+  --> set_baker "faucet"
+  --> unstake "delegate" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> check_balance_field "delegate" `Staked (Tez.of_mutez 10_000_000_000L)
+  --> set_baker "delegate"
+  (* same rights to have same block distribution *)
+  --> unstake "faucet" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> unstake "__bootstrap__" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> set_limit 5. --> wait_delegate_parameters_activation
+  --> add_account_with_funds
+        "staker1"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_delegate "staker1" (Some "delegate")
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_delegate "staker2" (Some "delegate")
+  (* Always overstaked *)
+  --> stake "staker1" (Amount (Tez.of_mutez 111_000_000_000L))
+  --> stake "staker2" (Amount (Tez.of_mutez 222_000_000_000L))
+  --> (Tag "limit = 0" --> set_limit 0.
+      |+ Tag "limit = 0.24" --> set_limit 0.24
+      |+ Tag "limit = 1" --> set_limit 1.
+      |+ Tag "limit >= 5" --> set_limit 6.)
+  (* Before activation: testing global limit (5) *)
+  --> wait_delegate_parameters_activation
+  --> wait_n_cycles 6
+  --> (Tag "limit = 0" --> set_limit 0.
+      |+ Tag "limit = 0.24" --> set_limit 0.24
+      |+ Tag "limit = 1" --> set_limit 1.
+      |+ Tag "limit >= 5" --> set_limit 6.)
+  --> wait_delegate_parameters_activation --> wait_n_cycles 6
+
 (** Tests that the activation time for AI is as expected:
     The expected delay is [consensus_rights_delay] + 1 cycles after activation. *)
 let test_ai_curve_activation_time =
@@ -308,6 +359,8 @@ let tests =
          test_static_decreasing );
        ( "Test static rate updated after consensus_rights_delay",
          test_static_timing );
+       ( "Test limit parameter with overstake and rewards",
+         test_overstake_different_limits );
      ]
 
 let () =

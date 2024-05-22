@@ -161,7 +161,8 @@ let apply_slashing_account all_denunciations_to_apply
           misbehaviour
   in
   let slash_culprit
-      ({frozen_deposits; unstaked_frozen; frozen_rights; _} as acc) =
+      ({frozen_deposits; unstaked_frozen; frozen_rights; parameters; _} as acc)
+      =
     Log.info
       "Slashing %a for %a with frozen deposits: { %a }"
       Signature.Public_key_hash.pp
@@ -176,7 +177,12 @@ let apply_slashing_account all_denunciations_to_apply
     in
     Log.info "Base rights: %a" Tez.pp base_rights ;
     let frozen_deposits, burnt_frozen, rewarded_frozen =
-      Frozen_tez.slash state.constants base_rights slashed_pct frozen_deposits
+      Frozen_tez.slash
+        ~limit:parameters.limit_of_staking_over_baking
+        state.constants
+        base_rights
+        slashed_pct
+        frozen_deposits
     in
     let slashed_pct_q = Protocol.Percentage.to_q slashed_pct in
     let slashed_pct = Q.(100 // 1 * slashed_pct_q |> to_int) in

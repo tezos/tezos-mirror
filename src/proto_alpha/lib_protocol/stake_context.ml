@@ -28,6 +28,16 @@ let apply_limits ctxt staking_parameters staking_balance =
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let own_frozen = Full_staking_balance_repr.own_frozen staking_balance in
   let staked_frozen = Full_staking_balance_repr.staked_frozen staking_balance in
+  let allowed_staked_frozen =
+    Full_staking_balance_repr.allowed_staked_frozen
+      ~adaptive_issuance_global_limit_of_staking_over_baking:
+        (Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
+           ctxt)
+      ~delegate_limit_of_staking_over_baking_millionth:
+        staking_parameters
+          .Staking_parameters_repr.limit_of_staking_over_baking_millionth
+      staking_balance
+  in
   let delegated =
     Full_staking_balance_repr.min_delegated_in_cycle
       ~current_cycle
@@ -35,38 +45,6 @@ let apply_limits ctxt staking_parameters staking_balance =
   in
   let limit_of_delegation_over_baking =
     Int64.of_int (Constants_storage.limit_of_delegation_over_baking ctxt)
-  in
-  let global_limit_of_staking_over_baking_millionth =
-    Int64.(
-      mul
-        1_000_000L
-        (of_int
-           (Constants_storage
-            .adaptive_issuance_global_limit_of_staking_over_baking
-              ctxt)))
-  in
-  let {Staking_parameters_repr.limit_of_staking_over_baking_millionth; _} =
-    staking_parameters
-  in
-  let limit_of_staking_over_baking_millionth =
-    let delegate_limit_of_staking_over_baking_millionth =
-      Int64.of_int32 limit_of_staking_over_baking_millionth
-    in
-    Compare.Int64.min
-      global_limit_of_staking_over_baking_millionth
-      delegate_limit_of_staking_over_baking_millionth
-  in
-  let allowed_staked_frozen =
-    match
-      Tez_repr.mul_ratio
-        ~rounding:`Down
-        own_frozen
-        ~num:limit_of_staking_over_baking_millionth
-        ~den:1_000_000L
-    with
-    | Ok max_allowed_staked_frozen ->
-        Tez_repr.min staked_frozen max_allowed_staked_frozen
-    | Error _max_allowed_staked_frozen_overflows -> staked_frozen
   in
   (* Overstaked tez count as delegated.
      Note that, unlike delegated tez, overstaked tez may not have been staked
