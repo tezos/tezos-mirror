@@ -77,11 +77,6 @@ module Slots : sig
     Types.slot_id ->
     (unit, [> Errors.other]) result Lwt.t
 
-  (** [exists_slot store ~slot_size slot_id] returns true IFF a slot is
-      associated to the given slot id. *)
-  val exists_slot :
-    t -> slot_size:int -> Types.slot_id -> (bool, [> Errors.other]) result Lwt.t
-
   (** [find_slot store ~slot_size slot_id] returns the slot associated to some
       slot id or [Error `Not_found] if no slot is associated. *)
   val find_slot :
@@ -101,44 +96,25 @@ module Commitment_indexed_cache : sig
   val find_opt : 'a t -> commitment -> 'a option
 end
 
-(** Shard proofs are not stored on disk because we can recompute
-    them. This computation is quite costly though so we cache the
-    result in memory. *)
-module Shard_proofs_cache = Commitment_indexed_cache
-
-(** A cache in which we keep the shards of the slots which we have
-    received via RPC but are not yet published so we cannot yet assign
-    a slot id to them. *)
-module Shard_cache = Commitment_indexed_cache
-
-(** A cache in which we keep the slots which we have received via RPC
-    but are not yet published so we cannot yet assign a slot id to
-    them. *)
-module Slot_cache = Commitment_indexed_cache
-
 type t = private {
   store : irmin;  (** The Irmin-based part of the store *)
   shards : Shards.t;  (** Shards store *)
   slots : Slots.t;  (** Slots store *)
-  in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
+  cache :
+    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
+    Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
-  not_yet_published_shards : Cryptobox.share array Shard_cache.t;
-      (** Cache of shards *)
-  not_yet_published_slots : Cryptobox.slot Slot_cache.t;  (** Cache of slots *)
 }
 
-(** [cache_shard_proofs store commitment shard_proofs] replaces in the
-    shard proof cache all the shard proofs for the given commitment
-    with the given ones. *)
-val cache_shard_proofs : t -> commitment -> shard_proof array -> unit
-
-(** [cache_shards store commitment shards] adds [shards] to the shard
-    cache with key [commitment]. *)
-val cache_shards : t -> commitment -> Cryptobox.share array -> unit
-
-(** [cache_slot store commitment slot] adds [slot] to the slot cache
-    with key [commitment]. *)
-val cache_slot : t -> commitment -> slot -> unit
+(** [cache_entry store commitment entry] adds or replace an entry to
+    the cache with key [commitment]. *)
+val cache_entry :
+  t ->
+  commitment ->
+  Cryptobox.slot ->
+  Cryptobox.share array ->
+  Cryptobox.shard_proof array ->
+  unit
 
 val init : Configuration_file.t -> t tzresult Lwt.t
 

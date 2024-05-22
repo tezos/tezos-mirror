@@ -31,7 +31,6 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
-  | Missing_shards_in_cache of Types.slot_id
 
 let () =
   register_error_kind
@@ -107,26 +106,7 @@ let () =
          be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
-    (fun () -> No_prover_SRS) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.missing_shards_in_cache"
-    ~title:"Missing shards in cache"
-    ~description:"Missing shards in cache could not be published"
-    ~pp:(fun ppf (published_level, slot_index) ->
-      Format.fprintf
-        ppf
-        "Could not publish the shards at level %ld for slot index %d because \
-         they were not found in the cache."
-        published_level
-        slot_index)
-    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
-    (function
-      | Missing_shards_in_cache slot_id ->
-          Some (slot_id.slot_level, slot_id.slot_index)
-      | _ -> None)
-    (fun (slot_level, slot_index) ->
-      Missing_shards_in_cache {slot_level; slot_index})
+    (fun () -> No_prover_SRS)
 
 type slot = bytes
 
@@ -247,30 +227,23 @@ let commit_slot slot cryptobox =
   return commitment
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
-    commitment slot ~with_proof =
+    commitment slot =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  let () =
-    let share_array =
-      shards
-      |> Seq.map (fun Cryptobox.{index = _; share} -> share)
-      |> Array.of_seq
-    in
-    Store.cache_shards node_store commitment share_array
+  let*? precomputation =
+    match shards_proofs_precomputation with
+    | None -> Error (`Other [No_prover_SRS])
+    | Some precomputation -> Ok precomputation
   in
-  let () = Store.cache_slot node_store commitment slot in
-  if with_proof then
-    let*? precomputation =
-      match shards_proofs_precomputation with
-      | None -> Error (`Other [No_prover_SRS])
-      | Some precomputation -> Ok precomputation
-    in
-    let shard_proofs =
-      Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
-    in
-    Store.cache_shard_proofs node_store commitment shard_proofs |> return
-  else return_unit
+  let shard_proofs =
+    Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
+  in
+  let shares =
+    Array.map (fun Cryptobox.{index = _; share} -> share) (Array.of_seq shards)
+  in
+  Store.cache_entry node_store commitment slot shares shard_proofs ;
+  return_unit
 
 let get_opt array i =
   if i >= 0 && i < Array.length array then Some array.(i) else None
@@ -353,11 +326,7 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
 let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
     gs_worker proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
-  match
-    Store.Shard_proofs_cache.find_opt
-      node_store.in_memory_shard_proofs
-      commitment
-  with
+  match Store.Commitment_indexed_cache.find_opt node_store.cache commitment with
   | None ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
 
@@ -371,42 +340,18 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
           3. The cache was full (unlikely to happen if
           [shards_proofs_cache_size] is set properly. *)
       return_unit
-  | Some shard_proofs ->
-      let*? shards =
-        match
-          Store.Shard_cache.find_opt
-            node_store.not_yet_published_shards
-            commitment
-        with
-        | Some shards ->
-            shards |> Array.to_seq
-            |> Seq.mapi (fun index share -> Cryptobox.{index; share})
-            |> Result.return
-        | None -> Result_syntax.tzfail @@ Missing_shards_in_cache slot_id
+  | Some (slot, shares, shard_proofs) ->
+      let shards =
+        shares |> Array.to_seq
+        |> Seq.mapi (fun index share -> Cryptobox.{index; share})
       in
       let* () =
         Store.(Shards.write_all node_store.shards slot_id shards)
         |> Errors.to_tzresult
       in
       let* () =
-        let* exists =
-          Store.(Slots.exists_slot node_store.slots ~slot_size slot_id)
-          |> Errors.to_tzresult
-        in
-        let* () =
-          if exists then return_unit
-          else
-            match
-              Store.Slot_cache.find_opt
-                node_store.not_yet_published_slots
-                commitment
-            with
-            | Some slot ->
-                Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
-                |> Errors.to_tzresult
-            | None -> return_unit
-        in
-        return_unit
+        Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
+        |> Errors.to_tzresult
       in
       publish_proved_shards
         slot_id
