@@ -5,12 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let read_value state path =
+let read_value ?default state path =
   let open Lwt_result_syntax in
   let*! value = Evm_state.inspect state path in
   match value with
-  | None -> tzfail Tracer_types.Trace_not_found
   | Some value -> return value
+  | None -> (
+      match default with
+      | Some d -> return d
+      | None -> tzfail Tracer_types.Trace_not_found)
 
 let read_output state =
   let open Lwt_result_syntax in
@@ -21,7 +24,11 @@ let read_output state =
     read_value state Durable_storage_path.Trace_transaction.output_failed
   in
   let* return_value =
-    read_value state Durable_storage_path.Trace_transaction.output_return_value
+    read_value
+    (* The key doesn't exist if there is no value returned by the transaction *)
+      ~default:Bytes.empty
+      state
+      Durable_storage_path.Trace_transaction.output_return_value
   in
   return @@ Tracer_types.output_binary_decoder ~gas ~failed ~return_value
 
