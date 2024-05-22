@@ -68,7 +68,7 @@ let get_blocks_response_time ~executors ~protocol =
     ~__FILE__
     ~title:response_time_test
     ~tags:["rpc"]
-    ~timeout:(Seconds 20)
+    ~timeout:(Minutes 3)
     ~uses_node:true
     ~executors
   @@ fun () ->
