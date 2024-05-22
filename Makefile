@@ -122,7 +122,7 @@ build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
 .PHONY: $(ALL_EXECUTABLES)
-$(ALL_EXECUTABLES):
+$(ALL_EXECUTABLES): check-slim-mode
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
@@ -149,6 +149,13 @@ validate-kaitai-struct-files:
 	@$(MAKE) check-kaitai-struct-files
 	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files 2>/dev/null || \
 	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
+
+# If slim mode is active, print a message before building anything.
+# This check is disabled if file scripts/slim-mode.sh is not available,
+# which may be the case in Docker images or tarballs for instance.
+.PHONY: check-slim-mode
+check-slim-mode:
+	@if [ -f scripts/slim-mode.sh ]; then scripts/slim-mode.sh check; fi
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
@@ -199,7 +206,7 @@ clean-old-names:
 # See comment of clean-old-names for an explanation regarding why we do not try
 # to generate the symbolic links from *_EXECUTABLES.
 .PHONY: build
-build: clean-old-names
+build: check-slim-mode clean-old-names
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
