@@ -305,7 +305,7 @@ val check_regression :
 
     Usage: [time measurement f]
 
-    This executes [f], measures the [time] it takes to run, adds
+    This executes [f], measures the [time] it takes to run, and adds
     a data point for [measurement] with field ["duration"] equal to [time].
     If [f] raises an exception, data points are not pushed and the
     exception is propagated.
@@ -322,10 +322,7 @@ val time :
   (unit -> unit) ->
   unit
 
-(** Same as {time} but uses [check_regression] to compare with previous
-    values.
-
-    See {!check_regression} for documentation about optional parameters. *)
+(** Same as {!time} followed by {!check_regression}. *)
 val time_and_check_regression :
   ?previous_count:int ->
   ?minimum_previous_count:int ->
@@ -338,7 +335,12 @@ val time_and_check_regression :
   (unit -> unit) ->
   unit Lwt.t
 
-(** Same as {!time}, but only record the duration returned by [f]. *)
+(** Same as {!time}, but let the function choose how it measures time.
+
+    {!time} measures time using [Unix.gettimeofday] around the whole execution
+    of the function. If you only want to measure parts of the execution,
+    or if you want to use something more precise than [Unix.gettimeofday],
+    or if you want to measure something which is not time, use [measure] instead. *)
 val measure :
   ?repeat:int ->
   ?tags:(string * string) list ->
@@ -346,11 +348,7 @@ val measure :
   (unit -> float) ->
   unit
 
-(** Same as {!time_and_check_regression}, but instead of measuring the duration taken
-    by [f ()] execution, delegates this responsability to [f] itself.
-
-    In this case, [f] represents a thunk that executes an expression
-    or a program and evaluates in the duration taken by its execution.*)
+(** Same as {!measure} followed by {!check_regression}. *)
 val measure_and_check_regression :
   ?previous_count:int ->
   ?minimum_previous_count:int ->
@@ -374,10 +372,7 @@ val time_lwt :
   (unit -> unit Lwt.t) ->
   unit Lwt.t
 
-(** Same as {!time_lwt}, but uses [check_regression] to compare with previous
-    values.
-
-    See {!check_regression} for documentation about optional parameters. *)
+(** Same as {!time_and_check_regression}, but for functions that return promises. *)
 val time_and_check_regression_lwt :
   ?previous_count:int ->
   ?minimum_previous_count:int ->
@@ -390,7 +385,7 @@ val time_and_check_regression_lwt :
   (unit -> unit Lwt.t) ->
   unit Lwt.t
 
-(** Same as {!time_lwt}, but only record the duration returned by [f]. *)
+(** Same as {!measure}, but for functions that return promises. *)
 val measure_lwt :
   ?repeat:int ->
   ?tags:(string * string) list ->
@@ -398,11 +393,7 @@ val measure_lwt :
   (unit -> float Lwt.t) ->
   unit Lwt.t
 
-(** Same as {!time_and_check_regression_lwt}, but instead of measuring the
-    duration taken by [f ()] execution, delegates to [f] itself.
-
-    In this case, [f] represents a thunk that executes an expression
-    or a program and evaluates in the duration taken by its execution.*)
+(** Same as {!measure_and_check_regression}, but for functions that return promises. *)
 val measure_and_check_regression_lwt :
   ?previous_count:int ->
   ?minimum_previous_count:int ->
