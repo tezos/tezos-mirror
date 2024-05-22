@@ -86,9 +86,15 @@ module Protocol : sig
 
   type number = Alpha | V of int | Other
 
+  type status = Active | Frozen | Overridden | Not_mainnet
+
+  val status : t -> status
+
   val main : t -> Manifest.target
 
   val alpha : t
+
+  val all : t list
 
   val active : t list
 
