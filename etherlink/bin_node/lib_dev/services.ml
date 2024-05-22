@@ -409,7 +409,7 @@ let dispatch_request (config : Configuration.t)
         let f ((hash, config) : Tracer_types.input) =
           let*! trace = Backend_rpc.trace_transaction hash config in
           match trace with
-          | Ok _ -> rpc_ok ()
+          | Ok trace -> rpc_ok trace
           | Error (Tracer_types.Not_supported :: _) ->
               rpc_error
                 (Rpc_errors.method_not_supported Trace_transaction.method_)

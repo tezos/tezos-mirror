@@ -709,11 +709,11 @@ end
 module Trace_transaction = struct
   type input = Tracer_types.input
 
-  type output = unit
+  type output = Tracer_types.output
 
   let input_encoding = Tracer_types.input_encoding
 
-  let output_encoding = Data_encoding.unit
+  let output_encoding = Tracer_types.output_encoding
 
   let method_ = "debug_traceTransaction"
 
