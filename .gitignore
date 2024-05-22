@@ -158,3 +158,6 @@ terraform.rc
 
 # Direnv
 .direnv
+
+# Emacs
+.dir-locals.el
