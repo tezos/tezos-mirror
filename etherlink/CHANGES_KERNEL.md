@@ -14,6 +14,9 @@
 
 - Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
 
+- Introduce new block encoding to include `baseFeePerGas` and `mixHash`.
+  New blocks would contain `baseFeePerGas` and a default `mixHash`. (!13159)
+
 ### Internal
 
 - Gas price is removed from internal structure block in progress. (!13220)
