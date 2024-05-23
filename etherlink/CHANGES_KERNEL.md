@@ -6,6 +6,7 @@
 
 - The kernel has now the ability to trace a transaction (via
   the EVM runtime). (!13185, !13502)
+- Incorporate the gas limit in the block hash. (!13280)
 
 ### Bug fixes
 
@@ -14,6 +15,10 @@
 - Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
 
 ### Internal
+
+- Gas price is removed from internal structure block in progress. (!13220)
+- Refactor block creation to properly add the gas limit. (!13278)
+- Gas limit is no longer optional for blocks. (!13279)
 
 ## Version b9f6c9138719220db83086f0548e49c5c4c8421f
 
