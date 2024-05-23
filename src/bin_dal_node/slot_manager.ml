@@ -220,16 +220,9 @@ let commit cryptobox polynomial =
 
 (* Main functions *)
 
-let commit_slot slot cryptobox =
-  let open Lwt_result_syntax in
-  let*? polynomial = polynomial_from_slot cryptobox slot in
-  let*? commitment = commit cryptobox polynomial in
-  return commitment
-
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
-    commitment slot =
+    commitment slot polynomial =
   let open Lwt_result_syntax in
-  let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
   let*? precomputation =
     match shards_proofs_precomputation with

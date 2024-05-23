@@ -72,16 +72,23 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | No_prover_SRS
 
-(** [commit_slot slot cryptobox] computes the given [slot]'s commitment.
+(** [Cryptobox.polynomial_from_slot] but using the [Errors] module.
 
-    In addition to decoding errors, the function returns an error
-    {!ref:Invalid_slot_size} if the [slot]'s size doesn't match the expected
-    slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
-*)
-val commit_slot :
-  Cryptobox.slot ->
+    The function returns an error {!ref:Invalid_slot_size} if the
+    [slot]'s size doesn't match the expected slots' size given in
+    [cryptobox], or the [slot]'s polynomial otherwise. *)
+val polynomial_from_slot :
   Cryptobox.t ->
-  (Cryptobox.commitment, [> Errors.other]) result Lwt.t
+  Cryptobox.slot ->
+  (Cryptobox.polynomial, [> Errors.other]) result
+
+(** [commit cryptobox polynomial] computes the commitment of the given
+    [polynomial].
+*)
+val commit :
+  Cryptobox.t ->
+  Cryptobox.polynomial ->
+  (Cryptobox.commitment, [> Errors.other]) result
 
 (** [get_slot_content ~reconstruct_if_missing node_ctxt node_store
     cryptobox slot_id] returns the slot content associated with the
@@ -104,8 +111,8 @@ val get_slot_content :
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store
-    cryptobox commitment slot] registers the shards of the slot whose
-    commitment is given.
+    cryptobox commitment slot polynomial] registers the shards of the
+    slot whose commitment is given.
 
     Proofs are generated for the computed shards using
     [shards_proofs_precomputation] and stored in a bounded structure
@@ -122,6 +129,7 @@ val add_commitment_shards :
   Cryptobox.t ->
   Cryptobox.commitment ->
   Cryptobox.slot ->
+  Cryptobox.polynomial ->
   (unit, [> Errors.other]) result Lwt.t
 
 (** This function publishes the given shards and their proofs. *)

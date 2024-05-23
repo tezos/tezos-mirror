@@ -83,32 +83,24 @@ module Slots_handlers = struct
           cryptobox
           slot_id)
 
-  (* This function assumes the slot is valid since we already have
-     computed a commitment for it. *)
-  let commitment_proof_from_slot cryptobox slot =
+  let commitment_proof_from_polynomial cryptobox polynomial =
     let open Result_syntax in
-    match Cryptobox.polynomial_from_slot cryptobox slot with
-    | Error (`Slot_wrong_size msg) ->
-        (* Storage consistency ensures we can always compute the
-           polynomial from the slot. But let's returne an errror to be defensive. *)
-        Error (Errors.other [Cryptobox_error ("polynomial_from_slot", msg)])
-    | Ok polynomial -> (
-        match Cryptobox.prove_commitment cryptobox polynomial with
-        (* [polynomial] was produced with the parameters from
-           [cryptobox], thus we can always compute the proof from
-           [polynomial] except if an error happens with the loading of the SRS. *)
-        | Error
-            ( `Invalid_degree_strictly_less_than_expected _
-            | `Prover_SRS_not_loaded ) ->
-            Error
-              (Errors.other
-                 [
-                   Cryptobox_error
-                     ( "prove_commitment",
-                       "Unexpected error. Maybe an issue with the SRS from the \
-                        DAL node." );
-                 ])
-        | Ok proof -> return proof)
+    match Cryptobox.prove_commitment cryptobox polynomial with
+    (* [polynomial] was produced with the parameters from
+       [cryptobox], thus we can always compute the proof from
+       [polynomial] except if an error happens with the loading of the SRS. *)
+    | Error
+        (`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
+      ->
+        Error
+          (Errors.other
+             [
+               Cryptobox_error
+                 ( "prove_commitment",
+                   "Unexpected error. Maybe an issue with the SRS from the DAL \
+                    node." );
+             ])
+    | Ok proof -> return proof
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
     call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
@@ -159,8 +151,11 @@ module Slots_handlers = struct
             let padding = String.make (slot_size - slot_length) query#padding in
             Ok (Bytes.of_string (slot ^ padding))
         in
-        let* commitment = Slot_manager.commit_slot slot cryptobox in
-        let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
+        let*? polynomial = Slot_manager.polynomial_from_slot cryptobox slot in
+        let*? commitment = Slot_manager.commit cryptobox polynomial in
+        let*? commitment_proof =
+          commitment_proof_from_polynomial cryptobox polynomial
+        in
         let* () =
           Slot_manager.add_commitment_shards
             ~shards_proofs_precomputation
@@ -168,6 +163,7 @@ module Slots_handlers = struct
             cryptobox
             commitment
             slot
+            polynomial
         in
         return (commitment, commitment_proof))
 
@@ -183,7 +179,11 @@ module Slots_handlers = struct
             cryptobox
             slot_id
         in
-        Slot_manager.commit_slot content cryptobox)
+        let*? polynomial =
+          Slot_manager.polynomial_from_slot cryptobox content
+        in
+        let*? commitment = Slot_manager.commit cryptobox polynomial in
+        return commitment)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
