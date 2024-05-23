@@ -13,7 +13,7 @@ open Externals
 include Product (struct
   let name = "CIAO"
 
-  let source = ["ci/"]
+  let source = ["ci"]
 end)
 
 let ci_lib_gitlab_ci_main =

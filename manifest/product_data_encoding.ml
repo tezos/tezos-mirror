@@ -13,7 +13,7 @@ open Externals
 include Product (struct
   let name = "data-encoding"
 
-  let source = ["data-encoding/"]
+  let source = ["data-encoding"]
 end)
 
 let opam_version = "1.0.1"

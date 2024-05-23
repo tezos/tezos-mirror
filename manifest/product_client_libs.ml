@@ -16,7 +16,7 @@ open Product_octez
 include Product (struct
   let name = "client-libs"
 
-  let source = ["client-libs/"]
+  let source = ["client-libs"]
 end)
 
 let kaitai =
