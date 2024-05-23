@@ -3690,6 +3690,67 @@ let test_trace_transaction_call =
       check_trace true (Some value_in_storage) transaction_receipt trace
   | Error _ -> Test.fail "Trace transaction shouldn't have failed"
 
+let test_miner =
+  let sequencer_pool_address =
+    String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
+  in
+  register_both
+    ~tags:["evm"; "miner"]
+    ~title:"Sequencer pool address is the block's miner"
+    ~sequencer_pool_address
+  @@ fun {sequencer; _} _protocol ->
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  Check.((String.lowercase_ascii block.miner = sequencer_pool_address) string)
+    ~error_msg:
+      "Block miner should be the sequencer pool address, expected %R got %L" ;
+  (* We deploy a contract that stores the block coinbase in its storage, and
+     also has a view to get the block coinbase. *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:Solidity_contracts.coinbase.label
+      ~abi:Solidity_contracts.coinbase.abi
+      ()
+  in
+  let* contract, _tx_hash =
+    send_transaction
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:Solidity_contracts.coinbase.abi
+          ~bin:Solidity_contracts.coinbase.bin)
+      sequencer
+  in
+  let* storage_coinbase =
+    Eth_cli.contract_call
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:Solidity_contracts.coinbase.label
+      ~address:contract
+      ~method_call:"getStorageCoinbase()"
+      ()
+  in
+  Check.(
+    (String.lowercase_ascii @@ String.trim storage_coinbase
+    = sequencer_pool_address)
+      string)
+    ~error_msg:
+      "Stored coinbase should be the sequencer pool address, expected %R got %L" ;
+  let* view_coinbase =
+    Eth_cli.contract_call
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:Solidity_contracts.coinbase.label
+      ~address:contract
+      ~method_call:"getStorageCoinbase()"
+      ()
+  in
+  Check.(
+    (String.lowercase_ascii @@ String.trim view_coinbase
+    = sequencer_pool_address)
+      string)
+    ~error_msg:
+      "Viewed coinbase should be the sequencer pool address, expected %R got %L" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -3741,4 +3802,5 @@ let () =
   test_txpool_content_empty_with_legacy_encoding protocols ;
   test_trace_transaction protocols ;
   test_trace_transaction_on_invalid_transaction protocols ;
-  test_trace_transaction_call protocols
+  test_trace_transaction_call protocols ;
+  test_miner protocols
