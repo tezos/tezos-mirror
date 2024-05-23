@@ -5553,6 +5553,216 @@ module Garbage_collection = struct
     Log.info "End of test" ;
     unit
 
+  (* This simple test checks the basic feature, with just a producer that
+     produces shards & deletes them and an attester with attests them. *)
+  let test_gc_producer_and_attester _protocol dal_parameters _cryptobox node
+      client dal_bootstrap =
+    let slot_index = 0 in
+    (* Parameters and constants. *)
+    let Dal.Parameters.
+          {number_of_slots; cryptobox = {Dal.Cryptobox.slot_size; _}; _} =
+      dal_parameters
+    in
+
+    (* Note: we don't need to configure and start the DAL bootstrap
+       node because it is the node started by the
+       scenario_with_layer1_and_dal_nodes wrapper. Instead, we check
+       that the dal node passed as argument to this test function is a
+       running bootstrap DAL node. If not, this means that we forgot
+       to register the test with ~bootstrap_profile:true *)
+    let* () =
+      check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap
+    in
+    Log.info "bootstrap DAL node is running" ;
+
+    (* When configuring the other DAL nodes, we use dal_bootstrap as
+       the single peer. *)
+    let peers = [Dal_node.listen_addr dal_bootstrap] in
+
+    (* Create & configure attester *)
+    let attester = Dal_node.create ~name:"attester" ~node () in
+    let bootstrap_pkhs =
+      Array.to_seq Account.Bootstrap.keys
+      |> Seq.map (fun account -> account.Account.public_key_hash)
+      |> List.of_seq
+    in
+    Dal_node.log_events attester ;
+    let* () =
+      Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
+    in
+    let* () = Dal_node.run ~wait_ready:true attester in
+    Log.info "attester DAL node ready" ;
+
+    let slot_producer = Dal_node.create ~name:"producer" ~node () in
+    Dal_node.log_events slot_producer ;
+    let* () =
+      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
+    in
+    (* Promise which will be resolved once the slot producer will be
+       connected to all the other DAL nodes (attester + bootstrap). *)
+    let wait_for_connections_of_producer_promise =
+      Dal_node.wait_for_connections slot_producer 2
+    in
+    let* () = Dal_node.run ~wait_ready:true slot_producer in
+
+    (* Check that the DAL nodes have the expected profiles. *)
+    let* () =
+      check_profiles
+        ~__LOC__
+        slot_producer
+        ~expected:Dal_RPC.(Operator [Producer slot_index])
+    in
+    Log.info "Slot producer DAL node is running" ;
+
+    let* () =
+      check_profiles
+        ~__LOC__
+        attester
+        ~expected:
+          (Dal_RPC.Operator
+             (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
+    in
+
+    Log.info "Attester DAL node is running" ;
+
+    (* Now that all the DAL nodes are running, we need some of them to
+       establish grafted connections. The connections between the
+       attester and the slot producer have no reason to be grafted on
+       other slot indices than the one the slot producer is subscribed
+       to, so we instruct [check_events_with_topic] to skip all events
+       but the one for [slot_index]. *)
+    let already_seen_slots =
+      Array.init number_of_slots (fun index -> slot_index <> index)
+    in
+    (* Wait for a GRAFT message between all nodes. *)
+    let check_graft node1 node2 attester_pkh =
+      let check_graft ~from:node1 node2 =
+        let* id1 = Dal_node.read_identity node1 in
+        check_events_with_topic
+          ~event_with_topic:(Graft id1)
+          node2
+          ~num_slots:number_of_slots
+          ~already_seen_slots
+          attester_pkh
+      in
+      Lwt.pick [check_graft ~from:node1 node2; check_graft ~from:node2 node1]
+    in
+    let check_graft_promises =
+      List.map (check_graft slot_producer attester) bootstrap_pkhs
+    in
+    Log.info "Waiting for grafting of the DAL nodes connections" ;
+    (* The attester DAL node won't join the DAL network until it has
+       processed some finalized L1 block in which the associated baker
+       is reported to have some rights. For this to happen, we need to
+       bake a few blocks. *)
+    let* () = bake_for ~count:3 client in
+    let* () = Lwt.join check_graft_promises in
+    Log.info "Attester - producer connections grafted" ;
+
+    let* () = wait_for_connections_of_producer_promise in
+
+    Log.info "DAL network is ready" ;
+
+    let wait_slot ~published_level ~slot_index =
+      (* We don’t wait for the producer because at this step it already stored
+         its shards *)
+      Log.info "Waiting for first shard to be stored by the attester" ;
+      wait_for_first_shard ~published_level ~slot_index attester
+    in
+
+    let* published_level, _commitment, shard_index_attester =
+      publish_store_and_wait_slot
+        node
+        client
+        slot_producer
+        Constant.bootstrap1
+        ~index:slot_index
+        ~wait_slot
+        ~number_of_extra_blocks_to_bake:2
+      @@ Helpers.make_slot ~slot_size "content"
+    in
+
+    Log.info "RPC first shard producer" ;
+    let* _shard_producer =
+      get_shard_rpc
+        ~slot_level:published_level
+        ~slot_index
+        ~shard_index:0
+        slot_producer
+    in
+    Log.info "RPC first shard attester" ;
+    let* _shard_attester =
+      get_shard_rpc
+        ~slot_level:published_level
+        ~slot_index
+        ~shard_index:shard_index_attester
+        attester
+    in
+
+    let wait_remove_shards_attester_promise =
+      Log.info "Waiting for first shard to be removed by the attester" ;
+      wait_remove_shards ~published_level ~slot_index attester
+    in
+
+    Log.info "All nodes received a shard, waiting for blocks to be baked" ;
+    let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
+    let rec bake_loop n =
+      if n <= 0 then unit
+      else
+        let* level = Client.level client in
+        let wait_block_p =
+          List.map
+            (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
+            [attester; dal_bootstrap; slot_producer]
+        in
+        let* () =
+          bake_for ~dal_node_endpoint:attester_dal_node_endpoint client
+        in
+        let* () = Lwt.join wait_block_p in
+        bake_loop (n - 1)
+    in
+    let* () = bake_loop 25 in
+    Log.info "Blocks baked !" ;
+
+    Log.info "Checking that the slot was attested" ;
+    let* () =
+      let* status =
+        Dal_RPC.(
+          call slot_producer
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index)
+      in
+      Check.(status = "attested")
+        ~__LOC__
+        Check.string
+        ~error_msg:
+          "The value of the fetched status should match the expected one \
+           (current = %L, expected = %R)" ;
+      unit
+    in
+
+    Log.info "Wait for first shard attester" ;
+    let* () = wait_remove_shards_attester_promise in
+
+    Log.info "RPC deleted shard attester" ;
+    let* () =
+      get_shard_rpc_failure_expected
+        ~slot_level:published_level
+        ~slot_index
+        attester
+    in
+
+    Log.info "RPC shard still stored producer" ;
+    let* _shard_producer =
+      get_shard_rpc
+        ~slot_level:published_level
+        ~slot_index
+        ~shard_index:0
+        slot_producer
+    in
+
+    Log.info "End of test" ;
+    unit
+
   (* For this test, we create a network of three DAL nodes — 1 slot producer,
      1 attester, 1 observer (so we can check for each profile). History mode is
      [Auto].
@@ -7032,6 +7242,13 @@ let register ~protocols =
     ~number_of_slots:1
     "garbage collection of shards for producer"
     Garbage_collection.test_gc_simple_producer
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gc"; "attester"; Tag.memory_4k]
+    ~bootstrap_profile:true
+    ~number_of_slots:1
+    "garbage collection of shards for producer and attester"
+    Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "multi"; Tag.memory_4k]
