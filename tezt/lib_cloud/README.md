@@ -101,7 +101,7 @@ Once your `TEZT_CLOUD` value is set and you have the appropriate
 rights, you should be able to create the bucket using:
 
 ```bash
-dune exec tezt/tests/main.exe -- terraform state deploy bucket -v
+dune exec tezt/tests/cloud/main.exe -- terraform state deploy bucket -v
 ```
 
 ## Docker registry
@@ -113,7 +113,7 @@ Once your `TEZT_CLOUD` value is set and you have the appropriate
 rights, you should be able to create the registry using:
 
 ```bash
-dune exec tezt/tests/main.exe -- docker registry deploy -v
+dune exec tezt/tests/cloud/main.exe -- docker registry deploy -v
 ```
 
 ## Deployment
@@ -121,7 +121,7 @@ dune exec tezt/tests/main.exe -- docker registry deploy -v
 To push your image, you should run:
 
 ```bash
-dune exec tezt/tests/main.exe -- docker push -v
+dune exec tezt/tests/cloud/main.exe -- docker push -v
 ```
 
 ## Run your first scenario
@@ -136,13 +136,13 @@ command-line via `--vms`. But it can also be computed by the scenario, so that
 We recommend to test it twice: using localhost or not:
 
 ```bash
-dune exec tezt/tests/main.exe -- cloud health --localhost -v
+dune exec tezt/tests/cloud/main.exe -- cloud health --localhost -v
 ```
 
 and using VMs:
 
 ```bash
-dune exec tezt/tests/main.exe -- cloud health -v
+dune exec tezt/tests/cloud/main.exe -- cloud health -v
 ```
 
 (Any scenario using this library should contain the tag `cloud`.)
@@ -159,7 +159,7 @@ point, either by specifying `--destroy` when running your scenario or by
 running:
 
 ```bash
-dune exec tezt/tests/main.exe -- terraform destroy -v
+dune exec tezt/tests/cloud/main.exe -- terraform destroy -v
 ```
 
 (It is actually quite difficult to provide an automatic way to destroy resources
@@ -201,7 +201,7 @@ snapshot can be set via `--prometheus-snapshot`.
 After being exported, a snapshot can be imported by running:
 
 ```bash
-dune exec tezt/tests/main.exe -- prometheus import --prometheus-snapshot <filename>
+dune exec tezt/tests/cloud/main.exe -- prometheus import --prometheus-snapshot <filename>
 ```
 
 ## Exporting ad-hoc metrics
@@ -255,7 +255,7 @@ exported to the Prometheus instance using the function
    - The clean-up of tezt or tezt-cloud failed. A manual clean-up can be done via
 
    ```bash
-   dune exec tezt/tests/main.exe -- clean up -v
+   dune exec tezt/tests/cloud/main.exe -- clean up -v
    ```
 
    - There is an internal issue with `tezt-cloud`. Please feel free to report
