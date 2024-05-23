@@ -670,11 +670,11 @@ let update_output_buffer pvm_state level =
 
 let apply_migration version pvm_state =
   match version with
-  | Wasm_pvm_state.V5 ->
-      {pvm_state with max_nb_ticks = Z.of_int64 50_000_000_000_000L}
+  | Wasm_pvm_state.V5 -> pvm_state
   | V4 ->
       {
         pvm_state with
+        max_nb_ticks = Z.of_int64 50_000_000_000_000L;
         buffers =
           {
             pvm_state.buffers with
