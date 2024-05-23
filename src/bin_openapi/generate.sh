@@ -4,9 +4,10 @@
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
-# When the python tests framework becomes a standalone library, this script
-# should be removed and replaced by a python script calling the test's core
+# This script should be replaced by a Tezt script calling the test's core
 # logic.
+
+set -e
 
 # Ensure we are running from the root directory of the Tezos repository.
 cd "$(dirname "$0")"/../.. || exit
@@ -46,6 +47,8 @@ mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi.json
 dal_node_openapi_json=docs/api/dal-node-openapi-dev.json
 
+rm -rf "$tmp"
+
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
 
@@ -79,7 +82,6 @@ sleep 1
 mkdir $dal_node_data_dir
 $dal_node config init --data-dir $dal_node_data_dir \
   --endpoint "http://localhost:$rpc_port" --expected-pow 0
-$dal_node identity generate --data-dir $dal_node_data_dir
 $dal_node run --data-dir $dal_node_data_dir &
 dal_node_pid="$!"
 
