@@ -207,3 +207,18 @@ val count_values :
   ('file, 'key, 'value) file_layout ->
   'file ->
   int tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** Same as {!init} above, except that the user can specify a prefix for the
+      lock file (default is lockfile_prefix = "internal_for_tests") to avoid issues
+      if the store is already locked by another process, such as:
+
+      IO error in lockf(): Resource temporarily unavailable)
+  *)
+  val init :
+    ?lockfile_prefix:string ->
+    lru_size:int ->
+    root_dir:string ->
+    unit ->
+    ('file, 'key, 'value) t tzresult Lwt.t
+end

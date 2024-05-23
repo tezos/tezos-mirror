@@ -177,6 +177,12 @@ val as_rpc_endpoint : t -> Endpoint.t
     ["new_connection.v0"] events. *)
 val wait_for_connections : t -> int -> unit Lwt.t
 
+(** Wait until the node is ready.
+
+    More precisely, wait until a [dal_node_is_ready] event occurs. If such an
+    event already occurred, return immediately. *)
+val wait_for_ready : t -> unit Lwt.t
+
 (** Wait for a node to receive a disconnection for some peer_id.
 
     [wait_for_disconnection node peer_id] waits until [node] receives a
@@ -198,3 +204,8 @@ module Agent : sig
 
   val create : ?path:string -> ?name:string -> node:Node.t -> Agent.t -> t Lwt.t
 end
+
+(** Load and return the current value of the last finalized level processed by
+    the crawler and stored in store/last_processed_level KVS file. The function
+    returns [None] in case of error (e.g. file not found, file locked, ...). *)
+val load_last_finalized_processed_level : t -> int option Lwt.t

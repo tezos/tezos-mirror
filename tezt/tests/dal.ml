@@ -4178,6 +4178,125 @@ let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
   in
   unit
 
+let monitor_finalized_levels_events ~__LOC__ ~last_notified_level ~target_level
+    dal_node =
+  let next_finalized_level = ref (last_notified_level + 1) in
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+      let finalized_level = JSON.(e |-> "level" |> as_int) in
+      Check.(
+        (finalized_level = !next_finalized_level)
+          int
+          ~error_msg:"Expected next finalized level to be %R (got %L)") ;
+      incr next_finalized_level ;
+      if finalized_level = target_level then Some finalized_level else None)
+
+(** The following test checks various things related to the DAL node crawler:
+- We check that the content of the file "last_processed_level" storing the last
+  processed finalized level by the crawler is updated correctly;
+- We restart the L1 node to check that the DAL node doesn't crash;
+- We restart the DAL node and bake meanwhile. Then, we check that it's able to
+  catch up;
+- We check that every finalized level is processed exactly once by the crawler.
+*)
+let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
+    node client dal_node =
+  (* The number of blocks we make in a raw before some additional checks or
+     nodes behaviour change. *)
+  let num_blocks = 5 in
+  (* The following helper function allows baking [num_blocks]. Then, it waits
+     for the DAL node's L1 crawler to process those blocks. Finally, it checks
+     that disk storage of the last finalized processed level is correctly
+     updated. *)
+  let bake_delta_blocks_and_check_last_processed_level () =
+    let* target_level =
+      let* level0 = Client.level client in
+      return (level0 + num_blocks)
+    in
+    let finalized_target = target_level - 2 in
+    let wait_l1_crawler_processing =
+      wait_for_layer1_head dal_node target_level
+    in
+    let wait_finalized_target =
+      wait_for_layer1_final_block dal_node finalized_target
+    in
+
+    let* () = bake_for ~count:num_blocks client in
+    let* () = wait_l1_crawler_processing in
+    let* () = wait_finalized_target in
+    let* written_last_finalized_level =
+      Dal_node.load_last_finalized_processed_level dal_node
+    in
+    let written_last_finalized_level =
+      Option.value ~default:0 written_last_finalized_level
+    in
+    Check.(
+      (finalized_target = written_last_finalized_level)
+        int
+        ~error_msg:"Expected last processed finalized level %R (got %L)") ;
+    unit
+  in
+  let* () = bake_for ~count:num_blocks client in
+
+  (* For this first part of the test, we will bake [num_blocks] blocks
+     twice. The two baking sessions are separated by an L1 node restart. *)
+  Log.info "1.a Bake some blocks and check the content of last_processed_level" ;
+  let* start_level = Client.level client in
+  let finalized_levels_events =
+    let start_finalized_level = start_level - 2 in
+    assert (start_finalized_level > 0) ;
+    monitor_finalized_levels_events
+      dal_node
+      ~__LOC__
+      ~last_notified_level:start_finalized_level
+      ~target_level:(start_finalized_level + (2 * num_blocks))
+  in
+  let* () = bake_delta_blocks_and_check_last_processed_level () in
+  Log.info "1.b Restart L1 node, bake and check last_processed_level's content" ;
+  let* () = Node.terminate ~timeout:10. node in
+  let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
+  let* () = bake_delta_blocks_and_check_last_processed_level () in
+  let* last_finalized_level = finalized_levels_events in
+
+  (* For this second part of the test, we stop the DAL node, bake [num_blocks]
+     blocks with [bake_for] function, then, we restart the DAL node and bake
+     additional [num_blocks] with our internal helper. *)
+  Log.info "2. Stop DAL node, bake, restart it and check that it catchs-up" ;
+  let* () = Dal_node.terminate ~timeout:10. dal_node in
+
+  (* Here, we bake some blocks to make the DAL node's crawler a little bit
+     late. *)
+  let* () = bake_for ~count:num_blocks client in
+
+  (* Restart the DAL node, the finalized events watcher promise, and wait until
+     the node is ready. We wait for the node to be ready after spawning an
+     instance of seen_finalized_per_level_events to prevent the test from being
+     flaky, in case the crawler starts processing finalized blocks and emitting
+     "dal_node_layer_1_new_final_block" events before we start observing
+     them. *)
+  let* () = Dal_node.run ~wait_ready:false dal_node in
+
+  let finalized_levels_events =
+    monitor_finalized_levels_events
+      dal_node
+      ~__LOC__
+      ~last_notified_level:last_finalized_level
+      ~target_level:(last_finalized_level + (2 * num_blocks))
+  in
+  let* () = Dal_node.wait_for_ready dal_node in
+  let* () = bake_delta_blocks_and_check_last_processed_level () in
+
+  let* last_finalized_level = finalized_levels_events in
+  let* expected_final_finalized_level =
+    let* level = Client.level client in
+    return @@ (level - 2)
+  in
+  Check.(
+    (last_finalized_level = expected_final_finalized_level)
+      int
+      ~error_msg:"Expected last processed finalized level %R (got %L)") ;
+  unit
+
 let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     dal_bootstrap =
   (* In this test we have three DAL nodes:
@@ -6723,6 +6842,11 @@ let register ~protocols =
     ~number_of_slots:1
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["crawler"; "reconnection"]
+    "DAL node crawler reconnects to L1 without crashing"
+    test_dal_node_crawler_reconnects_to_l1
     protocols ;
 
   (* Tests with all nodes *)

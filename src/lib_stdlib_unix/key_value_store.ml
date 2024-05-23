@@ -1065,3 +1065,14 @@ let values_exist t file_layout seq =
 let remove_file {files; root_dir; _} file_layout file =
   let layout = file_layout ~root_dir file in
   Files.remove files layout
+
+module Internal_for_tests = struct
+  let init ?(lockfile_prefix = "internal_for_tests") ~lru_size ~root_dir () =
+    let open Lwt_result_syntax in
+    let*! () =
+      if not (Sys.file_exists root_dir) then Lwt_utils_unix.create_dir root_dir
+      else Lwt.return_unit
+    in
+    with_lockfile_lock (Format.sprintf "%s/.%s.lock" root_dir lockfile_prefix)
+    @@ fun fd -> return {files = Files.init ~lru_size; root_dir; lockfile = fd}
+end
