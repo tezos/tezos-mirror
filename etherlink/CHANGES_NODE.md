@@ -34,6 +34,7 @@
   (!13268, !13321, !13350, !13378)
 - Return `baseFeePerGas` and `mixHash` field for `eth_getBlockBy*` RPCs. The
   former only when appropriate, the later with a default value. (!13159)
+- Support for the `eth_feeHistory` RPC. (!13259)
 
 ### Experimental
 
