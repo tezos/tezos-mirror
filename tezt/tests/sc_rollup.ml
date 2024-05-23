@@ -48,8 +48,8 @@ let default_wasm_pvm_revision = function
   | Protocol.Oxford -> "2.0.0-r3"
 
 let max_nb_ticks = function
-  | Protocol.Alpha -> 50_000_000_000_000
-  | Paris | Oxford -> 11_000_000_000
+  | Protocol.Alpha | Paris -> 50_000_000_000_000
+  | Oxford -> 11_000_000_000
 
 let get_outbox_proof ?rpc_hooks ~__LOC__ sc_rollup_node ~message_index
     ~outbox_level =

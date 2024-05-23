@@ -259,7 +259,7 @@ GET http://[HOST]:[PORT]/global/block/head/status
 
 GET http://[HOST]:[PORT]/global/block/head/ticks
 200 OK
-"99000000000"
+"450000000000000"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
