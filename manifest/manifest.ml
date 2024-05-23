@@ -2591,9 +2591,28 @@ let write filename f =
   generated_files := String_set.add filename !generated_files ;
   write_raw filename f
 
+(* Copied from [tezt/lib_wrapper/tezt_wrapper.ml] and adapted to remove ".." as well. *)
+let canonicalize_path path =
+  let rec simplify_parents acc = function
+    | [] -> List.rev acc
+    | ".." :: tail ->
+        let acc =
+          match acc with
+          | [] -> failwith ("cannot remove '..' from path: " ^ path)
+          | _ :: acc_tail -> acc_tail
+        in
+        simplify_parents acc tail
+    | head :: tail -> simplify_parents (head :: acc) tail
+  in
+  String.split_on_char '/' path
+  |> List.filter (function "" | "." -> false | _ -> true)
+  |> simplify_parents [] |> String.concat "/"
+
 let generate_content_input ~product ~source =
   let filename = Format.sprintf "script-inputs/%s-source-content" product in
-  write_raw filename @@ fun fmt -> List.iter (Format.fprintf fmt "%s\n") source
+  write_raw filename @@ fun fmt ->
+  Fun.flip List.iter source @@ fun path ->
+  Format.fprintf fmt "%s\n" (canonicalize_path path)
 
 module Product (M : sig
   val name : string
@@ -4194,23 +4213,6 @@ let read_tezt_runtime_dependencies () =
           |> String.trim
         in
         Some (tag, path)
-
-(* Copied from [tezt/lib_wrapper/tezt_wrapper.ml] and adapted to remove ".." as well. *)
-let canonicalize_path path =
-  let rec simplify_parents acc = function
-    | [] -> List.rev acc
-    | ".." :: tail ->
-        let acc =
-          match acc with
-          | [] -> failwith ("cannot remove '..' from path: " ^ path)
-          | _ :: acc_tail -> acc_tail
-        in
-        simplify_parents acc tail
-    | head :: tail -> simplify_parents (head :: acc) tail
-  in
-  String.split_on_char '/' path
-  |> List.filter (function "" | "." -> false | _ -> true)
-  |> simplify_parents [] |> String.concat "/"
 
 (* Compute and print a Tezt TSL expression representing the set of tests
    to run after [changed_files] changed.

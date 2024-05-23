@@ -84,7 +84,7 @@ let () =
   let module GlobalTezt = Internals.Product (struct
     let name = "tezt-tests"
 
-    let source = ["tezt/"]
+    let source = ["tezt"]
   end) in
   let tezt_exe_deps =
     [
