@@ -189,7 +189,7 @@ let validate_new_head w hash (header : Block_header.t) =
       let*! v =
         Block_validator.validate_and_apply
           ~notify_new_block:pv.parameters.notify_new_block
-          ~validate_and_notify:true
+          ~advertise_after_validation:true
           pv.parameters.block_validator
           pv.parameters.chain_db
           hash
