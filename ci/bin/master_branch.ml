@@ -76,7 +76,10 @@ let jobs =
       ~allow_failure:Yes
       ~before_script:
         ((* sets COVERAGE_OUTPUT *)
-         before_script ~source_version:true [])
+         before_script
+           ~source_version:true
+           ~eval_opam:true
+           [])
       ~rules:rules_always
       ~coverage:"/Coverage: ([^%]+%)/"
       [

@@ -186,6 +186,7 @@ oc.unified_coverage:
   allow_failure: true
   before_script:
   - . ./scripts/version.sh
+  - eval $(opam env)
   script:
   - mkdir -p _coverage_report
   - dune exec scripts/ci/download_coverage/download.exe -- --from last-merged-pipeline
