@@ -8,6 +8,11 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{
     append_u16_le, append_u64_le, check_list, decode_field, next,
 };
+#[cfg(test)]
+use tezos_ethereum::rlp_helpers::{
+    decode_field_u16_le, decode_field_u64_le, decode_list, decode_option,
+    decode_option_explicit,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct TracerConfig {
@@ -62,6 +67,29 @@ impl Encodable for StorageMapItem {
     }
 }
 
+#[cfg(test)]
+impl Decodable for StorageMapItem {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if Ok(3) != decoder.item_count() {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let address: H160 = decode_field(&next(&mut it)?, "address")?;
+        let index: H256 = decode_field(&next(&mut it)?, "index")?;
+        let value: H256 = decode_field(&next(&mut it)?, "value")?;
+
+        Ok(Self {
+            address,
+            index,
+            value,
+        })
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct StructLog {
     pub pc: u64,
@@ -101,5 +129,94 @@ impl Encodable for StructLog {
             Some(storage) => stream.append_list(storage),
             None => stream.append_empty_data(),
         };
+    }
+}
+
+#[cfg(test)]
+impl Decodable for StructLog {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if Ok(10) != decoder.item_count() {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let pc: u64 = decode_field_u64_le(&next(&mut it)?, "pc")?;
+        let opcode: u8 = decode_field(&next(&mut it)?, "opcode")?;
+        let gas: u64 = decode_field_u64_le(&next(&mut it)?, "gas")?;
+        let gas_cost: u64 = decode_field_u64_le(&next(&mut it)?, "gas")?;
+        let depth: u16 = decode_field_u16_le(&next(&mut it)?, "depth")?;
+        let error: Vec<u8> = decode_field(&next(&mut it)?, "error")?;
+        let stack: Option<Vec<H256>> =
+            decode_option_explicit(&next(&mut it)?, "stack", decode_list)?;
+        let return_data: Option<Vec<u8>> = decode_option(&next(&mut it)?, "return_data")?;
+        let memory: Option<Vec<u8>> = decode_option(&next(&mut it)?, "memory")?;
+        let storage: Option<Vec<StorageMapItem>> =
+            decode_option_explicit(&next(&mut it)?, "storage", decode_list)?;
+
+        Ok(Self {
+            pc,
+            opcode,
+            gas,
+            gas_cost,
+            depth,
+            error,
+            stack,
+            return_data,
+            memory,
+            storage,
+        })
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use primitive_types::{H160, H256};
+
+    use super::{StorageMapItem, StructLog};
+
+    #[test]
+    fn rlp_encode_decode_storage_map_item() {
+        let storage_map_item = StorageMapItem {
+            address: H160::from([25; 20]),
+            index: H256::from([11; 32]),
+            value: H256::from([97; 32]),
+        };
+
+        let encoded = rlp::encode(&storage_map_item);
+        let decoded: StorageMapItem =
+            rlp::decode(&encoded).expect("RLP decoding should succeed.");
+
+        assert_eq!(storage_map_item, decoded)
+    }
+
+    #[test]
+    fn rlp_encode_decode_struct_log() {
+        let storage_map_item = StorageMapItem {
+            address: H160::from([25; 20]),
+            index: H256::from([11; 32]),
+            value: H256::from([97; 32]),
+        };
+
+        let struct_log = StructLog {
+            pc: 25,
+            opcode: 11,
+            gas: 97,
+            gas_cost: 100,
+            depth: 3,
+            error: vec![25, 11, 97],
+            stack: Some(vec![H256::from([33; 32]), H256::from([35; 32])]),
+            return_data: Some(vec![25, 11, 97]),
+            memory: Some(vec![25, 11, 97]),
+            storage: Some(vec![storage_map_item]),
+        };
+
+        let encoded = rlp::encode(&struct_log);
+        let decoded: StructLog =
+            rlp::decode(&encoded).expect("RLP decoding should succeed.");
+
+        assert_eq!(struct_log, decoded)
     }
 }
