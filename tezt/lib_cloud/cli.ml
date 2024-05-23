@@ -88,7 +88,7 @@ let prometheus =
   Clap.flag
     ~section
     ~set_long:"prometheus"
-    ~description:"Netdata metrics are exported into prometheus"
+    ~description:"Flag to set whether metrics are exported into prometheus"
     false
 
 let prometheus_snapshot_directory =
@@ -96,8 +96,8 @@ let prometheus_snapshot_directory =
     ~section
     ~long:"prometheus-snapshot-directory"
     ~description:
-      "Enable to specify a directory where the prometheus snapshot can be \
-       exported"
+      "The directory where the prometheus snapshot can be exported (the \
+       default is /tmp)"
     "/tmp"
 
 let prometheus_snapshot =
