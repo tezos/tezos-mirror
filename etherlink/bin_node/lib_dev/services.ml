@@ -287,9 +287,7 @@ let dispatch_request (config : Configuration.t)
               rpc_ok nonce
           | _ ->
               let* nonce = Backend_rpc.nonce address block_param in
-              let nonce =
-                Option.value ~default:(Ethereum_types.Qty Z.zero) nonce
-              in
+              let nonce = Option.value ~default:Qty.zero nonce in
               rpc_ok nonce
         in
         build_with_input ~f module_ parameters
@@ -313,10 +311,10 @@ let dispatch_request (config : Configuration.t)
         in
         build_with_input ~f module_ parameters
     | Method (Get_uncle_count_by_block_hash.Method, module_) ->
-        let f _block_param = rpc_ok (Qty Z.zero) in
+        let f _block_param = rpc_ok Qty.zero in
         build_with_input ~f module_ parameters
     | Method (Get_uncle_count_by_block_number.Method, module_) ->
-        let f _block_param = rpc_ok (Qty Z.zero) in
+        let f _block_param = rpc_ok Qty.zero in
         build_with_input ~f module_ parameters
     | Method (Get_transaction_receipt.Method, module_) ->
         let f tx_hash =
@@ -472,7 +470,7 @@ let dispatch_request (config : Configuration.t)
         in
         build ~f module_ parameters
     | Method (Eth_max_priority_fee_per_gas.Method, module_) ->
-        let f (_ : unit option) = rpc_ok @@ Qty Z.zero in
+        let f (_ : unit option) = rpc_ok Qty.zero in
         build ~f module_ parameters
     | Method (Trace_transaction.Method, module_) ->
         let f ((hash, config) : Tracer_types.input) =
