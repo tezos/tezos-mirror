@@ -23,7 +23,6 @@ pub mod ocaml_api;
 use crate::{
     machine_state::{
         bus::main_memory::M1G, mode, registers::XRegister, MachineError, MachineState,
-        StepManyResult,
     },
     program::Program,
     state_backend::{
@@ -41,8 +40,7 @@ use machine_state::{
     registers::{FRegister, FValue},
     AccessType,
 };
-use pvm::{Pvm, PvmLayout};
-use range_utils::{is_null_range, range_bounds_saturating_sub};
+use pvm::{EvalError, EvalManyResult, Pvm, PvmLayout};
 use state_backend::Elem;
 use std::{collections::BTreeMap, ops::RangeBounds};
 use traps::Exception;
@@ -104,42 +102,27 @@ impl<'a> Interpreter<'a> {
         Ok(Self { pvm })
     }
 
-    fn handle_step_result<F>(
-        &mut self,
-        mut result: StepManyResult,
-        step_bounds: &impl RangeBounds<usize>,
-        should_continue: F,
-    ) -> InterpreterResult
-    where
-        F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
-    {
-        match result.exception {
-            Some(exc) => match self.pvm.handle_exception(&mut Default::default(), exc) {
-                exec_env::EcallOutcome::Fatal { message } => InterpreterResult::Exception {
-                    cause: exc,
-                    steps: result.steps,
-                    message: Some(message),
-                },
-
-                exec_env::EcallOutcome::Handled { continue_eval } => {
-                    // Handling the ECall marks the completion of a step
-                    result.steps = result.steps.saturating_add(1);
-
-                    let new_step_bounds = range_bounds_saturating_sub(step_bounds, result.steps);
-                    if let Some(code) = self.pvm.exec_env_state.exit_code() {
-                        Exit {
-                            code: code as usize,
-                            steps: result.steps,
-                        }
-                    } else if continue_eval && !is_null_range(&new_step_bounds) {
-                        self.run_accum(result.steps, &new_step_bounds, should_continue)
-                    } else {
-                        Running(result.steps)
-                    }
-                }
+    fn handle_step_result(&mut self, result: EvalManyResult) -> InterpreterResult {
+        match result.error {
+            // An error was encountered in the evaluation function.
+            Some(EvalError { cause, message }) => InterpreterResult::Exception {
+                cause,
+                steps: result.steps,
+                message: Some(message),
             },
 
-            None => Running(result.steps),
+            // Evaluation function returned without error.
+            None => {
+                // Check if the machine has exited.
+                if let Some(code) = self.pvm.exec_env_state.exit_code() {
+                    Exit {
+                        code: code as usize,
+                        steps: result.steps,
+                    }
+                } else {
+                    Running(result.steps)
+                }
+            }
         }
     }
 
@@ -158,27 +141,22 @@ impl<'a> Interpreter<'a> {
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let mut result = self
-            .pvm
-            .machine_state
-            .step_range(step_bounds, &mut should_continue);
+        let mut result =
+            self.pvm
+                .eval_range(&mut Default::default(), step_bounds, &mut should_continue);
         result.steps = result.steps.saturating_add(steps_done);
-        self.handle_step_result(result, step_bounds, should_continue)
+        self.handle_step_result(result)
     }
 
     pub fn step_range<F>(
         &mut self,
         steps: impl RangeBounds<usize>,
-        mut should_continue: F,
+        should_continue: F,
     ) -> InterpreterResult
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let result = self
-            .pvm
-            .machine_state
-            .step_range(&steps, &mut should_continue);
-        self.handle_step_result(result, &steps, should_continue)
+        self.run_accum(0, &steps, should_continue)
     }
 
     pub fn effective_translation_alg(
