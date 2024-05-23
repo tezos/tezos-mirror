@@ -8,5 +8,5 @@
 
 val run :
   data_dir:string ->
-  (Configuration_file.t -> Configuration_file.t) ->
+  configuration_override:(Configuration_file.t -> Configuration_file.t) ->
   unit tzresult Lwt.t
