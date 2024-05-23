@@ -3,9 +3,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use primitive_types::H256;
-use rlp::{Decodable, DecoderError, Rlp};
-use tezos_ethereum::rlp_helpers::{check_list, decode_field, next};
+use primitive_types::{H160, H256};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use tezos_ethereum::rlp_helpers::{
+    append_u16_le, append_u64_le, check_list, decode_field, next,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct TracerConfig {
@@ -41,5 +43,63 @@ impl Decodable for TracerInput {
                 disable_storage,
             },
         })
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct StorageMapItem {
+    pub address: H160,
+    pub index: H256,
+    pub value: H256,
+}
+
+impl Encodable for StorageMapItem {
+    fn rlp_append(&self, stream: &mut RlpStream) {
+        stream.begin_list(3);
+        stream.append(&self.address);
+        stream.append(&self.index);
+        stream.append(&self.value);
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct StructLog {
+    pub pc: u64,
+    pub opcode: u8,
+    pub gas: u64,
+    pub gas_cost: u64,
+    pub depth: u16,
+    pub error: Vec<u8>,
+    pub stack: Option<Vec<H256>>,
+    pub return_data: Option<Vec<u8>>,
+    pub memory: Option<Vec<u8>>,
+    pub storage: Option<Vec<StorageMapItem>>,
+}
+
+impl Encodable for StructLog {
+    fn rlp_append(&self, stream: &mut RlpStream) {
+        stream.begin_list(10);
+        append_u64_le(stream, &self.pc);
+        stream.append(&self.opcode);
+        append_u64_le(stream, &self.gas);
+        append_u64_le(stream, &self.gas_cost);
+        append_u16_le(stream, &self.depth);
+        stream.append(&self.error);
+        match &self.stack {
+            Some(stack) => stream.append_list(stack),
+            None => stream.append_empty_data(),
+        };
+        match &self.return_data {
+            Some(return_data) => stream.append(return_data),
+            None => stream.append_empty_data(),
+        };
+        match &self.memory {
+            Some(memory) => stream.append(memory),
+            None => stream.append_empty_data(),
+        };
+        match &self.storage {
+            Some(storage) => stream.append_list(storage),
+            None => stream.append_empty_data(),
+        };
     }
 }
