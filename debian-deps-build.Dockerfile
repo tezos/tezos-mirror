@@ -29,19 +29,19 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY scripts/version.sh /tmp/
 #hadolint ignore=SC2154
+ARG RECOMMENDED_RUST_VERSION=
 RUN curl -s https://sh.rustup.rs > rustup-init.sh && \
-    . /tmp/version.sh && \
     chmod +x rustup-init.sh && \
     ./rustup-init.sh --profile minimal \
-      --default-toolchain "$recommended_rust_version" -y
+      --default-toolchain "$RECOMMENDED_RUST_VERSION" -y
 
 RUN opam init --bare --disable-sandboxing
 
 # we do not need everything to run build-deps
 # we copy the mininum amount of files to use
 # the caching mechanism more efficiently
+COPY scripts/version.sh /tmp/
 COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
 COPY --link scripts/version.sh /root/tezos/scripts/
