@@ -52,10 +52,19 @@ let wait_gc_completion _repo = Lwt.return_unit
 let export_snapshot _repo _key _path =
   raise (Invalid_argument "export_snapshot not implemented")
 
-let find _state _key = raise (Invalid_argument "find not implemented")
+let pvm_state_key = ["pvm_state"]
 
-let lookup _state _key = raise (Invalid_argument "find not implemented")
+let find state key =
+  (* The entire context is the PVM state, no other keys are supported *)
+  if key == pvm_state_key then Lwt.return_some state else Lwt.return_none
 
-let set _state _key _substate = raise (Invalid_argument "set not implemented")
+(* Only used to inspect the durable storage, currently not supported *)
+let lookup _state _key = raise (Invalid_argument "lookup not implemented")
 
+let set _state key substate =
+  (* The entire context is the PVM state, no other keys are supported *)
+  if key == pvm_state_key then Lwt.return substate
+  else raise (Invalid_argument "key not supported")
+
+(* Only used for internal testing of the rollup node, not supported *)
 let add _state _key _bytes = raise (Invalid_argument "add not implemented")

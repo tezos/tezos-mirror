@@ -45,6 +45,8 @@ val wait_gc_completion : Repo.t -> unit Lwt.t
 
 val export_snapshot : Repo.t -> Id.t -> string -> unit tzresult Lwt.t
 
+val pvm_state_key : string list
+
 val find : State.t -> string list -> State.t option Lwt.t
 
 val lookup : State.t -> string list -> bytes option Lwt.t
