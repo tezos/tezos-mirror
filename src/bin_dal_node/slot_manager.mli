@@ -178,7 +178,7 @@ val update_selected_slot_headers_statuses :
   number_of_slots:int ->
   Dal_plugin.slot_index list ->
   Store.t ->
-  unit Lwt.t
+  unit tzresult Lwt.t
 
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently

@@ -5,14 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module handles the on-disk storage of the DAL node. We use
-    two key-value stores: the [Key_value_store] module from
-    lib_stdlib_unix (for storing shards) and Irmin (for everything
-    else). *)
+(** This module handles the on-disk storage of the DAL node. We rely
+    on the [Key_value_store] module from lib_stdlib_unix. *)
 
 open Cryptobox
-
-type irmin (* This is the Irmin part of the store *)
 
 module Value_size_hooks : sig
   (** [set_share_size size] sets the size of shard shares. This
@@ -88,60 +84,10 @@ module Slots : sig
   val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
 end
 
-module Commitment_indexed_cache : sig
-  type 'a t
+module Statuses : sig
+  (** A store keeping the attestation status of slot ids. *)
 
-  (** Returns the element associated to the commitment in the cache,
-      or [None] if there is none. *)
-  val find_opt : 'a t -> commitment -> 'a option
-end
-
-type t = private {
-  store : irmin;  (** The Irmin-based part of the store *)
-  shards : Shards.t;  (** Shards store *)
-  slots : Slots.t;  (** Slots store *)
-  cache :
-    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
-    Commitment_indexed_cache.t;
-      (* The length of the array is the number of shards per slot *)
-}
-
-(** [cache_entry store commitment entry] adds or replace an entry to
-    the cache with key [commitment]. *)
-val cache_entry :
-  t ->
-  commitment ->
-  Cryptobox.slot ->
-  Cryptobox.share array ->
-  Cryptobox.shard_proof array ->
-  unit
-
-val init : Configuration_file.t -> t tzresult Lwt.t
-
-module Legacy : sig
-  (** The Irmin part of the storage is considered legacy because we
-      want to move everything to the KV store. *)
-
-  (**
-     We have two concise ways to refer to a slot:
-
-     - a commitment uniquely identifies the content of the slot, it is
-       useful to prove properties about the slot length and the shards.
-
-     - a slot identifier gives at which level and at which index the
-       slot was published. It only makes sense for slots which have been
-       published in some block or at least whose publication in a block
-       has been attempted.
-
-     The Irmin part of the store provides a bidirectional mapping
-     between commitments and slot identifiers, it also maps to these
-     identifiers the following pieces of information:
-
-     - the content of the slot,
-     - the status of the publication operation (accepted or not),
-     - the attestation status (see Types.header_status).
-
-  *)
+  type t
 
   (** [add_slot_headers ~number_of_slots ~block_level slot_headers
       store] adds all the given slot headers at the given block level,
@@ -169,7 +115,7 @@ module Legacy : sig
     number_of_slots:int ->
     int list ->
     t ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 
   (** [get_slot_status ~slot_id store] returns the status associated
       to the given accepted [slot_id], or [None] if no status is
@@ -178,4 +124,38 @@ module Legacy : sig
     slot_id:Types.slot_id ->
     t ->
     (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
+
+  (** [remove_level_status ~level store] removes the status of all the
+      slot ids published at the given level. *)
+  val remove_level_status : level:int32 -> t -> unit tzresult Lwt.t
 end
+
+module Commitment_indexed_cache : sig
+  type 'a t
+
+  (** Returns the element associated to the commitment in the cache,
+      or [None] if there is none. *)
+  val find_opt : 'a t -> commitment -> 'a option
+end
+
+type t = private {
+  slot_header_statuses : Statuses.t;  (** Statuses store *)
+  shards : Shards.t;  (** Shards store *)
+  slots : Slots.t;  (** Slots store *)
+  cache :
+    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
+    Commitment_indexed_cache.t;
+      (* The length of the array is the number of shards per slot *)
+}
+
+(** [cache_entry store commitment entry] adds or replace an entry to
+    the cache with key [commitment]. *)
+val cache_entry :
+  t ->
+  commitment ->
+  Cryptobox.slot ->
+  Cryptobox.share array ->
+  Cryptobox.shard_proof array ->
+  unit
+
+val init : Configuration_file.t -> t tzresult Lwt.t

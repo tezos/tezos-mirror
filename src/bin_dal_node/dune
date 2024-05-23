@@ -33,9 +33,6 @@
   octez-libs.crypto
   octez-libs.base.p2p-identity-file
   octez-shell-libs.shell-services
-  octez-internal-libs.irmin_pack
-  octez-internal-libs.irmin_pack.unix
-  octez-internal-libs.irmin
   prometheus-app
   prometheus
   octez-crawler
