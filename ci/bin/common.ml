@@ -145,8 +145,8 @@ module Images_external = struct
 
   let fedora_39 = Image.mk_external ~image_path:"fedora:39"
 
-  let opam_ubuntu_focal =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-20.04"
+  let opam_ubuntu_jammy =
+    Image.mk_external ~image_path:"ocaml/opam:ubuntu-22.04"
 
   let opam_ubuntu_mantic =
     Image.mk_external ~image_path:"ocaml/opam:ubuntu-23.10"

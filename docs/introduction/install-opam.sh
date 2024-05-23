@@ -12,6 +12,8 @@ set -e
 set -x
 sudo apt-get update
 sudo apt-get install wget
+# upgrade opam to v>=2.1, where depext is no longer needed
+sudo apt-get -y upgrade opam
 export OPAMYES=true
 export OPAMSOLVERTIMEOUT=1200
 # [make sure opam has the latest repo]
@@ -24,9 +26,6 @@ wget -O latest-release:version.sh https://gitlab.com/tezos/tezos/raw/latest-rele
 source latest-release:version.sh
 opam switch create for_tezos $ocaml_version
 eval $(opam env)
-# [get system dependencies]
-# depext handling is done directly by opam 2.1 and later
-opam depext octez
 # [install tezos]
 opam install octez
 # [test executables]

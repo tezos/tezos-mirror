@@ -7184,8 +7184,8 @@ oc.install_bin_rc_ubuntu_jammy:
   script:
   - ./docs/introduction/install-bin-ubuntu.sh rc
 
-oc.install_opam_focal:
-  image: ocaml/opam:ubuntu-20.04
+oc.install_opam_jammy:
+  image: ocaml/opam:ubuntu-22.04
   stage: test
   tags:
   - gcp
