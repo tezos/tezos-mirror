@@ -9,9 +9,9 @@ open Store_sigs
 open Context_sigs
 open Octez_riscv_pvm
 
-type repo = Storage.repo
+type repo = Storage.Repo.t
 
-type tree = Storage.tree
+type tree = Storage.State.t
 
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 

@@ -5,6 +5,8 @@
 // Allow dead code while this module contains stubs.
 #![allow(dead_code)]
 
+pub mod dummy_pvm;
+
 use crate::{
     exec_env::{
         self,

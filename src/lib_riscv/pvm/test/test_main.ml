@@ -6,12 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_riscv_api
+let tests = [("Storage", [("Simple test", `Quick, Test_storage.test_simple)])]
 
-let add_test () =
-  let res = octez_riscv_add 5l 6l in
-  Alcotest.(check int32 "add" res 11l)
-
-let tests = [("Main", [("add", `Quick, add_test)])]
-
-let () = Alcotest.run ~__FILE__ "RISC-V interpreter" tests
+let () = Alcotest_lwt.run ~__FILE__ "RISC-V PVM" tests |> Lwt_main.run

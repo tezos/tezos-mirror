@@ -1,7 +1,93 @@
-use crate::add;
+// SPDX-FileCopyrightText: 2023-2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
+use crate::pvm::dummy_pvm::DummyPvm;
+use crate::storage::{self, StorageError};
+use ocaml::Pointer;
+
+#[ocaml::sig]
+pub struct Repo(storage::Repo<DummyPvm>);
+
+#[ocaml::sig]
+pub struct State(DummyPvm);
+
+#[ocaml::sig]
+pub struct Id(storage::Hash);
+
+ocaml::custom!(Repo);
+ocaml::custom!(State);
+ocaml::custom!(Id);
 
 #[ocaml::func]
-#[ocaml::sig("int32 -> int32 -> int32")]
-pub fn octez_riscv_add(left: u32, right: u32) -> u32 {
-    add(left as usize, right as usize) as u32
+#[ocaml::sig("string -> id")]
+pub fn octez_riscv_id_unsafe_of_raw_string(s: String) -> Pointer<Id> {
+    assert!(s.len() == storage::DIGEST_SIZE);
+    let hash: storage::Hash = s.as_bytes().try_into().unwrap();
+    Id(hash).into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("id -> string")]
+pub fn octez_riscv_storage_id_to_raw_string(id: Pointer<Id>) -> String {
+    std::str::from_utf8(&id.as_ref().0).unwrap().to_string()
+}
+
+#[ocaml::func]
+#[ocaml::sig("id -> id -> bool")]
+pub fn octez_riscv_storage_id_equal(id1: Pointer<Id>, id2: Pointer<Id>) -> bool {
+    id1.as_ref().0 == id2.as_ref().0
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> state -> bool")]
+pub fn octez_riscv_storage_state_equal(state1: Pointer<State>, state2: Pointer<State>) -> bool {
+    state1.as_ref().0 == state2.as_ref().0
+}
+
+#[ocaml::func]
+#[ocaml::sig("unit -> state")]
+pub fn octez_riscv_storage_state_empty() -> Pointer<State> {
+    State(DummyPvm::empty()).into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("string -> repo")]
+pub fn octez_riscv_storage_load(path: String) -> Result<Pointer<Repo>, ocaml::Error> {
+    match storage::Repo::load(path) {
+        Ok(repo) => Ok(Repo(repo).into()),
+        Err(e) => Err(ocaml::Error::Error(Box::new(e))),
+    }
+}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> unit")]
+pub fn octez_riscv_storage_close(_repo: Pointer<Repo>) {}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> state -> id")]
+pub fn octez_riscv_storage_commit(
+    mut repo: Pointer<Repo>,
+    state: Pointer<State>,
+) -> Result<Pointer<Id>, ocaml::Error> {
+    let state = &state.as_ref().0;
+    match repo.as_mut().0.commit(state) {
+        Ok(hash) => Ok(Id(hash).into()),
+        Err(e) => Err(ocaml::Error::Error(Box::new(e))),
+    }
+}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> id -> state option")]
+pub fn octez_riscv_storage_checkout(
+    repo: Pointer<Repo>,
+    id: Pointer<Id>,
+) -> Result<Option<Pointer<State>>, ocaml::Error> {
+    let id = id.as_ref().0;
+    match repo.as_ref().0.checkout(&id) {
+        Ok(state) => Ok(Some(State(state).into())),
+        Err(StorageError::NotFound(_)) => Ok(None),
+        Err(e) => Err(ocaml::Error::Error(Box::new(e))),
+    }
 }

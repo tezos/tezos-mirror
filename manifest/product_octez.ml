@@ -4657,11 +4657,17 @@ let octez_riscv_pvm =
 
 let _octez_riscv_pvm_test =
   tezt
-    ["test_main"]
+    ["test_main"; "test_storage"]
     ~path:"src/lib_riscv/pvm/test"
     ~opam:"octez-riscv-pvm-test"
     ~synopsis:"Tests for RISC-V OCaml API"
-    ~deps:[alcotezt; octez_riscv_pvm]
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib_unix |> open_;
+        alcotezt;
+        octez_riscv_pvm;
+      ]
 
 let octez_layer2_store =
   octez_l2_lib

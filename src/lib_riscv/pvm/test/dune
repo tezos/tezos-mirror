@@ -6,6 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  octez-libs.base
+  octez-libs.stdlib-unix
   octez-alcotezt
   octez-riscv-pvm)
  (library_flags (:standard -linkall))
@@ -13,8 +15,10 @@
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
   -open Octez_alcotezt)
- (modules test_main))
+ (modules test_main test_storage))
 
 (executable
  (name main)

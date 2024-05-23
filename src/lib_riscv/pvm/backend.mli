@@ -11,7 +11,7 @@ type write_debug = string -> unit Lwt.t
 
 type input_info
 
-type state = Storage.tree
+type state = Storage.State.t
 
 val compute_step_many :
   ?reveal_builtins:reveals ->
