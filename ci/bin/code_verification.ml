@@ -1206,11 +1206,11 @@ let jobs pipeline_type =
           ~stage:Stages.test
           [script]
       in
-      let job_install_opam_focal : tezos_job =
+      let job_install_opam_jammy : tezos_job =
         job
           ~__POS__
-          ~name:"oc.install_opam_focal"
-          ~image:Images.opam_ubuntu_focal
+          ~name:"oc.install_opam_jammy"
+          ~image:Images.opam_ubuntu_jammy
           ~dependencies:dependencies_needs_start
           ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
@@ -1266,7 +1266,7 @@ let jobs pipeline_type =
           ~rc:true
           Ubuntu_jammy;
         (* Test installing through opam *)
-        job_install_opam_focal;
+        job_install_opam_jammy;
         (* Test compiling the [latest-release] branch on Bullseye *)
         job_compile_sources
           ~__POS__

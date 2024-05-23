@@ -13,7 +13,7 @@ set -x
 sudo apt-get update
 sudo apt-get install wget
 # upgrade opam to v>=2.1, where depext is no longer needed
-sudo apt-get upgrade opam
+sudo apt-get -y upgrade opam
 export OPAMYES=true
 export OPAMSOLVERTIMEOUT=1200
 # [make sure opam has the latest repo]

@@ -34,7 +34,7 @@ where <test-name> can be:
 * install-bin-rc-fedora37
 * install-bin-rc-fedora38
 * install-opam-scratch
-* install-opam-focal
+* install-opam-jammy
 * compile-release-sources-bullseye
 * compile-sources-bullseye
 * compile-sources-mantic
@@ -80,7 +80,7 @@ for test_case in "$@"; do
   "install-opam-scratch")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_FOCAL" /Scripts/install-opam-scratch.sh
     ;;
-  "install-opam-focal")
+  "install-opam-jammy")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-22.04 /Scripts/install-opam.sh
     ;;
   "compile-release-sources-bullseye")
