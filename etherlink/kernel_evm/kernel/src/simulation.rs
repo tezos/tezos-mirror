@@ -10,6 +10,7 @@
 
 use crate::configuration::fetch_limits;
 use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
+use crate::storage::read_sequencer_pool_address;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
@@ -239,9 +240,12 @@ impl Evaluation {
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
+        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
 
         let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, block_fees, crate::block::GAS_LIMIT),
+            Ok(block) => {
+                block.constants(chain_id, block_fees, crate::block::GAS_LIMIT, coinbase)
+            }
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
@@ -250,6 +254,7 @@ impl Evaluation {
                     chain_id,
                     block_fees,
                     crate::block::GAS_LIMIT,
+                    coinbase,
                 )
             }
         };
@@ -364,9 +369,12 @@ impl TxValidation {
     ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
+        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
 
         let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, block_fees, crate::block::GAS_LIMIT),
+            Ok(block) => {
+                block.constants(chain_id, block_fees, crate::block::GAS_LIMIT, coinbase)
+            }
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
@@ -375,6 +383,7 @@ impl TxValidation {
                     chain_id,
                     block_fees,
                     crate::block::GAS_LIMIT,
+                    coinbase,
                 )
             }
         };
@@ -739,6 +748,7 @@ mod tests {
             chain_id.unwrap(),
             block_fees.unwrap(),
             crate::block::GAS_LIMIT,
+            H160::zero(),
         );
         let precompiles = precompiles::precompile_set::<Host>();
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();

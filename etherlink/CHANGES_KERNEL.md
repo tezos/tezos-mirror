@@ -7,6 +7,8 @@
 - The kernel has now the ability to trace a transaction (via
   the EVM runtime). (!13185, !13502)
 - Incorporate the gas limit in the block hash. (!13280)
+- The block's miner and coinbase address are set to sequencer pool
+  address if it exists. (!13414)
 
 ### Bug fixes
 

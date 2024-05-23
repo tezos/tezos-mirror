@@ -412,7 +412,13 @@ mod test {
             U256::from(12345),
             U256::from(2_000_000_000_000u64),
         );
-        BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX)
+        BlockConstants::first_block(
+            U256::zero(),
+            U256::one(),
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        )
     }
 
     #[test]
@@ -2174,8 +2180,13 @@ mod test {
             U256::from(54321),
             U256::from(2_000_000_000_000u64),
         );
-        let block =
-            BlockConstants::first_block(U256::zero(), chain_id, block_fees, u64::MAX);
+        let block = BlockConstants::first_block(
+            U256::zero(),
+            chain_id,
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        );
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2254,8 +2265,13 @@ mod test {
             base_fee_per_gas,
             U256::from(2_000_000_000_000u64),
         );
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX);
+        let block = BlockConstants::first_block(
+            U256::zero(),
+            U256::one(),
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        );
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2517,8 +2533,13 @@ mod test {
             base_fee_per_gas,
             U256::from(2_000_000_000_000u64),
         );
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX);
+        let block = BlockConstants::first_block(
+            U256::zero(),
+            U256::one(),
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        );
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2582,8 +2603,13 @@ mod test {
             base_fee_per_gas,
             U256::from(2_000_000_000_000u64),
         );
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX);
+        let block = BlockConstants::first_block(
+            U256::zero(),
+            U256::one(),
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        );
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2644,7 +2670,13 @@ mod test {
             base_fee_per_gas,
             U256::from(2_000_000_000_000u64),
         );
-        BlockConstants::first_block(U256::zero(), U256::one(), block_fees, u64::MAX)
+        BlockConstants::first_block(
+            U256::zero(),
+            U256::one(),
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        )
     }
 
     fn deploy(

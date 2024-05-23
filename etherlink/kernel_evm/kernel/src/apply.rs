@@ -752,6 +752,7 @@ mod tests {
             CHAIN_ID.into(),
             block_fees,
             crate::block::GAS_LIMIT,
+            H160::zero(),
         )
     }
 
