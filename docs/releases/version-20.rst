@@ -44,7 +44,7 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v20.0-rc1
+  git checkout octez-v20.0-rc1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps

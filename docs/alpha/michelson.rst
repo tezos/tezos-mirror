@@ -84,7 +84,7 @@ Transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~
 
 On one hand, a smart call may result from an external operation of kind Transaction.
-External operations are :doc:`blockchain operations <./blocks_ops>` included in a block, signed by an implicit account.
+External operations are :doc:`blockchain operations <./blocks_ops>` included in a block, signed by a user account.
 
 On the other hand, a smart contract call may be emitted as an internal operation of kind Transaction, either when executing another smart contract call or when :ref:`triggering the execution of an outbox message from a smart rollup <triggering_execution_outbox_message>`.
 
