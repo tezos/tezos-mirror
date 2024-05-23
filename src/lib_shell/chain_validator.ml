@@ -987,7 +987,7 @@ let validate_block w ?force hash block operations =
     Block_validator.validate_and_apply
       ~canceler:(Worker.canceler w)
       ~notify_new_block:(notify_new_block w None)
-      ~validate_and_notify:true
+      ~advertise_after_validation:true
       nv.parameters.block_validator
       nv.chain_db
       hash

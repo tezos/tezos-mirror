@@ -69,9 +69,9 @@ type block_validity =
   | Invalid of error trace
 (* Invalid (validation failed) *)
 
-(** [validate_and_apply ?validate_and_notify validator ddb hash header ops]
-    validates a block [header] [ops] of hash [hash]. It is a no-op in the
-    following cases:
+(** [validate_and_apply ?canceler ?peer ?notify_new_block
+    ?advertise_after_validation validator ddb hash header ops] validates a block
+    [header] [ops] of hash [hash]. It is a no-op in the following cases:
 
     - If the block has already been validated.
 
@@ -79,6 +79,9 @@ type block_validity =
 
     Otherwise it calls the [Block_validator_process] process
    associated to the current [validator].
+
+    - [advertise_after_validation] if set, the block is advertised to its peers
+    after its validation
 
     - [canceler] is trigerred when the validation of a block fails.
 
@@ -106,7 +109,7 @@ val validate_and_apply :
   ?canceler:Lwt_canceler.t ->
   ?peer:P2p_peer.Id.t ->
   ?notify_new_block:(new_block -> unit) ->
-  ?validate_and_notify:bool ->
+  ?advertise_after_validation:bool ->
   Distributed_db.chain_db ->
   Block_hash.t ->
   Block_header.t ->

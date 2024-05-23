@@ -85,7 +85,7 @@ module Request = struct
     hash : Block_hash.t;
     header : Block_header.t;
     operations : Operation.t list list;
-    validate_and_notify : bool;
+    advertise_after_validation : bool;
   }
 
   type preapplication_request = {
@@ -191,7 +191,7 @@ let on_validation_request w
       hash;
       header;
       operations;
-      validate_and_notify;
+      advertise_after_validation;
     } =
   let open Lwt_result_syntax in
   let bv = Worker.state w in
@@ -268,7 +268,7 @@ let on_validation_request w
                   match r with
                   | Error errs -> return (Validation_failed errs)
                   | Ok () -> (
-                      if validate_and_notify then
+                      if advertise_after_validation then
                         (* Headers which have been preapplied can be advertised
                            before being fully applied. *)
                         Distributed_db.Advertise.validated_head chain_db header ;
@@ -315,7 +315,7 @@ let on_validation_request w
       | Error errs ->
           let* () =
             if
-              (not validate_and_notify)
+              (not advertise_after_validation)
               && List.exists
                    (function Invalid_block _ -> true | _ -> false)
                    errs
@@ -324,7 +324,7 @@ let on_validation_request w
                   Distributed_db.commit_invalid_block chain_db hash header errs)
             else return_unit
           in
-          if validate_and_notify then (
+          if advertise_after_validation then (
             Block_hash_ring.replace
               bv.inapplicable_blocks_after_validation
               hash
@@ -553,8 +553,8 @@ type block_validity =
   | Invalid of error trace
 
 let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
-    ?(validate_and_notify = false) chain_db hash (header : Block_header.t)
-    operations =
+    ?(advertise_after_validation = false) chain_db hash
+    (header : Block_header.t) operations =
   let open Lwt_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let* b = Store.Block.is_known_valid chain_store hash in
@@ -580,7 +580,7 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
                hash;
                header;
                operations;
-               validate_and_notify;
+               advertise_after_validation;
              })
       in
       match r with

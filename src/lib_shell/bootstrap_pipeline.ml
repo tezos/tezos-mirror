@@ -493,7 +493,7 @@ let rec validation_worker_loop pipeline =
             Block_validator.validate_and_apply
               ~canceler:pipeline.canceler
               ~notify_new_block:pipeline.notify_new_block
-              ~validate_and_notify:false
+              ~advertise_after_validation:false
               pipeline.block_validator
               pipeline.chain_db
               hash
