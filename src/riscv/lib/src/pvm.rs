@@ -107,25 +107,35 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
-    pub fn eval_range(
+    pub fn eval_range<F>(
         &mut self,
         config: &mut EE::Config<'_>,
         step_bounds: &impl RangeBounds<usize>,
-    ) -> EvalManyResult {
-        self.eval_range_accum(config, step_bounds, 0)
+        should_continue: F,
+    ) -> EvalManyResult
+    where
+        F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
+    {
+        self.eval_range_accum(config, step_bounds, 0, should_continue)
     }
 
     // Tail-recursive helper function for [step_many]
-    fn eval_range_accum(
+    fn eval_range_accum<F>(
         &mut self,
         config: &mut EE::Config<'_>,
         step_bounds: &impl RangeBounds<usize>,
         accum: usize,
-    ) -> EvalManyResult {
+        mut should_continue: F,
+    ) -> EvalManyResult
+    where
+        F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
+    {
         let StepManyResult {
             mut steps,
             exception,
-        } = self.machine_state.step_range(step_bounds, |_| true);
+        } = self
+            .machine_state
+            .step_range(step_bounds, &mut should_continue);
 
         // Total steps done
         let mut total_steps = accum.saturating_add(steps);
@@ -154,7 +164,12 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
                     continue_eval: true,
                 } => {
                     let steps_left = range_bounds_saturating_sub(step_bounds, steps);
-                    return self.eval_range_accum(config, &steps_left, total_steps);
+                    return self.eval_range_accum(
+                        config,
+                        &steps_left,
+                        total_steps,
+                        should_continue,
+                    );
                 }
 
                 // EE suggests to stop evaluation.
