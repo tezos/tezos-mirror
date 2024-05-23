@@ -7,9 +7,17 @@
 
 type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
 
-let share ~rounding ~full_staking_balance amount =
+let share ~adaptive_issuance_global_limit_of_staking_over_baking
+    (delegate_parameters : Staking_parameters_repr.t) ~rounding
+    ~full_staking_balance amount =
   let open Result_syntax in
-  let num, den = Full_staking_balance_repr.own_ratio full_staking_balance in
+  let num, den =
+    Full_staking_balance_repr.own_ratio
+      ~adaptive_issuance_global_limit_of_staking_over_baking
+      ~delegate_limit_of_staking_over_baking_millionth:
+        delegate_parameters.limit_of_staking_over_baking_millionth
+      full_staking_balance
+  in
   let* baker_part =
     let rounding =
       match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
@@ -43,8 +51,9 @@ Rounding favors:
 
 In case the delegate's stake is zero, everything goes to the spendable balance.
 *)
-let compute_reward_distrib ~full_staking_balance ~stake
-    ~edge_of_baking_over_staking_billionth ~(rewards : Tez_repr.t) =
+let compute_reward_distrib
+    ~adaptive_issuance_global_limit_of_staking_over_baking delegate_parameters
+    ~full_staking_balance ~stake ~(rewards : Tez_repr.t) =
   let open Result_syntax in
   let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
   let* total_stake = Tez_repr.(frozen +? weighted_delegated) in
@@ -66,14 +75,21 @@ let compute_reward_distrib ~full_staking_balance ~stake
     in
     let* to_frozen = Tez_repr.(rewards -? to_spendable) in
     let* {baker_part; stakers_part} =
-      share ~rounding:`Towards_baker ~full_staking_balance to_frozen
+      share
+        ~adaptive_issuance_global_limit_of_staking_over_baking
+        delegate_parameters
+        ~rounding:`Towards_baker
+        ~full_staking_balance
+        to_frozen
     in
     let to_baker_from_staking = baker_part in
     let* to_baker_from_edge_over_stakers =
       Tez_repr.mul_ratio
         ~rounding:`Up
         stakers_part
-        ~num:(Int64.of_int32 edge_of_baking_over_staking_billionth)
+        ~num:
+          (Int64.of_int32
+             delegate_parameters.edge_of_baking_over_staking_billionth)
         ~den:1_000_000_000L
     in
     let* to_stakers =
@@ -89,27 +105,40 @@ let compute_reward_distrib ~full_staking_balance ~stake
 
 let share ~rounding ctxt delegate amount =
   let open Lwt_result_syntax in
-  let* full_staking_balance =
-    Stake_storage.get_full_staking_balance ctxt delegate
-  in
-  Lwt.return (share ~rounding ~full_staking_balance amount)
-
-let compute_reward_distrib ctxt delegate stake rewards =
-  let open Lwt_result_syntax in
-  let* (delegate_parameter : Staking_parameters_repr.t) =
+  let* delegate_parameters =
     Delegate_staking_parameters.of_delegate ctxt delegate
   in
   let* full_staking_balance =
     Stake_storage.get_full_staking_balance ctxt delegate
   in
-  let edge_of_baking_over_staking_billionth =
-    delegate_parameter.edge_of_baking_over_staking_billionth
+  Lwt.return
+    (share
+       ~adaptive_issuance_global_limit_of_staking_over_baking:
+         (Constants_storage
+          .adaptive_issuance_global_limit_of_staking_over_baking
+            ctxt)
+       delegate_parameters
+       ~rounding
+       ~full_staking_balance
+       amount)
+
+let compute_reward_distrib ctxt delegate stake rewards =
+  let open Lwt_result_syntax in
+  let* (delegate_parameters : Staking_parameters_repr.t) =
+    Delegate_staking_parameters.of_delegate ctxt delegate
+  in
+  let* full_staking_balance =
+    Stake_storage.get_full_staking_balance ctxt delegate
   in
   Lwt.return
   @@ compute_reward_distrib
+       ~adaptive_issuance_global_limit_of_staking_over_baking:
+         (Constants_storage
+          .adaptive_issuance_global_limit_of_staking_over_baking
+            ctxt)
+       delegate_parameters
        ~full_staking_balance
        ~stake
-       ~edge_of_baking_over_staking_billionth
        ~rewards
 
 let pay_rewards ctxt ?active_stake ~source ~delegate rewards =

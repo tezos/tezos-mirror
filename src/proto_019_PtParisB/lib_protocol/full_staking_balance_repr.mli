@@ -21,10 +21,17 @@ val voting_weight : t -> Int64.t tzresult
 
 val apply_slashing : percentage:Percentage.t -> t -> t
 
+(** The delegate's own frozen funds. *)
 val own_frozen : t -> Tez_repr.t
 
+(** The total frozen funds from all external stakers.
+
+    Does not take the [limit_of_staking_over_baking] into account. *)
 val staked_frozen : t -> Tez_repr.t
 
+(** The total delegated funds from all delegators.
+
+    Not adjusted considering overdelegation / overstaking. *)
 val current_delegated : t -> Tez_repr.t
 
 val min_delegated_in_cycle : current_cycle:Cycle_repr.t -> t -> Tez_repr.t
@@ -35,10 +42,34 @@ val total_frozen : t -> Tez_repr.t tzresult
 (** Sum of [own_frozen], [staked_frozen], and [current_delegated]. *)
 val current_total : t -> Tez_repr.t tzresult
 
-(** [own_ratio full_staking_balance] returns [(num, den)] representing the
-ratio of [own_frozen] over [total_frozen] for [full_staking_balance].
-If [total_frozen] is zero, the returned ratio is [(1L, 1L)]. *)
-val own_ratio : t -> Int64.t * Int64.t
+(** The portion of {!staked_frozen} that actually counts as staking
+    when computing baking rights, considering both the global and the
+    delegate's [limit_of_staking_over_baking].
+
+    It is equal to the minimum of:
+
+    - {!staked_frozen}
+
+    - {!own_frozen} scaled by the delegate's [limit_of_staking_over_baking]
+
+    - {!own_frozen} scaled by the global [limit_of_staking_over_baking] *)
+val allowed_staked_frozen :
+  adaptive_issuance_global_limit_of_staking_over_baking:int ->
+  delegate_limit_of_staking_over_baking_millionth:int32 ->
+  t ->
+  Tez_repr.t
+
+(** Computes [(num, den)] representing the ratio of [own_frozen] over
+    [own_frozen + allowed_staked_frozen].
+
+    If [allowed_staked_frozen] is zero, returns [(1L, 1L)].
+
+    If [own_frozen] is zero, returns [(0L, 1L)]. *)
+val own_ratio :
+  adaptive_issuance_global_limit_of_staking_over_baking:int ->
+  delegate_limit_of_staking_over_baking_millionth:int32 ->
+  t ->
+  int64 * int64
 
 val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
 
