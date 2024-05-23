@@ -445,12 +445,19 @@ let data_at_level_range conf db_pool boundaries =
                   }
           | None -> None
         in
+        let baking_rights = [] (* FIXME *) in
         Teztale_lib.Data.
           {
             level;
             data =
               Teztale_lib.Data.
-                {cycle_info; blocks; delegate_operations; unaccurate};
+                {
+                  cycle_info;
+                  blocks;
+                  delegate_operations;
+                  unaccurate;
+                  baking_rights;
+                };
           }
         :: acc)
       blocks

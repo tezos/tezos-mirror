@@ -124,6 +124,17 @@ let create_cycles =
   \   size INTEGER NOT NULL,\n\
   \   UNIQUE (level))"
 
+let create_missing_blocks =
+  "CREATE TABLE IF NOT EXISTS missing_blocks(\n\
+  \  id INTEGER PRIMARY KEY,\n\
+  \  source $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  level INTEGER NOT NULL,\n\
+  \  round INTEGER NOT NULL,\n\
+  \  baker $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
+  \  FOREIGN KEY (baker) REFERENCES delegates(id),\n\
+  \  UNIQUE (source, level, round))"
+
 module Mutex = struct
   let delegates = Lwt_mutex.create ()
 
@@ -142,6 +153,8 @@ module Mutex = struct
   let endorsing_rights = Lwt_mutex.create ()
 
   let cycles = Lwt_mutex.create ()
+
+  let missing_blocks = Lwt_mutex.create ()
 end
 
 let create_endorsing_rights_level_idx =
@@ -169,6 +182,9 @@ let create_operations_inclusion_operation_idx =
 let create_cycles_level_idx =
   "CREATE INDEX IF NOT EXISTS cycles_level_idx ON cycles(level)"
 
+let create_missing_blocks_level_idx =
+  "CREATE INDEX IF NOT EXISTS missing_blocks_level_idx ON missing_blocks(level)"
+
 let create_tables =
   [
     create_delegates;
@@ -180,6 +196,7 @@ let create_tables =
     create_operations_inclusion;
     create_endorsing_rights;
     create_cycles;
+    create_missing_blocks;
     create_endorsing_rights_level_idx;
     create_blocks_level_idx;
     create_operations_level_idx;
@@ -187,6 +204,7 @@ let create_tables =
     create_operations_reception_operation_idx;
     create_operations_inclusion_operation_idx;
     create_cycles_level_idx;
+    create_missing_blocks_level_idx;
   ]
 
 let alter_blocks =
@@ -325,6 +343,38 @@ let maybe_insert_cycle =
   Caqti_request.Infix.(Caqti_type.(t3 int32 int32 int32 ->. unit))
     "INSERT INTO cycles (id, level, size) VALUES (?, ?, ?) ON CONFLICT DO \
      NOTHING"
+
+let insert_missing_block =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t4
+        (* $1 source *) string
+        (* $2 level *) int32
+        (* $3 round *) int32
+        (* $4 baker *) Type.public_key_hash
+      ->. unit))
+    "\n\
+     INSERT INTO missing_blocks (source, level, round, baker)\n\
+    \     SELECT nodes.id AS source, $2 AS level, $3 AS round, delegates.id AS \
+     baker\n\
+    \     FROM nodes\n\
+    \     LEFT JOIN delegates ON delegates.address = $4\n\
+    \     LEFT JOIN blocks\n\
+    \       ON blocks.level = $2\n\
+    \       AND blocks.round = $3\n\
+    \     LEFT JOIN blocks_reception\n\
+    \       ON blocks_reception.block = blocks.id\n\
+    \       AND blocks_reception.source = nodes.id\n\
+    \     WHERE nodes.name = $1\n\
+    \     AND blocks_reception.id IS NULL"
+
+let delete_missing_block =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t3 (* $1 source_name *) string (* $2 level *) int32 (* $3 round *) int32
+      ->. unit))
+    "DELETE FROM missing_blocks WHERE source = (SELECT id FROM nodes WHERE \
+     name = $1) AND level = $2 AND round = $3"
 
 let insert_received_operation =
   Caqti_request.Infix.(

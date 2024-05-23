@@ -57,6 +57,8 @@ module Mutex : sig
   val endorsing_rights : Lwt_mutex.t
 
   val cycles : Lwt_mutex.t
+
+  val missing_blocks : Lwt_mutex.t
 end
 
 val create_tables : string list
@@ -94,6 +96,21 @@ val maybe_insert_block :
 
 val maybe_insert_cycle :
   ( int32 (* id *) * int32 (* level *) * int32 (* size *),
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val insert_missing_block :
+  ( string (* source_name *)
+    * int32 (* level *)
+    * int32 (* round *)
+    * Tezos_crypto.Signature.public_key_hash (* baker *),
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val delete_missing_block :
+  ( string (* source_name *) * int32 (* level *) * int32 (* round *),
     unit,
     [`Zero] )
   Caqti_request.t

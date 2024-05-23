@@ -167,7 +167,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     return (public_key_hash_of_v0 metadata.protocol_data.baker, cycle_info)
 
-  let baking_right cctxt level priority =
+  let baking_rights cctxt level priority =
     let* baking_rights =
       Plugin.RPC.Baking_rights.get
         ?levels:None
@@ -176,11 +176,19 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         cctxt
         (cctxt#chain, `Level (Int32.pred level))
     in
-    match List.last_opt baking_rights with
-    | None -> fail_with_exn Not_found
-    | Some {delegate; priority = p; _} ->
-        assert (Compare.Int.equal priority p) ;
-        return (public_key_hash_of_v0 delegate)
+    match
+      List.rev_map
+        (fun {Plugin.RPC.Baking_rights.delegate; priority; _} ->
+          {
+            Data.delegate = public_key_hash_of_v0 delegate;
+            round = Int32.of_int priority;
+          })
+        baking_rights
+    with
+    | [] -> fail_with_exn Not_found
+    | hd :: _ as baking_rights ->
+        assert (Int32.of_int priority = hd.round) ;
+        return (hd.delegate, baking_rights)
 
   let block_round header =
     match

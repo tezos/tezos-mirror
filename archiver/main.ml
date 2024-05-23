@@ -89,7 +89,7 @@ let main_server state cctxt =
 
 let server_to_json_chunk : Server_archiver.chunk -> Json_archiver.chunk option =
   function
-  | Block (level, (block, cycle_info, (endos, preendos))) ->
+  | Block (level, (block, cycle_info, (endos, preendos), baking_rights)) ->
       Some
         (Block
            ( level,
@@ -100,7 +100,8 @@ let server_to_json_chunk : Server_archiver.chunk -> Json_archiver.chunk option =
              block.reception_times,
              block.delegate,
              cycle_info,
-             endos @ preendos ))
+             endos @ preendos,
+             baking_rights ))
   | Mempool (level, ops) -> Some (Mempool (None, level, ops))
   | Rights (_, _) -> None
 

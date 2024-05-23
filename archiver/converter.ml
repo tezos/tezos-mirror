@@ -137,7 +137,8 @@ let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
           ( block,
             data.Data.cycle_info,
             ( Option.value (Block_hash.Map.find hash pred_ops_map) ~default:[],
-              Option.value (Block_hash.Map.find hash ops_map) ~default:[] ) )
+              Option.value (Block_hash.Map.find hash ops_map) ~default:[] ),
+            [] (* FIXME: baking rights *) )
         in
         `String
           (Ezjsonm.value_to_string

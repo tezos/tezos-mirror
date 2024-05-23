@@ -142,6 +142,7 @@ let with_caqti_error ~logger x f =
       | Ok x -> f x
       | Error e ->
           let body = Caqti_error.show e in
+          print_endline body ;
           Teztale_lib.Log.error logger (fun () -> body) ;
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
@@ -562,7 +563,8 @@ let block_callback =
       ( Teztale_lib.Data.Block.
           {delegate; timestamp; reception_times; round; hash; predecessor; _},
         cycle_info,
-        (endorsements, preendorsements) ) ->
+        (endorsements, preendorsements),
+        baking_rights ) ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     let level = Int32.of_string (Re.Group.get g 1) in
     let out =
@@ -661,6 +663,32 @@ let block_callback =
                   Sql_requests.insert_received_block
                   (r.application_time, r.validation_time, hash, source))
               reception_times
+          in
+          let* () =
+            match
+              List.filter
+                (fun x -> x.Teztale_lib.Data.round <> round)
+                baking_rights
+            with
+            | [] -> return_unit
+            | baking_rights ->
+                maybe_with_metrics conf "insert_missing_block__list"
+                @@ fun () ->
+                maybe_with_transaction conf (module Db) @@ fun () ->
+                Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                  (fun r ->
+                    Db.exec
+                      Sql_requests.insert_missing_block
+                      ( source,
+                        level,
+                        r.Teztale_lib.Data.round,
+                        r.Teztale_lib.Data.delegate ))
+                  baking_rights
+          in
+          let* () =
+            maybe_with_metrics conf "delete_missing_block__list" @@ fun () ->
+            maybe_with_transaction conf (module Db) @@ fun () ->
+            Db.exec Sql_requests.delete_missing_block (source, level, round)
           in
           Teztale_lib.Log.debug logger (fun () ->
               Format.asprintf

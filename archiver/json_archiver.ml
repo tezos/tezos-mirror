@@ -267,7 +267,8 @@ let add_inclusion_in_block block_hash validators delegate_operations =
         unknown
 
 let dump_included_in_block logger path block_level block_hash block_predecessor
-    block_round timestamp reception_times baker cycle_info consensus_ops =
+    block_round timestamp reception_times baker cycle_info consensus_ops
+    baking_rights =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
@@ -293,6 +294,7 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
              blocks = infos.blocks;
              delegate_operations;
              unaccurate = infos.unaccurate;
+             baking_rights;
            }
        in
        let* () = write filename Data.encoding out_infos in
@@ -340,6 +342,7 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
             blocks;
             delegate_operations;
             unaccurate = infos.unaccurate;
+            baking_rights;
           })
   >>= fun out ->
   let () = drop_file_mutex filename in
@@ -467,6 +470,7 @@ let dump_received logger path ?unaccurate level received_ops =
                    unknown)
         in
         let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
+        let baking_rights = [] (* FIXME *) in
         let out_infos =
           Data.
             {
@@ -474,6 +478,7 @@ let dump_received logger path ?unaccurate level received_ops =
               blocks = infos.blocks;
               delegate_operations;
               unaccurate;
+              baking_rights;
             }
         in
         let* () = write filename Data.encoding out_infos in
@@ -503,6 +508,7 @@ type chunk =
       * Tezos_crypto.Signature.Public_key_hash.t
       * Data.cycle_info option
       * Consensus_ops.block_op list
+      * Data.baking_right list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
@@ -519,7 +525,8 @@ let dump prefix chunk =
         reception_times,
         baker,
         cycle_info,
-        block_info ) ->
+        block_info,
+        baking_rights ) ->
       dump_included_in_block
         logger
         prefix
@@ -532,6 +539,7 @@ let dump prefix chunk =
         baker
         cycle_info
         block_info
+        baking_rights
   | Mempool (unaccurate, level, items) ->
       dump_received logger prefix ?unaccurate level items
 
@@ -542,7 +550,7 @@ let stop () = chunk_feeder None
 let add_mempool ?unaccurate ~level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level (block, cycle_info, (endos, preendos)) =
+let add_block ~level (block, cycle_info, (endos, preendos), baking_rights) =
   chunk_feeder
     (Some
        (Block
@@ -554,7 +562,8 @@ let add_block ~level (block, cycle_info, (endos, preendos)) =
             block.reception_times,
             block.delegate,
             cycle_info,
-            endos @ preendos )))
+            endos @ preendos,
+            baking_rights )))
 
 (* not used *)
 let add_rights ~level:_ _rights = ()

@@ -264,29 +264,51 @@ let cycle_info_encoding =
        (req "cycle_position" int32)
        (req "cycle_size" int32))
 
+type baking_right = {
+  delegate : Tezos_crypto.Signature.public_key_hash;
+  round : int32;
+}
+
+let baking_rights_encoding =
+  let open Data_encoding in
+  conv
+    (fun {delegate; round} -> (delegate, round))
+    (fun (delegate, round) -> {delegate; round})
+    (obj2
+       (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+       (req "round" int32))
+
 type t = {
   cycle_info : cycle_info option;
   blocks : Block.t list;
   delegate_operations : Delegate_operations.t list;
   unaccurate : bool;
+  baking_rights : baking_right list;
 }
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {cycle_info; blocks; delegate_operations; unaccurate} ->
-      (cycle_info, blocks, delegate_operations, unaccurate))
-    (fun (cycle_info, blocks, delegate_operations, unaccurate) ->
-      {cycle_info; blocks; delegate_operations; unaccurate})
-    (obj4
+    (fun {cycle_info; blocks; delegate_operations; unaccurate; baking_rights} ->
+      (cycle_info, blocks, delegate_operations, unaccurate, baking_rights))
+    (fun (cycle_info, blocks, delegate_operations, unaccurate, baking_rights) ->
+      {cycle_info; blocks; delegate_operations; unaccurate; baking_rights})
+    (obj5
        (opt "cycle_info" cycle_info_encoding)
        (dft "blocks" (list Block.encoding) [])
        (* TODO: change name? *)
        (dft "endorsements" (list Delegate_operations.encoding) [])
-       (dft "unaccurate" bool false))
+       (dft "unaccurate" bool false)
+       (dft "baking_rights" (list baking_rights_encoding) []))
 
 let empty =
-  {cycle_info = None; blocks = []; delegate_operations = []; unaccurate = true}
+  {
+    cycle_info = None;
+    blocks = [];
+    delegate_operations = [];
+    unaccurate = true;
+    baking_rights = [];
+  }
 
 type batch_item = {level : int32; data : t}
 
@@ -304,16 +326,17 @@ let batch_encoding = Data_encoding.list batch_item_encoding
 let block_data_encoding =
   let open Data_encoding in
   conv
-    (fun (block_info, cycle_info, (att, preatt)) ->
-      (block_info, (cycle_info, att, preatt)))
-    (fun (block_info, (cycle_info, att, preatt)) ->
-      (block_info, cycle_info, (att, preatt)))
+    (fun (block_info, cycle_info, (att, preatt), baking_rights) ->
+      (block_info, (cycle_info, att, preatt, baking_rights)))
+    (fun (block_info, (cycle_info, att, preatt, baking_rights)) ->
+      (block_info, cycle_info, (att, preatt), baking_rights))
     (merge_objs
        Block.encoding
-       (obj3
+       (obj4
           (opt "cycle_info" cycle_info_encoding)
           (req "endorsements" (list Consensus_ops.block_op_encoding))
-          (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])))
+          (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])
+          (dft "baking_rights" (list baking_rights_encoding) [])))
 
 let level_timestamp_encoding =
   let open Data_encoding in

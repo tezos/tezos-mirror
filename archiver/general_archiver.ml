@@ -84,6 +84,10 @@ let dump_my_current_endorsements (module A : Archiver.S) ~unaccurate ~level
 module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
   let () = supported_protocols := Services.hash :: !supported_protocols
 
+  let baking_rights ctxt level round =
+    let cctx = Services.wrap_full ctxt in
+    Services.baking_rights cctx level round
+
   let rights_of ctxt level =
     let cctx = Services.wrap_full ctxt in
     Services.endorsing_rights cctx ~reference_level:level level
@@ -108,7 +112,8 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     return
       ( block_info_data info reception_times,
         cycle_info,
-        split_endorsements_preendorsements operations )
+        split_endorsements_preendorsements operations,
+        [] (* FIXME? Baking rights *) )
 
   let block_of ctxt level =
     let cctx = Services.wrap_full ctxt in
@@ -121,14 +126,15 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
-    let* delegate = Services.baking_right cctx level round in
+    let* delegate, baking_rights = Services.baking_rights cctx level round in
     let predecessor = Some header.Block_header.shell.Block_header.predecessor in
     return
       ( block_info_data
           (delegate, timestamp, round, hash, predecessor)
           reception_times,
         None,
-        ([], []) )
+        ([], []),
+        baking_rights )
 
   let () =
     Protocol_hash.Table.add
@@ -152,7 +158,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     Protocol_hash.Table.add
       live_block_machine
       Services.hash
-      (rights_of, get_applied_block)
+      (baking_rights, rights_of, get_applied_block)
 
   let rec pack_by_slot i e = function
     | ((i', l) as x) :: t ->
@@ -387,13 +393,14 @@ module Loops (Archiver : Archiver.S) = struct
                                       current_protocol)
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some (rights_of, get_applied_block) ->
+                          | Some (_baking_rights, rights_of, get_applied_block)
+                            ->
                               let recorder cctx level hash header reception_time
                                   =
                                 let* (( _block_info,
                                         _cycle_info,
-                                        (endorsements, preendorsements) ) as
-                                     block_data) =
+                                        (endorsements, preendorsements),
+                                        _baking_rights ) as block_data) =
                                   get_applied_block
                                     cctx
                                     hash

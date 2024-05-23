@@ -51,11 +51,13 @@ module type PROTOCOL_SERVICES = sig
     tzresult
     Lwt.t
 
-  val baking_right :
+  (* baking_rights _ level round *)
+  val baking_rights :
     wrap_full ->
     Int32.t ->
     int ->
-    Tezos_crypto.Signature.public_key_hash tzresult Lwt.t
+    (Tezos_crypto.Signature.public_key_hash * Data.baking_right list) tzresult
+    Lwt.t
 
   val baker_and_cycle :
     wrap_full ->

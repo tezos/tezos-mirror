@@ -36,6 +36,7 @@ type chunk =
       * Tezos_crypto.Signature.Public_key_hash.t
       * Data.cycle_info option
       * Consensus_ops.block_op list
+      * Data.baking_right list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
 val dump : string -> chunk -> unit Lwt.t

@@ -48,7 +48,8 @@ module type S = sig
     level:Int32.t ->
     Data.Block.t
     * Data.cycle_info option
-    * (Consensus_ops.block_op list * Consensus_ops.block_op list) ->
+    * (Consensus_ops.block_op list * Consensus_ops.block_op list)
+    * Data.baking_right list ->
     unit
 
   val add_rights : level:Int32.t -> Consensus_ops.rights -> unit
