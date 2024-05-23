@@ -443,6 +443,23 @@ module Opcode = struct
     Data_encoding.conv opcode_to_string string_to_opcode Data_encoding.string
 end
 
+(* Serves only for encoding numeric values in JSON that are up to 2^53. *)
+type uint53 = Z.t
+
+let uint53_encoding =
+  let open Data_encoding in
+  let uint53_to_json i =
+    (* See {!Json_data_encoding.int53} *)
+    if i < Z.shift_left Z.one 53 then `Float (Z.to_float i)
+    else Stdlib.failwith "JSON cannot accept integers more than 2^53"
+  in
+  let json_to_uint53 = function
+    | `Float i -> Z.of_float i
+    | _ -> Stdlib.failwith "Invalid representation for uint53"
+  in
+  let json_encoding = conv uint53_to_json json_to_uint53 json in
+  splitted ~json:json_encoding ~binary:z
+
 (* This is a temporary type, it should be filled in a follow up patch. Int and
    not unit, so that the encoding doesn't fail with: "Cannot insert potentially
    zero-sized element in a list." Making it a list ensures it is encoded as an

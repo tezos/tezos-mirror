@@ -51,6 +51,10 @@ module Opcode : sig
   val encoding : t Data_encoding.t
 end
 
+type uint53 = Z.t
+
+val uint53_encoding : uint53 Data_encoding.t
+
 (* This is a temporary type, it should be filled in a follow up patch. *)
 type opcode_log
 
