@@ -3,10 +3,6 @@ ARG RUST_TAG=master
 ARG BASE_IMAGE=debian:sid-slim
 
 FROM ${RUST_IMAGE}:${RUST_TAG} AS kernel_build
-RUN curl http://http.us.debian.org/debian/pool/main/p/prelink/execstack_0.0.20131005-1+b10_amd64.deb -o execstack.deb
-RUN apt update && apt install -y ./execstack.deb
-# Needed to clear execstack for rust 1.66 on mac os
-RUN execstack -c $(find ~/.rustup/ -name libLLVM-*-rust-*-stable.so)
 ARG EVM_CONFIG=etherlink/config/dev.yaml
 ARG CI_COMMIT_SHA
 WORKDIR /build
