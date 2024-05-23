@@ -7,7 +7,7 @@ let section =
     "THIS SCRIPT"
     ~description:
       "Usage:\n\n\
-      \  dune exec scripts/ci/list_tezt_warnings/main.exe -- PIPELINE_ID\n\n\
+      \  dune exec scripts/ci/grep_pipeline_logs/main.exe -- PIPELINE_ID\n\n\
        This fetches the console logs of all jobs whose name match a given \
        filter (by default, all Tezt jobs) for pipeline PIPELINE_ID, and \
        searches for occurences of a given pattern (by default, Tezt warnings), \
