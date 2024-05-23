@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/shifts.tz on storage None and input '(Right (Pair 1 2))' --level 1 --trace-stack
+./octez-client --protocol PtParisBpr4Kn15JRo69h1hvaXEbTwbdw9JsNYRgkF9x11z4q3U --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/shifts.tz on storage None and input '(Right (Pair 1 2))' --level 1 --trace-stack
 storage
   (Some 0)
 emitted operations
