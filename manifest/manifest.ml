@@ -2304,6 +2304,14 @@ let register_tezt_targets ~make_tezt_exe =
              For more info on [%{env:VAR=VAL}] see
              https://dune.readthedocs.io/en/stable/concepts.html#variables *)
           ~enabled_if:Dune.[S "<>"; S "false"; S "%{env:RUNTEZTALIAS=true}"]
+          ~action:
+            Dune.
+              [
+                S "run";
+                S ("%{dep:./" ^ exe_name ^ ".exe}");
+                S "/flaky";
+                S "/ci_disabled";
+              ]
           ~path
           ~with_macos_security_framework
           ~opam
