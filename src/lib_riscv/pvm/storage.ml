@@ -43,14 +43,17 @@ let commit ?message:_ repo state =
 
 let is_gc_finished _repo = true
 
-let split _repo = raise (Invalid_argument "split not implemented")
+let split _repo = ()
 
 let gc _repo ?callback:_ _key = Lwt.return_unit
 
 let wait_gc_completion _repo = Lwt.return_unit
 
-let export_snapshot _repo _key _path =
-  raise (Invalid_argument "export_snapshot not implemented")
+let export_snapshot repo hash path =
+  let open Lwt_result_syntax in
+  match Api.octez_riscv_storage_export_snapshot repo hash path with
+  | Ok () -> return_unit
+  | Error (`Msg e) -> tzfail (Exn (Failure e))
 
 let pvm_state_key = ["pvm_state"]
 

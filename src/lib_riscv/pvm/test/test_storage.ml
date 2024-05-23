@@ -28,3 +28,19 @@ let test_state_simple () =
   let* set_empty = Storage.set empty Storage.pvm_state_key empty in
   assert (Storage.State.equal set_empty empty) ;
   return_unit
+
+let test_export_snapshot () =
+  let open Lwt_result_syntax in
+  Lwt_utils_unix.with_tempdir "base_dir" (fun dir_name ->
+      let repo_dir = dir_name ^ "/repo" in
+      let snapshot_dir = dir_name ^ "/snapshot" in
+      let empty = Storage.empty () in
+      let*! repo = Storage.load ~cache_size:0 ~readonly:false repo_dir in
+      let*! id = Storage.commit repo empty in
+      let* () = Storage.export_snapshot repo id snapshot_dir in
+      let*! snapshot = Storage.load ~cache_size:0 ~readonly:true snapshot_dir in
+      let*! exported_empty = Storage.checkout snapshot id in
+      assert (Option.equal Storage.State.equal exported_empty (Some empty)) ;
+      let*! () = Storage.close repo in
+      let*! () = Storage.close snapshot in
+      return_unit)

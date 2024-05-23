@@ -5,7 +5,7 @@
 
 use crate::pvm::dummy_pvm::DummyPvm;
 use crate::storage::{self, StorageError};
-use ocaml::Pointer;
+use ocaml::{Pointer, ToValue};
 
 #[ocaml::sig]
 pub struct Repo(storage::Repo<DummyPvm>);
@@ -88,8 +88,8 @@ pub fn octez_riscv_storage_checkout(
     repo: Pointer<Repo>,
     id: Pointer<Id>,
 ) -> Result<Option<Pointer<State>>, ocaml::Error> {
-    let id = id.as_ref().0;
-    match repo.as_ref().0.checkout(&id) {
+    let id = &id.as_ref().0;
+    match repo.as_ref().0.checkout(id) {
         Ok(state) => Ok(Some(State(state).into())),
         Err(StorageError::NotFound(_)) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
@@ -127,4 +127,18 @@ pub fn octez_riscv_compute_step_many(
 #[ocaml::sig("state -> int64")]
 pub fn octez_riscv_get_tick(_state: Pointer<State>) -> i64 {
     unimplemented!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> id -> string -> (unit, [`Msg of string]) result")]
+pub unsafe fn octez_riscv_storage_export_snapshot(
+    repo: Pointer<Repo>,
+    id: Pointer<Id>,
+    path: &str,
+) -> Result<(), ocaml::Value> {
+    let id = &id.as_ref().0;
+    repo.as_ref().0.export_snapshot(id, path).map_err(|e| {
+        let s = format!("{e:?}");
+        ocaml::Value::hash_variant(gc, "Msg", Some(s.to_value(gc)))
+    })
 }
