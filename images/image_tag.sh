@@ -11,8 +11,8 @@ Usage: $0 images/[image]
 
 Compute tag for [image] based on its input committed or staged state.
 
-Note that the tag of an image does not change if a change to to its
-inputs is not commited or staged in git.
+Note that the tag of an image on changes if changes to its input are
+staged or committed in git.
 
 Example:
   $0 images/rust-toolchain/
