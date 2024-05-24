@@ -181,6 +181,26 @@ let check_operations_merkle_root hash header operations =
          found = computed_hash;
        })
 
+(* [with_retry_to_load_protocol bv peer f] tries to call [f], if it fails with an
+   [Unavailable_protocol] error, it fetches the protocol from the [peer] and retries
+   to call [f] *)
+let with_retry_to_load_protocol (bv : Types.state) ~peer f =
+  let open Lwt_syntax in
+  let* r = f () in
+  match r with
+  (* [Unavailable_protocol] is expected to be the
+     first error in the trace *)
+  | Error (Unavailable_protocol {protocol; _} :: _) ->
+      let* _ =
+        Protocol_validator.fetch_and_compile_protocol
+          bv.protocol_validator
+          ?peer
+          ~timeout:bv.limits.protocol_timeout
+          protocol
+      in
+      f ()
+  | _ -> Lwt.return r
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -221,22 +241,6 @@ let on_validation_request w
                 let* pred =
                   Store.Block.read_block chain_store header.shell.predecessor
                 in
-                let with_retry_to_load_protocol f =
-                  let*! r = f () in
-                  match r with
-                  (* [Unavailable_protocol] is expected to be the
-                     first error in the trace *)
-                  | Error (Unavailable_protocol {protocol; _} :: _) ->
-                      let* _ =
-                        Protocol_validator.fetch_and_compile_protocol
-                          bv.protocol_validator
-                          ?peer
-                          ~timeout:bv.limits.protocol_timeout
-                          protocol
-                      in
-                      f ()
-                  | _ -> Lwt.return r
-                in
                 let*! mempool = Store.Chain.mempool chain_store in
                 let bv_operations =
                   List.map
@@ -248,7 +252,7 @@ let on_validation_request w
                 let*! r =
                   protect ~canceler:(Worker.canceler w) (fun () ->
                       protect ?canceler (fun () ->
-                          with_retry_to_load_protocol (fun () ->
+                          with_retry_to_load_protocol bv ~peer (fun () ->
                               validate_block
                                 bv.validation_process
                                 chain_db
@@ -270,7 +274,7 @@ let on_validation_request w
                       protect ~canceler:(Worker.canceler w) (fun () ->
                           protect ?canceler (fun () ->
                               let*! () = Events.(emit applying_block) hash in
-                              with_retry_to_load_protocol (fun () ->
+                              with_retry_to_load_protocol bv ~peer (fun () ->
                                   Block_validator_process.apply_block
                                     ~should_validate:false
                                     bv.validation_process
@@ -444,7 +448,7 @@ let on_completion :
       match Request.view request with
       | Validation v ->
           Events.(emit validation_and_application_success) (v.block, st)
-      | _ -> (* assert false *) Lwt.return_unit)
+      | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Application_error errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_count ;
@@ -458,12 +462,12 @@ let on_completion :
               let* () = Events.(emit validation_failure) (v.block, st, errs) in
               let* () = check_and_quit_on_irmin_errors errs in
               return_unit)
-      | _ -> (* assert false *) Lwt.return_unit)
+      | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_preapplication _, Preapplied _ -> (
       Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
       match Request.view request with
       | Preapplication v -> Events.(emit preapplication_success) (v.level, st)
-      | _ -> (* assert false *) Lwt.return_unit)
+      | Validation _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_preapplication _, Preapplication_error errs -> (
       Prometheus.Counter.inc_one metrics.preapplication_errors_count ;
       match Request.view request with
@@ -471,7 +475,7 @@ let on_completion :
           let* () = Events.(emit preapplication_failure) (v.level, st, errs) in
           let* () = check_and_quit_on_irmin_errors errs in
           return_unit
-      | _ -> (* assert false *) Lwt.return_unit)
+      | Validation _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Application_error_after_validation errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one
@@ -484,7 +488,7 @@ let on_completion :
           in
           let* () = check_and_quit_on_irmin_errors errs in
           return_unit
-      | _ -> (* assert false *) Lwt.return_unit)
+      | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Validation_failed errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_failed_count ;
@@ -498,8 +502,12 @@ let on_completion :
               let* () = Events.(emit validation_failure) (v.block, st, errs) in
               let* () = check_and_quit_on_irmin_errors errs in
               return_unit)
-      | _ -> (* assert false *) Lwt.return_unit)
-  | _ -> (* assert false *) Lwt.return_unit
+      | Preapplication _ -> (* assert false *) Lwt.return_unit)
+  | Request.Request_validation _, (Preapplied _ | Preapplication_error _)
+  | ( Request.Request_preapplication _,
+      ( Already_committed | Validated_and_applied | Application_error _
+      | Application_error_after_validation _ | Validation_failed _ ) ) ->
+      (* assert false *) Lwt.return_unit
 
 let on_close w =
   let bv = Worker.state w in
@@ -584,7 +592,7 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
       | Error (Closed None) -> return (Invalid [Worker_types.Terminated])
       | Error (Closed (Some errs)) -> return (Invalid errs)
       | Error (Any exn) -> return (Invalid [Exn exn])
-      | _ ->
+      | Ok (Preapplied _) | Ok (Preapplication_error _) ->
           (* preapplication cases *)
           assert false)
 
@@ -611,7 +619,9 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
   | Error (Closed None) -> Lwt.return_error [Worker_types.Terminated]
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
-  | _ ->
+  | Ok
+      ( Already_committed | Validated_and_applied | Application_error _
+      | Application_error_after_validation _ | Validation_failed _ ) ->
       (* validation cases *)
       assert false
 
