@@ -90,6 +90,7 @@ end
 module Block_validator : sig
   type t = {
     already_commited_blocks_count : Prometheus.Counter.t;
+    already_known_invalid_blocks_count : Prometheus.Counter.t;
     validated_blocks_count : Prometheus.Counter.t;
     validation_errors_count : Prometheus.Counter.t;
     preapplied_blocks_count : Prometheus.Counter.t;

@@ -30,6 +30,7 @@ open Block_validator_errors
 
 type validation_result =
   | Already_committed
+  | Already_known_invalid of error trace
   | Validated_and_applied
   | Application_error of error trace
   | Preapplied of (Block_header.shell_header * error Preapply_result.t list)
@@ -236,7 +237,7 @@ let on_validation_request w
         | None -> (
             let*! o = Store.Block.read_invalid_block_opt chain_store hash in
             match o with
-            | Some {errors; _} -> return (Application_error errors)
+            | Some {errors; _} -> return (Already_known_invalid errors)
             | None -> (
                 let* pred =
                   Store.Block.read_block chain_store header.shell.predecessor
@@ -444,6 +445,10 @@ let on_completion :
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
       let* () = Events.(emit previously_validated_and_applied) hash in
       Lwt.return_unit
+  | Request.Request_validation {hash; _}, Already_known_invalid errs ->
+      Prometheus.Counter.inc_one metrics.already_known_invalid_blocks_count ;
+      let* () = Events.(emit previously_invalid_block) (hash, errs) in
+      Lwt.return_unit
   | Request.Request_validation _, Validated_and_applied -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validated_blocks_count ;
@@ -507,8 +512,9 @@ let on_completion :
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, (Preapplied _ | Preapplication_error _)
   | ( Request.Request_preapplication _,
-      ( Already_committed | Validated_and_applied | Application_error _
-      | Application_error_after_validation _ | Validation_failed _ ) ) ->
+      ( Already_committed | Already_known_invalid _ | Validated_and_applied
+      | Application_error _ | Application_error_after_validation _
+      | Validation_failed _ ) ) ->
       (* assert false *) Lwt.return_unit
 
 let on_close w =
@@ -589,6 +595,7 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
           return (Inapplicable_after_validation errs)
       | Ok (Validation_failed errs)
       | Ok (Application_error errs)
+      | Ok (Already_known_invalid errs)
       | Error (Request_error errs) ->
           return (Invalid errs)
       | Error (Closed None) -> return (Invalid [Worker_types.Terminated])
@@ -622,8 +629,9 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
   | Ok
-      ( Already_committed | Validated_and_applied | Application_error _
-      | Application_error_after_validation _ | Validation_failed _ ) ->
+      ( Already_committed | Already_known_invalid _ | Validated_and_applied
+      | Application_error _ | Application_error_after_validation _
+      | Validation_failed _ ) ->
       (* validation cases *)
       assert false
 
