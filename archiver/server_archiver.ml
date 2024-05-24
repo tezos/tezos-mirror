@@ -103,7 +103,9 @@ let send_block ctx level block_data =
   let body =
     `String
       (Ezjsonm.value_to_string
-         (Data_encoding.Json.construct Data.block_data_encoding block_data))
+         (Data_encoding.Json.construct
+            Data.Archiver.raw_block_data_encoding
+            block_data))
   in
   let path = Int32.to_string level ^ "/block" in
   send_something ctx path body

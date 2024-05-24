@@ -266,9 +266,10 @@ let add_inclusion_in_block block_hash validators delegate_operations =
         updated_known
         unknown
 
+(* FIXME: Use to use Data.t instead of Data.block_data? *)
 let dump_included_in_block logger path block_level block_hash block_predecessor
     block_round timestamp reception_times baker cycle_info consensus_ops
-    baking_rights =
+    _baking_rights =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
@@ -294,7 +295,8 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
              blocks = infos.blocks;
              delegate_operations;
              unaccurate = infos.unaccurate;
-             baking_rights;
+             missing_blocks = [];
+             (* FIXME *)
            }
        in
        let* () = write filename Data.encoding out_infos in
@@ -342,7 +344,8 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
             blocks;
             delegate_operations;
             unaccurate = infos.unaccurate;
-            baking_rights;
+            missing_blocks = [];
+            (* FIXME *)
           })
   >>= fun out ->
   let () = drop_file_mutex filename in
@@ -470,7 +473,6 @@ let dump_received logger path ?unaccurate level received_ops =
                    unknown)
         in
         let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
-        let baking_rights = [] (* FIXME *) in
         let out_infos =
           Data.
             {
@@ -478,7 +480,8 @@ let dump_received logger path ?unaccurate level received_ops =
               blocks = infos.blocks;
               delegate_operations;
               unaccurate;
-              baking_rights;
+              missing_blocks = [];
+              (* FIXME *)
             }
         in
         let* () = write filename Data.encoding out_infos in

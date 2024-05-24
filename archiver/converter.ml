@@ -142,7 +142,9 @@ let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
         in
         `String
           (Ezjsonm.value_to_string
-             (Data_encoding.Json.construct Data.block_data_encoding v)))
+             (Data_encoding.Json.construct
+                Data.Archiver.raw_block_data_encoding
+                v)))
       data.Data.blocks
   in
   let headers =

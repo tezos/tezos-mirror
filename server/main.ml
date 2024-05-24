@@ -979,7 +979,7 @@ let routes :
       fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
-              Teztale_lib.Data.block_data_encoding
+              Teztale_lib.Data.Archiver.raw_block_data_encoding
               body
               (block_callback ~logger conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],

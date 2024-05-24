@@ -269,7 +269,7 @@ type baking_right = {
   round : int32;
 }
 
-let baking_rights_encoding =
+let baking_right_encoding =
   let open Data_encoding in
   conv
     (fun {delegate; round} -> (delegate, round))
@@ -278,28 +278,39 @@ let baking_rights_encoding =
        (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
        (req "round" int32))
 
+type missing_blocks = {baking_right : baking_right; sources : string list}
+
+let missing_blocks_encoding =
+  let open Data_encoding in
+  conv
+    (fun {baking_right; sources} -> (baking_right, sources))
+    (fun (baking_right, sources) -> {baking_right; sources})
+    (obj2
+       (req "baking_right" baking_right_encoding)
+       (req "sources" (list string)))
+
 type t = {
   cycle_info : cycle_info option;
   blocks : Block.t list;
   delegate_operations : Delegate_operations.t list;
   unaccurate : bool;
-  baking_rights : baking_right list;
+  missing_blocks : missing_blocks list;
 }
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {cycle_info; blocks; delegate_operations; unaccurate; baking_rights} ->
-      (cycle_info, blocks, delegate_operations, unaccurate, baking_rights))
-    (fun (cycle_info, blocks, delegate_operations, unaccurate, baking_rights) ->
-      {cycle_info; blocks; delegate_operations; unaccurate; baking_rights})
+    (fun {cycle_info; blocks; delegate_operations; unaccurate; missing_blocks} ->
+      (cycle_info, blocks, delegate_operations, unaccurate, missing_blocks))
+    (fun (cycle_info, blocks, delegate_operations, unaccurate, missing_blocks) ->
+      {cycle_info; blocks; delegate_operations; unaccurate; missing_blocks})
     (obj5
        (opt "cycle_info" cycle_info_encoding)
        (dft "blocks" (list Block.encoding) [])
        (* TODO: change name? *)
        (dft "endorsements" (list Delegate_operations.encoding) [])
        (dft "unaccurate" bool false)
-       (dft "baking_rights" (list baking_rights_encoding) []))
+       (dft "missing_blocks" (list missing_blocks_encoding) []))
 
 let empty =
   {
@@ -307,7 +318,7 @@ let empty =
     blocks = [];
     delegate_operations = [];
     unaccurate = true;
-    baking_rights = [];
+    missing_blocks = [];
   }
 
 type batch_item = {level : int32; data : t}
@@ -322,21 +333,6 @@ let batch_item_encoding =
     (obj2 (req "level" int32) (req "data" encoding))
 
 let batch_encoding = Data_encoding.list batch_item_encoding
-
-let block_data_encoding =
-  let open Data_encoding in
-  conv
-    (fun (block_info, cycle_info, (att, preatt), baking_rights) ->
-      (block_info, (cycle_info, att, preatt, baking_rights)))
-    (fun (block_info, (cycle_info, att, preatt, baking_rights)) ->
-      (block_info, cycle_info, (att, preatt), baking_rights))
-    (merge_objs
-       Block.encoding
-       (obj4
-          (opt "cycle_info" cycle_info_encoding)
-          (req "endorsements" (list Consensus_ops.block_op_encoding))
-          (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])
-          (dft "baking_rights" (list baking_rights_encoding) [])))
 
 let level_timestamp_encoding =
   let open Data_encoding in
@@ -353,6 +349,30 @@ let surrounding_levels_encoding =
     (obj2
        (opt "lower" level_timestamp_encoding)
        (opt "upper" level_timestamp_encoding))
+
+module Archiver = struct
+  (* Collected by the archiver and sent to the server *)
+  type raw_block_data =
+    Block.t
+    * cycle_info option
+    * (Consensus_ops.block_op list * Consensus_ops.block_op list)
+    * baking_right list
+
+  let raw_block_data_encoding =
+    let open Data_encoding in
+    conv
+      (fun (block_info, cycle_info, (att, preatt), baking_rights) ->
+        (block_info, (cycle_info, att, preatt, baking_rights)))
+      (fun (block_info, (cycle_info, att, preatt, baking_rights)) ->
+        (block_info, cycle_info, (att, preatt), baking_rights))
+      (merge_objs
+         Block.encoding
+         (obj4
+            (opt "cycle_info" cycle_info_encoding)
+            (req "endorsements" (list Consensus_ops.block_op_encoding))
+            (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])
+            (dft "baking_rights" (list baking_right_encoding) [])))
+end
 
 module Anomaly = struct
   (* only anomalies related to endorsements are considered for now *)

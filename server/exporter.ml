@@ -119,6 +119,55 @@ let select_cycles db_pool boundaries =
         [])
     db_pool
 
+module RoundBakerMap = Map.Make (struct
+  type t = Int32.t * Tezos_crypto.Signature.public_key_hash
+
+  (* No need for comparing delegates since round in unique within a level *)
+  let compare (r1, _) (r2, _) = Int32.compare r1 r2
+end)
+
+let select_missing_blocks_request =
+  Caqti_request.Infix.(
+    Caqti_type.(t2 int32 int32)
+    ->* Caqti_type.(t4 string int32 int32 Sql_requests.Type.public_key_hash))
+    "SELECT\n\
+    \  nodes.name,\n\
+    \  missing_blocks.level,\n\
+    \  missing_blocks.round,\n\
+    \  delegates.address\n\
+     FROM missing_blocks\n\
+     JOIN nodes ON nodes.id = missing_blocks.source\n\
+     JOIN delegates ON delegates.id = missing_blocks.baker\n\
+     WHERE missing_blocks.level >= $1\n\
+     AND missing_blocks.level <= $2"
+
+let select_missing_blocks_parse (source, level, round, baker) acc =
+  Int32Map.update
+    level
+    (function
+      | None ->
+          Some (RoundBakerMap.add (round, baker) [source] RoundBakerMap.empty)
+      | Some data ->
+          Some
+            (RoundBakerMap.update
+               (round, baker)
+               (function
+                 | None -> Some [source]
+                 | Some sources -> Some (source :: sources))
+               data))
+    acc
+
+let select_missing_blocks conf db_pool boundaries =
+  Caqti_lwt_unix.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      maybe_with_metrics conf "select_missing_blocks" @@ fun () ->
+      Db.fold
+        select_missing_blocks_request
+        select_missing_blocks_parse
+        boundaries
+        Int32Map.empty)
+    db_pool
+
 let select_blocks conf db_pool boundaries =
   let block_request =
     Caqti_request.Infix.(
@@ -405,10 +454,12 @@ let data_at_level_range conf db_pool boundaries =
         (select_single_cycle_info db_pool high)
     else Lwt_result.map (List.sort compare) (select_cycles db_pool boundaries)
   in
+  let missing_blocks = select_missing_blocks conf db_pool boundaries in
   let blocks = select_blocks conf db_pool boundaries in
   let* delegate_operations = select_ops conf db_pool boundaries in
   let* blocks in
   let* cycles in
+  let* missing_blocks in
   let delegate_operations = translate_ops delegate_operations in
   let blocks =
     Int32Map.map
@@ -445,7 +496,17 @@ let data_at_level_range conf db_pool boundaries =
                   }
           | None -> None
         in
-        let baking_rights = [] (* FIXME *) in
+        let missing_blocks =
+          match Int32Map.find_opt level missing_blocks with
+          | None -> []
+          | Some missing_blocks ->
+              RoundBakerMap.fold
+                (fun (round, delegate) sources acc ->
+                  Teztale_lib.Data.{baking_right = {round; delegate}; sources}
+                  :: acc)
+                missing_blocks
+                []
+        in
         Teztale_lib.Data.
           {
             level;
@@ -456,7 +517,7 @@ let data_at_level_range conf db_pool boundaries =
                   blocks;
                   delegate_operations;
                   unaccurate;
-                  baking_rights;
+                  missing_blocks;
                 };
           }
         :: acc)
