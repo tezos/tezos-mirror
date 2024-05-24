@@ -14,7 +14,7 @@ use crate::{
         ExecutionEnvironment, ExecutionEnvironmentState,
     },
     machine_state::{self, bus::main_memory, StepManyResult},
-    range_utils::range_bounds_saturating_sub,
+    range_utils::{range_bounds_saturating_sub, range_max, range_min},
     state_backend,
     traps::EnvironException,
 };
@@ -109,81 +109,76 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
+
+    // Trampoline style function for [eval_range]
     pub fn eval_range<F>(
         &mut self,
         config: &mut EE::Config<'_>,
         step_bounds: &impl RangeBounds<usize>,
-        should_continue: F,
-    ) -> EvalManyResult
-    where
-        F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
-    {
-        self.eval_range_accum(config, step_bounds, 0, should_continue)
-    }
-
-    // Tail-recursive helper function for [step_many]
-    fn eval_range_accum<F>(
-        &mut self,
-        config: &mut EE::Config<'_>,
-        step_bounds: &impl RangeBounds<usize>,
-        accum: usize,
         mut should_continue: F,
     ) -> EvalManyResult
     where
         F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
     {
-        let StepManyResult {
-            mut steps,
-            exception,
-        } = self
-            .machine_state
-            .step_range(step_bounds, &mut should_continue);
+        let min = range_min(step_bounds);
+        let max = range_max(step_bounds);
+        let mut bounds = min..=max;
 
-        // Total steps done
-        let mut total_steps = accum.saturating_add(steps);
+        // initial state
+        let mut total_steps: usize = 0;
 
-        if let Some(exc) = exception {
-            // Raising the exception is not a completed step. Trying to handle it is.
-            // We don't have to check against `max_steps` because running the
-            // instruction that triggered the exception meant that `max_steps > 0`.
-            total_steps = total_steps.saturating_add(1);
-            steps = steps.saturating_add(1);
+        // Evaluation loop.
+        // Runs the evaluation function until either:
+        // reached the max steps,
+        // or has stopped at an exception, handled or otherwise
+        let error = loop {
+            let StepManyResult {
+                mut steps,
+                exception,
+            } = self.machine_state.step_range(&bounds, &mut should_continue);
 
-            match self.handle_exception(config, exc) {
-                // EE encountered an error.
-                exec_env::EcallOutcome::Fatal { message } => {
-                    return EvalManyResult {
-                        steps: total_steps,
-                        error: Some(EvalError {
+            total_steps = total_steps.saturating_add(steps);
+
+            if let Some(exc) = exception {
+                // Raising the exception is not a completed step. Trying to handle it is.
+                // We don't have to check against `max_steps` because running the
+                // instruction that triggered the exception meant that `max_steps > 0`.
+                total_steps = total_steps.saturating_add(1);
+                steps = steps.saturating_add(1);
+
+                match self.handle_exception(config, exc) {
+                    // EE encountered an error.
+                    exec_env::EcallOutcome::Fatal { message } => {
+                        break Some(EvalError {
                             cause: exc,
                             message,
-                        }),
+                        });
+                    }
+
+                    // EE hints we may continue evaluation.
+                    exec_env::EcallOutcome::Handled {
+                        continue_eval: true,
+                    } => {
+                        // update min max by shifting the bounds
+                        bounds = range_bounds_saturating_sub(&bounds, steps);
+                        // loop
+                        continue;
+                    }
+
+                    // EE suggests to stop evaluation.
+                    exec_env::EcallOutcome::Handled {
+                        continue_eval: false,
+                    } => {
+                        break None;
                     }
                 }
-
-                // EE hints we may continue evaluation.
-                exec_env::EcallOutcome::Handled {
-                    continue_eval: true,
-                } => {
-                    let steps_left = range_bounds_saturating_sub(step_bounds, steps);
-                    return self.eval_range_accum(
-                        config,
-                        &steps_left,
-                        total_steps,
-                        should_continue,
-                    );
-                }
-
-                // EE suggests to stop evaluation.
-                exec_env::EcallOutcome::Handled {
-                    continue_eval: false,
-                } => {}
+            } else {
+                break None;
             }
-        }
-
+        };
         EvalManyResult {
             steps: total_steps,
-            error: None,
+            error,
         }
     }
 }

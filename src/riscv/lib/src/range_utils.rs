@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::ops::{Bound, RangeBounds};
+use std::ops::{Bound, RangeBounds, RangeInclusive};
 
 /// Get the smallest entry in range.
 #[inline(always)]
@@ -26,11 +26,12 @@ pub fn range_max(range: &impl RangeBounds<usize>) -> usize {
 
 /// Reduce lower and upper bounds by the given shift amount. Both bounds will be
 /// clamped to 0 and won't wrap.
+// TODO(AC): modify range shifting logic to handle unbounded ranges. !13484
 #[inline(always)]
 pub fn range_bounds_saturating_sub(
     range: &impl RangeBounds<usize>,
     shift: usize,
-) -> impl RangeBounds<usize> {
+) -> RangeInclusive<usize> {
     let min = range_min(range);
     let max = range_max(range);
     min.saturating_sub(shift)..=max.saturating_sub(shift)
