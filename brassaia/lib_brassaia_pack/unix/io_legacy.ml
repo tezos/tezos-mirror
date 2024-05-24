@@ -18,7 +18,7 @@ open! Import
 include Io_legacy_intf
 
 module Unix : S = struct
-  module Raw = Index_unix.Private.Raw
+  module Raw = Brassaia_index_unix.Index_unix.Private.Raw
 
   type t = {
     file : string;

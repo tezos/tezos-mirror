@@ -16,7 +16,7 @@
 
 open! Import
 open Io_intf
-module Syscalls = Index_unix.Syscalls
+module Syscalls = Brassaia_index_unix.Index_unix.Syscalls
 
 (* File utils, taken from index.unix package.
 

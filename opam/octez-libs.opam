@@ -61,9 +61,12 @@ depends: [
   "jsonm"
   "ocamlgraph"
   "optint"
-  "index" { >= "1.6.0" & < "1.7.0" }
-  "checkseum" { != "0.5.0" }
   "rusage"
+  "progress" { >= "0.1.0" }
+  "lru" { >= "0.3.0" }
+  "index" { >= "1.6.0" & < "1.7.0" }
+  "semaphore-compat" { >= "1.0.1" }
+  "checkseum" { != "0.5.0" }
   "ringo" { >= "1.0.0" }
   "octez-internal-libs" { = version }
   "conf-rust"

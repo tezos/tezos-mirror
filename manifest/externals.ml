@@ -150,6 +150,8 @@ let logs_fmt = external_sublib logs "logs.fmt"
 
 let logs_lwt = external_sublib logs "logs.lwt"
 
+let lru = external_lib "lru" V.(at_least "0.3.0")
+
 let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.7.0")
 
 let lwt_canceler =
@@ -218,6 +220,8 @@ let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.6")
 
 let pringo = external_lib "pringo" V.(at_least "1.3" && less_than "1.4")
 
+let progress = external_lib "progress" V.(at_least "0.1.0")
+
 let prometheus = external_lib "prometheus" V.(at_least "1.2")
 
 let prometheus_app = external_lib "prometheus-app" V.(at_least "1.2")
@@ -268,6 +272,8 @@ let secp256k1_internal =
     ~js_compatible:true
     "secp256k1-internal"
     version
+
+let semaphore_compat = external_lib "semaphore-compat" (V.at_least "1.0.1")
 
 let seqes = external_lib ~js_compatible:true "seqes" V.(at_least "0.2")
 
