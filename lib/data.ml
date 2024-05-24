@@ -293,23 +293,21 @@ type t = {
   cycle_info : cycle_info option;
   blocks : Block.t list;
   delegate_operations : Delegate_operations.t list;
-  unaccurate : bool;
   missing_blocks : missing_blocks list;
 }
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {cycle_info; blocks; delegate_operations; unaccurate; missing_blocks} ->
-      (cycle_info, blocks, delegate_operations, unaccurate, missing_blocks))
-    (fun (cycle_info, blocks, delegate_operations, unaccurate, missing_blocks) ->
-      {cycle_info; blocks; delegate_operations; unaccurate; missing_blocks})
-    (obj5
+    (fun {cycle_info; blocks; delegate_operations; missing_blocks} ->
+      (cycle_info, blocks, delegate_operations, missing_blocks))
+    (fun (cycle_info, blocks, delegate_operations, missing_blocks) ->
+      {cycle_info; blocks; delegate_operations; missing_blocks})
+    (obj4
        (opt "cycle_info" cycle_info_encoding)
        (dft "blocks" (list Block.encoding) [])
        (* TODO: change name? *)
        (dft "endorsements" (list Delegate_operations.encoding) [])
-       (dft "unaccurate" bool false)
        (dft "missing_blocks" (list missing_blocks_encoding) []))
 
 let empty =
@@ -317,7 +315,6 @@ let empty =
     cycle_info = None;
     blocks = [];
     delegate_operations = [];
-    unaccurate = true;
     missing_blocks = [];
   }
 

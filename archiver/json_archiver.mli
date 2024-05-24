@@ -40,3 +40,13 @@ type chunk =
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
 val dump : string -> chunk -> unit Lwt.t
+
+type level_file_content = {
+  cycle_info : Data.cycle_info option;
+  blocks : Data.Block.t list;
+  delegate_operations : Data.Delegate_operations.t list;
+  baking_rights : Data.baking_right list;
+  unaccurate : bool;
+}
+
+val level_file_content_encoding : level_file_content Data_encoding.t

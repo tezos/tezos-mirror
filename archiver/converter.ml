@@ -66,7 +66,7 @@ let to_received_ops ctx endpoint auth level data =
                        })
                    mempool_inclusion)
                operations) ))
-      data.Data.delegate_operations
+      data.Json_archiver.delegate_operations
   in
   let body =
     `String
@@ -127,7 +127,7 @@ let included_ops_map level data =
         acc
         operations)
     Block_hash.Map.empty
-    data.Data.delegate_operations
+    data.Json_archiver.delegate_operations
 
 let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
   let bodies =
@@ -135,17 +135,17 @@ let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
       (fun (Data.Block.{hash; _} as block) ->
         let v =
           ( block,
-            data.Data.cycle_info,
+            data.Json_archiver.cycle_info,
             ( Option.value (Block_hash.Map.find hash pred_ops_map) ~default:[],
               Option.value (Block_hash.Map.find hash ops_map) ~default:[] ),
-            [] (* FIXME: baking rights *) )
+            data.Json_archiver.baking_rights )
         in
         `String
           (Ezjsonm.value_to_string
              (Data_encoding.Json.construct
                 Data.Archiver.raw_block_data_encoding
                 v)))
-      data.Data.blocks
+      data.Json_archiver.blocks
   in
   let headers =
     Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
@@ -201,13 +201,17 @@ let main source password endpoint prefix =
                 let*! previous_block_ops_map = acc in
                 let*! data =
                   let* json = Lwt_utils_unix.Json.read_file filename in
-                  try return (Data_encoding.Json.destruct Data.encoding json)
+                  try
+                    return
+                      (Data_encoding.Json.destruct
+                         Json_archiver.level_file_content_encoding
+                         json)
                   with exn -> Lwt.return (Error_monad.error_with_exn exn)
                 in
                 match data with
                 | Ok data ->
                     let out = included_ops_map level data in
-                    if not data.Data.unaccurate then
+                    if not data.Json_archiver.unaccurate then
                       let*! _ =
                         to_received_ops
                           ctx

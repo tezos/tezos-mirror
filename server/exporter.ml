@@ -423,7 +423,6 @@ let data_at_level_range conf db_pool boundaries =
           [])
       blocks
   in
-  let unaccurate = false in
   let result =
     Int32Map.fold
       (fun level blocks acc ->
@@ -465,13 +464,7 @@ let data_at_level_range conf db_pool boundaries =
             level;
             data =
               Teztale_lib.Data.
-                {
-                  cycle_info;
-                  blocks;
-                  delegate_operations;
-                  unaccurate;
-                  missing_blocks;
-                };
+                {cycle_info; blocks; delegate_operations; missing_blocks};
           }
         :: acc)
       blocks

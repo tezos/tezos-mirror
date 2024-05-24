@@ -184,10 +184,49 @@ let add_inclusion_in_block block_hash validators delegate_operations =
         updated_known
         unknown
 
+type level_file_content = {
+  cycle_info : Data.cycle_info option;
+  blocks : Data.Block.t list;
+  delegate_operations : Data.Delegate_operations.t list;
+  baking_rights : Data.baking_right list;
+  unaccurate : bool;
+}
+
+let level_file_content_empty =
+  {
+    cycle_info = None;
+    blocks = [];
+    delegate_operations = [];
+    baking_rights = [];
+    unaccurate = false;
+  }
+
+let level_file_content_encoding =
+  let open Data_encoding in
+  conv
+    (fun {cycle_info; blocks; delegate_operations; baking_rights; unaccurate} ->
+      (cycle_info, blocks, delegate_operations, baking_rights, unaccurate))
+    (fun (cycle_info, blocks, delegate_operations, baking_rights, unaccurate) ->
+      {cycle_info; blocks; delegate_operations; baking_rights; unaccurate})
+    (obj5
+       (opt "cycle_info" Data.cycle_info_encoding)
+       (dft "blocks" (list Data.Block.encoding) [])
+       (* TODO: change name? *)
+       (dft "endorsements" (list Data.Delegate_operations.encoding) [])
+       (dft "baking_rights" (list Data.baking_right_encoding) [])
+       (dft "unaccurate" Data_encoding.bool false))
+
+let rec merge_baking_rights (acc : Data.baking_right list) = function
+  | [] -> acc
+  | hd :: tl ->
+      if List.exists (fun x -> x.Data.round = hd.Data.round) acc then
+        merge_baking_rights acc tl
+      else merge_baking_rights (hd :: acc) tl
+
 (* FIXME: Use to use Data.t instead of Data.block_data? *)
 let dump_included_in_block logger path block_level block_hash block_predecessor
     block_round timestamp reception_times baker cycle_info consensus_ops
-    _baking_rights =
+    baking_rights =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
@@ -199,25 +238,25 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
          block_level) ;
    let mutex = get_file_mutex filename in
    Lwt_mutex.with_lock mutex (fun () ->
-       let* infos = load filename Data.encoding Data.empty in
+       let* (info : level_file_content) =
+         load filename level_file_content_encoding level_file_content_empty
+       in
        let delegate_operations =
          add_inclusion_in_block
            block_hash
            consensus_ops
-           infos.Data.delegate_operations
+           info.delegate_operations
        in
-       let out_infos =
-         Data.
-           {
-             cycle_info;
-             blocks = infos.blocks;
-             delegate_operations;
-             unaccurate = infos.unaccurate;
-             missing_blocks = [];
-             (* FIXME *)
-           }
+       let out =
+         {
+           cycle_info;
+           blocks = info.blocks;
+           delegate_operations;
+           unaccurate = info.unaccurate;
+           baking_rights = info.baking_rights;
+         }
        in
-       write filename Data.encoding out_infos)
+       write filename level_file_content_encoding out)
    >>= fun out ->
    let () = drop_file_mutex filename in
    match out with
@@ -237,8 +276,10 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
   let filename = filename_of_level path block_level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      let* infos = load filename Data.encoding Data.empty in
-      let delegate_operations = infos.Data.delegate_operations in
+      let* infos =
+        load filename level_file_content_encoding level_file_content_empty
+      in
+      let delegate_operations = infos.delegate_operations in
       let blocks =
         Data.Block.
           {
@@ -250,20 +291,18 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
             timestamp;
             nonce = None;
           }
-        :: infos.Data.blocks
+        :: infos.blocks
       in
       write
         filename
-        Data.encoding
-        Data.
-          {
-            cycle_info;
-            blocks;
-            delegate_operations;
-            unaccurate = infos.unaccurate;
-            missing_blocks = [];
-            (* FIXME *)
-          })
+        level_file_content_encoding
+        {
+          cycle_info;
+          blocks;
+          delegate_operations;
+          unaccurate = infos.unaccurate;
+          baking_rights = merge_baking_rights infos.baking_rights baking_rights;
+        })
   >>= fun out ->
   let () = drop_file_mutex filename in
   match out with
@@ -319,7 +358,9 @@ let dump_received logger path ?unaccurate level received_ops =
   let mutex = get_file_mutex filename in
   let*! out =
     Lwt_mutex.with_lock mutex (fun () ->
-        let* infos = load filename Data.encoding Data.empty in
+        let* infos =
+          load filename level_file_content_encoding level_file_content_empty
+        in
         let updated_known, unknown =
           List.fold_left
             (fun (acc, missing)
@@ -347,7 +388,7 @@ let dump_received logger path ?unaccurate level received_ops =
                     missing' )
               | [], _ -> (delegate_ops :: acc, missing))
             ([], received_ops)
-            infos.Data.delegate_operations
+            infos.delegate_operations
         in
         let* delegate_operations =
           match unknown with
@@ -391,17 +432,15 @@ let dump_received logger path ?unaccurate level received_ops =
         in
         let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
         let out_infos =
-          Data.
-            {
-              cycle_info = infos.cycle_info;
-              blocks = infos.blocks;
-              delegate_operations;
-              unaccurate;
-              missing_blocks = [];
-              (* FIXME *)
-            }
+          {
+            cycle_info = infos.cycle_info;
+            blocks = infos.blocks;
+            delegate_operations;
+            unaccurate;
+            baking_rights = infos.baking_rights;
+          }
         in
-        write filename Data.encoding out_infos)
+        write filename level_file_content_encoding out_infos)
   in
   let () = drop_file_mutex filename in
   match out with
