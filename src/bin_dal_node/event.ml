@@ -222,7 +222,7 @@ let removed_slot_shards =
     ~section
     ~name:"removed_slot_shards"
     ~msg:"removed shards for level {published_level} and index {slot_index}"
-    ~level:Notice
+    ~level:Info
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
 
