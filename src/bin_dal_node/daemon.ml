@@ -285,8 +285,7 @@ module Handler = struct
           ~skip_list_store_dir:"skip_list"
           ~padded_encoded_cell_size
           ~encoded_hash_size
-          ~number_of_slots:
-            proto_parameters.cryptobox_parameters.number_of_shards
+          ~number_of_slots:proto_parameters.number_of_slots
       in
       let level =
         match last_notified_level with None -> level | Some level -> level
