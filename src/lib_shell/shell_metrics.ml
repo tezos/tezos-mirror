@@ -440,7 +440,6 @@ module Block_validator = struct
 
   type t = {
     already_commited_blocks_count : Counter.t;
-    outdated_blocks_count : Counter.t;
     validated_blocks_count : Counter.t;
     validation_errors_count : Counter.t;
     preapplied_blocks_count : Counter.t;
@@ -456,13 +455,6 @@ module Block_validator = struct
     let already_commited_blocks_count =
       let help = "Number of requests to validate a block already handled" in
       Counter.v ~help ~namespace ?subsystem "already_commited_blocks_count"
-    in
-    let outdated_blocks_count =
-      let help =
-        "Number of requests to validate a block older than the node's \
-         checkpoint"
-      in
-      Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
     in
     let validated_blocks_count =
       let help = "Number of requests to validate a valid block" in
@@ -532,7 +524,6 @@ module Block_validator = struct
     operations_per_pass_metrics () ;
     {
       already_commited_blocks_count;
-      outdated_blocks_count;
       validated_blocks_count;
       validation_errors_count;
       preapplied_blocks_count;
