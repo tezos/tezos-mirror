@@ -47,6 +47,17 @@ let previously_validated_and_applied =
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
 
+let previously_invalid_block =
+  declare_2
+    ~section
+    ~name:"previously_invalid_block"
+    ~msg:"previously invalid block {hash} with: {errors}"
+    ~level:Debug
+    ~pp1:Block_hash.pp
+    ~pp2:pp_print_top_error_of_trace
+    ("hash", Block_hash.encoding)
+    ("errors", Error_monad.trace_encoding)
+
 let validation_or_application_failure =
   declare_3
     ~section
