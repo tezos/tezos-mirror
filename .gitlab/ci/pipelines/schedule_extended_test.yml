@@ -1347,6 +1347,132 @@ opam:octez-distributed-lwt-internal:
     when: always
   retry: 2
 
+opam:octez-evm-node:
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/dune.inc'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/main.ml
+    - manifest/manifest.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    package: octez-evm-node
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+
+opam:octez-evm-node-libs:
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/dune.inc'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/main.ml
+    - manifest/manifest.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 1 minute
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    package: octez-evm-node-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+
 opam:octez-injector:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
@@ -1544,10 +1670,10 @@ opam:octez-libs:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -1563,7 +1689,7 @@ opam:octez-libs:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -3371,10 +3497,10 @@ opam:octez-rpc-process:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 4 minutes
+    start_in: 3 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 4 minutes
+    start_in: 3 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -3390,7 +3516,7 @@ opam:octez-rpc-process:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 4 minutes
+    start_in: 3 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -3686,10 +3812,10 @@ opam:octez-smart-rollup-node-Proxford:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 1 minute
+    start_in: 2 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 1 minute
+    start_in: 2 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -3705,7 +3831,7 @@ opam:octez-smart-rollup-node-Proxford:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 1 minute
+    start_in: 2 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -4694,10 +4820,10 @@ opam:tezos-dal-node-services:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -4713,7 +4839,7 @@ opam:tezos-dal-node-services:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -5135,10 +5261,10 @@ opam:tezos-protocol-005-PsBABY5H:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 5 minutes
+    start_in: 4 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 5 minutes
+    start_in: 4 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5154,7 +5280,7 @@ opam:tezos-protocol-005-PsBABY5H:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 5 minutes
+    start_in: 4 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -5198,10 +5324,10 @@ opam:tezos-protocol-005-PsBabyM1:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 5 minutes
+    start_in: 4 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 5 minutes
+    start_in: 4 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5217,7 +5343,7 @@ opam:tezos-protocol-005-PsBabyM1:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 5 minutes
+    start_in: 4 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -6017,10 +6143,10 @@ opam:tezos-protocol-017-PtNairob:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6036,7 +6162,7 @@ opam:tezos-protocol-017-PtNairob:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -6080,10 +6206,10 @@ opam:tezos-protocol-018-Proxford:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6099,7 +6225,7 @@ opam:tezos-protocol-018-Proxford:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -6143,10 +6269,10 @@ opam:tezos-protocol-019-PtParisB:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6162,7 +6288,7 @@ opam:tezos-protocol-019-PtParisB:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 6 minutes
+    start_in: 5 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -6458,10 +6584,10 @@ opam:tezos-proxy-server-config:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6477,7 +6603,7 @@ opam:tezos-proxy-server-config:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -6521,10 +6647,10 @@ opam:tezt-tezos:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6540,7 +6666,7 @@ opam:tezt-tezos:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   needs:
   - opam:prepare
   dependencies:
