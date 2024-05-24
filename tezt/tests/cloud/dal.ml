@@ -70,6 +70,27 @@ module Cli = struct
       ~description:"Machine type used for the DAL producers"
       ()
 
+  let observer_slot_indices =
+    let slot_indices_typ =
+      let parse string =
+        try
+          string |> String.split_on_char ',' |> List.map int_of_string
+          |> Option.some
+        with _ -> None
+      in
+      let show l = l |> List.map string_of_int |> String.concat "," in
+      Clap.typ ~name:"observer-slot-indices" ~dummy:[] ~parse ~show
+    in
+    Clap.default
+      ~section
+      ~long:"observer-slot-indices"
+      ~placeholder:"<slot_index>,<slot_index>,<slot_index>, ..."
+      ~description:
+        "For each slot index specified, an observer will be created to observe \
+         this slot index."
+      slot_indices_typ
+      []
+
   let protocol =
     let protocol_typ =
       let parse string =
@@ -96,6 +117,7 @@ type configuration = {
   stake : int list;
   stake_machine_type : string list option;
   dal_node_producer : int;
+  observer_slot_indices : int list;
   protocol : Protocol.t;
   producer_machine_type : string option;
 }
@@ -117,6 +139,8 @@ type producer = {
   account : Account.key;
   is_ready : unit Lwt.t;
 }
+
+type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
 
 type public_key_hash = string
 
@@ -160,6 +184,7 @@ type t = {
   bootstrap : bootstrap;
   bakers : baker list;
   producers : producer list;
+  observers : observer list;
   parameters : Dal_common.Parameters.t;
   infos : (int, per_level_info) Hashtbl.t;
   metrics : (int, metrics) Hashtbl.t;
@@ -750,6 +775,39 @@ let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {client; node; dal_node; account; is_ready}
 
+let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
+    =
+  let* node =
+    Node.Agent.init
+      ~name:(Format.asprintf "observer-node-%i" i)
+      ~arguments:
+        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      agent
+  in
+  let* dal_node =
+    Dal_node.Agent.create
+      ~name:(Format.asprintf "observer-dal-node-%i" i)
+      ~node
+      agent
+  in
+  let* () =
+    Dal_node.init_config
+      ~expected_pow:0.
+      ~observer_profiles:[slot_index]
+      ~peers:[Dal_node.point_str dal_bootstrap_node]
+      dal_node
+  in
+  let* () =
+    add_source
+      cloud
+      agent
+      ~job_name:(Format.asprintf "observer-%d" i)
+      node
+      dal_node
+  in
+  let* () = Dal_node.run ~event_level:`Notice dal_node in
+  Lwt.return {node; dal_node; slot_index}
+
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
   let* attesters_agents =
@@ -762,6 +820,14 @@ let init ~(configuration : configuration) cloud next_agent =
     List.init configuration.dal_node_producer (fun i ->
         let name = Format.asprintf "producer-%d" i in
         next_agent ~name)
+    |> Lwt.all
+  in
+  let* observers_agents =
+    List.map
+      (fun i ->
+        let name = Format.asprintf "observer-%d" i in
+        next_agent ~name)
+      configuration.observer_slot_indices
     |> Lwt.all
   in
   let* bootstrap, baker_accounts, producer_accounts =
@@ -794,6 +860,17 @@ let init ~(configuration : configuration) cloud next_agent =
           i
           agent)
       (List.combine producers_agents producer_accounts)
+  and* observers =
+    Lwt_list.mapi_p
+      (fun i (agent, slot_index) ->
+        init_observer
+          cloud
+          ~bootstrap_node:bootstrap.node
+          ~dal_bootstrap_node:bootstrap.dal_node
+          ~slot_index
+          i
+          agent)
+      (List.combine observers_agents configuration.observer_slot_indices)
   in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
@@ -805,6 +882,7 @@ let init ~(configuration : configuration) cloud next_agent =
       bootstrap;
       bakers;
       producers;
+      observers;
       parameters;
       infos;
       metrics;
@@ -878,19 +956,24 @@ let configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
   let dal_node_producer = Cli.producers in
+  let observer_slot_indices = Cli.observer_slot_indices in
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
   {
     stake;
     stake_machine_type;
     dal_node_producer;
+    observer_slot_indices;
     protocol;
     producer_machine_type;
   }
 
 let benchmark () =
   let vms =
-    1 + List.length configuration.stake + configuration.dal_node_producer
+    1
+    + List.length configuration.stake
+    + configuration.dal_node_producer
+    + List.length configuration.observer_slot_indices
   in
   let vms =
     List.init vms (fun i ->
