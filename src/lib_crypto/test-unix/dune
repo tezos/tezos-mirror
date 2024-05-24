@@ -10,7 +10,6 @@
   octez-libs.crypto
   octez-libs.error-monad
   zarith
-  zarith_stubs_js
   octez-libs.hacl
   octez-libs.data-encoding
   octez-alcotezt

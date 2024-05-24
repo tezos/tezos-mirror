@@ -42,9 +42,8 @@ module Dune : sig
   (** Compilation modes for executables.
 
     - [Byte]: compile to bytecode.
-    - [Native]: compile to native code.
-    - [JS]: compile to JavaScript. *)
-  type mode = Byte | Native | JS
+    - [Native]: compile to native code. *)
+  type mode = Byte | Native
 
   (** The content of the [(kind ...)] stanza of a [dune] file, when a
       library is intended to be used as a PPX rewriter or a
@@ -482,30 +481,6 @@ val if_some : target option -> target
     and to [no_target] if [condition] is [false]. *)
 val if_ : bool -> target -> target
 
-module Npm : sig
-  (** Npm package description
-
-     An npm package can be added as a dependency to an OCaml
-     library. For example, to get the wasm equivalent of a C library
-     when targeting JavaScript. *)
-
-  (** Npm package description *)
-  type t
-
-  (** Version of the package if it comes form an NPM registry, or a path to a
-      local NPM package or JavaScript file. *)
-  type version_or_path = Version of Version.constraints | Path of string
-
-  (** Make a npm package.
-
-    Usage: [Npm.make package_name version]
-
-  - [package_name] is the name of the npm package.
-  - [version]: version constraint used by npm when installing dependencies.
-  *)
-  val make : string -> version_or_path -> t
-end
-
 module Flags : sig
   (** OCaml flags
 
@@ -737,16 +712,6 @@ type bisect_ppx = No | Yes | With_sigterm
     - [inline_tests_deps]: specifies inline_tests dependencies. Can only be used when constructing
       a library with inline_tests enabled.
 
-    - [js_compatible]: whether the target can be compiled to JavaScript.
-      Default value for [js_compatible] is
-      [false] if [js_of_ocaml] is [None],
-      [true] otherwise.
-
-    - [js_of_ocaml]: specifies a [(js_of_ocaml ...)] stanza for the [dune] target,
-      where [...] is the value of the parameter. The toplevel parentheses are removed.
-      For instance, [~js_of_ocaml:Dune.[[S "javascript_files"; S "file.js"]]]
-      becomes [(js_of_ocaml (javascript_files file.js))].
-
     - [wrapped]: specifies a [(wrapped ...)] stanza for the [dune] target.
 
     - [documentation]: specifies a [(documentation ...)] stanza for the [dune]
@@ -766,8 +731,6 @@ type bisect_ppx = No | Yes | With_sigterm
     - [modules]: list of modules to include in this target.
 
     - [modules_without_implementation]: list of modules without implementation to include in this target.
-
-    - [npm]: npm dependencies used when targeting JavaScript.
 
     - [ocaml]: constraints for the version of the [ocaml] opam package,
       i.e. on the version of the OCaml compiler.
@@ -883,15 +846,12 @@ type 'a maker =
   ?implements:target ->
   ?inline_tests:inline_tests ->
   ?inline_tests_deps:Dune.s_expr list ->
-  ?js_compatible:bool ->
-  ?js_of_ocaml:Dune.s_expr ->
   ?wrapped:bool ->
   ?documentation:Dune.s_expr ->
   ?linkall:bool ->
   ?modes:Dune.mode list ->
   ?modules:string list ->
   ?modules_without_implementation:string list ->
-  ?npm_deps:Npm.t list ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
   ?opam_bug_reports:string ->
@@ -993,11 +953,9 @@ end
 val tezt :
   opam:string ->
   path:string ->
-  ?js_compatible:bool ->
   ?modes:Dune.mode list ->
   ?lib_deps:target list ->
   ?exe_deps:target list ->
-  ?js_deps:target list ->
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
   ?dep_files:string list ->
@@ -1018,11 +976,6 @@ val tezt :
 
     [main_module] is the name of the main module provided by the library (see [open_]).
 
-    [js_compatible]: whether the library can be compiled to JavaScript.
-    Default value for [js_compatible] is false.
-
-    [npm_deps]: npm dependencies used when targeting JavaScript.
-
     [released_on_opam]: whether the library is available on the upstream opam-repository
     (default true). In case the lib is not available on opam, tezos packages depending
     on it won't be installable on opam.
@@ -1038,8 +991,6 @@ val tezt :
 val vendored_lib :
   ?released_on_opam:bool ->
   ?main_module:string ->
-  ?js_compatible:bool ->
-  ?npm_deps:Npm.t list ->
   string ->
   Version.constraints ->
   target
@@ -1052,20 +1003,9 @@ val vendored_lib :
     Default value for [opam] is [name].
 
     [main_module] is the name of the main module provided by the library (see [open_]).
-
-    [js_compatible]: whether the library can be compiled to JavaScript.
-    Default value for [js_compatible] is false.
-
-    [npm]: npm dependencies used when targeting JavaScript.
   *)
 val external_lib :
-  ?main_module:string ->
-  ?opam:string ->
-  ?js_compatible:bool ->
-  ?npm_deps:Npm.t list ->
-  string ->
-  Version.constraints ->
-  target
+  ?main_module:string -> ?opam:string -> string -> Version.constraints -> target
 
 (** Make an external library that is a sublibrary of an other one.
 
@@ -1078,19 +1018,8 @@ val external_lib :
     [main_module] is the name of the main module provided by the library (see [open_]).
     The main module of [main_lib] is ignored.
 
-    [js_compatible]: whether the library can be compiled to JavaScript.
-    Default value for [js_compatible] is false.
-
-    [npm_deps]: npm dependencies used when targeting JavaScript.
-
     @raise Invalid_arg if [main_lib] was not built with [external_lib]. *)
-val external_sublib :
-  ?main_module:string ->
-  ?js_compatible:bool ->
-  ?npm_deps:Npm.t list ->
-  target ->
-  string ->
-  target
+val external_sublib : ?main_module:string -> target -> string -> target
 
 (** Make an external library that is to only appear in [.opam] dependencies.
 
@@ -1278,8 +1207,8 @@ end) : sig
   (** Register and return an internal test.
 
     - [alias]: if non-empty, an alias is set up for the given test, named [alias].
-      Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
-      Also note that if [alias] is non-empty, the target must belong to an opam package
+      Default is ["runtest"].
+      Note that if [alias] is non-empty, the target must belong to an opam package
       (i.e. [~opam] must also be non-empty). If given, the [enabled_if] and/or [locks]
       clauses are added to this alias.
 
@@ -1367,9 +1296,6 @@ val name_for_errors : target -> string
     - Check that there are no circular dependencies of opam packages.
       If this check is not performed before [generate], generation may cause
       a stack overflow.
-
-    - Check that the transitive closure of dependencies of a [js_compatible] target
-      is [js_compatible].
 
     - Check that all targets of an opam package contain the same value for
       [~opam_with_test]. *)

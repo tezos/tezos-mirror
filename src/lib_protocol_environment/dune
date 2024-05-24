@@ -7,7 +7,6 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   zarith
-  zarith_stubs_js
   bls12-381
   octez-libs.plonk
   octez-libs.crypto-dal

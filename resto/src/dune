@@ -6,7 +6,6 @@
  (public_name octez-libs.resto)
  (libraries
   uri)
- (js_of_ocaml)
  (wrapped false)
  (modules resto))
 
@@ -16,7 +15,6 @@
  (libraries
   lwt
   octez-libs.resto)
- (js_of_ocaml)
  (wrapped false)
  (modules resto_directory))
 
@@ -94,6 +92,5 @@
   octez-libs.json-data-encoding
   octez-libs.json-data-encoding-bson
   octez-libs.resto)
- (js_of_ocaml)
  (wrapped false)
  (modules resto_json))

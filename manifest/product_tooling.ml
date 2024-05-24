@@ -29,11 +29,6 @@ let _octez_tooling =
            it is added to images/ci. *)
         ocamlformat;
       ]
-    ~npm_deps:
-      [
-        Npm.make "kaitai-struct" (Version (V.exactly "0.10.0"))
-        (* Client-libs project requires Javascript Kaitai runtime. *);
-      ]
 
 let _node_wrapper =
   private_exe

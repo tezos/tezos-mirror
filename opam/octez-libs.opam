@@ -14,13 +14,10 @@ depends: [
   "hex" { >= "1.3.0" }
   "crowbar" { with-test & >= "0.2" }
   "alcotest" { >= "1.5.0" }
-  "js_of_ocaml-compiler" {with-test}
   "ocplib-endian"
-  "js_of_ocaml" { >= "3.3.0" }
   "ppx_hash"
   "ezjsonm" { >= "1.3.0" }
   "zarith" { >= "1.13" & < "1.14" }
-  "zarith_stubs_js" { >= "v0.16.1" }
   "bigstringaf" { >= "0.5.0" }
   "ppx_expect"
   "lwt" { >= "5.7.0" }
@@ -37,7 +34,6 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "hacl-star" { >= "0.7.1" & < "0.8" }
   "hacl-star-raw"
-  "ctypes_stubs_js"
   "ctypes" { >= "0.18.0" }
   "bls12-381" { = version }
   "re" { >= "1.10.0" }
@@ -77,7 +73,6 @@ depends: [
   "octez-internal-libs" { = version }
   "conf-rust"
   "integers"
-  "integers_stubs_js"
   "tezos-sapling-parameters" { >= "1.1.0" }
   "octez-rust-deps" { = version }
   "lwt-watcher" { = "0.2" }

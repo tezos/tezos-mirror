@@ -8,5 +8,4 @@
  (libraries
   seqes
   lwt
-  octez-libs.lwt-result-stdlib.bare.sigs)
- (js_of_ocaml))
+  octez-libs.lwt-result-stdlib.bare.sigs))

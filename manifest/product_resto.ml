@@ -34,7 +34,6 @@ let resto =
     "octez-libs.resto"
     ~internal_name:"resto"
     ~path:"resto/src"
-    ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["resto"]
@@ -46,7 +45,6 @@ let resto_directory =
     "octez-libs.resto-directory"
     ~internal_name:"resto_directory"
     ~path:"resto/src"
-    ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["resto_directory"]
@@ -127,7 +125,6 @@ let resto_json =
     "octez-libs.resto-json"
     ~internal_name:"resto_json"
     ~path:"resto/src"
-    ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["resto_json"]

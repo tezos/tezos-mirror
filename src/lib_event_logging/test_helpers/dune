@@ -13,7 +13,6 @@
   octez-libs.test-helpers
   tezt.core
   octez-alcotezt)
- (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

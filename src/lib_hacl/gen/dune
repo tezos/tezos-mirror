@@ -26,14 +26,3 @@
   (with-stdout-to
    %{targets}
    (run ./gen0.exe %{lib:hacl-star-raw:ocamlevercrypt.cma}))))
-
-(rule
- (alias runtest_js)
- (target api.json.corrected)
- (package octez-libs)
- (action (setenv NODE_PRELOAD hacl-wasm (run node %{dep:./check-api.js}))))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (diff api.json api.json.corrected)))

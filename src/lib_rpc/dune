@@ -11,7 +11,6 @@
   octez-libs.resto
   octez-libs.resto-directory
   uri)
- (js_of_ocaml)
  (flags
   (:standard)
   -open Data_encoding

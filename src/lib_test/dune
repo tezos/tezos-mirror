@@ -12,7 +12,4 @@
   lwt
   pure-splitmix
   octez-libs.data-encoding)
- (js_of_ocaml)
  (library_flags (:standard -linkall)))
-
-(rule (alias runtest_js) (action progn))

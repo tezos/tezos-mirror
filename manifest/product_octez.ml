@@ -95,7 +95,6 @@ let alcotezt =
     ~release_status:Released
     ~synopsis:
       "Provide the interface of Alcotest for Octez, but with Tezt as backend"
-    ~js_compatible:true
     ~deps:[tezt_core_lib]
   |> open_
 
@@ -186,16 +185,8 @@ let octez_test_helpers =
     ~path:"src/lib_test"
     ~internal_name:"tezos_test_helpers"
     ~deps:[uri; fmt; qcheck_alcotest; lwt; pure_splitmix; data_encoding]
-    ~js_compatible:true
     ~linkall:true
     ~release_status:Released
-    ~dune:
-      Dune.
-        [
-          (* This rule is necessary for `make lint-tests-pkg`, without it dune
-             complains that the alias is empty. *)
-          alias_rule "runtest_js" ~action:(S "progn");
-        ]
 
 let octez_expect_helper =
   octez_lib
@@ -217,10 +208,7 @@ let octez_stdlib =
     ~internal_name:"tezos_stdlib"
     ~path:"src/lib_stdlib"
     ~synopsis:"Yet-another local-extension of the OCaml standard library"
-    ~deps:[hex; zarith; zarith_stubs_js; lwt; aches]
-    ~js_compatible:true
-    ~js_of_ocaml:
-      [[S "javascript_files"; G (Dune.of_atom_list ["tzBytes_js.js"])]]
+    ~deps:[hex; zarith; lwt; aches]
     ~inline_tests:ppx_expect
     ~foreign_stubs:
       {language = C; flags = []; names = ["tzBytes_c"]; include_dirs = []}
@@ -241,7 +229,6 @@ let _octez_stdlib_tests =
     ~path:"src/lib_stdlib/test"
     ~with_macos_security_framework:true
     ~opam:"octez-libs"
-    ~modes:[Native; JS]
     ~deps:
       [
         octez_stdlib |> open_;
@@ -250,7 +237,6 @@ let _octez_stdlib_tests =
         octez_test_helpers |> open_;
         qcheck_alcotest;
       ]
-    ~js_compatible:true
 
 let _octez_stdlib_test_unix =
   tezt
@@ -278,7 +264,6 @@ let octez_lwt_result_stdlib_bare_functor_outputs =
     "lwt-result-stdlib.bare.functor-outputs"
     ~path:"src/lib_lwt_result_stdlib/bare/functor_outputs"
     ~internal_name:"bare_functor_outputs"
-    ~js_compatible:true
     ~deps:[lwt]
 
 let octez_lwt_result_stdlib_bare_sigs =
@@ -286,7 +271,6 @@ let octez_lwt_result_stdlib_bare_sigs =
     "lwt-result-stdlib.bare.sigs"
     ~path:"src/lib_lwt_result_stdlib/bare/sigs"
     ~internal_name:"bare_sigs"
-    ~js_compatible:true
     ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_functor_outputs]
 
 let octez_lwt_result_stdlib_bare_structs =
@@ -294,7 +278,6 @@ let octez_lwt_result_stdlib_bare_structs =
     "lwt-result-stdlib.bare.structs"
     ~path:"src/lib_lwt_result_stdlib/bare/structs"
     ~internal_name:"bare_structs"
-    ~js_compatible:true
     ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_sigs]
 
 let octez_lwt_result_stdlib_traced_functor_outputs =
@@ -302,7 +285,6 @@ let octez_lwt_result_stdlib_traced_functor_outputs =
     "lwt-result-stdlib.traced.functor-outputs"
     ~path:"src/lib_lwt_result_stdlib/traced/functor_outputs"
     ~internal_name:"traced_functor_outputs"
-    ~js_compatible:true
     ~deps:[lwt; octez_lwt_result_stdlib_bare_sigs]
 
 let octez_lwt_result_stdlib_traced_sigs =
@@ -310,7 +292,6 @@ let octez_lwt_result_stdlib_traced_sigs =
     "lwt-result-stdlib.traced.sigs"
     ~path:"src/lib_lwt_result_stdlib/traced/sigs"
     ~internal_name:"traced_sigs"
-    ~js_compatible:true
     ~deps:
       [
         lwt;
@@ -324,7 +305,6 @@ let octez_lwt_result_stdlib_traced_structs =
     "lwt-result-stdlib.traced.structs"
     ~path:"src/lib_lwt_result_stdlib/traced/structs"
     ~internal_name:"traced_structs"
-    ~js_compatible:true
     ~deps:
       [
         lwt;
@@ -338,7 +318,6 @@ let octez_lwt_result_stdlib =
     ~path:"src/lib_lwt_result_stdlib"
     ~internal_name:"tezos_lwt_result_stdlib"
     ~synopsis:"error-aware stdlib replacement"
-    ~js_compatible:true
     ~documentation:
       Dune.
         [
@@ -409,7 +388,6 @@ let octez_error_monad =
         octez_lwt_result_stdlib;
       ]
     ~conflicts:[external_lib "result" V.(less_than "1.5")]
-    ~js_compatible:true
 
 let octez_error_monad_legacy =
   octez_lib
@@ -419,53 +397,15 @@ let octez_error_monad_legacy =
     ~synopsis:"Error monad (legacy)"
     ~deps:[lwt; octez_error_monad]
     ~conflicts:[external_lib "result" V.(less_than "1.5")]
-    ~js_compatible:true
 
 let octez_hacl =
-  let js_stubs = ["random.js"; "evercrypt.js"] in
-  let js_generated = "runtime-generated.js" in
-  let js_helper = "helper.js" in
   octez_lib
     "hacl"
     ~internal_name:"tezos_hacl"
     ~path:"src/lib_hacl"
     ~synopsis:"Thin layer around hacl-star"
-    ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
-    ~js_of_ocaml:
-      [
-        [
-          S "javascript_files";
-          G (Dune.of_atom_list (js_generated :: js_helper :: js_stubs));
-        ];
-      ]
+    ~deps:[hacl_star; hacl_star_raw]
     ~conflicts:[Conflicts.hacl_x25519]
-    ~dune:
-      Dune.
-        [
-          [
-            S "rule";
-            [S "targets"; S js_generated];
-            [
-              S "deps";
-              S "gen/api.json";
-              S "gen/gen.exe";
-              G (of_atom_list js_stubs);
-            ];
-            [
-              S "action";
-              [
-                S "with-stdout-to";
-                S "%{targets}";
-                of_list
-                  (List.map
-                     (fun l -> H (of_atom_list l))
-                     Stdlib.List.(
-                       ["run"; "gen/gen.exe"] :: ["-api"; "gen/api.json"]
-                       :: List.map (fun s -> ["-stubs"; s]) js_stubs));
-              ];
-            ];
-          ];
-        ]
 
 let _octez_hacl_gen0 =
   private_exe
@@ -486,42 +426,22 @@ let _octez_hacl_gen =
     ~deps:[ctypes_stubs; ctypes; hacl_star_raw; ezjsonm]
     ~modules:["gen"; "bindings"; "api_json"]
     ~dune:
-      (let package = "octez-libs" in
-       Dune.
-         [
-           targets_rule
-             ["bindings.ml"]
-             ~deps:[Dune.(H [[S "package"; S "hacl-star-raw"]])]
-             ~action:
-               [
-                 S "with-stdout-to";
-                 S "%{targets}";
-                 [
-                   S "run";
-                   S "./gen0.exe";
-                   S "%{lib:hacl-star-raw:ocamlevercrypt.cma}";
-                 ];
-               ];
-           [
-             S "rule";
-             [S "alias"; S "runtest_js"];
-             [S "target"; S "api.json.corrected"];
-             [S "package"; S package];
-             [
-               S "action";
-               [
-                 S "setenv";
-                 S "NODE_PRELOAD";
-                 S "hacl-wasm";
-                 [S "run"; S "node"; S "%{dep:./check-api.js}"];
-               ];
-             ];
-           ];
-           alias_rule
-             ~package
-             "runtest_js"
-             ~action:[S "diff"; S "api.json"; S "api.json.corrected"];
-         ])
+      Dune.
+        [
+          targets_rule
+            ["bindings.ml"]
+            ~deps:[Dune.(H [[S "package"; S "hacl-star-raw"]])]
+            ~action:
+              [
+                S "with-stdout-to";
+                S "%{targets}";
+                [
+                  S "run";
+                  S "./gen0.exe";
+                  S "%{lib:hacl-star-raw:ocamlevercrypt.cma}";
+                ];
+              ];
+        ]
 
 let _octez_hacl_tests =
   tezt
@@ -541,15 +461,12 @@ let _octez_hacl_tests =
         octez_error_monad |> open_ ~m:"TzLwtreslib";
         octez_lwt_result_stdlib |> open_;
         zarith;
-        zarith_stubs_js;
         data_encoding |> open_;
         octez_hacl |> open_;
         qcheck_alcotest;
         alcotezt;
         octez_test_helpers |> open_;
       ]
-    ~modes:[Native; JS]
-    ~js_compatible:true
 
 let _octez_error_monad_tests =
   tezt
@@ -557,9 +474,7 @@ let _octez_error_monad_tests =
     ~path:"src/lib_error_monad/test"
     ~with_macos_security_framework:true
     ~opam:"octez-libs"
-    ~modes:[Native; JS]
     ~deps:[octez_error_monad |> open_; data_encoding; alcotezt]
-    ~js_compatible:true
 
 let octez_rpc =
   octez_lib
@@ -576,14 +491,12 @@ let octez_rpc =
         resto_directory;
         uri;
       ]
-    ~js_compatible:true
 
 let octez_rust_deps =
   public_lib
     "octez-rust-deps"
     ~path:"src/rust_deps"
     ~synopsis:"Octez Rust Dependencies"
-    ~js_compatible:true
     ~foreign_archives:["octez_rust_deps"]
     ~dune:
       Dune.
@@ -688,18 +601,7 @@ let bls12_381 =
     ~private_modules:["fq"; "fq2"]
     ~linkall:true
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
-    ~deps:[integers; integers_stubs_js; zarith; zarith_stubs_js; hex]
-    ~js_compatible:true
-    ~js_of_ocaml:
-      Dune.
-        [
-          [
-            S "javascript_files";
-            S "runtime_helper.js";
-            S "blst_bindings_stubs.js";
-          ];
-        ]
-    ~npm_deps:[Npm.make "ocaml-bls12-381" (Path "src/lib_bls12_381/blst.js")]
+    ~deps:[integers; zarith; hex]
     ~foreign_archives:["blst"]
     ~foreign_stubs:
       {
@@ -864,8 +766,6 @@ let _bls12_381_tests =
     ~path:"src/lib_bls12_381/test"
     ~opam:"bls12-381"
     ~deps:[alcotezt; qcheck_alcotest; bls12_381]
-    ~modes:[Native; JS]
-    ~js_compatible:true
     ~dep_globs_rec:["test_vectors/*"]
 
 let _octez_bls12_381_utils =
@@ -895,7 +795,6 @@ let octez_bls12_381_signature =
     ~internal_name:"bls12_381_signature"
     ~deps:[bls12_381]
     ~modules:["bls12_381_signature"]
-    ~js_compatible:true
     ~foreign_stubs:
       {
         language = C;
@@ -904,7 +803,6 @@ let octez_bls12_381_signature =
         names = ["blst_bindings_stubs"];
       }
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
-    ~js_of_ocaml:[[S "javascript_files"; S "blst_bindings_stubs.js"]]
     ~linkall:true
     ~dune:
       Dune.
@@ -931,9 +829,9 @@ let _octez_bls12_381_signature_tests =
          This test is affected by the [FinalizationRegistry] hangs in JS,
          so although JS compatible, we only test in [Native] mode *)
     ~modes:[Native]
-    ~deps:[bls12_381; octez_bls12_381_signature; alcotezt; integers_stubs_js]
-    ~dep_globs_rec:["test_vectors/*"] (* See above *)
-    ~js_compatible:false
+    ~deps:[bls12_381; octez_bls12_381_signature; alcotezt]
+    ~dep_globs_rec:["test_vectors/*"]
+(* See above *)
 
 let _octez_bls12_381_signature_gen_wasm_needed_names =
   private_exe
@@ -962,11 +860,9 @@ let octez_crypto =
         octez_rpc;
         aches;
         zarith;
-        zarith_stubs_js;
         bls12_381;
         octez_bls12_381_signature;
       ]
-    ~js_compatible:true
 
 let _octez_crypto_tests =
   tezt
@@ -995,15 +891,12 @@ let _octez_crypto_tests =
         octez_crypto |> open_;
         octez_error_monad |> open_ ~m:"TzLwtreslib";
         zarith;
-        zarith_stubs_js;
         octez_hacl;
         data_encoding |> open_;
         alcotezt;
         qcheck_alcotest;
         octez_test_helpers |> open_;
       ]
-    ~modes:[Native; JS]
-    ~js_compatible:true
 
 let _octez_crypto_tests_unix =
   tezt
@@ -1016,7 +909,6 @@ let _octez_crypto_tests_unix =
         octez_crypto |> open_;
         octez_error_monad |> open_ ~m:"TzLwtreslib";
         zarith;
-        zarith_stubs_js;
         octez_hacl;
         data_encoding |> open_;
         alcotezt;
@@ -1032,7 +924,6 @@ let octez_bls12_381_hash =
     ~internal_name:"bls12_381_hash"
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
     ~deps:[bls12_381]
-    ~js_compatible:false
     ~foreign_stubs:
       {
         language = C;
@@ -1158,7 +1049,6 @@ let octez_bls12_381_polynomial =
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"]
     ~preprocess:[pps ppx_repr]
     ~deps:[bls12_381; ppx_repr; bigstringaf]
-    ~js_compatible:false
     ~foreign_stubs:
       {
         language = C;
@@ -1620,7 +1510,6 @@ let octez_event_logging =
         octez_lwt_result_stdlib;
         uri;
       ]
-    ~js_compatible:true
 
 let octez_event_logging_test_helpers =
   octez_lib
@@ -1639,7 +1528,6 @@ let octez_event_logging_test_helpers =
         tezt_core_lib |> open_;
         alcotezt;
       ]
-    ~js_compatible:true
     ~linkall:true
     ~bisect_ppx:No
 
@@ -1698,7 +1586,6 @@ let octez_dal_config =
     ~internal_name:"tezos_crypto_dal_octez_dal_config"
     ~path:"src/lib_crypto_dal/dal_config"
     ~deps:[data_encoding |> open_]
-    ~js_compatible:true
 
 let octez_crypto_dal =
   octez_lib
@@ -1866,7 +1753,6 @@ let octez_clic =
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_lwt_result_stdlib;
       ]
-    ~js_compatible:true
 
 let octez_clic_unix =
   octez_lib
@@ -1908,12 +1794,10 @@ let octez_micheline =
       [
         uutf;
         zarith;
-        zarith_stubs_js;
         octez_stdlib |> open_;
         octez_error_monad |> open_;
         data_encoding |> open_;
       ]
-    ~js_compatible:true
     ~inline_tests:ppx_expect
 
 let _octez_micheline_tests =
@@ -1924,7 +1808,6 @@ let _octez_micheline_tests =
     ~inline_tests:ppx_expect
     ~modules:["test_parser"]
     ~deps:[octez_micheline |> open_]
-    ~js_compatible:true
 
 let _octez_micheline_tests =
   private_lib
@@ -1934,7 +1817,6 @@ let _octez_micheline_tests =
     ~inline_tests:ppx_expect
     ~modules:["test_diff"]
     ~deps:[octez_micheline |> open_]
-    ~js_compatible:true
 
 let octez_base =
   octez_lib
@@ -1960,7 +1842,6 @@ let octez_base =
         ipaddr;
         uri;
       ]
-    ~js_compatible:true
     ~documentation:[Dune.[S "package"; S "octez-libs"]]
     ~dune:Dune.[ocamllex "point_parser"]
     ~ocaml:
@@ -2024,8 +1905,6 @@ let _octez_base_tests =
         "points.ok";
         "points.ko";
       ]
-    ~modes:[Native; JS]
-    ~js_compatible:true
 
 let _octez_base_unix_tests =
   tezt
@@ -2220,7 +2099,6 @@ let octez_context_sigs =
     ~internal_name:"tezos_context_sigs"
     ~path:"src/lib_context/sigs"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib |> open_]
-    ~js_compatible:true
 
 let tree_encoding =
   octez_lib
@@ -2324,7 +2202,6 @@ let octez_version_parser =
     ~internal_name:"tezos_version_parser"
     ~path:"src/lib_version/parser"
     ~dune:Dune.[ocamllex "tezos_version_parser"]
-    ~js_compatible:true
     ~preprocess:[pps ppx_deriving_show]
 
 let octez_version =
@@ -2334,7 +2211,6 @@ let octez_version =
     ~path:"src/lib_version"
     ~synopsis:"Version information generated from Git"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_version_parser]
-    ~js_compatible:true
 
 let octez_version_value =
   public_lib
@@ -2348,7 +2224,6 @@ let octez_version_value =
         octez_version;
         octez_version_parser;
       ]
-    ~js_compatible:true
       (* We want generated_git_info.cmi to be compiled with -opaque so
          that a change in the implementation doesn't force rebuilding all
          the reverse dependencies. *)
@@ -2415,8 +2290,6 @@ let _octez_version_tests =
     ["test_parser"]
     ~path:"src/lib_version/test"
     ~opam:"octez-libs"
-    ~js_compatible:true
-    ~modes:[Native; JS]
     ~deps:[octez_version |> open_; octez_version_parser]
 
 let octez_p2p_services =
@@ -2426,7 +2299,6 @@ let octez_p2p_services =
     ~synopsis:"Descriptions of RPCs exported by [tezos-p2p]"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc]
     ~linkall:true
-    ~js_compatible:true
 
 let octez_workers =
   octez_lib
@@ -2468,7 +2340,6 @@ let octez_merkle_proof_encoding =
         octez_stdlib |> open_;
         octez_context_sigs;
       ]
-    ~js_compatible:true
 
 let octez_brassaia_merkle_proof_encoding =
   octez_lib
@@ -2480,7 +2351,6 @@ let octez_brassaia_merkle_proof_encoding =
         octez_stdlib |> open_;
         octez_context_sigs;
       ]
-    ~js_compatible:true
 
 let octez_shell_services =
   octez_shell_lib
@@ -2499,7 +2369,6 @@ let octez_shell_services =
         octez_dal_config |> open_;
       ]
     ~linkall:true
-    ~js_compatible:true
 
 let _octez_shell_services_tests =
   tezt
@@ -2512,8 +2381,6 @@ let _octez_shell_services_tests =
         octez_shell_services |> open_;
         alcotezt;
       ]
-    ~modes:[Native; JS]
-    ~js_compatible:true
 
 let octez_p2p =
   octez_shell_lib
@@ -3310,9 +3177,7 @@ let octez_sapling =
       [
         conf_rust;
         integers;
-        integers_stubs_js;
         ctypes;
-        ctypes_stubs_js;
         data_encoding;
         octez_stdlib |> open_;
         octez_crypto;
@@ -3322,7 +3187,6 @@ let octez_sapling =
         octez_rust_deps;
       ]
     ~dep_globs_rec:["../rust_deps/librustzcash/*"]
-    ~js_of_ocaml:[[S "javascript_files"; S "runtime.js"]]
     ~foreign_stubs:
       {
         language = C;
@@ -3335,15 +3199,6 @@ let octez_sapling =
       Dune.
         [
           [S "copy_files"; S "bindings/rustzcash_ctypes_bindings.ml"];
-          [
-            S "rule";
-            [S "target"; S "runtime.js"];
-            [S "deps"; [S ":gen"; S "./bindings/gen_runtime_js.exe"]];
-            [
-              S "action";
-              [S "with-stdout-to"; S "%{target}"; run "%{gen}" ["%{target}"]];
-            ];
-          ];
           [
             S "rule";
             [
@@ -3386,27 +3241,14 @@ let _octez_sapling_tests =
       ]
     ~dune_with_test:Never
 
-let _octez_sapling_js_tests =
-  test
-    "test_js"
-    ~path:"src/lib_sapling/test"
-    ~opam:"octez-libs"
-    ~deps:[octez_sapling; octez_hacl]
-    ~modules:["test_js"]
-    ~linkall:true
-    ~modes:[JS]
-    ~js_compatible:true
-    ~dune_with_test:Never
-
 let _octez_sapling_ctypes_gen =
   private_exes
-    ["rustzcash_ctypes_gen"; "gen_runtime_js"]
+    ["rustzcash_ctypes_gen"]
     ~path:"src/lib_sapling/bindings"
     ~opam:"octez-libs"
     ~bisect_ppx:No
     ~deps:[ctypes_stubs; ctypes]
-    ~modules:
-      ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
+    ~modules:["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"]
 
 let tezos_protocol_environment_sigs_internals =
   octez_proto_lib
@@ -3471,7 +3313,6 @@ let octez_protocol_environment =
     ~deps:
       [
         zarith;
-        zarith_stubs_js;
         bls12_381;
         octez_plonk |> open_;
         octez_crypto_dal;
@@ -4062,7 +3903,6 @@ let octez_client_base =
       ]
     ~modules:[":standard"; "bip39_english"]
     ~linkall:true
-    ~js_compatible:true
     ~dune:
       Dune.
         [
@@ -4083,8 +3923,6 @@ let _octez_client_base_tests =
     ~opam:"octez-shell-libs"
     ~with_macos_security_framework:true
     ~deps:[octez_base; octez_client_base |> open_; alcotezt]
-    ~js_compatible:true
-    ~modes:[Native; JS]
 
 let _bip39_generator =
   private_exe
@@ -4106,7 +3944,6 @@ let octez_signer_services =
         octez_client_base |> open_;
       ]
     ~linkall:true
-    ~js_compatible:true
 
 let octez_signer_backends =
   octez_shell_lib
@@ -4567,7 +4404,6 @@ let octez_micheline_rewriting =
     ~deps:
       [
         zarith;
-        zarith_stubs_js;
         octez_stdlib |> open_;
         octez_crypto;
         octez_error_monad |> open_;
@@ -7624,7 +7460,6 @@ let _yes_wallet_test =
         octez_error_monad |> open_ ~m:"TzLwtreslib";
         octez_crypto;
         zarith;
-        zarith_stubs_js;
         data_encoding |> open_;
         lwt_unix;
         ptime;

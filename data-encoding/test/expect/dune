@@ -7,7 +7,6 @@
  (libraries
   octez-libs.data-encoding
   zarith
-  zarith_stubs_js
   ezjsonm
   bigstringaf)
  (inline_tests (flags -verbose) (modes native))

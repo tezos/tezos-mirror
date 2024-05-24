@@ -7,5 +7,4 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt
-  octez-libs.lwt-result-stdlib.bare.sigs)
- (js_of_ocaml))
+  octez-libs.lwt-result-stdlib.bare.sigs))

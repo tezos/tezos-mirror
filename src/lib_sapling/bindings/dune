@@ -1,9 +1,9 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names rustzcash_ctypes_gen gen_runtime_js)
+(executable
+ (name rustzcash_ctypes_gen)
  (libraries
   ctypes.stubs
   ctypes)
- (modules rustzcash_ctypes_gen rustzcash_ctypes_bindings gen_runtime_js))
+ (modules rustzcash_ctypes_gen rustzcash_ctypes_bindings))

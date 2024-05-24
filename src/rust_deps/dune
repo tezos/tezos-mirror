@@ -5,7 +5,6 @@
  (name octez_rust_deps)
  (public_name octez-rust-deps)
  (instrumentation (backend bisect_ppx))
- (js_of_ocaml)
  (foreign_archives octez_rust_deps))
 
 (dirs :standard .cargo (not target))

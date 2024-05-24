@@ -328,12 +328,6 @@ test-unit: test-nonproto-unit test-proto-unit test-other-unit
 test-unit-alpha:
 	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
-# TODO: https://gitlab.com/tezos/tezos/-/issues/5377
-# Running the runtest_js targets intermittently hangs.
-.PHONY: test-js
-test-js:
-	@dune build --error-reporting=twice @runtest_js
-
 .PHONY: build-tezt
 build-tezt:
 	@dune build tezt
@@ -399,7 +393,7 @@ lint-opam-dune:
 # the repo if you add "internal" dependencies to octez-distributed-internal)
 .PHONY: lint-tests-pkg
 lint-tests-pkg:
-	@(dune build -p octez-distributed-internal @runtest @runtest_js) || \
+	@(dune build -p octez-distributed-internal @runtest) || \
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
 

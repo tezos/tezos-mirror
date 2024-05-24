@@ -7,11 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   integers
-  integers_stubs_js
   zarith
-  zarith_stubs_js
   hex)
- (js_of_ocaml (javascript_files runtime_helper.js blst_bindings_stubs.js))
  (library_flags (:standard -linkall))
  (modules bls12_381 ff_sig fr fq12 g1 g2 gt pairing fq fq2)
  (private_modules fq fq2)

@@ -1,15 +1,12 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD ocaml-bls12-381))))
-
 (library
  (name bls12_381_signature)
  (public_name octez-libs.bls12-381-signature)
  (instrumentation (backend bisect_ppx))
  (libraries
   bls12-381)
- (js_of_ocaml (javascript_files blst_bindings_stubs.js))
  (library_flags (:standard -linkall))
  (modules bls12_381_signature)
  (foreign_stubs
