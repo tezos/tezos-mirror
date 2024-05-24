@@ -427,7 +427,7 @@ let errors_contains_inode_error errors =
    critical and, if found, stop the node gracefully. *)
 let check_and_quit_on_irmin_errors errors =
   let open Lwt_syntax in
-  if List.exists (fun error -> errors_contains_inode_error error) errors then
+  if errors_contains_inode_error errors then
     let* () = Events.(emit stopping_node_missing_context_key ()) in
     let* _ = Lwt_exit.exit_and_wait 1 in
     return_unit
