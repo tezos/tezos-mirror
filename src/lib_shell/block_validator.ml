@@ -411,21 +411,23 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
       (* Keep the worker alive. *)
       return_ok_unit
 
-(* This failsafe aims to look for an irmin error that is known to be
-   critical and, if found, stop the node gracefully. *)
-let check_and_quit_on_irmin_errors errors =
-  let open Lwt_syntax in
-  let is_inode_error error =
-    match error with
+let errors_contains_inode_error errors =
+  let rex = Str.regexp_string "unknown inode key" in
+  let is_inode_error = function
     | Exn (Failure s) -> (
-        let rex = Str.regexp_string "unknown inode key" in
         try
           let _ = Str.search_forward rex s 0 in
           true
         with Not_found -> false)
     | _ -> false
   in
-  if List.exists (fun error -> is_inode_error error) errors then
+  List.exists is_inode_error errors
+
+(* This failsafe aims to look for an irmin error that is known to be
+   critical and, if found, stop the node gracefully. *)
+let check_and_quit_on_irmin_errors errors =
+  let open Lwt_syntax in
+  if List.exists (fun error -> errors_contains_inode_error error) errors then
     let* () = Events.(emit stopping_node_missing_context_key ()) in
     let* _ = Lwt_exit.exit_and_wait 1 in
     return_unit
