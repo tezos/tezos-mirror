@@ -375,34 +375,29 @@ module Handler = struct
     let block_level = finalized_shell_header.Block_header.level in
     let block = `Level block_level in
     let pred_level = Int32.pred block_level in
-    let*? (module PluginPred) =
+    let*? (module Plugin) =
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
-    let* block_info = PluginPred.block_info cctxt ~block ~metadata:`Always in
-    let* dal_constants =
+    let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
+    let get_constants ~level =
       let*? (module PluginCurr) =
-        Node_context.get_plugin_for_level ctxt ~level:block_level
+        Node_context.get_plugin_for_level ctxt ~level
       in
-      PluginCurr.get_constants `Main (`Level block_level) cctxt
+      PluginCurr.get_constants `Main (`Level level) cctxt
     in
+    let* dal_constants = get_constants ~level:block_level in
     let* () =
       if dal_constants.Dal_plugin.feature_enable then
-        let* slot_headers = PluginPred.get_published_slot_headers block_info in
+        let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
           if should_store_cells ctxt then
-            let get_constants ~level =
-              let*? (module Plugin) =
-                Node_context.get_plugin_for_level ctxt ~level
-              in
-              Plugin.get_constants `Main (`Level level) cctxt
-            in
             let* cells_of_level =
               let pred_published_level =
                 Int32.sub
                   block_level
                   (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
               in
-              PluginPred.Skip_list.cells_of_level
+              Plugin.Skip_list.cells_of_level
                 block_info
                 cctxt
                 ~dal_constants
@@ -413,10 +408,10 @@ module Handler = struct
               List.map
                 (fun (hash, cell) ->
                   ( Dal_proto_types.Skip_list_hash.of_proto
-                      PluginPred.Skip_list.hash_encoding
+                      Plugin.Skip_list.hash_encoding
                       hash,
                     Dal_proto_types.Skip_list_cell.of_proto
-                      PluginPred.Skip_list.cell_encoding
+                      Plugin.Skip_list.cell_encoding
                       cell ))
                 cells_of_level
             in
@@ -465,7 +460,7 @@ module Handler = struct
             slot_headers
         in
         let*? attested_slots =
-          PluginPred.attested_slot_headers
+          Plugin.attested_slot_headers
             block_info
             ~number_of_slots:proto_parameters.number_of_slots
         in
@@ -488,7 +483,7 @@ module Handler = struct
         return_unit
       else return_unit
     in
-    let*? block_round = PluginPred.get_round finalized_shell_header.fitness in
+    let*? block_round = Plugin.get_round finalized_shell_header.fitness in
     Dal_metrics.layer1_block_finalized ~block_level ;
     Dal_metrics.layer1_block_finalized_round ~block_round ;
     let*! () =
@@ -532,6 +527,8 @@ module Handler = struct
           match next_final_head with
           | None -> Lwt.fail_with "L1 crawler lib shut down"
           | Some (_finalized_hash, finalized_shell_header) ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7253
+                 Consider using [finalized_shell_header.level] instead of [head_level]. *)
               let head_level = Int32.add finalized_shell_header.level 2l in
               let* () =
                 Node_context.may_add_plugin
@@ -539,9 +536,6 @@ module Handler = struct
                   cctxt
                   ~proto_level:finalized_shell_header.proto_level
                   ~block_level:finalized_shell_header.level
-              in
-              let*? (module PluginHead) =
-                Node_context.get_plugin_for_level ctxt ~level:head_level
               in
               Gossipsub.Worker.Validate_message_hook.set
                 (gossipsub_app_messages_validation
