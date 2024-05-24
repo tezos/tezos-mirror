@@ -282,11 +282,10 @@ module Handler = struct
       let* skip_list_cells_store =
         Skip_list_cells_store.init
           ~node_store_dir:(Configuration_file.store_path config)
-          ~skip_list_store_dir:"skip_list"
+          ~skip_list_store_dir:"skip_list_store"
           ~padded_encoded_cell_size
           ~encoded_hash_size
-          ~number_of_slots:
-            proto_parameters.cryptobox_parameters.number_of_shards
+          ~number_of_slots:proto_parameters.number_of_slots
       in
       let level =
         match last_notified_level with None -> level | Some level -> level

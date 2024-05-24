@@ -30,9 +30,10 @@
 
    - Doesn't add padding (KVS with values of variable size)
 
-   - Doesn't encode to intermediate structures (those of strcuture). Maybe have a
-     per-protocol store in this case, and move most of the store creating and
-     updating to the proto plugin to avoid existential type variables issues.
+   - Doesn't encode to intermediate structures (like
+     [Dal_proto_types.Skip_list_cell]). Maybe have a per-protocol store in this
+     case, and move most of the store creating and updating to the proto plugin
+     to avoid existential type variables issues.
 *)
 (**
    This module instantiates the key value store to provide facilities for
@@ -71,7 +72,7 @@ val init :
 
 (** [insert store ~attested_level values] inserts the given list of [values]
     associated to the given [attested_level] in the [store]. Any existing value
-    is overriden. *)
+    is overridden. *)
 val insert :
   t ->
   attested_level:int32 ->
