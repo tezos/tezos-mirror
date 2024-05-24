@@ -182,6 +182,26 @@ let check_operations_merkle_root hash header operations =
          found = computed_hash;
        })
 
+(* [with_retry_to_load_protocol bv peer f] tries to call [f], if it fails with an
+   [Unavailable_protocol] error, it fetches the protocol from the [peer] and retries
+   to call [f] *)
+let with_retry_to_load_protocol (bv : Types.state) ~peer f =
+  let open Lwt_syntax in
+  let* r = f () in
+  match r with
+  (* [Unavailable_protocol] is expected to be the
+     first error in the trace *)
+  | Error (Unavailable_protocol {protocol; _} :: _) ->
+      let* _ =
+        Protocol_validator.fetch_and_compile_protocol
+          bv.protocol_validator
+          ?peer
+          ~timeout:bv.limits.protocol_timeout
+          protocol
+      in
+      f ()
+  | _ -> Lwt.return r
+
 let errors_contains_context_error errors =
   let rex =
     (* Matching all the candidate to a context error:
@@ -240,22 +260,6 @@ let on_validation_request w
                   let* pred =
                     Store.Block.read_block chain_store header.shell.predecessor
                   in
-                  let with_retry_to_load_protocol f =
-                    let*! r = f () in
-                    match r with
-                    (* [Unavailable_protocol] is expected to be the
-                       first error in the trace *)
-                    | Error (Unavailable_protocol {protocol; _} :: _) ->
-                        let* _ =
-                          Protocol_validator.fetch_and_compile_protocol
-                            bv.protocol_validator
-                            ?peer
-                            ~timeout:bv.limits.protocol_timeout
-                            protocol
-                        in
-                        f ()
-                    | _ -> Lwt.return r
-                  in
                   let*! mempool = Store.Chain.mempool chain_store in
                   let bv_operations =
                     List.map
@@ -267,7 +271,7 @@ let on_validation_request w
                   let*! r =
                     protect ~canceler:(Worker.canceler w) (fun () ->
                         protect ?canceler (fun () ->
-                            with_retry_to_load_protocol (fun () ->
+                            with_retry_to_load_protocol bv ~peer (fun () ->
                                 precheck_block
                                   bv.validation_process
                                   chain_db
