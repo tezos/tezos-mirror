@@ -23,18 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [data_at_level_range conf db_pool boundaries] *)
 val data_at_level_range :
-  Config.t ->
+  Config.t (* teztale server config *) ->
   ( Caqti_lwt.connection,
     ([> Caqti_error.call_or_retrieve] as 'a) )
-  Caqti_lwt_unix.Pool.t ->
-  Int32.t * Int32.t ->
+  Caqti_lwt_unix.Pool.t
+  (* DB connections pool *) ->
+  Int32.t (* lowest included level *) * Int32.t (* highest included level *) ->
   (Teztale_lib.Data.batch, 'a) result Lwt.t
-
-val anomalies_at_level :
-  Config.t ->
-  ( Caqti_lwt.connection,
-    ([> Caqti_error.call_or_retrieve] as 'a) )
-  Caqti_lwt_unix.Pool.t ->
-  Int32.t ->
-  (Teztale_lib.Data.Anomaly.t list, 'a) result Lwt.t

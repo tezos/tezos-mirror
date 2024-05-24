@@ -1053,43 +1053,6 @@ let routes :
                     header
                     Teztale_lib.Data.batch_encoding
                     data)) );
-    ( Re.seq
-        [
-          Re.str "/";
-          Re.group (Re.rep1 Re.digit);
-          Re.str "-";
-          Re.group (Re.rep1 Re.digit);
-          Re.str "/anomalies.json";
-        ],
-      fun g ~logger ~conf ~admins:_ ~users:_ db_pool _header meth _body ->
-        get_only_endpoint meth (fun () ->
-            let first_level = int_of_string (Re.Group.get g 1) in
-            let last_level = int_of_string (Re.Group.get g 2) in
-            with_caqti_error
-              ~logger
-              (let levels =
-                 Stdlib.List.init
-                   (last_level - first_level + 1)
-                   (fun i -> Int32.of_int (first_level + i))
-               in
-               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.concat_map_es
-                 (Exporter.anomalies_at_level conf db_pool)
-                 levels)
-              (fun data ->
-                let body =
-                  Ezjsonm.value_to_string
-                    (Data_encoding.Json.construct
-                       (Data_encoding.list Teztale_lib.Data.Anomaly.encoding)
-                       data)
-                in
-                Cohttp_lwt_unix.Server.respond_string
-                  ~headers:
-                    (Cohttp.Header.init_with
-                       "content-type"
-                       "application/json; charset=UTF-8")
-                  ~status:`OK
-                  ~body
-                  ())) );
     ( Re.str "/user",
       fun _g ~logger ~conf ~admins ~users db_pool header meth body ->
         let reply_ok login () =

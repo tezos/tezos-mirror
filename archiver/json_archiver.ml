@@ -31,19 +31,6 @@ let name = "json-archiver"
 
 let levels_per_folder = 4096l
 
-module Anomaly = struct
-  let rec insert_in_ordered_list (Data.Anomaly.{level; delegate; _} as anomaly)
-      = function
-    | [] -> [anomaly]
-    | head :: tail as l ->
-        if Compare.Int32.(head.Data.Anomaly.level < level) then anomaly :: l
-        else if
-          Int32.equal head.level level
-          && Tezos_crypto.Signature.Public_key_hash.equal head.delegate delegate
-        then if head.problem = Missed then anomaly :: tail else l
-        else head :: insert_in_ordered_list anomaly tail
-end
-
 let dirname_of_level prefix level =
   let base = Int32.mul (Int32.div level levels_per_folder) levels_per_folder in
   Filename.concat
@@ -93,75 +80,6 @@ let drop_file_mutex filename =
           && (not (Lwt_mutex.is_locked mutex))
           && Lwt_mutex.is_empty mutex))
       !files_in_use
-
-let dump_anomalies path level anomalies =
-  let filename =
-    Filename.concat (dirname_of_level path level) "anomalies.json"
-  in
-  let mutex = get_file_mutex filename in
-  let*! out =
-    Lwt_mutex.with_lock mutex (fun () ->
-        let* known =
-          load filename (Data_encoding.list Data.Anomaly.encoding) []
-        in
-        write
-          filename
-          (Data_encoding.list Data.Anomaly.encoding)
-          (List.fold_left
-             (fun x y -> Anomaly.insert_in_ordered_list y x)
-             known
-             anomalies))
-  in
-  let () = drop_file_mutex filename in
-  Lwt.return out
-
-let extract_anomalies path level infos =
-  if infos.Data.unaccurate then return_unit
-  else
-    let anomalies =
-      List.fold_left
-        (fun acc
-             Data.Delegate_operations.
-               {delegate; first_slot = _; endorsing_power = _; operations} ->
-          List.fold_left
-            (fun acc
-                 Data.Delegate_operations.
-                   {hash = _; kind; round; mempool_inclusion; block_inclusion} ->
-              match (kind, mempool_inclusion, block_inclusion) with
-              | Endorsement, [], [] ->
-                  Data.Anomaly.
-                    {
-                      level;
-                      round;
-                      kind;
-                      delegate;
-                      problem = Data.Anomaly.Missed;
-                    }
-                  :: acc
-              | Endorsement, Data.Delegate_operations.{errors; _} :: _, [] -> (
-                  match errors with
-                  | Some (_ :: _) ->
-                      Data.Anomaly.
-                        {level; round; kind; delegate; problem = Incorrect}
-                      :: acc
-                  | None | Some [] ->
-                      Data.Anomaly.
-                        {level; round; kind; delegate; problem = Forgotten}
-                      :: acc)
-              | Endorsement, [], _ :: _ ->
-                  Data.Anomaly.
-                    {level; round; kind; delegate; problem = Sequestered}
-                  :: acc
-              | Endorsement, _ :: _, _ :: _ -> acc
-              | Preendorsement, _, _ -> acc)
-            acc
-            operations)
-        []
-        infos.Data.delegate_operations
-    in
-    match anomalies with
-    | [] -> return_unit
-    | _ :: _ -> dump_anomalies path level anomalies
 
 (* [add_to_operations block_hash ops_kind ops_round ops] adds the
    preendorsements or endorsements in [ops] that were included in block
@@ -299,8 +217,7 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
              (* FIXME *)
            }
        in
-       let* () = write filename Data.encoding out_infos in
-       extract_anomalies path endorsements_level out_infos)
+       write filename Data.encoding out_infos)
    >>= fun out ->
    let () = drop_file_mutex filename in
    match out with
@@ -484,9 +401,7 @@ let dump_received logger path ?unaccurate level received_ops =
               (* FIXME *)
             }
         in
-        let* () = write filename Data.encoding out_infos in
-        if infos.unaccurate then return_unit
-        else extract_anomalies path level out_infos)
+        write filename Data.encoding out_infos)
   in
   let () = drop_file_mutex filename in
   match out with

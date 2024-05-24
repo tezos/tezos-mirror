@@ -394,34 +394,6 @@ let translate_ops info =
         [])
     info
 
-(* NB: We're not yet extracting [Incorrect] operations. we easily
-     could, they are quite noisy. At least in some cases, the "consensus
-     operations for old/future round/level" errors should be seen as a
-     "per block anomaly" rather than a "per delegate anomaly". *)
-let anomalies level ops =
-  let extract_anomalies delegate pkh_ops =
-    let open Teztale_lib.Data.Anomaly in
-    Tezos_crypto.Hashed.Operation_hash.Map.fold
-      (fun _op_hash {kind; round; received; included} acc ->
-        let problem =
-          match (received, included) with
-          | [], [] -> Some Missed
-          | [], _ -> Some Sequestered
-          | _, [] -> Some Forgotten
-          | _ -> None
-        in
-        match problem with
-        | None -> acc
-        | Some problem -> {level; kind; round; delegate; problem} :: acc)
-      pkh_ops
-      []
-  in
-  Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (_first_slot, _power, pkh_ops) acc ->
-      extract_anomalies pkh pkh_ops @ acc)
-    ops
-    []
-
 let data_at_level_range conf db_pool boundaries =
   let cycles =
     (* FIXME: do better than a list *)
@@ -506,8 +478,3 @@ let data_at_level_range conf db_pool boundaries =
       []
   in
   return result
-
-let anomalies_at_level conf db_pool level =
-  let* ops = select_ops conf db_pool (level, level) in
-  let ops = Int32Map.find level ops in
-  return (anomalies level ops)
