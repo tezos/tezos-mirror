@@ -207,14 +207,14 @@ let init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
 
 let insert {cells_store; hashes_store} ~attested_level items =
   let open Lwt_result_syntax in
-  let values, hashes =
+  let cells, hashes =
     List.to_seq items
     |> Seq.zip (Seq.ints 0)
-    |> Seq.map (fun (index, (hash, value)) ->
-           ((hash, (), value), (attested_level, index, hash)))
+    |> Seq.map (fun (index, (hash, cell)) ->
+           ((hash, (), cell), (attested_level, index, hash)))
     |> Seq.split
   in
-  let* () = Cells.(write_values cells_store values) in
+  let* () = Cells.(write_values cells_store cells) in
   let* () = Hashes.write_values hashes_store hashes in
   return_unit
 
