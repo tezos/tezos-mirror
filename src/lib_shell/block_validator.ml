@@ -30,7 +30,6 @@ open Block_validator_errors
 
 type validation_result =
   | Already_committed
-  | Outdated_block
   | Validated_and_applied
   | Application_error of error trace
   | Preapplied of (Block_header.shell_header * error Preapply_result.t list)
@@ -219,96 +218,91 @@ let on_validation_request w
             match o with
             | Some {errors; _} -> return (Application_error errors)
             | None -> (
-                let*! checkpoint = Store.Chain.checkpoint chain_store in
-                (* Safety and late workers in partial mode. *)
-                if Compare.Int32.(header.shell.level < snd checkpoint) then
-                  return Outdated_block
-                else
-                  let* pred =
-                    Store.Block.read_block chain_store header.shell.predecessor
-                  in
-                  let with_retry_to_load_protocol f =
-                    let*! r = f () in
-                    match r with
-                    (* [Unavailable_protocol] is expected to be the
-                       first error in the trace *)
-                    | Error (Unavailable_protocol {protocol; _} :: _) ->
-                        let* _ =
-                          Protocol_validator.fetch_and_compile_protocol
-                            bv.protocol_validator
-                            ?peer
-                            ~timeout:bv.limits.protocol_timeout
-                            protocol
-                        in
-                        f ()
-                    | _ -> Lwt.return r
-                  in
-                  let*! mempool = Store.Chain.mempool chain_store in
-                  let bv_operations =
-                    List.map
-                      (List.map
-                         (Block_validation.mk_operation
-                            ~known_valid_operation_set:mempool.known_valid))
-                      operations
-                  in
-                  let*! r =
-                    protect ~canceler:(Worker.canceler w) (fun () ->
-                        protect ?canceler (fun () ->
-                            with_retry_to_load_protocol (fun () ->
-                                validate_block
-                                  bv.validation_process
-                                  chain_db
-                                  chain_store
-                                  ~predecessor:pred
-                                  header
-                                  hash
-                                  operations
-                                  bv_operations)))
-                  in
+                let* pred =
+                  Store.Block.read_block chain_store header.shell.predecessor
+                in
+                let with_retry_to_load_protocol f =
+                  let*! r = f () in
                   match r with
-                  | Error errs -> return (Validation_failed errs)
-                  | Ok () -> (
-                      if advertise_after_validation then
-                        (* Headers which have been preapplied can be advertised
-                           before being fully applied. *)
-                        Distributed_db.Advertise.validated_head chain_db header ;
-                      let* result =
-                        protect ~canceler:(Worker.canceler w) (fun () ->
-                            protect ?canceler (fun () ->
-                                let*! () = Events.(emit applying_block) hash in
-                                with_retry_to_load_protocol (fun () ->
-                                    Block_validator_process.apply_block
-                                      ~should_validate:false
-                                      bv.validation_process
-                                      chain_store
-                                      ~predecessor:pred
-                                      header
-                                      bv_operations)))
+                  (* [Unavailable_protocol] is expected to be the
+                     first error in the trace *)
+                  | Error (Unavailable_protocol {protocol; _} :: _) ->
+                      let* _ =
+                        Protocol_validator.fetch_and_compile_protocol
+                          bv.protocol_validator
+                          ?peer
+                          ~timeout:bv.limits.protocol_timeout
+                          protocol
                       in
-                      Shell_metrics.Block_validator
-                      .set_operation_per_pass_collector
-                        (fun () ->
-                          List.map
-                            (fun v -> Int.to_float (List.length v))
-                            operations) ;
-                      let* o =
-                        Distributed_db.commit_block
-                          chain_db
-                          hash
-                          header
-                          operations
-                          result
-                      in
-                      match o with
-                      | Some block ->
-                          notify_new_block
-                            {
-                              block;
-                              resulting_context_hash =
-                                result.validation_store.resulting_context_hash;
-                            } ;
-                          return Validated_and_applied
-                      | None -> return Already_committed)))
+                      f ()
+                  | _ -> Lwt.return r
+                in
+                let*! mempool = Store.Chain.mempool chain_store in
+                let bv_operations =
+                  List.map
+                    (List.map
+                       (Block_validation.mk_operation
+                          ~known_valid_operation_set:mempool.known_valid))
+                    operations
+                in
+                let*! r =
+                  protect ~canceler:(Worker.canceler w) (fun () ->
+                      protect ?canceler (fun () ->
+                          with_retry_to_load_protocol (fun () ->
+                              validate_block
+                                bv.validation_process
+                                chain_db
+                                chain_store
+                                ~predecessor:pred
+                                header
+                                hash
+                                operations
+                                bv_operations)))
+                in
+                match r with
+                | Error errs -> return (Validation_failed errs)
+                | Ok () -> (
+                    if advertise_after_validation then
+                      (* Headers which have been preapplied can be advertised
+                         before being fully applied. *)
+                      Distributed_db.Advertise.validated_head chain_db header ;
+                    let* result =
+                      protect ~canceler:(Worker.canceler w) (fun () ->
+                          protect ?canceler (fun () ->
+                              let*! () = Events.(emit applying_block) hash in
+                              with_retry_to_load_protocol (fun () ->
+                                  Block_validator_process.apply_block
+                                    ~should_validate:false
+                                    bv.validation_process
+                                    chain_store
+                                    ~predecessor:pred
+                                    header
+                                    bv_operations)))
+                    in
+                    Shell_metrics.Block_validator
+                    .set_operation_per_pass_collector
+                      (fun () ->
+                        List.map
+                          (fun v -> Int.to_float (List.length v))
+                          operations) ;
+                    let* o =
+                      Distributed_db.commit_block
+                        chain_db
+                        hash
+                        header
+                        operations
+                        result
+                    in
+                    match o with
+                    | Some block ->
+                        notify_new_block
+                          {
+                            block;
+                            resulting_context_hash =
+                              result.validation_store.resulting_context_hash;
+                          } ;
+                        return Validated_and_applied
+                    | None -> return Already_committed)))
       in
       match r with
       | Ok r -> return r
@@ -442,10 +436,6 @@ let on_completion :
   match (request, v) with
   | Request.Request_validation {hash; _}, Already_committed ->
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
-      let* () = Events.(emit previously_validated_and_applied) hash in
-      Lwt.return_unit
-  | Request.Request_validation {hash; _}, Outdated_block ->
-      Prometheus.Counter.inc_one metrics.outdated_blocks_count ;
       let* () = Events.(emit previously_validated_and_applied) hash in
       Lwt.return_unit
   | Request.Request_validation _, Validated_and_applied -> (
@@ -584,8 +574,7 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
              })
       in
       match r with
-      | Ok (Validated_and_applied | Already_committed | Outdated_block) ->
-          return Valid
+      | Ok (Validated_and_applied | Already_committed) -> return Valid
       | Ok (Application_error_after_validation errs) ->
           return (Inapplicable_after_validation errs)
       | Ok (Validation_failed errs)
