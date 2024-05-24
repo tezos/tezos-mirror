@@ -542,9 +542,6 @@ module Handler = struct
                   ~proto_level:finalized_shell_header.proto_level
                   ~block_level:finalized_shell_header.level
               in
-              let*? (module PluginHead) =
-                Node_context.get_plugin_for_level ctxt ~level:head_level
-              in
               Gossipsub.Worker.Validate_message_hook.set
                 (gossipsub_app_messages_validation
                    ctxt
