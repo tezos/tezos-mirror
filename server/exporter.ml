@@ -220,25 +220,6 @@ type op_info = {
   received : Teztale_lib.Data.Delegate_operations.reception list;
 }
 
-(* NB: It can happen that there is an EQC at round r, but a block at
-   round r+1 is still proposed. In this case, the anomaly is rather
-   that the block is proposed (either the proposer has not seen an EQC
-   in time, or it is malicious), than that there are missing consensus
-   ops at round r+1. In other words, the "max round" should be r, not
-   r+1. *)
-let _max_round (module Db : Caqti_lwt.CONNECTION) level =
-  let q_blocks = "SELECT max(round) FROM blocks WHERE level = ?" in
-  let r_blocks =
-    Caqti_request.Infix.(Caqti_type.int ->! Caqti_type.int) q_blocks
-  in
-  let* m1 = Db.find r_blocks level in
-  let q_ops = "SELECT max(round) FROM operations WHERE level = ?" in
-  let r_ops =
-    Caqti_request.Infix.(Caqti_type.int ->! Caqti_type.(option int)) q_ops
-  in
-  let* m2 = Db.find r_ops level in
-  return (max (Some m1) m2)
-
 let kind_of_bool = function
   | false -> Teztale_lib.Consensus_ops.Preendorsement
   | true -> Teztale_lib.Consensus_ops.Endorsement
