@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
+    exec_env::posix::Posix,
     machine_state::{
         mode::Mode,
         registers::{gp, XRegister, XValue},
@@ -31,7 +32,7 @@ fn check_register_values(interpreter: &Interpreter, check_xregs: &[(XRegister, X
 }
 
 fn interpret_test_with_check(contents: &[u8], exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
-    let mut backend = Interpreter::create_backend();
+    let mut backend = Interpreter::<'_, Posix>::create_backend();
     let mut interpreter =
         Interpreter::new(&mut backend, contents, None, exit_mode).expect("Boot failed");
     match interpreter.run(MAX_STEPS) {

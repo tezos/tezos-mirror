@@ -8,6 +8,7 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use octez_riscv::{
     bits::Bits64,
+    exec_env::posix::Posix,
     kernel_loader,
     machine_state::{
         bus::Address,
@@ -154,7 +155,7 @@ impl Instruction {
 
 impl<'a> DebuggerApp<'a> {
     pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
-        let mut backend = Interpreter::create_backend();
+        let mut backend = Interpreter::<'_, Posix>::create_backend();
         let (mut interpreter, prog) =
             Interpreter::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
         let symbols = kernel_loader::get_elf_symbols(contents)?;
@@ -240,7 +241,7 @@ impl<'a> DebuggerApp<'a> {
 
     fn step_until_breakpoint(&mut self) {
         // perform at least a step to progress if already on a breakpoint
-        let result = self.interpreter.step_range(1..=MAX_STEPS, |m| {
+        let result = self.interpreter.run_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)
@@ -252,7 +253,7 @@ impl<'a> DebuggerApp<'a> {
 
     fn step_until_next_symbol(&mut self) {
         // perform at least a step to progress if already on a breakpoint/symbol
-        let result = self.interpreter.step_range(1..=MAX_STEPS, |m| {
+        let result = self.interpreter.run_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)

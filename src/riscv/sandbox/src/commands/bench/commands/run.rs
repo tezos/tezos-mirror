@@ -12,6 +12,7 @@ use crate::{
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
+    exec_env::posix::Posix,
     machine_state::bus::Address,
     parser::{instruction::Instr, parse},
     Interpreter, InterpreterResult,
@@ -111,7 +112,7 @@ fn bench_simple(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchD
 
 fn bench_iteration(opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
     let contents = std::fs::read(&opts.common.input)?;
-    let mut backend = Interpreter::create_backend();
+    let mut backend = Interpreter::<'_, Posix>::create_backend();
     let mut interpreter = Interpreter::new(
         &mut backend,
         &contents,
