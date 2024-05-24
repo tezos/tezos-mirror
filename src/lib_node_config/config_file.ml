@@ -178,7 +178,6 @@ let blockchain_network_ghostnet =
         "ghostnet.tzinit.org";
         "ghostnet.tzboot.net";
         "ghostnet.boot.ecadinfra.com";
-        "ghostnet.kaml.fr";
         "ghostnet.stakenow.de:9733";
       ]
     ~dal_config:
