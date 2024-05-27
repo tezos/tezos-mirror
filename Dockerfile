@@ -7,7 +7,8 @@ ARG BUILD_IMAGE_VERSION
 FROM ${BUILD_IMAGE}:${BUILD_IMAGE_VERSION} as builder
 
 
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as intermediate
+# hadolint ignore=DL3006
+FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as intermediate
 # Pull in built binaries
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin /home/tezos/bin
 # Add parameters for active protocols
@@ -24,7 +25,8 @@ COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts
 COPY --chown=tezos:nogroup scripts/alphanet_version src/bin_client/bash-completion.sh script-inputs/active_protocol_versions /home/tezos/scripts/
 
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as debug
+# hadolint ignore=DL3006
+FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as debug
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
@@ -52,14 +54,16 @@ COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/s
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION_NON_MIN} as stripper
+# hadolint ignore=DL3006
+FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION_NON_MIN} as stripper
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin /home/tezos/bin
 RUN rm /home/tezos/bin/*.sh && chmod +rw /home/tezos/bin/* && strip /home/tezos/bin/*
 # hadolint ignore=DL3003,DL4006,SC2046
 RUN cd /home/tezos/bin && for b in $(ls octez*); do ln -s "$b" $(echo "$b" | sed 's/^octez/tezos/'); done
 
 
-FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as bare
+# hadolint ignore=DL3006
+FROM  ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as bare
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
@@ -80,7 +84,8 @@ COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin /usr/local/bin
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
 
 
-FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as minimal
+# hadolint ignore=DL3006
+FROM  ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as minimal
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
