@@ -152,11 +152,17 @@ let expect_input input f =
 let build_with_input method_ ~f parameters =
   build method_ ~f:(fun input -> expect_input input f) parameters
 
-let get_fee_history block_count block_parameter
+let get_fee_history block_count block_parameter config
     (module Backend_rpc : Services_backend_sig.S) =
   (* TODO: exclude 0 blocks *)
   let open Lwt_result_syntax in
   let open Ethereum_types in
+  (* block count can be bounded in configuration *)
+  let block_count =
+    match Configuration.(config.fee_history.max_count) with
+    | None -> block_count
+    | Some count -> Z.(min (of_int count) block_count)
+  in
   let rec get_fee_history_aux block_count block_parameter history_acc =
     if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
     then return history_acc
@@ -499,10 +505,19 @@ let dispatch_request (config : Configuration.t)
         build_with_input ~f module_ parameters
     | Method (Eth_fee_history.Method, module_) ->
         let f (Qty block_count, newest_block, _reward_percentile) =
-          let* fee_history_result =
-            get_fee_history block_count newest_block (module Backend_rpc)
-          in
-          rpc_ok fee_history_result
+          if block_count = Z.zero then
+            rpc_error
+              (Rpc_errors.invalid_params
+                 "Number of block should be greater than 0.")
+          else
+            let* fee_history_result =
+              get_fee_history
+                block_count
+                newest_block
+                config
+                (module Backend_rpc)
+            in
+            rpc_ok fee_history_result
         in
         build_with_input ~f module_ parameters
     | Method (_, _) ->
