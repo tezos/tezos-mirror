@@ -316,6 +316,7 @@ mod test_helpers {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let is_static = true;

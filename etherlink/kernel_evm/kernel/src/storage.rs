@@ -7,13 +7,14 @@
 
 use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
-use crate::indexable_storage::IndexableStorage;
 use crate::simulation::SimulationResult;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use evm_execution::storage::blocks::add_new_block_hash;
+use evm_execution::trace::TracerInput;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
+use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -137,6 +138,9 @@ pub const WORD_SIZE: usize = 32usize;
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
 pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
+
+// Path where the input for the tracer is stored by the sequencer.
+const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,
@@ -773,19 +777,19 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
 /// Get the index of accounts.
 pub fn init_account_index() -> Result<IndexableStorage, StorageError> {
     let path = concat(&EVM_INDEXES, &ACCOUNTS_INDEX)?;
-    IndexableStorage::new(&RefPath::from(&path))
+    IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
 }
 
 /// Get the index of blocks.
 pub fn init_blocks_index() -> Result<IndexableStorage, StorageError> {
     let path = concat(&EVM_INDEXES, &BLOCKS_INDEX)?;
-    IndexableStorage::new(&RefPath::from(&path))
+    IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
 }
 
 /// Get the index of transactions
 pub fn init_transaction_hashes_index() -> Result<IndexableStorage, StorageError> {
     let path = concat(&EVM_INDEXES, &TRANSACTIONS_INDEX)?;
-    IndexableStorage::new(&RefPath::from(&path))
+    IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
 }
 
 pub fn index_account(
@@ -1062,6 +1066,20 @@ pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u3
             default_min_levels
         );
         Ok(default_min_levels)
+    }
+}
+
+pub fn read_tracer_input<Host: Runtime>(
+    host: &mut Host,
+) -> anyhow::Result<Option<TracerInput>> {
+    if let Some(ValueType::Value) = host.store_has(&TRACER_INPUT).map_err(Error::from)? {
+        let bytes = host
+            .store_read_all(&TRACER_INPUT)
+            .context("Cannot read tracer input")?;
+
+        Ok(Some(FromRlpBytes::from_rlp_bytes(&bytes)?))
+    } else {
+        Ok(None)
     }
 }
 

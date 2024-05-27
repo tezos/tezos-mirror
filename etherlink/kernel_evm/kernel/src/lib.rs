@@ -23,8 +23,9 @@ use safe_storage::WORLD_STATE_PATH;
 use storage::{
     read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
-    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_minimum_base_fee_per_gas, read_tracer_input, store_base_fee_per_gas,
+    store_chain_id, store_da_fee, store_kernel_version, store_storage_version,
+    STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
@@ -51,7 +52,6 @@ mod fallback_upgrade;
 mod fees;
 mod gas_price;
 mod inbox;
-mod indexable_storage;
 mod internal_storage;
 mod linked_list;
 mod migration;
@@ -264,6 +264,8 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     };
 
     let block_fees = retrieve_block_fees(host)?;
+    let trace_input = read_tracer_input(host)?;
+
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
@@ -274,6 +276,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             block_fees,
             &mut configuration,
             sequencer_pool_address,
+            trace_input,
         )
         .context("Failed during stage 2")?
         {
@@ -545,6 +548,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             block_fees,
             &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");

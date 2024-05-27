@@ -13,6 +13,7 @@ use evm_execution::account_storage::{
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
+use evm_execution::trace::{TracerConfig, TracerInput};
 use primitive_types::{H160, U256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockConstants;
@@ -21,6 +22,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::contract::Contract;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
@@ -37,7 +39,6 @@ use crate::configuration::Limits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::inbox::{Deposit, Transaction, TransactionContent};
-use crate::indexable_storage::IndexableStorage;
 use crate::storage::index_account;
 use crate::{tick_model, CONFIG};
 
@@ -337,6 +338,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     retriable: bool,
     is_delayed: bool,
     limits: &Limits,
+    tracer_config: Option<TracerConfig>,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -375,6 +377,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         allocated_ticks,
         retriable,
         false,
+        tracer_config,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -611,6 +614,25 @@ pub fn handle_transaction_result<Host: Runtime>(
     })
 }
 
+fn get_tracer_config(
+    current_transaction_hash: TransactionHash,
+    trace_input: &Option<TracerInput>,
+) -> Option<TracerConfig> {
+    if let Some(TracerInput {
+        transaction_hash,
+        config,
+    }) = trace_input
+    {
+        if transaction_hash.0 == current_transaction_hash {
+            Some(*config)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
@@ -626,7 +648,10 @@ pub fn apply_transaction<Host: Runtime>(
     ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
+    trace_input: &Option<TracerInput>,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
+    let current_transaction_hash = transaction.tx_hash;
+    let tracer_config = get_tracer_config(current_transaction_hash, trace_input);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
@@ -638,6 +663,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
             false,
             limits,
+            tracer_config,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -649,6 +675,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
             true,
             limits,
+            tracer_config,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");

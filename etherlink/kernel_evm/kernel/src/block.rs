@@ -12,7 +12,6 @@ use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
 use crate::configuration::Limits;
 use crate::error::Error;
 use crate::event::Event;
-use crate::indexable_storage::IndexableStorage;
 use crate::internal_storage::InternalRuntime;
 use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::storage;
@@ -27,10 +26,12 @@ use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
+use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -76,6 +77,7 @@ fn compute<Host: Runtime>(
     ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
+    trace_input: &Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -134,6 +136,7 @@ fn compute<Host: Runtime>(
             ticketer,
             sequencer_pool_address,
             limits,
+            trace_input,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -269,6 +272,7 @@ fn compute_bip<Host: KernelRuntime>(
     ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
+    trace_input: &Option<TracerInput>,
 ) -> anyhow::Result<ComputationResult> {
     let result = compute(
         host,
@@ -282,6 +286,7 @@ fn compute_bip<Host: KernelRuntime>(
         ticketer,
         sequencer_pool_address,
         limits,
+        trace_input,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -344,6 +349,7 @@ fn promote_block<Host: Runtime>(
         storage::delete_block_in_progress(safe_host)?;
     }
     safe_host.promote()?;
+    safe_host.promote_trace()?;
     drop_blueprint(safe_host.host, number)?;
 
     let number = storage::read_current_block_number(safe_host.host)?;
@@ -370,6 +376,7 @@ pub fn produce<Host: Runtime>(
     block_fees: BlockFees,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
+    trace_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
@@ -427,6 +434,7 @@ pub fn produce<Host: Runtime>(
                 &config.tezos_contracts.ticketer,
                 sequencer_pool_address,
                 &config.limits,
+                &trace_input,
             ) {
                 Ok(ComputationResult::Finished) => promote_block(
                     &mut safe_host,
@@ -509,6 +517,7 @@ pub fn produce<Host: Runtime>(
             &config.tezos_contracts.ticketer,
             sequencer_pool_address,
             &config.limits,
+            &trace_input,
         ) {
             Ok(ComputationResult::Finished) => {
                 promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?
@@ -779,6 +788,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
     }
@@ -826,6 +836,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -869,6 +880,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");
@@ -916,6 +928,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");
@@ -997,6 +1010,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1054,6 +1068,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees,
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");
@@ -1119,6 +1134,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1179,6 +1195,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1214,6 +1231,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1225,6 +1243,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");
@@ -1277,6 +1296,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");
@@ -1371,6 +1391,7 @@ mod tests {
             &None,
             None,
             &limits,
+            &None,
         )
         .expect("Should safely ask for a reboot");
 
@@ -1445,6 +1466,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
         assert!(
@@ -1491,6 +1513,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
@@ -1504,6 +1527,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
@@ -1516,6 +1540,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("Empty block should have been produced");
@@ -1659,6 +1684,7 @@ mod tests {
             dummy_block_fees(),
             &mut configuration,
             None,
+            None,
         )
         .expect("Should have produced");
 
@@ -1742,6 +1768,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");
@@ -1837,6 +1864,7 @@ mod tests {
             block_fees,
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1912,6 +1940,7 @@ mod tests {
             dummy_block_fees(),
             &mut configuration,
             None,
+            None,
         )
         .expect("Should have produced");
 
@@ -1931,6 +1960,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");
@@ -2017,6 +2047,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");

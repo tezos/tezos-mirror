@@ -289,6 +289,7 @@ impl Evaluation {
             allocated_ticks,
             false,
             false,
+            None,
         ) {
             Ok(Some(outcome)) => {
                 let outcome =
@@ -414,6 +415,7 @@ impl TxValidation {
             allocated_ticks,
             false,
             false,
+            None,
         ) {
             Ok(Some(ExecutionOutcome {
                 reason: ExtendedExitReason::OutOfTicks,
@@ -761,6 +763,7 @@ mod tests {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
         assert!(outcome.is_ok(), "contract should have been created");
         let outcome = outcome.unwrap();

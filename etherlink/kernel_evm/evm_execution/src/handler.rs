@@ -14,12 +14,14 @@ use crate::account_storage::{
     CODE_HASH_DEFAULT,
 };
 use crate::storage::blocks::get_block_hash;
-use crate::tick_model_opcodes;
+use crate::storage::tracer;
+use crate::trace::{StorageMapItem, StructLog};
 use crate::transaction::TransactionContext;
 use crate::transaction_layer_data::TransactionLayerData;
 use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
+use crate::{tick_model_opcodes, TracerConfig};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::convert::Infallible;
@@ -242,7 +244,7 @@ mod benchmarks {
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
     /// The host
-    host: &'a mut Host,
+    pub host: &'a mut Host,
     /// The ethereum accounts storage
     evm_account_storage: &'a mut EthereumAccountStorage,
     /// The original caller initiating the toplevel transaction
@@ -266,6 +268,66 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// Whether warm/cold storage and address access is enabled
     /// If not, all access are considered warm
     pub enable_warm_cold_access: bool,
+    /// Tracer configuration for debugging.
+    tracer: Option<TracerConfig>,
+    /// State of the storage during a given execution.
+    /// NB: For now, only used for tracing.
+    ///
+    /// TODO: https://gitlab.com/tezos/tezos/-/issues/6879
+    /// With a better representation (map) this could easily be
+    /// used for caching and optimise the VM's execution in terms
+    /// of speed.
+    storage_state: Vec<StorageMapItem>,
+}
+
+fn trace_map_error<E>(result: Result<(), E>) -> Result<(), EthereumError> {
+    result.map_err(|_| {
+        EthereumError::WrappedError(std::borrow::Cow::Borrowed(
+            "Something went wrong while storing tracing informations.",
+        ))
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn trace<Host: Runtime>(
+    host: &mut Host,
+    tracer: &Option<TracerConfig>,
+    return_data: Vec<u8>,
+    pc: Result<usize, ExitReason>,
+    opcode: Option<Opcode>,
+    gas: u64,
+    gas_cost: u64,
+    depth: usize,
+    error: Vec<u8>,
+    stack: Vec<H256>,
+    memory: Vec<u8>,
+    storage: Vec<StorageMapItem>,
+) -> Result<(), EthereumError> {
+    if let (Some(tracer), Some(opcode), Ok(pc)) = (tracer, opcode, pc) {
+        let opcode = opcode.as_u8();
+        let pc: u64 = pc.try_into().unwrap_or_default();
+        let depth: u16 = depth.try_into().unwrap_or_default();
+        let stack = tracer.disable_stack.then_some(stack);
+        let return_data = tracer.enable_return_data.then_some(return_data);
+        let memory = tracer.enable_memory.then_some(memory);
+        let storage = tracer.disable_storage.then_some(storage);
+
+        let struct_log = StructLog {
+            pc,
+            opcode,
+            gas,
+            gas_cost,
+            depth,
+            error,
+            stack,
+            return_data,
+            memory,
+            storage,
+        };
+
+        trace_map_error(tracer::store_struct_log(host, struct_log))?;
+    }
+    Ok(())
 }
 
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
@@ -281,6 +343,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         ticks_allocated: u64,
         effective_gas_price: U256,
         enable_warm_cold_access: bool,
+        tracer: Option<TracerConfig>,
     ) -> Self {
         Self {
             host,
@@ -294,6 +357,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             estimated_ticks_used: 0,
             effective_gas_price,
             enable_warm_cold_access,
+            tracer,
+            storage_state: vec![],
         }
     }
 
@@ -605,6 +670,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // level. At the end of each step if the kernel takes more than the
             // allocated ticks the transaction is marked as failed.
             let opcode = runtime.machine().inspect().map(|p| p.0);
+            let program_counter = runtime.machine().trace_position();
+            let gas_remaining = self.gas_remaining();
+            let return_value = runtime.machine().return_value();
+            let depth = self.transaction_data.len();
+            let stack = runtime.machine().stack().data().to_owned();
+            let memory = runtime.machine().memory().data()[..].to_vec();
+            let storage = self.storage_state.clone();
 
             #[cfg(feature = "benchmark-opcodes")]
             if let Some(opcode) = opcode {
@@ -622,17 +694,47 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             #[cfg_attr(not(feature = "benchmark-opcodes"), allow(unused_variables))]
             let gas_after = self.gas_used();
 
+            let gas_cost = gas_after - gas_before;
+
             if let Some(opcode) = opcode {
-                let gas = gas_after - gas_before;
-                self.account_for_ticks(&opcode, gas)?;
+                self.account_for_ticks(&opcode, gas_cost)?;
                 #[cfg(feature = "benchmark-opcodes")]
-                benchmarks::end_opcode_section(self.host, gas, &step_result);
+                benchmarks::end_opcode_section(self.host, gas_cost, &step_result);
             };
+
+            let error = if let Err(Capture::Exit(reason)) = &step_result {
+                match &reason {
+                    ExitReason::Error(exit) => format!("{:?}", exit).as_bytes().to_vec(),
+                    ExitReason::Fatal(exit) => format!("{:?}", exit).as_bytes().to_vec(),
+                    _ => vec![],
+                }
+            } else {
+                vec![]
+            };
+
+            trace(
+                self.host,
+                &self.tracer,
+                return_value,
+                program_counter,
+                opcode,
+                gas_remaining,
+                gas_cost,
+                depth,
+                error,
+                stack,
+                memory,
+                storage,
+            )?;
 
             match step_result {
                 Ok(()) => (),
-                Err(Capture::Exit(reason)) => return Ok(reason),
-                Err(Capture::Trap(_)) => return Err(EthereumError::InternalTrapError),
+                Err(Capture::Exit(reason)) => {
+                    return Ok(reason);
+                }
+                Err(Capture::Trap(_)) => {
+                    return Err(EthereumError::InternalTrapError);
+                }
             }
         }
     }
@@ -1996,9 +2098,21 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         let mut account = self.get_or_create_account(address).map_err(|_| {
             ExitError::Other(Cow::from("Could not get account for set_storage"))
         })?;
-        account
+
+        let storage_result = account
             .set_storage(self.host, &index, &value)
-            .map_err(|_| ExitError::Other(Cow::from("Could not set_storage in handler")))
+            .map_err(|_| ExitError::Other(Cow::from("Could not set_storage in handler")));
+
+        // Tracing
+        if self.tracer.is_some() {
+            self.storage_state.push(StorageMapItem {
+                address,
+                index,
+                value,
+            });
+        }
+
+        storage_result
     }
 
     fn log(
@@ -2383,6 +2497,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let result = handler
@@ -2417,6 +2532,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -2459,6 +2575,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -2505,6 +2622,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -2566,6 +2684,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -2659,6 +2778,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let input_value = U256::from(2026_u32);
@@ -2753,6 +2873,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let input_value = U256::from(1025_u32); // transaction depth for contract below is callarg - 1
@@ -2845,6 +2966,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(312);
@@ -2916,6 +3038,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let value = U256::zero();
@@ -2972,6 +3095,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let value = U256::zero();
@@ -3037,6 +3161,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(117);
@@ -3099,6 +3224,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3160,6 +3286,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3230,6 +3357,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let hash_of_unavailable_block = handler.block_hash(U256::zero());
@@ -3257,6 +3385,7 @@ mod test {
             10_000,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3317,6 +3446,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3368,6 +3498,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3454,6 +3585,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         // { (SELFDESTRUCT 0x10) }
@@ -3502,6 +3634,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
             false,
+            None,
         );
 
         set_balance(&mut handler, &caller, U256::from(10000));
@@ -3545,6 +3678,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -3620,6 +3754,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let hash = handler.code_hash(H160::from_low_u64_le(1));
@@ -3649,6 +3784,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
             false,
+            None,
         );
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
@@ -3691,6 +3827,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -3773,6 +3910,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -3873,6 +4011,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         let target_destruct =
@@ -3938,6 +4077,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             true,
+            None,
         );
 
         let contrac_addr =
@@ -4008,6 +4148,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::from(21000),
             false,
+            None,
         );
 
         handler
@@ -4068,6 +4209,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 1000,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -4155,6 +4297,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
@@ -4193,6 +4336,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
             false,
+            None,
         );
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
@@ -4233,6 +4377,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 1000,
             U256::from(21000),
             false,
+            None,
         );
 
         let address1 = H160::from_low_u64_be(210_u64);
@@ -4312,6 +4457,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         // SUICIDE would charge 25,000 gas when the destination is non-existent,
@@ -4383,6 +4529,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         // CALL would charge 25,000 gas when the destination is non-existent,
