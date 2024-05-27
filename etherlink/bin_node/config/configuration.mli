@@ -97,6 +97,8 @@ type observer = {
 
 type proxy = unit
 
+type fee_history = {max_count : int option; max_past : int option}
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
@@ -117,6 +119,7 @@ type t = {
   rollup_node_endpoint : Uri.t;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
+  fee_history : fee_history;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
