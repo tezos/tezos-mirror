@@ -893,13 +893,13 @@ module Preapply = struct
       get_consensus_info signer.public_key_hash client
     in
 
-    let preapply_op ~use_legacy_name =
+    let preapply_op () =
       let* consensus_op =
         create_consensus_op
           ~level
           ~slot:(List.hd slots)
           ~block_payload_hash
-          ~use_legacy_name
+          ~use_legacy_name:false
           ~signer
           ~kind
           client
@@ -915,10 +915,16 @@ module Preapply = struct
       let check ~use_legacy_name:_ json =
         check_kind JSON.(json |> as_list |> List.hd)
       in
-      check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
+      check_version
+        ~version:"1"
+        ~use_legacy_name:false
+        ~check
+        ~rpc
+        ~get_name
+        ~data:consensus_json
+        client
     in
-    let* () = preapply_op ~use_legacy_name:true in
-    preapply_op ~use_legacy_name:false
+    preapply_op ()
 
   let test_preapply_consensus =
     register_test
@@ -937,10 +943,10 @@ module Preapply = struct
     let* node, client = Client.init_with_protocol ~protocol `Client () in
     let* () = Client.bake_for_and_wait ~node client in
 
-    let preapply_op ~use_legacy_name =
+    let preapply_op () =
       let* double_consensus_evidence_op =
         create_double_consensus_evidence
-          ~use_legacy_name
+          ~use_legacy_name:false
           ~double_evidence_kind
           client
       in
@@ -955,10 +961,16 @@ module Preapply = struct
       let check ~use_legacy_name:_ json =
         check_kind JSON.(json |> as_list |> List.hd)
       in
-      check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
+      check_version
+        ~version:"1"
+        ~use_legacy_name:false
+        ~check
+        ~rpc
+        ~get_name
+        ~data:consensus_json
+        client
     in
-    let* () = preapply_op ~use_legacy_name:true in
-    preapply_op ~use_legacy_name:false
+    preapply_op ()
 
   let test_preapply_double_consensus_evidence =
     register_test
