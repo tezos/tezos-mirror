@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::pvm::dummy_pvm::DummyPvm;
+use crate::pvm::dummy_pvm::{self, DummyPvm};
 use crate::storage::{self, StorageError};
 use ocaml::{Pointer, ToValue};
 
@@ -17,7 +17,7 @@ pub struct State(DummyPvm);
 pub struct Id(storage::Hash);
 
 #[ocaml::sig]
-pub struct Status(String);
+pub struct Status(dummy_pvm::Status);
 
 ocaml::custom!(Repo);
 ocaml::custom!(State);
@@ -25,17 +25,17 @@ ocaml::custom!(Id);
 ocaml::custom!(Status);
 
 #[ocaml::func]
-#[ocaml::sig("string -> id")]
-pub fn octez_riscv_id_unsafe_of_raw_string(s: String) -> Pointer<Id> {
+#[ocaml::sig("bytes -> id")]
+pub fn octez_riscv_id_unsafe_of_raw_bytes(s: &[u8]) -> Pointer<Id> {
     assert!(s.len() == storage::DIGEST_SIZE);
-    let hash: storage::Hash = s.as_bytes().try_into().unwrap();
+    let hash: storage::Hash = s.try_into().unwrap();
     Id(hash).into()
 }
 
 #[ocaml::func]
-#[ocaml::sig("id -> string")]
-pub fn octez_riscv_storage_id_to_raw_string(id: Pointer<Id>) -> String {
-    std::str::from_utf8(&id.as_ref().0).unwrap().to_string()
+#[ocaml::sig("id -> bytes")]
+pub fn octez_riscv_storage_id_to_raw_bytes(id: Pointer<Id>) -> [u8; 32] {
+    id.as_ref().0
 }
 
 #[ocaml::func]
@@ -98,35 +98,80 @@ pub fn octez_riscv_storage_checkout(
 
 #[ocaml::func]
 #[ocaml::sig("state -> status")]
-pub fn octez_riscv_get_status(_state: Pointer<State>) -> Pointer<Status> {
-    Status("dummy_value".to_string()).into()
+pub fn octez_riscv_get_status(state: Pointer<State>) -> Pointer<Status> {
+    Status(state.as_ref().0.get_status()).into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("status -> string")]
-pub fn octez_riscv_string_of_status(_status: Pointer<Status>) -> String {
-    unimplemented!()
+pub fn octez_riscv_string_of_status(status: Pointer<Status>) -> String {
+    status.as_ref().0.to_string()
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> state")]
-pub fn octez_riscv_compute_step(_state: Pointer<State>) -> Pointer<State> {
-    unimplemented!()
+pub fn octez_riscv_compute_step(state: Pointer<State>) -> Pointer<State> {
+    State(state.as_ref().0.compute_step()).into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("int64 -> state -> (state * int64)")]
 pub fn octez_riscv_compute_step_many(
-    _max_steps: usize,
-    _state: Pointer<State>,
+    max_steps: usize,
+    state: Pointer<State>,
 ) -> (Pointer<State>, i64) {
-    unimplemented!()
+    let (s, steps) = state.as_ref().0.compute_step_many(max_steps);
+    (State(s).into(), steps)
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> int64")]
-pub fn octez_riscv_get_tick(_state: Pointer<State>) -> i64 {
-    unimplemented!()
+pub fn octez_riscv_get_tick(state: Pointer<State>) -> u64 {
+    state.as_ref().0.get_tick()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> int32 option")]
+pub fn octez_riscv_get_level(state: Pointer<State>) -> Option<u32> {
+    state.as_ref().0.get_current_level()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> bytes -> state")]
+pub fn octez_riscv_install_boot_sector(
+    state: Pointer<State>,
+    boot_sector: &[u8],
+) -> Pointer<State> {
+    State(state.as_ref().0.install_boot_sector(boot_sector.to_vec())).into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> bytes")]
+pub fn octez_riscv_state_hash(state: Pointer<State>) -> [u8; 32] {
+    state.as_ref().0.hash().try_into().unwrap()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> int32 -> int64 -> bytes -> state")]
+pub fn octez_riscv_set_input(
+    state: Pointer<State>,
+    level: u32,
+    message_counter: u64,
+    input: &[u8],
+) -> Pointer<State> {
+    State(
+        state
+            .as_ref()
+            .0
+            .set_input(level, message_counter, input.to_vec()),
+    )
+    .into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> int64")]
+pub fn octez_riscv_get_message_counter(state: Pointer<State>) -> u64 {
+    state.as_ref().0.get_message_counter()
 }
 
 #[ocaml::func]

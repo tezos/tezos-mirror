@@ -8,8 +8,8 @@ type repo
 type state
 type id
 type status
-external octez_riscv_id_unsafe_of_raw_string: string -> id = "octez_riscv_id_unsafe_of_raw_string"
-external octez_riscv_storage_id_to_raw_string: id -> string = "octez_riscv_storage_id_to_raw_string"
+external octez_riscv_id_unsafe_of_raw_bytes: bytes -> id = "octez_riscv_id_unsafe_of_raw_bytes"
+external octez_riscv_storage_id_to_raw_bytes: id -> bytes = "octez_riscv_storage_id_to_raw_bytes"
 external octez_riscv_storage_id_equal: id -> id -> bool = "octez_riscv_storage_id_equal"
 external octez_riscv_storage_state_equal: state -> state -> bool = "octez_riscv_storage_state_equal"
 external octez_riscv_storage_state_empty: unit -> state = "octez_riscv_storage_state_empty"
@@ -22,4 +22,9 @@ external octez_riscv_string_of_status: status -> string = "octez_riscv_string_of
 external octez_riscv_compute_step: state -> state = "octez_riscv_compute_step"
 external octez_riscv_compute_step_many: int64 -> state -> (state * int64) = "octez_riscv_compute_step_many"
 external octez_riscv_get_tick: state -> int64 = "octez_riscv_get_tick"
+external octez_riscv_get_level: state -> int32 option = "octez_riscv_get_level"
+external octez_riscv_install_boot_sector: state -> bytes -> state = "octez_riscv_install_boot_sector"
+external octez_riscv_state_hash: state -> bytes = "octez_riscv_state_hash"
+external octez_riscv_set_input: state -> int32 -> int64 -> bytes -> state = "octez_riscv_set_input"
+external octez_riscv_get_message_counter: state -> int64 = "octez_riscv_get_message_counter"
 external octez_riscv_storage_export_snapshot: repo -> id -> string -> (unit, [`Msg of string]) result = "octez_riscv_storage_export_snapshot"
