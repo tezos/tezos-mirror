@@ -316,9 +316,7 @@ module Handler = struct
 
   (* This function removes from the store all the slots (and their shards)
      published at level exactly [Node_context.next_level_to_gc_slots_and_shards
-     ~head_level]. In the future we may want to remove the shards from all
-     preceding levels, not only this one. Also, removing could be done more
-     efficiently than iterating on all the slots. *)
+     ~head_level]. *)
   let remove_old_level_slots_and_shards proto_parameters ctxt head_level =
     let open Lwt_syntax in
     let oldest_level =
@@ -366,8 +364,7 @@ module Handler = struct
 
   (* This function removes from the store all the skip list cells attested at
      level exactly [Node_context.next_level_to_gc_skip_list_cells
-     ~head_level]. In the future we may want to remove the cells from all
-     preceding levels, not only this one. *)
+     ~head_level]. *)
   let remove_old_level_skip_list_cells ctxt head_level =
     let open Lwt_result_syntax in
     let oldest_level =
