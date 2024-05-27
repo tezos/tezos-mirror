@@ -84,7 +84,7 @@ let run subcommand cli_options =
       in
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
-      @@ Daemon.run ~data_dir (merge cli_options)
+      @@ Daemon.run ~data_dir ~configuration_override:(merge cli_options)
   | Config_init ->
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error

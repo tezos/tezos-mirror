@@ -638,7 +638,7 @@ let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
-let run ~data_dir configuration_override =
+let run ~data_dir ~configuration_override =
   let open Lwt_result_syntax in
   let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
   let internal_events =
