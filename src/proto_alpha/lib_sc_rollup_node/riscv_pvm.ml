@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -19,145 +19,102 @@ module State = Riscv_context.PVMState
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
-module type Serializable_state_S = sig
-  type context
+module PVM :
+  Sc_rollup.PVM.S
+    with type state = tree
+     and type context = Riscv_context.rw_index = struct
+  let parse_boot_sector s = Some s
 
-  type state
+  let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
 
-  val empty : unit -> state
+  type void = |
 
-  val of_index : Context.rw_index -> context
+  let void =
+    Data_encoding.(
+      conv_with_guard
+        (function (_ : void) -> .)
+        (fun _ -> Error "void has no inhabitant")
+        unit)
 
-  val state_encoding : state Data_encoding.t
+  type state = tree
 
-  val path : string
-end
-
-module Embed
-    (P : Sc_rollup.PVM.S)
-    (S : Serializable_state_S
-           with type context = P.context
-            and type state = P.state) : sig
-  include
-    Sc_rollup.PVM.S
-      with type context = Context.rw_index
-       and type state = Context.tree
-       and type hash = Sc_rollup.State_hash.t
-
-  val decode : Context.tree -> P.state Lwt.t
-end = struct
-  let decode state =
-    let open Lwt_syntax in
-    let* bytes_opt = Storage.lookup state [S.path] in
-    match bytes_opt with
-    | None ->
-        Format.kasprintf
-          Lwt.fail_with
-          "Riscv_pvm: could not find state in /%s"
-          S.path
-    | Some bytes ->
-        Data_encoding.Binary.of_bytes_exn S.state_encoding bytes |> Lwt.return
-
-  let apply f state =
-    let open Lwt_syntax in
-    let* internal_state = decode state in
-    f internal_state
-
-  let lift f state =
-    let open Lwt_syntax in
-    let* internal_state = decode state in
-    let* internal_state = f internal_state in
-    let bytes =
-      Data_encoding.Binary.to_bytes_exn S.state_encoding internal_state
-    in
-    Storage.add state [S.path] bytes
+  let pp _ = raise (Invalid_argument "pp not implemented")
 
   type context = Context.rw_index
 
-  let parse_boot_sector = P.parse_boot_sector
-
-  let pp_boot_sector = P.pp_boot_sector
-
-  type state = Context.tree
-
   type hash = Sc_rollup.State_hash.t
 
-  type proof = P.proof
+  type proof = void
 
-  let pp = apply P.pp
+  let proof_encoding = void
 
-  let proof_encoding = P.proof_encoding
+  let proof_start_state = function (_ : proof) -> .
 
-  let proof_start_state = P.proof_start_state
+  let proof_stop_state = function (_ : proof) -> .
 
-  let proof_stop_state = P.proof_stop_state
+  let state_hash state =
+    Lwt.return (Sc_rollup.State_hash.of_bytes_exn (Backend.state_hash state))
 
-  let state_hash = apply P.state_hash
-
-  let initial_state ~empty =
-    let empty_state = S.empty () in
-    let bytes =
-      Data_encoding.Binary.to_bytes_exn S.state_encoding empty_state
-    in
-    Storage.add empty [S.path] bytes
+  let initial_state ~empty:_ = Lwt.return (Storage.empty ())
 
   let install_boot_sector state boot_sector =
-    lift (fun state -> P.install_boot_sector state boot_sector) state
+    Backend.install_boot_sector state boot_sector
 
-  let is_input_state ~is_reveal_enabled state =
-    apply (P.is_input_state ~is_reveal_enabled) state
+  let is_input_state ~is_reveal_enabled:_ state =
+    let open Lwt_syntax in
+    let* level = Backend.get_current_level state in
+    match level with
+    | None -> return Sc_rollup.Initial
+    | Some level ->
+        let* message_counter = Backend.get_message_counter state in
+        return
+          (Sc_rollup.First_after
+             (Raw_level.of_int32_exn level, Z.of_int64 message_counter))
 
-  let set_input input state = lift (P.set_input input) state
+  let set_input input state =
+    match input with
+    | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
+        Backend.set_input
+          state
+          (Raw_level.to_int32 inbox_level)
+          (Z.to_int64 message_counter)
+          (Sc_rollup.Inbox_message.unsafe_to_string payload)
+    | Sc_rollup.Reveal _ -> assert false
 
-  let eval = lift P.eval
+  let eval state = Backend.compute_step state
 
-  let verify_proof = P.verify_proof
+  let verify_proof ~is_reveal_enabled:_ _input = function (_ : proof) -> .
 
-  let produce_proof context ~is_reveal_enabled input_opt state =
-    apply
-      (P.produce_proof (S.of_index context) ~is_reveal_enabled input_opt)
-      state
+  let produce_proof _context ~is_reveal_enabled:_ _state _step = assert false
 
-  type output_proof = P.output_proof
+  type output_proof = void
 
-  let output_proof_encoding = P.output_proof_encoding
+  let output_proof_encoding = void
 
-  let output_of_output_proof = P.output_of_output_proof
+  let output_of_output_proof = function (_ : proof) -> .
 
-  let state_of_output_proof = P.state_of_output_proof
+  let state_of_output_proof = function (_ : proof) -> .
 
-  let verify_output_proof = P.verify_output_proof
+  let verify_output_proof = function (_ : proof) -> .
 
-  let produce_output_proof context state output =
-    apply
-      (fun state -> P.produce_output_proof (S.of_index context) state output)
-      state
+  let produce_output_proof _context _state _output = assert false
 
-  let check_dissection = P.check_dissection
+  let check_dissection ~default_number_of_sections:_ ~start_chunk:_
+      ~stop_chunk:_ =
+    assert false
 
-  let get_current_level = apply P.get_current_level
+  let get_current_level state =
+    let open Lwt_syntax in
+    let* level = Backend.get_current_level state in
+    return (Option.map Raw_level.of_int32_exn level)
 
   module Internal_for_tests = struct
-    let insert_failure = lift P.Internal_for_tests.insert_failure
+    let insert_failure _state =
+      raise (Invalid_argument "insert_failure not implemented")
   end
 end
 
-module Serializable_riscv_state = struct
-  type context = Sc_rollup.Riscv_PVM.Protocol_implementation.context
-
-  type state = Sc_rollup.Riscv_PVM.Protocol_implementation.state
-
-  let empty = Sc_rollup_riscv.make_empty_state
-
-  let path = "riscv_pvm"
-
-  let of_index _index = ()
-
-  let state_encoding = Sc_rollup_riscv.minimal_state_encoding
-end
-
-include
-  Embed (Sc_rollup.Riscv_PVM.Protocol_implementation) (Serializable_riscv_state)
+include PVM
 
 let kind = Sc_rollup.Kind.Riscv
 
