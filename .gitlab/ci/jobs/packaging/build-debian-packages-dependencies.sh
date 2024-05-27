@@ -38,6 +38,7 @@ docker build \
   -f debian-deps-build.Dockerfile \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
+  --build-arg RECOMMENDED_RUST_VERSION="$recommended_rust_version" \
   --cache-from="${DEP_IMAGE}:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}" \
   --cache-from="${DEP_IMAGE}:master" \
   -t "$LOCAL_IMAGE_NAME" \
