@@ -163,6 +163,14 @@ let get_fee_history block_count block_parameter config
     | None -> block_count
     | Some count -> Z.(min (of_int count) block_count)
   in
+  let* nb_latest = Backend_rpc.current_block_number () in
+  let is_reachable nb =
+    match Configuration.(config.fee_history.max_past) with
+    | None -> true
+    | Some delta ->
+        let oldest_reachable = Z.(sub (Qty.to_z nb_latest) (of_int delta)) in
+        Z.(gt (Qty.to_z nb) oldest_reachable)
+  in
   let rec get_fee_history_aux block_count block_parameter history_acc =
     if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
     then return history_acc
@@ -192,10 +200,13 @@ let get_fee_history block_count block_parameter config
       in
       let oldest_block = block.number in
       let history_acc = {oldest_block; base_fee_per_gas; gas_used_ratio} in
-      get_fee_history_aux
-        Z.(block_count - one)
-        (Block_parameter.Number (Qty.pred block.number))
-        history_acc
+      let next_block = Qty.pred block.number in
+      if is_reachable next_block then
+        get_fee_history_aux
+          Z.(block_count - one)
+          (Block_parameter.Number next_block)
+          history_acc
+      else return history_acc
   in
   let init_acc =
     {
