@@ -526,9 +526,6 @@ module Handler = struct
           match next_final_head with
           | None -> Lwt.fail_with "L1 crawler lib shut down"
           | Some (_finalized_hash, finalized_shell_header) ->
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7253
-                 Consider using [finalized_shell_header.level] instead of [head_level]. *)
-              let head_level = Int32.add finalized_shell_header.level 2l in
               let* () =
                 Node_context.may_add_plugin
                   ctxt
@@ -540,13 +537,13 @@ module Handler = struct
                 (gossipsub_app_messages_validation
                    ctxt
                    cryptobox
-                   head_level
+                   finalized_shell_header.level
                    proto_parameters.attestation_lag) ;
               let*! () =
                 remove_old_level_slots_and_shards
                   proto_parameters
                   ctxt
-                  head_level
+                  finalized_shell_header.level
               in
               let* () =
                 if finalized_shell_header.level = 1l then
