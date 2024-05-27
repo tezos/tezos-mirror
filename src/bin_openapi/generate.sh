@@ -15,31 +15,36 @@ cd "$(dirname "$0")"/../.. || exit
 tezos_node=./octez-node
 tezos_client=./octez-client
 smart_rollup_node=./octez-smart-rollup-node
+dal_node=./octez-dal-node
 
 # Protocol configuration.
-protocol_hash=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-protocol_parameters=src/proto_alpha/parameters/sandbox-parameters.json
-protocol_name=alpha
+protocol_hash=PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ
+protocol_parameters=src/proto_019_PtParisB/parameters/sandbox-parameters.json
+protocol_name=paris
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 # RPC port.
 rpc_port=8732
+dal_rpc_port=10732
 
 # Temporary files.
 tmp=openapi-tmp
 data_dir=$tmp/octez-sandbox
 client_dir=$tmp/octez-client
+dal_node_data_dir=$tmp/dal-node
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
+dal_api_json=$tmp/dal-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi-dev.json
-proto_openapi_json=docs/api/$protocol_name-openapi-dev.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-dev.json
-smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-dev.json
+openapi_json=docs/api/rpc-openapi-rc.json
+proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
+dal_node_openapi_json=docs/api/dal-node-openapi-rc.json
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
@@ -48,7 +53,7 @@ version=$(dune exec octez-version -- --full-with-commit)
 $tezos_node config init --data-dir $data_dir \
   --network sandbox \
   --expected-pow 0 \
-  --local-rpc-addr localhost:$rpc_port \
+  --rpc-addr localhost:$rpc_port \
   --no-bootstrap-peer \
   --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
@@ -70,13 +75,26 @@ $tezos_client --base-dir $client_dir activate protocol $protocol_hash \
 # Wait a bit again...
 sleep 1
 
+# Run a DAL node
+mkdir $dal_node_data_dir
+$dal_node config init --data-dir $dal_node_data_dir \
+  --endpoint "http://localhost:$rpc_port" --expected-pow 0
+$dal_node identity generate --data-dir $dal_node_data_dir
+$dal_node run --data-dir $dal_node_data_dir &
+dal_node_pid="$!"
+
+# Wait a bit again...
+sleep 1
+
 # Get the RPC descriptions.
 curl "http://localhost:$rpc_port/describe/?recurse=yes" > $api_json
 curl "http://localhost:$rpc_port/describe/chains/main/blocks/head?recurse=yes" > $proto_api_json
 curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $mempool_api_json
+curl "http://localhost:$dal_rpc_port/describe/?recurse=yes" > $dal_api_json
 
-# Kill the node.
+# Kill the nodes.
 kill -9 "$node_pid"
+kill -9 "$dal_node_pid"
 
 # Remove RPC starting with "/private/"
 clean_private_rpc() {
@@ -104,6 +122,12 @@ dune exec src/bin_openapi/rpc_openapi.exe -- \
   $mempool_api_json |
   clean_private_rpc "$@" > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
+dune exec src/bin_openapi/rpc_openapi.exe -- \
+  "$version" \
+  "Octez DAL Node RPC" "The RPC API for the Octez DAL node." \
+  $dal_api_json |
+  clean_private_rpc "$@" > $dal_node_openapi_json
+echo "Generated OpenAPI specification: $dal_node_openapi_json"
 
 # Gernerate openapi file for rollup node
 $smart_rollup_node generate openapi -P $protocol_hash > $smart_rollup_node_openapi_json
