@@ -9,6 +9,11 @@ open Filename.Infix
 
 type error += Caqti_error of string
 
+type pool =
+  ( Caqti_lwt.connection,
+    [Caqti_error.connect | `K_error of tztrace] )
+  Caqti_lwt_unix.Pool.t
+
 module Db = struct
   let caqti (p : ('a, Caqti_error.t) result Lwt.t) : 'a tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -16,6 +21,29 @@ module Db = struct
     match p with
     | Ok p -> return p
     | Error err -> fail [Caqti_error (Caqti_error.show err)]
+
+  let caqti' (p : ('a, Caqti_error.t) result) : 'a tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    match p with
+    | Ok p -> return p
+    | Error err -> fail [Caqti_error (Caqti_error.show err)]
+
+  let use_pool (pool : pool) (k : Caqti_lwt.connection -> 'a tzresult Lwt.t) =
+    let open Lwt_result_syntax in
+    let*! res =
+      Caqti_lwt_unix.Pool.use
+        (fun conn ->
+          let*! res = k conn in
+          match res with
+          | Ok res -> return res
+          | Error err -> fail (`K_error err))
+        pool
+    in
+    match res with
+    | Ok err -> return err
+    | Error (`K_error err) -> fail err
+    | Error (#Caqti_error.connect as err) ->
+        fail [Caqti_error (Caqti_error.show err)]
 
   let start (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.start ()
 
@@ -34,12 +62,16 @@ module Db = struct
     caqti @@ Db.find_opt req arg
 end
 
-type t = {
-  db_uri : Uri.t;
-  with_transaction : (module Caqti_lwt.CONNECTION) option;
-}
+type t = Pool : {db_pool : pool} -> t
 
-let assert_in_transaction store = assert (store.with_transaction <> None)
+type conn =
+  | Raw_connection of (module Caqti_lwt.CONNECTION)
+  | Ongoing_transaction of (module Caqti_lwt.CONNECTION)
+
+let assert_in_transaction conn =
+  match conn with
+  | Raw_connection _ -> assert false
+  | Ongoing_transaction _ -> ()
 
 module Q = struct
   open Caqti_request.Infix
@@ -307,24 +339,19 @@ module Q = struct
   end
 end
 
-let with_connection store k =
-  let open Lwt_result_syntax in
-  match store.with_transaction with
-  | Some conn -> k conn
-  | None ->
-      Caqti_lwt_unix.System.Switch.run @@ fun sw ->
-      let* conn = Db.caqti (Caqti_lwt_unix.connect ~sw store.db_uri) in
-      k conn
+let with_connection conn k =
+  match conn with
+  | Ongoing_transaction conn -> k conn
+  | Raw_connection conn -> k conn
 
-let with_transaction store k =
+let with_transaction conn k =
   let open Lwt_result_syntax in
-  match store.with_transaction with
-  | None -> (
-      with_connection store @@ fun conn ->
+  match conn with
+  | Raw_connection conn -> (
       let* () = Db.start conn in
       let*! res =
         Lwt.catch
-          (fun () -> k {store with with_transaction = Some conn})
+          (fun () -> k (Ongoing_transaction conn))
           (fun exn -> fail_with_exn exn)
       in
 
@@ -335,7 +362,7 @@ let with_transaction store k =
       | Error err ->
           let* () = Db.rollback conn in
           fail err)
-  | Some _ ->
+  | Ongoing_transaction _ ->
       failwith "Internal error: attempting to perform a nested transaction"
 
 module Journal_mode = struct
@@ -386,6 +413,9 @@ module Migrations = struct
     Db.exec conn Q.Migrations.register_migration (id, M.name)
 end
 
+let use (Pool {db_pool}) k =
+  Db.use_pool db_pool @@ fun conn -> k (Raw_connection conn)
+
 let init ~data_dir ~sqlite_journal_mode ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // "store.sqlite" in
@@ -396,33 +426,35 @@ let init ~data_dir ~sqlite_journal_mode ~perm () =
   let uri =
     Uri.of_string Format.(sprintf "sqlite3:%s?write=%b" path write_perm)
   in
-  let store = {db_uri = uri; with_transaction = None} in
+  let* db_pool = Db.caqti' @@ Caqti_lwt_unix.connect_pool uri in
+  let store = Pool {db_pool} in
+  use store @@ fun conn ->
   let* () =
     match sqlite_journal_mode with
     | `Force sqlite_journal_mode ->
-        Journal_mode.set_journal_mode store sqlite_journal_mode
+        Journal_mode.set_journal_mode conn sqlite_journal_mode
     | `Identity -> return_unit
   in
   let* () =
-    with_transaction store @@ fun store ->
+    with_transaction conn @@ fun conn ->
     let* () =
       if not exists then
-        let* () = Migrations.create_table store in
+        let* () = Migrations.create_table conn in
         let*! () = Evm_store_events.init_store () in
         return_unit
       else
-        let* table_exists = Migrations.table_exists store in
+        let* table_exists = Migrations.table_exists conn in
         let* () =
           when_ (not table_exists) (fun () ->
               failwith "A store already exists, but its content is incorrect.")
         in
         return_unit
     in
-    let* migrations = Migrations.missing_migrations store in
+    let* migrations = Migrations.missing_migrations conn in
     let* () =
       List.iter_es
         (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
-          let* () = Migrations.apply_migration store i mig in
+          let* () = Migrations.apply_migration conn i mig in
           let*! () = Evm_store_events.applied_migration M.name in
           return_unit)
         migrations
