@@ -59,6 +59,14 @@ Node
 
 - Removed Oxford mempool plugin. (MR :gl:`!13798`)
 
+- Remove support for deprecated version ``0`` for RPCs ``GET
+  ../mempool/monitor_operations``, ``POST ../helpers/preapply/operations``,
+  ``GET ../blocks/<block>``, ``GET ../blocks/<blocks>/metadata``. and ``GET
+  ../blocks/<blocks>/operations``. (MR :gl:`!13449`)
+
+- Remove support for deprecated version ``1`` for RPC ``GET
+  ../mempool/pending_operations``. (MR :gl:`!13449`)
+
 Client
 ------
 
