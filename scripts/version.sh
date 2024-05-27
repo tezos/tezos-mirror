@@ -26,15 +26,6 @@ export recommended_node_version=18.18.2
 ## https://github.com/ocaml/opam-repository
 export full_opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
 
-## `opam_repository_tag` is a commit hash of the
-## https://gitlab.com/tezos/opam-repository repository. This
-## repository is used to build the build-deps images used by the
-## tezos/tezos CI to run jobs and to produce the Octez Docker
-## distribution.
-## The value of `opam_repository_tag` MUST be reflected in the `build_deps_image_version` variable
-## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-b114b38e93159016d4f956dc9fce83f4223a8465}"
-
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
 export dal_srsu_g1_sha=c48ce4add1de2a7561108f17bf0c16bc1e93c0bff24bc7da465c24e0b4b2653e
