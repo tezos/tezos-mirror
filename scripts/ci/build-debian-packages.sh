@@ -1,15 +1,7 @@
 #!/bin/sh
 set -e
 
-deps_opam_repository_tag=$(cat /root/tezos/opam_repository_tag)
 . scripts/version.sh
-
-if [ "$deps_opam_repository_tag" != "$opam_repository_tag" ]; then
-  echo "Dependency tag: $deps_opam_repository_tag"
-  echo "Actual tag: $opam_repository_tag"
-  echo "The dependency image is outdated. Please rebuild before lunching this job"
-  exit 1
-fi
 
 BUILDDIR=$(pwd)
 export BLST_PORTABLE=true
