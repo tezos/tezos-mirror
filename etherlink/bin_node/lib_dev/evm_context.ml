@@ -957,10 +957,18 @@ let worker_promise, worker_waker = Lwt.task ()
 
 type error += No_worker
 
+let check_status_and_return worker =
+  match Worker.status worker with
+  | Closed (_, _, errs) -> (
+      match errs with
+      | Some errs -> Error errs
+      | None -> error_with "Worker failed with no error")
+  | _ -> Ok worker
+
 let worker =
   lazy
     (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
+    | Lwt.Return worker -> check_status_and_return worker
     | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
     | Lwt.Sleep -> Error (TzTrace.make No_worker))
 
