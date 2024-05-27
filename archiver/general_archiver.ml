@@ -61,7 +61,7 @@ let registered_rights_levels = Ring.create 120
 
 let rights_machine = Protocol_hash.Table.create 10
 
-let block_machine = Protocol_hash.Table.create 10
+let past_block_machine = Protocol_hash.Table.create 10
 
 let endorsement_machine = Protocol_hash.Table.create 10
 
@@ -115,12 +115,12 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         split_endorsements_preendorsements operations,
         [] (* FIXME? Baking rights *) )
 
-  let block_of ctxt level =
+  let past_block ctxt level =
     let cctx = Services.wrap_full ctxt in
     let* block_info, cycle_info = Services.get_block_info cctx level in
     block_data cctx block_info (Some cycle_info) []
 
-  let () = Protocol_hash.Table.add block_machine Services.hash block_of
+  let () = Protocol_hash.Table.add past_block_machine Services.hash past_block
 
   let get_validated_block ctxt level hash header reception_times =
     let cctx = Services.wrap_full ctxt in
@@ -275,10 +275,12 @@ module Loops (Archiver : Archiver.S) = struct
             return_unit
         | None -> return_unit)
 
-  let applied_blocks chain starting cctx =
+  (** [past_blocks chain starting cctx]
+      allows you to inject blocks from past level (in case of teztale shortage for instance) *)
+  let past_blocks chain starting cctx =
     mecanism chain starting cctx (fun {current_protocol; next_protocol} level ->
         if Protocol_hash.equal current_protocol next_protocol then
-          match Protocol_hash.Table.find block_machine current_protocol with
+          match Protocol_hash.Table.find past_block_machine current_protocol with
           | Some deal_with ->
               let* block_data = deal_with cctx level in
               let () = Archiver.add_block ~level block_data in
