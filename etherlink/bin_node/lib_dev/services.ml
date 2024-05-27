@@ -174,9 +174,15 @@ let get_fee_history block_count block_parameter
         :: history_acc.gas_used_ratio
       in
       (* 0 for block pre EIP-1559 *)
-      let base_fee_per_gas =
+      let block_base_fee_per_gas =
         Option.value block.baseFeePerGas ~default:Qty.zero
-        :: history_acc.base_fee_per_gas
+      in
+      let base_fee_per_gas =
+        match history_acc.base_fee_per_gas with
+        (* TODO : the list should start with the fee for the next block.
+           until then we double the first value to keep a list of correct length *)
+        | [] -> [block_base_fee_per_gas; block_base_fee_per_gas]
+        | l -> block_base_fee_per_gas :: l
       in
       let oldest_block = block.number in
       let history_acc = {oldest_block; base_fee_per_gas; gas_used_ratio} in

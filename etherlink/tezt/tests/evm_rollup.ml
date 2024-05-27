@@ -5701,7 +5701,7 @@ let test_rpc_feeHistory =
   Check.(
     Int64.(history.oldest_block = sub (of_int32 latest_block.number) 2L) int64)
     ~error_msg:"Expected block %R, but got %L" ;
-  Check.((List.length history.base_fee_per_gas = 3) int)
+  Check.((List.length history.base_fee_per_gas = 4) int)
     ~error_msg:"Expected list of size %R, but got %L" ;
   Check.((List.length history.gas_used_ratio = 3) int)
     ~error_msg:"Expected list of size %R, but got %L" ;
@@ -5744,7 +5744,8 @@ let test_rpc_feeHistory_past =
   in
   Check.(Int64.(history.oldest_block = sub old_block @@ pred block_count) int64)
     ~error_msg:"Expected block %R, but got %L" ;
-  Check.((List.length history.base_fee_per_gas = Int64.to_int block_count) int)
+  Check.(
+    (List.length history.base_fee_per_gas = 1 + Int64.to_int block_count) int)
     ~error_msg:"Expected list of size %R, but got %L" ;
   Check.((List.length history.gas_used_ratio = Int64.to_int block_count) int)
     ~error_msg:"Expected list of size %R, but got %L" ;
@@ -5784,7 +5785,7 @@ let test_rpc_feeHistory_long =
   Check.((history.oldest_block = 1L) int64)
     ~error_msg:"Expected block %R, but got %L" ;
   Check.(
-    (List.length history.base_fee_per_gas = Int32.to_int latest_block.number)
+    (List.length history.base_fee_per_gas = 1 + Int32.to_int latest_block.number)
       int)
     ~error_msg:"Expected list of size %R, but got %L" ;
   Check.(
