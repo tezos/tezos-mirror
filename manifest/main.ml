@@ -259,7 +259,11 @@ let () =
     |> List.map Filename.basename
   in
   pp_do_not_edit ~comment_start:";" fmt () ;
-  Format.pp_print_newline fmt () ;
+  Format.fprintf
+    fmt
+    "@.; This file contains a list of protocols to NOT build.@.; It is only \
+     used when slim mode is active.@.; Otherwise it is ignored by the build \
+     system.@.; For more information, see: scripts/slim-mode.sh@.@." ;
   Dune.pp fmt [S "data_only_dirs" :: Dune.of_atom_list ignored_dirs]
 
 let () = postcheck ~exclude ()
