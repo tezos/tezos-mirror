@@ -35,10 +35,6 @@ where <test-name> can be:
 * install-bin-rc-jammy
 * install-bin-bookworm
 * install-bin-rc-bookworm
-* install-bin-fedora37
-* install-bin-fedora38
-* install-bin-rc-fedora37
-* install-bin-rc-fedora38
 * install-opam-scratch
 * install-opam-jammy
 * compile-release-sources-bullseye
@@ -76,18 +72,6 @@ for test_case in "$@"; do
     ;;
   "install-bin-rc-bookworm")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$DEBIAN_BOOKWORM" /Scripts/install-bin-deb.sh debian bookworm rc
-    ;;
-  "install-bin-fedora37")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh
-    ;;
-  "install-bin-fedora38")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh
-    ;;
-  "install-bin-rc-fedora37")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh rc
-    ;;
-  "install-bin-rc-fedora38")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh rc
     ;;
   "install-opam-scratch")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_FOCAL" /Scripts/install-opam-scratch.sh

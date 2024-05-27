@@ -152,19 +152,17 @@ let read_opam_packages =
     | _ -> fail ()
 
 (* These are the set of Linux distributions and their release for
-   which we test installation of pre-19.1 packages for debian and
+   which we test installation of current packages for debian and
    the deprecated Serokell PPA binary packages for rpm. *)
 type install_octez_distribution =
   | Ubuntu_focal
   | Ubuntu_jammy
   | Debian_bookworm
-  | Fedora_37
 
 let image_of_distribution = function
   | Ubuntu_focal -> Images.ubuntu_focal
   | Ubuntu_jammy -> Images.ubuntu_jammy
   | Debian_bookworm -> Images.debian_bookworm
-  | Fedora_37 -> Images.fedora_37
 
 let job_tezt ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
     ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
@@ -1188,7 +1186,7 @@ let jobs pipeline_type =
       let install_octez_rules =
         make_rules ~changes:changeset_install_jobs ~manual:Yes ()
       in
-      (* Test installation of the pre-v19.1 deb and rpm binary packages. *)
+      (* Test installation of the current deb binary packages. *)
       let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
           distribution =
         let script =
@@ -1201,9 +1199,6 @@ let jobs pipeline_type =
               ^ if rc then " rc" else ""
           | Debian_bookworm ->
               sf "./docs/introduction/install-bin-deb.sh debian bookworm"
-              ^ if rc then " rc" else ""
-          | Fedora_37 ->
-              sf "./docs/introduction/install-bin-fedora.sh"
               ^ if rc then " rc" else ""
         in
         job
@@ -1247,44 +1242,32 @@ let jobs pipeline_type =
         |> enable_networked_cargo
       in
       [
-        (* Test installing binary / binary RC distributions in all distributions *)
-        job_install_bin ~__POS__ ~name:"oc.install_bin_fedora_37" Fedora_37;
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_rc_fedora_37"
-          ~rc:true
-          Fedora_37;
+        (* Test installing binary / binary RC distributions in all distributions. *)
         job_install_bin
           ~__POS__
           ~name:"oc.install_bin_ubuntu_focal"
-          ~allow_failure:Yes
           Ubuntu_focal;
         job_install_bin
           ~__POS__
           ~name:"oc.install_bin_ubuntu_jammy"
-          ~allow_failure:Yes
           Ubuntu_jammy;
         job_install_bin
           ~__POS__
           ~name:"oc.install_bin_rc_ubuntu_focal"
-          ~allow_failure:Yes
           ~rc:true
           Ubuntu_focal;
         job_install_bin
           ~__POS__
           ~name:"oc.install_bin_rc_ubuntu_jammy"
-          ~allow_failure:Yes
           ~rc:true
           Ubuntu_jammy;
         job_install_bin
           ~__POS__
           ~name:"oc.install_bin_debian_bookworm"
-          ~allow_failure:Yes
           Debian_bookworm;
         job_install_bin
           ~__POS__
           ~name:"oc.install_bin_rc_debian_bookworm"
-          ~allow_failure:Yes
           ~rc:true
           Debian_bookworm;
         (* Test installing through opam *)

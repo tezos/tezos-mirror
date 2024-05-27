@@ -7858,42 +7858,6 @@ oc.unit:protocol_compiles:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-oc.install_bin_fedora_37:
-  image: fedora:37
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - docs/introduction/compile*.sh
-    - docs/introduction/install*.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  script:
-  - ./docs/introduction/install-bin-fedora.sh
-
-oc.install_bin_rc_fedora_37:
-  image: fedora:37
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - docs/introduction/compile*.sh
-    - docs/introduction/install*.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  script:
-  - ./docs/introduction/install-bin-fedora.sh rc
-
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   stage: test
@@ -7909,7 +7873,6 @@ oc.install_bin_ubuntu_focal:
   needs:
   - trigger
   dependencies: []
-  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu focal
 
@@ -7928,7 +7891,6 @@ oc.install_bin_ubuntu_jammy:
   needs:
   - trigger
   dependencies: []
-  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
 
@@ -7947,7 +7909,6 @@ oc.install_bin_rc_ubuntu_focal:
   needs:
   - trigger
   dependencies: []
-  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu focal rc
 
@@ -7966,7 +7927,6 @@ oc.install_bin_rc_ubuntu_jammy:
   needs:
   - trigger
   dependencies: []
-  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy rc
 
@@ -7985,7 +7945,6 @@ oc.install_bin_debian_bookworm:
   needs:
   - trigger
   dependencies: []
-  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
 
@@ -8004,7 +7963,6 @@ oc.install_bin_rc_debian_bookworm:
   needs:
   - trigger
   dependencies: []
-  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm rc
 
