@@ -9250,8 +9250,10 @@ oc.docker:amd64:
     allow_failure: true
   needs:
   - oc.docker:rust-toolchain:amd64
+  - oc.docker:opam-repository:amd64
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -9273,8 +9275,10 @@ oc.docker:arm64:
   rules:
   - when: manual
     allow_failure: true
-  needs: []
-  dependencies: []
+  needs:
+  - oc.docker:opam-repository:arm64
+  dependencies:
+  - oc.docker:opam-repository:arm64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:

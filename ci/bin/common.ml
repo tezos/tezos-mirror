@@ -739,7 +739,16 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     | _ -> false
   in
   let image_dependencies =
-    if with_evm_artifacts then [Images.rust_toolchain] else []
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7293
+
+       In reality, we actually require both
+       {!Images.runtime_dependencies} and
+       {!Images.runtime_build_dependencies}. But these two images are
+       created by the same job, and depending on them both will create
+       a duplicated dependency on that single job, which GitLab CI
+       does not allow. This should be somehow handled by CIAO. *)
+    [Images.runtime_dependencies]
+    @ if with_evm_artifacts then [Images.rust_toolchain] else []
   in
   let variables =
     [

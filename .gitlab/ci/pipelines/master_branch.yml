@@ -198,6 +198,7 @@ oc.docker:amd64:
   - when: always
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -218,7 +219,8 @@ oc.docker:arm64:
   - gcp_arm64
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:

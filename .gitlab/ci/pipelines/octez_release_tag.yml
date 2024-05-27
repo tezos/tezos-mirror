@@ -101,7 +101,8 @@ oc.docker:amd64:
   stage: build
   tags:
   - gcp
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -120,7 +121,8 @@ oc.docker:arm64:
   stage: build
   tags:
   - gcp_arm64
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
