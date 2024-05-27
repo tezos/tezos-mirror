@@ -28,6 +28,14 @@
 (** Same as [Filename.concat]. *)
 val ( // ) : string -> string -> string
 
+(** Pretty-print a comment that says "this file was generated".
+
+    [comment_start] is prepended to each line.
+    For dune files for instance it should be [";"].
+
+    No empty line is printed after the comment; you should add one manually. *)
+val pp_do_not_edit : comment_start:string -> Format.formatter -> unit -> unit
+
 module Dune : sig
   (** Dune AST. *)
 
@@ -77,6 +85,9 @@ module Dune : sig
     | V of s_expr
     | []
     | ( :: ) of s_expr * s_expr
+
+  (** Pretty-print an S-expression. *)
+  val pp : Format.formatter -> s_expr -> unit
 
   (** Convert a list of [s_expr] to an [s_expr].
 

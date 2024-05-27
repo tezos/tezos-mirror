@@ -75,6 +75,8 @@ let exclude filename =
   (* We need to tell Dune about excluding directories without defining targets
      in those directories. Therefore we hand write some Dune in these. *)
   | "src" :: "riscv" :: _ -> true
+  (* [src/dune] is either absent or copied from [script-inputs/slim-mode-dune]. *)
+  | "src" :: "dune" :: _ -> true
   | _ -> false
 
 let () =
@@ -233,5 +235,35 @@ let () =
     ~header
     fmt
     Etherlink.registered_octez_evm_node_libs
+
+(* Generate the slim mode configuration. *)
+let () =
+  write "script-inputs/slim-mode-dune" @@ fun fmt ->
+  let is_ignored_in_slim_mode protocol =
+    match Octez.Protocol.status protocol with
+    | Active -> false
+    | Frozen | Overridden ->
+        (* Protocol 000 is always needed,
+           if only to be able to bootstrap Mainnet. *)
+        Octez.Protocol.number protocol <> V 000
+    | Not_mainnet ->
+        (* Demo protocols are useful for tests,
+           and slim mode is intended for developers
+           who sometimes actually test their code. *)
+        false
+  in
+  let ignored_dirs =
+    Octez.Protocol.all
+    |> List.filter is_ignored_in_slim_mode
+    |> List.map Octez.Protocol.base_path
+    |> List.map Filename.basename
+  in
+  pp_do_not_edit ~comment_start:";" fmt () ;
+  Format.fprintf
+    fmt
+    "@.; This file contains a list of protocols to NOT build.@.; It is only \
+     used when slim mode is active.@.; Otherwise it is ignored by the build \
+     system.@.; For more information, see: scripts/slim-mode.sh@.@." ;
+  Dune.pp fmt [S "data_only_dirs" :: Dune.of_atom_list ignored_dirs]
 
 let () = postcheck ~exclude ()

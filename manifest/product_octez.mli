@@ -86,18 +86,46 @@ module Protocol : sig
 
   type number = Alpha | V of int | Other
 
+  (** Status of the protocol on Mainnet.
+
+      - [Active]: the protocol is the current protocol on Mainnet, is being proposed,
+        or was active recently and was not deleted or frozen yet.
+        Or, it is protocol Alpha.
+      - [Frozen]: the protocol is an old protocol of Mainnet which was frozen
+        (its tests, daemons etc. have been removed).
+      - [Overridden]: the protocol has been replaced using a user-activated protocol override.
+      - [Not_mainnet]: this protocol was never on Mainnet (e.g. demo protocols). *)
+  type status = Active | Frozen | Overridden | Not_mainnet
+
+  val status : t -> status
+
   val main : t -> Manifest.target
 
   val alpha : t
 
+  (** List of all protocols. *)
+  val all : t list
+
+  (** List of active protocols. *)
   val active : t list
 
   val number : t -> number
 
   val name_dash : t -> string
 
+  (** E.g. ["src/proto_007_PsDELPH1"]. *)
+  val base_path : t -> string
+
   val short_hash : t -> string
 
+  (** Get packages to link.
+
+      This takes a function that selects packages from a protocol.
+      For instance, the node wants the embedded protocol and the plugin registerer,
+      while the client wants the client commands etc.
+
+      The result is the list of all such packages that exist.
+      All of them are optional dependencies. *)
   val all_optionally :
     (t -> Manifest.target option) list -> Manifest.target list
 

@@ -161,3 +161,7 @@ terraform.rc
 
 # Emacs
 .dir-locals.el
+
+# /src/dune is present in slim mode, absent otherwise.
+# Slim mode is a choice and, as such, must not be committed.
+/src/dune
