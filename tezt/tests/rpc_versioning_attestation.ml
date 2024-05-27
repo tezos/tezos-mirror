@@ -1000,7 +1000,9 @@ end
 module Block = struct
   let call_and_check_operation ~validation_pass get_name client =
     Log.info "Check kind for operation rpc" ;
-    check_rpc_versions
+    check_version
+      ~version:"1"
+      ~use_legacy_name:false
       ~check:(fun ~use_legacy_name:_ -> check_kind)
       ~get_name
       ~rpc:(fun ~version () ->
@@ -1016,7 +1018,9 @@ module Block = struct
       =
     Log.info "Check kind for operations_validation_pass rpc" ;
     let check ~use_legacy_name:_ json = check_kind JSON.(json |=> 0) in
-    check_rpc_versions
+    check_version
+      ~version:"1"
+      ~use_legacy_name:false
       ~check
       ~get_name
       ~rpc:(fun ~version () ->
@@ -1032,7 +1036,9 @@ module Block = struct
     let check ~use_legacy_name:_ json =
       check_kind JSON.(json |=> validation_pass |=> 0)
     in
-    check_rpc_versions
+    check_version
+      ~version:"1"
+      ~use_legacy_name:false
       ~check
       ~get_name
       ~rpc:(fun ~version () -> RPC.get_chain_block_operations ~version ())
@@ -1044,7 +1050,9 @@ module Block = struct
     let check ~use_legacy_name:_ json =
       check_kind JSON.(json |-> "operations" |=> validation_pass |=> 0)
     in
-    check_rpc_versions
+    check_version
+      ~version:"1"
+      ~use_legacy_name:false
       ~check
       ~get_name
       ~rpc:(fun ~version () -> RPC.get_chain_block ~version ())
@@ -1170,7 +1178,16 @@ module Block = struct
       check_category (sf "lost %s rewards" name)
     in
     let rpc ~version _ = RPC.get_chain_block ~version () in
-    let* () = check_rpc_versions ~check ~rpc ~get_name ~data:() client in
+    let* () =
+      check_version
+        ~version:"1"
+        ~use_legacy_name:false
+        ~check
+        ~rpc
+        ~get_name
+        ~data:()
+        client
+    in
 
     Log.info "Check the block metadata RPC" ;
     let check ~use_legacy_name:_ (metadata : RPC.block_metadata) name =
@@ -1193,7 +1210,16 @@ module Block = struct
       check_category (sf "lost %s rewards" name)
     in
     let rpc ~version data = RPC.get_chain_block_metadata ~version data in
-    let* () = check_rpc_versions ~check ~rpc ~get_name ~data:() client in
+    let* () =
+      check_version
+        ~version:"1"
+        ~use_legacy_name:false
+        ~check
+        ~rpc
+        ~get_name
+        ~data:()
+        client
+    in
     unit
 
   let register ~protocols =
