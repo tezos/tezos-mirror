@@ -89,7 +89,7 @@ odoc-lite:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms --exclude=target \
-		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../vendors ../dune ../dune-project ../dune-workspace ../data-encoding ../rust-toolchain ../resto ../prometheus $(TMPDOCDIR)/
+		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../client-libs ../etherlink ../data-encoding ../resto ../prometheus ../vendors ../dune ../dune-project ../dune-workspace ../rust-toolchain $(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh on
 	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in odoc.log"
 	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \

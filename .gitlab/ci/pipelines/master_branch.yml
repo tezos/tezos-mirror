@@ -315,10 +315,15 @@ publish:documentation:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
     - script-inputs/**/*/
     - scripts/**/*/
     - src/**/*

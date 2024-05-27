@@ -3180,10 +3180,15 @@ documentation:odoc:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
     - script-inputs/**/*/
     - scripts/**/*/
     - src/**/*
@@ -3232,10 +3237,15 @@ documentation:manuals:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
     - script-inputs/**/*/
     - scripts/**/*/
     - src/**/*
@@ -3285,10 +3295,15 @@ documentation:docgen:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
     - script-inputs/**/*/
     - scripts/**/*/
     - src/**/*
@@ -3339,10 +3354,15 @@ documentation:build_all:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
     - script-inputs/**/*/
     - scripts/**/*/
     - src/**/*
@@ -3381,10 +3401,15 @@ documentation:linkcheck:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
     - script-inputs/**/*/
     - scripts/**/*/
     - src/**/*
