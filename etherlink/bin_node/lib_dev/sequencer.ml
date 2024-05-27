@@ -42,8 +42,6 @@ end) : Services_backend_sig.Backend = struct
 
   let smart_rollup_address =
     Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
-
-  let mode = Services_backend_sig.Sequencer
 end
 
 module Make (Ctxt : sig

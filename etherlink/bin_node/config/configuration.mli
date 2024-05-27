@@ -54,6 +54,7 @@ val sqlite_journal_mode_encoding : sqlite_journal_mode Data_encoding.t
 type experimental_features = {
   sqlite_journal_mode : sqlite_journal_mode;
   drop_duplicate_on_injection : bool;
+  enable_send_raw_transaction : bool;
 }
 
 type sequencer = {
@@ -94,7 +95,7 @@ type observer = {
       (** See {!time_between_blocks}. *)
 }
 
-type proxy = {read_only : bool}
+type proxy = unit
 
 type t = {
   rpc_addr : string;
@@ -222,7 +223,6 @@ module Cli : sig
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
-    ?proxy_read_only:bool ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     unit ->
     t
@@ -255,7 +255,6 @@ module Cli : sig
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
-    ?proxy_read_only:bool ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     unit ->
     t tzresult Lwt.t

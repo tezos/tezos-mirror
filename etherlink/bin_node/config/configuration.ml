@@ -26,6 +26,7 @@ type sqlite_journal_mode = Delete | Wal
 type experimental_features = {
   sqlite_journal_mode : sqlite_journal_mode;
   drop_duplicate_on_injection : bool;
+  enable_send_raw_transaction : bool;
 }
 
 type sequencer = {
@@ -59,7 +60,7 @@ type observer = {
   time_between_blocks : time_between_blocks option;
 }
 
-type proxy = {read_only : bool}
+type proxy = unit
 
 type t = {
   rpc_addr : string;
@@ -92,9 +93,12 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
 
 let default_sqlite_journal_mode = Delete
 
+let default_enable_send_raw_transaction = true
+
 let default_experimental_features =
   {
     sqlite_journal_mode = default_sqlite_journal_mode;
+    enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
   }
 
@@ -457,22 +461,33 @@ let sqlite_journal_mode_encoding =
 let experimental_features_encoding =
   let open Data_encoding in
   conv
-    (fun {sqlite_journal_mode; drop_duplicate_on_injection} ->
-      (sqlite_journal_mode, drop_duplicate_on_injection))
-    (fun (sqlite_journal_mode, drop_duplicate_on_injection) ->
-      {sqlite_journal_mode; drop_duplicate_on_injection})
-    (obj2
+    (fun {
+           sqlite_journal_mode;
+           drop_duplicate_on_injection;
+           enable_send_raw_transaction;
+         } ->
+      ( sqlite_journal_mode,
+        drop_duplicate_on_injection,
+        enable_send_raw_transaction ))
+    (fun ( sqlite_journal_mode,
+           drop_duplicate_on_injection,
+           enable_send_raw_transaction ) ->
+      {
+        sqlite_journal_mode;
+        drop_duplicate_on_injection;
+        enable_send_raw_transaction;
+      })
+    (obj3
        (dft "sqlite_journal_mode" sqlite_journal_mode_encoding Delete)
-       (dft "drop_duplicate_on_injection" bool false))
+       (dft "drop_duplicate_on_injection" bool false)
+       (dft
+          "enable_send_raw_transaction"
+          bool
+          default_enable_send_raw_transaction))
 
-let proxy_encoding =
-  let open Data_encoding in
-  conv
-    (fun {read_only} -> read_only)
-    (fun read_only -> {read_only})
-    (obj1 (dft "read_only" bool false))
+let proxy_encoding = Data_encoding.unit
 
-let default_proxy = {read_only = false}
+let default_proxy = ()
 
 let encoding data_dir : t Data_encoding.t =
   let open Data_encoding in
@@ -644,8 +659,7 @@ module Cli = struct
       ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?(proxy_read_only = false) ?sequencer_sidecar_endpoint
-      () =
+      ?catchup_cooldown ?sequencer_sidecar_endpoint () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -695,7 +709,7 @@ module Cli = struct
             ())
         evm_node_endpoint
     in
-    let proxy = {read_only = proxy_read_only} in
+    let proxy = () in
     let log_filter =
       default_filter_config
         ?max_nb_blocks:log_filter_max_nb_blocks
@@ -739,7 +753,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?(proxy_read_only = false) ?sequencer_sidecar_endpoint configuration =
+      ?sequencer_sidecar_endpoint configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -927,9 +941,7 @@ module Cli = struct
                 ())
             evm_node_endpoint
     in
-    let proxy =
-      {read_only = configuration.proxy.read_only || proxy_read_only}
-    in
+    let proxy = () in
     let log_filter =
       {
         max_nb_blocks =
@@ -989,7 +1001,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?proxy_read_only ?sequencer_sidecar_endpoint () =
+      ?sequencer_sidecar_endpoint () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1039,7 +1051,6 @@ module Cli = struct
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
-          ?proxy_read_only
           ?sequencer_sidecar_endpoint
           configuration
       in
@@ -1079,7 +1090,6 @@ module Cli = struct
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
-          ?proxy_read_only
           ?sequencer_sidecar_endpoint
           ()
       in

@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Proxy | Sequencer | Observer | Threshold_encryption_sequencer
-
 module type S = sig
   module Reader : Durable_storage.READER
 
@@ -136,8 +134,6 @@ module type S = sig
     Ethereum_types.hex tzresult Lwt.t
 
   val smart_rollup_address : string
-
-  val mode : mode
 end
 
 module type Backend = sig
@@ -156,8 +152,6 @@ module type Backend = sig
     Ethereum_types.quantity tzresult Lwt.t
 
   val smart_rollup_address : string
-
-  val mode : mode
 end
 
 module Make (Backend : Backend) : S = struct
@@ -169,6 +163,4 @@ module Make (Backend : Backend) : S = struct
   let block_param_to_block_number = Backend.block_param_to_block_number
 
   let smart_rollup_address = Backend.smart_rollup_address
-
-  let mode = Backend.mode
 end

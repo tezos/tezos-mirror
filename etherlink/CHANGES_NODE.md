@@ -27,6 +27,7 @@
 - Add the field `drop_duplicate` for the batcher injection rpc input
   (rollup node version must support it). The field allows to reduce
   the cost of operating a rollup batcher node. (!13189)
+- Support enabling or disabling the `eth_sendRawTransaction` method. (!13162 !13288)
 
 ### Bug fixes
 

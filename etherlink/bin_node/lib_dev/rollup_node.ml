@@ -161,8 +161,6 @@ end) : Services_backend_sig.Backend = struct
               hash)
 
   let smart_rollup_address = Base.smart_rollup_address
-
-  let mode = Services_backend_sig.Proxy
 end
 
 module Make (Base : sig

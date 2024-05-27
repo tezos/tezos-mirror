@@ -89,7 +89,8 @@ let main
     let smart_rollup_address = smart_rollup_address
   end) in
   let* () =
-    if config.proxy.read_only then return_unit
+    if not config.experimental_features.enable_send_raw_transaction then
+      return_unit
     else
       Tx_pool.start
         {
