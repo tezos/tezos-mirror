@@ -2191,9 +2191,6 @@ module Receipt : sig
   type balance_updates = balance_update_item list
 
   val balance_updates_encoding : balance_updates Data_encoding.t
-
-  val balance_updates_encoding_with_legacy_attestation_name :
-    balance_updates Data_encoding.t
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)

@@ -2818,12 +2818,7 @@ let block_metadata_encoding ~use_legacy_attestation_name =
              (req "voting_period_info" Voting_period.info_encoding)
              (req "nonce_hash" (option Nonce_hash.encoding))
              (req "deactivated" (list Signature.Public_key_hash.encoding))
-             (dft
-                "balance_updates"
-                (if use_legacy_attestation_name then
-                   Receipt.balance_updates_encoding_with_legacy_attestation_name
-                 else Receipt.balance_updates_encoding)
-                [])
+             (dft "balance_updates" Receipt.balance_updates_encoding [])
              (req
                 "liquidity_baking_toggle_ema"
                 Per_block_votes.Liquidity_baking_toggle_EMA.encoding)
