@@ -14,7 +14,8 @@
 ## with both the make and sh syntax
 
 export ocaml_version=4.14.1
-export opam_version=2
+# Used for sanity check in Makefile.
+export opam_version_major=2
 export recommended_rust_version=1.74.0
 export recommended_node_version=18.18.2
 

@@ -44,8 +44,8 @@ BUILD_EXTRA ?=
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
-ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
-$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
+ifeq ($(filter ${opam_version_major}.%,${current_opam_version}),)
+$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version_major}.*))
 endif
 endif
 
