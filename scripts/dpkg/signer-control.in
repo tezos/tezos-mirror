@@ -3,4 +3,4 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
 Description: The Octez Signer
-Depends: adduser, @DEPENDS@
+Depends: adduser, systemd, @DEPENDS@
