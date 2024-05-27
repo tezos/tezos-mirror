@@ -3,6 +3,7 @@
 
 stages:
 - start
+- images
 - sanity
 - build
 - test
@@ -29,6 +30,24 @@ oc.docker:client-libs-dependencies:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
 
+oc.docker:rust-toolchain:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
+
 trigger:
   image: alpine:3.19
   stage: start
@@ -52,6 +71,8 @@ sanity_ci:
   stage: sanity
   tags:
   - gcp
+  needs:
+  - trigger
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh
@@ -102,44 +123,6 @@ nix:
     paths:
     - flake.lock
     when: on_failure
-
-oc.docker:rust-toolchain:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - etherlink.mk
-    - etherlink/**/*
-    - images/**/*
-    - irmin/**/*
-    - kernels.mk
-    - michelson_test_scripts/**/*
-    - scripts/ci/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  before_script: []
-  script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.6
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
 
 oc.build_arm64-released:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -367,8 +350,6 @@ oc.build_kernels:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7117,8 +7098,6 @@ test_kernels:
     - kernels.mk
     - src/kernel_*/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7147,8 +7126,6 @@ test_etherlink_kernel:
     - images/**/*
     - src/kernel_sdk/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7176,8 +7153,6 @@ test_etherlink_firehose:
     - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
     - images/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7204,8 +7179,6 @@ test_riscv_kernels:
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7235,8 +7208,6 @@ test_evm_compatibility:
     - etherlink/kernel_evm/evm_execution/**/*
     - images/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -8467,13 +8438,13 @@ oc.docker:amd64:
   rules:
   - when: manual
     allow_failure: true
-  needs: []
-  dependencies: []
-  before_script: []
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  - source rust_toolchain_image_tag.env
-  - export rust_toolchain_image_tag
   - ./scripts/ci/docker_release.sh
   services:
   - docker:${DOCKER_VERSION}-dind
@@ -8483,7 +8454,6 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
-    RUST_TOOLCHAIN_ALWAYS_REBUILD: "true"
 
 oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -8507,7 +8477,6 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
-    rust_toolchain_image_tag: is-never-pulled
 
 oc.build:dpkg:amd64:
   image: $DISTRIBUTION

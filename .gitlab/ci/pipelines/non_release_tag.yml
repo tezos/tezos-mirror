@@ -62,7 +62,6 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables
-    rust_toolchain_image_tag: is-never-pulled
 
 oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -82,7 +81,6 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
-    rust_toolchain_image_tag: is-never-pulled
 
 oc.build:dpkg:amd64:
   image: $DISTRIBUTION

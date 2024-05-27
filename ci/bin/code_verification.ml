@@ -433,6 +433,7 @@ let jobs pipeline_type =
         ~name:"sanity_ci"
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.sanity
+        ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
           "make -C manifest check";
@@ -491,13 +492,6 @@ let jobs pipeline_type =
       | _ -> []
     in
     [job_sanity_ci; job_docker_hadolint] @ mr_only_jobs
-  in
-  let job_docker_rust_toolchain =
-    job_docker_rust_toolchain
-      ~__POS__
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:Yes ())
-      ~dependencies:dependencies_needs_start
-      ()
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
@@ -559,7 +553,6 @@ let jobs pipeline_type =
       ~name:"oc.build_kernels"
       ~image:Images.rust_toolchain
       ~stage:Stages.build
-      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
       ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
       [
         "make -f kernels.mk build";
@@ -695,7 +688,6 @@ let jobs pipeline_type =
       | Before_merging -> []
     in
     [
-      job_docker_rust_toolchain;
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
       job_static_x86_64_experimental;
@@ -1466,7 +1458,6 @@ let jobs pipeline_type =
           ~name
           ~image:Images.rust_toolchain
           ~stage:Stages.test
-          ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
           ~rules:(make_rules ~dependent:true ~changes ())
           script
           ~cache:[cache_kernels]

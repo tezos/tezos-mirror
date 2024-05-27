@@ -561,9 +561,9 @@ let enc_git_strategy = function
   | No_strategy -> "none"
 
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
-    ?interruptible ?(dependencies = Staged []) ?services ?variables ?rules
-    ?timeout ?tag ?git_strategy ?coverage ?retry ?parallel ~__POS__ ~image
-    ~stage ~name script : tezos_job =
+    ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
+    ?services ?variables ?rules ?timeout ?tag ?git_strategy ?coverage ?retry
+    ?parallel ~__POS__ ~image ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag) with
@@ -592,7 +592,8 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
         name
   | _ -> ()) ;
   let image_dependencies =
-    match image with Internal _ -> [image] | External _ -> []
+    (match image with Internal _ -> [image] | External _ -> [])
+    @ image_dependencies
   in
   let dependencies =
     (Fun.flip List.iter image_dependencies @@ function

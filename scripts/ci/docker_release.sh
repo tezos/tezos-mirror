@@ -8,8 +8,6 @@ set -eu
 
 build_deps_image_name=${build_deps_image_name:?"build_deps_image_name is unset"}
 build_deps_image_version=${build_deps_image_version:?"build_deps_image_version is unset"}
-rust_toolchain_image_name=${rust_toolchain_image_name:?"rust_toolchain_image_name is unset"}
-rust_toolchain_image_tag=${rust_toolchain_image_tag:?"rust_toolchain_image_tag is unset"}
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
@@ -21,6 +19,10 @@ or to 'script-inputs/released-executables script-inputs/experimental-executables
 OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 
 # Build minimal, bare and debug images
+
+# Disable the quote-warning from shellcheck so that we can pass the
+# optional arguments rust_toolchain_image_{name,tag}
+# shellcheck disable=SC2046
 ./scripts/create_docker_image.sh \
   --image-name "${DOCKER_IMAGE_NAME}" \
   --image-version "${DOCKER_IMAGE_TAG}" \
@@ -29,8 +31,8 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
-  --rust-toolchain-image "${rust_toolchain_image_name}" \
-  --rust-toolchain-image-tag "${rust_toolchain_image_tag}"
+  $(if [ -n "${rust_toolchain_image_name}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image_name}"; fi) \
+  $(if [ -n "${rust_toolchain_image_tag}" ]; then echo "--rust-toolchain-image-tag ${rust_toolchain_image_tag}"; fi)
 
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`

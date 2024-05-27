@@ -286,7 +286,13 @@ val enc_git_strategy : git_strategy -> string
       - Setting both [arch] and [tag] throws an error.
       - Omitting both [arch] and [tag] is equivalent to setting
         [~tag:Gcp] or, equivalently, omitting tag and setting
-        [~arch:Amd64].*)
+        [~arch:Amd64].
+
+    - [image_dependencies] is a list of internal !{Image.t}s that this
+      job uses indirectly, i.e. not in it's [image:] field. For
+      instance, this can be used by a job that builds a Docker image
+      with an internal image as input.  A run-time error will be thrown
+      if this list includes an external image. *)
 val job :
   ?arch:arch ->
   ?after_script:string list ->
@@ -296,6 +302,7 @@ val job :
   ?cache:Gitlab_ci.Types.cache list ->
   ?interruptible:bool ->
   ?dependencies:dependencies ->
+  ?image_dependencies:Image.t list ->
   ?services:Gitlab_ci.Types.service list ->
   ?variables:Gitlab_ci.Types.variables ->
   ?rules:Gitlab_ci.Types.job_rule list ->

@@ -36,13 +36,6 @@ let jobs =
      {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
      GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
   let rules_always = [job_rule ~when_:Always ()] in
-  let job_docker_rust_toolchain =
-    job_docker_rust_toolchain
-      ~__POS__ (* Always rebuild on master to reduce risk of tampering *)
-      ~always_rebuild:true
-      ~rules:rules_always
-      ()
-  in
   let job_docker_amd64_experimental : tezos_job =
     job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
   in
@@ -133,7 +126,6 @@ let jobs =
       ~image:Images.rust_toolchain
       ~stage:Stages.manual
       ~rules:[job_rule ~when_:Manual ()]
-      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
       ~interruptible:false
       ~variables:
         [("CARGO_HOME", Predefined_vars.(show ci_project_dir) // "cargo")]
@@ -154,7 +146,6 @@ let jobs =
   in
   [
     (* Stage: build *)
-    job_docker_rust_toolchain;
     job_static_x86_64;
     job_static_arm64;
     job_build_arm64_release;
