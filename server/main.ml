@@ -142,7 +142,6 @@ let with_caqti_error ~logger x f =
       | Ok x -> f x
       | Error e ->
           let body = Caqti_error.show e in
-          print_endline body ;
           Teztale_lib.Log.error logger (fun () -> body) ;
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
