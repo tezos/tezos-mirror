@@ -38,11 +38,14 @@ if [ ! -f "${image_directory}/inputs" ]; then
 fi
 
 # Sanity check that each line in the image's inputs corresponds to an
-# existing file or directory:
+# existing file or directory and its git status:
 while read -r input; do
   if [ ! -e "$input" ]; then
     echo "${image_directory}/inputs: ${input} does not exist" >&2
     exit 1
+  fi
+  if ! git diff-files --quiet -- "$input"; then
+    echo "Warning: ${image_directory}/inputs: ${input} has unstaged changes which will be ignored." >&2
   fi
 done < "${image_directory}/inputs"
 
