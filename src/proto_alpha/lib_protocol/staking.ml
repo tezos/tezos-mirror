@@ -195,9 +195,10 @@ let stake_from_unstake_for_delegate ctxt ~for_next_cycle_use_only_after_slashing
   match unfinalizable_requests_opt with
   | None -> return (ctxt, [], amount)
   | Some Unstake_requests_storage.{delegate = delegate_requests; requests} ->
-      if Signature.Public_key_hash.(delegate <> delegate_requests) then
-        (* Possible. If reached, stake should not do anything,
-           so we also set the amount to stake from the liquid part to zero. *)
+      if
+        Signature.Public_key_hash.(delegate <> delegate_requests)
+        && not (List.is_empty requests)
+      then (* Should not be possible *)
         return (ctxt, [], Tez_repr.zero)
       else
         let* allowed =
