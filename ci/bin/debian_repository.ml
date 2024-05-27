@@ -46,7 +46,7 @@ let jobs =
       ~stage:Stages.build
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
-      ~tags:["$TAGS"]
+      ~tag:Dynamic
       [".gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh"]
   in
   let job_docker_build_debian_dependencies : tezos_job =
@@ -71,7 +71,7 @@ let jobs =
       ~stage:Stages.packaging
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
-      ~tags:["$TAGS"]
+      ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [".gitlab/ci/jobs/packaging/build-debian-packages.sh"]
   in
