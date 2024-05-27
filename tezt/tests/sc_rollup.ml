@@ -46,6 +46,10 @@ let default_wasm_pvm_revision = function
   | Protocol.Alpha | Paris -> "2.0.0-r4"
   | Protocol.Oxford -> "2.0.0-r3"
 
+let max_nb_ticks = function
+  | Protocol.Paris -> 50_000_000_000_000
+  | Alpha | Oxford -> 11_000_000_000
+
 let get_outbox_proof ?rpc_hooks ~__LOC__ sc_rollup_node ~message_index
     ~outbox_level =
   let* proof =
@@ -1715,7 +1719,7 @@ let commitment_not_published_if_non_final _protocol sc_rollup_node sc_rollup
     ~error_msg:"No commitment published has been found by the rollup node" ;
   unit
 
-let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup _node
+let commitments_messages_reset kind protocol sc_rollup_node sc_rollup _node
     client =
   (* For `sc_rollup_commitment_period_in_blocks` levels after the sc rollup
      origination, i messages are sent to the rollup, for a total of
@@ -1728,6 +1732,7 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup _node
      `block_finality_time` empty levels are baked which ensures that two
      commitments are stored and published by the rollup node.
   *)
+  let max_nb_ticks = max_nb_ticks protocol in
   let* genesis_info =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -1786,7 +1791,7 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup _node
          4
          (* one snapshot for collecting, two snapshots for SOL,
             Info_per_level and EOL *)
-         * 11_000_000_000 (* number of ticks in a snapshots *)
+         * max_nb_ticks (* number of ticks in a snapshots *)
          * levels_to_commitment (* number of inboxes *)
      | _ -> failwith "incorrect kind"
    in
@@ -1893,7 +1898,7 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
     (stored_commitment', "stored in second node") ;
   unit
 
-let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node sc_rollup
+let commitments_reorgs ~switch_l1_node ~kind protocol sc_rollup_node sc_rollup
     node client =
   (* No messages are published after origination, for
      `sc_rollup_commitment_period_in_blocks - 1` levels. Then a divergence
@@ -2028,7 +2033,8 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node sc_rollup
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   let () = Log.info "init_level: %d" init_level in
-  (let expected_number_of_ticks =
+  (let max_nb_ticks = max_nb_ticks protocol in
+   let expected_number_of_ticks =
      match kind with
      | "arith" ->
          1 (* boot sector *) + 1 (* metadata *) + (3 * levels_to_commitment)
@@ -2036,7 +2042,7 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node sc_rollup
      | "wasm_2_0_0" ->
          (* Number of ticks per snapshot,
             see Lib_scoru_wasm.Constants.wasm_max_tick *)
-         let snapshot_ticks = 11_000_000_000 in
+         let snapshot_ticks = max_nb_ticks in
          snapshot_ticks * 4
          (* 1 snapshot for collecting messages, 3 snapshots for SOL,
             Info_per_level and SOL *) * levels_to_commitment
