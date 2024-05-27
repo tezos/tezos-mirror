@@ -490,11 +490,6 @@ module Internal_for_tests : sig
       verifier using default parameters designed to handle test cases. *)
   val init_verifier_dal : unit -> unit
 
-  (** This function loads in memory the default verifier SRS. The
-      difference with [init_verifier_dal] is that the latter loads a
-      SRS that should be only used for tests. *)
-  val init_verifier_dal_default : unit -> unit
-
   (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
   val make_dummy_shards : t -> state:Random.State.t -> shard Seq.t
@@ -581,30 +576,22 @@ end
 
 (** node parameters for the DAL. *)
 module Config : sig
-  type t = Dal_config.t = {
-    activated : bool;
-    use_mock_srs_for_testing : bool;
-    bootstrap_peers : string list;
-  }
+  type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}
 
   val encoding : t Data_encoding.t
 
   val default : t
 
-  (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the
-     DAL according to the dal configuration [config], a function to find the SRS
-     files [find_trusted_setup_files] and the optional log2 of the SRS size
-     [srs_size_log2].
-
-      When [config.use_mock_srs_for_testing = false],
-     [init_dal] loads [initialisation_parameters] from the files at the
-     paths provided by [find_trusted_setup_files ()]. It is important that
-     every time the primitives above are used, they are used with the very
-     same initialization parameters. (To ensure this property, an integrity
-     check is run.) In this case, [init_dal] can take several seconds
-     to run. *)
+  (** [init_verifier_dal config] initializes the DAL according to the DAL
+      configuration [config], with a minimal SRS for the verifier.
+     Note that only verifying functions can be used with this setup *)
   val init_verifier_dal : t -> unit Error_monad.tzresult
 
+  (** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) config] initializes
+      the DAL according to the DAL configuration [config], a function to find
+      the SRS files [find_srs_files] and the optional log2 of the SRS size
+      [srs_size_log2].
+      Note that the proving & verifying functions can be used with this setup *)
   val init_prover_dal :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
     ?srs_size_log2:int ->

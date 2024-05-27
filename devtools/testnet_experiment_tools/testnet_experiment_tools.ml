@@ -264,12 +264,7 @@ module Local = struct
           user_activated_upgrades = [];
           user_activated_protocol_overrides = [];
           default_bootstrap_peers = [];
-          dal_config =
-            {
-              activated = false;
-              use_mock_srs_for_testing = false;
-              bootstrap_peers = [];
-            };
+          dal_config = {activated = false; bootstrap_peers = []};
           genesis_parameters =
             Some
               {

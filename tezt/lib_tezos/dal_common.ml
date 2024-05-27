@@ -556,19 +556,28 @@ module Helpers = struct
       ?(on_error =
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
       parameters =
-    Cryptobox.Internal_for_tests.init_prover_dal () ;
-    match Cryptobox.make parameters with
-    | Ok cryptobox -> cryptobox
-    | Error (`Fail msg) ->
-        let parameters_json =
-          Data_encoding.Json.construct Cryptobox.parameters_encoding parameters
-        in
-        on_error
-        @@ Format.asprintf
-             "%s,@ parameters: %a"
-             msg
-             Data_encoding.Json.pp
-             parameters_json
+    let* init =
+      Cryptobox.Config.init_prover_dal
+        ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+        Cryptobox.Config.default
+    in
+    match init with
+    | Error _ -> on_error @@ Format.asprintf "init_prover_dal failed."
+    | Ok () -> (
+        match Cryptobox.make parameters with
+        | Ok cryptobox -> return cryptobox
+        | Error (`Fail msg) ->
+            let parameters_json =
+              Data_encoding.Json.construct
+                Cryptobox.parameters_encoding
+                parameters
+            in
+            on_error
+            @@ Format.asprintf
+                 "%s,@ parameters: %a"
+                 msg
+                 Data_encoding.Json.pp
+                 parameters_json)
 
   let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
       ~commitment ~proof client =

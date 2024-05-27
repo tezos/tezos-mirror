@@ -55,10 +55,7 @@ let dal_parameters ~is_fake =
   let parameters =
     {number_of_shards; redundancy_factor; page_size; slot_size}
   in
-  let dal_config =
-    let use_mock_srs_for_testing = is_fake in
-    Config.{activated = true; use_mock_srs_for_testing; bootstrap_peers = []}
-  in
+  let dal_config = Config.{activated = true; bootstrap_peers = []} in
   let find_srs_files = Tezos_base.Dal_srs.find_trusted_setup_files in
   let check_make error_msg =
     match make parameters with

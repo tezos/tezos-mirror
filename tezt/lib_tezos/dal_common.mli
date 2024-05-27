@@ -67,7 +67,9 @@ module Helpers : sig
   val slot_of_pages : slot_size:int -> string list -> slot
 
   val make_cryptobox :
-    ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
+    ?on_error:(string -> Cryptobox.t Lwt.t) ->
+    Cryptobox.parameters ->
+    Cryptobox.t Lwt.t
 
   val publish_commitment :
     ?dont_wait:bool ->

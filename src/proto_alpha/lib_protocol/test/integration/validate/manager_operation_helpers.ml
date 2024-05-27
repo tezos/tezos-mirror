@@ -404,7 +404,7 @@ let init_ctxt_only ctxtreq =
     Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
       {Context.default_test_constants with consensus_threshold = 0}
   in
-  let*? _cryptobox =
+  let* _cryptobox =
     Dal_helpers.mk_cryptobox initial_params.constants.dal.cryptobox_parameters
   in
   let* block, contracts =
