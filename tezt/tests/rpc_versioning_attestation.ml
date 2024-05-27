@@ -87,21 +87,8 @@ let check_unknown_version ~version ~rpc ~data client =
   let msg = rex "Failed to parse argument 'version'" in
   Process.check_error ~msg p
 
-let check_rpc_versions ?(old = "0") ?(new_ = "1") ?(unknown = "2") ~check ~rpc
-    ~get_name ~data client =
-  Log.info
-    "Call the rpc with the old version and check that the operations returned \
-     contain endorsement kinds" ;
-  let* () =
-    check_version
-      ~version:old
-      ~use_legacy_name:true
-      ~check
-      ~rpc
-      ~get_name
-      ~data
-      client
-  in
+let check_rpc_versions ?(new_ = "1") ?(unknown = "2") ~check ~rpc ~get_name
+    ~data client =
   Log.info
     "Call the rpc with the new version and check that the operations returned \
      contain attestation kinds" ;
@@ -499,7 +486,6 @@ module Mempool = struct
     in
     let get_name = Operation.Consensus.kind_to_string kind in
     check_rpc_versions
-      ~old:"1"
       ~new_:"2"
       ~unknown:"3"
       ~check
@@ -548,7 +534,6 @@ module Mempool = struct
     in
     let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
     check_rpc_versions
-      ~old:"1"
       ~new_:"2"
       ~unknown:"3"
       ~check
@@ -585,14 +570,11 @@ module Mempool = struct
       Operation.Anonymous.Double_preattestation_evidence
       protocol
 
-  let monitor_mempool node ~use_legacy_name =
+  let monitor_mempool node =
     let monitor_operations_url =
       RPC_core.make_uri
         (Node.as_rpc_endpoint node)
-        (RPC.get_chain_mempool_monitor_operations
-           ~refused:true
-           ~version:(if use_legacy_name then "0" else "1")
-           ())
+        (RPC.get_chain_mempool_monitor_operations ~refused:true ~version:"1" ())
       |> Uri.to_string
     in
     Curl.get monitor_operations_url
@@ -633,8 +615,7 @@ module Mempool = struct
     let* node, client = Client.init_with_protocol ~protocol `Client () in
     let signer = Constant.bootstrap1 in
 
-    let*? p_legacy = monitor_mempool node ~use_legacy_name:true in
-    let*? p = monitor_mempool node ~use_legacy_name:false in
+    let*? p = monitor_mempool node in
 
     let* consensus_op =
       create_consensus_op ~use_legacy_name:true ~signer ~kind client
@@ -648,7 +629,6 @@ module Mempool = struct
       let name = Operation.Consensus.kind_to_string kind ~use_legacy_name in
       check_monitor_mempool p name
     in
-    let* () = check_monitor_mempool p_legacy ~use_legacy_name:true in
     let* () = check_monitor_mempool p ~use_legacy_name:false in
     check_invalid_monitor_mempool_version node
 
@@ -673,8 +653,7 @@ module Mempool = struct
     let* node, client = Client.init_with_protocol ~protocol `Client () in
     let* () = Client.bake_for_and_wait ~node client in
 
-    let*? p_legacy = monitor_mempool node ~use_legacy_name:true in
-    let*? p = monitor_mempool node ~use_legacy_name:false in
+    let*? p = monitor_mempool node in
 
     let* consensus_op =
       create_double_consensus_evidence
@@ -693,7 +672,6 @@ module Mempool = struct
       in
       check_monitor_mempool p name
     in
-    let* () = check_monitor_mempool p_legacy ~use_legacy_name:true in
     let* () = check_monitor_mempool p ~use_legacy_name:false in
     check_invalid_monitor_mempool_version node
 
