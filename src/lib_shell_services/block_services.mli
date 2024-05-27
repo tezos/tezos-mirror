@@ -26,7 +26,7 @@
 
 module Proof = Tezos_context_sigs.Context.Proof_types
 
-type version = Version_0 | Version_1 | Version_2
+type version = Version_1 | Version_2
 
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
