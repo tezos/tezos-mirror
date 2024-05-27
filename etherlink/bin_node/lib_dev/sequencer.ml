@@ -217,6 +217,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~smart_rollup_address
       ~sqlite_journal_mode:
         (`Force configuration.experimental_features.sqlite_journal_mode)
+      ~store_perm:`Read_write
       ()
   in
   let*! head = Evm_context.head_info () in

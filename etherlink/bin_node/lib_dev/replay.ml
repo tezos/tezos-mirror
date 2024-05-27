@@ -46,6 +46,7 @@ let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       ~fail_on_missing_blueprint:false
       ?smart_rollup_address
       ~sqlite_journal_mode:`Identity
+      ~store_perm:`Read_only
       ()
   in
   let alter_evm_state =

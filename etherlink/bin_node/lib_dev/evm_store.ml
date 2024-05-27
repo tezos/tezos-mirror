@@ -386,11 +386,16 @@ module Migrations = struct
     Db.exec conn Q.Migrations.register_migration (id, M.name)
 end
 
-let init ~data_dir ~sqlite_journal_mode () =
+let init ~data_dir ~sqlite_journal_mode ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // "store.sqlite" in
   let*! exists = Lwt_unix.file_exists path in
-  let uri = Uri.of_string Format.(sprintf "sqlite3:%s" path) in
+  let write_perm =
+    match perm with `Read_only -> false | `Read_write -> true
+  in
+  let uri =
+    Uri.of_string Format.(sprintf "sqlite3:%s?write=%b" path write_perm)
+  in
   let store = {db_uri = uri; with_transaction = None} in
   let* () =
     match sqlite_journal_mode with

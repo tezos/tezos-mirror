@@ -20,7 +20,9 @@ type parameters = {
   preimages_endpoint : Uri.t option;
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
-  sqlite_journal_mode : [`Identity | `Force of Configuration.sqlite_journal_mode];
+  sqlite_journal_mode :
+    [`Identity | `Force of Configuration.sqlite_journal_mode];
+  store_perm : [`Read_only | `Read_write];
 }
 
 type session_state = {
@@ -266,9 +268,9 @@ module State = struct
 
   let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-  let load ~data_dir ~sqlite_journal_mode index =
+  let load ~data_dir ~sqlite_journal_mode ~store_perm:perm index =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~sqlite_journal_mode () in
+    let* store = Evm_store.init ~data_dir ~sqlite_journal_mode ~perm () in
     let* latest = Evm_store.Context_hashes.find_latest store in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
@@ -661,7 +663,8 @@ module State = struct
           {smart_rollup_address; rollup_node_smart_rollup_address})
 
   let init ?kernel_path ~fail_on_missing_blueprint ~data_dir ~preimages
-      ~preimages_endpoint ?smart_rollup_address ~sqlite_journal_mode () =
+      ~preimages_endpoint ?smart_rollup_address ~sqlite_journal_mode ~store_perm
+      () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -672,7 +675,7 @@ module State = struct
     in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
-      load ~data_dir ~sqlite_journal_mode index
+      load ~data_dir ~sqlite_journal_mode ~store_perm index
     in
     let* pending_upgrade =
       Evm_store.Kernel_upgrades.find_latest_pending store
@@ -760,7 +763,13 @@ module State = struct
 
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~sqlite_journal_mode:`Identity () in
+    let* store =
+      Evm_store.init
+        ~data_dir
+        ~sqlite_journal_mode:`Identity
+        ~perm:`Read_write
+        ()
+    in
     Evm_store.with_transaction store @@ fun store ->
     Evm_store.reset store ~l2_level
 
@@ -986,6 +995,7 @@ module Handlers = struct
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         sqlite_journal_mode;
+        store_perm;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -997,6 +1007,7 @@ module Handlers = struct
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~sqlite_journal_mode
+        ~store_perm
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1166,7 +1177,8 @@ let worker_wait_for_request req =
   return_ res
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ?smart_rollup_address ~fail_on_missing_blueprint ~sqlite_journal_mode () =
+    ?smart_rollup_address ~fail_on_missing_blueprint ~sqlite_journal_mode
+    ~store_perm () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -1180,6 +1192,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         smart_rollup_address;
         fail_on_missing_blueprint;
         sqlite_journal_mode;
+        store_perm;
       }
       (module Handlers)
   in
@@ -1279,7 +1292,9 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
     | None -> failwith "The block hash was not found"
   in
   (* Init the store *)
-  let* store = Evm_store.init ~data_dir ~sqlite_journal_mode:`Identity () in
+  let* store =
+    Evm_store.init ~data_dir ~sqlite_journal_mode:`Identity ~perm:`Read_write ()
+  in
   let* () =
     Evm_store.Context_hashes.store
       store
@@ -1376,6 +1391,7 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~sqlite_journal_mode:`Identity
+      ~store_perm:`Read_write
       ()
   in
   let* () =
