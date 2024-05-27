@@ -61,9 +61,7 @@ generated HTML pages are put in ``_build/<context>/_doc``.
 It creates one sub-directory
 per public library and generates an ``index.html`` file in each sub-directory.
 
-The documentation is not installed on the system by Octez. It is meant to be
-read locally while developing and then published on the www when releasing
-packages.
+The documentation is published online at :doc:`api/api-inline`.
 
 Writing documentation
 =====================

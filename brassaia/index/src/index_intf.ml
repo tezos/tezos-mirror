@@ -248,8 +248,8 @@ module type Index = sig
   end
 
   module Value : sig
-    (** The input of {!Make} for values. The same requirements as for {!Key}
-        apply. *)
+    (** The input of {!Make} for values. The same requirements as for
+        {!module-Key} apply. *)
     module type S = sig
       include Value
       (** @inline *)
