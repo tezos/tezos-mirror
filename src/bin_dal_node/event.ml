@@ -240,7 +240,15 @@ let removed_status =
     ~section
     ~name:"removed_status"
     ~msg:"removed statuses for level {level}"
-    ~level:Info
+    ~level:Debug
+    ("level", Data_encoding.int32)
+
+let removed_skip_list_cells =
+  declare_1
+    ~section
+    ~name:"removed_skip_list_cells"
+    ~msg:"removed skip list cells for level {level}"
+    ~level:Debug
     ("level", Data_encoding.int32)
 
 let removing_shards_failed =
@@ -272,6 +280,15 @@ let removing_status_failed =
     ~name:"removing_status_failed"
     ~level:Warning
     ~msg:"removing status file for level {level} failed"
+    ("level", Data_encoding.int32)
+    ("error", Error_monad.trace_encoding)
+
+let removing_skip_list_cells_failed =
+  declare_2
+    ~section
+    ~name:"removing_skip_list_cells_failed"
+    ~level:Warning
+    ~msg:"removing skip list cells for level {level} failed"
     ("level", Data_encoding.int32)
     ("error", Error_monad.trace_encoding)
 

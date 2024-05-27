@@ -190,7 +190,7 @@ let get_all_plugins ctxt =
   | Starting _ -> []
   | Ready {proto_plugins; _} -> Proto_plugins.to_list proto_plugins
 
-let next_level_to_gc_slots_and_shards ctxt ~current_level =
+let level_to_gc ctxt ~current_level =
   match ctxt.config.history_mode with
   | Full -> Int32.zero
   | Rolling {blocks = `Some n} ->
@@ -200,20 +200,11 @@ let next_level_to_gc_slots_and_shards ctxt ~current_level =
       | Starting _ -> Int32.zero
       | Ready {proto_parameters; _} ->
           let n =
-            Profile_manager.get_default_shard_store_period
-              proto_parameters
+            Profile_manager.get_attested_data_default_store_period
               ctxt.profile_ctxt
+              proto_parameters
           in
           Int32.(max zero (sub current_level (of_int n))))
-
-let next_level_to_gc_skip_list_cells ctxt ~current_level =
-  match ctxt.status with
-  | Starting _ -> Int32.zero
-  | Ready {proto_parameters; _} ->
-      let n =
-        Profile_manager.get_skip_list_cells_store_period proto_parameters
-      in
-      Int32.(max zero (sub current_level (of_int n)))
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 

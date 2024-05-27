@@ -360,13 +360,32 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  (* This function removes from the store all the slots (and their shards)
-     published at level exactly [Node_context.next_level_to_gc_slots_and_shards
-     ~current_level]. *)
-  let remove_old_level_slots_and_shards proto_parameters ctxt current_level =
+  let should_store_skip_list_cells ctxt dal_constants =
+    let profile = Node_context.get_profile_ctxt ctxt in
+    Profile_manager.should_store_skip_list_cells profile dal_constants
+
+  (* This function removes from the store slot data (slots, their shards, and
+     their status) for commitments published at level exactly
+     {!Node_context.level_to_gc ~current_level}. It also removes skip list
+     cells attested at that level. *)
+  let remove_old_level_stored_data proto_parameters ctxt skip_list_cells_store
+      current_level =
     let open Lwt_syntax in
-    let oldest_level =
-      Node_context.next_level_to_gc_slots_and_shards ctxt ~current_level
+    let oldest_level = Node_context.level_to_gc ctxt ~current_level in
+    let* () =
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
+         We may want to remove this check. *)
+      if should_store_skip_list_cells ctxt proto_parameters then
+        let* res =
+          Skip_list_cells_store.remove
+            skip_list_cells_store
+            ~attested_level:oldest_level
+        in
+        match res with
+        | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
+        | Error err ->
+            Event.(emit removing_skip_list_cells_failed (oldest_level, err))
+      else return_unit
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
@@ -406,25 +425,6 @@ module Handler = struct
         return_unit)
       (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
-  (* This function removes from the store all the skip list cells attested at
-     level exactly [Node_context.next_level_to_gc_skip_list_cells
-     ~current_level]. *)
-  let remove_old_level_skip_list_cells ctxt current_level =
-    let open Lwt_result_syntax in
-    let oldest_level =
-      Node_context.next_level_to_gc_skip_list_cells ctxt ~current_level
-    in
-    let*? ready_ctxt = Node_context.get_ready ctxt in
-    Skip_list_cells_store.remove
-      ready_ctxt.skip_list_cells_store
-      ~attested_level:oldest_level
-
-  let should_store_skip_list_cells ctxt =
-    let profile = Node_context.get_profile_ctxt ctxt in
-    not
-      (Profile_manager.is_bootstrap_profile profile
-      || Profile_manager.is_attester_only_profile profile)
-
   let process_block ctxt cctxt proto_parameters skip_list_cells_store
       finalized_shell_header =
     let open Lwt_result_syntax in
@@ -446,7 +446,7 @@ module Handler = struct
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
-          if should_store_skip_list_cells ctxt then
+          if should_store_skip_list_cells ctxt dal_constants then
             let* cells_of_level =
               let pred_published_level =
                 Int32.sub
@@ -638,12 +638,11 @@ module Handler = struct
                    level
                    proto_parameters) ;
               let*! () =
-                remove_old_level_slots_and_shards proto_parameters ctxt level
-              in
-              let* () =
-                if should_store_skip_list_cells ctxt then
-                  remove_old_level_skip_list_cells ctxt level
-                else return_unit
+                remove_old_level_stored_data
+                  proto_parameters
+                  ctxt
+                  skip_list_cells_store
+                  level
               in
               let* () =
                 if level = 1l then
