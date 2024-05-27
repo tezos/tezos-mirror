@@ -71,7 +71,7 @@
  (package octez-libs)
  (deps vectors.csv vectors-zip32.csv)
  (enabled_if false)
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

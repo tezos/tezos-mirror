@@ -52,7 +52,7 @@
  (package tezos-protocol-019-PtParisB-tests)
  (deps (glob_files wasm_kernel/*.wasm))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

@@ -1210,6 +1210,7 @@ module Target = struct
     | Test_executable of {
         names : string Ne_list.t;
         runtest_alias : string option;
+        runtest_action : Dune.s_expr option;
         locks : string option;
         enabled_if : Dune.s_expr option;
         lib_deps : t option list;
@@ -1804,9 +1805,25 @@ module Target = struct
       in
       match (kind, opam, dep_files) with
       | ( Test_executable
-            {names; runtest_alias = Some alias; locks; enabled_if; _},
+            {
+              names;
+              runtest_alias = Some alias;
+              locks;
+              enabled_if;
+              runtest_action;
+              _;
+            },
           package,
           _ ) ->
+          (* Warning: if [runtest_action] is set, then the JS tests
+             and the non-JS tests will be non-coherent since their
+             actions wont concur [runtest_action] is not taken into
+             account in the JS rules. We currently only use
+             [runtest_action] to disable some tests that probably
+             doesn't run in javascript anyhow, so for the moment this
+             is fine. We should however either port this to the
+             javascript tests, or just disable them, or tear out js
+             support from manifest. *)
           let runtest_js_rules =
             if run_js then
               List.map
@@ -1832,6 +1849,7 @@ module Target = struct
                     ~dep_files
                     ~dep_globs
                     ~dep_globs_rec
+                    ?action:runtest_action
                     ?locks
                     ?enabled_if
                     ?package
@@ -1844,6 +1862,7 @@ module Target = struct
             {
               names = name, _;
               runtest_alias = None;
+              runtest_action = None;
               locks = _;
               enabled_if = _;
               lib_deps = _;
@@ -1989,7 +2008,7 @@ module Target = struct
     | head :: tail -> Private_executable (head, tail)
 
   let test ?(alias = "runtest") ?locks ?enabled_if ?(dune_with_test = Always)
-      ?(lib_deps = []) =
+      ?(lib_deps = []) ?action =
     (match (alias, enabled_if, locks) with
     | "", Some _, _ | "", _, Some _ ->
         invalid_arg
@@ -2014,7 +2033,14 @@ module Target = struct
     in
     internal @@ fun test_name ->
     Test_executable
-      {names = (test_name, []); runtest_alias; locks; enabled_if; lib_deps}
+      {
+        names = (test_name, []);
+        runtest_alias;
+        runtest_action = action;
+        locks;
+        enabled_if;
+        lib_deps;
+      }
 
   let tests ?(alias = "runtest") ?locks ?enabled_if ?(lib_deps = []) =
     (match (alias, enabled_if, locks) with
@@ -2028,7 +2054,14 @@ module Target = struct
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail ->
         Test_executable
-          {names = (head, tail); runtest_alias; locks; enabled_if; lib_deps}
+          {
+            names = (head, tail);
+            runtest_alias;
+            runtest_action = None;
+            locks;
+            enabled_if;
+            lib_deps;
+          }
 
   let vendored_lib ?(released_on_opam = true) ?main_module
       ?(js_compatible = false) ?(npm_deps = []) name version =
@@ -2271,6 +2304,14 @@ let register_tezt_targets ~make_tezt_exe =
              For more info on [%{env:VAR=VAL}] see
              https://dune.readthedocs.io/en/stable/concepts.html#variables *)
           ~enabled_if:Dune.[S "<>"; S "false"; S "%{env:RUNTEZTALIAS=true}"]
+          ~action:
+            Dune.
+              [
+                S "run";
+                S ("%{dep:./" ^ exe_name ^ ".exe}");
+                S "/flaky";
+                S "/ci_disabled";
+              ]
           ~path
           ~with_macos_security_framework
           ~opam

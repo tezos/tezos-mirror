@@ -1278,6 +1278,9 @@ end) : sig
       [enabled_if] are set, then logically, the resulting clause is the conjunction
       of the two (i.e. [(and <enabled_if> <dune_with_test>)])
 
+    - [action]: replace the default action. If omitted, the action is
+      to run the test executable.
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
   val test :
@@ -1286,6 +1289,7 @@ end) : sig
     ?enabled_if:Dune.s_expr ->
     ?dune_with_test:with_test ->
     ?lib_deps:target list ->
+    ?action:Dune.s_expr ->
     string maker
 
   (** Same as {!test} but with several names, to define multiple tests at once. *)
