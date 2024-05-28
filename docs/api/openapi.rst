@@ -80,12 +80,12 @@ Paris RPCs
 The OpenAPI specifications for RPCs which are specific to the Paris A (``PtParisA``)
 protocol can be found at:
 
-- `paris-openapi-rc.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-openapi-rc.json>`_
+- `paris-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Paris protocol can be found at:
 
-- `paris-mempool-openapi-rc.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi-rc.json>`_
+- `paris-mempool-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi.json>`_
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -115,8 +115,8 @@ Paris RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 (``PtParisB``) protocol can be found at:
 
-- `paris-smart-rollup-node-openapi.json (version 20.0~rc1)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi-rc.json>`_
+- `paris-smart-rollup-node-openapi.json (version 20.0)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi.json>`_
 
 
 DAL Node
