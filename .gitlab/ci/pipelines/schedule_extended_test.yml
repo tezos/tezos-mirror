@@ -7454,7 +7454,7 @@ tezt-memory-3k:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 4
+  parallel: 6
 
 tezt-memory-4k:
   image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
