@@ -58,8 +58,12 @@ impl Store {
         })
     }
 
+    fn file_name_of_hash(hash: &Hash) -> String {
+        hex::encode(hash)
+    }
+
     fn path_of_hash(&self, hash: &Hash) -> PathBuf {
-        self.path.join(hex::encode(hash))
+        self.path.join(Self::file_name_of_hash(hash))
     }
 
     fn write_data_if_new(&self, file_name: PathBuf, data: &[u8]) -> Result<(), StorageError> {
@@ -98,6 +102,14 @@ impl Store {
                 StorageError::IoError(e)
             }
         })
+    }
+
+    /// Copy the data corresponding to `hash` to `path`.
+    pub fn copy(&self, hash: &Hash, path: impl AsRef<Path>) -> Result<(), StorageError> {
+        let source_path = self.path_of_hash(hash);
+        let target_path = path.as_ref().join(Self::file_name_of_hash(hash));
+        std::fs::copy(source_path, target_path)?;
+        Ok(())
     }
 }
 
@@ -153,5 +165,23 @@ where
         }
         let data: T = deserialize(&bytes)?;
         Ok(data)
+    }
+
+    /// A snapshot is a new repo to which only `id` has been committed.
+    pub fn export_snapshot(&self, id: &Hash, path: impl AsRef<Path>) -> Result<(), StorageError> {
+        // Only export a snapshot to a new or empty directory
+        let path = path.as_ref();
+        if !path.exists() || path.read_dir()?.next().is_none() {
+            std::fs::create_dir_all(path)?;
+        } else {
+            return Err(StorageError::InvalidRepo);
+        };
+        let bytes = self.backend.load(id)?;
+        let commit: Vec<Hash> = deserialize(&bytes)?;
+        for chunk in commit {
+            self.backend.copy(&chunk, path)?;
+        }
+        self.backend.copy(id, path)?;
+        Ok(())
     }
 }

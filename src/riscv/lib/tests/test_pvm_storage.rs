@@ -58,7 +58,17 @@ fn test_repo() {
         Err(StorageError::NotFound(_))
     ));
 
-    tmp_dir.close().unwrap()
+    // Check that exporting a snapshot creates a new repo which contains
+    // the requested commit
+    let snapshot_dir = tempfile::tempdir().unwrap();
+    let (export_hash, export_data) = &test_data[0];
+    repo.export_snapshot(export_hash, &snapshot_dir).unwrap();
+    let snapshot_repo = Repo::<Vec<u8>>::load(tmp_dir.path()).unwrap();
+    let checked_out_data = snapshot_repo.checkout(export_hash).unwrap();
+    assert_eq!(checked_out_data, *export_data);
+
+    tmp_dir.close().unwrap();
+    snapshot_dir.close().unwrap()
 }
 
 // Mirrors `src/lib_riscv/pvm/test/test_storage.ml`

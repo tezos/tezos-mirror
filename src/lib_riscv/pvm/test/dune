@@ -8,6 +8,7 @@
   tezt.core
   octez-libs.base
   octez-libs.stdlib-unix
+  octez-libs.base-test-helpers
   octez-alcotezt
   octez-riscv-pvm)
  (library_flags (:standard -linkall))
@@ -17,6 +18,7 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
+  -open Tezos_base_test_helpers
   -open Octez_alcotezt)
  (modules test_main test_storage))
 

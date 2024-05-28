@@ -22,3 +22,4 @@ external octez_riscv_string_of_status: status -> string = "octez_riscv_string_of
 external octez_riscv_compute_step: state -> state = "octez_riscv_compute_step"
 external octez_riscv_compute_step_many: int64 -> state -> (state * int64) = "octez_riscv_compute_step_many"
 external octez_riscv_get_tick: state -> int64 = "octez_riscv_get_tick"
+external octez_riscv_storage_export_snapshot: repo -> id -> string -> (unit, [`Msg of string]) result = "octez_riscv_storage_export_snapshot"

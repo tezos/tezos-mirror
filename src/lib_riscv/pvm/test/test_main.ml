@@ -12,6 +12,7 @@ let tests =
       [
         ("Simple test", `Quick, Test_storage.test_simple);
         ("Simple state test", `Quick, Test_storage.test_state_simple);
+        Tztest.tztest "Export snapshot" `Quick Test_storage.test_export_snapshot;
       ] );
   ]
 

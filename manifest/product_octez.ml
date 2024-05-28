@@ -4680,6 +4680,7 @@ let _octez_riscv_pvm_test =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_base_test_helpers |> open_;
         alcotezt;
         octez_riscv_pvm;
       ]
