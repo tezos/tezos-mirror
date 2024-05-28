@@ -8306,7 +8306,7 @@ documentation:manuals:
   before_script:
   - eval $(opam env)
   script:
-  - ./.gitlab/ci/jobs/doc/documentation:manuals.sh
+  - ./scripts/ci/documentation:manuals.sh
   artifacts:
     expire_in: 1 week
     paths:

@@ -1676,7 +1676,7 @@ let jobs pipeline_type =
                  "docs/developer/metrics.csv";
                  "docs/user/node-config.json";
                ])
-          ["./.gitlab/ci/jobs/doc/documentation:manuals.sh"]
+          ["./scripts/ci/documentation:manuals.sh"]
       in
       let job_docgen =
         job
