@@ -130,17 +130,10 @@ let blockchain_network_mainnet =
         ( "PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc",
           "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" );
         ( "PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz",
-          "PtParisBpr4Kn15JRo69h1hvaXEbTwbdw9JsNYRgkF9x11z4q3U" );
+          "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ" );
       ]
     ~default_bootstrap_peers:
       ["boot.tzinit.org"; "boot.tzboot.net"; "boot.tzbeta.net"]
-    ~dal_config:
-      {
-        activated = true;
-        use_mock_srs_for_testing = false;
-        bootstrap_peers =
-          ["dalboot.mainnet.tzinit.org"; "dalboot.mainnet.tzboot.net"];
-      }
 
 let blockchain_network_ghostnet =
   make_blockchain_network
@@ -182,13 +175,6 @@ let blockchain_network_ghostnet =
         "ghostnet.boot.ecadinfra.com";
         "ghostnet.stakenow.de:9733";
       ]
-    ~dal_config:
-      {
-        activated = true;
-        use_mock_srs_for_testing = false;
-        bootstrap_peers =
-          ["dalboot.ghostnet.tzinit.org"; "dalboot.ghostnet.tzboot.net"];
-      }
 
 let blockchain_network_sandbox =
   make_blockchain_network
@@ -218,8 +204,6 @@ let blockchain_network_sandbox =
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:sandbox_user_activated_upgrades
-    ~dal_config:
-      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
 
 let blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
