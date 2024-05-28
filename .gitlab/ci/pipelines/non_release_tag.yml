@@ -91,7 +91,7 @@ oc.build:dpkg:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - .gitlab/ci/jobs/build/bin_packages_deb_dependencies.sh
+  - ./scripts/ci/bin_packages_deb_dependencies.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh
@@ -134,7 +134,7 @@ oc.build:rpm:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - .gitlab/ci/jobs/build/bin_packages_rpm_dependencies.sh
+  - ./scripts/ci/bin_packages_rpm_dependencies.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh

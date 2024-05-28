@@ -7007,7 +7007,7 @@ oc.script:snapshot_alpha_and_link:
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
-  - ./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh
+  - ./scripts/ci/script:snapshot_alpha_and_link.sh
 
 oc.script:test_octez_release_versions:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -8306,7 +8306,7 @@ documentation:manuals:
   before_script:
   - eval $(opam env)
   script:
-  - ./.gitlab/ci/jobs/doc/documentation:manuals.sh
+  - ./scripts/ci/documentation:manuals.sh
   artifacts:
     expire_in: 1 week
     paths:
@@ -8491,7 +8491,7 @@ oc.build:dpkg:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - .gitlab/ci/jobs/build/bin_packages_deb_dependencies.sh
+  - ./scripts/ci/bin_packages_deb_dependencies.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh
@@ -8537,7 +8537,7 @@ oc.build:rpm:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - .gitlab/ci/jobs/build/bin_packages_rpm_dependencies.sh
+  - ./scripts/ci/bin_packages_rpm_dependencies.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh

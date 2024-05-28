@@ -1107,7 +1107,7 @@ let jobs pipeline_type =
              ~source_version:true
              ~eval_opam:true
              [])
-        ["./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh"]
+        ["./scripts/ci/script:snapshot_alpha_and_link.sh"]
     in
     let job_oc_script_test_release_versions : tezos_job =
       job
@@ -1676,7 +1676,7 @@ let jobs pipeline_type =
                  "docs/developer/metrics.csv";
                  "docs/user/node-config.json";
                ])
-          ["./.gitlab/ci/jobs/doc/documentation:manuals.sh"]
+          ["./scripts/ci/documentation:manuals.sh"]
       in
       let job_docgen =
         job

@@ -730,8 +730,8 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     before_script
       ~source_version:true
       (match target with
-      | Dpkg -> [".gitlab/ci/jobs/build/bin_packages_deb_dependencies.sh"]
-      | Rpm -> [".gitlab/ci/jobs/build/bin_packages_rpm_dependencies.sh"])
+      | Dpkg -> ["./scripts/ci/bin_packages_deb_dependencies.sh"]
+      | Rpm -> ["./scripts/ci/bin_packages_rpm_dependencies.sh"])
   in
   job
     ?rules
