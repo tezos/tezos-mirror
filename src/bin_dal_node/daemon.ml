@@ -526,6 +526,29 @@ module Handler = struct
       (Node_context.get_last_processed_level_store ctxt)
       ~level:block_level
 
+  let rec try_process_block ~retries ctxt cctxt proto_parameters
+      skip_list_cells_store finalized_shell_header =
+    let open Lwt_syntax in
+    let* res =
+      process_block
+        ctxt
+        cctxt
+        proto_parameters
+        skip_list_cells_store
+        finalized_shell_header
+    in
+    match res with
+    | Error e when Layer_1.is_connection_error e && retries > 0 ->
+        let* () = Lwt_unix.sleep Constants.crawler_re_processing_delay in
+        try_process_block
+          ~retries:(retries - 1)
+          ctxt
+          cctxt
+          proto_parameters
+          skip_list_cells_store
+          finalized_shell_header
+    | _ -> return res
+
   (* Monitor finalized heads and store *finalized* published slot headers
      indexed by block hash. A slot header is considered finalized when it is in
      a block with at least two other blocks on top of it, as guaranteed by
@@ -587,7 +610,8 @@ module Handler = struct
                      contain DAL information, and it has no round. *)
                   return_unit
                 else
-                  process_block
+                  try_process_block
+                    ~retries:Constants.crawler_retries_on_disconnection
                     ctxt
                     cctxt
                     proto_parameters
