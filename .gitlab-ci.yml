@@ -16,7 +16,7 @@ stages:
   - deploy
   - docker
 
-.supported-OCTEZ_BRANCH: &supported-OCTEZ_BRANCH ["octez-v20.0-rc1", "master"]
+.supported-OCTEZ_BRANCH: &supported-OCTEZ_BRANCH ["octez-v20.0", "master"]
 
 .default_matrix: &default_matrix
   matrix:
