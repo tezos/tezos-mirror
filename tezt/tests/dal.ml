@@ -4674,7 +4674,7 @@ module History_rpcs = struct
       dal_node
 
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; "memory_3k"] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
     let description = "test commitments history with migration" in
     let slot_index = 3 in
     let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
@@ -6919,14 +6919,14 @@ let register ~protocols =
     test_baker_registers_profiles
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; "memory_3k"]
+    ~tags:["bootstrap"; Tag.memory_3k]
     ~bootstrap_profile:true
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
     protocols ;
 
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; "trusted"; "connection"; "memory_3k"]
+    ~tags:["bootstrap"; "trusted"; "connection"; Tag.memory_3k]
     ~bootstrap_profile:true
     "trusted peers reconnection"
     test_peers_reconnection
@@ -6950,7 +6950,7 @@ let register ~protocols =
     History_rpcs.test_commitments_history_rpcs
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "memory_3k"]
+    ~tags:["amplification"; Tag.memory_3k]
     ~bootstrap_profile:true
     ~redundancy_factor:2
       (* With a redundancy factor of 4 or more, not much luck is
@@ -6964,13 +6964,13 @@ let register ~protocols =
     Amplification.test_amplification
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "simple"; "memory_3k"]
+    ~tags:["amplification"; "simple"; Tag.memory_3k]
     ~bootstrap_profile:true
     "observer triggers amplification (without lost shards)"
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "simple"; "memory_3k"]
+    ~tags:["gc"; "simple"; Tag.memory_3k]
     ~producer_profiles:[0]
     ~history_mode:(Dal_node.Custom 15)
     ~number_of_slots:1
@@ -6978,7 +6978,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"; "memory_3k"]
+    ~tags:["gc"; "multi"; Tag.memory_3k]
     ~bootstrap_profile:true
     ~number_of_slots:1
     "garbage collection of shards for all profiles"
