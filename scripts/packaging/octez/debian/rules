@@ -5,6 +5,7 @@
 
 override_dh_auto_build:
 	binaries/octez-node --help=groff > manpages/octez-node.1
+	binaries/octez-proxy-server --help=groff > manpages/octez-proxy-server.1
 	binaries/octez-dal-node --help=groff > manpages/octez-dal-node.1
 	dh_auto_build --parallel
 
@@ -14,10 +15,19 @@ override_dh_builddeb:
 	cp debian/copyright debian/octez-dal-node/usr/share/doc/octez-dal-node/
 
 override_dh_installman:
-	dh_installman --name octez-node manpages/octez-node.1
-	dh_installman --name octez-client manpages/octez-client.1
-	dh_installman --name octez-baker manpages/octez-baker.1
-	dh_installman --name octez-signer manpages/octez-signer.1
+	dh_installman
+	find binaries/ -name octez-baker-\* -type f -printf "%f\n" | \
+		while read bin; \
+		do \
+			ln -s debian/octez-baker/usr/share/man/man1/octez-baker.1.gz \
+			debian/octez-baker/usr/share/man/man1/$$bin.1.gz ; \
+		done
+	find binaries/ -name octez-accuser-\* -type f -printf "%f\n" | \
+		while read bin; \
+		do \
+			ln -s debian/octez-baker/usr/share/man/man1/octez-accuser.1.gz \
+			debian/octez-baker/usr/share/man/man1/$$bin.1.gz ; \
+		done
 
 override_dh_installdocs:
 	dh_installdocs -p octez-node docs/README.octez-node
