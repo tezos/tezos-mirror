@@ -277,6 +277,9 @@ module Replay_block :
     with type input = Ethereum_types.quantity
      and type output = Ethereum_types.block
 
+module Trace_transaction :
+  METHOD with type input = Tracer_types.input and type output = unit
+
 type map_result =
   | Method :
       ('input, 'output) method_

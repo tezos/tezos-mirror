@@ -136,37 +136,17 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-let encoding_with_optional_block_param block_param_encoding default_block_param
-    encoding =
-  let open Data_encoding in
-  let encoding = if is_tup encoding then encoding else tup1 encoding in
-  union
-    [
-      case
-        ~title:"with_block_param"
-        (Tag 0)
-        (merge_tups encoding (tup1 block_param_encoding))
-        (fun (t, block_param) -> Some (t, block_param))
-        (fun (t, block_param) -> (t, block_param));
-      case
-        ~title:"without_block_param"
-        (Tag 1)
-        encoding
-        (fun (t, _) -> Some t)
-        (fun t -> (t, default_block_param));
-    ]
-
 let encoding_with_optional_extended_block_param encoding =
-  encoding_with_optional_block_param
+  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_second_param
+    encoding
     Ethereum_types.Block_parameter.extended_encoding
     Ethereum_types.Block_parameter.(Block_parameter Latest)
-    encoding
 
 let encoding_with_optional_block_param encoding =
-  encoding_with_optional_block_param
+  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_second_param
+    encoding
     Ethereum_types.Block_parameter.encoding
     Ethereum_types.Block_parameter.Latest
-    encoding
 
 module Kernel_version = struct
   type input = unit
@@ -726,6 +706,20 @@ module Replay_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Trace_transaction = struct
+  type input = Tracer_types.input
+
+  type output = unit
+
+  let input_encoding = Tracer_types.input_encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "debug_traceTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -771,6 +765,7 @@ let supported_methods : (module METHOD) list =
     (module Durable_state_value);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
+    (module Trace_transaction);
   ]
 
 let unsupported_methods : string list =

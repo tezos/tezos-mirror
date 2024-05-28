@@ -161,3 +161,12 @@ type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
     contained in the `pending` and `queued` pools. *)
 val txpool_content :
   Evm_node.t -> (txpool_slot list * txpool_slot list, error) result Lwt.t
+
+(** [trace_transaction ~transaction_hash evm_node] replays the given transaction
+    in the same execution context. Doesn't return the trace for now. *)
+val trace_transaction :
+  transaction_hash:string ->
+  ?tracer:string ->
+  ?tracer_config:(string * JSON.u) list ->
+  Evm_node.t ->
+  (unit, error) result Lwt.t

@@ -405,7 +405,20 @@ let dispatch_request (config : Configuration.t)
     | Method (Eth_max_priority_fee_per_gas.Method, module_) ->
         let f (_ : unit option) = rpc_ok @@ Qty Z.zero in
         build ~f module_ parameters
-    | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
+    | Method (Trace_transaction.Method, module_) ->
+        let f (_ : Tracer_types.input option) =
+          return
+            (Error
+               JSONRPC.
+                 {
+                   code = -32000;
+                   message = "Method not implemented";
+                   data = Some (`String method_);
+                 })
+        in
+        build ~f module_ parameters
+    | Method (_, _) ->
+        Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
   Lwt.return JSONRPC.{value; id}
 
