@@ -202,7 +202,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    releases/releases
-   releases/version-19
    releases/version-20
    releases/history
 

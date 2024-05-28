@@ -51,9 +51,7 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
-
-- `rpc-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi-rc.json>`_
+- `rpc-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -63,16 +61,12 @@ Oxford RPCs
 The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
 protocol can be found at:
 
-- `oxford-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
-
-- `oxford-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi-rc.json>`_
+- `oxford-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Oxford protocol can be found at:
 
-- `oxford-mempool-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
-
-- `oxford-mempool-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
+- `oxford-mempool-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
 
 Paris RPCs
 -----------
@@ -80,12 +74,12 @@ Paris RPCs
 The OpenAPI specifications for RPCs which are specific to the Paris A (``PtParisA``)
 protocol can be found at:
 
-- `paris-openapi-rc.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-openapi-rc.json>`_
+- `paris-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Paris protocol can be found at:
 
-- `paris-mempool-openapi-rc.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi-rc.json>`_
+- `paris-mempool-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi.json>`_
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -103,11 +97,8 @@ Oxford RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
 (``Proxford``) protocol can be found at:
 
-- `oxford-smart-rollup-node-openapi.json (version 19.2)
+- `oxford-smart-rollup-node-openapi.json (version 20.0)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
-
-- `oxford-smart-rollup-node-openapi.json (version 20.0~rc1)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi-rc.json>`_
 
 Paris RPCs
 ----------
@@ -115,8 +106,8 @@ Paris RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 (``PtParisB``) protocol can be found at:
 
-- `paris-smart-rollup-node-openapi.json (version 20.0~rc1)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi-rc.json>`_
+- `paris-smart-rollup-node-openapi.json (version 20.0)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi.json>`_
 
 
 DAL Node
@@ -125,7 +116,7 @@ DAL Node
 The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
-- `dal-node-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi-rc.json>`_
+- `dal-node-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi.json>`_
 
 .. _openapi_generate:
 
