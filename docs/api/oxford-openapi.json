@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol oxford RPC",
     "description": "The RPC API for protocol oxford served by the Octez node.",
-    "version": "19.2 (54a1580334)"
+    "version": "Octez 20.0 (1e5e4424)"
   },
   "paths": {
     "/": {
@@ -13,7 +13,7 @@
           {
             "name": "version",
             "in": "query",
-            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "description": "Supported RPC versions are version \"0\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -8581,7 +8581,7 @@
           {
             "name": "version",
             "in": "query",
-            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "description": "Supported RPC versions are version \"0\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -10800,7 +10800,7 @@
           {
             "name": "version",
             "in": "query",
-            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "description": "Supported RPC versions are version \"0\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -11139,7 +11139,7 @@
           {
             "name": "version",
             "in": "query",
-            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "description": "Supported RPC versions are version \"0\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -11225,7 +11225,7 @@
           {
             "name": "version",
             "in": "query",
-            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "description": "Supported RPC versions are version \"0\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -11314,7 +11314,7 @@
           {
             "name": "version",
             "in": "query",
-            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "description": "Supported RPC versions are version \"0\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"

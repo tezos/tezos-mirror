@@ -63,16 +63,12 @@ Oxford RPCs
 The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
 protocol can be found at:
 
-- `oxford-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
-
-- `oxford-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi-rc.json>`_
+- `oxford-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Oxford protocol can be found at:
 
-- `oxford-mempool-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
-
-- `oxford-mempool-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
+- `oxford-mempool-openapi.json (version 20.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
 
 Paris RPCs
 -----------
@@ -103,11 +99,8 @@ Oxford RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
 (``Proxford``) protocol can be found at:
 
-- `oxford-smart-rollup-node-openapi.json (version 19.2)
+- `oxford-smart-rollup-node-openapi.json (version 20.0)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
-
-- `oxford-smart-rollup-node-openapi.json (version 20.0~rc1)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi-rc.json>`_
 
 Paris RPCs
 ----------
