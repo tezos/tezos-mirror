@@ -31,8 +31,8 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
-  $(if [ -n "${rust_toolchain_image_name}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image_name}"; fi) \
-  $(if [ -n "${rust_toolchain_image_tag}" ]; then echo "--rust-toolchain-image-tag ${rust_toolchain_image_tag}"; fi)
+  $(if [ -n "${rust_toolchain_image_name:-}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image_name}"; fi) \
+  $(if [ -n "${rust_toolchain_image_tag:-}" ]; then echo "--rust-toolchain-image-tag ${rust_toolchain_image_tag}"; fi)
 
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`
