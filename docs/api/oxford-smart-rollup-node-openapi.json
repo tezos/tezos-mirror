@@ -3,7 +3,7 @@
     { "title": "Smart Rollup Node RPCs",
       "description":
         "Smart Rollup Node RPC API for protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
-      "version": "Octez 20.0 (1e5e4424)" },
+      "version": "Octez 20.0 (0dcf32097f)" },
   "paths":
     { "/describe":
         { "get":
