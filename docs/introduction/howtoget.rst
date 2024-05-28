@@ -84,6 +84,47 @@ There are several packages:
 - ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
+
+Ubuntu and Debian Octez packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you're using Ubuntu or Debian, you can also install packages with Octez binaries
+using ``apt`` directly from our APT repository, instead of going to the Octez
+release page as explained above.
+
+We support the following distribution/releases:
+- ``debian/bookworm``
+- ``ubuntu/focal``
+- ``ubuntu/jammy``
+
+both on ``amd64`` and ``arm64`` architectures.
+
+In order to add the Tezos package repository to your machine, do:
+
+::
+
+    export distribution=debian
+    export release=bookworm
+    export bucket="tezos-linux-repo"
+
+and run:
+
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [add repository]
+   :end-before: [install tezos]
+
+We also maintain a separate repository for release candidates. To install
+the last release candidate simply prepend ``RC/`` to the distribution name
+as in ``export distribution=RC/debian``
+
+Then, to install the binaries, run the following commands:
+
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [install tezos]
+   :end-before: [test executables]
+
 Also there are some experimental packages:
 
 - ``octez-experimental`` - binaries that are considered experimental including
@@ -98,24 +139,11 @@ possible to configure the software to use a different user (even root).
 The documentation for these packages, originally developed by Chris Pinnock,
 can be found here: https://chrispinnock.com/tezos/packages/
 
-Ubuntu and Debian Octez packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you're using Ubuntu or Debian, you can install packages with Octez binaries
-using ``dpkg`` or ``apt``. Currently it supports the two latest LTS releases
-for Ubuntu and for Debian, the stable and testing release.
-
-Upgrading to a newer release requires downloading again all the ``deb``
-packages and repeat the installation.
-
-For example using dpkg::
-
-     dpkg -i octez-client_19.1-1_arm64.deb
-
 Fedora Octez packages
 ~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Octez binaries
+from the Octez release page indicated above
 using ``rpm`` or ``dnf``. Currently it supports the latest LTS release for
 Fedora and for RockyLinux.
 

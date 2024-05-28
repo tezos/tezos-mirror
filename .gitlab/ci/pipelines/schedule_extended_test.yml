@@ -7642,7 +7642,7 @@ oc.install_bin_ubuntu_focal:
   dependencies: []
   allow_failure: true
   script:
-  - ./docs/introduction/install-bin-ubuntu.sh
+  - ./docs/introduction/install-bin-deb.sh ubuntu focal
 
 oc.install_bin_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
@@ -7654,7 +7654,7 @@ oc.install_bin_ubuntu_jammy:
   dependencies: []
   allow_failure: true
   script:
-  - ./docs/introduction/install-bin-ubuntu.sh
+  - ./docs/introduction/install-bin-deb.sh ubuntu jammy
 
 oc.install_bin_rc_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
@@ -7666,7 +7666,7 @@ oc.install_bin_rc_ubuntu_focal:
   dependencies: []
   allow_failure: true
   script:
-  - ./docs/introduction/install-bin-ubuntu.sh rc
+  - ./docs/introduction/install-bin-deb.sh ubuntu focal rc
 
 oc.install_bin_rc_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
@@ -7678,7 +7678,31 @@ oc.install_bin_rc_ubuntu_jammy:
   dependencies: []
   allow_failure: true
   script:
-  - ./docs/introduction/install-bin-ubuntu.sh rc
+  - ./docs/introduction/install-bin-deb.sh ubuntu jammy rc
+
+oc.install_bin_debian_bookworm:
+  image: debian:bookworm
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  allow_failure: true
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
+
+oc.install_bin_rc_debian_bookworm:
+  image: debian:bookworm
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  allow_failure: true
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm rc
 
 oc.install_opam_jammy:
   image: ocaml/opam:ubuntu-22.04
