@@ -6874,7 +6874,7 @@ oc.script:snapshot_alpha_and_link:
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
-  - ./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh
+  - ./scripts/ci/script:snapshot_alpha_and_link.sh
 
 oc.script:test_octez_release_versions:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
