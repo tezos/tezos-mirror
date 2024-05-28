@@ -25,7 +25,8 @@
   octez-libs.event-logging-test-helpers
   octez-libs.test-helpers
   octez-alcotezt
-  octez-version.value)
+  octez-version.value
+  src_lib_requester_test_tezt_lib)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -47,7 +48,8 @@
   -open Tezos_validation
   -open Tezos_event_logging_test_helpers
   -open Tezos_test_helpers
-  -open Octez_alcotezt)
+  -open Octez_alcotezt
+  -open Src_lib_requester_test_tezt_lib)
  (modules
   generators
   generators_tree
@@ -55,6 +57,7 @@
   test_consensus_heuristic
   test_node
   test_peer_validator
+  test_prevalidator
   test_prevalidation
   test_prevalidator_bounding
   test_prevalidator_classification

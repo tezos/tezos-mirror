@@ -1,0 +1,5 @@
+code TICKET;
+self "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" ;
+input { Stack_elt string "Blue"; Stack_elt nat 0 } ;
+output { Stack_elt (option (ticket string)) None} ;
+

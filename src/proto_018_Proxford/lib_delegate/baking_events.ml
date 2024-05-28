@@ -71,6 +71,16 @@ module State_transitions = struct
       ~msg:"received new head with level increasing"
       ()
 
+  let new_forge_event =
+    let open Baking_state in
+    declare_1
+      ~section
+      ~name:"new_forge_event"
+      ~level:Notice
+      ~msg:"received new forge event: {event}"
+      ~pp1:pp_forge_event
+      ("event", forge_event_encoding)
+
   let no_proposal_slot =
     declare_3
       ~section
@@ -264,6 +274,15 @@ module State_transitions = struct
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
 
+  let attempting_vote_proposal =
+    declare_1
+      ~section
+      ~name:"attempting_vote_proposal"
+      ~level:Info
+      ~msg:"attempting to vote for proposal {block_hash}"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+
   let skipping_invalid_proposal =
     declare_0
       ~section
@@ -281,12 +300,12 @@ module State_transitions = struct
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
 
-  let proposing_fresh_block =
+  let preparing_fresh_block =
     declare_2
       ~section
-      ~name:"proposing_fresh_block"
+      ~name:"preparing_fresh_block"
       ~level:Info
-      ~msg:"proposing fresh block for {delegate} at round {round}"
+      ~msg:"preparing fresh block for {delegate} at round {round}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Round.pp
@@ -345,6 +364,21 @@ module State_transitions = struct
       ("phase", Baking_state.phase_encoding)
       ~pp2:Baking_state.pp_event
       ("event", Baking_state.event_encoding)
+
+  let discarding_attestation =
+    declare_3
+      ~section
+      ~name:"discarding_attestation"
+      ~level:Info
+      ~msg:
+        "discarding outdated attestation for {delegate} at level {level}, \
+         round {round}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
 end
 
 module Node_rpc = struct
@@ -506,6 +540,35 @@ module Scheduling = struct
       ~msg:"process proposal received in the future with hash {block_hash}"
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
+
+  let waiting_to_forge_block =
+    declare_2
+      ~section
+      ~name:"waiting_to_forge_block"
+      ~level:Info
+      ~msg:"waiting {timespan} until it's time to forge block at {timestamp}"
+      ~pp1:Ptime.Span.pp
+      ("timespan", Time.System.Span.encoding)
+      ~pp2:Timestamp.pp
+      ("timestamp", Timestamp.encoding)
+
+  let no_need_to_wait_to_forge_block =
+    declare_0
+      ~section
+      ~name:"no_need_to_wait_to_forge_block"
+      ~level:Info
+      ~msg:"no need to wait to forge a block"
+      ()
+
+  let first_baker_of_next_level =
+    declare_0
+      ~section
+      ~name:"first_baker_of_next_level"
+      ~level:Info
+      ~msg:
+        "first baker of next level found among delegates. pre-emptively \
+         forging block."
+      ()
 end
 
 module Lib = struct
@@ -513,23 +576,19 @@ module Lib = struct
 
   let section = section @ ["lib"]
 
-  let attempting_preattest_proposal =
-    declare_1
+  let attempting_to_vote_for_proposal =
+    declare_2
       ~section
       ~name:"attempting_preattest_proposal"
       ~level:Debug
-      ~msg:"attempting to preattest proposal {proposal}"
-      ~pp1:Baking_state.pp_proposal
+      ~msg:"attempting to {action} proposal {proposal}"
+      ("action", Baking_state.consensus_vote_kind_encoding)
+      ~pp1:
+        (fun fmt -> function
+          | Baking_state.Preattestation -> Format.fprintf fmt "preattest"
+          | Attestation -> Format.fprintf fmt "attest")
       ("proposal", Baking_state.proposal_encoding)
-
-  let attempting_attest_proposal =
-    declare_1
-      ~section
-      ~name:"attempting_attest_proposal"
-      ~level:Debug
-      ~msg:"attempting to attest proposal {proposal}"
-      ~pp1:Baking_state.pp_proposal
-      ("proposal", Baking_state.proposal_encoding)
+      ~pp2:Baking_state.pp_proposal
 end
 
 module Actions = struct
@@ -537,26 +596,23 @@ module Actions = struct
 
   let section = section @ ["actions"]
 
-  let skipping_preattestation =
-    declare_2
+  let skipping_consensus_vote =
+    declare_5
       ~section
-      ~name:"skipping_preattestation"
+      ~name:"skipping_consensus_vote"
       ~level:Error
-      ~msg:"unable to sign preattestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ~msg:
+        "unable to sign {vote_kind} for {delegate} at level {level}, round \
+         {round} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let skipping_attestation =
-    declare_2
-      ~section
-      ~name:"skipping_attestation"
-      ~level:Error
-      ~msg:"unable to sign attestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
+      ~pp3:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp4:Round.pp
+      ("round", Round.encoding)
+      ~pp5:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_get_dal_attestations =
@@ -581,23 +637,25 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_inject_preattestation =
-    declare_2
+  let failed_to_inject_consensus_vote =
+    declare_3
       ~section
-      ~name:"failed_to_inject_preattestation"
+      ~name:"failed_to_inject_consensus_vote"
       ~level:Error
-      ~msg:"failed to inject preattestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ~msg:"failed to inject {vote_kind} for {delegate} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
+      ~pp3:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_inject_attestation =
+  let failed_to_forge_block =
     declare_2
       ~section
-      ~name:"failed_to_inject_attestation"
+      ~name:"failed_to_forge_block"
       ~level:Error
-      ~msg:"failed to inject attestation for {delegate} -- {trace}"
+      ~msg:"failed to forge block for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -614,38 +672,23 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let preattestation_injected =
-    declare_4
+  let consensus_vote_injected =
+    declare_5
       ~section
-      ~name:"preattestation_injected"
+      ~name:"consensus_vote_injected"
       ~level:Notice
       ~msg:
-        "injected preattestation {ophash} for {delegate} for level {level}, \
-         round {round}"
-      ~pp1:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-
-  let attestation_injected =
-    declare_4
-      ~section
-      ~name:"attestation_injected"
-      ~level:Notice
-      ~msg:
-        "injected attestation {ophash} for {delegate} for level {level}, round \
+        "injected {vote_kind} {ophash} for {delegate} for level {level}, round \
          {round}"
-      ~pp1:Operation_hash.pp
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_consensus_key_and_delegate
+      ~pp3:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp3:pp_int32
+      ~pp4:pp_int32
       ("level", Data_encoding.int32)
-      ~pp4:Round.pp
+      ~pp5:Round.pp
       ("round", Round.encoding)
 
   let dal_attestation_injected =
@@ -716,6 +759,23 @@ module Actions = struct
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
+  let delayed_block_injection =
+    declare_4
+      ~section
+      ~name:"delayed_block_injection"
+      ~level:Debug
+      ~msg:
+        "waiting {delay} before injecting block at level {level}, round \
+         {round} for {delegate}"
+      ("delay", Time.System.Span.encoding)
+      ~pp1:Time.System.Span.pp_hum
+      ("level", Data_encoding.int32)
+      ~pp2:pp_int32
+      ("round", Round.encoding)
+      ~pp3:Round.pp
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp4:Baking_state.pp_consensus_key_and_delegate
+
   let injecting_block =
     declare_3
       ~section
@@ -745,22 +805,26 @@ module Actions = struct
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
-  let signing_preattestation =
-    declare_1
+  let block_injection_failed =
+    declare_2
       ~section
-      ~name:"signing_preattestation"
-      ~level:Info
-      ~msg:"signing preattestation for {delegate}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~name:"block_injection_failed"
+      ~level:Error
+      ~msg:"failed to inject block {block_hash} -- {trace}"
+      ("block_hash", Block_hash.encoding)
+      ~pp1:Block_hash.pp
+      ("trace", Error_monad.trace_encoding)
+      ~pp2:Error_monad.pp_print_trace
 
-  let signing_attestation =
-    declare_1
+  let signing_consensus_vote =
+    declare_2
       ~section
-      ~name:"signing_attestation"
+      ~name:"signing_consensus_vote"
       ~level:Info
-      ~msg:"signing attestation for {delegate}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ~msg:"signing {vote_kind} for {delegate}"
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let invalid_json_file =
@@ -889,8 +953,8 @@ module Nonces = struct
       ~msg:"found nonce to reveal for block {block}, level {level}"
       ~pp1:Block_hash.pp
       ("block", Block_hash.encoding)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
+      ~pp2:Raw_level.pp
+      ("level", Raw_level.encoding)
 
   let revealing_nonce =
     declare_3
@@ -921,8 +985,8 @@ module Nonces = struct
       ~name:"incoherent_nonce"
       ~level:Error
       ~msg:"incoherent nonce for level {level}"
-      ~pp1:pp_int32
-      ("level", Data_encoding.int32)
+      ~pp1:(fun fmt -> Format.fprintf fmt "%a" Raw_level.pp)
+      ("level", Raw_level.encoding)
 
   let cannot_read_nonces =
     declare_1
@@ -961,18 +1025,6 @@ module Nonces = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let too_many_nonces =
-    declare_1
-      ~section
-      ~name:"too_many_nonces"
-      ~level:Warning
-      ~msg:
-        "too many nonces associated with blocks unknown by node in \
-         '$TEZOS_CLIENT/{filename}'. After checking that these blocks were \
-         never included in the chain (e.g., via a block explorer), consider \
-         using `octez-client filter orphan nonces` to clear them."
-      ("filename", Data_encoding.string)
-
   let registering_nonce =
     declare_1
       ~section
@@ -998,6 +1050,54 @@ module Nonces = struct
       ~level:Info
       ~msg:"revelation worker started"
       ()
+
+  let success_migrate_nonces =
+    declare_0
+      ~section
+      ~name:"success_migrate_nonces"
+      ~level:Notice
+      ~msg:"successfully migrated nonces: legacy nonces are safe to delete"
+      ()
+
+  let ignore_failed_nonce_migration =
+    declare_1
+      ~section
+      ~name:"ignore_failed_nonce_migration"
+      ~level:Warning
+      ~msg:
+        "There is not enough block history to complete the migration. Try \
+         starting from an older snapshot or providing more block history. The \
+         nonces from the following blocks will not be migrated:\n\
+         {failed} "
+      ~pp1:(Format.pp_print_list Block_hash.pp)
+      ("failed", Data_encoding.list Block_hash.encoding)
+
+  let outdated_nonce =
+    declare_1
+      ~section
+      ~name:"outdated_nonce"
+      ~level:Info
+      ~msg:"outdated nonce for block {block_hash} is safe to delete"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+
+  let unexpected_nonce =
+    declare_1
+      ~section
+      ~name:"unexpected_nonce"
+      ~level:Info
+      ~msg:"unexpected nonce for block {block_hash} is safe to delete"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+
+  let revealed_nonce =
+    declare_1
+      ~section
+      ~name:"revealed_nonce"
+      ~level:Info
+      ~msg:"revealed nonce for block {block_hash} is safe to delete"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
 end
 
 module Per_block_votes = struct
@@ -1064,4 +1164,28 @@ module Selection = struct
       ~msg:"cannot serialize operation {op} metadata"
       ~pp1:Operation_hash.pp
       ("op", Operation_hash.encoding)
+end
+
+module Forge_worker = struct
+  include Internal_event.Simple
+
+  let section = section @ ["forge_worker"]
+
+  let error_while_processing_forge_request =
+    declare_1
+      ~section
+      ~name:"error_while_processing_forge_request"
+      ~level:Warning
+      ~msg:"error while processing forge request: {errors}"
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ~pp1:pp_print_top_error_of_trace
+
+  let error_while_authorizing_consensus_votes =
+    declare_1
+      ~section
+      ~name:"error_while_authorizing_consensus_votes"
+      ~level:Error
+      ~msg:"error while authorizing consensus votes: {errors}"
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ~pp1:pp_print_top_error_of_trace
 end

@@ -41,6 +41,7 @@ module Worker : sig
        and type GS.Span.t = Types.Span.t
        and type GS.Time.t = Types.Time.t
        and type 'a Monad.t = 'a Lwt.t
+       and type Point.t = Types.Point.t
 
   module Default_parameters : module type of Gs_default_parameters
 
@@ -52,6 +53,7 @@ module Worker : sig
        and type GS.Peer.t = Types.Peer.t
        and type GS.Span.t = Types.Span.t
        and type GS.Time.t = Types.Time.t
+       and type Point.t = Types.Point.t
 
   module Logging : sig
     val event : event -> unit Monad.t
@@ -169,6 +171,15 @@ module Transport_layer : sig
   (** [get_peer_info t peer] returns the info of the corresponding peer if found. *)
   val get_peer_info :
     t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult Lwt.t
+
+  (** [patch_peer t peer acl] patches the acl of the corresponding
+      peer if found and returns the info. When [acl] is [None] this is
+      equivalent to [get_peer_info]. *)
+  val patch_peer :
+    t ->
+    P2p_peer.Id.t ->
+    [`Ban | `Open | `Trust] option ->
+    Types.P2P.Peer.Info.t option tzresult Lwt.t
 end
 
 (** This module implements the list of hooks that allow interconnecting the

@@ -49,7 +49,7 @@ module Request = struct
     | Process {Layer1.hash; level} ->
         Format.fprintf
           ppf
-          "Processing new L1 head %a at level %ld"
+          "[Refutation coordinator] Processing new L1 head %a at level %ld"
           Block_hash.pp
           hash
           level

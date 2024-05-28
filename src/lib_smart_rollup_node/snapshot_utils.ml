@@ -237,8 +237,55 @@ let rec create_dir ?(perm = 0o755) dir =
            time. *)
         ())
 
+let copy_file ~src ~dst =
+  let in_chan = open_in src in
+  let out_chan = open_out dst in
+  try
+    let buffer_size = 64 * 1024 in
+    let buf = Bytes.create buffer_size in
+    let rec copy () =
+      let read_bytes = input in_chan buf 0 buffer_size in
+      output out_chan buf 0 read_bytes ;
+      if read_bytes > 0 then copy ()
+    in
+    copy () ;
+    flush out_chan ;
+    close_in in_chan ;
+    close_out out_chan
+  with e ->
+    close_in in_chan ;
+    close_out out_chan ;
+    raise e
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6857
+   Use Lwt_utils_unix.copy_dir instead when file descriptors issue is fixed. *)
+let copy_dir ?(perm = 0o755) src dst =
+  create_dir ~perm dst ;
+  let files =
+    list_files src ~include_file:(fun ~relative_path:_ -> true)
+    @@ fun ~full_path ~relative_path ->
+    let dst_file = Filename.concat dst relative_path in
+    (full_path, dst_file)
+  in
+  Stream.iter
+    (fun (src, dst) ->
+      let dst_dir = Filename.dirname dst in
+      create_dir ~perm dst_dir ;
+      copy_file ~src ~dst)
+    files
+
 let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     ~snapshot_file ~dest =
+  let open Lwt_result_syntax in
+  let module Writer = struct
+    include Writer
+
+    let count_progress = ref (fun _ -> ())
+
+    let output oc b p l =
+      !count_progress 1 ;
+      output oc b p l
+  end in
   let module Archive_reader = Tar.Make (struct
     include Reader
     include Writer
@@ -249,21 +296,25 @@ let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     Writer.open_out path
   in
   let in_chan = Reader.open_in snapshot_file in
-  try
-    let metadata =
-      read_snapshot_metadata
-        (module struct
-          include Reader
+  let reader_input : (module READER_INPUT) =
+    (module struct
+      include Reader
 
-          let in_chan = in_chan
-        end)
-    in
-    metadata_check metadata ;
-    Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
-    Reader.close_in in_chan
-  with e ->
-    Reader.close_in in_chan ;
-    raise e
+      let in_chan = in_chan
+    end)
+  in
+  Lwt.finalize
+    (fun () ->
+      let metadata = read_snapshot_metadata reader_input in
+      let* () = metadata_check metadata in
+      let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
+      Progress_bar.with_reporter spinner @@ fun count_progress ->
+      Writer.count_progress := count_progress ;
+      Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
+      return metadata)
+    (fun () ->
+      Reader.close_in in_chan ;
+      Lwt.return_unit)
 
 let compress ~snapshot_file =
   let Unix.{st_size = total; _} = Unix.stat snapshot_file in
@@ -295,4 +346,21 @@ let compress ~snapshot_file =
   with e ->
     Gzip.close_out out_chan ;
     close_in in_chan ;
+    raise e
+
+let read_metadata (module Reader : READER) ~snapshot_file =
+  let in_chan = Reader.open_in snapshot_file in
+  let reader_input : (module READER_INPUT) =
+    (module struct
+      include Reader
+
+      let in_chan = in_chan
+    end)
+  in
+  try
+    let metadata = read_snapshot_metadata reader_input in
+    Reader.close_in in_chan ;
+    metadata
+  with e ->
+    Reader.close_in in_chan ;
     raise e

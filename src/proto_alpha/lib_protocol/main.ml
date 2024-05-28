@@ -223,7 +223,6 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
     | Partial_construction _ ->
         init_consensus_rights_for_mempool ctxt ~predecessor_level
   in
-  let* ctxt = Dal_apply.initialisation ~level:predecessor_level ctxt in
   return
     ( ctxt,
       migration_balance_updates,
@@ -367,15 +366,17 @@ let init chain_id ctxt block_header =
   let predecessor = block_header.predecessor in
   let typecheck_smart_contract (ctxt : Alpha_context.context)
       (script : Alpha_context.Script.t) =
-    let allow_forged_in_storage =
-      false
+    let allow_forged_tickets_in_storage, allow_forged_lazy_storage_id_in_storage
+        =
+      (false, false)
       (* There should be no forged value in bootstrap contracts. *)
     in
     let* Ex_script (Script parsed_script), ctxt =
       Script_ir_translator.parse_script
         ctxt
         ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-        ~allow_forged_in_storage
+        ~allow_forged_tickets_in_storage
+        ~allow_forged_lazy_storage_id_in_storage
         script
     in
     let* storage, lazy_storage_diff, ctxt =

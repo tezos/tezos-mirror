@@ -31,14 +31,25 @@ open Validation_errors
 module Event = struct
   include Internal_event.Simple
 
-  let inherited_inconsistent_cache =
+  let inherited_inconsistent_cache_apply =
     declare_1
       ~section:["block"; "validation"]
-      ~name:"block_validation_inconsistent_cache"
+      ~name:"block_validation_inconsistent_cache_apply"
       ~msg:"applied block {hash} with an inconsistent cache: reloading cache"
       ~level:Warning
       ~pp1:Block_hash.pp
       ("hash", Block_hash.encoding)
+
+  let inherited_inconsistent_cache_preapply =
+    declare_1
+      ~section:["block"; "validation"]
+      ~name:"block_validation_inconsistent_cache_preapply"
+      ~msg:
+        "preapplied block on top of {pred_hash} with an inconsistent cache: \
+         reloading cache"
+      ~level:Warning
+      ~pp1:Block_hash.pp
+      ("pred_hash", Block_hash.encoding)
 end
 
 type operation = {
@@ -75,7 +86,8 @@ type validation_store = {
   timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_finalized_block_level : Int32.t;
+  last_preserved_block_level : Int32.t;
 }
 
 let validation_store_encoding =
@@ -86,31 +98,36 @@ let validation_store_encoding =
            timestamp;
            message;
            max_operations_ttl;
-           last_allowed_fork_level;
+           last_finalized_block_level;
+           last_preserved_block_level;
          } ->
       ( resulting_context_hash,
         timestamp,
         message,
         max_operations_ttl,
-        last_allowed_fork_level ))
+        last_finalized_block_level,
+        last_preserved_block_level ))
     (fun ( resulting_context_hash,
            timestamp,
            message,
            max_operations_ttl,
-           last_allowed_fork_level ) ->
+           last_finalized_block_level,
+           last_preserved_block_level ) ->
       {
         resulting_context_hash;
         timestamp;
         message;
         max_operations_ttl;
-        last_allowed_fork_level;
+        last_finalized_block_level;
+        last_preserved_block_level;
       })
-    (obj5
+    (obj6
        (req "resulting_context_hash" Context_hash.encoding)
        (req "timestamp" Time.Protocol.encoding)
        (req "message" (option string))
        (req "max_operations_ttl" int31)
-       (req "last_allowed_fork_level" int32))
+       (req "last_finalized_block_level" int32)
+       (req "last_preserved_block_level" int32))
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
@@ -494,7 +511,8 @@ module Make (Proto : Protocol_plugin.T) = struct
     let should_include_metadata_hashes =
       match proto_env_version with
       | Protocol.V0 -> false
-      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11) ->
+      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12)
+        ->
           true
     in
     let block_metadata =
@@ -826,7 +844,10 @@ module Make (Proto : Protocol_plugin.T) = struct
             timestamp = block_header.shell.timestamp;
             message = validation_result.message;
             max_operations_ttl = validation_result.max_operations_ttl;
-            last_allowed_fork_level = validation_result.last_allowed_fork_level;
+            last_finalized_block_level =
+              validation_result.last_finalized_block_level;
+            last_preserved_block_level =
+              validation_result.last_preserved_block_level;
           }
         in
         return
@@ -982,7 +1003,7 @@ module Make (Proto : Protocol_plugin.T) = struct
       Protocol.(
         match Proto.environment_version with
         | V0 -> false
-        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 -> true)
+        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12 -> true)
       && not is_from_genesis
     in
     let* context =
@@ -1232,7 +1253,10 @@ module Make (Proto : Protocol_plugin.T) = struct
           timestamp;
           message = validation_result.message;
           max_operations_ttl;
-          last_allowed_fork_level = validation_result.last_allowed_fork_level;
+          last_finalized_block_level =
+            validation_result.last_finalized_block_level;
+          last_preserved_block_level =
+            validation_result.last_preserved_block_level;
         }
       in
       let result =
@@ -1480,24 +1504,11 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
     ~block_header
     operations
 
-let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
-    block_header operations =
+let retry_with_force_loaded_cache ?(event = fun () -> Lwt.return_unit) ~cache f
+    =
   let open Lwt_result_syntax in
-  let block_hash = Block_header.hash block_header in
   let*! r =
-    (* The cache might be inconsistent with the context. By forcing
-       the reloading of the cache, we restore the consistency. *)
-    let*! r =
-      apply
-        ?simulate
-        ?cached_result
-        ?should_precheck
-        apply_environment
-        ~cache
-        block_hash
-        block_header
-        operations
-    in
+    let*! r = f ~cache in
     match r with
     | Error (Validation_errors.Inconsistent_hash _ :: _) ->
         (* The shell makes an assumption over the protocol concerning
@@ -1505,15 +1516,8 @@ let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
            fails with an [Inconsistency_hash] error. To make the node
            resilient to such problem, when such an error occurs, we retry
            the application using a fresh cache. *)
-        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
-        apply
-          ?cached_result
-          ?should_precheck
-          apply_environment
-          ~cache:`Force_load
-          block_hash
-          block_header
-          operations
+        let*! () = event () in
+        f ~cache:`Force_load
     | (Ok _ | Error _) as res -> Lwt.return res
   in
   match r with
@@ -1521,12 +1525,30 @@ let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
       tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
+let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
+    block_header operations =
+  let block_hash = Block_header.hash block_header in
+  let event () = Event.(emit inherited_inconsistent_cache_apply) block_hash in
+  let f ~cache =
+    apply
+      ?simulate
+      ?cached_result
+      ?should_precheck
+      apply_environment
+      ~cache
+      block_hash
+      block_header
+      operations
+  in
+  retry_with_force_loaded_cache ~event ~cache f
+
 let preapply ~chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit ~timestamp
     ~protocol_data ~live_blocks ~live_operations ~predecessor_context
     ~predecessor_resulting_context_hash ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
-    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash ~cache
+    operations =
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
   let* (module Proto) =
@@ -1548,7 +1570,7 @@ let preapply ~chain_id ~user_activated_upgrades
   in
   Block_validation.preapply
     ~chain_id
-    ~cache:`Force_load
+    ~cache
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~operation_metadata_size_limit
@@ -1570,9 +1592,12 @@ let preapply ~chain_id ~user_activated_upgrades
     ~protocol_data ~live_blocks ~live_operations ~predecessor_context
     ~predecessor_resulting_context_hash ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
-    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
-  let open Lwt_result_syntax in
-  let*! r =
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash ~cache
+    operations =
+  let event () =
+    Event.(emit inherited_inconsistent_cache_preapply) predecessor_hash
+  in
+  let f ~cache =
     preapply
       ~chain_id
       ~user_activated_upgrades
@@ -1589,9 +1614,7 @@ let preapply ~chain_id ~user_activated_upgrades
       ~predecessor_max_operations_ttl
       ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash
+      ~cache
       operations
   in
-  match r with
-  | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      tzfail (System_error {errno = Unix.error_message errno; fn; msg})
-  | (Ok _ | Error _) as res -> Lwt.return res
+  retry_with_force_loaded_cache ~event ~cache f

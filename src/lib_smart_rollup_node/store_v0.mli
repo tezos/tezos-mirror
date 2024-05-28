@@ -106,33 +106,6 @@ module Dal_slots_headers :
      and type value := Dal.Slot_header.V1.t
      and type 'a store := 'a Irmin_store.t
 
-module Dal_confirmed_slots_history :
-  Store_sigs.Append_only_map
-    with type key := Block_hash.t
-     and type value := Dal.Slot_history.V1.t
-     and type 'a store := 'a Irmin_store.t
-
-(** Confirmed DAL slots histories cache. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_histories :
-  Store_sigs.Append_only_map
-    with type key := Block_hash.t
-     and type value := Dal.Slot_history_cache.V1.t
-     and type 'a store := 'a Irmin_store.t
-
-(** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
-    of dal slots fetched by the rollup node, as a list of pages. The values of
-    this storage module have type `string list`. A value of the form
-    [page_contents] refers to a page of a slot that has been confirmed, and
-    whose contents are [page_contents].
-*)
-module Dal_slot_pages :
-  Store_sigs.Nested_map
-    with type primary_key := Block_hash.t
-     and type secondary_key := Dal.Slot_index.t * Dal.Page_index.t
-     and type value := bytes
-     and type 'a store := 'a Irmin_store.t
-
 (** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing
     status of dal slots content fetched by the rollup node. The values of
     this storage module have type `[`Confirmed | `Unconfirmed]`, depending on

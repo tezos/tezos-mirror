@@ -12,6 +12,7 @@ license = "MIT"
 [dependencies]
 
 thiserror.workspace = true
+anyhow.workspace = true
 
 primitive-types.workspace = true
 ethereum.workspace = true

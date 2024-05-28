@@ -1,0 +1,3 @@
+code { SOME } ;
+input { Stack_elt (pair int int) (Pair 5 4) } ;
+output { Stack_elt (option (pair int int)) (Some (Pair 5 4)) }

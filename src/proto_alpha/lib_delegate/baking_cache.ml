@@ -82,11 +82,3 @@ end
 module Round_timestamp_interval_cache =
   Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (Round_cache_key)
-
-module Cycle_cache =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (struct
-      include Cycle
-
-      let hash = Hashtbl.hash
-    end)

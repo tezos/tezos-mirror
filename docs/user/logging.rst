@@ -1,5 +1,5 @@
-Logging
-=======
+Logging features
+================
 
 Logging features in Octez allow to monitor the execution of Octez binaries, informing in real
 time about events of interest, such as errors, completion of certain steps,
@@ -7,6 +7,10 @@ etc. This is why various software components emit *events* throughout the
 codebase (see :doc:`../developer/event_logging_framework`), the logging
 framework dispatches them to an arbitrary number of (active) *sinks* which can
 filter print, store, or otherwise handle events.
+
+.. note::
+
+  Log events should not be confused with :doc:`contract events <../active/event>`, which are emitted by smart contracts using specific support in the Michelson language.
 
 The logging framework can be configured with environment variables, which specify how events are mapped to sinks.
 Some Octez binaries provide additional configurations means.

@@ -1,0 +1,3 @@
+code { MAP {} ; CONCAT } ;
+input { Stack_elt (list bytes) { } } ;
+output { Stack_elt bytes 0x }

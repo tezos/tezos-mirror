@@ -1,0 +1,38 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+db_version 2.0
+
+# work directory to store temporary files associated to this package
+mkdir -p /var/lib/octez-baker
+
+case "${1}" in
+configure)
+
+  db_get octez-baker/liquidity-vote
+  echo "LQVOTE=${RET}" > /etc/default/octez-baker
+
+  db_get octez-baker/baker-key
+  echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
+
+  db_get octez-baker/baker-active-protocol
+  echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
+
+  db_get octez-baker/baker-next-protocol
+  if [ -z "$RET" ]; then
+    echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+  else
+    echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+  fi
+
+  ;;
+*)
+  echo "postinst noop"
+  ;;
+esac
+
+#DEBHELPER#

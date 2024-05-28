@@ -93,20 +93,21 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
     | Some peer -> Client.Admin.connect_address ~peer client
   in
   (* Update [dal_config] in the node config. *)
-  let* dal_parameters = Dal.Parameters.from_client client in
   let config : Dal.Cryptobox.Config.t =
     {
       activated = true;
-      use_mock_srs_for_testing = Some dal_parameters.cryptobox;
+      use_mock_srs_for_testing = true;
       bootstrap_peers =
         (match dal_bootstrap_peer with
         | None -> []
         | Some peer -> [Dal_node.listen_addr peer]);
     }
   in
-  Node.Config_file.update
-    node
-    (Node.Config_file.set_sandbox_network_with_dal_config config) ;
+  let* () =
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_sandbox_network_with_dal_config config)
+  in
   (* Restart the node to load the new config. *)
   let* () = Node.terminate node in
   let* () =
@@ -144,14 +145,14 @@ let store_slot_to_dal_node ~slot_size dal_node =
   in
   return (commitment_hash, proof)
 
-let publish_slot_header_to_l1_node ~slot_index ~source ~commitment_hash ~proof
+let publish_commitment_to_l1_node ~slot_index ~source ~commitment_hash ~proof
     client =
   let* (`OpHash op_hash) =
     Operation.Manager.(
       inject
         [
           make ~source
-          @@ dal_publish_slot_header
+          @@ dal_publish_commitment
                ~index:slot_index
                ~commitment:commitment_hash
                ~proof;
@@ -235,9 +236,9 @@ let test_produce_and_propagate_shards ~executors ~protocol =
         ~slot_size:dal_parameters.cryptobox.slot_size
         dal_node2
     in
-    Log.info "Publish slot header from [node2]." ;
+    Log.info "Publish commitment from [node2]." ;
     let* op_hash =
-      publish_slot_header_to_l1_node
+      publish_commitment_to_l1_node
         ~slot_index
         ~source:Constant.bootstrap2
         ~commitment_hash
@@ -249,7 +250,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
        [op_hash] in it's mempool." ;
     let* () =
       (* Wait until [node1] gets notified about a new operation
-         (should be the above publish slot header operation in this case). *)
+         (should be the above publish commitment operation in this case). *)
       let* () = Node.wait_for_request ~request:`Notify node1 in
       let* m = Mempool.get_mempool client1 in
       Check.(
@@ -260,9 +261,9 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       unit
     in
     let dal_node_endpoint = Dal.Helpers.endpoint dal_node2 in
-    Log.info "Bake two blocks to finalize the slot header." ;
+    Log.info "Bake one block to include the op, and two blocks to finalize it." ;
     let* () =
-      Base.repeat 2 (fun () ->
+      Base.repeat 3 (fun () ->
           Client.bake_for_and_wait client1 ~dal_node_endpoint)
     in
     Log.info
@@ -282,7 +283,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     in
     Log.info "Bake several blocks to surpass the attestation lag." ;
     let* () =
-      Base.repeat (dal_parameters.attestation_lag - 1) (fun () ->
+      Base.repeat (dal_parameters.attestation_lag - 2) (fun () ->
           Client.bake_for_and_wait client1 ~dal_node_endpoint)
     in
     Log.info "Assert that the attestation was indeed posted." ;

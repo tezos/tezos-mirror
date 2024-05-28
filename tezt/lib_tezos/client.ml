@@ -76,6 +76,10 @@ type stresstest_contract_parameters = {
   invocation_gas_limit : int;
 }
 
+type ai_vote = On | Off | Pass
+
+let ai_vote_to_string = function On -> "on" | Off -> "off" | Pass -> "pass"
+
 let name t = t.name
 
 let base_dir t = t.base_dir
@@ -135,8 +139,8 @@ let address ?(hostname = false) ?from peer =
   | Some endpoint ->
       Runner.address ~hostname ?from:(runner endpoint) (runner peer)
 
-let create_with_mode ?runner ?(path = Constant.octez_client)
-    ?(admin_path = Constant.octez_admin_client) ?name
+let create_with_mode ?runner ?(path = Uses.path Constant.octez_client)
+    ?(admin_path = Uses.path Constant.octez_admin_client) ?name
     ?(color = Log.Color.FG.blue) ?base_dir mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
@@ -184,7 +188,7 @@ let endpoint_arg ?(endpoint : endpoint option) client =
   (* pass [?endpoint] first: it has precedence over client.mode *)
   match either endpoint (mode_to_endpoint client.mode) with
   | None -> []
-  | Some e -> ["--endpoint"; string_of_endpoint ~hostname:true e]
+  | Some e -> ["--endpoint"; string_of_endpoint e]
 
 let media_type_arg client =
   match client with
@@ -762,7 +766,8 @@ let empty_mempool_file ?(filename = "mempool.json") () =
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
-    ?force ?context_path ?dal_node_endpoint ?(state_recorder = false) client =
+    ?force ?context_path ?dal_node_endpoint ?ai_vote ?(state_recorder = false)
+    client =
   spawn_command
     ?endpoint
     client
@@ -784,12 +789,13 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
     @ optional_arg "dal-node" Fun.id dal_node_endpoint
+    @ optional_arg "adaptive-issuance-vote" ai_vote_to_string ai_vote
     @ optional_switch "record_state" state_recorder)
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
-    ?state_recorder ?expect_failure client =
+    ?ai_vote ?state_recorder ?expect_failure client =
   spawn_bake_for
     ?endpoint
     ?keys
@@ -804,6 +810,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     ?dal_node_endpoint
+    ?ai_vote
     ?state_recorder
     client
   |> Process.check ?expect_failure
@@ -811,7 +818,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint ?state_recorder client =
+    ?node ?dal_node_endpoint ?ai_vote ?state_recorder client =
   let node =
     match node with
     | Some n -> n
@@ -842,6 +849,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
       ?force
       ?context_path
       ?dal_node_endpoint
+      ?ai_vote
       ?state_recorder
       client
   in
@@ -850,7 +858,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint client =
+    ?node ?dal_node_endpoint ?ai_vote client =
   let* (_level : int) =
     bake_for_and_wait_level
       ?endpoint
@@ -868,8 +876,31 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
       ?level_before
       ?node
       ?dal_node_endpoint
+      ?ai_vote
       client
   in
+  unit
+
+let bake_until_level ~target_level ?keys ?node client =
+  Log.info "Bake until level %d." target_level ;
+  let node =
+    match node with
+    | Some n -> n
+    | None -> (
+        match node_of_client_mode client.mode with
+        | Some n -> n
+        | None -> Test.fail "No node found for bake_until_level")
+  in
+  let* current = Node.get_level node in
+  if current >= target_level then
+    Test.fail "bake_until_level(%d): already at level %d" target_level current ;
+  let* () =
+    repeat (target_level - current) (fun () ->
+        bake_for_and_wait ?keys ~node client)
+  in
+  let* final_level = Node.get_level node in
+  Check.((final_level = target_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
   unit
 
 (* Handle attesting and preattesting similarly *)
@@ -1082,8 +1113,8 @@ let bls_import_secret_key ?hooks ?force key sc_client =
   spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
 
 let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
-    ?gas_limit ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
-    ?(force = false) ~amount ~giver ~receiver client =
+    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
+    ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
     ?log_output
     ?endpoint
@@ -1097,6 +1128,7 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
         fee
     @ optional_arg "burn-cap" Tez.to_string burn_cap
     @ optional_arg "gas-limit" string_of_int gas_limit
+    @ optional_arg "safety-guard" string_of_int safety_guard
     @ optional_arg "storage-limit" string_of_int storage_limit
     @ optional_arg "counter" string_of_int counter
     @ optional_arg "entrypoint" Fun.id entrypoint
@@ -1105,8 +1137,8 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     @ if force then ["--force"] else [])
 
 let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force ?expect_failure
-    ~amount ~giver ~receiver client =
+    ?safety_guard ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force
+    ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?log_output
     ?endpoint
@@ -1115,6 +1147,7 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?burn_cap
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?counter
     ?entrypoint
@@ -1128,22 +1161,24 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
   |> Process.check ?expect_failure
 
 let spawn_call ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?entrypoint ?arg ~destination ~source client =
+    ?safety_guard ?entrypoint ?arg ~destination ~source client =
   spawn_command ?log_output ?endpoint ?hooks client
   @@ ["--wait"; wait]
   @ ["call"; destination; "from"; source]
   @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "safety-guard" string_of_int safety_guard
   @ optional_arg "entrypoint" Fun.id entrypoint
   @ optional_arg "arg" Fun.id arg
 
-let call ?hooks ?log_output ?endpoint ?wait ?burn_cap ?entrypoint ?arg
-    ~destination ~source client =
+let call ?hooks ?log_output ?endpoint ?wait ?burn_cap ?safety_guard ?entrypoint
+    ?arg ~destination ~source client =
   spawn_call
     ?hooks
     ?log_output
     ?endpoint
     ?wait
     ?burn_cap
+    ?safety_guard
     ?entrypoint
     ?arg
     ~destination
@@ -1357,12 +1392,16 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
-let set_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src ~limit client =
+let spawn_set_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src ~limit
+    client =
   spawn_command
     ?hooks
     ?endpoint
     client
     (["--wait"; wait] @ ["set"; "deposits"; "limit"; "for"; src; "to"; limit])
+
+let set_deposits_limit ?hooks ?endpoint ?wait ~src ~limit client =
+  spawn_set_deposits_limit ?hooks ?endpoint ?wait ~src ~limit client
   |> Process.check_and_read_stdout
 
 let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
@@ -2203,6 +2242,22 @@ let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     client
   |> Process.check
 
+let spawn_run_tzt_unit_tests ?hooks ?protocol_hash ~tests ?no_base_dir_warnings
+    client =
+  spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["run"; "unit"; "tests"; "from"]
+  @ tests
+
+let run_tzt_unit_tests ?hooks ?protocol_hash ~tests ?no_base_dir_warnings client
+    =
+  spawn_run_tzt_unit_tests
+    ?hooks
+    ?protocol_hash
+    ~tests
+    ?no_base_dir_warnings
+    client
+  |> Process.check
+
 let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode
     ?other_contracts ?extra_big_maps ~entrypoint ~contract ?input
     ?(unlimited_gas = false) client =
@@ -2281,7 +2336,7 @@ let spawn_list_protocols mode client =
     | `Light -> "light"
     | `Proxy -> "proxy"
   in
-  spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
+  spawn_command client ["list"; mode_str; "protocols"]
 
 let list_protocols mode client =
   let* output =
@@ -2303,9 +2358,7 @@ let list_understood_protocols ?config_file client =
   return (parse_list_protocols_output output)
 
 let spawn_migrate_mockup ~next_protocol client =
-  spawn_command
-    client
-    (mode_arg client @ ["migrate"; "mockup"; "to"; Protocol.hash next_protocol])
+  spawn_command client ["migrate"; "mockup"; "to"; Protocol.hash next_protocol]
 
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
@@ -2911,11 +2964,11 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
 let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?(keys = Constant.all_secret_keys) ?rpc_local tag () =
+    ?(keys = Constant.all_secret_keys) ?rpc_external tag () =
   match tag with
   | (`Client | `Proxy) as mode ->
       let* node =
-        Node.init ?event_level ?event_sections_levels ?rpc_local nodes_args
+        Node.init ?event_level ?event_sections_levels ?rpc_external nodes_args
       in
       let endpoint = Node node in
       let mode =
@@ -2937,7 +2990,7 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?timestamp ?keys ?rpc_local tag ~protocol () =
+    ?parameter_file ?timestamp ?keys ?rpc_external tag ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -2949,7 +3002,7 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       ?event_sections_levels
       ?nodes_args
       ?keys
-      ?rpc_local
+      ?rpc_external
       tag
       ()
   in
@@ -3017,10 +3070,12 @@ let contract_entrypoint_type ~entrypoint ~contract client =
   spawn_contract_entrypoint_type ~entrypoint ~contract client
   |> Process.check_and_read_stdout
 
+let spawn_sign_bytes ~signer ~data client =
+  spawn_command client ["sign"; "bytes"; data; "for"; signer]
+
 let sign_bytes ~signer ~data client =
   let* output =
-    spawn_command client ["sign"; "bytes"; data; "for"; signer]
-    |> Process.check_and_read_stdout
+    spawn_sign_bytes ~signer ~data client |> Process.check_and_read_stdout
   in
   match output =~* rex "Signature: ([a-zA-Z0-9]+)" with
   | Some signature -> Lwt.return signature
@@ -3586,7 +3641,7 @@ let spawn_compute_chain_id_from_block_hash ?endpoint client block_hash =
   spawn_command ?endpoint client
   @@ ["compute"; "chain"; "id"; "from"; "block"; "hash"; block_hash]
 
-(** Run [tezos-client compute chain id from block hash]. *)
+(** Run [octez-client compute chain id from block hash]. *)
 let compute_chain_id_from_block_hash ?endpoint client block_hash =
   let* output =
     spawn_compute_chain_id_from_block_hash ?endpoint client block_hash
@@ -3598,7 +3653,7 @@ let spawn_compute_chain_id_from_seed ?endpoint client seed =
   spawn_command ?endpoint client
   @@ ["compute"; "chain"; "id"; "from"; "seed"; seed]
 
-(** Run [tezos-client compute chain id from seed]. *)
+(** Run [octez-client compute chain id from seed]. *)
 let compute_chain_id_from_seed ?endpoint client seed =
   let* output =
     spawn_compute_chain_id_from_seed ?endpoint client seed
@@ -4209,6 +4264,58 @@ let as_foreign_endpoint = function
           port = Proxy_server.rpc_port ps;
         }
 
+let get_receipt_for ~operation ?(check_previous = 10) client =
+  spawn_command client
+  @@ [
+       "get";
+       "receipt";
+       "for";
+       operation;
+       "--check-previous";
+       string_of_int check_previous;
+     ]
+  |> Process.check_and_read_stdout
+
+let spawn_stake ?(wait = "none") ?hooks amount ~staker client =
+  spawn_command ?hooks client
+  @@ ["--wait"; wait; "stake"; Tez.to_string amount; "for"; staker]
+
+let stake ?wait ?hooks amount ~staker client =
+  spawn_stake ?wait ?hooks amount ~staker client |> Process.check
+
+let spawn_unstake ?(wait = "none") amount ~staker client =
+  spawn_command client
+  @@ ["--wait"; wait; "unstake"; Tez.to_string amount; "for"; staker]
+
+let unstake ?wait amount ~staker client =
+  spawn_unstake ?wait amount ~staker client |> Process.check
+
+let spawn_finalize_unstake ?(wait = "none") ~staker client =
+  spawn_command client @@ ["--wait"; wait; "finalize"; "unstake"; "for"; staker]
+
+let finalize_unstake ?wait ~staker client =
+  spawn_finalize_unstake ?wait ~staker client |> Process.check
+
+let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
+  spawn_command client
+  @@ [
+       "set";
+       "delegate";
+       "parameters";
+       "for";
+       delegate;
+       "--limit-of-staking-over-baking";
+       limit;
+       "--edge-of-baking-over-staking";
+       edge;
+     ]
+
+let set_delegate_parameters ~delegate ~limit ~edge client =
+  spawn_set_delegate_parameters ~delegate ~limit ~edge client |> Process.check
+
+(* Keep an alias to external RPC module to allow RPC calls *)
+module R = RPC
+
 module RPC = struct
   let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?endpoint ?hooks ?env ?protocol_hash client
@@ -4297,3 +4404,31 @@ module RPC = struct
       path
       client
 end
+
+let bake_until_cycle ~target_cycle ?keys ?node client =
+  let* constants = RPC.call client @@ R.get_chain_block_context_constants () in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  Log.info
+    "Bake until cycle %d (level %d)"
+    target_cycle
+    (target_cycle * blocks_per_cycle) ;
+
+  bake_until_level
+    ~target_level:(target_cycle * blocks_per_cycle)
+    ?keys
+    ?node
+    client
+
+let bake_until_cycle_end ~target_cycle ?keys ?node client =
+  let* constants = RPC.call client @@ R.get_chain_block_context_constants () in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  Log.info
+    "Bake until cycle %d (level %d)"
+    target_cycle
+    (target_cycle * blocks_per_cycle) ;
+
+  bake_until_level
+    ~target_level:(((target_cycle + 1) * blocks_per_cycle) - 1)
+    ?keys
+    ?node
+    client

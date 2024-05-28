@@ -8,8 +8,8 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib
-  irmin-pack
-  irmin-pack.mem
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.mem
   octez-libs.context.sigs
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers)

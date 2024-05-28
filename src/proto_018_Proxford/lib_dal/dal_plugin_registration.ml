@@ -44,18 +44,23 @@ module Plugin = struct
       attestation_lag;
       attestation_threshold;
       cryptobox_parameters;
-      blocks_per_epoch;
+      blocks_per_epoch = _;
     } =
       parametric.dal
     in
     return
       {
         Dal_plugin.feature_enable;
+        incentives_enable = false;
         number_of_slots;
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
-        blocks_per_epoch;
+        sc_rollup_challenge_window_in_blocks =
+          parametric.sc_rollup.challenge_window_in_blocks;
+        commitment_period_in_blocks =
+          parametric.sc_rollup.commitment_period_in_blocks;
+        dal_attested_slots_validity_lag = Int.max_int;
       }
 
   let block_info ?chain ?block ~metadata ctxt =
@@ -66,6 +71,13 @@ module Plugin = struct
       ?block
       ~metadata
       ()
+
+  let block_shell_header (block_info : block_info) = block_info.header.shell
+
+  let get_round fitness =
+    let open Result_syntax in
+    let* round = Fitness.round_from_raw fitness |> Environment.wrap_tzresult in
+    return @@ Round.to_int32 round
 
   (* Turn the given value of type {!Protocol.Apply_operation_result.operation_result}
      into a value of type {!Dal_plugin.operation_application_result}. *)
@@ -100,8 +112,16 @@ module Plugin = struct
     let+ pkh_to_shards =
       Plugin.RPC.Dal.dal_shards cpctxt (`Main, `Head 0) ~level ()
     in
+    let indexes (initial_slot, power) =
+      let last_slot = initial_slot + power - 1 in
+      let rec iter acc i =
+        if i < initial_slot then acc else iter (i :: acc) (i - 1)
+      in
+      iter [] last_slot
+    in
     List.fold_left
-      (fun acc (pkh, s) -> Signature.Public_key_hash.Map.add pkh s acc)
+      (fun acc (pkh, s) ->
+        Signature.Public_key_hash.Map.add pkh (indexes s) acc)
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
@@ -127,6 +147,30 @@ module Plugin = struct
     in
     List.filter (Dal.Attestation.is_attested confirmed_slots) all_slots
     |> Dal.Slot_index.to_int_list |> return
+
+  (* Section of helpers for Skip lists *)
+  module Skip_list = struct
+    type cell = Dal.Slots_history.t
+
+    type hash = Dal.Slots_history.Pointer_hash.t
+
+    let cell_encoding = Dal.Slots_history.encoding
+
+    let hash_encoding = Dal.Slots_history.Pointer_hash.encoding
+
+    let cell_equal = Dal.Slots_history.equal
+
+    let hash_equal = Dal.Slots_history.Pointer_hash.equal
+
+    let cell_hash = Dal.Slots_history.hash
+
+    (* We return the empty list here because DAL is not activated in Oxford2. *)
+    let cells_of_level _block_info _ctxt = Lwt_result_syntax.return []
+  end
+
+  module RPC = struct
+    let directory _skip_list_cells_store = Tezos_rpc.Directory.empty
+  end
 end
 
 let () = Dal_plugin.register (module Plugin)

@@ -835,6 +835,7 @@ module Tickets = struct
           ~__FILE__
           ~title:("Contract onchain opcodes: " ^ title)
           ~tags:["contract"; "onchain"; "opcodes"]
+          ~uses_node:false
           (fun protocol ->
             let* client = Client.init_mockup ~protocol () in
             body protocol client)
@@ -859,6 +860,7 @@ let register ~protocols =
         ~__FILE__
         ~title:("Contract onchain opcodes: " ^ title)
         ~tags:["contract"; "onchain"; "opcodes"]
+        ~uses_node:false
         (fun protocol ->
           let* client = Client.init_mockup ~protocol () in
           body protocol client)

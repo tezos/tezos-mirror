@@ -285,7 +285,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     encode pvm tree
 
   let compute_step_many ?reveal_builtins ?write_debug ?stop_at_snapshot
-      ~max_steps tree =
+      ~wasm_entrypoint ~max_steps tree =
     let open Lwt.Syntax in
     let* pvm_state = decode tree in
     let* pvm_state, executed_ticks =
@@ -293,21 +293,26 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
         ?reveal_builtins
         ?write_debug
         ?stop_at_snapshot
+        ~wasm_entrypoint
         ~max_steps
         pvm_state
     in
     let+ tree = encode pvm_state tree in
     (tree, executed_ticks)
 
-  let compute_step_with_debug ~write_debug tree =
+  let compute_step_with_debug ~wasm_entrypoint ~write_debug tree =
     let open Lwt.Syntax in
     let* initial_state = decode tree in
     let* final_state =
-      Wasm_vm.compute_step_with_debug ~write_debug initial_state
+      Wasm_vm.compute_step_with_debug
+        ~wasm_entrypoint
+        ~write_debug
+        initial_state
     in
     encode final_state tree
 
-  let compute_step tree = compute_step_with_debug tree ~write_debug:Noop
+  let compute_step ~wasm_entrypoint tree =
+    compute_step_with_debug tree ~wasm_entrypoint ~write_debug:Noop
 
   let get_output output_info tree =
     let open Lwt_syntax in
@@ -347,7 +352,22 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
     Wasm_vm.get_wasm_version pvm
 
+  module Unsafe = struct
+    let get_max_nb_ticks tree =
+      let open Lwt_syntax in
+      let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      pvm_state.max_nb_ticks
+
+    let set_max_nb_ticks n tree =
+      let open Lwt_syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let pvm_state = {pvm_state with max_nb_ticks = n} in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+  end
+
   module Internal_for_tests = struct
+    include Unsafe
+
     let get_tick_state tree =
       let open Lwt_syntax in
       let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
@@ -367,12 +387,6 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       match pvm.tick_state with
       | Stuck error -> Lwt.return_some error
       | _ -> Lwt.return_none
-
-    let set_max_nb_ticks n tree =
-      let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let pvm_state = {pvm_state with max_nb_ticks = n} in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
     let set_maximum_reboots_per_input n tree =
       let open Lwt_syntax in
@@ -416,7 +430,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       pvm.buffers.input
 
     let compute_step_many_with_hooks ?reveal_builtins ?write_debug
-        ?after_fast_exec ?stop_at_snapshot ~max_steps tree =
+        ?after_fast_exec ?stop_at_snapshot ~wasm_entrypoint ~max_steps tree =
       let open Lwt.Syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* pvm_state, ticks =
@@ -425,6 +439,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
           ?write_debug
           ?after_fast_exec
           ?stop_at_snapshot
+          ~wasm_entrypoint
           ~max_steps
           pvm_state
       in
@@ -433,12 +448,13 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       in
       (tree, ticks)
 
-    let compute_step_many_until ?max_steps ?reveal_builtins ?write_debug
-        should_compute tree =
+    let compute_step_many_until ~wasm_entrypoint ?max_steps ?reveal_builtins
+        ?write_debug should_compute tree =
       let open Lwt.Syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* pvm_state, ticks =
         Wasm_vm.compute_step_many_until
+          ~wasm_entrypoint
           ?max_steps
           ?reveal_builtins
           ?write_debug

@@ -23,7 +23,10 @@
   -open Tezos_event_logging
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_key_value_store_fuzzy test_log_config_rules))
+ (modules
+  test_key_value_store
+  test_key_value_store_fuzzy
+  test_log_config_rules))
 
 (executable
  (name main)

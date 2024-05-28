@@ -15,8 +15,11 @@
   octez-shell-libs.client-commands
   octez-l2-libs.smart-rollup
   octez-smart-rollup-node-lib
-  octez_smart_rollup_node_PtNairob
+  (select void_for_linking-octez_smart_rollup_node_PtNairob from
+   (octez_smart_rollup_node_PtNairob -> void_for_linking-octez_smart_rollup_node_PtNairob.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PtNairob.empty))
   octez_smart_rollup_node_Proxford
+  octez_smart_rollup_node_PtParisB
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))
@@ -29,7 +32,7 @@
   (:standard)
   -open Tezos_base
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base.TzPervasives.Error_monad
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_client_base_unix
@@ -39,4 +42,6 @@
 
 (rule
  (action
-  (progn (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))
+  (progn
+   (write-file void_for_linking-octez_smart_rollup_node_PtNairob.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))

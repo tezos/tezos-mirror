@@ -79,6 +79,7 @@ val register_global_constant :
   ?simulation:bool ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
@@ -295,6 +296,7 @@ val originate_contract :
   ?branch:int ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   delegate:public_key_hash option ->
   initial_storage:string ->
@@ -346,6 +348,7 @@ val transfer_with_script :
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
@@ -380,6 +383,7 @@ val transfer :
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
@@ -590,6 +594,7 @@ val transfer_ticket :
   ?simulation:bool ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
@@ -628,6 +633,7 @@ val sc_rollup_originate :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -660,6 +666,7 @@ val sc_rollup_add_messages :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -691,6 +698,7 @@ val sc_rollup_cement :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -724,6 +732,7 @@ val sc_rollup_publish :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -755,6 +764,7 @@ val sc_rollup_execute_outbox_message :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -788,6 +798,7 @@ val sc_rollup_recover_bond :
   ?simulation:bool ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
@@ -819,6 +830,7 @@ val sc_rollup_refute :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -851,6 +863,7 @@ val sc_rollup_timeout :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -877,6 +890,7 @@ val zk_rollup_originate :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -905,6 +919,7 @@ val zk_rollup_publish :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
@@ -931,6 +946,7 @@ val zk_rollup_update :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   source:public_key_hash ->

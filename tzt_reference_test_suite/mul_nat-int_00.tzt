@@ -1,0 +1,3 @@
+code { MUL } ;
+input { Stack_elt nat 5 ; Stack_elt int -2 } ;
+output { Stack_elt int -10 }

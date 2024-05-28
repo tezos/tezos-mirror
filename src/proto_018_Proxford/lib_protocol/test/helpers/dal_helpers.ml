@@ -48,10 +48,7 @@ let () =
 
 let mk_cryptobox dal_params =
   let open Result_syntax in
-  let parameters =
-    Cryptobox.Internal_for_tests.parameters_initialisation dal_params
-  in
-  let () = Cryptobox.Internal_for_tests.load_parameters parameters in
+  let () = Cryptobox.Internal_for_tests.init_prover_dal () in
   match Cryptobox.make dal_params with
   | Ok dal -> return dal
   | Error (`Fail s) -> fail [Test_failure s]
@@ -105,7 +102,9 @@ struct
     let open Result_syntax in
     match Cryptobox.commit cryptobox polynomial with
     | Ok cm -> return cm
-    | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+    | Error
+        ((`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
+        as commit_error) ->
         fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let dal_mk_prove_page polynomial page_id =
@@ -115,7 +114,9 @@ struct
     | Ok p -> return p
     | Error `Page_index_out_of_range ->
         fail [Test_failure "compute_proof_segment: Page_index_out_of_range"]
-    | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+    | Error
+        ((`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
+        as commit_error) ->
         fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let mk_slot ?(level = level_one) ?(index = Slot_index.zero)

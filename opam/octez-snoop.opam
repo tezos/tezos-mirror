@@ -10,14 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezos-benchmark"
-  "tezos-benchmark-examples"
-  "octez-shell-libs"
-  "tezos-benchmarks-proto-alpha"
+  "octez-libs" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-examples" { = version }
+  "octez-shell-libs" { = version }
+  "tezos-benchmarks-proto-alpha" { = version }
   "pyml" { >= "20220905" }
   "prbnmcn-stats" { = "0.0.6" }
-  "octez-version"
+  "octez-version" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

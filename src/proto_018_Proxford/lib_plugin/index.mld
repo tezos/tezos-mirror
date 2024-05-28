@@ -7,7 +7,7 @@ It contains the following libraries:
 - {{!module-Tezos_018_Proxford_test_helpers}Tezos_018_Proxford_test_helpers}: Protocol testing framework
 - {{!module-Tezos_baking_018_Proxford}Tezos_baking_018_Proxford}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_018_Proxford_commands}Tezos_baking_018_Proxford_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_018_Proxford}Tezos_client_018_Proxford}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_018_Proxford}Tezos_client_018_Proxford}: Protocol specific library for `octez-client`
 - {{!module-Tezos_dac_018_Proxford}Tezos_dac_018_Proxford}: Protocol specific library for the Data availability Committee
 - {{!module-Tezos_dal_018_Proxford}Tezos_dal_018_Proxford}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_018_Proxford}Tezos_layer2_utils_018_Proxford}: Protocol specific library for Layer 2 utils

@@ -80,6 +80,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
       ?name:rollup_node_name
       ~base_dir:(Client.base_dir client)
       ~default_operator:operator.Account.alias
+      ?loser_mode
       config.mode
       node
   in
@@ -92,17 +93,16 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
         let setup_file =
           let path =
             Option.value
-              ~default:(project_root // "etherlink/kernel_evm/config/dev.yaml")
+              ~default:(project_root // "etherlink/config/dev.yaml")
               config.setup_file
           in
           `Path path
         in
         let* {boot_sector; _} =
           Sc_rollup_helpers.prepare_installer_kernel
-            ~base_installee:"./"
             ~preimages_dir
             ~config:setup_file
-            "evm_kernel"
+            Constant.WASM.evm_kernel
         in
         Log.info "EVM Kernel installer ready." ;
         let* rollup_address =
@@ -113,7 +113,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
         in
         return rollup_address
   in
-  let* _ = Sc_rollup_node.config_init ?loser_mode rollup_node rollup_address in
+  let* _ = Sc_rollup_node.config_init rollup_node rollup_address in
   let* () =
     match preexisting_rollup with
     | Some {current_preimages_dir; _} ->
@@ -133,7 +133,10 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
   let* current_level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level rollup_node current_level in
   let* evm_node =
-    Evm_node.init ~devmode:true ?runner (Sc_rollup_node.endpoint rollup_node)
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      ?runner
+      (Sc_rollup_node.endpoint rollup_node)
   in
   Log.info "Node API is available at %s." (Evm_node.endpoint evm_node) ;
   return (rollup_address, rollup_node, evm_node)

@@ -1,0 +1,3 @@
+test_etherlink_kernel:
+  extends:
+    - .test_etherlink_kernel

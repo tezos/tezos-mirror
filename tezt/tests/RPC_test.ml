@@ -707,7 +707,7 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     @@ RPC.get_chain_block_helper_current_level ()
   in
   let* () =
-    if Protocol.(number protocol >= number Nairobi + 1) then
+    if Protocol.(number protocol >= number Oxford) then
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
         @@ RPC.get_chain_block_context_denunciations ()
@@ -716,12 +716,10 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     else unit
   in
   let* () =
-    if Protocol.(number protocol <= number Nairobi + 1) then
+    if Protocol.(number protocol <= number Oxford) then
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
         @@ RPC.get_chain_block_helper_endorsing_rights ()
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
-           This RPC helper should be removed once Oxford will be frozen. *)
       in
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
@@ -867,7 +865,8 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     (* To test the monitor_operations rpc we use curl since the client does
        not support streaming RPCs yet. *)
     sf
-      "http://localhost:%d/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true"
+      "http://%s:%d/chains/main/mempool/monitor_operations?validated=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true"
+      Constant.default_host
       (get_client_port client)
   in
   let proc_monitor =
@@ -1207,16 +1206,18 @@ let start_with_acl address acl =
 let test_network test_mode_tag _protocol ?endpoint client =
   let test peer_id =
     let call rpc = Client.RPC.call ?endpoint client rpc in
+    let patch_acl value =
+      JSON.parse ~origin:"RPC patch data" ("{\"acl\":\"" ^ value ^ "\"}")
+    in
     let* _ = call @@ RPC.get_network_connection peer_id in
-    let* _ = call RPC.get_network_greylist_clear in
+    let* _ = call RPC.delete_network_greylist in
     (* Peers *)
     let* _ = call RPC.get_network_peers in
     let* _ = call @@ RPC.get_network_peer peer_id in
-    let* _ = call @@ RPC.get_network_peer_ban peer_id in
+    let* _ = call @@ RPC.patch_network_peer peer_id (patch_acl "ban") in
     let* _ = call @@ RPC.get_network_peer_banned peer_id in
-    let* _ = call @@ RPC.get_network_peer_unban peer_id in
-    let* _ = call @@ RPC.get_network_peer_untrust peer_id in
-    let* _ = call @@ RPC.get_network_peer_trust peer_id in
+    let* _ = call @@ RPC.patch_network_peer peer_id (patch_acl "open") in
+    let* _ = call @@ RPC.patch_network_peer peer_id (patch_acl "trust") in
     (* Connections *)
     let* points = call @@ RPC.get_network_points in
     let point_id =
@@ -1225,14 +1226,11 @@ let test_network test_mode_tag _protocol ?endpoint client =
       | _ -> Test.fail "Expected at least one point."
     in
     let* _ = call @@ RPC.get_network_point point_id in
-    let* _ = call @@ RPC.get_network_point_ban point_id in
+    let* _ = call @@ RPC.patch_network_point point_id (patch_acl "ban") in
     let* _ = call @@ RPC.get_network_point_banned point_id in
-    let* _ = call @@ RPC.get_network_point_unban point_id in
-    let* _ = call @@ RPC.get_network_point_untrust point_id in
-    let* _ = call @@ RPC.get_network_point_trust point_id in
+    let* _ = call @@ RPC.patch_network_point point_id (patch_acl "open") in
+    let* _ = call @@ RPC.patch_network_point point_id (patch_acl "trust") in
     let* _ = call RPC.get_network_stat in
-    let* _ = call RPC.get_network_version in
-    let* _ = call RPC.get_network_versions in
     unit
   in
   match test_mode_tag with
@@ -1299,6 +1297,7 @@ let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let* _ = Client.RPC.call ?endpoint client @@ RPC.get_stats_gc in
   let* _ = Client.RPC.call ?endpoint client @@ RPC.get_stats_memory in
   let* _ = Client.RPC.call ?endpoint client @@ RPC.get_config in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_version in
   unit
 
 let test_chain _test_mode_tag _protocol ?endpoint client =
@@ -1578,7 +1577,7 @@ let test_blacklist address () =
   unit
 
 let binary_regression_test () =
-  let node = Node.create ~rpc_host:"127.0.0.1" [] in
+  let node = Node.create [] in
   let endpoint = Client.(Node node) in
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in
@@ -1674,7 +1673,6 @@ let register protocols =
       ~parameter_overrides:consensus_threshold ;
     check_rpc_regression
       "adaptive_issuance"
-      ~supports:Protocol.(From_protocol (number Nairobi + 1))
       ~test_function:test_adaptive_issuance ;
     check_rpc_regression
       "votes"

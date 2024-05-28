@@ -1,0 +1,3 @@
+code SHA256;
+input { Stack_elt bytes 0xdeadbeef };
+output { Stack_elt bytes 0x5f78c33274e43fa9de5659265c1d917e25c03722dcb0b8d27db8d5feaa813953 }

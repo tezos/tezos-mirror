@@ -99,13 +99,13 @@ module Make (Parameters : PARAMETERS) = struct
 
   type injected_l1_op_content = {
     level : int32;
-    inj_ops : Inj_operation.Hash.t list;
+    inj_ops : Inj_operation.Id.t list;
     signer_pkh : Signature.public_key_hash;
   }
 
   type included_l1_op_content = {
     level : int32;
-    inj_ops : Inj_operation.Hash.t list;
+    inj_ops : Inj_operation.Id.t list;
   }
 
   type status =
@@ -118,24 +118,28 @@ module Make (Parameters : PARAMETERS) = struct
       (struct
         let name = "operations_queue"
       end)
-      (Inj_operation.Hash)
-      (Inj_operation)
+      (Inj_operation.Id)
+      (struct
+        include Inj_operation
 
-  module Injected_operations = Inj_operation.Hash.Table
+        let persist o = Parameters.persist_operation o.operation
+      end)
+
+  module Injected_operations = Inj_operation.Id.Table
   module Injected_ophs = Operation_hash.Table
 
   (** The part of the state which gathers information about injected
     operations (but not included). *)
   type injected_state = {
     injected_operations : injected_info Injected_operations.t;
-        (** A table mapping L1 manager operation hashes to the injection info for that
-          operation.  *)
+        (** A table mapping L1 operation ids to the injection info for that
+            operation.  *)
     injected_ophs : injected_l1_op_content Injected_ophs.t;
-        (** A mapping of all L1 manager operations contained in a L1 batch (i.e. an L1
-          operation). *)
+        (** A mapping of all L1 manager operations contained in a L1 batch
+            (i.e. an L1 operation). *)
   }
 
-  module Included_operations = Inj_operation.Hash.Table
+  module Included_operations = Inj_operation.Id.Table
   module Included_in_blocks = Block_hash.Table
 
   (** The part of the state which gathers information about
@@ -340,7 +344,7 @@ module Make (Parameters : PARAMETERS) = struct
     operation.  *)
   let add_pending_operation ?(retry = false) state (op : Inj_operation.t) =
     let open Lwt_result_syntax in
-    if already_exists state op.hash then
+    if already_exists state op.id then
       (* Ignore operations which already exist in the injector *)
       return_unit
     else
@@ -349,14 +353,14 @@ module Make (Parameters : PARAMETERS) = struct
           state
           op.operation
       in
-      Op_queue.replace state.queue op.hash op
+      Op_queue.replace state.queue op.id op
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state {pkh = signer_pkh; _} oph ~injection_level
       operations =
     let infos =
       List.map
-        (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
+        (fun (op_index, op) -> (op.Inj_operation.id, {op; oph; op_index}))
         operations
     in
     Injected_operations.replace_seq
@@ -375,7 +379,7 @@ module Make (Parameters : PARAMETERS) = struct
     let infos =
       List.map
         (fun ({op; oph; op_index} : injected_info) ->
-          (op.Inj_operation.hash, {op; oph; op_index; l1_block; l1_level}))
+          (op.Inj_operation.id, {op; oph; op_index; l1_block; l1_level}))
         operations
     in
     Included_operations.replace_seq
@@ -467,6 +471,20 @@ module Make (Parameters : PARAMETERS) = struct
       }
       ops
 
+  (** The safety guard parameter is global to the simulation function, so in the
+      case of a batch of L1 operations, we set this safety guard as the maximum
+      of safety guards decided by the injector instance for each operation. *)
+  let safety_guard_of_operations ops =
+    List.fold_left
+      (fun acc {Inj_operation.operation; _} ->
+        let op_safety = Parameters.safety_guard operation in
+        match (acc, op_safety) with
+        | None, _ -> op_safety
+        | Some _, None -> acc
+        | Some safety, Some op_safety -> Some (max safety op_safety))
+      None
+      ops
+
   (** Returns the first half of the list [ops] if there is more than two
       elements, or [None] otherwise.  *)
   let keep_half ops =
@@ -485,14 +503,12 @@ module Make (Parameters : PARAMETERS) = struct
       (fun s -> not @@ Signature.Public_key_hash.Set.mem s.pkh used_signers)
       state.signers
 
-  (** [simulate_operations ~must_succeed state operations] simulates the
+  (** [simulate_operations state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
       [op] is the packed operation with the adjusted limits, [ops] is the prefix
       of [operations] which was considered (because it did not exceed the
-      quotas) and [results] are the results of the simulation. See
-      {!inject_operations_for_signer} for the specification of [must_succeed]. *)
-  let rec simulate_operations ~must_succeed state signer
-      (operations : Inj_operation.t list) =
+      quotas) and [results] are the results of the simulation. *)
+  let rec simulate_operations state signer (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let force =
       match operations with
@@ -500,16 +516,16 @@ module Make (Parameters : PARAMETERS) = struct
       | [_] ->
           (* If there is only one operation, fail when simulation fails *)
           false
-      | _ -> (
-          (* We want to see which operation failed in the batch if not all must
-             succeed *)
-          match must_succeed with `All -> false | `At_least_one -> true)
+      | _ ->
+          (* We want to see which operation failed in the batch *)
+          true
     in
     let op_operations =
       List.map (fun o -> o.Inj_operation.operation) operations
     in
     let*! () = Event.(emit2 simulating_operations) state op_operations force in
     let fee_parameter = fee_parameter_of_operations state.state operations in
+    let safety_guard = safety_guard_of_operations operations in
     let module Proto_client = (val state.proto_client) in
     let*! simulation_result =
       Proto_client.simulate_operations
@@ -521,6 +537,7 @@ module Make (Parameters : PARAMETERS) = struct
           (* Operations are simulated in the next block, which is important for
              rollups and ok for other applications. *)
         ~fee_parameter
+        ?safety_guard
         op_operations
     in
     match simulation_result with
@@ -542,8 +559,7 @@ module Make (Parameters : PARAMETERS) = struct
             @@ TzTrace.cons
                  (Exn (Failure "Quotas exceeded when simulating one operation"))
                  trace
-        | Some operations ->
-            simulate_operations ~must_succeed state signer operations)
+        | Some operations -> simulate_operations state signer operations)
     | Ok {operations_statuses; unsigned_operation} ->
         let*? results =
           List.combine
@@ -575,7 +591,7 @@ module Make (Parameters : PARAMETERS) = struct
           op.errors.count
           op.errors.last_error
       in
-      Op_queue.remove state.queue op.hash
+      Op_queue.remove state.queue op.id
     else
       let*! () =
         Event.(emit3 ?signers error_simulation_operation)
@@ -603,20 +619,16 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () = Event.(emit2 ~signers:[signer] injected) state nb oph in
     return oph
 
-  (** Inject the given [operations] in an L1 batch. If [must_succeed] is [`All]
-    then all the operations must succeed in the simulation of injection. If
-    [must_succeed] is [`At_least_one] at least one operation in the list
-    [operations] must be successful in the simulation. In any case, only
-    operations which are known as successful will be included in the injected L1
-    batch. {b Note}: [must_succeed = `At_least_one] allows to incrementally build
-    "or-batches" by iteratively removing operations that fail from the desired
-    batch. *)
-  let rec inject_operations_for_signer ~must_succeed state signer
+  (** Inject the given [operations] in an L1 batch. Only operations which are
+      known as successful will be included in the injected L1 batch. {b Note}:
+      This function incrementally builds "or-batches" by iteratively removing
+      operations that fail from the desired batch. *)
+  let rec inject_operations_for_signer state signer
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let*! simulation_result =
       trace (Step_failed "simulation")
-      @@ simulate_operations ~must_succeed state signer operations
+      @@ simulate_operations state signer operations
     in
     let* () =
       match simulation_result with
@@ -645,11 +657,9 @@ module Make (Parameters : PARAMETERS) = struct
         operations_results
     in
     if !failure then
-      (* Invariant: must_succeed = `At_least_one, otherwise the simulation would
-         have returned an error. We try to inject without the failing
-         operation. *)
+      (* We try to inject without the failing operation. *)
       let operations = List.rev rev_non_failing_operations in
-      inject_operations_for_signer ~must_succeed state signer operations
+      inject_operations_for_signer state signer operations
     else
       (* Inject on node for real *)
       let+ oph =
@@ -763,18 +773,8 @@ module Make (Parameters : PARAMETERS) = struct
             state
             (List.length operations_to_inject)
         in
-        let must_succeed =
-          Parameters.batch_must_succeed
-          @@ List.map
-               (fun op -> op.Inj_operation.operation)
-               operations_to_inject
-        in
         let*! res =
-          inject_operations_for_signer
-            ~must_succeed
-            state
-            signer
-            operations_to_inject
+          inject_operations_for_signer state signer operations_to_inject
         in
         let* res =
           ignore_ignorable_failing_operations state operations_to_inject res
@@ -785,7 +785,7 @@ module Make (Parameters : PARAMETERS) = struct
             let* () =
               List.iter_es
                 (fun (_index, op) ->
-                  Op_queue.remove state.queue op.Inj_operation.hash)
+                  Op_queue.remove state.queue op.Inj_operation.id)
                 injected_operations
             in
             let*! () =
@@ -818,7 +818,7 @@ module Make (Parameters : PARAMETERS) = struct
             in
             let* () =
               List.iter_es
-                (fun op -> Op_queue.remove state.queue op.Inj_operation.hash)
+                (fun op -> Op_queue.remove state.queue op.Inj_operation.id)
                 operations_to_drop
             in
             return (`Continue 0))
@@ -927,7 +927,7 @@ module Make (Parameters : PARAMETERS) = struct
             block
             level
             (List.map
-               (fun (o : injected_info) -> o.op.Inj_operation.hash)
+               (fun (o : injected_info) -> o.op.Inj_operation.id)
                included)
         in
         add_included_operations state block level (List.rev included) ;
@@ -952,10 +952,15 @@ module Make (Parameters : PARAMETERS) = struct
             Proto_client.manager_pass)
         Lwt.return
 
+  let has_injected_operations state =
+    Injected_operations.length state.injected.injected_operations <> 0
+    || Injected_ophs.length state.injected.injected_ophs <> 0
+
   (** [register_included_operations state (block, level)] marks the known (by
       this injector) manager operations contained in [block] as being included. *)
   let register_included_operations state (block_hash, level) =
     let open Lwt_result_syntax in
+    when_ (has_injected_operations state) @@ fun () ->
     let* operation_hashes =
       manager_operations_hashes_of_block state block_hash
     in
@@ -963,17 +968,22 @@ module Make (Parameters : PARAMETERS) = struct
       (fun oph -> register_included_operation state block_hash level oph)
       operation_hashes
 
+  let has_included_operations state =
+    Included_in_blocks.length state.included.included_in_blocks <> 0
+    || Included_operations.length state.included.included_operations <> 0
+
   (** [revert_included_operations state block] marks the known (by this injector)
     manager operations contained in [block] as not being included any more,
     typically in the case of a reorganization where [block] is on an alternative
     chain. The operations are put back in the pending queue. *)
   let revert_included_operations state block =
     let open Lwt_result_syntax in
+    when_ (has_included_operations state) @@ fun () ->
     let revert_infos = forget_block state block in
     let*! () =
       Event.(emit1 revert_operations)
         state
-        (List.map (fun o -> o.op.hash) revert_infos)
+        (List.map (fun o -> o.op.id) revert_infos)
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2814
        maybe put at the front of the queue for re-injection. *)
@@ -1063,6 +1073,10 @@ module Make (Parameters : PARAMETERS) = struct
     let*! reorg =
       match state.last_seen_head with
       | None ->
+          return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
+      | Some {level; _} when Int32.sub head_level level > 120l ->
+          (* Don't analyze reorgs which are too long (more than 120 blocks) as
+             this would be too expensive in the injector. *)
           return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
       | Some last_head ->
           Layer_1.get_tezos_reorg_for_new_head
@@ -1158,10 +1172,12 @@ module Make (Parameters : PARAMETERS) = struct
   (* The worker for the injector. *)
   module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
-  (* The queue for the requests to the injector worker is infinite. *)
-  type worker = Worker.infinite Worker.queue Worker.t
+  (* The injector worker can have a single pending injection request at a
+     time. *)
+  type worker = Worker.dropbox Worker.t
 
-  let table = Worker.create_table Queue
+  let table =
+    Worker.create_table (Dropbox {merge = (fun _w new_r _old_r -> Some new_r)})
 
   let tags_table = Tags_table.create 7
 
@@ -1176,12 +1192,8 @@ module Make (Parameters : PARAMETERS) = struct
      fun w request ->
       let state = Worker.state w in
       match request with
-      | Request.Add_pending op ->
-          (* The execution of the request handler is protected to avoid stopping the
-             worker in case of an exception. *)
-          protect @@ fun () -> add_pending_operation state op
-      | Request.New_tezos_head (block_hash, level) ->
-          protect @@ fun () -> on_new_tezos_head state {block_hash; level}
+      (* The execution of the request handler is protected to avoid stopping the
+         worker in case of an exception. *)
       | Request.Inject -> protect @@ fun () -> on_inject state
 
     type launch_error = error trace
@@ -1224,10 +1236,7 @@ module Make (Parameters : PARAMETERS) = struct
         let*! () = Event.(emit3 request_failed) state request_view st errs in
         return_unit
       in
-      match r with
-      | Request.Add_pending _ -> emit_and_return_errors errs
-      | Request.New_tezos_head _ -> emit_and_return_errors errs
-      | Request.Inject -> emit_and_return_errors errs
+      match r with Request.Inject -> emit_and_return_errors errs
 
     let on_completion w r _ st =
       let state = Worker.state w in
@@ -1276,22 +1285,17 @@ module Make (Parameters : PARAMETERS) = struct
       (fun (_signer, w) ->
         let open Lwt_syntax in
         let worker_state = Worker.state w in
-        if has_tag_in ~tags worker_state then
+        if has_tag_in ~tags worker_state then (
           delay_strategy worker_state header @@ fun () ->
-          let* _pushed = Worker.Queue.push_request w Request.Inject in
-          return_unit
+          Worker.Dropbox.put_request w Request.Inject ;
+          return_unit)
         else Lwt.return_unit)
       workers
 
   let notify_new_tezos_head h =
-    let open Lwt_syntax in
     let workers = Worker.list table in
-    List.iter_p
-      (fun (_signer, w) ->
-        let* (_pushed : bool) =
-          Worker.Queue.push_request w (Request.New_tezos_head h)
-        in
-        return_unit)
+    List.iter_ep
+      (fun (_signer, w) -> on_new_tezos_head (Worker.state w) h)
       workers
 
   let protocols_of_head cctxt =
@@ -1338,15 +1342,14 @@ module Make (Parameters : PARAMETERS) = struct
   let rec monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
     let open Lwt_result_syntax in
     let*! res =
-      Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
-      let head = (head_hash, header.shell.level) in
+      Layer_1.iter_heads ~name:"injector" l1_ctxt @@ fun (head_hash, header) ->
+      let head = {block_hash = head_hash; level = header.shell.level} in
       let* next_protocol =
         next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)
       in
       update_protocol ~next_protocol ;
       (* Notify all workers of a new Tezos head *)
-      let*! () = notify_new_tezos_head head in
-      return_unit
+      notify_new_tezos_head head
     in
     (* Ignore errors *)
     let*! () =
@@ -1448,13 +1451,11 @@ module Make (Parameters : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 100) ?(injection_ttl = 120)
-      ?(reconnection_delay = 2.0) state ~signers =
+      ?(allowed_attempts = 10) ?(injection_ttl = 120) l1_ctxt state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     assert (allowed_attempts >= 0) ;
     assert (injection_ttl > 0) ;
-    let*! l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
     let* () =
       register_disjoint_signers
         (cctxt : #Client_context.full)
@@ -1484,10 +1485,8 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let operation = Inj_operation.make op in
     let*? w = worker_of_tag (Parameters.operation_tag op) in
-    let*! (_pushed : bool) =
-      Worker.Queue.push_request w (Request.Add_pending operation)
-    in
-    return operation.hash
+    let* () = add_pending_operation (Worker.state w) operation in
+    return operation.id
 
   let shutdown () =
     let workers = Worker.list table in
@@ -1516,6 +1515,73 @@ module Make (Parameters : PARAMETERS) = struct
     List.find_map
       (fun (_signer, w) -> op_status_in_worker (Worker.state w) l1_hash)
       workers
+
+  let total_queued_operations () =
+    let workers = Worker.list table in
+    List.fold_left
+      (fun (acc, total) (tags, w) ->
+        let state = Worker.state w in
+        let len = Op_queue.length state.queue in
+        let tag_list = Tags.to_seq tags |> List.of_seq in
+        ((tag_list, len) :: acc, total + len))
+      ([], 0)
+      workers
+
+  let get_queues ?tag () =
+    let workers = Worker.list table in
+    List.fold_left
+      (fun acc (tags, w) ->
+        let to_count =
+          match tag with None -> true | Some tag -> Tags.mem tag tags
+        in
+        if not to_count then acc
+        else
+          let state = Worker.state w in
+          let queue = Op_queue.elements state.queue in
+          let tag_list = Tags.to_seq tags |> List.of_seq in
+          (tag_list, queue) :: acc)
+      []
+      workers
+
+  let clear_all_queues () =
+    let workers = Worker.list table in
+    List.iter_p
+      (fun (_tags, w) ->
+        let state = Worker.state w in
+        Injected_operations.clear state.injected.injected_operations ;
+        Injected_ophs.clear state.injected.injected_ophs ;
+        Included_operations.clear state.included.included_operations ;
+        Included_in_blocks.clear state.included.included_in_blocks ;
+        Op_queue.clear state.queue)
+      workers
+
+  let remove_operations_with_tag tag state =
+    let open Lwt_result_syntax in
+    Op_queue.fold
+      (fun id op acc ->
+        if Parameters.Tag.equal (Parameters.operation_tag op.operation) tag then
+          let* () = Op_queue.remove state.queue id in
+          acc
+        else acc)
+      state.queue
+      return_unit
+
+  let clear_queues ?tag () =
+    let open Lwt_result_syntax in
+    match tag with
+    | None ->
+        let*! () = clear_all_queues () in
+        return_unit
+    | Some tag ->
+        let workers = Worker.list table in
+        List.iter_ep
+          (fun (tags, w) ->
+            let to_clean = Tags.mem tag tags in
+            if not to_clean then return_unit
+            else
+              let state = Worker.state w in
+              remove_operations_with_tag tag state)
+          workers
 
   let register_proto_client = Inj_proto.register
 end

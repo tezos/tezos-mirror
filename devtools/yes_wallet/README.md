@@ -1,8 +1,7 @@
-Yes_wallet script
-=================
+# Yes_wallet script
 
 The purpose of this tool is to extract baker addresses from a node's
-context and generate tezos-client's wallet containing these addresses.
+context and generate octez-client's wallet containing these addresses.
 In combination with the yes-node patch it can be used to perform a test
 protocol migration (see the relevant documentation page for more details)
 or to reproduce contexts where trouble occurred in the past in order to
@@ -10,8 +9,8 @@ debug them.
 
 The script can be run using dune:
 
-```
-$ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /path/to/context in /path/to/wallet
+```shell
+dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /path/to/context in /path/to/wallet
 ```
 
 The script will automatically detect the protocol of the given context
@@ -20,6 +19,7 @@ and use the appropriate module to extract the data.
 Whenever a new protocol is snapshotted, this script requires the
 following adjustments, **which are currently being automatically
 performed by the Manifest** (`src/manifest/main.ml`):
+
   1. `get_delegates_alpha.ml` should be copied with an appropriate name
   2. `dune` should be updated with a new executable definition
   3. delete modules supporting frozen protocol versions to ease the maintenance burden.
@@ -45,7 +45,7 @@ After that, the support for the given protocol should be restored.
 In order to define aliases, `yes-wallet` supports an optional flag,
 `--aliases` which takes as argument .json file like the following:
 
-```
+```json
 [ 
   {
     "alias": "Tezos Foundation Baker 1",
@@ -89,7 +89,7 @@ Such file can be populated using an indexer's API. For example the
 following script gets all known aliases from active delegates in Tezos
 Mainnet using [tzkt.io](https://tzkt.io)'s API:
 
-```
+```shell
 curl https://api.tzkt.io/v1/delegates?limit=5000 | jq 'map(select ((.alias?) and .active) |{ "alias" : .alias, "address" : .address , "publicKey" : .publicKey})' > aliases.json
 
 ```

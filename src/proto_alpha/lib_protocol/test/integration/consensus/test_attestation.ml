@@ -36,9 +36,11 @@
 open Protocol
 open Alpha_context
 
-let init_genesis ?policy () =
+let init_genesis ?policy ?dal_enable () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* genesis, _contracts =
+    Context.init_n ?dal_enable ~consensus_threshold:0 5 ()
+  in
   let* b = Block.bake ?policy genesis in
   return (genesis, b)
 
@@ -586,7 +588,7 @@ let test_no_conflict_various_levels_and_rounds () =
     let (Operation_data protocol_data) = op.protocol_data in
     let content =
       match protocol_data.contents with
-      | Single (Attestation content) -> content
+      | Single (Attestation {consensus_content = content; _}) -> content
       | _ -> assert false
     in
     Format.eprintf
@@ -646,6 +648,181 @@ let test_attestation_threshold ~sufficient_threshold () =
         | Validate_errors.Block.Not_enough_attestations _ -> true
         | _ -> false)
 
+let test_two_attestations_with_same_attester () =
+  let open Lwt_result_syntax in
+  let* _genesis, attested_block = init_genesis ~dal_enable:true () in
+  let* op1 = Op.raw_attestation attested_block in
+  let dal_content =
+    let attestation =
+      Dal.Attestation.commit Dal.Attestation.empty Dal.Slot_index.zero
+    in
+    {attestation}
+  in
+  let* op2 = Op.raw_attestation ~dal_content attested_block in
+  let*! res =
+    Block.bake
+      ~baking_mode:Application
+      ~operations:[Operation.pack op1; Operation.pack op2]
+      attested_block
+  in
+  let error = function
+    | Validate_errors.(
+        Consensus.Conflicting_consensus_operation
+          {
+            kind = Attestation;
+            conflict = Operation_conflict {existing; new_operation};
+          }) ->
+        Operation_hash.equal existing (Operation.hash op1)
+        && Operation_hash.equal new_operation (Operation.hash op2)
+    | _ -> false
+  in
+  Assert.proto_error ~loc:__LOC__ res error
+
+(* Check that if an attester includes some DAL content but is not in the DAL
+   committee, then an error is returned at block validation.
+
+   Note that we change the value of [consensus_committee_size] because with the
+   default test parameters, [consensus_committee_size = 25 < 64 =
+   number_of_shards], so that test would not work! *)
+let test_attester_not_in_dal_committee () =
+  let open Lwt_result_syntax in
+  let bal_high = 80_000_000_000L in
+  let bal_low = 08_000_000_000L in
+  (* Create many accounts with balance [bal_high] and one with [bal_low]. *)
+  let n = 10 in
+  let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
+  let dal =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_sandbox.dal
+  in
+  let dal =
+    (* We need to take a small number of shards to be sure there is a
+       really high probability an attester is not part of the DAL
+       committee in the first hundred blocks. *)
+    {
+      dal with
+      cryptobox_parameters =
+        {dal.cryptobox_parameters with number_of_shards = 64};
+    }
+  in
+  let* genesis, contracts =
+    Context.init_gen
+      ~dal_enable:true
+      ~dal
+      ~consensus_committee_size:100
+      ~consensus_threshold:0
+      ~bootstrap_balances
+      (Context.TList (n + 1))
+      ()
+  in
+  let pkh = Stdlib.List.hd contracts |> Context.Contract.pkh in
+  let rec iter b i =
+    let* committee = Context.get_attesters (B b) in
+    let* dal_committee = Context.Dal.shards (B b) () in
+    let in_committee =
+      List.exists
+        (fun del ->
+          Signature.Public_key_hash.equal pkh del.RPC.Validators.delegate)
+        committee
+    in
+    let in_dal_committee =
+      List.exists
+        (fun ({delegate; _} : Plugin.RPC.Dal.S.shards_assignment) ->
+          Signature.Public_key_hash.equal pkh delegate)
+        dal_committee
+    in
+    if in_committee && not in_dal_committee then
+      let dal_content = {attestation = Dal.Attestation.empty} in
+      let* op = Op.attestation ~delegate:pkh ~dal_content b in
+      let* ctxt = Incremental.begin_construction b in
+      let expect_apply_failure = function
+        | [
+            Environment.Ecoproto_error
+              (Alpha_context.Dal_errors
+               .Dal_data_availibility_attester_not_in_committee
+                {attester; level; slot = _});
+          ]
+          when Signature.Public_key_hash.equal attester pkh
+               && Raw_level.to_int32 level = b.header.shell.level ->
+            return_unit
+        | errs ->
+            failwith
+              "Error trace:@, %a does not match the expected one"
+              Error_monad.pp_print_trace
+              errs
+      in
+      Incremental.add_operation ctxt op ~expect_failure:expect_apply_failure
+    else
+      let* b = Block.bake b in
+      if i = 100 then
+        failwith
+          "The account is in all DAL committees for 100 levels! The test needs \
+           to be adapted."
+      else iter b (i + 1)
+  in
+  let* b = Block.bake genesis in
+  let* _ = iter b 0 in
+  return_unit
+
+let test_dal_attestation_threshold () =
+  let open Lwt_result_wrap_syntax in
+  let n = 100 in
+  let* genesis, contracts = Context.init_n n ~consensus_threshold:0 () in
+  let contract = Stdlib.List.hd contracts in
+  let* {
+         parametric =
+           {
+             dal =
+               {
+                 attestation_lag;
+                 attestation_threshold;
+                 cryptobox_parameters = {number_of_shards; _};
+                 _;
+               };
+             _;
+           };
+         _;
+       } =
+    Context.get_constants (B genesis)
+  in
+  let slot_index = Dal.Slot_index.zero in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let slot_header =
+    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+  in
+  let* op = Op.dal_publish_commitment (B genesis) contract slot_header in
+  let* b = Block.bake genesis ~operation:op in
+  let* b = Block.bake_n (attestation_lag - 1) b in
+  let* dal_committee = Context.Dal.shards (B b) () in
+  let attestation = Dal.Attestation.commit Dal.Attestation.empty slot_index in
+  let dal_content = {attestation} in
+  let min_power = attestation_threshold * number_of_shards / 100 in
+  Log.info "Number of minimum required attested shards: %d" min_power ;
+  let* _ =
+    List.fold_left_es
+      (fun (acc_ops, acc_power)
+           ({delegate; indexes} : RPC.Dal.S.shards_assignment) ->
+        let* op = Op.attestation ~delegate ~dal_content b in
+        let ops = op :: acc_ops in
+        let power = acc_power + List.length indexes in
+        let* _b, (metadata, _ops) =
+          Block.bake_with_metadata ~operations:ops b
+        in
+        let attested_expected = power >= min_power in
+        let attested =
+          Dal.Attestation.is_attested metadata.dal_attestation slot_index
+        in
+        Log.info "With %d power, the slot is attested: %b " power attested ;
+        Check.(attested = attested_expected)
+          Check.bool
+          ~error_msg:
+            "Unexpected attestation status for slot 0: got %L, expected %R " ;
+        return (ops, power))
+      ([], 0)
+      dal_committee
+  in
+  return_unit
+
 let tests =
   [
     (* Positive tests *)
@@ -697,6 +874,18 @@ let tests =
       "insufficient attestation threshold"
       `Quick
       (test_attestation_threshold ~sufficient_threshold:false);
+    Tztest.tztest
+      "two attestations with same attester in a block"
+      `Quick
+      test_two_attestations_with_same_attester;
+    Tztest.tztest
+      "attester not in DAL committee"
+      `Quick
+      test_attester_not_in_dal_committee;
+    Tztest.tztest
+      "DAL attestation_threshold"
+      `Quick
+      test_dal_attestation_threshold;
   ]
 
 let () =

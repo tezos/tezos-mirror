@@ -9,16 +9,14 @@
  (libraries
   tezt.core
   octez-libs.version
-  octez-libs.version.parser
-  octez-alcotezt)
+  octez-libs.version.parser)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
-  -open Tezos_version
-  -open Octez_alcotezt)
+  -open Tezos_version)
  (modules test_parser))
 
 (executable

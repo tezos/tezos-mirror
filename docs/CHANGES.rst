@@ -3,13 +3,205 @@
 Changelog
 '''''''''
 
+Version 19.1
+============
+
+Node
+----
+
+- Added ``--max-active-rpc-connections <NUM>`` that limits the number
+  of active RPC connections per server to the provided argument. The
+  default limit is set to 100.
+
+- Enforced the proposed default ACL list.
+
+Smart Rollup node
+-----------------
+
+- Fixed a critical bug that could lead to data loss when chain
+  reorganizations happen while a GC is running. (MR :gl:`!11358`)
+
+- Fixed issue with constants fetching during protocol migration. (MR :gl:`!11804`)
+
+Version 19.0
+============
+
+Miscellaneous
+-------------
+
+- References to ``teztnets.xyz`` have been changed to ``teztnets.com``.
+
+Version 19.0~rc1
+================
+
+Node
+----
+
+- **Breaking change** Removed the deprecated ``endorsing_rights`` RPC,
+  use ``attestation_rights`` instead. (MR :gl:`!9849`)
+
+- Added metrics about messages sent, broadcasted, or received by the shell's DDB.
+
+- **Breaking change** Removed the deprecated
+  ``disable-mempool-precheck`` configuration flag and
+  ``disable_precheck`` field of ``prevalidator`` in the shell limits
+  of the configuration file. They already had no effect on the node
+  anymore. (MR :gl:`!10030`)
+
+- Log at ``Info``` level the reasons behind disconnections in the p2p section.
+
+- Removed a spurious "missing validation plugin" warning message that
+  was emitted every time a block was applied using an old protocol
+  whose its plugin was removed.
+
+- **Breaking change** Removed the deprecated ``/monitor/valid_blocks``
+  RPC. Instead, use the ``/monitor/applied_blocks`` RPC that has the
+  same behaviour.
+
+Client
+------
+
+- Fixed indentation of the stacks outputted by the ``normalize stack``
+  command. (MR :gl:`!9944`)
+
+- Added options to temporarily extend the context with other contracts
+  and extra big maps in Michelson commands. (MR :gl:`!9946`)
+
+- Added a ``run_instruction`` RPC in the plugin and a ``run michelson code``
+  client command allowing to run a single Michelson instruction or a
+  sequence of Michelson instructions on a given stack. (MR :gl:`!9935`)
+
+- The legacy unary macros for the ``DIP`` and ``DUP`` Michelson
+  instructions have been deprecated. Using them now displays a warning
+  message on stderr.
+
+Baker
+-----
+
+- Made the baker attest as soon as the pre-attestation quorum is
+  reached instead of waiting for the chain's head to be fully
+  applied (MR :gl:`!10554`)
+
+Docker Images
+-------------
+
+- The rollup node is protocol agnostic and released as part of the Docker
+  image. (MR :gl:`!10086`)
+
+
+Smart Rollup node
+-----------------
+
+- A new bailout mode that solely cements and defends existing
+  commitments without publishing new ones. Recovers bonds when
+  possible, after which the node exits gracefully. (MR :gl:`!9721`, MR
+  :gl:`!9817`, MR :gl:`!9835`)
+
+- RPC ``/global/block/<block-id>/simulate`` accepts inputs with a new optional
+  field ``"log_kernel_debug_file"`` which allows to specify a file in which
+  kernel logs should be written (this file is in
+  ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
+
+- The protocol specific rollup nodes binaries are now deprecated and replaced
+  by symbolic links to the protocol agnostic rollup node. In the future, the
+  symbolic links will be removed. (MR :gl:`!10086`)
+
+- Released the protocol agnostic rollup node ``octez-smart-rollup-node`` as part
+  of the Octez distribution. (MR :gl:`!10086`)
+
+- Added the rollup node command inside the docker entrypoint (MR :gl:`!10253`)
+
+- Added the argument ``cors-headers`` and ``cors-origins`` to specify respectively the
+  allowed headers and origins. (MR :gl:`!10571`)
+
+- Fix header in messages store to use predecessor hash to avoid missing pointer
+  in case of reorganization and GC. (MR :gl:`!10847`)
+
+- Added a garbage collection mechanism that cleans historical data before the LCC.
+  (MRs :gl:`!10050`, :gl:`!10135`, :gl:`!10236`, :gl:`!10237`, :gl:`!10452`)
+
+- Added a ``history-mode`` option, which can be either ``archive`` or
+  ``full``. In ``archive``, the default, the rollup node has the whole L2 chain
+  history, no GC happens. In ``full`` the rollup node retains data for possible
+  refutations. (MRs :gl:`!10475`, :gl:`!10695`)
+
+- Snapshot export with integrity checks. (MR :gl:`!10704`)
+
+- Now smart rollup node allows multiple batcher keys. Setting multiple
+  keys for the batching purpose allows to inject multiple operations
+  of the same kind per block by the rollup node. ( MR :gl:`!10512`, MR
+  :gl:`!10529`, MR :gl:`!10533`, MR :gl:`!10567`, MR :gl:`!10582`, MR
+  :gl:`!10584`, MR :gl:`!10588`, MR :gl:`!10597`, MR :gl:`!10601`, MR
+  :gl:`!10622`, MR :gl:`!10642`, MR :gl:`!10643`, MR :gl:`!10839`, MR
+  :gl:`!10842`, MR :gl:`!10861`, MR :gl:`!11008` )
+
+Smart Rollup client
+-------------------
+
+- **Breaking change** Smart Rollup client have been deprecated and
+  no longer exist, most commands have equivalents RPCs and ``octez-codec`` (MR :gl:`!11046`).
+
+- The following table outlines the deprecated commands of the Smart Rollup client and
+  their corresponding replacements with new RPCs:
+
+  .. code-block:: rst
+
+    ==========================================  ====================================================
+    Command                                     RPC
+    ==========================================  ====================================================
+    get smart rollup address                    [GET global/smart_rollup_address]
+    ------------------------------------------  ----------------------------------------------------
+    get state value for <key> [-B --block       [GET global/block/<block>/state]
+    <block>]
+    ------------------------------------------  ----------------------------------------------------
+    get proof for message <index> of outbox     [GET /global/block/<block-id>/helpers/proofs/outbox/
+    at level <level> transferring               <outbox_level>/messages] with message index in query
+    <transactions>
+    ------------------------------------------  ----------------------------------------------------
+    get proof for message <index> of outbox     [GET /global/block/<block-id>/helpers/proofs/outbox/
+    at level <level>                            <outbox_level>/messages] with message index in query
+    ==========================================  ====================================================
+
+
+Smart Rollup WASM Debugger
+--------------------------
+
+- Added flag ``--no-kernel-debug`` to deactivate kernel debug messages. (MR
+  :gl:`!9813`)
+
+- Support special directives using ``write_debug`` host function in the
+  profiler, prefixed with ``__wasm_debugger__::``. Support
+  ``start_section(<data>)`` and ``end_section(<data>)`` to count ticks in
+
+- Partially support the installer configuration of the Smart Rollup's SDK, i.e.
+  support only the instruction ``Set``. The configuration can be passed to
+  the debugger via the option ``--installer-config`` and will initialize the
+  storage with this configuration. (MR :gl:`!9641`)
+
+- The argument ``--kernel`` accepts hexadecimal files (suffixed by ``.hex``), it
+  is consired as an hexadecimal ``.wasm`` file. (MR :gl:`!11094`)
+
+Miscellaneous
+-------------
+
+- Beta scripts to build Debian and RedHat packages have been added to the tree.
+
+- Recommended Rust version bumped to 1.71.1 from 1.64.0.
+
+- Extended the Micheline lexer to allow primitives starting with the
+  underscore symbol (``_``). (MR :gl:`!10782`)
+
+- Beta Debian and Redhat packages are now linked in gitlab releases.
+
+- Renamed package registries for releases from ``tezos-x.y`` to ``octez-x.y``.
+
 Version 18.1
 ============
 
 Node
 ----
 
-- **Breaking change** Bumped the snapshot version from ``6`` to ``7``, 
+- **Breaking change** Bumped the snapshot version from ``6`` to ``7``,
   in order to address an issue which resulted in the export of corrupted tar rolling and full
   snapshots. Octez v18.1 nodes can still import previous version ``6`` (and earlier) snapshots.
   but snapshots in version 7 are not retro-compatible with previous
@@ -2404,12 +2596,12 @@ Proxy server
 
 -  Added a new binary: ``octez-proxy-server``, a read-only frontend to a node.
    It is designed to lower the load of nodes, by being capable
-   of serving `protocol RPCs <https://tezos.gitlab.io/alpha/rpc.html>`__.
+   of serving :doc:`protocol RPCs <alpha/rpc>`.
    An instance of a proxy server is protocol-specific: it automatically picks
    up the protocol from the backing node when it starts. Proxy servers
    can be started and destroyed at will, making them easy to deploy.
 
-   Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
+   Please refer to the :doc:`online documentation <user/proxy-server>`
    for further details.
 
 Version 9.7
@@ -2877,8 +3069,7 @@ Node
 -  Added new RPC ``/config`` to query the configuration of a node.
 
 -  Changed signal handling and exit codes for most binaries. The codes’
-   significance are detailed in `the user
-   documentation <http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes>`__.
+   significance are detailed in :doc:`the user documentation <user/exits>`.
 
 -  Command ``octez-node --version`` now exits with exit code 0 instead
    of 1.
@@ -3250,7 +3441,7 @@ Multinetwork
 
 -  The network name is printed in the logs on startup.
 
-For more information, see: http://tezos.gitlab.io/user/multinetwork.html
+For more information, see :doc:`user/multinetwork`.
 
 
 Node

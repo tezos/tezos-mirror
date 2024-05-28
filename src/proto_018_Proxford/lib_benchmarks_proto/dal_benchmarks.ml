@@ -104,6 +104,7 @@ module Publish_slot_header : Benchmark.S = struct
                      expected=%d}"
                     given
                     expected
+              | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
             in
             failwith "Dal_benchmarks: failed to generate operation (%s)" msg
       in
@@ -128,11 +129,11 @@ module Publish_slot_header : Benchmark.S = struct
   let create_benchmarks ~rng_state ~bench_num config =
     let () =
       Lwt_main.run
-      @@ Tezos_crypto_dal.Cryptobox.Config.init_dal
+      @@ Tezos_crypto_dal.Cryptobox.Config.init_prover_dal
            ~find_srs_files:(Fun.const (Ok ("", "")))
            {
              activated = true;
-             use_mock_srs_for_testing = Some config;
+             use_mock_srs_for_testing = true;
              bootstrap_peers = [];
            }
       |> function

@@ -191,7 +191,7 @@ module P2p_connect_handler = struct
       ~section
       ~name:"authenticate_status_peer_id_correct"
       ~msg:"expected peer id {peer} for this point {point}"
-      ~level:Notice
+      ~level:Info
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
 
@@ -506,7 +506,7 @@ module P2p_fd = struct
       ~level:Debug
       ("connection_id", Data_encoding.int31)
       ("nread", Data_encoding.int31)
-      ("nread_total", Data_encoding.int31)
+      ("nread_total", Data_encoding.int64)
 
   let written_fd =
     declare_3
@@ -516,7 +516,7 @@ module P2p_fd = struct
       ~level:Debug
       ("connection_id", Data_encoding.int31)
       ("nwrit", Data_encoding.int31)
-      ("nwrit_total", Data_encoding.int31)
+      ("nwrit_total", Data_encoding.int64)
 
   let connect_fd =
     declare_2

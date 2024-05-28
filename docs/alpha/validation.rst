@@ -67,9 +67,9 @@ operations included in newly received blocks, whose validation is
 triggered by the :ref:`block validator<block_validator>`, in order to
 localize validation rules as needed. The resulting concrete API is
 specified by the :package-api:`Protocol
-<octez-proto-libs/Tezos_protocol_environment/V11/module-type-T/Updater/module-type-PROTOCOL/index.html>`
+<octez-proto-libs/Tezos_protocol_environment/V12/module-type-T/Updater/module-type-PROTOCOL/index.html>`
 module in the :doc:`protocol
-environment<../shell/protocol_environment>` ``V11``, and it is
+environment<../shell/protocol_environment>` ``V12``, and it is
 implemented by this protocol in the
 :package-api:`Main<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Main/index.html>`
 module.
@@ -201,7 +201,7 @@ Indeed, by relying on the ancestor context, this mode can *only*
 assert the validity of consensus-related preconditions (attesting
 power, block fitness, etc.), as future consensus slots are known in
 advance -- how much in advance being specified by the
-``<PRESERVED_CYCLES>`` protocol constant. Thus, the ``Partial
+``<CONSENSUS_RIGHTS_DELAY>`` protocol constant. Thus, the ``Partial
 application`` mode provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.

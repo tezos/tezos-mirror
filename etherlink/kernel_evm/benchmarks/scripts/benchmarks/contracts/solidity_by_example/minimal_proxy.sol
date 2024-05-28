@@ -5,6 +5,9 @@ pragma solidity ^0.8.20;
 // https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
 
 contract MinimalProxy {
+    
+    address clone_address;
+
     function clone(address target) external returns (address result) {
         // convert address to 20 bytes
         bytes20 targetBytes = bytes20(target);
@@ -67,5 +70,13 @@ contract MinimalProxy {
             // code size 0x37 (55 bytes)
             result := create(0, clone, 0x37)
         }
+        clone_address = result;
+    }
+
+    fallback(bytes calldata data) external returns (bytes memory) {
+        
+        (bool ok, bytes memory res) = clone_address.call(data);
+        require(ok, "call failed");
+        return res;
     }
 }

@@ -44,7 +44,7 @@ val stop : t -> unit Lwt.t
 val continue : t -> unit Lwt.t
 
 (** See [Daemon.Make.log_events]. *)
-val log_events : t -> unit
+val log_events : ?max_length:int -> t -> unit
 
 (** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
@@ -95,7 +95,8 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
 
     This function just creates a value of type [t], it does not call {!val:run}.
 
-   [path] provides the path to the baker binary, the default being the one derived from the [protocol].
+    [path] provides the path to the baker binary, the default being the one 
+    derived from the [protocol].
 
     The standard output and standard error output of the baker will
     be logged with prefix [name] and color [color].
@@ -138,12 +139,12 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     through the flag [--minimal-nanotez-per-gas-unit].
  *)
 val create :
+  ?runner:Runner.t ->
   protocol:Protocol.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
-  ?runner:Runner.t ->
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
@@ -176,12 +177,12 @@ val create :
     to specify the DAL node's endpoint.
  *)
 val create_from_uris :
+  ?runner:Runner.t ->
   protocol:Protocol.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
-  ?runner:Runner.t ->
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
@@ -238,11 +239,12 @@ val create_from_uris :
     in order to determine the attestations it sends to the L1 node. A
     [--dal_node] argument is passed to specify the DAL node's endpoint. *)
 val init :
+  ?runner:Runner.t ->
   protocol:Protocol.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
-  ?runner:Runner.t ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
   ?votefile:string ->

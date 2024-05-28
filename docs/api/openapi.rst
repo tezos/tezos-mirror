@@ -8,6 +8,9 @@ a specification and perform API calls from your browser.
 Several code generators also exist to generate API libraries for various
 programming languages.
 
+Octez Node
+~~~~~~~~~~
+
 The REST API served by the Octez node on the RPC port is described by the union of several OpenAPI specifications:
 
 - ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs
@@ -48,27 +51,46 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi-rc.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Nairobi RPCs
-------------
+Oxford RPCs
+-----------
 
-The OpenAPI specifications for RPCs which are specific to the Nairobi (``PtNairob``)
+The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
 protocol can be found at:
 
-- `nairobi-openapi.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
+- `oxford-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Nairobi protocol can be found at:
+and specific to the Oxford protocol can be found at:
 
-- `nairobi-mempool-openapi.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
+- `oxford-mempool-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
+
+Smart Rollup Node
+~~~~~~~~~~~~~~~~~
+
+The smart rollup node exposes different RPCs depending on the underlying L1
+protocol in use. Their specification is given in the sections below.
+(The exact versions of the rollup node for which these files are produced can be
+seen in the field ``.info.version`` within each file.)
+
+.. TODO tezos/tezos#2170: add/remove section(s)
+
+Oxford RPCs
+-----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
+(``Proxford``) protocol can be found at:
+
+- `oxford-smart-rollup-node-openapi.json (version 19.1)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
 
 .. _openapi_generate:
 
 How to Generate
----------------
+~~~~~~~~~~~~~~~
 
 To generate the above files, run the ``src/bin_openapi/generate.sh`` script
 from the root of the Octez repository.
@@ -88,7 +110,7 @@ For ``protocol_hash``, use the value defined in ``TEZOS_PROTOCOL``.
 
 
 How to Test
------------
+~~~~~~~~~~~
 
 You can test OpenAPI specifications using `Swagger Editor <https://editor.swagger.io/>`_
 to check for syntax issues (just copy-paste ``rpc-openapi.json`` into it or open

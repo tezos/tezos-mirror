@@ -54,8 +54,10 @@ type source =
   | File of string
       (** A file name whose associated file contains the whole data *)
 
-(** [get ~data_dir ~pvm_name ~hash] retrieves the data associated with
-    the reveal hash [hash] from disk. May fail with:
+(** [get ~pre_images_endpoint ~data_dir ~pvm_name ~hash] retrieves
+    the data associated with the reveal hash [hash] from disk. If the data is
+    not already on disk, it will be retrieved from an
+    HTTP service at [pre_images_endpoint]. May fail with:
     {ul
       {li [Wrong_hash {found; expected}] where [expected = hash], and
         [found <> hash], if the data is retrieved and hashes to the wrong
@@ -67,6 +69,7 @@ type source =
         4kB) to be revealed.}
    } *)
 val get :
+  pre_images_endpoint:Uri.t option ->
   data_dir:string ->
   pvm_kind:Kind.t ->
   hash:Protocol.Sc_rollup_reveal_hash.t ->

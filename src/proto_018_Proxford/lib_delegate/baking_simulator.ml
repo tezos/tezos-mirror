@@ -23,33 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
 open Protocol
 open Alpha_context
-
-type error += Failed_to_checkout_context
-
-type error += Invalid_context
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Client_baking_simulator.failed_to_checkout_context"
-    ~title:"Failed to checkout context"
-    ~description:"The given context hash does not exists in the context."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Failed to checkout the context")
-    Data_encoding.unit
-    (function Failed_to_checkout_context -> Some () | _ -> None)
-    (fun () -> Failed_to_checkout_context) ;
-  register_error_kind
-    `Permanent
-    ~id:"Client_baking_simulator.invalid_context"
-    ~title:"Invalid context"
-    ~description:"Occurs when the context is inconsistent."
-    ~pp:(fun ppf () -> Format.fprintf ppf "The given context is invalid.")
-    Data_encoding.unit
-    (function Invalid_context -> Some () | _ -> None)
-    (fun () -> Invalid_context)
+open Baking_errors
 
 type incremental = {
   predecessor : Baking_state.block_info;
@@ -186,11 +162,25 @@ let finalize_construction inc =
       let** () = Protocol.finalize_validation validation_state in
       let** result =
         match application_state with
-        | Some application_state ->
-            let* result =
+        | Some application_state -> (
+            let*! result =
               Protocol.finalize_application application_state (Some inc.header)
             in
-            return_some result
+            match result with
+            | Ok (vr, metadata) ->
+                let new_vr =
+                  Tezos_protocol_environment.
+                    {
+                      context = vr.context;
+                      fitness = vr.fitness;
+                      message = vr.message;
+                      max_operations_ttl = vr.max_operations_ttl;
+                      last_finalized_block_level = vr.last_allowed_fork_level;
+                      last_preserved_block_level = vr.last_allowed_fork_level;
+                    }
+                in
+                return_some (new_vr, metadata)
+            | Error e -> Lwt.return (Error e))
         | None -> return_none
       in
       return result)

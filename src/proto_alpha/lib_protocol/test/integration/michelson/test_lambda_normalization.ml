@@ -46,7 +46,13 @@ let parse_and_project (ty : ((_, _) lambda, _) ty) (node : Script.node) =
   let* ctxt = new_ctxt () in
   let elab_conf = Script_ir_translator_config.make ~legacy:false () in
   let*@ lam, _ctxt =
-    Script_ir_translator.parse_data ~elab_conf ctxt ~allow_forged:false ty node
+    Script_ir_translator.parse_data
+      ~elab_conf
+      ctxt
+      ~allow_forged_tickets:false
+      ~allow_forged_lazy_storage_id:false
+      ty
+      node
   in
   match lam with
   | Lam (_kdescr, node) -> return node

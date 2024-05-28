@@ -329,9 +329,11 @@ type 'action io_error = {
   arg : string;
 }
 
-type error += Io_error of [`Close | `Open | `Rename] io_error
+type error += Io_error of [`Close | `Open | `Rename | `Unlink | `Lock] io_error
 
-let tzfail_of_io_error e = Error [Io_error e]
+let tzfail_of_io_error
+    (e : [< `Close | `Open | `Rename | `Unlink | `Lock] io_error) =
+  Error [Io_error e]
 
 let () =
   register_error_kind
@@ -351,7 +353,13 @@ let () =
         (req
            "action"
            (string_enum
-              [("close", `Close); ("open", `Open); ("Rename", `Rename)]))
+              [
+                ("close", `Close);
+                ("open", `Open);
+                ("Rename", `Rename);
+                ("Unlink", `Unlink);
+                ("lock", `Lock);
+              ]))
         (req "unix_code" Unix_error.encoding)
         (req "caller" string)
         (req "arg" string))

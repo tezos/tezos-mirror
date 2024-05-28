@@ -1,0 +1,3 @@
+code { SUB } ;
+input { Stack_elt timestamp 5 ; Stack_elt int 2 } ;
+output { Stack_elt timestamp 3 }

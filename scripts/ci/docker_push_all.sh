@@ -7,7 +7,6 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 . "${current_dir}/docker.sh"
 
 # Loop over images
-for docker_image in ${docker_images}
-do
+for docker_image in ${docker_images}; do
   docker push "${docker_image}:${DOCKER_IMAGE_TAG}"
 done

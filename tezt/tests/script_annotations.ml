@@ -50,6 +50,7 @@ let register =
     ~__FILE__
     ~title:"Tests of Michelson annotations"
     ~tags:["client"; "michelson"; "annotations"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   (* annotation length limit positive case *)
@@ -107,7 +108,7 @@ let register =
   let* () =
     typecheck_script
       ?res:
-        (if Protocol.(number protocol > number Nairobi) then
+        (if Protocol.(number protocol >= number Oxford) then
          Some (rex "unexpected annotation")
         else None)
       ~legacy:true
@@ -118,10 +119,7 @@ let register =
      was allowed in legacy mode *)
   let* () =
     typecheck_script
-      ?res:
-        (if Protocol.(number protocol > number Nairobi) then
-         Some (rex "unexpected annotation")
-        else None)
+      ~res:(rex "unexpected annotation")
       ~legacy:true
       ~script:"parameter %1 unit; storage unit; code { FAILWITH }"
       client

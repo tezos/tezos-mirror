@@ -28,6 +28,8 @@ type parameters = {
   context_root : string;
   protocol_root : string;
   genesis : Genesis.t;
+  readonly : bool;
+  data_dir : string;
   sandbox_parameters : Data_encoding.json option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
@@ -36,8 +38,10 @@ type parameters = {
   internal_events : Tezos_base.Internal_event_config.t;
 }
 
-type request =
-  | Validate of {
+type never = |
+
+type _ request =
+  | Apply : {
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
@@ -50,7 +54,8 @@ type request =
       should_precheck : bool;
       simulate : bool;
     }
-  | Preapply of {
+      -> Block_validation.result request
+  | Preapply : {
       chain_id : Chain_id.t;
       timestamp : Time.Protocol.t;
       protocol_data : bytes;
@@ -65,7 +70,8 @@ type request =
       predecessor_resulting_context_hash : Context_hash.t;
       operations : Block_validation.operation list list;
     }
-  | Precheck of {
+      -> (Block_header.shell_header * error Preapply_result.t list) request
+  | Precheck : {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
@@ -74,28 +80,36 @@ type request =
       operations : Block_validation.operation list list;
       hash : Block_hash.t;
     }
-  | Commit_genesis of {chain_id : Chain_id.t}
-  | Fork_test_chain of {
+      -> unit request
+  | Commit_genesis : {chain_id : Chain_id.t} -> Context_hash.t request
+  | Fork_test_chain : {
       chain_id : Chain_id.t;
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {
+      -> Block_header.t request
+  | Context_garbage_collection : {
       context_hash : Context_hash.t;
       gc_lockfile_path : string;
     }
-  | Context_split
-  | Terminate
-  | Reconfigure_event_logging of
+      -> unit request
+  | Context_split : unit request
+  | Terminate : never request
+  | Reconfigure_event_logging :
       Tezos_base_unix.Internal_event_unix.Configuration.t
+      -> unit request
 
-val request_pp : Format.formatter -> request -> unit
+val request_pp : Format.formatter -> 'a request -> unit
 
 val magic : Bytes.t
 
 val parameters_encoding : parameters Data_encoding.t
 
-val request_encoding : request Data_encoding.t
+type packed_request = Erequest : _ request -> packed_request
+
+val request_encoding : packed_request Data_encoding.t
+
+val result_encoding : 'a request -> 'a Data_encoding.t
 
 val send : Lwt_io.output_channel -> 'a Data_encoding.t -> 'a -> unit Lwt.t
 
@@ -123,4 +137,6 @@ val create_socket_listen :
   Lwt_unix.file_descr tzresult Lwt.t
 
 val create_socket_connect :
-  canceler:Lwt_canceler.t -> socket_path:string -> Lwt_unix.file_descr Lwt.t
+  canceler:Lwt_canceler.t ->
+  socket_path:string ->
+  Lwt_unix.file_descr tzresult Lwt.t

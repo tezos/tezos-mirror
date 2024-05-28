@@ -41,6 +41,7 @@ let version_name = function
   | V1 -> "v1"
   | V2 -> "v2"
   | V3 -> "v3"
+  | V4 -> "v4"
 
 let capture_hash_of tree =
   Regression.capture @@ Context_hash.to_b58check
@@ -53,7 +54,12 @@ let rec eval_and_capture_many ?(fail_on_stuck = true) ~bunk
   match info.input_request with
   | No_input_required when max_steps > 0L ->
       let steps = Int64.min bunk max_steps in
-      let* tree, steps = Wasm_fast.compute_step_many ~max_steps:steps tree in
+      let* tree, steps =
+        Wasm_fast.compute_step_many
+          ~wasm_entrypoint:Constants.wasm_entrypoint
+          ~max_steps:steps
+          tree
+      in
       let max_steps = Int64.sub max_steps steps in
       eval_and_capture_many ~bunk ~max_steps tree
   | _ ->
@@ -62,6 +68,13 @@ let rec eval_and_capture_many ?(fail_on_stuck = true) ~bunk
         Test.fail ~__LOC__ "WASM PVM is stuck" ;
       return tree
 
+(* Note: if new files are read like this, they should be declared in the manifest,
+   with [~dep_files], so that Manifezt knows that those tests should be run if those
+   files are changed.
+
+   Another approach would be to link with [Tezt_wrapper] and use [Uses],
+   so that dependencies are known at the granularity of tests and not the whole module,
+   but this requires calling [read_file] in tests instead of at toplevel. *)
 let echo_kernel =
   read_file
   @@ project_root // "src" // "proto_alpha" // "lib_protocol" // "test"
@@ -142,7 +155,9 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
       match info.input_request with
       | No_input_required when checked_ticks < ticks_to_check ->
           let* () = k context s in
-          let* s = Wasm_fast.compute_step s in
+          let* s =
+            Wasm_fast.compute_step ~wasm_entrypoint:Constants.wasm_entrypoint s
+          in
           (eval [@tailcall]) Int64.(succ checked_ticks) s
       | No_input_required -> (skip [@tailcall]) s
       | _ -> return s
@@ -150,7 +165,12 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
       let* info = Wasm_fast.get_info s in
       match info.input_request with
       | No_input_required when 0L < skip_ticks ->
-          let* s, _ = Wasm_fast.compute_step_many ~max_steps:skip_ticks s in
+          let* s, _ =
+            Wasm_fast.compute_step_many
+              ~wasm_entrypoint:Constants.wasm_entrypoint
+              ~max_steps:skip_ticks
+              s
+          in
           (eval [@tailcall]) 0L s
       | No_input_required -> (eval [@tailcall]) 0L s
       | _ -> return s
@@ -215,7 +235,7 @@ let register ?(from_binary = false) ?(fail_on_stuck = true) ?ticks_per_snapshot
         kernel
   | None -> ()
 
-let register () =
+let () =
   let versions = List.map snd Tezos_scoru_wasm.Wasm_pvm_state.versions in
   register
     ~name:"echo"

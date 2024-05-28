@@ -62,11 +62,8 @@ let register_dir () =
         Lwt.return inj_operation_hash)
   in
   let dir =
-    Tezos_rpc.Directory.register0 dir operation_status (fun {op_hash} () ->
-        let op_hash =
-          Injector_server.Inj_operation.Hash.of_b58check_exn op_hash
-        in
-        let status = Injector_server.operation_status op_hash in
+    Tezos_rpc.Directory.register0 dir operation_status (fun {op_id} () ->
+        let status = Injector_server.operation_status op_id in
         return
         @@ Option.map
              (fun (status : Injector_server.status) ->
@@ -136,6 +133,9 @@ let run ~data_dir (cctxt : Client_context.full) =
     Configuration.load ~data_dir
   in
   let*? signers = make_signers_for_transactions signer block_delay in
-  let* () = Injector_server.init cctxt ~data_dir state ~signers in
+  let*! l1_ctxt =
+    Octez_crawler.Layer_1.start ~name:"injector" ~reconnection_delay:2.0 cctxt
+  in
+  let* () = Injector_server.init cctxt l1_ctxt ~data_dir state ~signers in
   let*! () = Event.(emit accepting_requests) ("HTTP", config.rpc_port) in
   start ~rpc_address ~rpc_port ()

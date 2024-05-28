@@ -38,8 +38,8 @@ type proposal_acceptance = Invalid | Outdated_proposal | Valid_proposal
 val is_acceptable_proposal_for_current_level :
   state -> proposal -> proposal_acceptance Lwt.t
 
-val make_consensus_list :
-  state -> proposal -> (consensus_key_and_delegate * consensus_content) list
+val make_consensus_vote_batch :
+  state -> proposal -> consensus_vote_kind -> unsigned_consensus_vote_batch
 
 val may_update_proposal :
   is_proposal_applied:bool -> state -> proposal -> state Lwt.t
@@ -69,12 +69,14 @@ val propose_block_action :
    level), if the baker has a proposer slot. *)
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
-(** Propose (if possible) for the first time at a new level. *)
-val time_to_bake_at_next_level : state -> Round.t -> (state * action) Lwt.t
+(** Propose for the first time at a level at the given round. There was no
+    previous proposal at the current level. *)
+val time_to_prepare_next_level_block :
+  state -> Round.t -> (state * action) Lwt.t
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
 
-val make_attest_action : state -> proposal -> action
+val prepare_attest_action : state -> proposal -> action
 
 val prequorum_reached_when_awaiting_preattestations :
   state ->

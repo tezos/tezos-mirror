@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
@@ -53,6 +53,8 @@ pub enum StorageError {
     GenesisAccountInitialisation,
     #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
     InvalidLoadValue { expected: usize, actual: usize },
+    #[error("Storage error: storing the current block hash failed")]
+    BlockHashStorageFailed,
 }
 
 #[derive(Error, Debug)]

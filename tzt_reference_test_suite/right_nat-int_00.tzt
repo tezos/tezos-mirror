@@ -1,0 +1,3 @@
+code { RIGHT nat } ;
+input { Stack_elt int -5 } ;
+output { Stack_elt (or nat int) (Right -5) }

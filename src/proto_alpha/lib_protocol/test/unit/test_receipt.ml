@@ -42,6 +42,7 @@ let random_amount () =
 
 (** Test that [decode (encode balance_updates) = balance_updates]. *)
 let test_encodings balance =
+  let open Lwt_result_syntax in
   Random.init 0 ;
   let am = random_amount () in
   let r1 = Receipt.item balance (Debited am) Protocol_migration in
@@ -54,14 +55,10 @@ let test_encodings balance =
   let r8 = Receipt.item balance (Credited am) Block_application in
   let coded =
     Json.construct
-      Receipt.balance_updates_encoding_with_legacy_attestation_name
+      Receipt.balance_updates_encoding
       [r1; r2; r3; r4; r5; r6; r7; r8]
   in
-  let decoded =
-    Json.destruct
-      Receipt.balance_updates_encoding_with_legacy_attestation_name
-      coded
-  in
+  let decoded = Json.destruct Receipt.balance_updates_encoding coded in
   match decoded with
   | [r1'; r2'; r3'; r4'; r5'; r6'; r7'; r8'] ->
       assert (

@@ -335,8 +335,7 @@ let default_cli_args =
     client_mode = `Mode_client;
   }
 
-let string_parameter () : (string, #Client_context.full) Tezos_clic.parameter =
-  Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
+let string_parameter () = Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
 
 let media_type_parameter () :
     (Media_type.Command_line.t, #Client_context.full) Tezos_clic.parameter =

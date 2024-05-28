@@ -37,6 +37,7 @@ let context_init_memory ?dal ~rng_state () =
       ~rng_state
       ~dal_enable
       ?dal
+      ~consensus_committee_size:7000
       ~bootstrap_balances:
         [
           initial_balance;

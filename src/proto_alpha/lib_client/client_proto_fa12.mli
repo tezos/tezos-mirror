@@ -105,6 +105,7 @@ val call_contract :
   tez_amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
@@ -144,6 +145,7 @@ val inject_token_transfer_batch :
   ?default_fee:Tez.t ->
   ?default_gas_limit:Gas.Arith.integral ->
   ?default_storage_limit:Z.t ->
+  ?safety_guard:Gas.Arith.integral ->
   unit ->
   unit tzresult Lwt.t
 

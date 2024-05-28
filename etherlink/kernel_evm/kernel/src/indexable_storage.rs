@@ -65,7 +65,7 @@ impl IndexableStorage {
     }
 
     fn get_length_and_increment<Host: Runtime>(
-        &mut self,
+        &self,
         host: &mut Host,
     ) -> Result<u64, StorageError> {
         let path = concat(&self.path, &LENGTH)?;
@@ -124,7 +124,7 @@ impl IndexableStorage {
 
     /// Push a value at index `length`, and increments the length.
     pub fn push_value<Host: Runtime>(
-        &mut self,
+        &self,
         host: &mut Host,
         value: &[u8],
     ) -> Result<(), StorageError> {
@@ -152,8 +152,7 @@ mod tests {
     fn test_indexing_new_value() {
         let mut host = MockHost::default();
         let values = RefPath::assert_from(b"/values");
-        let mut storage =
-            IndexableStorage::new(&values).expect("Path to index is invalid");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
         let value = b"value";
 
@@ -170,8 +169,7 @@ mod tests {
     fn test_get_out_of_bounds() {
         let mut host = MockHost::default();
         let values = RefPath::assert_from(b"/values");
-        let mut storage =
-            IndexableStorage::new(&values).expect("Path to index is invalid");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
         let value = b"value";
 

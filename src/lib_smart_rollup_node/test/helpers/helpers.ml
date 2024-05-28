@@ -52,7 +52,13 @@ let default_constants =
           commitment_period_in_blocks = 3;
           reveal_activation_level =
             Some
-              {blake2B = 0l; metadata = 0l; dal_page = 0l; dal_parameters = 0l};
+              {
+                blake2B = 0l;
+                metadata = 0l;
+                dal_page = 0l;
+                dal_parameters = 0l;
+                dal_attested_slots_validity_lag = Int32.max_int;
+              };
           max_number_of_stored_cemented_commitments = 5;
         };
       dal =
@@ -90,7 +96,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   let inbox_witness = Inbox.current_witness inbox in
-  let ctxt = Octez_smart_rollup_node.Context.empty node_ctxt.context in
+  let ctxt = Context.empty node_ctxt.context in
   let num_ticks = 0L in
   let initial_tick = Z.zero in
   let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
@@ -99,7 +105,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   in
   let*! genesis_state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
   let*! ctxt = Context.PVMState.set ctxt state in
-  let*! context_hash = Octez_smart_rollup_node.Context.commit ctxt in
+  let*! context_hash = Context.commit ctxt in
   let commitment =
     Commitment.genesis_commitment
       ~origination_level:node_ctxt.genesis_info.level
@@ -115,7 +121,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context = Smart_rollup_context_hash.of_context_hash context_hash;
         inbox_witness;
         inbox_hash;
       }
@@ -154,7 +160,7 @@ let initialize_node_context protocol ?(constants = default_constants) kind
     {Node_context.hash = protocol; proto_level = 0; constants}
   in
   let* ctxt =
-    Node_context.Internal_for_tests.create_node_context
+    Node_context_loader.Internal_for_tests.create_node_context
       cctxt
       current_protocol
       ~data_dir
@@ -176,7 +182,7 @@ let with_node_context ?constants kind protocol ~boot_sector f =
   in
   Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
   let open Lwt_syntax in
-  let* _ = Node_context.close node_ctxt in
+  let* _ = Node_context_loader.close node_ctxt in
   return_unit
 
 let make_header ~predecessor level messages =

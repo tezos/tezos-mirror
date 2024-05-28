@@ -30,7 +30,12 @@
   -open Tezos_base_test_helpers
   -open Tezos_event_logging_test_helpers
   -open Tezos_p2p_test_common)
- (modules test_p2p_fd test_p2p_socket test_p2p_conn))
+ (modules
+  test_p2p_fd
+  test_p2p_socket
+  test_p2p_conn
+  test_p2p_node
+  test_p2p_pool))
 
 (executable
  (name main)

@@ -1,0 +1,18 @@
+code APPLY ;
+input
+  {
+    Stack_elt string "Hi" ;
+    Stack_elt (lambda (pair string int) nat) (Lambda_rec { DROP 2 ; PUSH nat 1 }) ;
+  } ;
+output
+  {
+    Stack_elt
+      (lambda int nat)
+      {
+        PUSH string "Hi";
+        PAIR;
+        LAMBDA_REC (pair string int) nat { DROP 2 ; PUSH nat 1 };
+        SWAP;
+        EXEC
+      }
+  }

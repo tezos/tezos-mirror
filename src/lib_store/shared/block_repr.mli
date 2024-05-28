@@ -50,7 +50,7 @@ type contents = {
 type metadata = {
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_preserved_block_level : Int32.t;
   block_metadata : Bytes.t;
   operations_metadata : Block_validation.operation_metadata list list;
 }
@@ -172,7 +172,7 @@ val message : metadata -> string option
 
 val max_operations_ttl : metadata -> int
 
-val last_allowed_fork_level : metadata -> Int32.t
+val last_preserved_block_level : metadata -> Int32.t
 
 val block_metadata : metadata -> bytes
 

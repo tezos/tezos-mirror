@@ -1,0 +1,3 @@
+code SHA512;
+input { Stack_elt bytes 0x00 };
+output { Stack_elt bytes 0xb8244d028981d693af7b456af8efa4cad63d282e19ff14942c246e50d9351d22704a802a71c3580b6370de4ceb293c324a8423342557d4e5c38438f0e36910ee }

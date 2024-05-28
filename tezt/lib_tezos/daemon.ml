@@ -442,13 +442,19 @@ module Make (X : PARAMETERS) = struct
   let on_stderr daemon handler =
     daemon.stderr_handlers <- handler :: daemon.stderr_handlers
 
-  let log_events daemon =
+  let log_events ?max_length daemon =
+    let truncate s max_length =
+      match max_length with
+      | Some max_length when String.length s > max_length ->
+          String.sub s 0 max_length ^ "[...]"
+      | _ -> s
+    in
     on_event daemon @@ fun event ->
     Log.info
       "[%s] Received event: %s = %s"
       daemon.name
       event.name
-      (JSON.encode event.value)
+      (truncate (JSON.encode event.value) max_length)
 
   type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
 

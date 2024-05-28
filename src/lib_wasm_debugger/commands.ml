@@ -307,31 +307,80 @@ let read_data_from_stdin retries =
   in
   input_data retries
 
-let read_data ~kind ~directory ~filename retries =
-  Lwt.catch
-    (fun () ->
-      let path = Filename.concat directory filename in
-      let s = read_data_from_file path in
-      Lwt.return s)
-    (fun _ ->
-      let open Lwt_syntax in
+let read_data ~kind ~directory ~filename ?fetch_from_remote retries =
+  let read_from_file () =
+    let path = Filename.concat directory filename in
+    let s = read_data_from_file path in
+    Lwt.return s
+  in
+  let read_from_remote =
+    match fetch_from_remote with
+    | None -> fun () -> raise Not_found
+    | Some fetch_from_remote ->
+        fun () ->
+          let open Lwt_syntax in
+          let* s = fetch_from_remote filename in
+          let ch = open_out (Filename.concat directory filename) in
+          output_string ch s ;
+          close_out ch ;
+          return s
+  in
+  let read_from_stdin () =
+    let open Lwt_syntax in
+    let* () =
+      Lwt_fmt.printf
+        "%s %s not found in %s, or there was a reading error. Please provide \
+         it manually.\n\
+         %!"
+        kind
+        filename
+        directory
+    in
+    read_data_from_stdin retries
+  in
+  Lwt.catch read_from_file @@ fun _ ->
+  Lwt.catch read_from_remote @@ fun _ -> read_from_stdin ()
+
+let fetch_preimage_from_remote endpoint hash_hex =
+  let open Lwt_syntax in
+  let url =
+    Uri.with_path endpoint String.(concat "/" [Uri.path endpoint; hash_hex])
+  in
+  let* resp, body = Cohttp_lwt_unix.Client.get url in
+  let* body_str = Cohttp_lwt.Body.to_string body in
+  match resp.status with
+  | `OK ->
+      let contents_hash_hex =
+        let open Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash in
+        hash_string ~scheme:Blake2B [body_str] |> to_hex
+      in
+      if not (String.equal contents_hash_hex hash_hex) then
+        Format.ksprintf
+          Stdlib.failwith
+          "The kernel fetched pre-image with hash %s instead of %s."
+          contents_hash_hex
+          hash_hex ;
+      return body_str
+  | #Cohttp.Code.status_code ->
       let* () =
         Lwt_fmt.printf
-          "%s %s not found in %s, or there was a reading error. Please provide \
-           it manually.\n\
-           %!"
-          kind
-          filename
-          directory
+          "Could not fetch %s from %s. Response status code %d\n%!"
+          hash_hex
+          (Uri.path endpoint)
+          (Cohttp.Code.code_of_status resp.status)
       in
-      read_data_from_stdin retries)
+      raise Not_found
 
 let reveal_preimage_builtin config retries hash =
   let hex = Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.to_hex hash in
+  let fetch_from_remote =
+    Option.map fetch_preimage_from_remote config.Config.preimage_endpoint
+  in
   read_data
     ~kind:"Preimage"
     ~directory:config.Config.preimage_directory
     ~filename:hex
+    ?fetch_from_remote
     retries
 
 let request_dal_page config retries published_level slot_index page_index =
@@ -367,7 +416,7 @@ let reveals config request =
   | Request_dal_page {slot_id = {published_level; index}; page_index} ->
       request_dal_page config num_retries published_level index page_index
 
-let write_debug config =
+let write_debug_default config =
   if config.Config.kernel_debug then
     Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_fmt.printf "%s%!" msg)
   else Tezos_scoru_wasm.Builtins.Noop
@@ -382,7 +431,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let open Lwt_syntax in
     trap_exn (fun () ->
         let+ tree =
-          Wasm.compute_step_with_debug ~write_debug:(write_debug config) tree
+          Wasm.compute_step_with_debug
+            ~wasm_entrypoint:Constants.wasm_entrypoint
+            ~write_debug:(write_debug_default config)
+            tree
         in
         (tree, 1L))
 
@@ -392,20 +444,21 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let eval_to_result config tree =
     trap_exn (fun () ->
         eval_to_result
-          ~write_debug:(write_debug config)
+          ~write_debug:(write_debug_default config)
           ~reveal_builtins:(reveals config)
           tree)
 
   (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
      starts a new one if already at snapshot point). *)
-  let eval_kernel_run config tree =
+  let eval_kernel_run ~wasm_entrypoint config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree, _ =
           Wasm_fast.compute_step_many
+            ~wasm_entrypoint
             ~reveal_builtins:(reveals config)
-            ~write_debug:(write_debug config)
+            ~write_debug:(write_debug_default config)
             ~stop_at_snapshot:true
             ~max_steps:Int64.max_int
             tree
@@ -416,15 +469,19 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         ))
 
   (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-  let eval_until_input_requested config tree =
+  let eval_until_input_requested ?write_debug ~wasm_entrypoint config tree =
     let open Lwt_syntax in
+    let write_debug =
+      Option.value ~default:(write_debug_default config) write_debug
+    in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree =
           eval_until_input_requested
+            ~wasm_entrypoint
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
-            ~write_debug:(write_debug config)
+            ~write_debug
             ~max_steps:Int64.max_int
             tree
         in
@@ -433,12 +490,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick
         ))
 
-  let produce_flamegraph ~collapse ~max_depth kernel_runs =
+  let produce_flamegraph ~collapse ~max_depth config kernel_runs =
     let filename =
       Time.System.(
         Format.asprintf "wasm-debugger-profiling-%a.out" pp_hum (now ()))
     in
-    let path = Filename.(concat (get_temp_dir_name ()) filename) in
+    let path = Filename.(concat config.Config.flamecharts_directory filename) in
     let file = open_out path in
     let pp_kernel_run ppf = function
       | Some run ->
@@ -492,14 +549,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            %!" ;
         let+ tree, ticks, graph =
           Prof.eval_and_profile
-            ~write_debug:(write_debug config)
+            ~write_debug:(write_debug_default config)
             ~reveal_builtins:(reveals config)
             ~with_time
             ~no_reboot
             function_symbols
             tree
         in
-        produce_flamegraph ~collapse ~max_depth:100 graph ;
+        produce_flamegraph ~collapse ~max_depth:100 config graph ;
         List.iter profiling_results graph ;
         Format.printf
           "----------------------\nFull execution with padding: %a ticks\n%!"
@@ -541,12 +598,6 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
                 level
                 tree)
         in
-        let*! () =
-          Lwt_fmt.printf
-            "Loaded %d inputs at level %ld\n%!"
-            (List.length inputs)
-            level
-        in
         return (tree, inboxes, Int32.succ level)
     | None ->
         let*! () = Lwt_fmt.printf "No more inputs at level %ld\n%!" level in
@@ -562,7 +613,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval level inboxes config step tree =
+  let eval ?write_debug ~wasm_entrypoint level inboxes config step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
@@ -571,15 +622,22 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     match step with
     | Tick -> return' (compute_step config tree)
     | Result -> return' (eval_to_result config tree)
-    | Kernel_run -> return' (eval_kernel_run config tree)
+    | Kernel_run -> return' (eval_kernel_run ~wasm_entrypoint config tree)
     | Inbox -> (
         let*! status = check_input_request tree in
         match status with
         | Ok () ->
             let* tree, inboxes, level = load_inputs inboxes level tree in
-            let* tree, ticks = eval_until_input_requested config tree in
+            let* tree, ticks =
+              eval_until_input_requested
+                ?write_debug
+                ~wasm_entrypoint
+                config
+                tree
+            in
             return (tree, ticks, inboxes, level)
-        | Error _ -> return' (eval_until_input_requested config tree))
+        | Error _ ->
+            return' (eval_until_input_requested ~wasm_entrypoint config tree))
 
   let profile ~collapse ~with_time ~no_reboot level inboxes config
       function_symbols tree =
@@ -655,9 +713,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [step level inboxes config kind tree] evals according to the step kind and
      prints the number of ticks elapsed and the new status. *)
-  let step level inboxes config kind tree =
+  let step ~wasm_entrypoint level inboxes config kind tree =
     let open Lwt_result_syntax in
-    let* tree, ticks, inboxes, level = eval level inboxes config kind tree in
+    let* tree, ticks, inboxes, level =
+      eval ~wasm_entrypoint level inboxes config kind tree
+    in
     let*! () = Lwt_fmt.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
     return_some (tree, inboxes, level)
@@ -979,7 +1039,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Show_status ->
           let*! () = show_status tree in
           return ()
-      | Step kind -> step level inboxes config kind tree
+      | Step kind ->
+          step
+            ~wasm_entrypoint:Constants.wasm_entrypoint
+            level
+            inboxes
+            config
+            kind
+            tree
       | Show_inbox ->
           let*! () = show_inbox tree in
           return ()

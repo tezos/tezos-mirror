@@ -9,18 +9,39 @@
  (modules get_git_info))
 
 (executable
- (name tezos_print_version)
+ (name octez_print_version)
  (public_name octez-version)
  (package octez-version)
  (libraries
   octez-version.value
   octez-libs.version
-  octez-libs.base.unix)
+  octez-libs.base.unix
+  octez-version.print)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_version_value
-  -open Tezos_version)
- (modules tezos_print_version))
+  -open Tezos_version
+  -open Octez_version_print)
+ (modules octez_print_version))
+
+(executable
+ (name etherlink_print_version)
+ (public_name etherlink-version)
+ (package octez-version)
+ (libraries
+  octez-version.value
+  octez-libs.version
+  octez-libs.base.unix
+  octez-version.print)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_version_value
+  -open Tezos_version
+  -open Octez_version_print)
+ (modules etherlink_print_version))

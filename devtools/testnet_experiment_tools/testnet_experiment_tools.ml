@@ -95,11 +95,11 @@ let protocol_alpha_parameters_template =
 
 let network_activation_parameters_templates protocol_hash =
   match protocol_hash with
-  | Tezt_tezos.Protocol.Nairobi ->
+  | Tezt_tezos.Protocol.Paris ->
       Some
         (Filename.concat
            network_parameters_templates_dir
-           "proto_017_PtNairob_mainnet.json")
+           "proto_019_PtParisA_mainnet.json")
   | Tezt_tezos.Protocol.Oxford ->
       Some
         (Filename.concat
@@ -267,7 +267,7 @@ module Local = struct
           dal_config =
             {
               activated = false;
-              use_mock_srs_for_testing = None;
+              use_mock_srs_for_testing = false;
               bootstrap_peers = [];
             };
           genesis_parameters =
@@ -378,7 +378,7 @@ let () =
     ~__FILE__
     ~title:"Generate Network Activation Parameters"
     ~tags:["generate_activation_parameters"]
-    (Local.generate_network_activation_parameters Protocol.Nairobi) ;
+    (Local.generate_network_activation_parameters Protocol.Oxford) ;
   register
     ~__FILE__
     ~title:"Partition bakers by node"

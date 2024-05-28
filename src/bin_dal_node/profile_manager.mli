@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -48,6 +49,16 @@ val add_operator_profiles :
   Types.operator_profiles ->
   t option
 
+(** [add_profiles t proto_parameters gs_worker profiles] registers [profiles].
+    If the current profiles are incompatible with provided [profiles], it
+    returns [None]. *)
+val add_profiles :
+  t ->
+  Dal_plugin.proto_parameters ->
+  Gossipsub.Worker.t ->
+  Types.profiles ->
+  t option
+
 (** Checks that each producer profile only refers to slot indexes strictly
     smaller than [number_of_slots]. This may not be the case when the profile
     context is first built because there is no information about the number of
@@ -73,3 +84,18 @@ val get_attestable_slots :
   Dal_plugin.proto_parameters ->
   attested_level:int32 ->
   (Types.attestable_slots, [Errors.decoding | Errors.other]) result Lwt.t
+
+(* Returns the number of previous blocks for which we want to keep the shards
+   in the storage, depending on the profile of the node (3 months for observer
+   & slot producer, twice attestation lag for attester) *)
+val get_default_shard_store_period : Dal_plugin.proto_parameters -> t -> int
+
+(** Load the profile context from disk. The file where the context is loaded
+    from is relative to the given [base_dir]. An error is returned in case of an
+    IO failure or an ill formatted file. *)
+val load_profile_ctxt : base_dir:string -> t tzresult Lwt.t
+
+(** Save the profile context to disk. The file where the context is saved is
+    relative to the given [base_dir]. An error is returned in case of an
+    IO failure. *)
+val save_profile_ctxt : t -> base_dir:string -> unit tzresult Lwt.t

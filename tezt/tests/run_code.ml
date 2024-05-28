@@ -17,6 +17,7 @@ let test_balance_and_self_address =
     ~__FILE__
     ~title:"Run code with balance and self address"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -79,6 +80,7 @@ let test_source_and_sender =
     ~__FILE__
     ~title:"Run code with source and sender"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -143,6 +145,7 @@ let test_other_contracts =
     ~__FILE__
     ~title:"Run code with other_contracts"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -166,6 +169,7 @@ let test_extra_big_maps =
     ~__FILE__
     ~title:"Run code with extra_big_maps"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -184,6 +188,7 @@ let test_amount =
     ~__FILE__
     ~title:"Run code with amount"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -200,6 +205,7 @@ let test_level =
     ~__FILE__
     ~title:"Run code with level"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -214,6 +220,7 @@ let test_now =
     ~__FILE__
     ~title:"Run code with now"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -229,6 +236,7 @@ let test_long_output =
     ~__FILE__
     ~title:"Run code outputing a long stack"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

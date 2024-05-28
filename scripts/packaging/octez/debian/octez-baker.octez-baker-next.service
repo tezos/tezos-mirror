@@ -1,0 +1,23 @@
+[Unit]
+Description=Octez baker
+Documentation=https://tezos.gitlab.io/
+After=network.target
+
+[Service]
+# We use the octez-node default to determine the node's DATADIR
+EnvironmentFile=-/etc/default/octez-node
+EnvironmentFile=-/etc/default/octez-baker-next
+WorkingDirectory=/var/tezos
+Restart=on-failure
+User=tezos
+
+# We wrap the command in /bin/sh to use identify the baker associated to $PROTOCOL
+ExecStart=/bin/sh -c "/usr/bin/octez-baker-$PROTOCOL --base-dir /var/tezos/.tezos-client run with local node $DATADIR --liquidity-baking-toggle-vote $LQVOTE $RUNTIME_OPTS $BAKING_KEY"
+
+# The baker is started only if the node is up and running
+ExecStartPre=/usr/share/octez-baker/wait-for-node-up.sh
+StandardOutput=append:/var/log/tezos/baker-next.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

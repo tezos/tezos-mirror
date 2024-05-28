@@ -1,0 +1,23 @@
+code { APPLY; SWAP; APPLY } ;
+input
+  {
+    Stack_elt string "Hi" ;
+    Stack_elt (lambda (pair string bool int) nat) (Lambda_rec { DROP 2 ; PUSH nat 1 }) ;
+    Stack_elt bool True ;
+  } ;
+output
+  {
+    Stack_elt
+      (lambda int nat)
+      {
+        PUSH bool True;
+        PAIR;
+        {
+          PUSH string "Hi";
+          PAIR;
+          LAMBDA_REC (pair string bool int) nat { DROP 2 ; PUSH nat 1 };
+          SWAP;
+          EXEC
+        }
+      } ;
+  }

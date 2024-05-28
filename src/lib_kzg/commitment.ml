@@ -31,83 +31,89 @@ module Commit = struct
     commit_single Srs_g2.pippenger G2.zero (Srs_g2.size srs) srs p
 end
 
-module Single = struct
-  type t = G1.t [@@deriving repr]
+module Single (G : Bls.G_sig) = struct
+  type t = G.t [@@deriving repr]
 
-  type public_parameters = Srs_g1.t
+  type public_parameters = G.Srs.t
 
   type secret = Poly.t
 
-  let zero = G1.zero
+  let zero = G.zero
 
-  let random = G1.random
+  let random = G.random
 
-  let alter_proof proof = G1.(add proof one)
+  let alter_proof proof = G.(add proof one)
 
-  let encoding = G1.encoding
+  let encoding = G.encoding
 
-  let equal = G1.eq
+  let equal = G.eq
 
   let compare a b =
-    if G1.eq a b then 0 else Bytes.compare (G1.to_bytes a) (G1.to_bytes b)
+    if G.eq a b then 0 else Bytes.compare (G.to_bytes a) (G.to_bytes b)
 
-  let commit = Commit.with_srs1
+  let commit srs secret =
+    Commit.commit_single G.Srs.pippenger G.zero (G.Srs.size srs) srs secret
 
-  let size = G1.compressed_size_in_bytes
+  let size = G.compressed_size_in_bytes
 
   let commitment_of_bytes_exn bytes =
-    match G1.of_compressed_bytes_opt bytes with
+    match G.of_compressed_bytes_opt bytes with
     | None ->
         Format.kasprintf Stdlib.failwith "Unexpected data (KZG commitment)"
     | Some commitment -> commitment
     [@@coverage off]
 
-  let to_string commitment =
-    G1.to_compressed_bytes commitment |> Bytes.to_string
+  let to_string commitment = G.to_compressed_bytes commitment |> Bytes.to_string
     [@@coverage off]
 
-  let of_string_opt str = G1.of_compressed_bytes_opt (String.to_bytes str)
+  let of_string_opt str = G.of_compressed_bytes_opt (String.to_bytes str)
     [@@coverage off]
 end
 
-(* module Commitment = struct *)
-type public_parameters = Single.public_parameters
+module Make (G : G_sig) = struct
+  module Single = Single (G)
 
-type secret = Single.secret SMap.t
+  type public_parameters = Single.public_parameters
 
-type t = Single.t SMap.t [@@deriving repr]
+  type secret = Single.secret SMap.t
 
-type prover_aux = unit [@@deriving repr]
+  type t = Single.t SMap.t [@@deriving repr]
 
-let commit_single = Single.commit
+  type prover_aux = unit [@@deriving repr]
 
-let commit ?all_keys:_ srs f_map =
-  let cmt = SMap.map (commit_single srs) f_map in
-  let prover_aux = () in
-  (cmt, prover_aux)
+  let commit_single = Single.commit
 
-let cardinal cmt = SMap.cardinal cmt
+  let commit ?all_keys:_ srs f_map =
+    let cmt = SMap.map (commit_single srs) f_map in
+    let prover_aux = () in
+    (cmt, prover_aux)
 
-let rename f cmt =
-  SMap.fold (fun key x acc -> SMap.add (f key) x acc) cmt SMap.empty
+  let cardinal cmt = SMap.cardinal cmt
 
-let recombine cmt_list =
-  List.fold_left
-    (SMap.union (fun _k x _ -> Some x))
-    (List.hd cmt_list)
-    (List.tl cmt_list)
+  let rename f cmt =
+    SMap.fold (fun key x acc -> SMap.add (f key) x acc) cmt SMap.empty
 
-let recombine_prover_aux _ = ()
+  let recombine cmt_list =
+    List.fold_left
+      (SMap.union (fun _k x _ -> Some x))
+      (List.hd cmt_list)
+      (List.tl cmt_list)
 
-let empty = SMap.empty
+  let recombine_prover_aux _ = ()
 
-let empty_prover_aux = ()
+  let empty = SMap.empty
 
-let of_list _ ~name l =
-  let n = List.length l in
-  ( SMap.(
-      of_list
-        (List.mapi (fun i c -> (Aggregation.add_prefix ~n ~i "" name, c)) l)),
-    () )
+  let empty_prover_aux = ()
 
-let to_map cm = cm
+  let of_list _ ~name l =
+    let n = List.length l in
+    ( SMap.(
+        of_list
+          (List.mapi (fun i c -> (Aggregation.add_prefix ~n ~i "" name, c)) l)),
+      () )
+
+  let to_map cm = cm
+end
+
+module Single_G1 = Single (G1)
+module Commitment_G1 = Make (G1)

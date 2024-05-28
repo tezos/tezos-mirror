@@ -81,7 +81,7 @@ let fork_testchain chain_store (blocks, forked_block) =
   let testchain_store = Store.Chain.testchain_store testchain in
   let* test_blocks, head =
     append_blocks
-      ~min_lafl:genesis_header.shell.level
+      ~min_lpbl:genesis_header.shell.level
       ~should_set_head:true
       testchain_store
       ~kind:`Full

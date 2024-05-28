@@ -250,7 +250,7 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context
 
     method confirmations = None
 
-    method verbose_rpc_error_diagnostics = true
+    method verbose_rpc_error_diagnostics = false
   end
 
 class unix_proxy ~base_dir ?protocol ~chain ~block ~confirmations
@@ -279,5 +279,5 @@ class unix_proxy ~base_dir ?protocol ~chain ~block ~confirmations
 
     method confirmations = confirmations
 
-    method verbose_rpc_error_diagnostics = true
+    method verbose_rpc_error_diagnostics = false
   end

@@ -1,16 +1,21 @@
 #!/bin/sh
 
-set -e
+# This script is intended for sourcing. This means the use of 'set -o
+# errexit' leaks to the user unless we go through a bit of
+# ritual. Store the old value of 'set -o errexit' to restore at the
+# end of the script.
+old_errexit=$(set +o | grep 'errexit$')
+set -o errexit
 
 if [ -z "$recommended_node_version" ]; then
-    script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-    if [ -f "${script_dir}"/version.sh ]; then
-        #shellcheck source=scripts/version.sh
-        . "$script_dir"/version.sh;
-    else
-        echo "\$recommended_node_version is undefined, please source scripts/version.sh";
-        exit 1;
-    fi
+  script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+  if [ -f "${script_dir}"/version.sh ]; then
+    #shellcheck source=scripts/version.sh
+    . "$script_dir"/version.sh
+  else
+    echo "\$recommended_node_version is undefined, please source scripts/version.sh"
+    exit 1
+  fi
 fi
 
 # nvm is a runtime dependency now.
@@ -21,11 +26,10 @@ export NVM_DIR="$HOME/.nvm"
 #shellcheck disable=SC1091
 . "$HOME/.nvm/nvm.sh"
 
-# shellcheck disable=SC2039
 # override nvm_get_arch, as suggested in https://github.com/nvm-sh/nvm/issues/1102
 nvm_get_arch() {
-  HOST_ARCH
-  NVM_OS
+  HOST_ARCH=''
+  NVM_OS=''
 
   NVM_OS="$(nvm_get_os)"
   # If the OS is SunOS, first try to use pkgsrc to guess
@@ -44,21 +48,26 @@ nvm_get_arch() {
     HOST_ARCH="$(command uname -m)"
   fi
 
-  NVM_ARCH
+  NVM_ARCH=''
   case "${HOST_ARCH}" in
-    x86_64 | amd64) NVM_ARCH="x64" ;;
-    i*86) NVM_ARCH="x86" ;;
-    aarch64) NVM_ARCH="arm64" ;;
-    *) NVM_ARCH="${HOST_ARCH}" ;;
+  x86_64 | amd64) NVM_ARCH="x64" ;;
+  i*86) NVM_ARCH="x86" ;;
+  aarch64) NVM_ARCH="arm64" ;;
+  *) NVM_ARCH="${HOST_ARCH}" ;;
   esac
   # The next three lines are used to support alpine
   if (ldd "$(which echo)" | nvm_grep -q musl); then
-  NVM_ARCH="${NVM_ARCH}-musl"
+    NVM_ARCH="${NVM_ARCH}-musl"
   fi
   nvm_echo "${NVM_ARCH}"
 }
 
-nvm install "$NODE_VERSION"
+# Turn off the nvm progress bar in GitLab CI to improve logs.
+if [ -n "${CI:-}" ]; then
+  nvm install --no-progress "$NODE_VERSION"
+else
+  nvm install "$NODE_VERSION"
+fi
 nvm use --delete-prefix "$NODE_VERSION"
 
 echo "Check versions"
@@ -66,8 +75,13 @@ node --version
 
 # [npm ci] is like [npm install] but will fail if [package.json] and
 # [package-lock.json] disagree. It also removes any pre-existing [node_modules] install.
-if [ -z "${CI_PROJECT_DIR}" ] ; then
-    npm install ;
+if [ -z "${CI_PROJECT_DIR}" ]; then
+  npm install
 else
-    npm ci ;
+  npm ci
+fi
+
+# Disable 'errexit' if it was disabled at the beginning of the script.
+if [ "$old_errexit" = "set +o errexit" ]; then
+  set +o errexit
 fi

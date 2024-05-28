@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -21,7 +22,7 @@ use tezos_ethereum::block::{BlockConstants, L2Block};
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
-    TransactionType, TRANSACTION_HASH_SIZE,
+    TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, Level::*};
@@ -43,11 +44,17 @@ pub struct BlockInProgress {
     /// index for next transaction
     pub index: u32,
     /// gas price for transactions in the block being created
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/6810
+    //       this seems like dead code, can we remove it?
+    //       (ensure that BlockInProgress encoding doesn't need
+    //        backwards compatibility).
     pub gas_price: U256,
     /// hash of the parent
     pub parent_hash: H256,
-    /// Cumulative number of ticks used
-    pub estimated_ticks: u64,
+    /// Cumulative number of ticks used in current kernel run
+    pub estimated_ticks_in_run: u64,
+    /// Cumulative number of ticks used in the block
+    pub estimated_ticks_in_block: u64,
     /// logs bloom filter
     pub logs_bloom: Bloom,
     /// offset for the first log of the next transaction
@@ -58,7 +65,7 @@ pub struct BlockInProgress {
 
 impl Encodable for BlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(10);
+        stream.begin_list(11);
         stream.append(&self.number);
         append_queue(stream, &self.tx_queue);
         append_txs(stream, &self.valid_txs);
@@ -66,6 +73,7 @@ impl Encodable for BlockInProgress {
         stream.append(&self.index);
         stream.append(&self.gas_price);
         stream.append(&self.parent_hash);
+        stream.append(&self.estimated_ticks_in_block);
         stream.append(&self.logs_bloom);
         stream.append(&self.logs_offset);
         append_timestamp(stream, self.timestamp);
@@ -91,7 +99,7 @@ impl Decodable for BlockInProgress {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 10 {
+        if decoder.item_count()? != 11 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -104,10 +112,11 @@ impl Decodable for BlockInProgress {
         let index: u32 = decode_field(&next(&mut it)?, "index")?;
         let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
         let parent_hash: H256 = decode_field(&next(&mut it)?, "parent_hash")?;
+        let estimated_ticks_in_block: u64 =
+            decode_field(&next(&mut it)?, "estimated_ticks_in_block")?;
         let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
         let logs_offset: u64 = decode_field(&next(&mut it)?, "logs_offset")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
-        let estimated_ticks: u64 = 0;
         let bip = Self {
             number,
             tx_queue,
@@ -116,7 +125,8 @@ impl Decodable for BlockInProgress {
             index,
             gas_price,
             parent_hash,
-            estimated_ticks,
+            estimated_ticks_in_run: 0,
+            estimated_ticks_in_block,
             logs_bloom,
             logs_offset,
             timestamp,
@@ -161,7 +171,7 @@ impl BlockInProgress {
         parent_hash: H256,
         gas_price: U256,
         transactions: VecDeque<Transaction>,
-        estimated_ticks: u64,
+        estimated_ticks_in_run: u64,
         timestamp: Timestamp,
     ) -> Self {
         Self {
@@ -172,7 +182,8 @@ impl BlockInProgress {
             index: 0,
             gas_price,
             parent_hash,
-            estimated_ticks,
+            estimated_ticks_in_block: 0,
+            estimated_ticks_in_run,
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp,
@@ -196,31 +207,23 @@ impl BlockInProgress {
         )
     }
 
-    pub fn from_queue_element(
-        proposal: crate::blueprint::QueueElement,
+    pub fn from_blueprint(
+        blueprint: crate::blueprint::Blueprint,
         current_block_number: U256,
         parent_hash: H256,
         constants: &BlockConstants,
         tick_counter: u64,
     ) -> BlockInProgress {
-        match proposal {
-            crate::blueprint::QueueElement::Blueprint(proposal) => {
-                // proposal is turn into a ring to allow poping from the front
-                let ring = proposal.transactions.into();
-                BlockInProgress::new_with_ticks(
-                    current_block_number,
-                    parent_hash,
-                    constants.gas_price,
-                    ring,
-                    tick_counter,
-                    proposal.timestamp,
-                )
-            }
-            crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
-                bip.estimated_ticks = tick_counter;
-                *bip
-            }
-        }
+        // blueprint is turn into a ring to allow popping from the front
+        let ring = blueprint.transactions.into();
+        BlockInProgress::new_with_ticks(
+            current_block_number,
+            parent_hash,
+            constants.base_fee_per_gas(),
+            ring,
+            tick_counter,
+            blueprint.timestamp,
+        )
     }
 
     fn add_gas(&mut self, gas: U256) -> Result<(), Error> {
@@ -229,6 +232,11 @@ impl BlockInProgress {
             .checked_add(gas)
             .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
         Ok(())
+    }
+
+    fn add_ticks(&mut self, ticks: u64) {
+        self.estimated_ticks_in_run += ticks;
+        self.estimated_ticks_in_block += ticks;
     }
 
     pub fn register_valid_transaction<Host: Runtime>(
@@ -240,11 +248,16 @@ impl BlockInProgress {
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
         // account for gas
-        self.add_gas(object_info.gas_used)?;
+        let Some(gas_used) = receipt_info.execution_outcome.as_ref().map(|eo| eo.gas_used) else {
+            anyhow::bail!("No execution outcome on valid transaction 0x{}", hex::encode(transaction.tx_hash));
+        };
+        self.add_gas(gas_used.into())?;
 
         // account for transaction ticks
-        self.estimated_ticks +=
-            tick_model::ticks_of_valid_transaction(transaction, ticks_used);
+        self.add_ticks(tick_model::ticks_of_valid_transaction(
+            transaction,
+            ticks_used,
+        ));
 
         // register transaction as done
         self.valid_txs.push(transaction.tx_hash);
@@ -253,12 +266,7 @@ impl BlockInProgress {
         // make receipt
         let receipt = self.make_receipt(receipt_info);
         let receipt_bloom_size: u64 = tick_model::bloom_size(&receipt.logs).try_into()?;
-        log!(
-            host,
-            Debug,
-            "[Benchmarking] bloom size: {}",
-            receipt_bloom_size
-        );
+        log!(host, Benchmarking, "bloom size: {}", receipt_bloom_size);
         // extend BIP's logs bloom
         self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 
@@ -270,14 +278,17 @@ impl BlockInProgress {
                 .context("Failed to store the transaction object")?;
 
         // account for registering ticks
-        self.estimated_ticks +=
-            tick_model::ticks_of_register(receipt_size, obj_size, receipt_bloom_size);
+        self.add_ticks(tick_model::ticks_of_register(
+            receipt_size,
+            obj_size,
+            receipt_bloom_size,
+        ));
 
         Ok(())
     }
 
     pub fn account_for_invalid_transaction(&mut self, tx_data_size: u64) {
-        self.estimated_ticks += tick_model::ticks_of_invalid_transaction(tx_data_size);
+        self.add_ticks(tick_model::ticks_of_invalid_transaction(tx_data_size));
     }
 
     fn safe_store_get_hash<Host: KernelRuntime>(
@@ -319,17 +330,12 @@ impl BlockInProgress {
         self.tx_queue.pop_front()
     }
 
-    pub fn has_tx(&self) -> bool {
-        !self.tx_queue.is_empty()
+    pub fn repush_tx(&mut self, tx: Transaction) {
+        self.tx_queue.push_front(tx)
     }
 
-    pub fn would_overflow(&self) -> bool {
-        match self.tx_queue.front() {
-            Some(transaction) => {
-                tick_model::estimate_would_overflow(self.estimated_ticks, transaction)
-            }
-            None => false, // should not happen, but false is a safe value anyway
-        }
+    pub fn has_tx(&self) -> bool {
+        !self.tx_queue.is_empty()
     }
 
     pub fn make_receipt(
@@ -342,12 +348,13 @@ impl BlockInProgress {
             caller: from,
             to,
             execution_outcome,
+            effective_gas_price,
+            type_,
             ..
         } = receipt_info;
 
         let &mut Self {
             number: block_number,
-            gas_price: effective_gas_price,
             cumulative_gas,
             logs_offset,
             ..
@@ -376,7 +383,7 @@ impl BlockInProgress {
                     contract_address: outcome.new_address,
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,
-                    type_: TransactionType::Legacy,
+                    type_,
                     status: if outcome.is_success {
                         TransactionStatus::Success
                     } else {
@@ -396,7 +403,7 @@ impl BlockInProgress {
                 contract_address: None,
                 logs: vec![],
                 logs_bloom: Bloom::default(),
-                type_: TransactionType::Legacy,
+                type_,
                 status: TransactionStatus::Failure,
             },
         }
@@ -406,7 +413,7 @@ impl BlockInProgress {
         TransactionObject {
             block_number: self.number,
             from: object_info.from,
-            gas_used: object_info.gas_used,
+            gas_used: object_info.gas,
             gas_price: object_info.gas_price,
             hash: object_info.hash,
             input: object_info.input,
@@ -439,23 +446,23 @@ mod tests {
     }
 
     fn dummy_etc(i: u8) -> EthereumTransactionCommon {
-        EthereumTransactionCommon {
-            type_: TransactionType::Legacy,
-            chain_id: U256::from(i),
-            nonce: U256::from(i),
-            max_fee_per_gas: U256::from(i),
-            max_priority_fee_per_gas: U256::from(i),
-            gas_limit: i.into(),
-            to: None,
-            value: U256::from(i),
-            data: Vec::new(),
-            access_list: vec![],
-            signature: Some(new_sig_unsafe(
+        EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(U256::from(i)),
+            u64::from(i),
+            U256::from(i),
+            U256::from(i),
+            i.into(),
+            None,
+            U256::from(i),
+            Vec::new(),
+            vec![],
+            Some(new_sig_unsafe(
                 (36 + i * 2).into(), // need to be consistent with chain_id
                 H256::from([i; 32]),
                 H256::from([i; 32]),
             )),
-        }
+        )
     }
 
     fn dummy_tx_eth(i: u8) -> Transaction {
@@ -468,7 +475,6 @@ mod tests {
     fn dummy_tx_deposit(i: u8) -> Transaction {
         let deposit = Deposit {
             amount: U256::from(i),
-            gas_price: U256::from(i),
             receiver: H160::from([i; 20]),
         };
         Transaction {
@@ -487,14 +493,15 @@ mod tests {
             index: 4,
             gas_price: U256::from(5),
             parent_hash: H256::from([5; 32]),
-            estimated_ticks: 99,
+            estimated_ticks_in_block: 99,
+            estimated_ticks_in_run: 199,
             logs_bloom: Bloom::default(),
             logs_offset: 33,
             timestamp: Timestamp::from(0i64),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9025e2af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00505050505050505050505050505050505050505050505050505050505050505b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021880000000000000000";
+        let expected = "f9025f2af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021880000000000000000";
 
         assert_eq!(hex::encode(encoded), expected);
 
@@ -503,9 +510,9 @@ mod tests {
         let decoded =
             BlockInProgress::decode(&decoder).expect("Should have decoded data");
 
-        // the estimated ticks are not stored
+        // the estimated ticks in the current run are not stored
         let fresh_bip = BlockInProgress {
-            estimated_ticks: 0,
+            estimated_ticks_in_run: 0,
             ..bip
         };
         assert_eq!(decoded, fresh_bip);
@@ -521,14 +528,15 @@ mod tests {
             index: 4,
             gas_price: U256::from(5),
             parent_hash: H256::from([5; 32]),
-            estimated_ticks: 99,
+            estimated_ticks_in_block: 99,
+            estimated_ticks_in_run: 199,
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp: Timestamp::from(0i64),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f901f22af87af83ba00101010101010101010101010101010101010101010101010101010101010101d902d70101940101010101010101010101010101010101010101f83ba00808080808080808080808080808080808080808080808080808080808080808d902d70808940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00505050505050505050505050505050505050505050505050505050505050505b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080880000000000000000";
+        let expected = "f901f12af878f83aa00101010101010101010101010101010101010101010101010101010101010101d802d601940101010101010101010101010101010101010101f83aa00808080808080808080808080808080808080808080808080808080808080808d802d608940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080880000000000000000";
 
         assert_eq!(hex::encode(encoded), expected);
 
@@ -537,9 +545,9 @@ mod tests {
         let decoded =
             BlockInProgress::decode(&decoder).expect("Should have decoded data");
 
-        // the estimated ticks are not stored
+        // the estimated ticks in the current run are not stored
         let fresh_bip = BlockInProgress {
-            estimated_ticks: 0,
+            estimated_ticks_in_run: 0,
             ..bip
         };
         assert_eq!(decoded, fresh_bip);
@@ -555,14 +563,15 @@ mod tests {
             index: 4,
             gas_price: U256::from(5),
             parent_hash: H256::from([5; 32]),
-            estimated_ticks: 99,
+            estimated_ticks_in_block: 99,
+            estimated_ticks_in_run: 199,
             logs_bloom: Bloom::default(),
             logs_offset: 4,
             timestamp: Timestamp::from(0i64),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f902282af8b0f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ba00808080808080808080808080808080808080808080808080808080808080808d902d70808940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00505050505050505050505050505050505050505050505050505050505050505b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004880000000000000000";
+        let expected = "f902282af8aff871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83aa00808080808080808080808080808080808080808080808080808080808080808d802d608940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004880000000000000000";
 
         assert_eq!(hex::encode(encoded), expected);
 
@@ -571,9 +580,9 @@ mod tests {
         let decoded =
             BlockInProgress::decode(&decoder).expect("Should have decoded data");
 
-        // the estimated ticks are not stored
+        // the estimated ticks in the run are not stored
         let fresh_bip = BlockInProgress {
-            estimated_ticks: 0,
+            estimated_ticks_in_run: 0,
             ..bip
         };
         assert_eq!(decoded, fresh_bip);

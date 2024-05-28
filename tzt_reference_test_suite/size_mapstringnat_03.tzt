@@ -1,0 +1,3 @@
+code { SIZE } ;
+input { Stack_elt (map string nat) { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 ; Elt "d" 1 ; Elt "e" 2 ; Elt "f" 3 } } ;
+output { Stack_elt nat 6 }

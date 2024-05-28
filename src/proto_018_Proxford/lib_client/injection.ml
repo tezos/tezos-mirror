@@ -625,7 +625,7 @@ let signature_size_of_algo : Signature.algo -> int = function
       Signature.Bls.size + 2
 
 (* This value is used as a safety guard for gas limit. *)
-let safety_guard = Gas.Arith.(integral_of_int_exn 100)
+let default_safety_guard = Gas.Arith.(integral_of_int_exn 100)
 
 (*
 
@@ -652,7 +652,7 @@ let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 
 let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     ~fee_parameter ~signature_algo ~chain ~block ?successor_level ?branch
-    ?(force = false) ?(simulation = false)
+    ?(force = false) ?(simulation = false) ?safety_guard
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
     kind Kind.manager contents_list tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -866,13 +866,16 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                        (Limit.known Gas.Arith.zero)
                        op)
                 else
-                  let safety_guard =
+                  let default_safety_guard =
                     match c.operation with
                     | Transaction {destination = Implicit _; _}
                     | Reveal _ | Delegation _ | Set_deposits_limit _
                     | Increase_paid_storage _ ->
                         Gas.Arith.zero
-                    | _ -> safety_guard
+                    | _ -> default_safety_guard
+                  in
+                  let safety_guard =
+                    Option.value safety_guard ~default:default_safety_guard
                   in
                   let*! () =
                     cctxt#message
@@ -1467,9 +1470,9 @@ let rec build_contents :
         return (Annotated_manager_operation.Cons_manager (op, rest))
 
 let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
-    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ~source
-    ~(src_pk : public_key) ~src_sk ~fee ~gas_limit ~storage_limit ?counter
-    ?(replace_by_fees = false) ~fee_parameter (type kind)
+    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ?safety_guard
+    ~source ~(src_pk : public_key) ~src_sk ~fee ~gas_limit ~storage_limit
+    ?counter ?(replace_by_fees = false) ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
     * packed_operation
@@ -1540,6 +1543,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
             ~block
             ?force
             ?simulation
+            ?safety_guard
             ?successor_level
             ?branch
             contents
@@ -1589,6 +1593,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
             ~block
             ?force
             ?simulation
+            ?safety_guard
             ?successor_level
             ?branch
             contents

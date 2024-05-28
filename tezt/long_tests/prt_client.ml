@@ -57,6 +57,7 @@ let client_load_time ~executors () =
     ~title:load_time
     ~tags:["client"; "load"]
     ~timeout:(Minutes 2)
+    ~uses_node:true
     ~executors
   @@ fun () ->
   let client = Client.create () in
@@ -68,6 +69,7 @@ let get_blocks_response_time ~executors ~protocol =
     ~title:response_time_test
     ~tags:["rpc"]
     ~timeout:(Seconds 20)
+    ~uses_node:true
     ~executors
   @@ fun () ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in

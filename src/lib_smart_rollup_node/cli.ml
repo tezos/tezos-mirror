@@ -29,6 +29,12 @@ let force_switch : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Overwrites the configuration file when it exists."
     ()
 
+let import_force_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"force"
+    ~doc:"Import into an already populated data dir."
+    ()
+
 let sc_rollup_address_param x =
   Smart_rollup_alias.Address.param
     ~name:"smart-rollup-address"
@@ -50,9 +56,11 @@ let operator_param next =
     Format.asprintf
       "Public key hash, or alias, of a smart rollup node operator. An operator \
        can be specialized to a particular purpose by prefixing its key or \
-       alias by said purpose, e.g. operating:alias_of_my_operator. The \
+       alias by said purpose, e.g. operating:<alias_of_my_operator>. The \
        possible purposes are: @[<h>%a@]."
-      (Format.pp_print_list Purpose.pp_ex_purpose)
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+         Purpose.pp_ex_purpose)
       Purpose.all
   in
   let parse_default cctxt s =
@@ -118,6 +126,18 @@ let dal_node_endpoint_arg =
           downloads slots. When not provided, the rollup node will not support \
           the DAL. In production, a DAL node must be provided if DAL is \
           enabled and used in the rollup.")
+    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         Lwt.return_ok (Uri.of_string s)))
+
+let pre_images_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"pre-images-endpoint"
+    ~placeholder:"url"
+    ~doc:
+      (Format.sprintf
+         "The address of a service which provides pre-images for the rollup. \
+          Missing pre-images will be downloaded remotely if they are not \
+          already present on disk.")
     (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
          Lwt.return_ok (Uri.of_string s)))
 
@@ -203,6 +223,23 @@ struct
            binary_name
            default)
       int_parameter
+
+  let acl_override_arg : ([`Allow_all | `Secure] option, _) Tezos_clic.arg =
+    Tezos_clic.arg
+      ~long:"acl-override"
+      ~placeholder:"kind"
+      ~doc:
+        "Specify a different ACL for the rpc server to override the default \
+         one. Possible values are 'secure' and 'allow-all'"
+      (Tezos_clic.parameter (fun (_cctxt : Client_context.full) ->
+           let open Lwt_result_syntax in
+           function
+           | "secure" -> return `Secure
+           | "allow-all" | "allow_all" -> return `Allow_all
+           | _ ->
+               failwith
+                 "Bad value for acl-override, possible values are 'secure' and \
+                  'allow-all'"))
 
   let data_dir_arg =
     let default = Configuration.default_data_dir in
@@ -406,6 +443,42 @@ let snapshot_dir_arg =
        directory)"
     string_parameter
 
+let snapshot_file_param next =
+  Tezos_clic.param
+    ~name:"snapshot_file"
+    ~desc:"Snapshot archive file"
+    string_parameter
+    next
+
+let no_checks_arg : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"no-check"
+    ~doc:"Don't check integrity of the snapshot."
+    ()
+
+let compress_on_the_fly_arg : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"compress-on-the-fly"
+    ~doc:
+      "Produce a compressed snapshot on the fly. The rollup node will use less \
+       disk space to produce the snapshot but will lock the rollup node (if \
+       running) for a longer time. Without this option, producing a snaphsot \
+       requires the available disk space to be around the size of the data \
+       dir."
+    ()
+
+let uncompressed : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"uncompressed"
+    ~doc:"Produce an uncompressed snapshot."
+    ()
+
+let compact : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"compact"
+    ~doc:"Produce a compact snapshot with a single commit for the context."
+    ()
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in
@@ -424,3 +497,25 @@ let cors_allowed_origins_arg =
     ~placeholder:"ALLOWED_ORIGINS"
     ~doc:"List of accepted cors origins."
     string_list
+
+let protocol_hash_parameter =
+  Tezos_clic.parameter (fun (_cctxt : Client_context.full) p ->
+      Lwt.return (Protocol_hash.of_b58check p))
+
+let protocol_hash_arg =
+  Tezos_clic.arg
+    ~long:"protocol"
+    ~short:'P'
+    ~placeholder:"Proto"
+    ~doc:
+      "Protocol hash in base58-check. If not provided, the export will be for \
+       the last registered protocol in the rollup node which may be different \
+       between different versions of the node."
+    protocol_hash_parameter
+
+let apply_unsafe_patches_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"apply-unsafe-patches"
+    ~doc:
+      "Apply unsafe PVM patches in the configuration or hardcoded by the node."
+    ()

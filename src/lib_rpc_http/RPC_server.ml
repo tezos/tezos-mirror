@@ -95,8 +95,10 @@ module Acl = struct
           List.map
             parse
             [
-              (* Protocol RPCs *)
+              "GET /chains/*/blocks";
               "GET /chains/*/blocks/*";
+              "GET /chains/*/chain_id";
+              "GET /chains/*/checkpoint";
               "GET /chains/*/blocks/*/context/adaptive_issuance_launch_cycle";
               "GET /chains/*/blocks/*/context/big_maps/*/*";
               "GET /chains/*/blocks/*/context/cache/**";
@@ -132,17 +134,12 @@ module Acl = struct
               "GET /chains/*/blocks/*/protocols";
               "GET /chains/*/blocks/*/resulting_context_hash";
               "GET /chains/*/blocks/*/votes/**";
-              "GET /chains/*/mempool/filter";
-              "GET /chains/*/mempool/pending_operations";
-              "POST /chains/*/blocks/*/context/seed";
-              (* Shell RPCs *)
-              "GET /chains/*/blocks";
-              "GET /chains/*/chain_id";
-              "GET /chains/*/checkpoint";
               "GET /chains/*/invalid_blocks";
               "GET /chains/*/invalid_blocks/*";
               "GET /chains/*/is_bootstrapped";
               "GET /chains/*/levels/*";
+              "GET /chains/*/mempool/filter";
+              "GET /chains/*/mempool/pending_operations";
               "GET /config/history_mode";
               "GET /config/network/user_activated_protocol_overrides";
               "GET /config/network/user_activated_upgrades";
@@ -154,6 +151,7 @@ module Acl = struct
               "GET /protocols/*/environment";
               "GET /version";
               "POST /chains/*/blocks/*/context/contracts/*/big_map_get";
+              "POST /chains/*/blocks/*/context/seed";
               "POST /injection/operation";
             ];
       }
@@ -307,8 +305,49 @@ module Acl = struct
     Internal_for_test.resolve_domain_names resolve
 end
 
-let launch ?host server ?conn_closed ?callback ?(max_active_connections = 100)
-    mode =
+module Max_active_rpc_connections = struct
+  type t = Unlimited | Limited of int
+
+  let default = Limited 100
+
+  let encoding =
+    let open Data_encoding in
+    def
+      "max_active_rpc_connections"
+      ~title:"max_active_rpc_connections"
+      ~description:"The maximum alowed number of RPC connections"
+      (union
+         ~tag_size:`Uint8
+         [
+           case
+             ~title:"unlimited"
+             ~description:
+               "There is not limit of the number of RPC connections allowed."
+             (Tag 0)
+             (constant "unlimited")
+             (function Unlimited -> Some () | _ -> None)
+             (fun () -> Unlimited);
+           case
+             ~title:"limited"
+             ~description:
+               "The number of maximum RPC connections allowed is limited to \
+                the given integer's value."
+             (Tag 1)
+             int31
+             (function Limited i -> Some i | _ -> None)
+             (fun i -> Limited i);
+         ])
+
+  let pp_parameter ppf = function
+    | Unlimited -> Format.fprintf ppf "unlimited"
+    | Limited limit -> Format.fprintf ppf "%l" limit
+end
+
+let launch ?host server ?conn_closed ?callback
+    ?(max_active_connections = Max_active_rpc_connections.default) mode =
   (* TODO: backport max_active_connections in resto *)
-  Conduit_lwt_unix.set_max_active max_active_connections ;
+  (match max_active_connections with
+  | Unlimited -> ()
+  | Limited max_active_connections ->
+      Conduit_lwt_unix.set_max_active max_active_connections) ;
   launch ?host server ?conn_closed ?callback mode

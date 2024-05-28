@@ -23,11 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type head_info = {
-  proto : int; (* the [proto_level] from the head's shell header *)
-  level : int32;
-}
-
 (** A [ready_ctx] value contains globally needed informations for a running dal
     node. It is available when both cryptobox is initialized and the plugin
     for dal has been loaded.
@@ -39,10 +34,14 @@ type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   plugin_proto : int;  (** Protocol level of the plugin. *)
-  last_seen_head : head_info option;
-      (** The level of the last seen head of the L1 node. *)
+  last_processed_level : int32 option;
+  skip_list_cells_store : Skip_list_cells_store.t;
+  mutable ongoing_amplifications : Types.Slot_id.Set.t;
+      (** The slot identifiers of the commitments currently being
+     amplified. This set is used to prevent concurrent amplifications
+     of the same slot. *)
 }
 
 (** The status of the dal node *)
@@ -68,29 +67,30 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt dal_plugin cryptobox proto_parameters plugin_proto] updates
-    in place the status value to [Ready], and initializes the inner [ready_ctxt]
-    value with the given parameters.
+(** [set_ready ctxt dal_plugin skip_list_cells_store cryptobox proto_parameters
+    plugin_proto] updates in place the status value to [Ready], and initializes
+    the inner [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  (module Tezos_dal_node_lib.Dal_plugin.T) ->
+  (module Dal_plugin.T) ->
+  Skip_list_cells_store.t ->
   Cryptobox.t ->
+  Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
   int ->
   unit tzresult
 
 (** Updates the plugin and the protocol level. *)
-val update_plugin_in_ready :
-  t -> (module Tezos_dal_node_lib.Dal_plugin.T) -> int -> unit
+val update_plugin_in_ready : t -> (module Dal_plugin.T) -> int -> unit
 
 type error += Node_not_ready
 
-(** Updates the [last_seen_head] field of the "ready context" with the given
-    info.  Assumes the node's status is ready. Otherwise it returns
+(** Updates the [last_processed_level] field of the "ready context" with the given
+    info. Assumes the node's status is ready. Otherwise it returns
     [Node_not_ready]. *)
-val update_last_seen_head : t -> head_info -> unit tzresult
+val update_last_processed_level : t -> level:int32 -> unit tzresult
 
 (** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
     propagates [Node_not_ready] if status is not ready yet. If called multiple
@@ -100,8 +100,13 @@ val get_ready : t -> ready_ctxt tzresult
 (** [get_profile_ctxt ctxt] returns the profile context.  *)
 val get_profile_ctxt : t -> Profile_manager.t
 
-(** [set_profile_ctxt ctxt pctxt] sets the profile context.  *)
-val set_profile_ctxt : t -> Profile_manager.t -> unit
+(** [load_profile_ctxt ctxt] tries to load the profile context from disk. *)
+val load_profile_ctxt : t -> Profile_manager.t option Lwt.t
+
+(** [set_profile_ctxt ctxt ?save pctxt] sets the profile context. If [save] is
+    set, which is [true] by default, the profile context is saved on
+    disk. *)
+val set_profile_ctxt : t -> ?save:bool -> Profile_manager.t -> unit Lwt.t
 
 (** [get_config ctxt] returns the dal node configuration *)
 val get_config : t -> Configuration_file.t
@@ -120,6 +125,11 @@ val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
+
+(** [next_shards_level_to_gc ctxt ~current_level] returns the oldest
+    level that should have shards stored; during [current_level], shards for
+    commitments published at this level will be removed *)
+val next_shards_level_to_gc : t -> current_level:int32 -> int32
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL
@@ -214,6 +224,14 @@ module P2P : sig
   (** [get_peer_info t peer] returns the info of the corresponding peer if found. *)
   val get_peer_info :
     t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult Lwt.t
+
+  (** [patch_peer t peer acl] patches the acl of the given peer and
+      returns the info of the corresponding peer if found. *)
+  val patch_peer :
+    t ->
+    P2p_peer.Id.t ->
+    [`Ban | `Open | `Trust] option ->
+    Types.P2P.Peer.Info.t option tzresult Lwt.t
 
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)

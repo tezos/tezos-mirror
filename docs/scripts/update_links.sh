@@ -17,26 +17,26 @@ if ! [ -f $trace_file ]; then
 fi
 
 regesc_pattern() {
-    printf "%s\n" "$1" | sed -e 's/\([][\/.*|]\)/\\&/g'
+  printf "%s\n" "$1" | sed -e 's/\([][\/.*|]\)/\\&/g'
 }
 
 # developer/snoop_example.rst:12: [redirected permanently] https://github.com/project-everest/hacl-star to https://github.com/hacl-star/hacl-star
 # user/snapshots.rst:198: [redirected with Found] https://mainnet.xtz-shots.io/ to https://xtz-shots.io/mainnet/
 grep -o '^[^/].*:[0-9][0-9]*: .*redirected.*' "$trace_file" | while read -r redirect; do
-    pattern="^\([^:]*\):\([0-9][0-9]*\): .*redirected.*\(http[^ ]*\).*\(http[^ ]*\).*";
+  pattern="^\([^:]*\):\([0-9][0-9]*\): .*redirected.*\(http[^ ]*\).*\(http[^ ]*\).*"
 
-    file=$(echo "$redirect" | sed "s@${pattern}@\1@");
-    line=$(echo "$redirect" | sed "s@${pattern}@\2@");
-    prev=$(echo "$redirect" | sed "s@${pattern}@\3@");
-    next=$(echo "$redirect" | sed "s@${pattern}@\4@");
+  file=$(echo "$redirect" | sed "s@${pattern}@\1@")
+  line=$(echo "$redirect" | sed "s@${pattern}@\2@")
+  prev=$(echo "$redirect" | sed "s@${pattern}@\3@")
+  next=$(echo "$redirect" | sed "s@${pattern}@\4@")
 
-    echo "Replacing '$prev' with '$next' on line '$line' of '$file'"
-    sed "s/$(regesc_pattern "$prev")/$(regesc_pattern "$next")/" "$file" > "$file.fixed";
+  echo "Replacing '$prev' with '$next' on line '$line' of '$file'"
+  sed "s/$(regesc_pattern "$prev")/$(regesc_pattern "$next")/" "$file" > "$file.fixed"
 
-    if diff -q "$file" "$file.fixed" > /dev/null ; then
-        echo "No replacement was made"
-        rm -f "$file.fixed"
-    else
-        mv "$file.fixed" "$file"
-    fi
+  if diff -q "$file" "$file.fixed" > /dev/null; then
+    echo "No replacement was made"
+    rm -f "$file.fixed"
+  else
+    mv "$file.fixed" "$file"
+  fi
 done

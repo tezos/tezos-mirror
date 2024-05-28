@@ -172,47 +172,6 @@ module Encodings = struct
 end
 
 module Query = struct
-  let outbox_proof_query =
-    let open Tezos_rpc.Query in
-    let open Sc_rollup in
-    let invalid_message e =
-      raise
-        (Invalid
-           (Format.asprintf
-              "Invalid message (%a)"
-              Environment.Error_monad.pp_trace
-              e))
-    in
-    query (fun outbox_level message_index serialized_outbox_message ->
-        let req name f = function
-          | None ->
-              raise
-                (Invalid (Format.sprintf "Query parameter %s is required" name))
-          | Some arg -> f arg
-        in
-        let outbox_level =
-          req "outbox_level" Raw_level.of_int32_exn outbox_level
-        in
-        let message_index = req "message_index" Z.of_int64 message_index in
-        let message =
-          req
-            "serialized_outbox_message"
-            (fun s -> Outbox.Message.(unsafe_of_string s |> deserialize))
-            serialized_outbox_message
-        in
-        match message with
-        | Error e -> invalid_message e
-        | Ok message -> {outbox_level; message_index; message})
-    |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
-           Some (Raw_level.to_int32 o.outbox_level))
-    |+ opt_field "message_index" Tezos_rpc.Arg.int64 (fun o ->
-           Some (Z.to_int64 o.message_index))
-    |+ opt_field "serialized_outbox_message" Tezos_rpc.Arg.string (fun o ->
-           match Outbox.Message.serialize o.message with
-           | Ok message -> Some (Outbox.Message.unsafe_to_string message)
-           | Error e -> invalid_message e)
-    |> seal
-
   type key_query = {key : string}
 
   let key_query : key_query Tezos_rpc.Query.t =
@@ -434,17 +393,6 @@ module Block = struct
     type nonrec prefix = prefix
 
     let path = path / "helpers"
-
-    let outbox_proof =
-      Tezos_rpc.Service.get_service
-        ~description:"Generate serialized output proof for some outbox message"
-        ~query:Query.outbox_proof_query
-        ~output:
-          Data_encoding.(
-            obj2
-              (req "commitment" Sc_rollup.Commitment.Hash.encoding)
-              (req "proof" Encodings.hex_string))
-        (path / "proofs" / "outbox")
 
     let outbox_proof_simple =
       Tezos_rpc.Service.get_service

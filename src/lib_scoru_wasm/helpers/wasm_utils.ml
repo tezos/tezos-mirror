@@ -137,12 +137,18 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
   let reveal_builtins _reveal =
     Stdlib.failwith "reveals are not available out of the box in tests"
 
-  let eval_until_stuck ?(reveal_builtins = reveal_builtins) ?write_debug
-      ?(max_steps = 20000L) tree =
+  let eval_until_stuck ?(wasm_entrypoint = Constants.wasm_entrypoint)
+      ?(reveal_builtins = reveal_builtins) ?write_debug ?(max_steps = 20000L)
+      tree =
     let open Lwt.Syntax in
     let rec go counter tree =
       let* tree, _ =
-        Wasm.compute_step_many ~reveal_builtins ?write_debug ~max_steps tree
+        Wasm.compute_step_many
+          ~wasm_entrypoint
+          ~reveal_builtins
+          ?write_debug
+          ~max_steps
+          tree
       in
       let* stuck = Wasm.Internal_for_tests.is_stuck tree in
       match stuck with
@@ -156,12 +162,14 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
   (* This function relies on the invariant that `compute_step_many` will always
      stop at a Snapshot or an input request, and never start another
      `kernel_run`. *)
-  let rec eval_to_snapshot ?(reveal_builtins = reveal_builtins) ?write_debug
+  let rec eval_to_snapshot ?(wasm_entrypoint = Constants.wasm_entrypoint)
+      ?(reveal_builtins = reveal_builtins) ?write_debug
       ?(max_steps = Int64.max_int) tree =
     let open Lwt_syntax in
     let eval tree =
       let* tree, _ =
         Wasm.compute_step_many
+          ~wasm_entrypoint
           ~reveal_builtins
           ?write_debug
           ~stop_at_snapshot:true
@@ -171,7 +179,13 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
       let* state = Wasm.Internal_for_tests.get_tick_state tree in
       match state with
       | Snapshot | Collect -> return tree
-      | _ -> eval_to_snapshot ~max_steps ~reveal_builtins ?write_debug tree
+      | _ ->
+          eval_to_snapshot
+            ~wasm_entrypoint
+            ~max_steps
+            ~reveal_builtins
+            ?write_debug
+            tree
     in
     let* info = Wasm.get_info tree in
     match info.input_request with
@@ -182,15 +196,16 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
   (** [eval_until_input_requested tree] will either
     - return tree if input is required
     - or run compute_step_many to reach a point where input is required *)
-  let eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
-      ?write_debug ?after_fast_exec ?(fast_exec = false)
-      ?(max_steps = Int64.max_int) tree =
+  let eval_until_input_requested ?(wasm_entrypoint = Constants.wasm_entrypoint)
+      ?(reveal_builtins = Some reveal_builtins) ?write_debug ?after_fast_exec
+      ?(fast_exec = false) ?(max_steps = Int64.max_int) tree =
     let open Lwt_syntax in
     let run =
       if fast_exec then
         Wasm_fast.Internal_for_tests.compute_step_many_with_hooks
+          ~wasm_entrypoint
           ?after_fast_exec
-      else Wasm.compute_step_many
+      else Wasm.compute_step_many ~wasm_entrypoint
     in
     let* info = Wasm.get_info tree in
     match info.input_request with
@@ -319,7 +334,7 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
   let set_empty_inbox_step ?migrate_to level tree =
     set_full_input_step ?migrate_to [] level tree
 
-  let rec eval_until_init tree =
+  let rec eval_until_init ?(wasm_entrypoint = Constants.wasm_entrypoint) tree =
     let open Lwt_syntax in
     let* state_after_first_message =
       Wasm.Internal_for_tests.get_tick_state tree
@@ -327,13 +342,14 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
     match state_after_first_message with
     | Stuck _ | Init _ -> return tree
     | _ ->
-        let* tree = Wasm.compute_step tree in
+        let* tree = Wasm.compute_step ~wasm_entrypoint tree in
         eval_until_init tree
 
   (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
-  let eval_to_result ?write_debug ?reveal_builtins tree =
+  let eval_to_result ?(wasm_entrypoint = Constants.wasm_entrypoint) ?write_debug
+      ?reveal_builtins tree =
     let open Lwt_syntax in
     let should_compute pvm_state =
       let+ input_request_val = Wasm_vm.get_info pvm_state in
@@ -359,6 +375,7 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
       Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
     in
     Wasm.Internal_for_tests.compute_step_many_until
+      ~wasm_entrypoint
       ?write_debug
       ?reveal_builtins
       ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)

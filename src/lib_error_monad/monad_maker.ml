@@ -107,48 +107,6 @@ module type S = sig
 
   val classify_trace : tztrace -> Error_classification.t
 
-  module Legacy_monad_globals : sig
-    val return : 'a -> ('a, 'e) result Lwt.t
-
-    val return_unit : (unit, 'e) result Lwt.t
-
-    val return_none : ('a option, 'e) result Lwt.t
-
-    val return_some : 'a -> ('a option, 'e) result Lwt.t
-
-    val return_nil : ('a list, 'e) result Lwt.t
-
-    val return_true : (bool, 'e) result Lwt.t
-
-    val return_false : (bool, 'e) result Lwt.t
-
-    val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-    val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
-
-    val ok : 'a -> ('a, 'e) result
-
-    val error : 'e -> ('a, 'e trace) result
-
-    val ( >>? ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-
-    val ( >|? ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
-
-    val fail : 'e -> ('a, 'e trace) result Lwt.t
-
-    val ( >>=? ) :
-      ('a, 'e) result Lwt.t ->
-      ('a -> ('b, 'e) result Lwt.t) ->
-      ('b, 'e) result Lwt.t
-
-    val ( >|=? ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
-
-    val ( >>?= ) :
-      ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
-
-    val ( >|?= ) : ('a, 'e) result -> ('a -> 'b Lwt.t) -> ('b, 'e) result Lwt.t
-  end
-
   val pp_print_trace : Format.formatter -> tztrace -> unit
 
   val pp_print_top_error_of_trace : Format.formatter -> tztrace -> unit
@@ -233,35 +191,6 @@ struct
     let tzall = Monad.Lwt_traced_result_syntax.all
 
     let tzjoin = Monad.Lwt_traced_result_syntax.join
-  end
-
-  module Legacy_monad_globals = struct
-    (* we default to exposing the combined monad syntax everywhere.
-       We do the bulk of this by including [Lwt_traced_result_syntax] directly. *)
-    include Monad.Lwt_traced_result_syntax
-
-    (* Some globals that Lwtreslib does not expose but that the Tezos code uses a
-       lot. *)
-    let ( >>= ) = Monad.Lwt_syntax.( let* )
-
-    let ( >|= ) = Monad.Lwt_syntax.( let+ )
-
-    let ( >>? ) = Monad.Result_syntax.( let* )
-
-    let ( >|? ) = Monad.Result_syntax.( let+ )
-
-    let ok = Monad.Result_syntax.return
-
-    let error = Monad.Traced_result_syntax.fail
-
-    let ( >>=? ) = Monad.Lwt_result_syntax.( let* )
-
-    let ( >|=? ) = Monad.Lwt_result_syntax.( let+ )
-
-    let ( >>?= ) = Monad.Lwt_result_syntax.( let*? )
-
-    let ( >|?= ) r f =
-      match r with Error _ as e -> Lwt.return e | Ok o -> Lwt_result.ok (f o)
   end
 
   (* default (traced-everywhere) helper types *)

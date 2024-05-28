@@ -1,14 +1,61 @@
 include:
+  # Stage: sanity
+  - .gitlab/ci/jobs/sanity/sanity_ci.yml
+  - .gitlab/ci/jobs/sanity/docker:hadolint-schedule_extended_test.yml
+
   # Stage: build
-  - .gitlab/ci/jobs/build/arm64.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-released-scheduled_extended_test.yml
+  # Check that binary packages build
+  - .gitlab/ci/jobs/build/oc.build:rpm:amd64.yml
+  - .gitlab/ci/jobs/build/oc.build:dpkg:amd64.yml
+  - .gitlab/ci/jobs/build/select_tezts.yml
+
+  # These jobs are necessary to run flaky tezts
+  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-released-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_kernels-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.tezt:fetch-records-scheduled_extended_test.yml
+
+  # These jobs may not have been run in before_merging pipeline
+  # because of absence of certain changes
+  - .gitlab/ci/jobs/build/ocaml-check-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/doc/documentation.yml
 
   # Stage: packaging
-  - .gitlab/ci/jobs/packaging/opam_prepare.yml
+  - .gitlab/ci/jobs/packaging/opam:prepare-scheduled_extended_test.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/install_octez.yml
+  - .gitlab/ci/jobs/test/install_octez-scheduled_extended_test.yml
+  # Flaky tezts
+  - .gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml
+  # Slow tezts
+  - .gitlab/ci/jobs/test/tezt-slow-schedule_extended_test.yml
+  # Tests that may not have been run in before_merging pipeline
+  # because of absence of certain changes
+  - .gitlab/ci/jobs/test/kaitai_checks-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/kaitai_e2e_checks-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.misc_checks-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/misc_opam_checks-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.semgrep-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.unit-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.integration:compiler-rejections-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:b58_prefix-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/tezt.yml
+  - .gitlab/ci/jobs/test/test_kernels.yml
+  - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml
+  - .gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml
+  - .gitlab/ci/jobs/test/test_evm_compatibility.yml
 
   # Stage: doc
-  - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/test_install_python.yml
+  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
+  - .gitlab/ci/jobs/doc/oc.install_python.yml

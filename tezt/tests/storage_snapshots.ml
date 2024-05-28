@@ -43,16 +43,23 @@ let pp_snapshot_history_mode fmt v =
     | Node.Rolling_history -> "rolling"
     | Node.Full_history -> "full")
 
-let get_constants client =
+let get_constants ~protocol client =
   let* constants =
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
-  let preserved_cycles = JSON.(constants |-> "preserved_cycles" |> as_int) in
+  let blocks_preservation_cycles =
+    let v =
+      if Protocol.number protocol > Protocol.number Protocol.Oxford then
+        "blocks_preservation_cycles"
+      else "preserved_cycles"
+    in
+    JSON.(constants |-> v |> as_int)
+  in
   let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
   let max_op_ttl =
     JSON.(constants |-> "max_operations_time_to_live" |> as_int)
   in
-  return (preserved_cycles, blocks_per_cycle, max_op_ttl)
+  return (blocks_preservation_cycles, blocks_per_cycle, max_op_ttl)
 
 let export_snapshot node ~export_level ~snapshot_dir ~history_mode
     ~export_format =
@@ -161,7 +168,7 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
     match history_mode with
     | Node.Full_history ->
         iter_block_range_s 1 (savepoint - 1) @@ expect_no_metadata
-    | _ ->
+    | Node.Rolling_history ->
         if caboose <> 0 then
           iter_block_range_s 1 (caboose - 1) @@ expect_no_block
         else unit
@@ -243,6 +250,20 @@ let export_import_and_check node ~export_level ~history_mode ~export_format
   let* () = Node.terminate final_node in
   unit
 
+let wait_for_complete_merge node target =
+  let wait_for_starting_merge target =
+    let filter json =
+      let level = JSON.(json |-> "stop" |> as_int) in
+      if level = target then Some () else None
+    in
+    Node.wait_for node "start_cementing_blocks.v0" filter
+  in
+  let wait_for_ending_merge () =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
+  in
+  let* () = wait_for_starting_merge target in
+  wait_for_ending_merge ()
+
 (* This test aims to:
    - start 3 nodes: an archive, a full and a rolling one,
    - bake few blocks using the archive node as a baker,
@@ -255,7 +276,7 @@ let test_export_import_snapshots =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot export and import"
-    ~tags:["storage"; "snapshot"; "export"; "import"; Tag.memory_4k]
+    ~tags:["storage"; "snapshot"; "export"; "import"; Tag.memory_4k; Tag.layer1]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -277,17 +298,29 @@ let test_export_import_snapshots =
   let* () = Cluster.start ~public:true cluster in
   let* client = Client.init ~endpoint:(Node archive_node) () in
   let* () = Client.activate_protocol_and_wait ~protocol client in
-  let* preserved_cycles, blocks_per_cycle, max_op_ttl = get_constants client in
+  let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
+    get_constants ~protocol client
+  in
   (* Bake enough blocks so that the rolling node caboose is not at the
      genesis anymore. To do so, we need to bake at least 3 cycles,
      after activating the protocol, i.e 3*8 = 24 blocks. *)
-  let blocks_to_bake = (preserved_cycles + 1) * blocks_per_cycle in
+  let blocks_to_bake = (blocks_preservation_cycles + 1) * blocks_per_cycle in
+  let archive_level = blocks_to_bake + 1 in
+  (* Waiting for merges the second merge of the scenario, i.e, the
+     second cycle (starting at blocks_per_cycle + 1). *)
+  let await_merges =
+    List.map
+      (fun node -> wait_for_complete_merge node (blocks_per_cycle + 1))
+      cluster
+  in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
-  let* archive_level = Node.get_level archive_node in
   let* () = sync_all_nodes cluster archive_level in
   (* Terminate all nodes to save resources. Note: we may consider
      that exporting a snapshot from a node that is running is an
      actual usecase (such exports are already done in other tests). *)
+  let* (_ : unit list) =
+    Lwt_list.map_p (fun p -> Lwt.bind p (fun () -> unit)) await_merges
+  in
   let* () = Lwt_list.iter_p Node.terminate cluster in
   let export_import_and_check =
     export_import_and_check ~max_op_ttl ~export_level:archive_level
@@ -316,7 +349,7 @@ let test_drag_after_rolling_import =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot drag after rolling import"
-    ~tags:["storage"; "snapshot"; "drag"; "rolling"; "import"]
+    ~tags:["storage"; "snapshot"; "drag"; "rolling"; "import"; Tag.layer1]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -337,7 +370,16 @@ let test_drag_after_rolling_import =
   let* () = Cluster.start ~public:true cluster in
   let* client = Client.init ~endpoint:(Node archive_node) () in
   let* () = Client.activate_protocol_and_wait ~protocol client in
-  let* preserved_cycles, blocks_per_cycle, max_op_ttl = get_constants client in
+  let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
+    get_constants ~protocol client
+  in
+  let finalized_block_distance =
+    match protocol with
+    | Oxford ->
+        (* Conservative TB finality *)
+        blocks_preservation_cycles * blocks_per_cycle
+    | Alpha | Paris -> (* TB finality *) 2
+  in
   Log.info "Baking a few blocks"
   (* Baking enough blocks so that the caboose is not the genesis
      anymore (depending on the max_op_ttl)*) ;
@@ -357,6 +399,8 @@ let test_drag_after_rolling_import =
       ~history_mode
       ~export_format:Node.Tar
   in
+  (* Kill the rolling node as it is not useful anymore. *)
+  let* () = Node.terminate rolling_node in
   let fresh_node_name =
     Format.asprintf
       "%a_node_from_%s"
@@ -369,11 +413,15 @@ let test_drag_after_rolling_import =
       ~name:fresh_node_name
       ~snapshot:(snapshot_dir // filename, false)
       node_arguments
+      ~event_sections_levels:[("node.store", `Info)]
   in
   (* Baking a few blocks so that the caboose is not the genesis
-     anymore. *)
+     anymore. We subtract 1 to stop just before the end of a cycle,
+     and thus, the trigger of a merge. It allows to make the test more
+     deterministic and avoids missing the trigger of a merge as the
+     previous one might not be finished yet. *)
   let blocks_to_bake =
-    (preserved_cycles + additional_cycles) * blocks_per_cycle
+    ((blocks_preservation_cycles + additional_cycles) * blocks_per_cycle) - 1
   in
   let expected_checkpoint, expected_savepoint, expected_caboose =
     (export_level, export_level, max 0 (export_level - max_op_ttl))
@@ -395,30 +443,63 @@ let test_drag_after_rolling_import =
       ~caboose:expected_caboose
   in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
+  let* last_head = Node.get_level archive_node in
+  (* Expected head after the final bake. *)
+  let final_head = last_head + 1 in
   let* () = Client.Admin.connect_address ~peer:fresh_node client in
-  let* expected_head = Node.get_level archive_node in
-  let* (_ : int) = Node.wait_for_level fresh_node expected_head in
+  let* (_ : int) = Node.wait_for_level fresh_node last_head in
+  (* Restart fresh not to make sure that all the ongoing merges are
+     terminated. *)
+  let* () = Node.terminate fresh_node in
+  let* () = Node.run fresh_node node_arguments in
+  let* () = Node.wait_for_ready fresh_node in
+  (* Waiting for the last cycle to be cemented before checking
+     store's invariants. *)
+  let wait_for_merge_at_checkpoint =
+    let expected_checkpoint =
+      final_head - (blocks_preservation_cycles * blocks_per_cycle)
+    in
+    wait_for_complete_merge fresh_node expected_checkpoint
+  in
+  let* () = Client.Admin.connect_address ~peer:fresh_node client in
+  (* Bake a final block that will trigger the store's merge so that we
+     can synchronize merges on the archive_node and fresh_node. *)
+  let* () = Client.bake_for_and_wait client ~node:archive_node in
+  let* (_ : int) = Node.wait_for_level fresh_node final_head in
+  let* () = wait_for_merge_at_checkpoint in
   let expected_checkpoint, expected_savepoint, expected_caboose =
     match history_mode with
     | Node.Full_history -> Test.fail "testing only rolling mode"
     | Node.Rolling_history ->
-        let checkpoint =
-          expected_head - (preserved_cycles * blocks_per_cycle)
-        in
+        let checkpoint = final_head - finalized_block_distance in
         let savepoint =
-          expected_head
-          - ((preserved_cycles + additional_cycles) * blocks_per_cycle)
+          final_head
+          - ((blocks_preservation_cycles + additional_cycles) * blocks_per_cycle)
         in
-        (checkpoint, savepoint, savepoint - max_op_ttl)
+        let caboose =
+          max
+            0
+            (min
+               savepoint
+               (final_head
+               - (blocks_preservation_cycles * blocks_per_cycle)
+               - max_op_ttl))
+        in
+        (checkpoint, savepoint, caboose)
   in
   let* () =
     check_consistency_after_import
       fresh_node
-      ~expected_head
+      ~expected_head:final_head
       ~expected_checkpoint
       ~expected_savepoint
       ~expected_caboose
   in
+  (* Restart the node to invalidate the cache and avoid false
+     positives. *)
+  let* () = Node.terminate fresh_node in
+  let* () = Node.run fresh_node node_arguments in
+  let* () = Node.wait_for_ready fresh_node in
   let* () =
     check_blocks_availability
       fresh_node
@@ -435,7 +516,7 @@ let test_info_command =
   Protocol.register_test
     ~__FILE__
     ~title:(Format.asprintf "storage snapshot info command")
-    ~tags:["storage"; "snapshot"; "info"; "command"]
+    ~tags:["storage"; "snapshot"; "info"; "command"; Tag.layer1]
   @@ fun protocol ->
   let* node = Node.init ~name:"node" node_arguments in
   let* client = Client.init ~endpoint:(Node node) () in

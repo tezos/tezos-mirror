@@ -54,7 +54,8 @@ module Attempt_logging = Internal_event.Make (struct
   let level = Internal_event.Error
 end)
 
-module RetryClient : Cohttp_lwt.S.Client = struct
+module RetryClient :
+  Cohttp_lwt.S.Client with type ctx = Cohttp_lwt_unix.Net.ctx = struct
   include Cohttp_lwt_unix.Client
 
   let clone_body = function `Stream s -> `Stream (Lwt_stream.clone s) | x -> x
@@ -62,7 +63,9 @@ module RetryClient : Cohttp_lwt.S.Client = struct
   let call ?ctx ?headers ?body ?chunked meth uri =
     let rec call_and_retry_on_502 attempt delay =
       let open Lwt_syntax in
-      let* response, ansbody = call ?ctx ?headers ?body ?chunked meth uri in
+      let* response, ansbody =
+        Cohttp_lwt_unix.Client.call ?ctx ?headers ?body ?chunked meth uri
+      in
       let status = Cohttp.Response.status response in
       match status with
       | `Bad_gateway ->

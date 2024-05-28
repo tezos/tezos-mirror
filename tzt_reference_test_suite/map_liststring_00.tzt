@@ -1,0 +1,3 @@
+code { MAP { PUSH nat 1 ; PUSH nat 0 ; SLICE ; IF_NONE { UNIT ; FAILWITH } { } } } ;
+input { Stack_elt (list string) { "The" ; "Password" ; "Is" } } ;
+output { Stack_elt (list string) { "T" ; "P" ; "I" } }

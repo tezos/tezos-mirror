@@ -12,7 +12,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base.TzPervasives.Error_monad_legacy
   -open Tezos_protocol_016_PtMumbai
   -open Tezos_smart_rollup_016_PtMumbai)
  (modules (:standard \ Plugin_registerer)))
@@ -31,7 +31,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base.TzPervasives.Error_monad_legacy
   -open Tezos_embedded_protocol_016_PtMumbai
   -open Tezos_protocol_plugin_016_PtMumbai
   -open Tezos_validation)

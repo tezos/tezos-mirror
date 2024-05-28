@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (list bool) { True; False } } ;
+output { Stack_elt bytes 0x050200000004030a0303 } ;

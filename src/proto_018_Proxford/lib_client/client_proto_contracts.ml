@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -87,7 +88,7 @@ module Originated_contract_alias = struct
         [
           desc;
           "Can be a literal or an alias (autodetected in order).\n\
-           Use 'text:literal' or 'alias:name' to force.";
+           Use 'text:<literal>' or 'alias:<name>' to force.";
         ]
     in
     Tezos_clic.param ~name ~desc (destination_parameter ()) next
@@ -99,7 +100,7 @@ module Originated_contract_alias = struct
         [
           doc;
           "Can be a literal or an alias (autodetected in order).\n\
-           Use 'text:literal' or 'alias:name' to force.";
+           Use 'text:<literal>' or 'alias:<name>' to force.";
         ]
     in
     Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
@@ -147,7 +148,7 @@ module Contract_alias = struct
     let desc =
       desc ^ "\n"
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
-         Use 'key:name' to force the later."
+         Use 'key:<name>' to force the later."
     in
     Tezos_clic.(param ~name ~desc (parameter ~autocomplete get_contract) next)
 
@@ -185,7 +186,7 @@ module Contract_alias = struct
         [
           desc;
           "Can be a literal, an alias, or a key (autodetected in order).\n\
-           Use 'text:literal', 'alias:name', 'key:name' to force.";
+           Use 'text:<literal>', 'alias:<name>', 'key:<key>' to force.";
         ]
     in
     Tezos_clic.param ~name ~desc (destination_parameter ()) next
@@ -197,7 +198,7 @@ module Contract_alias = struct
         [
           doc;
           "Can be a literal, an alias, or a key (autodetected in order).\n\
-           Use 'text:literal', 'alias:name', 'key:name' to force.";
+           Use 'text:<literal>', 'alias:<name>', 'key:<key>' to force.";
         ]
     in
     Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
@@ -208,6 +209,35 @@ module Contract_alias = struct
     match str_opt with
     | None -> return (Contract.to_b58check contract)
     | Some name -> return name
+end
+
+module Destination_alias = struct
+  let contract_parameter () =
+    Tezos_clic.map_parameter
+      ~f:(fun c -> Destination.Contract c)
+      (Contract_alias.destination_parameter ())
+
+  let smart_rollup_parameter () =
+    Tezos_clic.map_parameter
+      ~f:(fun sc -> Destination.Sc_rollup sc)
+      (Smart_rollup_alias.Address.parameter ())
+
+  let destination_parameter () =
+    Tezos_clic.compose_parameters
+      (contract_parameter ())
+      (smart_rollup_parameter ())
+
+  let destination_param ?(name = "dst") ?(desc = "destination address") next =
+    let desc =
+      String.concat
+        "\n"
+        [
+          desc;
+          "Can be a literal, an alias, or a key (autodetected in order).\n\
+           Use 'text:<literal>', 'alias:<name>', 'key:<key>' to force.";
+        ]
+    in
+    Tezos_clic.param ~name ~desc (destination_parameter ()) next
 end
 
 let list_contracts cctxt =

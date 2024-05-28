@@ -27,6 +27,7 @@
 
 type state = {
   mutable plugin : (module Protocol_plugin_sig.S);
+  mutable degraded : bool;
   rpc_server : Rpc_server.t;
   configuration : Configuration.t;
   node_ctxt : Node_context.rw;
@@ -73,9 +74,10 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
        need to use its predecessor to fetch constants from the correct
        context. For the other cases, the context of the predecessor is always
        the same protocol. *)
-    Protocol_plugins.get_constants_of_level
-      state.node_ctxt
-      (Int32.pred head.level)
+    let constants_level =
+      Int32.max (Int32.pred head.level) state.node_ctxt.genesis_info.level
+    in
+    Protocol_plugins.get_constants_of_level state.node_ctxt constants_level
   in
   let new_protocol =
     {
@@ -87,6 +89,27 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   state.plugin <- new_plugin ;
   state.node_ctxt.current_protocol <- new_protocol ;
   return_unit
+
+let maybe_split_context node_ctxt commitment_hash head_level =
+  let open Lwt_result_syntax in
+  let* history_mode = Node_context.get_history_mode node_ctxt in
+  let commit_is_gc_candidate =
+    history_mode <> Archive && Option.is_some commitment_hash
+  in
+  when_ commit_is_gc_candidate @@ fun () ->
+  let* last = Node_context.get_last_context_split_level node_ctxt in
+  let last = Option.value last ~default:node_ctxt.genesis_info.level in
+  let splitting_period =
+    Option.value
+      node_ctxt.config.gc_parameters.context_splitting_period
+      ~default:
+        node_ctxt.current_protocol.constants.sc_rollup
+          .challenge_window_in_blocks
+  in
+  if Int32.(to_int @@ sub head_level last) >= splitting_period then (
+    Context.split node_ctxt.context ;
+    Node_context.save_context_split_level node_ctxt head_level)
+  else return_unit
 
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
@@ -116,8 +139,8 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       (module Plugin)
       node_ctxt
       rollup_ctxt
-      ~predecessor
-      head
+      ~predecessor:(Layer1.head_of_header predecessor)
+      (Layer1.head_of_header head)
       (inbox, messages)
   in
   let*! context_hash = Context.commit ctxt in
@@ -129,6 +152,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       head
       ctxt
   in
+  let* () = maybe_split_context node_ctxt commitment_hash head.level in
   let* () =
     unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
     Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox
@@ -149,7 +173,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context = Smart_rollup_context_hash.of_context_hash context_hash;
         inbox_witness;
         inbox_hash;
       }
@@ -217,13 +241,9 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
            the predecessor. In this case, we don't update the head or notify the
            block. *)
         return_unit
-      else
-        let* () = Node_context.set_l2_head node_ctxt l2_block in
-        Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
-        return_unit
+      else Node_context.set_l2_head node_ctxt l2_block
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
-      Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
       Metrics.Inbox.set_process_time process_time ;
@@ -266,6 +286,17 @@ let report_missing_data result =
                   Block_hash.pp
                   hash)
                trace))
+
+let notify_synchronized (node_ctxt : _ Node_context.t) =
+  Lwt_condition.broadcast node_ctxt.sync.on_synchronized ()
+
+let notify_synchronization (node_ctxt : _ Node_context.t) head_level =
+  let latest_l1_head = Layer1.get_latest_head node_ctxt.l1_ctxt in
+  match latest_l1_head with
+  | None -> notify_synchronized node_ctxt
+  | Some l1_head when head_level = l1_head.level ->
+      notify_synchronized node_ctxt
+  | Some _ -> ()
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
    also processes any missing blocks that were not processed. *)
@@ -312,32 +343,63 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
         update_l2_chain state ~catching_up header)
       new_chain_prefetching
   in
+  notify_synchronization node_ctxt head.level ;
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
-  let* () = Refutation_coordinator.process stripped_head in
   let* () = Batcher.produce_batches () in
   let*! () = Injector.inject ~header:head.header () in
+  state.degraded <- false ;
   return_unit
 
 let daemonize state =
-  Layer1.iter_heads state.node_ctxt.l1_ctxt (on_layer_1_head state)
+  Layer1.iter_heads
+    ~name:"daemon"
+    state.node_ctxt.l1_ctxt
+    (on_layer_1_head state)
 
-let degraded_refutation_mode state =
+let simple_refutation_loop head =
+  Refutation_coordinator.process (Layer1.head_of_header head)
+
+let degraded_refutation_loop state (head : Layer1.header) =
   let open Lwt_result_syntax in
-  let*! () = Daemon_event.degraded_mode () in
-  let message = state.node_ctxt.Node_context.cctxt#message in
-  let*! () = message "Shutting down Batcher@." in
-  let*! () = Batcher.shutdown () in
-  let*! () = message "Shutting down Commitment Publisher@." in
-  let*! () = Publisher.shutdown () in
-  Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
+  let*! () = Daemon_event.new_head_degraded head.hash head.level in
   let* predecessor = Node_context.get_predecessor_header state.node_ctxt head in
   let* () = Node_context.save_protocol_info state.node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up:false state head in
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
+  let* () = Publisher.publish_commitments () in
+  (* Continue to produce batches but ignore any error *)
+  let*! (_ : unit tzresult) = Batcher.produce_batches () in
   let*! () = Injector.inject () in
   return_unit
+
+let refutation_loop state (head : Layer1.header) =
+  if state.degraded then degraded_refutation_loop state head
+  else simple_refutation_loop head
+
+let rec refutation_daemon ?(restart = false) state =
+  let open Lwt_result_syntax in
+  let on_error e =
+    Format.eprintf "Refutation daemon error: %a@." pp_print_trace e ;
+    refutation_daemon ~restart:true state
+  in
+  let loop ~restart () =
+    let*! () =
+      if restart then
+        let*! () =
+          Daemon_event.refutation_loop_retry
+            state.node_ctxt.config.loop_retry_delay
+        in
+        Lwt_unix.sleep state.node_ctxt.config.loop_retry_delay
+      else Lwt.return_unit
+    in
+    Layer1.iter_heads
+      ~name:"refutation"
+      state.node_ctxt.l1_ctxt
+      (refutation_loop state)
+  in
+  dont_wait (loop ~restart) on_error (fun e -> on_error [Exn e])
 
 let install_finalizer state =
   let open Lwt_syntax in
@@ -353,7 +415,7 @@ let install_finalizer state =
   let* () = Publisher.shutdown () in
   let* () = message "Shutting down Refutation Coordinator@." in
   let* () = Refutation_coordinator.shutdown () in
-  let* (_ : unit tzresult) = Node_context.close state.node_ctxt in
+  let* (_ : unit tzresult) = Node_context_loader.close state.node_ctxt in
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
@@ -449,61 +511,8 @@ let make_signers_for_injector operators =
          in
          (operators, strategy, operation_kinds))
 
-let run ({node_ctxt; configuration; plugin; _} as state) =
+let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
-  let module Plugin = (val state.plugin) in
-  let start () =
-    let signers = make_signers_for_injector node_ctxt.config.operators in
-    let* () =
-      unless (signers = []) @@ fun () ->
-      Injector.init
-        node_ctxt.cctxt
-        {
-          cctxt = (node_ctxt.cctxt :> Client_context.full);
-          fee_parameters = configuration.fee_parameters;
-          minimal_block_delay =
-            node_ctxt.current_protocol.constants.minimal_block_delay;
-          delay_increment_per_round =
-            node_ctxt.current_protocol.constants.delay_increment_per_round;
-        }
-        ~data_dir:node_ctxt.data_dir
-        ~signers
-        ~retention_period:configuration.injector.retention_period
-        ~allowed_attempts:configuration.injector.attempts
-    in
-    let* () = start_workers plugin node_ctxt in
-    Lwt.dont_wait
-      (fun () ->
-        let*! r = Metrics.metrics_serve configuration.metrics_addr in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error err ->
-            Event.(metrics_ended (Format.asprintf "%a" pp_print_trace err)))
-      (fun exn -> Event.(metrics_ended_dont_wait (Printexc.to_string exn))) ;
-    let* whitelist =
-      Plugin.Layer1_helpers.find_whitelist
-        node_ctxt.cctxt
-        configuration.sc_rollup_address
-    in
-    let*? () =
-      match whitelist with
-      | Some whitelist ->
-          Node_context.check_op_in_whitelist_or_bailout_mode node_ctxt whitelist
-      | None -> Result_syntax.return_unit
-    in
-    let* () = maybe_recover_bond state in
-    let*! () =
-      Event.node_is_ready
-        ~rpc_addr:configuration.rpc_addr
-        ~rpc_port:configuration.rpc_port
-    in
-    daemonize state
-  in
-  Metrics.Info.init_rollup_node_info
-    ~id:configuration.sc_rollup_address
-    ~mode:configuration.mode
-    ~genesis_level:node_ctxt.genesis_info.level
-    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
   let fatal_error_exit e =
     Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
     let*! _ = Lwt_exit.exit_and_wait 1 in
@@ -511,8 +520,14 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   in
   let error_to_degraded_mode e =
     let*! () = Daemon_event.error e in
+    state.degraded <- true ;
     if node_ctxt.config.no_degraded then fatal_error_exit e
-    else degraded_refutation_mode state
+    else
+      let*! () =
+        Daemon_event.main_loop_retry node_ctxt.config.loop_retry_delay
+      in
+      let*! () = Lwt_unix.sleep node_ctxt.config.loop_retry_delay in
+      process_daemon state
   in
   let handle_preimage_not_found e =
     (* When running/initialising a rollup node with missing preimages
@@ -538,11 +553,12 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         else error_to_degraded_mode e
     | None -> fatal_error_exit e
   in
-  protect start ~on_error:(function
-      | Rollup_node_errors.(
-          ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-          | Operator_not_in_whitelist | Purpose.Missing_operator _
-          | Purpose.Too_many_operators _ ))
+  let loop () = daemonize state in
+  protect loop ~on_error:(function
+      | ( Rollup_node_errors.(
+            ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
+            | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup ))
+        | Purpose.(Missing_operator _ | Too_many_operators _) )
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
@@ -552,6 +568,65 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
           let*! _ = Lwt_exit.exit_and_wait 0 in
           return_unit
       | e -> error_to_degraded_mode e)
+
+let run ({node_ctxt; configuration; plugin; _} as state) =
+  let open Lwt_result_syntax in
+  let module Plugin = (val state.plugin) in
+  Metrics.Info.init_rollup_node_info
+    ~id:configuration.sc_rollup_address
+    ~mode:configuration.mode
+    ~genesis_level:node_ctxt.genesis_info.level
+    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
+  let signers = make_signers_for_injector node_ctxt.config.operators in
+  let* () =
+    unless (signers = []) @@ fun () ->
+    Injector.init
+      node_ctxt.cctxt
+      (Layer1.raw_l1_connection node_ctxt.l1_ctxt)
+      {
+        cctxt = (node_ctxt.cctxt :> Client_context.full);
+        fee_parameters = configuration.fee_parameters;
+        minimal_block_delay =
+          node_ctxt.current_protocol.constants.minimal_block_delay;
+        delay_increment_per_round =
+          node_ctxt.current_protocol.constants.delay_increment_per_round;
+      }
+      ~data_dir:node_ctxt.data_dir
+      ~signers
+      ~retention_period:configuration.injector.retention_period
+      ~allowed_attempts:configuration.injector.attempts
+  in
+  let* () = start_workers plugin node_ctxt in
+  Lwt.dont_wait
+    (fun () ->
+      let*! r = Metrics.metrics_serve configuration.metrics_addr in
+      match r with
+      | Ok () -> Lwt.return_unit
+      | Error err ->
+          Event.(metrics_ended (Format.asprintf "%a" pp_print_trace err)))
+    (fun exn -> Event.(metrics_ended_dont_wait (Printexc.to_string exn))) ;
+  let* whitelist =
+    Plugin.Layer1_helpers.find_whitelist
+      node_ctxt.cctxt
+      configuration.sc_rollup_address
+  in
+  let*? () =
+    match whitelist with
+    | Some whitelist ->
+        Node_context.check_op_in_whitelist_or_bailout_mode node_ctxt whitelist
+    | None -> Result_syntax.return_unit
+  in
+  let* () = maybe_recover_bond state in
+  let*! () =
+    Event.node_is_ready
+      ~rpc_addr:configuration.rpc_addr
+      ~rpc_port:configuration.rpc_port
+  in
+  (* Run the refutation daemon in the background if needed. *)
+  if Refutation_coordinator.start_in_mode configuration.mode then
+    refutation_daemon state ;
+  (* Run the main rollup node daemon. *)
+  process_daemon state
 
 module Internal_for_tests = struct
   (** Same as {!update_l2_chain} but only builds and stores the L2 block
@@ -576,8 +651,8 @@ module Internal_for_tests = struct
         (module Plugin)
         node_ctxt
         ctxt
-        ~predecessor
-        head
+        ~predecessor:(Layer1.head_of_header predecessor)
+        (Layer1.head_of_header head)
         (inbox, messages)
     in
     let*! context_hash = Context.commit ctxt in
@@ -606,7 +681,7 @@ module Internal_for_tests = struct
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
-          context = context_hash;
+          context = Smart_rollup_context_hash.of_context_hash context_hash;
           inbox_witness;
           inbox_hash;
         }
@@ -616,7 +691,6 @@ module Internal_for_tests = struct
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
     let* () = Node_context.set_l2_head node_ctxt l2_block in
-    let () = Lwt_watcher.notify node_ctxt.global_block_watcher l2_block in
     return l2_block
 end
 
@@ -637,6 +711,9 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
   let* () =
     Tezos_base_unix.Internal_event_unix.enable_default_daily_logs_at
       ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
+  in
+  let cctxt =
+    Layer_1.client_context_with_timeout cctxt configuration.l1_rpc_timeout
   in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
@@ -707,7 +784,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     }
   in
   let* node_ctxt =
-    Node_context.init
+    Node_context_loader.init
       cctxt
       ~data_dir
       ~irmin_cache_size
@@ -723,10 +800,17 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       current_protocol
       configuration
   in
-  let* () = Plugin.L1_processing.check_pvm_initial_state_hash node_ctxt in
+  let dir = Rpc_directory.directory node_ctxt in
   let* rpc_server =
-    Rpc_server.start configuration (Rpc_directory.directory node_ctxt)
+    Rpc_server.start
+      ~rpc_addr:configuration.rpc_addr
+      ~rpc_port:configuration.rpc_port
+      ~acl:configuration.acl
+      ~cors:configuration.cors
+      dir
   in
-  let state = {node_ctxt; rpc_server; configuration; plugin} in
+  let state =
+    {node_ctxt; rpc_server; configuration; plugin; degraded = false}
+  in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state

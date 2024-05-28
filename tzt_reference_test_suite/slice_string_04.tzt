@@ -1,0 +1,3 @@
+code { DUP ; SIZE ; PUSH nat 0 ; SLICE } ;
+input { Stack_elt string "hello world" } ;
+output { Stack_elt (option string) (Some "hello world") }

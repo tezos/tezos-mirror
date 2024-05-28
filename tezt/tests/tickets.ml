@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022-2024 Marigold <contact@marigold.dev>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,8 +31,6 @@
    Subject:      Regression tests for tickets
 *)
 
-open Tezos_protocol_alpha.Protocol
-
 let hooks = Tezos_regression.hooks
 
 let setup_node protocol ~direct_ticket_spending_enable =
@@ -50,24 +48,19 @@ let setup_node protocol ~direct_ticket_spending_enable =
   in
   return (node, client)
 
-(* Return micheline encoding of ticket. *)
-let encode_ticket ~ticketer ~content ~amount =
-  let ticketer_contract =
-    Result.get_ok (Alpha_context.Contract.of_b58check ticketer)
-  in
-  let ticketer_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Alpha_context.Contract.encoding
-      ticketer_contract
-  in
-  let encoded_ticketer = Hex.show (Hex.of_bytes ticketer_bytes) in
-  sf {|Pair 0x%s (Pair %S %d)|} encoded_ticketer content amount
+type ticket_constructor = Pair | Ticket
+
+let encode_ticket ~constructor ~ticketer ~content ~amount =
+  match constructor with
+  | Pair -> sf {|Pair %S (Pair %S %d)|} ticketer content amount
+  | Ticket -> sf {|Ticket %S string %S %d|} ticketer content amount
 
 let test_create_and_remove_tickets =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Create and remove tickets"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract_id =
@@ -141,6 +134,7 @@ let test_send_tickets_in_big_map =
     ~__FILE__
     ~title:"Send tickets in bigmap"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _receive_contract_alias, receive_contract_hash =
@@ -202,6 +196,7 @@ let test_send_tickets_to_implicit_account =
     ~__FILE__
     ~title:"Send tickets from contracts to implicit accounts"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -240,13 +235,8 @@ let test_send_tickets_to_implicit_account =
 
 (* Tests that an implicit account can send a single ticket to originated
    using the [Transfer] manager operation. *)
-let test_direct_transfer_tickets_from_implicit_account_to_originated =
-  Protocol.register_regression_test
-    ~__FILE__
-    ~title:"Send tickets from implicit account to originated directly"
-    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
-    ~supports:(Protocol.From_protocol 19)
-  @@ fun protocol ->
+let test_direct_transfer_tickets_from_implicit_account_to_originated
+    ~ticket_constructor protocol =
   let* _node, client =
     setup_node protocol ~direct_ticket_spending_enable:true
   in
@@ -295,51 +285,97 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated =
   in
   let* () = Client.bake_for_and_wait client in
   (* Transfer ticket from implicit to originated using the [Transaction] manager operation. *)
-  let* () =
-    Client.transfer
-      ~burn_cap:Tez.one
-      ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.alias
-      ~receiver:bag
-      ~entrypoint:"save"
-      ~arg:(encode_ticket ~ticketer ~content:"Ticket" ~amount:1)
-      ~hooks
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-  let* () =
-    assert_ticket_balance
-      ~contract:Constant.bootstrap1.alias
-      ~ticketer
-      ~ty:"string"
-      ~contents:"\"Ticket\""
-      ~expected:0
-      client
-  in
-  let* () =
-    assert_ticket_balance
-      ~contract:bag
-      ~ticketer
-      ~ty:"string"
-      ~contents:"\"Ticket\""
-      ~expected:1
-      client
-  in
-  unit
+  match ticket_constructor with
+  | Pair ->
+      let* () =
+        Process.check_error
+          ~msg:(rex "invalid primitive Pair, only Ticket can be used here")
+          (Client.spawn_transfer
+             ~burn_cap:Tez.one
+             ~amount:Tez.zero
+             ~giver:Constant.bootstrap1.alias
+             ~receiver:bag
+             ~entrypoint:"save"
+             ~arg:
+               (encode_ticket
+                  ~constructor:Pair
+                  ~ticketer
+                  ~content:"Ticket"
+                  ~amount:1)
+             ~hooks
+             client)
+      in
+      unit
+  | Ticket ->
+      let* () =
+        Client.transfer
+          ~burn_cap:Tez.one
+          ~amount:Tez.zero
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:bag
+          ~entrypoint:"save"
+          ~arg:
+            (encode_ticket
+               ~constructor:Ticket
+               ~ticketer
+               ~content:"Ticket"
+               ~amount:1)
+          ~hooks
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* () =
+        assert_ticket_balance
+          ~contract:Constant.bootstrap1.alias
+          ~ticketer
+          ~ty:"string"
+          ~contents:"\"Ticket\""
+          ~expected:0
+          client
+      in
+      let* () =
+        assert_ticket_balance
+          ~contract:bag
+          ~ticketer
+          ~ty:"string"
+          ~contents:"\"Ticket\""
+          ~expected:1
+          client
+      in
+      unit
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_with_pair_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Send Pair tickets from implicit account to originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 20)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated
+    protocol
+    ~ticket_constructor:Pair
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_with_ticket_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send tickets with Ticket constructor from implicit account to \
+       originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated
+    protocol
+    ~ticket_constructor:Ticket
 
 (* Tests that an implicit account can send a tickets to originated
    using the [Transfer] manager operation. The parameter of the
    transfer is made complex to check that the [Transfer] properly
    scans the parameter and transfers all included tickets. *)
-let test_direct_transfer_tickets_from_implicit_account_to_originated_complex =
-  Protocol.register_regression_test
-    ~__FILE__
-    ~title:
-      "Send tickets from implicit account to originated directly (with complex \
-       parameters)"
-    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
-    ~supports:(Protocol.From_protocol 19)
-  @@ fun protocol ->
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    ~ticket_constructor protocol =
   let* _node, client =
     setup_node protocol ~direct_ticket_spending_enable:true
   in
@@ -417,65 +453,112 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated_complex =
     sf
       {|Pair 99 {Pair "garbage" (%s) ; Pair "garbage" (%s)}|}
       (encode_ticket
+         ~constructor:ticket_constructor
          ~ticketer
          ~content:first_ticket_content
          ~amount:first_ticket_sent)
       (encode_ticket
+         ~constructor:ticket_constructor
          ~ticketer
          ~content:second_ticket_content
          ~amount:second_ticket_sent)
   in
-  let* () =
-    Client.transfer
-      ~hooks
-      ~burn_cap:Tez.one
-      ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.alias
-      ~entrypoint:"store"
-      ~receiver:ticketer
-      ~arg:complex_arg_with_tickets
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-  (* Check that ticket balance is removed for implicit account. *)
-  let* () =
-    assert_ticket_balance
-      ~contract:Constant.bootstrap1.alias
-      ~ticketer
-      ~ty:"string"
-      ~contents:(sf "%S" first_ticket_content)
-      ~expected:(amount - first_ticket_sent)
-      client
-  in
-  let* () =
-    assert_ticket_balance
-      ~contract:Constant.bootstrap1.alias
-      ~ticketer
-      ~ty:"string"
-      ~contents:(sf "%S" second_ticket_content)
-      ~expected:(amount - second_ticket_sent)
-      client
-  in
-  (* Check that ticket balance is added for originated contract. *)
-  let* () =
-    assert_ticket_balance
-      ~contract:ticketer
-      ~ticketer
-      ~ty:"string"
-      ~contents:(sf "%S" first_ticket_content)
-      ~expected:first_ticket_sent
-      client
-  in
-  let* () =
-    assert_ticket_balance
-      ~contract:ticketer
-      ~ticketer
-      ~ty:"string"
-      ~contents:(sf "%S" second_ticket_content)
-      ~expected:second_ticket_sent
-      client
-  in
-  unit
+  match ticket_constructor with
+  | Pair ->
+      let* () =
+        Process.check_error
+          ~msg:(rex "invalid primitive Pair, only Ticket can be used here")
+          (Client.spawn_transfer
+             ~hooks
+             ~burn_cap:Tez.one
+             ~amount:Tez.zero
+             ~giver:Constant.bootstrap1.alias
+             ~entrypoint:"store"
+             ~receiver:ticketer
+             ~arg:complex_arg_with_tickets
+             client)
+      in
+      unit
+  | Ticket ->
+      let* () =
+        Client.transfer
+          ~hooks
+          ~burn_cap:Tez.one
+          ~amount:Tez.zero
+          ~giver:Constant.bootstrap1.alias
+          ~entrypoint:"store"
+          ~receiver:ticketer
+          ~arg:complex_arg_with_tickets
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      (* Check that ticket balance is removed for implicit account. *)
+      let* () =
+        assert_ticket_balance
+          ~contract:Constant.bootstrap1.alias
+          ~ticketer
+          ~ty:"string"
+          ~contents:(sf "%S" first_ticket_content)
+          ~expected:(amount - first_ticket_sent)
+          client
+      in
+      let* () =
+        assert_ticket_balance
+          ~contract:Constant.bootstrap1.alias
+          ~ticketer
+          ~ty:"string"
+          ~contents:(sf "%S" second_ticket_content)
+          ~expected:(amount - second_ticket_sent)
+          client
+      in
+      (* Check that ticket balance is added for originated contract. *)
+      let* () =
+        assert_ticket_balance
+          ~contract:ticketer
+          ~ticketer
+          ~ty:"string"
+          ~contents:(sf "%S" first_ticket_content)
+          ~expected:first_ticket_sent
+          client
+      in
+      let* () =
+        assert_ticket_balance
+          ~contract:ticketer
+          ~ticketer
+          ~ty:"string"
+          ~contents:(sf "%S" second_ticket_content)
+          ~expected:second_ticket_sent
+          client
+      in
+      unit
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_ticket_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send tickets with Ticket constructor (with complex parameters) from \
+       implicit account to originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    protocol
+    ~ticket_constructor:Ticket
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_pair_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send Pair tickets (with complex parameters) from implicit account to \
+       originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 20)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    protocol
+    ~ticket_constructor:Pair
 
 (* This test originates one contract which mints and sends tickets to the address
    passed in the parameter. In this test, the receiver of the ticket is an
@@ -486,6 +569,7 @@ let test_send_tickets_to_implicit_account_non_zero_amount =
     ~title:
       "Send tickets from contracts to implicit accounts with some Tez along"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -534,6 +618,7 @@ let test_send_tickets_to_implicit_with_wrong_type =
       "Send tickets from contracts to implicit accounts with the wrong type \
        must fail"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -587,6 +672,7 @@ let test_ticket_transfer_commutative =
     ~__FILE__
     ~title:"Send tickets between originated contracts and implicit accounts"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -750,6 +836,7 @@ let test_ticket_transfer_from_storage_to_implicit =
     ~__FILE__
     ~title:"Sending ticket from contract storage to implicit accounts"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -871,6 +958,7 @@ let test_zero_ticket_rejection =
     ~__FILE__
     ~title:"Sending zero ticket from implicit accounts must be rejected"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -951,6 +1039,7 @@ let test_ticket_overdraft_rejection =
     ~__FILE__
     ~title:"Overdrafting ticket from implicit accounts must be rejected"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -1023,6 +1112,7 @@ let test_ticket_of_wrong_type_rejection =
     ~title:
       "Sending ticket of wrong type from implicit accounts must be rejected"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -1070,6 +1160,7 @@ let test_originated_implicit_can_be_equipotent =
       "Sending tickets to either implicit accounts or originated contracts \
        accepting tickets with default entrypoint should equally work"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -1316,6 +1407,11 @@ let register ~protocols =
   test_originated_implicit_can_be_equipotent protocols ;
   test_send_tickets_to_sc_rollup protocols ;
   test_send_tickets_from_storage_to_sc_rollup protocols ;
-  test_direct_transfer_tickets_from_implicit_account_to_originated protocols ;
-  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+  test_direct_transfer_tickets_from_implicit_account_to_originated_with_pair_constructor
+    protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_with_ticket_constructor
+    protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_pair_constructor
+    protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_ticket_constructor
     protocols

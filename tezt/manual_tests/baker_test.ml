@@ -112,6 +112,7 @@ let baker_early_preattestation_test =
     ~__FILE__
     ~title:"Test baker early pre-attestation"
     ~tags:["node"; "baker"; "early"; "preattestation"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   Log.info

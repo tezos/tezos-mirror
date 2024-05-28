@@ -33,6 +33,9 @@
     supports it. *)
 val init : Node_context.rw -> unit tzresult Lwt.t
 
+(** Whether the refutation coordinator is run in the given mode. *)
+val start_in_mode : Configuration.mode -> bool
+
 (** [process head] processes a new l1 head. This means that the coordinator
     will:
     {ol

@@ -77,7 +77,7 @@ let check_node_synchronization_state =
     ~title:"check synchronization state"
     ~tags:
       [
-        Tag.ci_disabled;
+        Tag.flaky;
         "synchronisation_threshold";
         "bootstrap";
         "node";
@@ -170,7 +170,7 @@ let check_prevalidator_start =
     ~title:"Check prevalidator start"
     ~tags:
       [
-        Tag.ci_disabled;
+        Tag.flaky;
         "synchronisation_threshold";
         "bootstrap";
         "node";
@@ -234,8 +234,8 @@ let test_threshold_zero =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold zero"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Setup network" ;
   let* node, client =
@@ -272,6 +272,7 @@ let test_threshold_one =
     ~__FILE__
     ~title:"bootstrap: test threshold one"
     ~tags:["bootstrap"; "threshold"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -307,8 +308,8 @@ let test_threshold_two =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold two"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -374,8 +375,8 @@ let test_threshold_stuck =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold stuck"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let sync_latency = 3 in
 
@@ -437,8 +438,8 @@ let test_threshold_split_view =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold split view"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info
     "Add two peers with threshold zero, and one with threshold 2 and a high \
@@ -506,6 +507,7 @@ let test_many_nodes_bootstrap =
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
     ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"; Tag.memory_4k]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in

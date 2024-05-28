@@ -1,0 +1,3 @@
+code { SWAP } ;
+input { };
+output (StaticError _);

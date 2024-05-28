@@ -183,6 +183,26 @@ let test_case_3 =
       (67, (67, 66, 7, 0, false));
     ] )
 
+let test_cycle_from_raw () =
+  let open Lwt_result_wrap_syntax in
+  List.iter_es
+    (fun (cycle_eras, test_cases) ->
+      List.iter_es
+        (fun (input_level, (_, _, cycle, _, _)) ->
+          let raw_level =
+            Raw_level_repr.of_int32_exn (Int32.of_int input_level)
+          in
+          let*?@ cycle_eras = Level_repr.create_cycle_eras cycle_eras in
+          let cycle_from_raw =
+            Protocol.Level_repr.cycle_from_raw ~cycle_eras raw_level
+          in
+          Assert.equal_int
+            ~loc:__LOC__
+            (Int32.to_int (Cycle_repr.to_int32 cycle_from_raw))
+            cycle)
+        test_cases)
+    [test_case_1; test_case_2; test_case_3]
+
 let test_level_from_raw () =
   let open Lwt_result_wrap_syntax in
   List.iter_es
@@ -277,6 +297,7 @@ let test_first_level_in_cycle () =
 let tests =
   [
     Tztest.tztest "create_cycle_eras" `Quick test_create_cycle_eras;
+    Tztest.tztest "cycle_from_raw" `Quick test_cycle_from_raw;
     Tztest.tztest "level_from_raw" `Quick test_level_from_raw;
     Tztest.tztest "first_level_in_cycle" `Quick test_first_level_in_cycle;
   ]

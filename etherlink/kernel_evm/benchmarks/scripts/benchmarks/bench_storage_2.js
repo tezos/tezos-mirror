@@ -39,6 +39,8 @@ for (player1 of players) {
     }
 }
 
+let mode = utils.bench_args(process.argv);
+
 // first set of messages: initialisation
 // second set of messages: calls
-utils.print_bench([txs_1.concat(txs_2)])
+utils.print_bench([txs_1.concat(txs_2)], mode)

@@ -44,6 +44,7 @@ let register_fa12_test ~title ?(tags = []) test_body protocols =
        ~title:
          (sf "test fa1.2, %s [%s]" title (String.concat "/" fa12_script.name))
        ~tags:(["client"; "fa12"; script_tag] @ tags)
+       ~uses_node:false
        (fun protocol ->
          let* client = Client.init_mockup ~protocol () in
          let admin = Account.Bootstrap.keys.(2) in
@@ -89,6 +90,7 @@ let test_check_contract_fail =
     ~__FILE__
     ~title:(sf "test fa1.2, check contract fail")
     ~tags:["client"; "fa12"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let identity = Account.Bootstrap.keys.(2).public_key_hash in

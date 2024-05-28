@@ -54,6 +54,15 @@ module Shared = struct
         | None, res -> return res)
 end
 
+(* Caches the current state of the live blocks and operations. *)
+type live_data_cache = {
+  (* Live blocks and operations cache. *)
+  live_data : (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
+  (* Trailing cache containing the latest block/operations that were
+     considered as non-live. *)
+  pred : (Block_hash.t * Operation_hash.Set.t) option;
+}
+
 type store = {
   store_dir : [`Store_dir] Naming.directory;
   (* Mutability allows a back-reference from chain_store to store: not
@@ -88,6 +97,7 @@ and chain_state = {
   (* Following fields are not safe to update concurrently and must be
      manipulated carefuly: *)
   current_head_data : block_descriptor Stored_data.t;
+  mutable last_finalized_block_level : Int32.t option;
   cementing_highwatermark_data : int32 option Stored_data.t;
   target_data : block_descriptor option Stored_data.t;
   checkpoint_data : block_descriptor Stored_data.t;
@@ -102,8 +112,7 @@ and chain_state = {
   mempool : Mempool.t;
   live_blocks : Block_hash.Set.t;
   live_operations : Operation_hash.Set.t;
-  mutable live_data_cache :
-    (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
+  mutable live_data_cache : live_data_cache;
   validated_blocks : Block_repr.t Block_lru_cache.t;
 }
 
@@ -240,7 +249,7 @@ module Block = struct
   type metadata = Block_repr.metadata = {
     message : string option;
     max_operations_ttl : int;
-    last_allowed_fork_level : Int32.t;
+    last_preserved_block_level : Int32.t;
     block_metadata : Bytes.t;
     operations_metadata : Block_validation.operation_metadata list list;
   }
@@ -251,14 +260,23 @@ module Block = struct
 
   (* I/O operations *)
 
-  let is_known_valid {block_store; _} hash =
+  let is_known_valid chain_store block_hash =
     let open Lwt_syntax in
-    let* r = Block_store.(mem block_store (Block (hash, 0))) in
-    match r with
-    | Ok k -> Lwt.return k
-    | Error _ ->
-        (* should never happen : (0 \in N) *)
-        Lwt.return_false
+    let* current_head = current_head chain_store in
+    if
+      Block_hash.(
+        Block_repr.hash current_head = block_hash
+        || Block_repr.predecessor current_head = block_hash)
+    then return_true
+    else
+      let* r =
+        Block_store.(mem chain_store.block_store (Block (block_hash, 0)))
+      in
+      match r with
+      | Ok k -> return k
+      | Error _ ->
+          (* should never happen : (0 \in N) *)
+          return_false
 
   let locked_is_known_invalid chain_state hash =
     let open Lwt_syntax in
@@ -451,7 +469,8 @@ module Block = struct
           timestamp = _;
           message;
           max_operations_ttl;
-          last_allowed_fork_level;
+          last_preserved_block_level;
+          last_finalized_block_level;
         };
       block_metadata;
       ops_metadata;
@@ -501,22 +520,22 @@ module Block = struct
           .chain_id
     in
     let genesis_level = Block_repr.level genesis_block in
-    let* last_allowed_fork_level =
+    let* last_preserved_block_level =
       if is_main_chain then
         let* () =
           fail_unless
-            Compare.Int32.(last_allowed_fork_level >= genesis_level)
+            Compare.Int32.(last_preserved_block_level >= genesis_level)
             (Cannot_store_block
                ( hash,
-                 Invalid_last_allowed_fork_level
-                   {last_allowed_fork_level; genesis_level} ))
+                 Invalid_last_preserved_block_level
+                   {last_preserved_block_level; genesis_level} ))
         in
-        return last_allowed_fork_level
-      else if Compare.Int32.(last_allowed_fork_level < genesis_level) then
-        (* Hack: on the testchain, the block's lafl depends on the
-           lafl and is not max(genesis_level, expected_lafl) *)
+        return last_preserved_block_level
+      else if Compare.Int32.(last_preserved_block_level < genesis_level) then
+        (* Hack: on the testchain, the block's lpbl depends on the
+           lpbl and is not max(genesis_level, expected_lpbl) *)
         return genesis_level
-      else return last_allowed_fork_level
+      else return last_preserved_block_level
     in
     let*! b = is_known_valid chain_store hash in
     match b with
@@ -561,7 +580,7 @@ module Block = struct
             {
               message;
               max_operations_ttl;
-              last_allowed_fork_level;
+              last_preserved_block_level;
               block_metadata = fst block_metadata;
               operations_metadata =
                 (match ops_metadata with
@@ -580,10 +599,22 @@ module Block = struct
         let*! () =
           Store_events.(emit store_block) (hash, block_header.shell.level)
         in
-        let*! () =
-          Shared.use chain_store.chain_state (fun {validated_blocks; _} ->
-              Block_lru_cache.remove validated_blocks hash ;
-              Lwt.return_unit)
+        let* () =
+          Shared.update_with chain_store.chain_state (fun chain_state ->
+              Block_lru_cache.remove chain_state.validated_blocks hash ;
+              let new_last_finalized_block_level =
+                match chain_state.last_finalized_block_level with
+                | None -> Some last_finalized_block_level
+                | Some prev_lfbl ->
+                    Some (Int32.max last_finalized_block_level prev_lfbl)
+              in
+              let new_chain_state =
+                {
+                  chain_state with
+                  last_finalized_block_level = new_last_finalized_block_level;
+                }
+              in
+              return (Some new_chain_state, ()))
         in
         Lwt_watcher.notify chain_store.block_watcher block ;
         Lwt_watcher.notify
@@ -837,8 +868,8 @@ module Block = struct
 
   let max_operations_ttl metadata = Block_repr.max_operations_ttl metadata
 
-  let last_allowed_fork_level metadata =
-    Block_repr.last_allowed_fork_level metadata
+  let last_preserved_block_level metadata =
+    Block_repr.last_preserved_block_level metadata
 
   let block_metadata metadata = Block_repr.block_metadata metadata
 
@@ -910,9 +941,9 @@ module Chain_traversal = struct
     let open Lwt_syntax in
     let rec loop acc block_head n =
       let hashes = Block.all_operation_hashes block_head in
-      let acc = f acc (Block.hash block_head, hashes) in
       if n = 0 then Lwt.return acc
       else
+        let acc = f acc (Block.hash block_head, hashes) in
         let* o = Block.read_predecessor_opt chain_store block_head in
         match o with
         | None -> Lwt.return acc
@@ -1056,74 +1087,240 @@ module Chain = struct
     Shared.use chain_store.chain_state (fun {live_blocks; live_operations; _} ->
         Lwt.return (live_blocks, live_operations))
 
-  let locked_compute_live_blocks ?(force = false) ?(update_cache = true)
-      chain_store chain_state block metadata =
-    let open Lwt_syntax in
+  (* Returns the live_blocks and live_operations sets after removing
+     the current_head from it, and adding the block candidate. This is
+     particularly useful when computing the liveblocks for a new block
+     candidate that is not on top of the current head, but rather at
+     the same level with a higher round -- as it avoids recomputing
+     the whole livedata *)
+  let replace_head_from_live_data chain_state ~update_cache ~current_head
+      live_blocks live_operations ~new_head ~cache_expected_capacity =
+    let open Lwt_result_syntax in
+    let most_recent_block = Block.hash new_head in
+    let most_recent_ops =
+      Block.all_operation_hashes new_head
+      |> List.flatten |> Operation_hash.Set.of_list
+    in
+    let blocks_without_current_head =
+      Block_hash.Set.remove (Block.hash current_head) live_blocks
+    in
+    let new_live_blocks =
+      Block_hash.Set.add most_recent_block blocks_without_current_head
+    in
+    let current_head_ops =
+      Block.all_operation_hashes current_head
+      |> List.flatten |> Operation_hash.Set.of_list
+    in
+    let ops_without_current_head =
+      Operation_hash.Set.diff live_operations current_head_ops
+    in
+    let new_live_ops =
+      Operation_hash.Set.union ops_without_current_head most_recent_ops
+    in
+    let new_livedata = (new_live_blocks, new_live_ops) in
+    let () =
+      if update_cache then
+        (* Updating live_data_cache by re-adding the oldest elements
+           first (to maintain the cache ordering) thanks to the
+           ordered Ringo.Ring.elements. Then, when reaching the last
+           element of the elements, that is the current_head, drop it
+           a add the block candidate instead. *)
+        let new_cache =
+          match chain_state.live_data_cache.live_data with
+          | Some cache ->
+              let lbe = Ringo.Ring.elements cache in
+              let rec loop acc = function
+                | _current_head_to_drop :: [] ->
+                    Ringo.Ring.add acc (most_recent_block, most_recent_ops) ;
+                    acc
+                | hd :: tl ->
+                    Ringo.Ring.add acc hd ;
+                    loop acc tl
+                | [] ->
+                    (* The live_data_cache is expected to be None. *)
+                    assert false
+              in
+              let new_cache =
+                loop (Ringo.Ring.create cache_expected_capacity) lbe
+              in
+              Some new_cache
+          | None -> None
+        in
+        (* Updating the cache with the new one. The pred_cache remains
+           the same. *)
+        chain_state.live_data_cache <-
+          {chain_state.live_data_cache with live_data = new_cache}
+    in
+    return new_livedata
+
+  (* Returns the live_blocks and live_operations shifted by one block
+     in the past. This is particularly useful when applying a block of
+     a round >= 1, and avoids recomputing the whole livedata. *)
+  let rollback_livedata ~current_head live_blocks live_operations
+      ~pred_cache:(pred_hash, pred_ops) =
+    let open Lwt_result_syntax in
+    let blocks_without_current_head =
+      Block_hash.Set.remove (Block.hash current_head) live_blocks
+    in
+    let new_live_blocks =
+      Block_hash.Set.add pred_hash blocks_without_current_head
+    in
+    let head_ops =
+      Block.all_operation_hashes current_head
+      |> List.flatten |> Operation_hash.Set.of_list
+    in
+    let ops_without_current_head =
+      Operation_hash.Set.diff live_operations head_ops
+    in
+    let new_live_ops =
+      Operation_hash.Set.union ops_without_current_head pred_ops
+    in
+    let new_cache = (new_live_blocks, new_live_ops) in
+    return new_cache
+
+  (* Computes the set of live blocks/operations for a given
+     block. [update_cache] updates the chain_state's cache, typically
+     on new heads. *)
+  let locked_compute_live_blocks_with_cache ~update_cache chain_store
+      chain_state block metadata =
+    let open Lwt_result_syntax in
     let {current_head; live_blocks; live_operations; live_data_cache; _} =
       chain_state
     in
-    if Block.equal current_head block && not force then
-      Lwt.return (live_blocks, live_operations)
-    else
-      (* We actually compute max_op_ttl + 1... *)
-      let expected_capacity = Block.max_operations_ttl metadata + 1 in
-      match live_data_cache with
-      | Some live_data_cache
-        when update_cache
-             && Block_hash.equal
-                  (Block.predecessor block)
-                  (Block.hash current_head)
-             && Ringo.Ring.capacity live_data_cache = expected_capacity -> (
-          let most_recent_block = Block.hash block in
-          let most_recent_ops =
-            Block.all_operation_hashes block
-            |> List.flatten |> Operation_hash.Set.of_list
-          in
-          let new_live_blocks =
-            Block_hash.Set.add most_recent_block live_blocks
-          in
-          let new_live_operations =
-            Operation_hash.Set.union most_recent_ops live_operations
-          in
-          match
-            Ringo.Ring.add_and_return_erased
-              live_data_cache
-              (most_recent_block, most_recent_ops)
-          with
-          | None -> Lwt.return (new_live_blocks, new_live_operations)
-          | Some (last_block, last_ops) ->
-              let diffed_new_live_blocks =
-                Block_hash.Set.remove last_block new_live_blocks
-              in
-              let diffed_new_live_operations =
-                Operation_hash.Set.diff new_live_operations last_ops
-              in
-              Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
-      | _ when update_cache ->
-          let new_cache = Ringo.Ring.create expected_capacity in
-          let* () =
-            Chain_traversal.live_blocks_with_ring
-              chain_store
-              block
-              expected_capacity
-              new_cache
-          in
-          chain_state.live_data_cache <- Some new_cache ;
-          let live_blocks, live_ops =
-            Ringo.Ring.fold
-              new_cache
-              ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
-              ~f:(fun (bhs, opss) (bh, ops) ->
-                (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
-          in
-          Lwt.return (live_blocks, live_ops)
-      | _ -> Chain_traversal.live_blocks chain_store block expected_capacity
+    (* We actually compute max_op_ttl + 1... *)
+    let expected_capacity = Block.max_operations_ttl metadata + 1 in
+    match (live_data_cache.live_data, live_data_cache.pred) with
+    | Some live_data, _
+      when update_cache
+           && Block_hash.equal
+                (Block.predecessor block)
+                (Block.hash current_head)
+           && Ringo.Ring.capacity live_data = expected_capacity -> (
+        (* The block candidate is on top of the current head. It
+           corresponds to a new promoted head. We need to move the
+           live data window one stop forward, including that new head
+           and discarding the oldest block of the previous
+           state. Checking the expected capacity allows to force
+           recomputing the livedata as soon as a max_op_ttl changes
+           between blocks. *)
+        let most_recent_block = Block.hash block in
+        let most_recent_ops =
+          Block.all_operation_hashes block
+          |> List.flatten |> Operation_hash.Set.of_list
+        in
+        let new_live_blocks =
+          Block_hash.Set.add most_recent_block live_blocks
+        in
+        let new_live_operations =
+          Operation_hash.Set.union most_recent_ops live_operations
+        in
+        match
+          Ringo.Ring.add_and_return_erased
+            live_data
+            (most_recent_block, most_recent_ops)
+        with
+        | None -> return (new_live_blocks, new_live_operations)
+        | Some (last_block, last_ops) ->
+            let diffed_new_live_blocks =
+              Block_hash.Set.remove last_block new_live_blocks
+            in
+            let diffed_new_live_operations =
+              Operation_hash.Set.diff new_live_operations last_ops
+            in
+            chain_state.live_data_cache <-
+              {
+                chain_state.live_data_cache with
+                pred = Some (last_block, last_ops);
+              } ;
+            return (diffed_new_live_blocks, diffed_new_live_operations))
+    | Some live_data, Some _
+      when Block_hash.equal
+             (Block.predecessor block)
+             (Block.predecessor current_head)
+           && Ringo.Ring.capacity live_data = expected_capacity ->
+        (* The block candidate's predecessor equals the current head
+           predecessor. It is an alternate head. We update the current
+           cache by substituting the current head live data with the
+           block's candidate one. *)
+        replace_head_from_live_data
+          chain_state
+          ~update_cache
+          ~current_head
+          live_blocks
+          live_operations
+          ~new_head:block
+          ~cache_expected_capacity:expected_capacity
+    | _ when update_cache ->
+        (* The block candidate is not on top of the current head. It is
+           likely to be an alternate branch. We recompute the whole live
+           data. We may keep this new state in the cache. *)
+        let new_cache = Ringo.Ring.create expected_capacity in
+        let*! () =
+          Chain_traversal.live_blocks_with_ring
+            chain_store
+            block
+            expected_capacity
+            new_cache
+        in
+        chain_state.live_data_cache <- {live_data = Some new_cache; pred = None} ;
+        let live_blocks, live_ops =
+          Ringo.Ring.fold
+            new_cache
+            ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
+            ~f:(fun (bhs, opss) (bh, ops) ->
+              (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
+        in
+        return (live_blocks, live_ops)
+    | _ ->
+        (* The block candidate is not on top of the current head. It
+           is likely to be an alternate head. We recompute the whole
+           live data. *)
+        let*! new_live_blocks =
+          Chain_traversal.live_blocks chain_store block expected_capacity
+        in
+        return new_live_blocks
+
+  let locked_compute_live_blocks ?(force = false) ?(update_cache = true)
+      chain_store chain_state block metadata =
+    let open Lwt_result_syntax in
+    let {current_head; live_blocks; live_operations; live_data_cache; _} =
+      chain_state
+    in
+    let is_pred_cache_set = Option.is_some live_data_cache.pred in
+    let* res =
+      if Block.equal current_head block && not force then
+        (* Computing live blocks/operations of the current head. The
+           cache is valid and returned as is. *)
+        return (live_blocks, live_operations)
+      else if
+        Block_hash.equal (Block.predecessor current_head) (Block.hash block)
+        && is_pred_cache_set && not force
+      then
+        (* Computing the live blocks/operations of the current head
+           predecessor. We rollback the livedata window by one step to
+           align with the predecessors livedata window, thanks to the
+           pred_cache. This is valid as a block max_op_ttl change will
+           force recomputing the livedata, invalidation the
+           pred_cache. *)
+        let pred_cache =
+          WithExceptions.Option.get ~loc:__LOC__ live_data_cache.pred
+        in
+        rollback_livedata ~current_head live_blocks live_operations ~pred_cache
+      else
+        locked_compute_live_blocks_with_cache
+          ~update_cache
+          chain_store
+          chain_state
+          block
+          metadata
+    in
+    return res
 
   let compute_live_blocks chain_store ~block =
     let open Lwt_result_syntax in
     Shared.use chain_store.chain_state (fun chain_state ->
         let* metadata = Block.get_block_metadata chain_store block in
-        let*! r =
+        let* r =
           locked_compute_live_blocks
             ~update_cache:false
             chain_store
@@ -1298,11 +1495,14 @@ module Chain = struct
                 chain_state.cementing_highwatermark_data
                 (Some new_highest_cemented_level))
 
-  let may_update_checkpoint_and_target chain_store ~new_head ~new_head_lafl
+  let may_update_checkpoint_and_target chain_store ~new_head ~new_head_lfbl
       ~checkpoint ~target =
     let open Lwt_result_syntax in
     let new_checkpoint =
-      if Compare.Int32.(snd new_head_lafl > snd checkpoint) then new_head_lafl
+      (* Ensure that the checkpoint is not above the current head *)
+      if Compare.Int32.(snd new_head_lfbl > snd checkpoint) then
+        if Compare.Int32.(snd new_head_lfbl > snd new_head) then new_head
+        else new_head_lfbl
       else checkpoint
     in
     match target with
@@ -1319,7 +1519,7 @@ module Chain = struct
               tzfail Target_mismatch
         else return (new_checkpoint, Some target)
 
-  let locked_determine_cementing_highwatermark chain_store chain_state head_lafl
+  let locked_determine_cementing_highwatermark chain_store chain_state head_lpbl
       =
     let open Lwt_syntax in
     let* cementing_highwatermark =
@@ -1338,10 +1538,10 @@ module Chain = struct
             (* If we have cemented blocks, take the highest cemented level *)
             Lwt.return_some hcb
         | None ->
-            (* If we don't, check that the head lafl is > caboose *)
+            (* If we don't, check that the head lpbl is > caboose *)
             let* _, caboose_level = Block_store.caboose block_store in
-            if Compare.Int32.(head_lafl >= caboose_level) then
-              Lwt.return_some head_lafl
+            if Compare.Int32.(head_lpbl >= caboose_level) then
+              Lwt.return_some head_lpbl
             else Lwt.return_none)
 
   let locked_may_update_cementing_highwatermark chain_state
@@ -1372,13 +1572,13 @@ module Chain = struct
      cycle, i.e, a future savepoint. Thus, that commit will end a
      chunk and will be an optimal candidate for a GC call.
 
-     The call of split is triggered when the last allowed fork level
-     of the new head changes. This is not ensuring that the created
-     chunk will be ended by a commit that will be the target of a
-     future gc call as reorganization may occur above the last allowed
-     fork level. Most of the time, and as reorganization are often
-     short, this will lead to the optimal behaviour. *)
-  let may_split_context chain_store new_head_lafl previous_head =
+     The call of split is triggered when the last preserved block
+     level of the new head changes. This is not ensuring that the
+     created chunk will be ended by a commit that will be the target
+     of a future gc call as reorganization may occur above the last
+     preserved block level. Most of the time, and as reorganization
+     are often short, this will lead to the optimal behaviour. *)
+  let may_split_context chain_store new_head_lpbl previous_head =
     let open Lwt_result_syntax in
     match history_mode chain_store with
     | Archive -> return_unit
@@ -1389,11 +1589,11 @@ module Chain = struct
         if
           not
             (Int32.equal
-               new_head_lafl
-               (Block.last_allowed_fork_level previous_head_metadata))
+               new_head_lpbl
+               (Block.last_preserved_block_level previous_head_metadata))
         then
           let block_store = chain_store.block_store in
-          Block_store.split_context block_store new_head_lafl
+          Block_store.split_context block_store new_head_lpbl
         else return_unit
 
   let set_head chain_store new_head =
@@ -1443,13 +1643,15 @@ module Chain = struct
              Block.get_block_metadata chain_store new_head)
         in
         let*! target = Stored_data.get chain_state.target_data in
-        let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
-        let* () = may_split_context chain_store new_head_lafl previous_head in
+        let new_head_lpbl =
+          Block.last_preserved_block_level new_head_metadata
+        in
+        let* () = may_split_context chain_store new_head_lpbl previous_head in
         let*! cementing_highwatermark =
           locked_determine_cementing_highwatermark
             chain_store
             chain_state
-            new_head_lafl
+            new_head_lpbl
         in
         (* This write call will initialize the cementing
            highwatermark when it is not yet set or do nothing
@@ -1459,24 +1661,30 @@ module Chain = struct
             chain_state
             cementing_highwatermark
         in
-        let*! lafl_block_opt =
-          Block.locked_read_block_by_level_opt
-            chain_store
-            new_head
-            new_head_lafl
+        let* lfbl_block_opt =
+          match chain_state.last_finalized_block_level with
+          | None -> return_none
+          | Some lfbl ->
+              let distance =
+                Int32.(to_int @@ max 0l (sub (Block.level new_head) lfbl))
+              in
+              Block_store.read_block
+                chain_store.block_store
+                ~read_metadata:false
+                (Block (Block.hash new_head, distance))
         in
         let* new_checkpoint, new_target =
-          match lafl_block_opt with
+          match lfbl_block_opt with
           | None ->
-              (* This case may occur when importing a rolling
-                 snapshot where the lafl block is not known.
-                 We may use the checkpoint instead. *)
+              (* This case may occur when importing a rolling snapshot
+                 where the lfbl block is not known or when a node was
+                 just started. We may use the checkpoint instead. *)
               return (checkpoint, target)
-          | Some lafl_block ->
+          | Some lfbl_block ->
               may_update_checkpoint_and_target
                 chain_store
                 ~new_head:new_head_descr
-                ~new_head_lafl:(Block.descriptor lafl_block)
+                ~new_head_lfbl:(Block.descriptor lfbl_block)
                 ~checkpoint
                 ~target
         in
@@ -1493,7 +1701,7 @@ module Chain = struct
                  set. *)
               false
           | Some cementing_highwatermark ->
-              Compare.Int32.(new_head_lafl > cementing_highwatermark)
+              Compare.Int32.(new_head_lpbl > cementing_highwatermark)
         in
         let* new_cementing_highwatermark =
           if should_merge then
@@ -1535,9 +1743,9 @@ module Chain = struct
                          ~loc:__LOC__
                          cementing_highwatermark)
                 in
-                (* The new memory highwatermark is new_head_lafl, the disk
+                (* The new memory highwatermark is new_head_lpbl, the disk
                    value will be updated after the merge completion. *)
-                return_some new_head_lafl
+                return_some new_head_lpbl
           else return cementing_highwatermark
         in
         let*! new_checkpoint =
@@ -1582,7 +1790,7 @@ module Chain = struct
         in
         let* () = Stored_data.write chain_state.target_data new_target in
         (* Update live_data *)
-        let*! live_blocks, live_operations =
+        let* live_blocks, live_operations =
           locked_compute_live_blocks
             ~update_cache:true
             chain_store
@@ -1689,7 +1897,7 @@ module Chain = struct
         {
           Block_repr.message = Some "Genesis";
           max_operations_ttl = 0;
-          last_allowed_fork_level = genesis_header.shell.level;
+          last_preserved_block_level = genesis_header.shell.level;
           block_metadata = Bytes.create 0;
           operations_metadata = [];
         }
@@ -1705,7 +1913,7 @@ module Chain = struct
     let cementing_highwatermark =
       Option.fold
         ~none:0l
-        ~some:(fun metadata -> Block.last_allowed_fork_level metadata)
+        ~some:(fun metadata -> Block.last_preserved_block_level metadata)
         (Block_repr.metadata genesis_block)
     in
     let activation_block = genesis_descr in
@@ -1757,15 +1965,17 @@ module Chain = struct
         ~initial_data:Chain_id.Map.empty
     in
     let current_head = genesis_block in
+    let last_finalized_block_level = None in
     let active_testchain = None in
     let mempool = Mempool.empty in
     let live_blocks = Block_hash.Set.singleton genesis_block.hash in
     let live_operations = Operation_hash.Set.empty in
-    let live_data_cache = None in
+    let live_data_cache = {live_data = None; pred = None} in
     let validated_blocks = Block_lru_cache.create 10 in
     return
       {
         current_head_data;
+        last_finalized_block_level;
         cementing_highwatermark_data;
         target_data;
         checkpoint_data;
@@ -1853,15 +2063,17 @@ module Chain = struct
     match o with
     | None -> failwith "load_store: cannot read head"
     | Some current_head ->
+        let last_finalized_block_level = None in
         let active_testchain = None in
         let mempool = Mempool.empty in
         let live_blocks = Block_hash.Set.empty in
         let live_operations = Operation_hash.Set.empty in
-        let live_data_cache = None in
+        let live_data_cache = {live_data = None; pred = None} in
         let validated_blocks = Block_lru_cache.create 10 in
         return
           {
             current_head_data;
+            last_finalized_block_level;
             cementing_highwatermark_data;
             target_data;
             checkpoint_data;
@@ -1972,7 +2184,7 @@ module Chain = struct
     | None -> tzfail Inconsistent_chain_store
     | Some metadata ->
         Shared.update_with chain_state (fun chain_state ->
-            let*! live_blocks, live_operations =
+            let* live_blocks, live_operations =
               locked_compute_live_blocks
                 ~force:true
                 ~update_cache:true
@@ -2864,10 +3076,10 @@ let rec make_pp_chain_store (chain_store : chain_store) =
           in
           Format.fprintf
             fmt
-            "%a (lafl: %ld) (max_op_ttl: %d)"
+            "%a (lpbl: %ld) (max_op_ttl: %d)"
             pp_block_descriptor
             (Block.descriptor block)
-            (Block.last_allowed_fork_level metadata)
+            (Block.last_preserved_block_level metadata)
             (Block.max_operations_ttl metadata))
         current_head
         pp_block_descriptor
@@ -3058,36 +3270,33 @@ module Unsafe = struct
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
     let* lockfile = create_lockfile chain_dir in
-    let*! () = lock_for_read lockfile in
+    let*! is_locked =
+      Lwt.catch
+        (fun () ->
+          let*! () = Lwt_unix.lockf lockfile Unix.F_TEST 0 in
+          Lwt.return_false)
+        (fun (_ : exn) -> Lwt.return_true)
+    in
+    let* () =
+      protect
+        (fun () ->
+          if not is_locked then return_unit
+          else
+            Animation.three_dots
+              ~progress_display_mode:Auto
+              ~msg:
+                "The storage is locked by a context pruning. Waiting for it to \
+                 finish before exporting the snapshot"
+            @@ fun () ->
+            let*! () = lock_for_read lockfile in
+            return_unit)
+        ~on_error:(fun errs ->
+          let*! () = Lwt_unix.close lockfile in
+          Lwt.return (Error errs))
+    in
     protect
       (fun () ->
         let*! context_index = Context.init ~readonly:true context_dir in
-        let*! fd =
-          Lwt_unix.openfile
-            (Naming.gc_lockfile chain_dir |> Naming.file_path)
-            [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
-            0o644
-        in
-        let*! is_locked =
-          Lwt.catch
-            (fun () ->
-              let*! () = Lwt_unix.lockf fd Unix.F_TEST 0o644 in
-              Lwt.return_false)
-            (fun (_ : exn) -> Lwt.return_true)
-        in
-        let*! () =
-          Lwt.finalize
-            (fun () ->
-              if not is_locked then Lwt.return_unit
-              else
-                Animation.three_dots
-                  ~progress_display_mode:Auto
-                  ~msg:
-                    "The storage is locked by a context prunning. Waiting for \
-                     it to finish before exporting the snapshot"
-                @@ fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
-            (fun () -> Lwt_unix.close fd)
-        in
         let* store =
           load_store
             store_dir

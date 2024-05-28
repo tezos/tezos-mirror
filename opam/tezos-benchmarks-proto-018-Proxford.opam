@@ -10,14 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezos-protocol-018-Proxford"
-  "tezos-benchmark"
-  "tezos-benchmark-018-Proxford"
-  "tezos-benchmark-type-inference-018-Proxford"
-  "octez-shell-libs"
-  "octez-protocol-018-Proxford-libs"
-  "octez-proto-libs"
+  "octez-libs" { = version }
+  "tezos-protocol-018-Proxford" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-018-Proxford" { = version }
+  "tezos-benchmark-type-inference-018-Proxford" { = version }
+  "octez-shell-libs" { = version }
+  "octez-protocol-018-Proxford-libs" { = version }
+  "octez-proto-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

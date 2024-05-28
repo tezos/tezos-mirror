@@ -168,7 +168,7 @@ fails.
 .. sidebar:: Checking a hash is of a valid protocol
 
    When a hash is proposed by a delegate, it is usually accompanied by some
-   blogposts and forum threads on :ref:`community websites <tezos_community>`.
+   blogposts and forum threads on :ref:`community <tezos_community>` websites.
    These should include directions for testing the proposed protocols. If you
    cannot find such directions, do not hesitate to ask.
 

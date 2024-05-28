@@ -34,7 +34,7 @@ let pack_operation ctxt signature contents =
 let sign ?(watermark = Signature.Generic_operation) sk branch contents =
   let unsigned =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding_with_legacy_attestation_name
+      Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
   let signature = Some (Signature.sign ~watermark sk unsigned) in
@@ -97,8 +97,8 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
   let* signer = Account.find delegate_pkh in
   return (consensus_content, signer.sk, branch)
 
-let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
+    ?dal_content ?branch attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
@@ -110,7 +110,7 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?branch
       attested_block
   in
-  let op = Single (Attestation consensus_content) in
+  let op = Single (Attestation {consensus_content; dal_content}) in
   return
     (sign
        ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
@@ -118,8 +118,8 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
        branch
        op)
 
-let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
+    ?branch attested_block =
   let open Lwt_result_syntax in
   let* op =
     raw_attestation
@@ -128,6 +128,7 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?level
       ?round
       ?block_payload_hash
+      ?dal_content
       ?branch
       attested_block
   in
@@ -633,18 +634,20 @@ let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
 
 let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
     ctxt source limit =
+  let open Lwt_result_syntax in
   let top = Set_deposits_limit limit in
-  manager_operation
-    ?force_reveal
-    ?fee
-    ?counter
-    ?storage_limit
-    ?gas_limit
-    ~source
-    ctxt
-    top
-  >>=? fun sop ->
-  Context.Contract.manager ctxt source >|=? fun account ->
+  let* sop =
+    manager_operation
+      ?force_reveal
+      ?fee
+      ?counter
+      ?storage_limit
+      ?gas_limit
+      ~source
+      ctxt
+      top
+  in
+  let+ account = Context.Contract.manager ctxt source in
   sign account.sk (Context.branch ctxt) sop
 
 let increase_paid_storage ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
@@ -792,7 +795,7 @@ let dummy_script =
       storage = lazy_expr (strip_locations (Prim ((), D_Unit, [], [])));
     }
 
-let dummy_script_cost = Test_tez.of_mutez_exn 9_500L
+let dummy_script_cost = Tez_helpers.of_mutez 9_500L
 
 let transfer_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     ~(source : Contract.t) ~contents ~ty ~ticketer ~amount ~destination
@@ -958,8 +961,8 @@ let sc_rollup_timeout ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   let+ account = Context.Contract.manager ctxt src in
   sign account.sk (Context.branch ctxt) to_sign_op
 
-let dal_publish_slot_header ?force_reveal ?counter ?fee ?gas_limit
-    ?storage_limit ctxt (src : Contract.t) slot_header =
+let dal_publish_commitment ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ctxt (src : Contract.t) slot_header =
   let open Lwt_result_syntax in
   let* to_sign_op =
     manager_operation
@@ -970,7 +973,7 @@ let dal_publish_slot_header ?force_reveal ?counter ?fee ?gas_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Dal_publish_slot_header slot_header)
+      (Dal_publish_commitment slot_header)
   in
   let+ account = Context.Contract.manager ctxt src in
   sign account.sk (Context.branch ctxt) to_sign_op

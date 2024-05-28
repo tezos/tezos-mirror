@@ -51,7 +51,11 @@ pub fn panic_handler(info: &PanicInfo) {
         std::eprintln!("{}", message);
     }
 
-    // If we're testing, we want to be able to see the panic trace
-    #[cfg(all(feature = "abort", target_arch = "wasm32"))]
+    // We don't want to abort when testing because that prevents the panic trace
+    // from being printed.
+    #[cfg(all(
+        feature = "abort",
+        any(target_arch = "wasm32", target_arch = "riscv64")
+    ))]
     std::process::abort()
 }

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2018-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -80,11 +80,11 @@ let get_version node =
        commit_hash = Tezos_version_value.Current_git_info.commit_hash;
        commit_date = Tezos_version_value.Current_git_info.committer_date;
      }
-      : Tezos_version.Node_version.commit_info)
+      : Tezos_version.Octez_node_version.commit_info)
   in
-  let version = Tezos_version_value.Current_git_info.version in
+  let version = Tezos_version_value.Current_git_info.octez_version in
   let network_version = P2p.announced_version node.p2p in
-  Tezos_version.Node_version.
+  Tezos_version.Octez_node_version.
     {version; commit_info = Some commit_info; network_version}
 
 let peer_metadata_cfg : _ P2p_params.peer_meta_config =
@@ -273,24 +273,29 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
       in
       let main_chain_store = Store.main_chain_store store in
       let* validator_process =
-        init validator_environment (Internal main_chain_store)
+        init (Internal (validator_environment, main_chain_store))
       in
       return (validator_process, store)
     else
       let* validator_process =
         init
-          validator_environment
           (External
              {
-               data_dir;
-               readonly = false;
-               genesis;
-               context_root;
-               protocol_root;
+               parameters =
+                 {
+                   data_dir;
+                   readonly = false;
+                   genesis;
+                   context_root;
+                   protocol_root;
+                   sandbox_parameters;
+                   dal_config;
+                   user_activated_upgrades;
+                   user_activated_protocol_overrides;
+                   operation_metadata_size_limit;
+                   internal_events;
+                 };
                process_path = Sys.executable_name;
-               sandbox_parameters;
-               dal_config;
-               internal_events;
              })
       in
       let commit_genesis ~chain_id =
@@ -392,6 +397,7 @@ let build_rpc_directory ~node_version ~commit_info node =
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory node_version) ;
+  merge (Health_directory.build_rpc_directory ()) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

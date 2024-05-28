@@ -32,17 +32,10 @@ type validator_environment = {
 }
 
 type validator_kind =
-  | Internal : Store.Chain.chain_store -> validator_kind
+  | Internal : validator_environment * Store.Chain.chain_store -> validator_kind
   | External : {
-      genesis : Genesis.t;
-      readonly : bool;
-      data_dir : string;
-      context_root : string;
-      protocol_root : string;
+      parameters : External_validation.parameters;
       process_path : string;
-      sandbox_parameters : Data_encoding.json option;
-      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-      internal_events : Tezos_base.Internal_event_config.t;
     }
       -> validator_kind
 
@@ -144,7 +137,19 @@ module Internal_validator_process = struct
         ~section
         ~level:Debug
         ~name:"seq_validation_request"
-        ~msg:"requesting validation of {block} for chain {chain}"
+        ~msg:
+          "requesting validation and application of {block} for chain {chain}"
+        ~pp1:Block_hash.pp
+        ("block", Block_hash.encoding)
+        ~pp2:Chain_id.pp
+        ("chain", Chain_id.encoding)
+
+    let application_request =
+      declare_2
+        ~section
+        ~level:Debug
+        ~name:"seq_application_request"
+        ~msg:"requesting application of {block} for chain {chain}"
         ~pp1:Block_hash.pp
         ("block", Block_hash.encoding)
         ~pp2:Chain_id.pp
@@ -156,6 +161,17 @@ module Internal_validator_process = struct
         ~level:Debug
         ~name:"seq_validation_success"
         ~msg:"block {block} successfully validated in {timespan}"
+        ~pp1:Block_hash.pp
+        ("block", Block_hash.encoding)
+        ~pp2:Time.System.Span.pp_hum
+        ("timespan", Time.System.Span.encoding)
+
+    let application_success =
+      declare_2
+        ~section
+        ~level:Debug
+        ~name:"seq_application_success"
+        ~msg:"block {block} successfully applied in {timespan}"
         ~pp1:Block_hash.pp
         ("block", Block_hash.encoding)
         ~pp2:Time.System.Span.pp_hum
@@ -268,7 +284,11 @@ module Internal_validator_process = struct
     let predecessor_resulting_context_hash =
       env.predecessor_resulting_context_hash
     in
-    let*! () = Events.(emit validation_request (block_hash, env.chain_id)) in
+    let*! () =
+      if should_precheck then
+        Events.(emit validation_request (block_hash, env.chain_id))
+      else Events.(emit application_request (block_hash, env.chain_id))
+    in
     let cache =
       match validator.cache with
       | None -> `Load
@@ -293,7 +313,11 @@ module Internal_validator_process = struct
       Some
         {context_hash = result.validation_store.resulting_context_hash; cache} ;
     validator.preapply_result <- None ;
-    let*! () = Events.(emit validation_success (block_hash, timespan)) in
+    let*! () =
+      if should_precheck then
+        Events.(emit validation_success (block_hash, timespan))
+      else Events.(emit application_success (block_hash, timespan))
+    in
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -323,6 +347,12 @@ module Internal_validator_process = struct
     let operation_metadata_size_limit =
       validator.operation_metadata_size_limit
     in
+    let cache =
+      match validator.cache with
+      | None -> `Load
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_resulting_context_hash)
+    in
     let* result, apply_result =
       Block_validation.preapply
         ~chain_id
@@ -340,6 +370,7 @@ module Internal_validator_process = struct
         ~predecessor_max_operations_ttl
         ~predecessor_block_metadata_hash
         ~predecessor_ops_metadata_hash
+        ~cache
         operations
     in
     validator.preapply_result <- Some apply_result ;
@@ -426,6 +457,14 @@ module External_validator_process = struct
         ~level:Notice
         ~name:"proc_initialized"
         ~msg:"external validation initialized"
+        ()
+
+    let init_error =
+      declare_0
+        ~section
+        ~level:Error
+        ~name:"init_error"
+        ~msg:"failed to initialize the external block validator: shutting down"
         ()
 
     let close =
@@ -535,7 +574,8 @@ module External_validator_process = struct
         ~level:Debug
         ~name:"proc_request"
         ~msg:"request for {request}"
-        ~pp1:External_validation.request_pp
+        ~pp1:(fun fmt (External_validation.Erequest r) ->
+          External_validation.request_pp fmt r)
         ("request", External_validation.request_encoding)
 
     let request_result =
@@ -544,7 +584,8 @@ module External_validator_process = struct
         ~level:Debug
         ~name:"proc_request_result"
         ~msg:"completion of {request_result} in {timespan}"
-        ~pp1:External_validation.request_pp
+        ~pp1:(fun fmt (External_validation.Erequest r) ->
+          External_validation.request_pp fmt r)
         ("request_result", External_validation.request_encoding)
         ~pp2:Time.System.Span.pp_hum
         ("timespan", Time.System.Span.encoding)
@@ -564,20 +605,10 @@ module External_validator_process = struct
   type process_status = Uninitialized | Running of validator_process | Exiting
 
   type t = {
-    genesis : Genesis.t;
-    readonly : bool;
-    data_dir : string;
-    context_root : string;
-    protocol_root : string;
-    user_activated_upgrades : User_activated.upgrades;
-    user_activated_protocol_overrides : User_activated.protocol_overrides;
-    operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
+    parameters : External_validation.parameters;
     process_path : string;
     mutable validator_process : process_status;
     lock : Lwt_mutex.t;
-    sandbox_parameters : Data_encoding.json option;
-    dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-    internal_events : Tezos_base.Internal_event_config.t;
   }
 
   let kind = External_process
@@ -639,24 +670,11 @@ module External_validator_process = struct
   *)
   let process_init vp process_input process_output =
     let open Lwt_result_syntax in
-    let parameters =
-      {
-        External_validation.context_root = vp.context_root;
-        protocol_root = vp.protocol_root;
-        sandbox_parameters = vp.sandbox_parameters;
-        genesis = vp.genesis;
-        user_activated_upgrades = vp.user_activated_upgrades;
-        user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
-        operation_metadata_size_limit = vp.operation_metadata_size_limit;
-        dal_config = vp.dal_config;
-        internal_events = vp.internal_events;
-      }
-    in
     let*! () =
       External_validation.send
         process_input
         External_validation.parameters_encoding
-        parameters
+        vp.parameters
     in
     let* () =
       External_validation.recv
@@ -677,10 +695,7 @@ module External_validator_process = struct
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
-    let args =
-      ["octez-validator"; "--socket-dir"; socket_dir]
-      @ match vp.readonly with true -> ["--readonly"] | false -> []
-    in
+    let args = ["octez-validator"; "--socket-dir"; socket_dir] in
     let env = Unix.environment () in
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
 
@@ -728,26 +743,37 @@ module External_validator_process = struct
           clean_process_fd socket_path)
     in
     let* process_socket =
-      Lwt.finalize
+      protect
+        ~on_error:(function
+          | [Exn Lwt_unix.Timeout] as err ->
+              let*! () = Events.(emit init_error ()) in
+              process#terminate ;
+              let*! _ = Lwt_exit.exit_and_wait 1 in
+              Lwt.return_error err
+          | err -> Lwt.return_error err)
         (fun () ->
-          let* process_socket =
-            External_validation.create_socket_listen
-              ~canceler
-              ~max_requests:1
-              ~socket_path
-          in
-          let*! v, _ = Lwt_unix.accept process_socket in
-          let*! () = Lwt_unix.close process_socket in
-          return v)
-        (fun () ->
-          (* As the external validation process is now started, we can
-              unlink the named socket. Indeed, the file descriptor will
-              remain valid as long as at least one process keeps it
-              open. This method mimics an anonymous file descriptor
-              without relying on Linux specific features. It also
-              trigger the clean up procedure if some sockets related
-              errors are thrown. *)
-          clean_process_fd socket_path)
+          Lwt.finalize
+            (fun () ->
+              let* process_socket =
+                External_validation.create_socket_listen
+                  ~canceler
+                  ~max_requests:1
+                  ~socket_path
+              in
+              let*! v, _ =
+                Lwt.pick [Lwt_unix.timeout 30.; Lwt_unix.accept process_socket]
+              in
+              let*! () = Lwt_unix.close process_socket in
+              return v)
+            (fun () ->
+              (* As the external validation process is now started, we can
+                  unlink the named socket. Indeed, the file descriptor will
+                  remain valid as long as at least one process keeps it
+                  open. This method mimics an anonymous file descriptor
+                  without relying on Linux specific features. It also
+                  trigger the clean up procedure if some sockets related
+                  errors are thrown. *)
+              clean_process_fd socket_path))
     in
     Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
     (* Register clean up callback to ensure that the validator process
@@ -806,13 +832,14 @@ module External_validator_process = struct
     | Uninitialized -> start_process vp
     | Exiting ->
         let*! () = Events.(emit cannot_start_process ()) in
-        tzfail Block_validator_errors.Cannot_validate_while_shutting_down
+        tzfail Block_validator_errors.Cannot_process_request_while_shutting_down
 
   (* Sends the given request to the external validator. If the request
      failed to be fulfilled, the status of the external validator is
      set to Uninitialized and the associated error is propagated. *)
-  let send_request vp request result_encoding =
+  let send_request vp request =
     let open Lwt_result_syntax in
+    let prequest = External_validation.Erequest request in
     let* process, process_input, process_output = validator_state vp in
     Lwt.catch
       (fun () ->
@@ -822,23 +849,23 @@ module External_validator_process = struct
           Lwt.protected
             (Lwt_mutex.with_lock vp.lock (fun () ->
                  let now = Time.System.now () in
-                 let*! () = Events.(emit request_for request) in
+                 let*! () = Events.(emit request_for prequest) in
                  let*! () =
                    External_validation.send
                      process_input
                      External_validation.request_encoding
-                     request
+                     prequest
                  in
                  let*! res =
                    External_validation.recv_result
                      process_output
-                     result_encoding
+                     (External_validation.result_encoding request)
                  in
                  let timespan =
                    let then_ = Time.System.now () in
                    Ptime.diff then_ now
                  in
-                 let*! () = Events.(emit request_result (request, timespan)) in
+                 let*! () = Events.(emit request_result (prequest, timespan)) in
                  Lwt.return res))
         in
         match process#state with
@@ -864,34 +891,14 @@ module External_validator_process = struct
      Note that it is important to have [init] as a blocking promise as
      the external validator must initialize the context (in RW) before
      the node tries to open it (in RO).*)
-  let init
-      ({
-         user_activated_upgrades;
-         user_activated_protocol_overrides;
-         operation_metadata_size_limit;
-         _;
-       } :
-        validator_environment) ~genesis ~data_dir ~readonly ~context_root
-      ~protocol_root ~process_path ~sandbox_parameters ~dal_config
-      ~internal_events =
+  let init parameters ~process_path =
     let open Lwt_result_syntax in
-    let*! () = Events.(emit init ()) in
     let validator =
       {
-        data_dir;
-        readonly;
-        genesis;
-        context_root;
-        protocol_root;
-        user_activated_upgrades;
-        user_activated_protocol_overrides;
-        operation_metadata_size_limit;
+        parameters;
         process_path;
         validator_process = Uninitialized;
         lock = Lwt_mutex.create ();
-        sandbox_parameters;
-        dal_config;
-        internal_events;
       }
     in
     let* (_ :
@@ -900,6 +907,7 @@ module External_validator_process = struct
            * Lwt_io.input Lwt_io.channel) =
       start_process validator
     in
+    let*! () = Events.(emit init ()) in
     return validator
 
   let apply_block ~simulate ?(should_precheck = true) validator chain_store
@@ -917,7 +925,7 @@ module External_validator_process = struct
       Store.Block.resulting_context_hash chain_store predecessor
     in
     let request =
-      External_validation.Validate
+      External_validation.Apply
         {
           chain_id;
           block_header;
@@ -931,7 +939,7 @@ module External_validator_process = struct
           simulate;
         }
     in
-    send_request validator request Block_validation.result_encoding
+    send_request validator request
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
@@ -955,7 +963,7 @@ module External_validator_process = struct
           operations;
         }
     in
-    send_request validator request Block_validation.preapply_result_encoding
+    send_request validator request
 
   let precheck_block validator chain_store ~predecessor header hash operations =
     let open Lwt_result_syntax in
@@ -977,7 +985,7 @@ module External_validator_process = struct
           hash;
         }
     in
-    send_request validator request Data_encoding.unit
+    send_request validator request
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
       =
@@ -985,15 +993,15 @@ module External_validator_process = struct
       External_validation.Context_garbage_collection
         {context_hash; gc_lockfile_path}
     in
-    send_request validator request Data_encoding.unit
+    send_request validator request
 
   let context_split validator _index =
     let request = External_validation.Context_split in
-    send_request validator request Data_encoding.unit
+    send_request validator request
 
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
-    send_request validator request Context_hash.encoding
+    send_request validator request
 
   let init_test_chain validator chain_id forking_block =
     let forked_header = Store.Block.header forking_block in
@@ -1002,20 +1010,19 @@ module External_validator_process = struct
       External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header}
     in
-    send_request validator request Block_header.encoding
+    send_request validator request
 
   let reconfigure_event_logging validator config =
     send_request
       validator
       (External_validation.Reconfigure_event_logging config)
-      Data_encoding.unit
 
   let close vp =
     let open Lwt_syntax in
     let* () = Events.(emit close ()) in
     match vp.validator_process with
     | Running {process; input = process_input; canceler; _} ->
-        let request = External_validation.Terminate in
+        let request = External_validation.Erequest Terminate in
         let* () = Events.(emit request_for request) in
         let* () =
           Lwt.catch
@@ -1060,10 +1067,10 @@ module External_validator_process = struct
     | Uninitialized | Exiting -> Lwt.return_unit
 end
 
-let init validator_environment validator_kind =
+let init validator_kind =
   let open Lwt_result_syntax in
   match validator_kind with
-  | Internal chain_store ->
+  | Internal (validator_environment, chain_store) ->
       let* (validator : 'a) =
         Internal_validator_process.init validator_environment chain_store
       in
@@ -1071,30 +1078,9 @@ let init validator_environment validator_kind =
         (module Internal_validator_process)
       in
       return (E {validator_process; validator})
-  | External
-      {
-        genesis;
-        readonly;
-        data_dir;
-        context_root;
-        protocol_root;
-        process_path;
-        sandbox_parameters;
-        dal_config;
-        internal_events;
-      } ->
+  | External {parameters; process_path} ->
       let* (validator : 'b) =
-        External_validator_process.init
-          validator_environment
-          ~genesis
-          ~data_dir
-          ~readonly
-          ~context_root
-          ~protocol_root
-          ~process_path
-          ~sandbox_parameters
-          ~dal_config
-          ~internal_events
+        External_validator_process.init parameters ~process_path
       in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)

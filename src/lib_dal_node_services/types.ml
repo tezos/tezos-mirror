@@ -29,6 +29,8 @@ type level = int32
 
 type slot_index = int
 
+type page_index = int
+
 module Topic = struct
   type t = {slot_index : int; pkh : Signature.Public_key_hash.t}
 
@@ -191,6 +193,24 @@ module Peer = struct
   let encoding = P2p_peer.Id.encoding
 end
 
+module Point = struct
+  type t = P2p_point.Id.t
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare p1 p2 = P2p_point.Id.compare p1 p2
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
+
+  let pp = P2p_point.Id.pp
+
+  let encoding = P2p_point.Id.encoding
+end
+
 let get_value ~__LOC__ func =
   Option.value_f ~default:(fun () ->
       Stdlib.failwith
@@ -255,7 +275,24 @@ module Score = struct
 end
 
 (* Declaration of types used as inputs and/or outputs. *)
-type slot_id = {slot_level : level; slot_index : slot_index}
+module Slot_id = struct
+  type t = {slot_level : level; slot_index : slot_index}
+
+  let compare {slot_level = l1; slot_index = i1}
+      {slot_level = l2; slot_index = i2} =
+    let open Compare in
+    or_else (Int32.compare l1 l2) (fun () -> Int.compare i1 i2)
+
+  module Comparable = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  module Set = Set.Make (Comparable)
+end
+
+type slot_id = Slot_id.t
 
 type slot_set = {slots : bool list; published_level : int32}
 
@@ -279,10 +316,21 @@ type slot_header = {
 type operator_profile =
   | Attester of Tezos_crypto.Signature.public_key_hash
   | Producer of {slot_index : int}
+  | Observer of {slot_index : int}
 
 type operator_profiles = operator_profile list
 
-type profiles = Bootstrap | Operator of operator_profiles
+type profiles = Bootstrap | Operator of operator_profiles | Random_observer
+
+let merge_profiles ~lower_prio ~higher_prio =
+  match (lower_prio, higher_prio) with
+  | Bootstrap, Bootstrap -> Bootstrap
+  | Operator _, Bootstrap -> Bootstrap
+  | Bootstrap, Operator op -> Operator op
+  | Operator op1, Operator op2 -> Operator (op1 @ op2)
+  | Random_observer, Random_observer -> Random_observer
+  | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
+  | (Operator _ | Bootstrap), Random_observer -> Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -294,6 +342,7 @@ let slot_id_encoding =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4396
       Reuse protocol encodings. *)
   let open Data_encoding in
+  let open Slot_id in
   conv
     (fun {slot_level; slot_index} -> (slot_level, slot_index))
     (fun (slot_level, slot_index) -> {slot_level; slot_index})
@@ -394,6 +443,12 @@ let operator_profile_encoding =
         (obj2 (req "kind" (constant "producer")) (req "slot_index" int31))
         (function Producer {slot_index} -> Some ((), slot_index) | _ -> None)
         (function (), slot_index -> Producer {slot_index});
+      case
+        ~title:"observer"
+        (Tag 2)
+        (obj2 (req "kind" (constant "observer")) (req "slot_index" int31))
+        (function Observer {slot_index} -> Some ((), slot_index) | _ -> None)
+        (function (), slot_index -> Observer {slot_index});
     ]
 
 let profiles_encoding =
@@ -416,6 +471,12 @@ let profiles_encoding =
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)
         (function (), operator_profiles -> Operator operator_profiles);
+      case
+        ~title:"Random_observer"
+        (Tag 3)
+        (obj1 (req "kind" (constant "random_observer")))
+        (function Random_observer -> Some () | _ -> None)
+        (function () -> Random_observer);
     ]
 
 let with_proof_encoding =
@@ -435,6 +496,24 @@ let header_status_arg =
   in
   let construct = Data_encoding.Binary.to_string_exn header_status_encoding in
   Tezos_rpc.Arg.make ~name:"header_status" ~destruct ~construct ()
+
+let char =
+  Resto.Arg.make
+    ~name:"char"
+    ~destruct:(fun str ->
+      if String.length str = 1 then Ok (String.get str 0)
+      else Error "A single character string is expected")
+    ~construct:(fun c -> String.make 1 c)
+    ()
+
+let slot_query =
+  let open Tezos_rpc.Query in
+  query (fun padding ->
+      object
+        method padding = padding
+      end)
+  |+ field "padding" char '\x00' (fun obj -> obj#padding)
+  |> seal
 
 let wait_query =
   let open Tezos_rpc.Query in

@@ -343,111 +343,6 @@ pub struct ReadInputMessageInfo {
     pub id: i32,
 }
 
-#[cfg(all(target_arch = "riscv64", target_os = "none", feature = "proto-alpha"))]
-mod riscv64_none {
-    use crate::{
-        riscv64_syscalls::{write, StdErr},
-        smart_rollup_core::ReadInputMessageInfo,
-    };
-
-    pub unsafe fn read_input(
-        _message_info: *mut ReadInputMessageInfo,
-        _dst: *mut u8,
-        _max_bytes: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn write_debug(src: *const u8, num_bytes: usize) {
-        write(StdErr as i64, src, num_bytes);
-    }
-
-    pub unsafe fn store_has(_path: *const u8, _path_len: usize) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_read(
-        _path: *const u8,
-        _path_len: usize,
-        _offset: usize,
-        _dst: *mut u8,
-        _max_bytes: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_write(
-        _path: *const u8,
-        _path_len: usize,
-        _offset: usize,
-        _src: *const u8,
-        _num_bytes: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_delete(_path: *const u8, _len: usize) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_delete_value(_path: *const u8, _len: usize) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_list_size(_path: *const u8, _path_len: usize) -> i64 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_move(
-        _from_path: *const u8,
-        _from_path_len: usize,
-        _to_path: *const u8,
-        _to_path_len: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_copy(
-        _from_path: *const u8,
-        _from_path_len: usize,
-        _to_path: *const u8,
-        _to_path_len: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn reveal_preimage(
-        _hash_addr: *const u8,
-        _hash_len: usize,
-        _destination_addr: *mut u8,
-        _max_bytes: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    #[cfg(feature = "proto-alpha")]
-    pub unsafe fn reveal(
-        _payload_addr: *const u8,
-        _payload_len: usize,
-        _destination_addr: *mut u8,
-        _max_bytes: usize,
-    ) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32 {
-        unimplemented!()
-    }
-
-    pub unsafe fn reveal_metadata(_destination_addr: *mut u8, _max_bytes: usize) -> i32 {
-        unimplemented!()
-    }
-}
-
 #[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
 mod riscv64_hermit {
     extern crate std;
@@ -456,13 +351,93 @@ mod riscv64_hermit {
         io::{self, Write},
         slice::from_raw_parts,
     };
+    use tezos_smart_rollup_constants::riscv::{
+        SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
+        SBI_TEZOS_META_ORIGINATION_LEVEL,
+    };
+
+    /// Information about the next inbox level
+    struct MessageInfo {
+        /// Level of the inbox that contains the new message
+        level: i32,
+
+        /// ID within that inbox level
+        id: i32,
+
+        /// Number of bytes in the message
+        length: u64,
+    }
+
+    /// Select the next available inbox message.
+    #[inline(always)]
+    unsafe fn sbi_tezos_inbox_next(buffer: *mut u8, max_len: u64) -> MessageInfo {
+        let level: i32;
+        let id: i32;
+        let length: u64;
+
+        core::arch::asm!(
+            "ecall",
+            in("a0") buffer,
+            in("a1") max_len,
+            in("a7") SBI_FIRMWARE_TEZOS, // Extension ID for Tezos
+            in("a6") SBI_TEZOS_INBOX_NEXT, // Function ID for `sbi_tezos_inbox_next`
+            lateout("a0") level,
+            lateout("a1") id,
+            lateout("a2") length
+        );
+
+        MessageInfo { level, id, length }
+    }
+
+    /// Retrieve this rollup's origination level.
+    #[inline(always)]
+    unsafe fn sbi_tezos_meta_origination_level() -> u64 {
+        let level: u64;
+
+        core::arch::asm!(
+            "ecall",
+            in("a7") SBI_FIRMWARE_TEZOS,
+            in("a6") SBI_TEZOS_META_ORIGINATION_LEVEL,
+            lateout("a0") level
+        );
+
+        level
+    }
+
+    /// Retrieve the address of this rollup and return it via `buffer`. Returns
+    /// the number of bytes written to `buffer`.
+    #[inline(always)]
+    unsafe fn sbi_tezos_meta_address(buffer: *mut u8, max_len: u64) -> u64 {
+        let result: u64;
+
+        core::arch::asm!(
+            "ecall",
+            in("a0") buffer,
+            in("a1") max_len,
+            in("a7") SBI_FIRMWARE_TEZOS,
+            in("a6") SBI_TEZOS_META_ADDRESS,
+            lateout("a0") result
+        );
+
+        result
+    }
 
     pub unsafe fn read_input(
-        _message_info: *mut ReadInputMessageInfo,
-        _dst: *mut u8,
-        _max_bytes: usize,
+        message_info: *mut ReadInputMessageInfo,
+        dst: *mut u8,
+        max_bytes: usize,
     ) -> i32 {
-        unimplemented!()
+        let info = sbi_tezos_inbox_next(dst, max_bytes as u64);
+
+        // Length of 0 means nothing is available.
+        if info.length == 0 {
+            return 0i32;
+        }
+
+        (*message_info).level = info.level;
+        (*message_info).id = info.id;
+
+        info.length as i32
     }
 
     pub unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
@@ -553,13 +528,20 @@ mod riscv64_hermit {
         unimplemented!()
     }
 
-    pub unsafe fn reveal_metadata(_destination_addr: *mut u8, _max_bytes: usize) -> i32 {
-        unimplemented!()
+    pub unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
+        // Fill in the address part of the buffer.
+        let offset = sbi_tezos_meta_address(buffer, max_bytes as u64) as usize;
+
+        // Fill the remaining part of the buffer with the origination level.
+        let orig_level = (sbi_tezos_meta_origination_level() as u32).to_le_bytes();
+        assert!(max_bytes - offset >= orig_level.len());
+        buffer
+            .add(offset)
+            .copy_from(orig_level.as_ptr(), orig_level.len());
+
+        (offset + orig_level.len()) as i32
     }
 }
-
-#[cfg(all(target_arch = "riscv64", target_os = "none", feature = "proto-alpha"))]
-pub use riscv64_none::*;
 
 #[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
 pub use riscv64_hermit::*;

@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package exporter;
+
+message SubDag {
+    uint64 id = 1;
+    Certificate leader = 2;
+    repeated Certificate certificates = 3;
+    repeated Payload payloads = 4;
+}
+
+message Certificate {
+    Header header = 1;
+    bytes signature = 2;
+    bytes signers = 3;
+}
+
+message Header {
+    uint32 author = 1;
+    uint64 round = 2;
+    uint64 epoch = 3;
+    uint64 created_at = 4;
+    repeated BatchInfo payload_info = 5;
+    repeated SystemMessage system_messages = 6;
+    repeated bytes parents = 7;
+}
+
+message BatchInfo {
+    bytes digest = 1;
+    uint32 worker_id = 2;
+    uint64 created_at = 3;
+}
+
+message SystemMessage {
+    oneof message {
+        bytes dkg_message = 1;
+        bytes dkg_confirmation = 2;
+        RandomnessSignature randomness_signature = 3;
+    }
+}
+
+message RandomnessSignature {
+    uint64 randomness_round = 1;
+    bytes bytes = 2;
+}
+
+message Payload {
+    repeated Batch batches = 1;
+}
+
+message Batch {
+    repeated bytes transactions = 1;
+}
+
+message ExportRequest {
+    uint64 from_id = 1;
+}
+
+service Exporter {
+    rpc Export(ExportRequest) returns (stream SubDag) {}
+}

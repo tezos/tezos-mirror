@@ -58,7 +58,9 @@ module Encoding = struct
         let j = Json_repr.convert (module Repr) (module Json_repr.Ezjsonm) j in
         make_lazy encoding (Json.destruct encoding j)
       in
-      repr_agnostic_custom {write; read} ~schema:Json_schema.any
+      repr_agnostic_custom
+        {write; read; is_object = false}
+        ~schema:Json_schema.any
     in
     Data_encoding__Encoding.raw_splitted ~json ~binary
 
@@ -84,6 +86,43 @@ module Encoding = struct
     let string = string'
 
     let bytes = bytes'
+  end
+
+  module Compact = struct
+    include Compact
+
+    module Custom = struct
+      include Custom
+
+      module type S = sig
+        type input
+
+        type layout
+
+        val layouts : layout list
+
+        val tag_len : int
+
+        val tag : layout -> tag
+
+        val partial_encoding : layout -> input encoding
+
+        val classify : input -> layout
+
+        val json_encoding : input encoding
+      end
+
+      let make : type a. (module S with type input = a) -> a t =
+       fun (module C : S with type input = a) ->
+        let (module CC : Compact.Custom.S with type input = C.input) =
+          (module struct
+            include C
+
+            let title _ = None
+          end)
+        in
+        make (module CC)
+    end
   end
 end
 

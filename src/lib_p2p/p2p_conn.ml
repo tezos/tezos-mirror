@@ -221,9 +221,15 @@ let write_sync t msg =
 
 let encode t msg = P2p_socket.encode t.conn (Message msg)
 
-let write_encoded_now t buf = P2p_socket.write_encoded_now t.conn buf
+let write_encoded_now t buf =
+  let result = P2p_socket.write_encoded_now t.conn buf in
+  Prometheus.Counter.inc_one P2p_metrics.Messages.broadcast_message_sent ;
+  result
 
-let write_now t msg = P2p_socket.write_now t.conn (Message msg)
+let write_now t msg =
+  let result = P2p_socket.write_now t.conn (Message msg) in
+  Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
+  result
 
 let write_swap_request t point peer_id =
   t.last_sent_swap_request <- Some (Time.System.now (), peer_id) ;

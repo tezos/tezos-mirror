@@ -220,7 +220,7 @@ let originate block ~script ~storage ~sender ~baker ~forges_tickets =
     Op.contract_origination_hash
       (B block)
       sender
-      ~fee:(Test_tez.of_int 10)
+      ~fee:(Tez_helpers.of_int 10)
       ~script
   in
   let* incr =
@@ -280,7 +280,8 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
     Script_ir_translator.parse_script
       ctxt
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-      ~allow_forged_in_storage:true
+      ~allow_forged_tickets_in_storage:true
+      ~allow_forged_lazy_storage_id_in_storage:true
       script
   in
   let operation =

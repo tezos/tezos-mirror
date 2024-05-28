@@ -38,6 +38,11 @@ val head_processing : Block_hash.t -> int32 -> unit Lwt.t
     [level] in [process_time] seconds. *)
 val new_head_processed : Block_hash.t -> int32 -> Ptime.Span.t -> unit Lwt.t
 
+(** [new_head_degraded hash level] emits an error event that indicates the
+    rollup node is running in degraded modes and sees an L1 block [hash] and at
+    the given [level]. *)
+val new_head_degraded : Block_hash.t -> int32 -> unit Lwt.t
+
 (** [processing_heads_iteration heads] emits the event that the [heads] are
     going to be processed. *)
 val processing_heads_iteration : Layer1.head list -> unit Lwt.t
@@ -69,6 +74,10 @@ val error : tztrace -> unit Lwt.t
 (** Emit an event for when the node enters the degraded mode to only play
     refutations. *)
 val degraded_mode : unit -> unit Lwt.t
+
+val refutation_loop_retry : float -> unit Lwt.t
+
+val main_loop_retry : float -> unit Lwt.t
 
 (** Emit an event when the node exits after recovering the operator's
     stakes. *)

@@ -21,4 +21,6 @@ txs.push(utils.transfer(player1, create, 10000))
 txs.push(utils.send(player1, create.addr, 0, getBalance))
 txs.push(utils.send(player1, create.addr, 0, withdraw))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

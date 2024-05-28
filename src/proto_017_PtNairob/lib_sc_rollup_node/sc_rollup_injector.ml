@@ -261,7 +261,7 @@ module Proto_client = struct
          "edsk3UqeiQWXX7NFEY1wUs6J1t2ez5aQ3hEWdqX5Jr5edZiGLW8nZr"
 
   let simulate_operations cctxt ~force ~source ~src_pk ~successor_level
-      ~fee_parameter operations =
+      ~fee_parameter ?safety_guard operations =
     let open Lwt_result_syntax in
     let fee_parameter : Injection.fee_parameter =
       {
@@ -293,6 +293,7 @@ module Proto_client = struct
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
     in
+    let safety_guard = Option.map Gas.Arith.integral_of_int_exn safety_guard in
     let*! simulation_result =
       Injection.inject_manager_operation
         cctxt
@@ -308,6 +309,7 @@ module Proto_client = struct
         ~fee:Limit.unknown
         ~gas_limit:Limit.unknown
         ~storage_limit:Limit.unknown
+        ?safety_guard
         ~fee_parameter
         annot_op
     in
@@ -410,6 +412,14 @@ module Proto_client = struct
           (Time.System.now ())
 
   let check_fee_parameters Injector.{fee_parameters; _} =
+    (* copied from removed Nairobi’s mempool module *)
+    let default_minimal_fees =
+      match Tez.of_mutez 100L with None -> assert false | Some t -> t
+    in
+    (* copied from removed Nairobi’s mempool module *)
+    let default_minimal_nanotez_per_gas_unit = Q.of_int 100 in
+    (* copied from removed Nairobi’s mempool module *)
+    let default_minimal_nanotez_per_byte = Q.of_int 1000 in
     let check_value operation_kind name compare to_string mempool_default value
         =
       if compare mempool_default value > 0 then
@@ -437,8 +447,7 @@ module Proto_client = struct
           "minimal_fees"
           Int64.compare
           Int64.to_string
-          (Protocol.Alpha_context.Tez.to_mutez
-             Plugin.Mempool.default_minimal_fees)
+          (Protocol.Alpha_context.Tez.to_mutez default_minimal_fees)
           minimal_fees.mutez
       and+ () =
         check_value
@@ -446,7 +455,7 @@ module Proto_client = struct
           "minimal_nanotez_per_byte"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_byte
+          default_minimal_nanotez_per_byte
           minimal_nanotez_per_byte
       and+ () =
         check_value
@@ -454,7 +463,7 @@ module Proto_client = struct
           "minimal_nanotez_per_gas_unit"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+          default_minimal_nanotez_per_gas_unit
           minimal_nanotez_per_gas_unit
       in
       ()

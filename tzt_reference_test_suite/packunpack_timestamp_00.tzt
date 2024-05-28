@@ -1,0 +1,3 @@
+code { PACK ; UNPACK timestamp } ;
+input { Stack_elt timestamp "2019-09-09T08:35:33Z" } ;
+output { Stack_elt (option timestamp) (Some "2019-09-09T08:35:33Z") }

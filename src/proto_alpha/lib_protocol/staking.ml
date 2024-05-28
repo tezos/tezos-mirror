@@ -31,7 +31,7 @@ let () =
   let description =
     "A contract tries to stake to its delegate while having unstake requests \
      to a previous delegate that cannot be finalized yet. Try again in a later \
-     cycle (no more than preserved_cycles + max_slashing_period)."
+     cycle (no more than consensus_rights_delay + max_slashing_period)."
   in
   register_error_kind
     `Permanent
@@ -131,27 +131,42 @@ let finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing contract =
 let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
     ~delegate =
   let open Lwt_result_syntax in
-  let* slashing_history_opt =
-    Storage.Contract.Slashed_deposits.find
+  let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
+  let slashing_history = Option.value slashing_history_opt ~default:[] in
+
+  let* slashing_history_opt_o =
+    Storage.Contract.Slashed_deposits__Oxford.find
       ctxt
       (Contract_repr.Implicit delegate)
   in
-  let slashing_history = Option.value slashing_history_opt ~default:[] in
+  let slashing_history_o =
+    Option.value slashing_history_opt_o ~default:[]
+    |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+  in
+
+  let slashing_history = slashing_history @ slashing_history_o in
+
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let current_cycle =
     if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle
     else current_cycle
   in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
   let oldest_slashable_cycle =
-    Cycle_repr.sub current_cycle (preserved_cycles + 1)
+    Cycle_repr.sub current_cycle (slashable_deposits_period + 1)
     |> Option.value ~default:Cycle_repr.root
   in
-  return
-  @@ not
-       (List.exists
-          (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
-          slashing_history)
+  let*! is_denounced =
+    Pending_denunciations_storage.has_pending_denunciations ctxt delegate
+  in
+  let is_slashed =
+    List.exists
+      (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
+      slashing_history
+  in
+  return @@ not (is_denounced || is_slashed)
 
 let stake_from_unstake_for_delegate ctxt ~for_next_cycle_use_only_after_slashing
     ~delegate ~unfinalizable_requests_opt amount =

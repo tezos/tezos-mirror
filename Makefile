@@ -41,6 +41,9 @@ DEV_EXECUTABLES := $(shell cat script-inputs/dev-executables)
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
+#Define octez only executables by excluding the EVM-node.
+OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node,${ALL_EXECUTABLES})
+
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
 # build the TPS evaluation tool, Octogram and the Tezt test suite in the
@@ -103,6 +106,10 @@ all:
 release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES)"
 
+.PHONY: octez
+octez:
+	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_EXECUTABLES)"
+
 .PHONY: experimental-release
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
@@ -130,25 +137,29 @@ $(ALL_EXECUTABLES):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
+.PHONY: kaitai-struct-files-update
+kaitai-struct-files-update:
+	@dune exe client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files
+
 .PHONY: kaitai-struct-files
 kaitai-struct-files:
-	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
-	@$(MAKE) -C contrib/kaitai-struct-files/
+	@$(MAKE) kaitai-struct-files-update
+	@$(MAKE) -C client-libs/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
 check-kaitai-struct-files:
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
-	@dune build contrib/bin_codec_kaitai/codec.exe
-	@rm contrib/kaitai-struct-files/*.ksy
-	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/ 2>/dev/null
-	@git add contrib/kaitai-struct-files/*.ksy
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
+	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
+	@dune build client-libs/bin_codec_kaitai/codec.exe
+	@rm client-libs/kaitai-struct-files/files/*.ksy
+	@_build/default/client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files 2>/dev/null
+	@git add client-libs/kaitai-struct-files/files/*.ksy
+	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
 validate-kaitai-struct-files:
 	@$(MAKE) check-kaitai-struct-files
-	@./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input 2>/dev/null || \
-	 (echo "To see the full log run: \"./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input\""; exit 1)
+	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files 2>/dev/null || \
+	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
@@ -171,15 +182,12 @@ clean-old-names:
 	@rm -f tezos-baker-013-PtJakart
 	@rm -f tezos-accuser-013-PtJakart
 	@rm -f tezos-tx-rollup-node-013-PtJakart
-	@rm -f tezos-tx-rollup-client-013-PtJakart
 	@rm -f tezos-baker-015-PtLimaPt
 	@rm -f tezos-accuser-015-PtLimaPt
 	@rm -f tezos-tx-rollup-node-015-PtLimaPt
-	@rm -f tezos-tx-rollup-client-015-PtLimaPt
 	@rm -f tezos-baker-alpha
 	@rm -f tezos-accuser-alpha
 	@rm -f tezos-smart-rollup-node-alpha
-	@rm -f tezos-smart-rollup-client-alpha
 	@rm -f tezos-snoop
 	@rm -f tezos-dal-node
 # octez-validator should stay in this list for Octez 16.0 because we
@@ -190,11 +198,9 @@ clean-old-names:
 	@rm -f octez-baker-013-PtJakart
 	@rm -f octez-accuser-013-PtJakart
 	@rm -f octez-tx-rollup-node-013-PtJakart
-	@rm -f octez-tx-rollup-client-013-PtJakart
 	@rm -f octez-baker-015-PtLimaPt
 	@rm -f octez-accuser-015-PtLimaPt
 	@rm -f octez-tx-rollup-node-015-PtLimaPt
-	@rm -f octez-tx-rollup-client-015-PtLimaPt
 	@rm -f octez-smart-rollup-node-PtMumbai
 	@rm -f octez-smart-rollup-node-PtNairob
 	@rm -f octez-smart-rollup-node-Proxford
@@ -269,7 +275,7 @@ test-protocol-compile:
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
-OTHER_DIRS := $(shell find contrib/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
+OTHER_DIRS := $(shell find contrib/ ci/ client-libs/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:
@@ -405,7 +411,10 @@ check-ocaml-linting:
 	@./scripts/semgrep/lint-all-ocaml-sources.sh
 
 .PHONY: fmt fmt-ocaml fmt-python
-fmt: fmt-ocaml fmt-python
+fmt: fmt-ocaml fmt-python fmt-shell
+
+fmt-shell:
+	scripts/lint.sh --format-shell
 
 fmt-ocaml:
 	@dune build --profile=$(PROFILE) @fmt --auto-promote
@@ -536,24 +545,35 @@ clean: coverage-clean clean-old-names dpkg-clean rpm-clean
 
 .PHONY: build-kernels-deps
 build-kernels-deps:
-	make -f kernels.mk build-deps
+	$(MAKE) -f kernels.mk build-deps
+	$(MAKE) -f etherlink.mk build-deps
+	$(MAKE) -C src/risc_v build-deps
 
 .PHONY: build-kernels-dev-deps
 build-kernels-dev-deps:
-	make -f kernels.mk build-dev-deps
+	$(MAKE) -f kernels.mk build-dev-deps
+	$(MAKE) -f etherlink.mk build-dev-deps
 
 .PHONY: build-kernels
 build-kernels:
-	make -f kernels.mk build
+	$(MAKE) -f kernels.mk build
+	$(MAKE) -f etherlink.mk build
+	$(MAKE) -C src/risc_v build
 
 .PHONY: check-kernels
 check-kernels:
-	make -f kernels.mk check
+	$(MAKE) -f kernels.mk check
+	$(MAKE) -f etherlink.mk check
+	$(MAKE) -C src/risc_v check
 
 .PHONY: test-kernels
 test-kernels:
-	make -f kernels.mk test
+	$(MAKE) -f kernels.mk test
+	$(MAKE) -f etherlink.mk test
+	$(MAKE) -C src/risc_v test
 
 .PHONY: clean-kernels
 clean-kernels:
-	make -f kernels.mk clean
+	$(MAKE) -f kernels.mk clean
+	$(MAKE) -f etherlink.mk clean
+	$(MAKE) -C src/risc_v clean

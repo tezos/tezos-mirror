@@ -59,7 +59,7 @@ module Address = struct
         [
           desc;
           "Can be a literal or an alias (autodetected in order).\n\
-           Use 'alias:name' or 'text:literal' to force.";
+           Use 'alias:<name>' or 'text:<literal>' to force.";
         ]
     in
     Tezos_clic.param ~name ~desc (parameter ()) next

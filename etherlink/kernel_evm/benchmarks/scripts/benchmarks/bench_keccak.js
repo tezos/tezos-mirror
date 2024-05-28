@@ -29,4 +29,7 @@ txs.push(utils.send(player1, create.addr, 0, call_guess_test))
 txs.push(utils.send(player1, create.addr, 0, call_guess_long))
 txs.push(utils.send(player1, create.addr, 0, call_lorem_ipsum))
 
-utils.print_bench([txs])
+
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

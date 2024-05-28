@@ -769,13 +769,35 @@ module Register (C : S) = struct
   let ops = (module C : S with type t = 'ctxt and type tree = 'tree)
 end
 
-type validation_result = {
+type legacy_validation_result = {
   context : Context.t;
   fitness : Fitness.t;
   message : string option;
   max_operations_ttl : int;
   last_allowed_fork_level : Int32.t;
 }
+
+type validation_result = {
+  context : Context.t;
+  fitness : Fitness.t;
+  message : string option;
+  max_operations_ttl : int;
+  last_finalized_block_level : Int32.t;
+  last_preserved_block_level : Int32.t;
+}
+
+let lift_legacy_validation_result
+    (legacy_validation_result : legacy_validation_result) : validation_result =
+  {
+    context = legacy_validation_result.context;
+    fitness = legacy_validation_result.fitness;
+    message = legacy_validation_result.message;
+    max_operations_ttl = legacy_validation_result.max_operations_ttl;
+    last_finalized_block_level =
+      legacy_validation_result.last_allowed_fork_level;
+    last_preserved_block_level =
+      legacy_validation_result.last_allowed_fork_level;
+  }
 
 type quota = {max_size : int; max_op : int option}
 

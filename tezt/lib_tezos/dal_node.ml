@@ -34,6 +34,7 @@ module Parameters = struct
     metrics_addr : string;
     l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
+    runner : Runner.t option;
   }
 
   type session_state = {mutable ready : bool}
@@ -42,6 +43,8 @@ module Parameters = struct
 
   let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
 end
+
+type history_mode = Full | Auto | Custom of int
 
 open Parameters
 include Daemon.Make (Parameters)
@@ -77,37 +80,57 @@ let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
 let spawn_command dal_node =
-  Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
+  Process.spawn
+    ?runner:dal_node.persistent_state.runner
+    ~name:dal_node.name
+    ~color:dal_node.color
+    dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
-    ?(bootstrap_profile = false) dal_node =
-  spawn_command dal_node
-  @@ List.filter_map
-       Fun.id
-       [
-         Some "config";
-         Some "init";
-         Some "--data-dir";
-         Some (data_dir dal_node);
-         Some "--rpc-addr";
-         Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
-         Some "--net-addr";
-         Some (listen_addr dal_node);
-         Some "--public-addr";
-         Some (public_addr dal_node);
-         Some "--metrics-addr";
-         Some (metrics_addr dal_node);
-         Some "--expected-pow";
-         Some (string_of_float expected_pow);
-         Some "--peers";
-         Some (String.concat "," peers);
-         Some "--attester-profiles";
-         Some (String.concat "," attester_profiles);
-         Some "--producer-profiles";
-         Some (String.concat "," (List.map string_of_int producer_profiles));
-         (if bootstrap_profile then Some "--bootstrap-profile" else None);
-       ]
+    ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
+    dal_node =
+  spawn_command dal_node @@ List.filter_map Fun.id
+  @@ [
+       Some "config";
+       Some "init";
+       Some "--data-dir";
+       Some (data_dir dal_node);
+       Some "--rpc-addr";
+       Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
+       Some "--net-addr";
+       Some (listen_addr dal_node);
+       Some "--public-addr";
+       Some (public_addr dal_node);
+       Some "--metrics-addr";
+       Some (metrics_addr dal_node);
+       Some "--expected-pow";
+       Some (string_of_float expected_pow);
+     ]
+  @ (if peers = [] then [None]
+    else [Some "--peers"; Some (String.concat "," peers)])
+  @ (if attester_profiles = [] then [None]
+    else
+      [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
+  @ (if observer_profiles = [] then [None]
+    else
+      [
+        Some "--observer-profiles";
+        Some (String.concat "," (List.map string_of_int observer_profiles));
+      ])
+  @ (if producer_profiles = [] then [None]
+    else
+      [
+        Some "--producer-profiles";
+        Some (String.concat "," (List.map string_of_int producer_profiles));
+      ])
+  @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
+  @
+  match history_mode with
+  | None -> []
+  | Some Full -> [Some "--history-mode"; Some "full"]
+  | Some Auto -> [Some "--history-mode"; Some "auto"]
+  | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
@@ -120,21 +143,23 @@ module Config_file = struct
 end
 
 let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile dal_node =
+    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
   let process =
     spawn_config_init
       ?expected_pow
       ?peers
       ?attester_profiles
       ?producer_profiles
+      ?observer_profiles
       ?bootstrap_profile
+      ?history_mode
       dal_node
   in
   Process.check process
 
 let read_identity dal_node =
   let filename = sf "%s/identity.json" @@ data_dir dal_node in
-  JSON.parse_file filename
+  JSON.(parse_file filename |-> "peer_id" |> as_string)
 
 let check_event ?timeout ?where dal_node name promise =
   let* result =
@@ -174,12 +199,28 @@ let wait_for_ready dal_node =
         resolver :: dal_node.persistent_state.pending_ready ;
       check_event dal_node "dal_node_is_ready.v0" promise
 
+let wait_for_connections node connections =
+  let counter = ref 0 in
+  let waiter, resolver = Lwt.task () in
+  on_event node (fun {name; _} ->
+      match name with
+      | "new_connection.v0" ->
+          incr counter ;
+          if !counter = connections then Lwt.wakeup resolver ()
+      | _ -> ()) ;
+  let* () = wait_for_ready node in
+  waiter
+
+let wait_for_disconnection node ~peer_id =
+  wait_for node "disconnected.v0" (fun event ->
+      if JSON.(event |-> "peer" |> as_string) = peer_id then Some () else None)
+
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
-    ?color ?data_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
+let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
+    ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
+    ?rpc_port ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -189,7 +230,7 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
   in
   let listen_addr =
     match listen_addr with
-    | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
+    | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
     | Some addr -> addr
   in
   let public_addr =
@@ -197,11 +238,12 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
   in
   let metrics_addr =
     match metrics_addr with
-    | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
+    | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
     | Some addr -> addr
   in
   let dal_node =
     create
+      ?runner
       ~path
       ~name
       ?color
@@ -215,16 +257,18 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
         metrics_addr;
         pending_ready = [];
         l1_node_endpoint;
+        runner;
       }
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
 (* TODO: have rpc_addr here, like for others. *)
-let create ?(path = Uses.path Constant.octez_dal_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr
-    ?metrics_addr ~node () =
+let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
+    ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
+    ?listen_addr ?public_addr ?metrics_addr ~node () =
   create_from_endpoint
+    ?runner
     ~path
     ?name
     ?color
@@ -268,7 +312,14 @@ let do_runlike_command ?env ?(event_level = `Debug) node arguments =
      * [make_arguments] seems incomplete
      * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
-  run ?env ~event_level node {ready = false} arguments ~on_terminate
+  run
+    ?runner:node.persistent_state.runner
+    ?env
+    ~event_level
+    node
+    {ready = false}
+    arguments
+    ~on_terminate
 
 let run ?env ?event_level node =
   do_runlike_command

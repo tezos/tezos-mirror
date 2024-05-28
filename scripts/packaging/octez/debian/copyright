@@ -1,0 +1,9 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://gitlab.com/tezos/tezos
+Upstream-Name: Octez
+Upstream-Contact: Nomadic Labs <info@nomadic-labs.com>
+License: MIT
+
+Files: *
+Copyright: Copyright Nomadic Labs 2018-2024 <info@nomadic-labs.com>
+License: MIT

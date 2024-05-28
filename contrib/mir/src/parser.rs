@@ -5,22 +5,33 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Michelson parser.
+
+pub mod macros;
+
 use crate::ast::*;
 use crate::lexer::{LexerError, Tok};
 use crate::syntax;
 use lalrpop_util::ParseError;
 use logos::Logos;
+use macros::MacroError;
 use typed_arena::Arena;
 
+/// Errors that can happen during parsing, aside from parser-specific ones.
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
-    #[error("expected a natural from 0 to 1023 inclusive, but got {0}")]
-    ExpectedU10(i128),
+    /// An error happened at the lexer stage.
     #[error(transparent)]
     LexerError(#[from] LexerError),
+    /// An error happened during macro expansion.
+    #[error(transparent)]
+    MacroError(#[from] MacroError),
 }
 
+/// A parser for Michelson. Carries an [Arena] for placing [Micheline] nodes
+/// into.
 pub struct Parser<'a> {
+    /// The [Arena] to place [Micheline] nodes into.
     pub arena: Arena<Micheline<'a>>,
 }
 
@@ -31,26 +42,33 @@ impl Default for Parser<'_> {
 }
 
 impl<'a> Parser<'a> {
+    /// Construct a new parser.
     pub fn new() -> Self {
         Parser {
             arena: Arena::new(),
         }
     }
 
-    pub fn parse(&'a self, src: &str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+    /// Parse Michelson code or value into [Micheline].
+    pub fn parse(&'a self, src: &'a str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
         syntax::MichelineNakedParser::new().parse(&self.arena, spanned_lexer(src))
     }
 
+    /// Parse Michelson script into [Micheline]. Top-level refers to a full
+    /// Michelson script, i.e. something that contains `parameter`, `storage`
+    /// and `code` fields.
     pub fn parse_top_level(
         &'a self,
-        src: &str,
+        src: &'a str,
     ) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
         syntax::MichelineTopLevelParser::new().parse(&self.arena, spanned_lexer(src))
     }
 }
 
-pub fn spanned_lexer(
-    src: &'_ str,
+/// Given a Michelson string, create an iterator over lexemes in that string,
+/// with location information attached.
+pub(crate) fn spanned_lexer(
+    src: &str,
 ) -> impl Iterator<Item = Result<(usize, Tok, usize), ParserError>> + '_ {
     Tok::lexer(src)
         .spanned()
@@ -81,6 +99,24 @@ pub mod test_helpers {
 mod tests {
     use super::test_helpers::*;
     use crate::ast::micheline::test_helpers::{app, seq};
+    use crate::ast::{Annotation, Micheline};
+    use crate::lexer::Prim;
+
+    #[test]
+    fn instructions() {
+        assert_eq!(parse("LE").unwrap(), app!(LE));
+        assert_eq!(parse("EQ").unwrap(), app!(EQ));
+        assert_eq!(
+            parse("EQ @a").unwrap(),
+            Micheline::App(Prim::EQ, &[], [Annotation::Variable("a".into())].into())
+        );
+    }
+
+    #[test]
+    fn types() {
+        assert_eq!(parse("ticket").unwrap(), app!(ticket));
+        assert_eq!(parse("timestamp").unwrap(), app!(timestamp));
+    }
 
     #[test]
     fn pair_type() {
@@ -154,21 +190,75 @@ mod tests {
 
     #[test]
     fn type_anns() {
-        assert_eq!(parse("(int :p)"), Ok(app!(int)));
+        assert_eq!(
+            parse("(int :p)"),
+            Ok(Micheline::App(
+                Prim::int,
+                &[],
+                [Annotation::Type("p".into())].into()
+            ))
+        );
         assert_eq!(
             parse("(pair :point (int :x_pos) (int :y_pos))"),
-            Ok(app!(pair[app!(int), app!(int)]))
+            Ok(Micheline::App(
+                Prim::pair,
+                &[
+                    Micheline::App(Prim::int, &[], [Annotation::Type("x_pos".into())].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Type("y_pos".into())].into()),
+                ],
+                [Annotation::Type("point".into())].into()
+            ))
         );
-        assert_eq!(parse("(string %foo)"), Ok(app!(string)));
-        assert_eq!(parse("(string %foo :bar @baz)"), Ok(app!(string)));
-        assert_eq!(parse("(string @foo)"), Ok(app!(string)));
+        assert_eq!(
+            parse("(string %foo)"),
+            Ok(Micheline::App(
+                Prim::string,
+                &[],
+                [Annotation::Field("foo".into())].into()
+            ))
+        );
+        assert_eq!(
+            parse("(string %foo :bar @baz)"),
+            Ok(Micheline::App(
+                Prim::string,
+                &[],
+                [
+                    Annotation::Field("foo".into()),
+                    Annotation::Type("bar".into()),
+                    Annotation::Variable("baz".into())
+                ]
+                .into()
+            ))
+        );
+        assert_eq!(
+            parse("(string @foo)"),
+            Ok(Micheline::App(
+                Prim::string,
+                &[],
+                [Annotation::Variable("foo".into())].into()
+            ))
+        );
         assert_eq!(
             parse("(pair %a (int %b) (int %c))"),
-            Ok(app!(pair[app!(int), app!(int)]))
+            Ok(Micheline::App(
+                Prim::pair,
+                &[
+                    Micheline::App(Prim::int, &[], [Annotation::Field("b".into())].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("c".into())].into()),
+                ],
+                [Annotation::Field("a".into())].into()
+            ))
         );
         assert_eq!(
             parse("(or %a (int %b) (int %c))"),
-            Ok(app!(or[app!(int), app!(int)]))
+            Ok(Micheline::App(
+                Prim::or,
+                &[
+                    Micheline::App(Prim::int, &[], [Annotation::Field("b".into())].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("c".into())].into()),
+                ],
+                [Annotation::Field("a".into())].into()
+            ))
         );
         assert_eq!(
             parse("(option %a int %b)")
@@ -178,7 +268,7 @@ mod tests {
                 .lines()
                 .next()
                 .unwrap(),
-            "Unrecognized token `<ann>` found at 15:17"
+            "Unrecognized token `%b` found at 15:17"
         );
     }
 
@@ -186,11 +276,32 @@ mod tests {
     fn instr_anns() {
         assert_eq!(
             parse("PUSH @var :ty %field int 1").unwrap(),
-            app!(PUSH[app!(int), 1]),
+            Micheline::App(
+                Prim::PUSH,
+                &[app!(int), 1.into()],
+                [
+                    Annotation::Variable("var".into()),
+                    Annotation::Type("ty".into()),
+                    Annotation::Field("field".into())
+                ]
+                .into()
+            ),
         );
         assert_eq!(
             parse("CAR @var :ty %field :ty.2 @var.2 %field.2").unwrap(),
-            app!(CAR),
+            Micheline::App(
+                Prim::CAR,
+                &[],
+                [
+                    Annotation::Variable("var".into()),
+                    Annotation::Type("ty".into()),
+                    Annotation::Field("field".into()),
+                    Annotation::Type("ty.2".into()),
+                    Annotation::Variable("var.2".into()),
+                    Annotation::Field("field.2".into()),
+                ]
+                .into()
+            ),
         );
     }
 
@@ -240,7 +351,14 @@ mod tests {
     fn contract_ty_push() {
         assert_eq!(
             parse("PUSH (contract :ct %foo unit) Unit").unwrap(),
-            app!(PUSH[app!(contract[app!(unit)]), app!(Unit)])
+            app!(PUSH[
+                Micheline::App(
+                    Prim::contract,
+                    &[app!(unit)],
+                    [Annotation::Type("ct".into()), Annotation::Field("foo".into())].into(),
+                ),
+                app!(Unit)
+            ])
         );
     }
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #############################################################################
 #                                                                           #
@@ -43,27 +43,28 @@
 # context around modified lines (option `U0`).
 
 case "$#" in
-  0)
-    OLD=$(git log --pretty=format:"%H" --merges -n 1)
-    NEW='HEAD'
-    ;;
+0)
+  OLD=$(git log --pretty=format:"%H" --merges -n 1)
+  NEW='HEAD'
+  ;;
 
-  1)
-    OLD=$1
-    NEW='HEAD'
-    ;;
+1)
+  OLD=$1
+  NEW='HEAD'
+  ;;
 
-  2)
-    OLD=$1
-    NEW=$2
-    ;;
+2)
+  OLD=$1
+  NEW=$2
+  ;;
 
-  *)
-    echo "** Error: wrong number of arguments (0, 1 or 2 expected, found $#)."
-    echo 'Usage: ./git-gas-diff.sh to use git-gas-diff between the last merge commit and HEAD;'
-    echo '       ./git-gas-diff.sh [commit] to use git-gas-diff between [commit] and HEAD;'
-    echo '       ./git-gas-diff.sh [commit1] [commit2] to use git-gas-diff between [commit1] and [commit2].'
-    exit 1
+*)
+  echo "** Error: wrong number of arguments (0, 1 or 2 expected, found $#)."
+  echo 'Usage: ./git-gas-diff.sh to use git-gas-diff between the last merge commit and HEAD;'
+  echo '       ./git-gas-diff.sh [commit] to use git-gas-diff between [commit] and HEAD;'
+  echo '       ./git-gas-diff.sh [commit1] [commit2] to use git-gas-diff between [commit1] and [commit2].'
+  exit 1
+  ;;
 
 esac
 

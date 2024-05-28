@@ -60,6 +60,7 @@ let register_protocol_independent_tests () =
   Rpc_tls.register_protocol_independent () ;
   Snoop_codegen.register_protocol_independent () ;
   Snoop_protocol_codegen.register_protocol_independent () ;
+  Sc_rollup.register_protocol_independent () ;
   Risc_v_sandbox.register ()
 
 (* Tests related to protocol migration. *)
@@ -107,6 +108,7 @@ let register_old_protocol_migration_tests () =
    Then we could remove the [~protocols] argument from all register functions. *)
 let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
+  Adaptive_issuance.register ~protocols ;
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
@@ -167,6 +169,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Node_event_level.register ~protocols ;
   Nonce_seed_revelation.register ~protocols ;
   Normalize.register ~protocols ;
+  Operations_liveness.register ~protocols ;
   Operation_size.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
@@ -175,6 +178,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Protocol_limits.register ~protocols ;
   Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols ;
+  Rpc_process.register ~protocols ;
   RPC_test.register protocols ;
   Rpc_versioning_attestation.register ~protocols ;
   Reject_malformed_micheline.register ~protocols ;
@@ -214,18 +218,15 @@ let register_protocol_tests_that_use_supports_correctly () =
   Zk_rollup.register ~protocols ;
   Tx_sc_rollup.register ~protocols ;
   Dac.register ~protocols ;
-  Timelock.register ~protocols
+  Timelock.register ~protocols ;
+  Tzt_regression.register ~protocols ;
+  Dal.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
    those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
    Some do not. Those that do not are declared here. *)
-let register_protocol_specific_because_regression_tests () =
-  Dal.register ~protocols:[Alpha] ;
-  Evm_rollup.register ~protocols:[Alpha] ;
-  Evm_sequencer.register ~protocols:[Alpha] ;
-  (* This can be safely removed after Nairobi is frozen *)
-  Timelock_disabled.register ~protocols:[Nairobi]
+let register_protocol_specific_because_regression_tests () = ()
 
 let () =
   register_protocol_independent_tests () ;
@@ -233,6 +234,6 @@ let () =
   register_old_protocol_migration_tests () ;
   register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
-  Tezos_scoru_wasm_regressions.register () ;
+  Tezt_wrapper.Uses.register_meta_test () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

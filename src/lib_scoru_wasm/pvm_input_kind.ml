@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type protocol = Nairobi | Oxford | Proto_alpha
+(* You can only add variants to this type. You cannot remove them. *)
+type protocol = Nairobi | Oxford | Paris | Proto_alpha
 
 (* This type mimics [Sc_rollup_inbox_repr.internal_inbox_messages], without
    fully deserializing the `Transfer`, and is produced by reading the first bytes
@@ -56,12 +57,14 @@ let protocol_from_raw payload =
   else
     let payload = String.sub payload 2 (String.length payload - 2) in
     match Data_encoding.(Binary.of_string_exn string payload) with
-    | payload when String.equal payload Constants.proto_alpha_name ->
-        Some (Protocol_migration Proto_alpha)
-    | payload when String.equal payload Constants.oxford_name ->
-        Some (Protocol_migration Oxford)
     | payload when String.equal payload Constants.nairobi_name ->
         Some (Protocol_migration Nairobi)
+    | payload when String.equal payload Constants.oxford_name ->
+        Some (Protocol_migration Oxford)
+    | payload when String.equal payload Constants.paris_name ->
+        Some (Protocol_migration Paris)
+    | payload when String.equal payload Constants.proto_alpha_name ->
+        Some (Protocol_migration Proto_alpha)
     | _ -> None
 
 let internal_from_raw payload =
@@ -93,6 +96,7 @@ module Internal_for_tests = struct
         Data_encoding.(Binary.to_string_exn string Constants.nairobi_name)
     | Oxford ->
         Data_encoding.(Binary.to_string_exn string Constants.oxford_name)
+    | Paris -> Data_encoding.(Binary.to_string_exn string Constants.paris_name)
     | Proto_alpha ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_alpha_name)
 

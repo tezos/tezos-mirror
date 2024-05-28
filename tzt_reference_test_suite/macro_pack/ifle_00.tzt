@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda int unit) { IFLE {} {}; UNIT } } ;
+output { Stack_elt bytes 0x050200000015020000000e0332072c02000000000200000000034f } ;

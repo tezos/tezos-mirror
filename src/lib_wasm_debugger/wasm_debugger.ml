@@ -54,6 +54,20 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     Repl_helpers.trap_exn (fun () ->
         Tezos_webassembly_interpreter.Import.link module_)
 
+  let set_durable_value tree key value =
+    let open Lwt_syntax in
+    let open Tezos_scoru_wasm.Durable in
+    let* durable_storage = Wasm.wrap_as_durable_storage tree in
+    let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable_storage in
+    let key = key_of_string_exn key in
+    let* durable = set_value_exn durable key value in
+    let durable_storage = Tezos_scoru_wasm.Durable.to_storage durable in
+    let wrapped_tree = Durable_storage.to_tree_exn durable_storage in
+    Wasm.Tree_encoding_runner.encode
+      Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
+      wrapped_tree
+      tree
+
   let handle_installer_config_instr durable
       Octez_smart_rollup.Installer_config.(Set {value; to_}) =
     let open Tezos_scoru_wasm.Durable in
@@ -281,6 +295,18 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let open Tezos_clic in
     switch ~doc:"Hides the kernel debug messages." ~long:"no-kernel-debug" ()
 
+  let flamecharts_directory_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:
+        (Format.sprintf
+           "Directory where the profiler output its flamecharts. If not \
+            specified, it defaults to `%s`."
+           Config.default_flamecharts_directory)
+      ~long:"flamecharts-dir"
+      ~placeholder:"flamecharts-dir"
+      dir_parameter
+
   let plugins_parameter =
     Tezos_clic.parameter (fun _ filenames ->
         let filenames = String.split_on_char ',' filenames in
@@ -300,7 +326,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
 
   let global_options =
     Tezos_clic.(
-      args9
+      args10
         wasm_arg
         input_arg
         rollup_arg
@@ -309,7 +335,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         version_arg
         no_kernel_debug_flag
         plugins_arg
-        installer_config_arg)
+        installer_config_arg
+        flamecharts_directory_arg)
 
   let handle_plugin_file f =
     try Dynlink.loadfile f with
@@ -332,7 +359,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
              version,
              no_kernel_debug_flag,
              plugins,
-             installer_config ),
+             installer_config,
+             flamecharts_directory ),
            _ ) =
       Tezos_clic.parse_global_options global_options () args
     in
@@ -347,6 +375,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         ?destination:rollup_arg
         ?preimage_directory
         ?dal_pages_directory
+        ?flamecharts_directory
         ~kernel_debug:(not no_kernel_debug_flag)
         ()
     in
@@ -400,7 +429,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     match result with
     | Ok _ -> ()
     | Error [Tezos_clic.Version] ->
-        let version = Tezos_version_value.Bin_version.version_string in
+        let version = Tezos_version_value.Bin_version.octez_version_string in
         Format.printf "%s\n" version ;
         exit 0
     | Error [Tezos_clic.Help command] ->

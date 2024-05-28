@@ -1,19 +1,17 @@
 #!/bin/sh
 
-usage () {
-    cat >&2 <<!EOF
+usage() {
+  cat >&2 << !EOF
 usage:
   $0 [rc]
 !EOF
 }
 
-if [ $# -eq 1 ] && [ "$1" = "rc" ]
-then
+if [ $# -eq 1 ] && [ "$1" = "rc" ]; then
   # [setup rc repository]
   REPO="@Serokell/Tezos-rc"
   # [end]
-elif [ $# -eq 0 ]
-then
+elif [ $# -eq 0 ]; then
   # [setup stable repository]
   REPO="@Serokell/Tezos"
   # [end]
@@ -31,10 +29,10 @@ dnf install -y dnf-plugins-core
 dnf copr enable -y $REPO && dnf update -y
 dnf install -y tezos-client
 dnf install -y tezos-node
-dnf install -y tezos-baker-PtNairob
-dnf install -y tezos-accuser-PtNairob
+dnf install -y tezos-baker-Proxford
+dnf install -y tezos-accuser-Proxford
 # [test executables]
 octez-client --version
 octez-node --version
-octez-baker-PtNairob --version
-octez-accuser-PtNairob --version
+octez-baker-Proxford --version
+octez-accuser-Proxford --version

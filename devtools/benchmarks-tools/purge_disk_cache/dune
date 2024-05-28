@@ -4,4 +4,4 @@
 (executable
  (name purge_disk_cache)
  (public_name purge_disk_cache)
- (package internal-devtools))
+ (package tezos-tooling))

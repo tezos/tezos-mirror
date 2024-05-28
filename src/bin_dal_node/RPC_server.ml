@@ -35,6 +35,42 @@ let call_handler2 ctxt handler =
   let store = Node_context.get_store ctxt in
   handler store ready_ctxt
 
+type error +=
+  | Cryptobox_error of string * string
+  | Post_slot_too_large of {expected : int; got : int}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"cryptobox_error"
+    ~title:"cryptobox error"
+    ~description:"A wrapper around an error raised by the cryptobox of the DAL."
+    ~pp:(fun fmt (f, msg) ->
+      Format.fprintf
+        fmt
+        "The DAL cryptobox function '%s' failed with:@.'%s'"
+        f
+        msg)
+    Data_encoding.(obj2 (req "function_name" string) (req "explanation" string))
+    (function Cryptobox_error (f, msg) -> Some (f, msg) | _ -> None)
+    (fun (f, msg) -> Cryptobox_error (f, msg)) ;
+  register_error_kind
+    `Permanent
+    ~id:"post_slot_too_large"
+    ~title:"Post slot too large"
+    ~description:
+      "The length of posted data exceeds the expected size of DAL slots."
+    ~pp:(fun fmt (expected, got) ->
+      Format.fprintf
+        fmt
+        "The RPC expects a slot_size of at most '%d'. Got: '%d' expected got"
+        expected
+        got)
+    Data_encoding.(obj2 (req "expected" int31) (req "got" int31))
+    (function
+      | Post_slot_too_large {expected; got} -> Some (expected, got) | _ -> None)
+    (fun (expected, got) -> Post_slot_too_large {expected; got})
+
 module Slots_handlers = struct
   let to_option_tzresult r =
     Errors.to_option_tzresult
@@ -59,6 +95,30 @@ module Slots_handlers = struct
         Slot_manager.get_commitment_slot store cryptobox commitment
         |> to_option_tzresult)
 
+  (* This function assumes the slot is valid since we already have
+     computed a commitment for it. *)
+  let commitment_proof_from_slot cryptobox slot =
+    let open Result_syntax in
+    match Cryptobox.polynomial_from_slot cryptobox slot with
+    | Error (`Slot_wrong_size msg) ->
+        (* Storage consistency ensures we can always compute the
+           polynomial from the slot. But let's returne an errror to be defensive. *)
+        tzfail (Cryptobox_error ("polynomial_from_slot", msg))
+    | Ok polynomial -> (
+        match Cryptobox.prove_commitment cryptobox polynomial with
+        (* [polynomial] was produced with the parameters from
+           [cryptobox], thus we can always compute the proof from
+           [polynomial] except if an error happens with the loading of the SRS. *)
+        | Error
+            ( `Invalid_degree_strictly_less_than_expected _
+            | `Prover_SRS_not_loaded ) ->
+            tzfail
+              (Cryptobox_error
+                 ( "prove_commitment",
+                   "Unexpected error. Maybe an issue with the SRS from the DAL \
+                    node." ))
+        | Ok proof -> return proof)
+
   let get_commitment_proof ctxt commitment () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         let open Lwt_result_syntax in
@@ -70,19 +130,33 @@ module Slots_handlers = struct
         in
         match slot with
         | None -> return_none
-        | Some slot -> (
-            match Cryptobox.polynomial_from_slot cryptobox slot with
-            | Error _ ->
-                (* Storage consistency ensures we can always compute the
-                   polynomial from the slot. *)
-                assert false
-            | Ok polynomial -> (
-                match Cryptobox.prove_commitment cryptobox polynomial with
-                (* [polynomial] was produced with the parameters from
-                   [cryptobox], thus we can always compute the proof from
-                   [polynomial]. *)
-                | Error _ -> assert false
-                | Ok proof -> return_some proof)))
+        | Some slot ->
+            let*? proof = commitment_proof_from_slot cryptobox slot in
+            return_some proof)
+
+  let get_page_proof ctxt page_index () slot_data =
+    call_handler2 ctxt (fun _store {cryptobox; _} ->
+        let open Lwt_result_syntax in
+        let proof =
+          let open Result_syntax in
+          let* polynomial =
+            Cryptobox.polynomial_from_slot cryptobox slot_data
+          in
+          Cryptobox.prove_page cryptobox polynomial page_index
+        in
+        match proof with
+        | Ok proof -> return proof
+        | Error e ->
+            let msg =
+              match e with
+              | `Fail s -> "Fail " ^ s
+              | `Page_index_out_of_range -> "Page_index_out_of_range"
+              | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
+              | ( `Invalid_degree_strictly_less_than_expected _
+                | `Prover_SRS_not_loaded ) as commit_error ->
+                  Cryptobox.string_of_commit_error commit_error
+            in
+            tzfail (Cryptobox_error ("get_page_proof", msg)))
 
   let put_commitment_shards ctxt commitment () Types.{with_proof} =
     call_handler2
@@ -95,6 +169,39 @@ module Slots_handlers = struct
           commitment
           ~with_proof
         |> Errors.to_option_tzresult)
+
+  let post_slot ctxt query slot =
+    call_handler2
+      ctxt
+      (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
+      ->
+        let open Lwt_result_syntax in
+        let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+        let slot_length = String.length slot in
+        let*? slot =
+          if slot_length > slot_size then
+            Result_syntax.tzfail
+              (Post_slot_too_large {expected = slot_size; got = slot_length})
+          else if slot_length = slot_size then Ok (Bytes.of_string slot)
+          else
+            let padding = String.make (slot_size - slot_length) query#padding in
+            Ok (Bytes.of_string (slot ^ padding))
+        in
+        let* commitment =
+          Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult
+        in
+        let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
+        (* Cannot return None *)
+        let* (_ : unit option) =
+          Slot_manager.add_commitment_shards
+            ~shards_proofs_precomputation
+            store
+            cryptobox
+            commitment
+            ~with_proof:true
+          |> Errors.to_option_tzresult
+        in
+        return (commitment, commitment_proof))
 
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
     call_handler1 ctxt (fun store ->
@@ -121,16 +228,9 @@ module Slots_handlers = struct
           store
         |> Errors.to_tzresult)
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4338
-
-     Re-consider this implementation/interface when the issue above is
-     tackeled. *)
-  let monitor_shards ctxt () () () =
-    call_handler1 ctxt (fun store ->
-        let stream, stopper = Store.open_shards_stream store in
-        let shutdown () = Lwt_watcher.shutdown stopper in
-        let next () = Lwt_stream.get stream in
-        Tezos_rpc.Answer.return_stream {next; shutdown})
+  let get_shard ctxt ((_, commitment), shard_index) () () =
+    call_handler1 ctxt (fun {shard_store; _} ->
+        Slot_manager.get_shard shard_store commitment shard_index)
 end
 
 module Profile_handlers = struct
@@ -146,7 +246,9 @@ module Profile_handlers = struct
             operator_profiles
         with
         | None -> fail Errors.[Profile_incompatibility]
-        | Some pctxt -> return @@ Node_context.set_profile_ctxt ctxt pctxt)
+        | Some pctxt ->
+            let*! () = Node_context.set_profile_ctxt ctxt pctxt in
+            return_unit)
 
   let get_profiles ctxt () () =
     let open Lwt_result_syntax in
@@ -212,6 +314,8 @@ module P2P = struct
 
   let get_peer_info ctxt peer () () = Node_context.P2P.get_peer_info ctxt peer
 
+  let patch_peer ctxt peer () acl = Node_context.P2P.patch_peer ctxt peer acl
+
   module Gossipsub = struct
     let get_topics ctxt () () =
       let open Lwt_result_syntax in
@@ -251,6 +355,10 @@ let register_new :
   directory
   |> add_service
        Tezos_rpc.Directory.register0
+       Services.post_slot
+       (Slots_handlers.post_slot ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
        Services.post_commitment
        (Slots_handlers.post_commitment ctxt)
   |> add_service
@@ -265,6 +373,10 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.get_commitment_proof
        (Slots_handlers.get_commitment_proof ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.get_page_proof
+       (Slots_handlers.get_page_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.put_commitment_shards
@@ -297,10 +409,6 @@ let register_new :
        Tezos_rpc.Directory.register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
-  |> add_service
-       Tezos_rpc.Directory.gen_register
-       Services.monitor_shards
-       (Slots_handlers.monitor_shards ctxt)
   |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
@@ -362,20 +470,45 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.P2P.Peers.get_peer_info
        (P2P.get_peer_info ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.P2P.Peers.patch_peer
+       (P2P.patch_peer ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register
+       Services.get_shard
+       (Slots_handlers.get_shard ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
-  Tezos_rpc.Directory.empty |> register_shard ctxt |> register_shards ctxt
-  |> register_show_slot_pages ctxt
+  Tezos_rpc.Directory.empty |> register_show_slot_pages ctxt
 
 let register ctxt = register_new ctxt (register_legacy ctxt)
 
-let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
+let register_plugin node_ctxt =
+  Tezos_rpc.Directory.register_dynamic_directory
+    Tezos_rpc.Directory.empty
+    Tezos_rpc.Path.(open_root / "plugin")
+    (fun () ->
+      match Node_context.get_ready node_ctxt with
+      | Ok {plugin = (module Plugin); skip_list_cells_store; _} ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7069
+
+             DAL: handle protocol plugins change in dynamic proto-related RPCs.
+
+             In case of protocol change where the type of cells and/or hashes
+             change(s), we could register the wrong directory (the one with the
+             current plugin while we want to request data encoded with the
+             previous protocol). A fix would be try answering the RPCs with the
+             current protocol plugin, then with the previous one in case of
+             failure. *)
+          Lwt.return (Plugin.RPC.directory skip_list_cells_store)
+      | Error _ -> Lwt.return Tezos_rpc.Directory.empty)
 
 let start configuration ctxt =
   let open Lwt_syntax in
   let Configuration_file.{rpc_addr; _} = configuration in
-  let dir = register ctxt in
+  let dir = Tezos_rpc.Directory.merge (register ctxt) (register_plugin ctxt) in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
       dir
@@ -413,6 +546,3 @@ let install_finalizer rpc_server =
   let* () = shutdown rpc_server in
   let* () = Event.(emit shutdown_node exit_status) in
   Tezos_base_unix.Internal_event_unix.close ()
-
-let monitor_shards_rpc ctxt =
-  Tezos_rpc.Context.make_streamed_call Services.monitor_shards ctxt () () ()

@@ -1,7 +1,8 @@
 {
   "infrastructure": {
     "tags": [
-      "binaries"
+      "binaries",
+      "infrastructure"
     ],
     "path_patterns": [
       "^devtools/yes_wallet"
@@ -15,25 +16,42 @@
       "protocol_cache",
       "protocol_table",
       "stresstest",
-      "transaction",
-      "transfer"
+      "transfer",
+      "layer1"
     ],
     "path_patterns": [
       "^src/lib_requester",
       "^src/proto_.*/lib_protocol",
       "^src/proto_.*/lib_delegate",
-      "^devtools/yes_wallet"
+      "^devtools/yes_wallet",
+      "^tezt/tests/bootstrap.ml$",
+      "^tezt/tests/double_bake.ml$",
+      "^tezt/tests/precheck.ml$",
+      "^tezt/tests/replace_by_fees.ml$"
     ]
   },
   "tezos2": {
     "tags": [
       "dac",
       "dac_node",
-      "vdf"
+      "dal",
+      "vdf",
+      "tezos2"
     ],
     "path_patterns": [
+      "^src/bin_dal_node",
+      "^src/bin_testnet_scenarios/dal.ml$",
       "^src/lib_aplonk",
-      "^src/lib_distributed_plonk"
+      "^src/lib_crypto_dal",
+      "^src/lib_dal_node",
+      "^src/lib_dal_node_services",
+      "^src/lib_distributed_plonk",
+      "^src/lib_gossipsub",
+      "^src/lib_stdlib_unix/test/test_key_value_store.ml$",
+      "^src/lib_stdlib_unix/test/test_key_value_store_fuzzy.ml$",
+      "^tezt/tests/injector_test.ml$",
+      "^tezt/manual_tests/dal.ml$",
+      "^tezt/tests/dal.ml$"
     ]
   },
   "etherlink": {
@@ -42,8 +60,12 @@
       "sc_rollup",
       "rollup_node",
       "refutation",
-      "commitment"
+      "commitment",
+      "etherlink"
     ],
-    "path_patterns": []
+    "path_patterns": [
+      "^etherlink/tezt/tests/evm_rollup.ml$",
+      "^etherlink/tezt/tests/evm_sequencer.ml$"
+    ]
   }
 }

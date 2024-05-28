@@ -43,10 +43,12 @@ val make_unix_cctxt : Uri.t -> cctxt
 
 val get_slot : #cctxt -> Cryptobox.Commitment.t -> Cryptobox.slot tzresult Lwt.t
 
-val get_shard :
-  #cctxt -> Cryptobox.Commitment.t -> int -> Cryptobox.shard tzresult Lwt.t
-
 (** [get_slot_pages cctxt header ] fetches from the dal node the pages
     of the slot with header [header]. *)
 val get_slot_pages :
   #cctxt -> Cryptobox.Commitment.t -> bytes list tzresult Lwt.t
+
+(** [get_page_proof cctxt page_index slot_data] computes and returns the proof
+    of the page whose index and slot are given. *)
+val get_page_proof :
+  #cctxt -> int -> bytes -> Cryptobox.page_proof tzresult Lwt.t

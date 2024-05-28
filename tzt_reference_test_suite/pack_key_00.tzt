@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt key "edpkuRdpy8Bwwf9Zmk5QChYaioJKBw6f2sgSC5HDe9f8e4PebB5LtU" } ;
+output { Stack_elt bytes 0x050a0000002100671d017cfd178748559c7b550853dee14c55f69a7b5039de79789f07e513d907 } ;

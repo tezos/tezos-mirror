@@ -24,8 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let build_rpc_directory ~(commit_info : Node_version.commit_info) validator
-    mainchain_validator =
+let build_rpc_directory ~(commit_info : Octez_node_version.commit_info)
+    validator mainchain_validator =
   let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in

@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt key_hash "tz2V4544tMhJUm1AkdiJbybe8oYCn1hcwAWF" } ;
+output { Stack_elt bytes 0x050a0000001501e37c61b158f6626985ef211c2261ffc0f3a87655 } ;

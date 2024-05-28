@@ -7,6 +7,7 @@
 
 open Protocol
 open Alpha_context
+module Context = Irmin_context
 
 module type Serializable_state_S = sig
   type context
@@ -199,4 +200,14 @@ module State = Context.PVMState
 module Inspect_durable_state = struct
   let lookup _state _keys =
     raise (Invalid_argument "No durable storage for riscv PVM")
+end
+
+module Unsafe_patches = struct
+  (** No unsafe patches for the riscv PVM. *)
+  type t = |
+
+  let of_patch (p : Pvm_patches.unsafe_patch) =
+    match p with Increase_max_nb_ticks _ -> assert false
+
+  let apply _state (x : t) = match x with _ -> .
 end

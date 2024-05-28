@@ -24,14 +24,14 @@ pkg_vers=$(getOctezVersion)
 
 # Checking prerequisites
 #
-if ! which rpmbuild >/dev/null 2>&1; then
+if ! which rpmbuild > /dev/null 2>&1; then
   echo "Needs to run on a system with rpmbuild in path" >&2
   echo "yum install rpmdevtools"
   exit 2
 fi
 
 rpmdev-setuptree
-rpmbuild_root=$HOME/rpmbuild  # Seems to be standard
+rpmbuild_root=$HOME/rpmbuild # Seems to be standard
 spec_dir="${rpmbuild_root}/SPECS"
 rpm_dir="${rpmbuild_root}/RPMS"
 src_dir="${rpmbuild_root}/SOURCES"
@@ -50,17 +50,17 @@ for specfile in "$myhome"/*spec.in; do
   #
   rpm_name=${OCTEZ_PKGNAME}-${pg}
   init_name=${OCTEZ_REALNAME}-${pg}
-  rpm_fullname="${rpm_name}-${pkg_vers}-${OCTEZ_PKGREV}.${rpm_arch}.rpm"
+  rpm_vers=$(echo "${pkg_vers}" | tr -d '~')
+  rpm_fullname="${rpm_name}-${rpm_vers}-${OCTEZ_PKGREV}.${rpm_arch}.rpm"
 
   binaries=$(fixBinaryList "${common}/${pg}-binaries")
 
-
   if [ -f "$rpm_fullname" ]; then
     echo "built already - skipping"
-        continue
+    continue
   fi
 
-  tar_name=${rpm_name}-${pkg_vers}
+  tar_name=${rpm_name}-${rpm_vers}
   # Populate the staging directory with control scripts
   # binaries and configuration as appropriate
   #
@@ -79,20 +79,18 @@ for specfile in "$myhome"/*spec.in; do
         install -s -t "${build_dir}/usr/bin" "${bin}"
       else
         echo "WARN: ${bin} not found"
-                                [ "$dieonwarn" = "1" ] && exit 1
+        [ "$dieonwarn" = "1" ] && exit 1
       fi
     done
   fi
 
-
   # init.d scripts
   #
   initdScripts "${common}/${pg}.initd.in" "${init_name}" "${build_dir}"
-    if [ "$pg" = "baker" ]; then
+  if [ "$pg" = "baker" ]; then
     initdScripts "${common}/vdf.initd.in" octez-vdf \
       "${build_dir}"
   fi
-
 
   # Configuration files
   #
@@ -109,7 +107,7 @@ for specfile in "$myhome"/*spec.in; do
   # Edit the spec file to contain real values
   #
   spec_file="${pg}.spec"
-  sed -e "s/@ARCH@/${rpm_arch}/g" -e "s/@VERSION@/$pkg_vers/g" \
+  sed -e "s/@ARCH@/${rpm_arch}/g" -e "s/@VERSION@/$rpm_vers/g" \
     -e "s/@REVISION@/${OCTEZ_PKGREV}/g" \
     -e "s/@MAINT@/${OCTEZ_PKGMAINTAINER}/g" \
     -e "s/@PKG@/${rpm_name}/g" \
@@ -120,7 +118,7 @@ for specfile in "$myhome"/*spec.in; do
   # Stage the package
   #
   echo "=> Staging ${pg}"
-  (cd ${staging_dir} && tar zcf "${src_dir}/${tar_name}.tar.gz" "${tar_name}" )
+  (cd ${staging_dir} && tar zcf "${src_dir}/${tar_name}.tar.gz" "${tar_name}")
 
   # Build the package
   #

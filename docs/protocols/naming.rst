@@ -41,6 +41,8 @@ sequence:
 * 015 Lima
 * 016 Mumbai
 * 017 Nairobi
+* 018 Oxford
+* 019 Paris
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol
@@ -61,6 +63,8 @@ in-use and upcoming protocols:
   phases: "candidate protocol".
 
   - other possible terms: "(new) protocol proposal", "current proposal"
+
+* A protocol proposal that has successfully passed all the votes in the :doc:`voting process <../active/voting>` and is waiting for activation during the Adoption period: "voted protocol (proposal)".
 
 External resources
 ------------------

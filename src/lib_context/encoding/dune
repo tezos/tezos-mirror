@@ -8,8 +8,8 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib
-  irmin
-  irmin-pack)
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin_pack)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

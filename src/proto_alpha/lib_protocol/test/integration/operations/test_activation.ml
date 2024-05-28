@@ -43,7 +43,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 (* Generated commitments and secrets  *)
 
@@ -426,7 +426,7 @@ let test_activation_and_transfer () =
   let* operation = Op.activation (B blk) account activation_code in
   let* blk = Block.bake ~operation blk in
   let* amount = Context.Contract.balance (B blk) bootstrap_contract in
-  let half_amount = Test_tez.(amount /! 2L) in
+  let half_amount = Tez_helpers.(amount /! 2L) in
   let* activated_amount_before =
     Context.Contract.balance (B blk) first_contract
   in

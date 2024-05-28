@@ -319,6 +319,7 @@ module V8 = V7
 module V9 = V8
 module V10 = V9
 module V11 = V10
+module V12 = V11
 
 module type S = V7.S
 
@@ -333,6 +334,7 @@ module type Sigs = sig
   module V9 = V9
   module V10 = V10
   module V11 = V11
+  module V12 = V12
 
   module type VIEW = VIEW
 

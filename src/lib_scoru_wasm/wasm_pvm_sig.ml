@@ -25,6 +25,18 @@
 (*****************************************************************************)
 open Wasm_pvm_state
 
+module type Unsafe = sig
+  type tree
+
+  (** Retrieve the maximum number of ticks for the PVM from the state. *)
+  val get_max_nb_ticks : tree -> Z.t Lwt.t
+
+  (** Change the maximum number of ticks (per snapshot) of the WASM PVM. This is
+      to be used only for tests or to increase the tick limit in a non-refutable
+      setting. *)
+  val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
+end
+
 module type Internal_for_tests = sig
   open Internal_state
 
@@ -36,8 +48,6 @@ module type Internal_for_tests = sig
     tree -> Tezos_webassembly_interpreter.Instance.module_inst Lwt.t
 
   val is_stuck : tree -> Wasm_pvm_errors.t option Lwt.t
-
-  val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
 
   val set_maximum_reboots_per_input : Z.t -> tree -> tree Lwt.t
 
@@ -52,12 +62,15 @@ module type Internal_for_tests = sig
     tree -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
 
   val compute_step_many_until :
+    wasm_entrypoint:string ->
     ?max_steps:int64 ->
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     (pvm_state -> bool Lwt.t) ->
     tree ->
     (tree * int64) Lwt.t
+
+  include Unsafe with type tree := tree
 
   include Wasm_vm_sig.Internal_for_tests with type state := tree
 end
@@ -88,6 +101,8 @@ module type S = sig
       [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
       function may raise an exception. *)
   val get_output : output_info -> tree -> string option Lwt.t
+
+  module Unsafe : Unsafe with type tree := tree
 
   module Internal_for_tests : Internal_for_tests with type tree := tree
 end

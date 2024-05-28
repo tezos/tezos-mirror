@@ -61,7 +61,7 @@ type t
 
 type operation := t
 
-type consensus_kind = Attestation | Preattestation | Dal_attestation
+type consensus_kind = Attestation of {with_dal : bool} | Preattestation
 
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
@@ -230,12 +230,6 @@ module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
 
-  (** [dal_attestation ~attestation ~level ~slot] crafts a slot attestation
-     operation to attest at [level] slot headers published at level
-     [level - attestation_lag].  For each slot, the value of the
-     booleans indicates whether the data is deemed available. *)
-  val dal_attestation : attestation:bool array -> level:int -> slot:int -> t
-
   (** [consensus ~kind ~use_legacy_name ~level ~round ~slot ~block_payload_hash]
       crafts a consensus operation with the [kind] at [level] on the [round]
       with the [slot] and [block_payload_hash]. If [use_legacy_name] is set, the
@@ -263,22 +257,26 @@ module Consensus : sig
     block_payload_hash:string ->
     t
 
-  (** [attestation ?use_legacy_name ~level ~round ~slot ~block_payload_hash]
-      crafts an attestation operation at [level] on the [round] with the [slot]
-      and [block_payload_hash]. If [use_legacy_name] is set, the [kind] field in
-      the crafted JSON will be "endorsement" instead of "attestation". *)
+  (** [attestation ?use_legacy_name ~level ~round ~slot ~block_payload_hash
+      ?dal_attestation ()] crafts an attestation operation at the given [level]
+      on the given [round] with the given [slot] and [block_payload_hash] and
+      optionally the given [dal_attestation]. If [use_legacy_name] is set, the
+      [kind] field in the crafted JSON will be "endorsement" instead of
+      "attestation". *)
   val attestation :
     use_legacy_name:bool ->
     slot:int ->
     level:int ->
     round:int ->
     block_payload_hash:string ->
+    ?dal_attestation:bool array ->
+    unit ->
     t
 
-  (** [kind_to_string kind use_legacy_name] return the name of the [kind]. If
-      [use_legacy_name] is set, the name corresponding to the [kind] will be
-      "(pre)endorsement" instead of "(pre)attestation". *)
-  val kind_to_string : consensus_kind -> bool -> string
+  (** [kind_to_string kind ~use_legacy_name] returns the name of the
+      [kind]. If [use_legacy_name] is set, the name corresponding to the [kind]
+      will be "(pre)endorsement" instead of "(pre)attestation". *)
+  val kind_to_string : consensus_kind -> use_legacy_name:bool -> string
 
   (** [operation] constructs an operation from a consensus
      operation. the [client] is used to fetch the branch and the
@@ -319,7 +317,7 @@ module Consensus : sig
 
   (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
       extracts the head block's payload hash from the result. *)
-  val get_block_payload_hash : Client.t -> string Lwt.t
+  val get_block_payload_hash : ?block:string -> Client.t -> string Lwt.t
 end
 
 module Anonymous : sig
@@ -362,11 +360,12 @@ module Anonymous : sig
     operation * Tezos_crypto.Signature.t ->
     t
 
-  (** [kind_to_string kind use_legacy_name] return the name of the [kind]. If
+  (** [kind_to_string kind ~use_legacy_name] return the name of the [kind]. If
       [use_legacy_name] is set, the name corresponding to the [kind] will be
       "double_(pre)endorsement_evidence" instead of
       "double_(pre)attestation_evidence". *)
-  val kind_to_string : double_consensus_evidence_kind -> bool -> string
+  val kind_to_string :
+    double_consensus_evidence_kind -> use_legacy_name:bool -> string
 
   (** [operation] constructs an operation from an anonymous operation. the
       [client] is used to fetch the branch and the [chain_id]. *)
@@ -383,6 +382,22 @@ module Anonymous : sig
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** Crafts two (pre)attestations that only differ in their block
+      payload hash, then a well-formed double (pre)attestation
+      evidence operation on them.
+
+      The denounced (pre)attestations have the specified
+      [misbehaviour_level] and [misbehaviour_round], the first slot of
+      [culprit], and two constant and distinct block payload
+      hashes. They are signed by [culprit]. *)
+  val make_double_consensus_evidence_with_distinct_bph :
+    kind:double_consensus_evidence_kind ->
+    misbehaviour_level:int ->
+    misbehaviour_round:int ->
+    culprit:Account.key ->
+    Client.t ->
+    t Lwt.t
 end
 
 (** Voting operations (validation pass [1]): [proposals] and [ballot].
@@ -477,10 +492,10 @@ module Manager : sig
     unit ->
     payload
 
-  (** [dal_publish_slot_header ~level ~index ~header] builds an
+  (** [dal_publish_commitment ~level ~index ~header] builds an
      operation for the data-availability layer that publishes a
      slot. *)
-  val dal_publish_slot_header :
+  val dal_publish_commitment :
     index:int ->
     commitment:Tezos_crypto_dal.Cryptobox.commitment ->
     proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
@@ -676,6 +691,13 @@ val rejected_by_full_mempool_with_needed_fee : rex
     Captures [hash]. *)
 val rejected_by_full_mempool_no_possible_fee : rex
 
+(** Matches the message produced by
+    [Dal_data_availibility_attester_not_in_committee {attester; level; slot}]
+    from [src/proto_alpha/lib_protocol/dal_errors_repr].
+
+    Captures [attester], [level], and [slot]. *)
+val dal_data_availibility_attester_not_in_committee : rex
+
 (** Calls {!inject_and_capture2_stderr} and checks that the second
     captured group is [expected_fee].
 
@@ -683,3 +705,17 @@ val rejected_by_full_mempool_no_possible_fee : rex
     {!rejected_by_full_mempool_with_needed_fee} as [rex]. *)
 val inject_error_check_recommended_fee :
   loc:string -> rex:rex -> expected_fee:int -> t -> Client.t -> unit Lwt.t
+
+(** Matches the message produced by
+    [Already_denounced {kind; delegate; level}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [delegate], [level], [kind]. *)
+val already_denounced : rex
+
+(** Matches the message produced by
+    [Outdated_denunciation {kind; level; last_cycle}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [kind], [last_cycle], [level]. *)
+val outdated_denunciation : rex

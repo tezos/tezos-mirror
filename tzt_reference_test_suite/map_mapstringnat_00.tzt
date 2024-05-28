@@ -1,0 +1,3 @@
+code { MAP { CDR ; DIP {DUP} ; ADD } } ;
+input { Stack_elt (map string nat) { Elt "foo" 1 } ; Stack_elt nat 10 } ;
+output { Stack_elt (map string nat) { Elt "foo" 11 } ; Stack_elt nat 10 }

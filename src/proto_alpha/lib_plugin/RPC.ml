@@ -38,16 +38,15 @@ let version_of_string = function
   | "1" -> Ok Version_1
   | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
 
-let default_operations_version = Version_0
+let default_operations_version = Version_1
 
 let version_arg =
   let open RPC_arg in
   make
     ~descr:
-      "Supported RPC versions are version '0' (default but deprecated) that \
-       will output attestation operations as \"endorsement\" in the \"kind\" \
-       field and version '1' that will output \"attestation\" in the \"kind\" \
-       field"
+      "Supported RPC versions are version '1' (default) that will output \
+       \"attestation\" in the \"kind\" field and version '0' (deprecated) that \
+       will output \"endorsement\""
     ~name:"version"
     ~destruct:version_of_string
     ~construct:string_of_version
@@ -780,14 +779,16 @@ module Scripts = struct
           (fun () ->
             let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
             Script_tc_errors.Ill_typed_data (None, data, exp_ty))
-          (let allow_forged =
+          (let allow_forged_tickets = true in
+           let allow_forged_lazy_storage_id =
              true
              (* Safe since we ignore the value afterwards. *)
            in
            Script_ir_translator.parse_data
              ctxt
              ~elab_conf:(elab_conf ~legacy ())
-             ~allow_forged
+             ~allow_forged_tickets
+             ~allow_forged_lazy_storage_id
              exp_ty
              (Micheline.root data))
       in
@@ -909,7 +910,8 @@ module Scripts = struct
               Script_ir_translator.parse_data
                 ctxt
                 ~elab_conf
-                ~allow_forged:true
+                ~allow_forged_tickets:true
+                ~allow_forged_lazy_storage_id:true
                 ty
                 data_node
             in
@@ -1141,8 +1143,7 @@ module Scripts = struct
     let*? () =
       match packed_operation.protocol_data with
       | Operation_data {contents = Single (Preattestation _); _}
-      | Operation_data {contents = Single (Attestation _); _}
-      | Operation_data {contents = Single (Dal_attestation _); _} ->
+      | Operation_data {contents = Single (Attestation _); _} ->
           Environment.Error_monad.Result_syntax.tzfail
             Run_operation_does_not_support_consensus_operations
       | _ -> Result_syntax.return_unit
@@ -1212,9 +1213,9 @@ module Scripts = struct
       end)
       (op, chain_id)
 
-  let default_from_context ctxt get = function
-    | None -> get ctxt
-    | Some x -> return x
+  let default_from_context ctxt get =
+    let open Lwt_result_syntax in
+    function None -> get ctxt | Some x -> return x
 
   (* A convenience type for return values of [ensure_contracts_exist] below. *)
   type run_code_config = {
@@ -1289,7 +1290,8 @@ module Scripts = struct
               parse_data
                 ctxt
                 ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-                ~allow_forged:true
+                ~allow_forged_tickets:true
+                ~allow_forged_lazy_storage_id:true
                 map_ty
                 items
             in
@@ -1778,7 +1780,8 @@ module Scripts = struct
         let* storage, _ =
           Script_ir_translator.parse_data
             ~elab_conf
-            ~allow_forged:true
+            ~allow_forged_tickets:true
+            ~allow_forged_lazy_storage_id:true
             ctxt
             storage_type
             (Micheline.root storage)
@@ -1828,7 +1831,8 @@ module Scripts = struct
           parse_data
             ctxt
             ~elab_conf:(elab_conf ~legacy:true ())
-            ~allow_forged:true
+            ~allow_forged_tickets:true
+            ~allow_forged_lazy_storage_id:true
             typ
             (Micheline.root expr)
         in
@@ -1855,7 +1859,8 @@ module Scripts = struct
           parse_data
             ctxt
             ~elab_conf:(elab_conf ~legacy ())
-            ~allow_forged:true
+            ~allow_forged_tickets:true
+            ~allow_forged_lazy_storage_id:true
             typ
             (Micheline.root expr)
         in
@@ -2325,6 +2330,7 @@ module Contract = struct
   end
 
   let get_contract contract f =
+    let open Lwt_result_syntax in
     match contract with
     | Contract.Implicit _ -> return_none
     | Contract.Originated contract -> f contract
@@ -2347,7 +2353,8 @@ module Contract = struct
               parse_script
                 ctxt
                 ~elab_conf:(elab_conf ~legacy:true ())
-                ~allow_forged_in_storage:true
+                ~allow_forged_tickets_in_storage:true
+                ~allow_forged_lazy_storage_id_in_storage:true
                 script
             in
             let+ storage, _ctxt =
@@ -2369,7 +2376,8 @@ module Contract = struct
               Script_ir_translator.parse_and_unparse_script_unaccounted
                 ctxt
                 ~legacy:true
-                ~allow_forged_in_storage:true
+                ~allow_forged_tickets_in_storage:true
+                ~allow_forged_lazy_storage_id_in_storage:true
                 unparsing_mode
                 ~normalize_types
                 script
@@ -2416,7 +2424,8 @@ module Contract = struct
               Script_ir_translator.parse_script
                 ctxt
                 ~elab_conf:(elab_conf ~legacy:true ())
-                ~allow_forged_in_storage:true
+                ~allow_forged_tickets_in_storage:true
+                ~allow_forged_lazy_storage_id_in_storage:true
                 script
             in
             let*? has_tickets, ctxt =
@@ -2537,7 +2546,8 @@ module Big_map = struct
                   parse_data
                     ctxt
                     ~elab_conf:(elab_conf ~legacy:true ())
-                    ~allow_forged:true
+                    ~allow_forged_tickets:true
+                    ~allow_forged_lazy_storage_id:true
                     value_type
                     (Micheline.root value)
                 in
@@ -2577,13 +2587,6 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output:Sc_rollup.Kind.encoding
         RPC_path.(path_sc_rollup / "kind")
-
-    let initial_pvm_state_hash =
-      RPC_service.get_service
-        ~description:"Initial PVM state hash of smart rollup"
-        ~query:RPC_query.empty
-        ~output:Sc_rollup.State_hash.encoding
-        RPC_path.(path_sc_rollup / "initial_pvm_state_hash")
 
     let genesis_info =
       RPC_service.get_service
@@ -2817,19 +2820,6 @@ module Sc_rollup = struct
     let+ _ctxt, kind = Alpha_context.Sc_rollup.kind ctxt address in
     Some kind
 
-  let register_initial_pvm_state_hash () =
-    let open Lwt_result_syntax in
-    Registration.opt_register1 ~chunked:true S.initial_pvm_state_hash
-    @@ fun ctxt address () () ->
-    let+ _ctxt, kind = Alpha_context.Sc_rollup.kind ctxt address in
-    match kind with
-    | Sc_rollup.Kind.Example_arith ->
-        Some Sc_rollup.ArithPVM.reference_initial_state_hash
-    | Sc_rollup.Kind.Wasm_2_0_0 ->
-        Some Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash
-    | Sc_rollup.Kind.Riscv ->
-        Some Sc_rollup.Riscv_PVM.reference_initial_state_hash
-
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
   let register_genesis_info () =
     let open Lwt_result_syntax in
@@ -3021,7 +3011,6 @@ module Sc_rollup = struct
     register_timeout () ;
     register_timeout_reached () ;
     register_can_be_cemented () ;
-    register_initial_pvm_state_hash () ;
     register_ticket_balance ()
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
@@ -3107,15 +3096,6 @@ module Sc_rollup = struct
       ()
       ()
 
-  let initial_pvm_state_hash ctxt block sc_rollup_address =
-    RPC_context.make_call1
-      S.initial_pvm_state_hash
-      ctxt
-      block
-      sc_rollup_address
-      ()
-      ()
-
   let can_be_cemented ctxt block sc_rollup_address commitment_hash =
     RPC_context.make_call2
       S.can_be_cemented
@@ -3130,65 +3110,156 @@ module Sc_rollup = struct
     RPC_context.make_call1 S.ticket_balance ctxt block sc_rollup () key
 end
 
+type Environment.Error_monad.error +=
+  | Published_slot_headers_not_initialized of Raw_level.t
+
+let () =
+  Environment.Error_monad.register_error_kind
+    `Permanent
+    ~id:"published_slot_headers_not_initialized"
+    ~title:"The published slot headers bucket not initialized in the context"
+    ~description:
+      "The published slot headers bucket is not initialized in the context"
+    ~pp:(fun ppf level ->
+      Format.fprintf
+        ppf
+        "The published slot headers bucket is not initialized in the context \
+         at level %a"
+        Raw_level.pp
+        level)
+    Data_encoding.(obj1 (req "level" Raw_level.encoding))
+    (function
+      | Published_slot_headers_not_initialized level -> Some level | _ -> None)
+    (fun level -> Published_slot_headers_not_initialized level)
+
 module Dal = struct
   let path : RPC_context.t RPC_path.context =
     RPC_path.(open_root / "context" / "dal")
 
   module S = struct
-    let dal_confirmed_slot_headers_history =
+    let dal_commitments_history =
       let output = Data_encoding.option Dal.Slots_history.encoding in
       let query = RPC_query.(seal @@ query ()) in
       RPC_service.get_service
         ~description:
-          "Returns the value of the DAL confirmed slots history skip list if \
-           DAL is enabled, or [None] otherwise."
+          "Returns the (currently last) DAL skip list cell if DAL is enabled, \
+           or [None] otherwise."
         ~output
         ~query
-        RPC_path.(path / "confirmed_slot_headers_history")
+        RPC_path.(path / "commitments_history")
 
-    let shards_query =
+    let level_query =
       RPC_query.(
         query (fun level -> level)
         |+ opt_field "level" Raw_level.rpc_arg (fun t -> t)
         |> seal)
 
+    type shards_query = {
+      level : Raw_level.t option;
+      delegates : Signature.Public_key_hash.t list;
+    }
+
+    let shards_query =
+      let open RPC_query in
+      query (fun level delegates -> {level; delegates})
+      |+ opt_field "level" Raw_level.rpc_arg (fun t -> t.level)
+      |+ multi_field "delegates" Signature.Public_key_hash.rpc_arg (fun t ->
+             t.delegates)
+      |> seal
+
+    type shards_assignment = {
+      delegate : Signature.Public_key_hash.t;
+      indexes : int list;
+    }
+
+    let shards_assignment_encoding =
+      let open Data_encoding in
+      conv
+        (fun {delegate; indexes} -> (delegate, indexes))
+        (fun (delegate, indexes) -> {delegate; indexes})
+        (obj2
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "indexes" (list int16)))
+
+    type shards_output = shards_assignment list
+
     let shards =
       RPC_service.get_service
         ~description:
-          "Get the shard assignements for a given level (the default is the \
-           current level)"
+          "Get the shards assignment for a given level (the default is the \
+           current level) and given delegates (the default is all delegates)"
         ~query:shards_query
-        ~output:
-          Data_encoding.(
-            list (tup2 Signature.Public_key_hash.encoding (tup2 int16 int16)))
+        ~output:(Data_encoding.list shards_assignment_encoding)
         RPC_path.(path / "shards")
+
+    let published_slot_headers =
+      let output = Data_encoding.(list Dal.Slot.Header.encoding) in
+      RPC_service.get_service
+        ~description:"Get the published slots headers for the given level"
+        ~query:level_query
+        ~output
+        RPC_path.(path / "published_slot_headers")
   end
 
-  let register_dal_confirmed_slot_headers_history () =
+  let register_dal_commitments_history () =
     let open Lwt_result_syntax in
     Registration.register0
       ~chunked:false
-      S.dal_confirmed_slot_headers_history
+      S.dal_commitments_history
       (fun ctxt () () ->
         if (Constants.parametric ctxt).dal.feature_enable then
           let+ result = Dal.Slots_storage.get_slot_headers_history ctxt in
           Option.some result
         else return_none)
 
-  let dal_confirmed_slots_history ctxt block =
-    RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
+  let dal_commitments_history ctxt block =
+    RPC_context.make_call0 S.dal_commitments_history ctxt block () ()
 
-  let dal_shards ctxt block ?level () =
-    RPC_context.make_call0 S.shards ctxt block level ()
+  let dal_shards ctxt block ?level ?(delegates = []) () =
+    RPC_context.make_call0 S.shards ctxt block {level; delegates} ()
 
   let register_shards () =
-    Registration.register0 ~chunked:true S.shards @@ fun ctxt level () ->
+    Registration.register0 ~chunked:true S.shards @@ fun ctxt q () ->
+    let open Lwt_result_syntax in
+    let*? level_opt =
+      Option.map_e (Level.from_raw_with_offset ctxt ~offset:0l) q.level
+    in
+    let level = Option.value level_opt ~default:(Level.current ctxt) in
+    let* _ctxt, map = Dal_services.shards ctxt ~level in
+    let query_delegates = Signature.Public_key_hash.Set.of_list q.delegates in
+    let all_delegates =
+      Signature.Public_key_hash.Set.is_empty query_delegates
+    in
+    Signature.Public_key_hash.Map.fold
+      (fun delegate indexes acc ->
+        if
+          all_delegates
+          || Signature.Public_key_hash.Set.mem delegate query_delegates
+        then ({delegate; indexes} : S.shards_assignment) :: acc
+        else acc)
+      map
+      []
+    |> return
+
+  let dal_published_slot_headers ctxt block ?level () =
+    RPC_context.make_call0 S.published_slot_headers ctxt block level ()
+
+  let register_published_slot_headers () =
+    let open Lwt_result_syntax in
+    Registration.register0 ~chunked:true S.published_slot_headers
+    @@ fun ctxt level () ->
     let level = Option.value level ~default:(Level.current ctxt).level in
-    Dal_services.shards ctxt ~level
+    let* result = Dal.Slot.find_slot_headers ctxt level in
+    match result with
+    | Some l -> return l
+    | None ->
+        Environment.Error_monad.tzfail
+        @@ Published_slot_headers_not_initialized level
 
   let register () =
-    register_dal_confirmed_slot_headers_history () ;
-    register_shards ()
+    register_dal_commitments_history () ;
+    register_shards () ;
+    register_published_slot_headers ()
 end
 
 module Forge = struct
@@ -3253,13 +3324,14 @@ module Forge = struct
   end
 
   let register () =
+    let open Lwt_result_syntax in
     Registration.register0_noctxt
       ~chunked:true
       S.operations
       (fun () operation ->
         return
           (Data_encoding.Binary.to_bytes_exn
-             Operation.unsigned_encoding_with_legacy_attestation_name
+             Operation.unsigned_encoding
              operation)) ;
     Registration.register0_noctxt
       ~chunked:true
@@ -3386,8 +3458,8 @@ module Forge = struct
       ()
       ({branch}, Contents_list (Single operation))
 
-  let attestation ctxt b ~branch ~consensus_content () =
-    operation ctxt b ~branch (Attestation consensus_content)
+  let attestation ctxt b ~branch ~consensus_content ?dal_content () =
+    operation ctxt b ~branch (Attestation {consensus_content; dal_content})
 
   let proposals ctxt b ~branch ~source ~period ~proposals () =
     operation ctxt b ~branch (Proposals {source; period; proposals})
@@ -3496,7 +3568,7 @@ module Parse = struct
     let open Result_syntax in
     match
       Data_encoding.Binary.of_bytes_opt
-        Operation.protocol_data_encoding_with_legacy_attestation_name
+        Operation.protocol_data_encoding
         op.proto
     with
     | Some protocol_data -> return {shell = op.shell; protocol_data}
@@ -3806,7 +3878,7 @@ module Attestation_rights = struct
     estimated_time : Time.t option;
   }
 
-  let delegate_rights_encoding use_legacy_attestation_name =
+  let delegate_rights_encoding =
     let open Data_encoding in
     conv
       (fun {delegate; consensus_key; first_slot; attestation_power} ->
@@ -3816,13 +3888,10 @@ module Attestation_rights = struct
       (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
-         (req
-            (if use_legacy_attestation_name then "endorsing_power"
-            else "attestation_power")
-            uint16)
+         (req "attestation_power" uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
-  let encoding ~use_legacy_attestation_name =
+  let encoding =
     let open Data_encoding in
     conv
       (fun {level; delegates_rights; estimated_time} ->
@@ -3831,17 +3900,13 @@ module Attestation_rights = struct
         {level; delegates_rights; estimated_time})
       (obj3
          (req "level" Raw_level.encoding)
-         (req
-            "delegates"
-            (list (delegate_rights_encoding use_legacy_attestation_name)))
+         (req "delegates" (list delegate_rights_encoding))
          (opt "estimated_time" Timestamp.encoding))
 
   module S = struct
     open Data_encoding
 
     let attestation_path = RPC_path.(path / "attestation_rights")
-
-    let endorsing_path = RPC_path.(path / "endorsing_rights")
 
     type attestation_rights_query = {
       levels : Raw_level.t list;
@@ -3881,34 +3946,8 @@ module Attestation_rights = struct
            block's, based on the hypothesis that all predecessor blocks were \
            baked at the first round."
         ~query:attestation_rights_query
-        ~output:(list (encoding ~use_legacy_attestation_name:false))
+        ~output:(list encoding)
         attestation_path
-
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5156
-       endorsing_rights RPC should be removed once the depreciation period
-       will be over *)
-    let endorsing_rights =
-      RPC_service.get_service
-        ~description:
-          "Deprecated: use `attestation_rights` instead.\n\
-           Retrieves the delegates allowed to endorse a block.\n\
-           By default, it gives the endorsing power for delegates that have at \
-           least one endorsing slot for the next block.\n\
-           Parameters `level` and `cycle` can be used to specify the (valid) \
-           level(s) in the past or future at which the endorsing rights have \
-           to be returned. Parameter `delegate` can be used to restrict the \
-           results to the given delegates.\n\
-           Parameter `consensus_key` can be used to restrict the results to \
-           the given consensus_keys. \n\
-           Returns the smallest endorsing slots and the endorsing power. Also \
-           returns the minimal timestamp that corresponds to endorsing at the \
-           given level. The timestamps are omitted for levels in the past, and \
-           are only estimates for levels higher that the next block's, based \
-           on the hypothesis that all predecessor blocks were baked at the \
-           first round."
-        ~query:attestation_rights_query
-        ~output:(list (encoding ~use_legacy_attestation_name:true))
-        endorsing_path
   end
 
   let attestation_rights_at_level ctxt level =
@@ -3935,7 +3974,8 @@ module Attestation_rights = struct
                  consensus_pk = _;
                  consensus_pkh = consensus_key;
                },
-               attestation_power )
+               attestation_power,
+               _dal_power )
              acc ->
           {delegate; consensus_key; first_slot; attestation_power} :: acc)
         rights
@@ -3979,8 +4019,6 @@ module Attestation_rights = struct
 
   let register () =
     Registration.register0 ~chunked:true S.attestation_rights (fun ctxt q () ->
-        get_attestation_rights ctxt q) ;
-    Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
         get_attestation_rights ctxt q)
 
   let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(consensus_keys = [])
@@ -4107,6 +4145,299 @@ module Validators = struct
       ()
 end
 
+module Delegates = struct
+  let min_delegated_in_current_cycle_encoding =
+    let open Data_encoding in
+    conv
+      (fun (min_delegated, anchor) -> (min_delegated, anchor))
+      (fun (min_delegated, anchor) -> (min_delegated, anchor))
+      (obj2 (req "amount" Tez.encoding) (opt "level" Level_repr.encoding))
+
+  type info = {
+    full_balance : Tez.t;
+    current_frozen_deposits : Tez.t;
+    frozen_deposits : Tez.t;
+    staking_balance : Tez.t;
+    frozen_deposits_limit : Tez.t option;
+    delegated_contracts : Alpha_context.Contract.t list;
+    delegated_balance : Tez.t;
+    min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
+    total_delegated_stake : Tez.t;
+    staking_denominator : Staking_pseudotoken.t;
+    deactivated : bool;
+    grace_period : Cycle.t;
+    pending_denunciations : bool;
+    voting_info : Vote.delegate_info;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+  }
+
+  let info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             full_balance;
+             current_frozen_deposits;
+             frozen_deposits;
+             staking_balance;
+             frozen_deposits_limit;
+             delegated_contracts;
+             delegated_balance;
+             min_delegated_in_current_cycle;
+             total_delegated_stake;
+             staking_denominator;
+             deactivated;
+             grace_period;
+             pending_denunciations;
+             voting_info;
+             active_consensus_key;
+             pending_consensus_keys;
+           } ->
+        ( ( full_balance,
+            current_frozen_deposits,
+            frozen_deposits,
+            staking_balance,
+            frozen_deposits_limit,
+            delegated_contracts,
+            delegated_balance,
+            min_delegated_in_current_cycle,
+            deactivated,
+            grace_period ),
+          ( (pending_denunciations, total_delegated_stake, staking_denominator),
+            (voting_info, (active_consensus_key, pending_consensus_keys)) ) ))
+      (fun ( ( full_balance,
+               current_frozen_deposits,
+               frozen_deposits,
+               staking_balance,
+               frozen_deposits_limit,
+               delegated_contracts,
+               delegated_balance,
+               min_delegated_in_current_cycle,
+               deactivated,
+               grace_period ),
+             ( ( pending_denunciations,
+                 total_delegated_stake,
+                 staking_denominator ),
+               (voting_info, (active_consensus_key, pending_consensus_keys)) )
+           ) ->
+        {
+          full_balance;
+          current_frozen_deposits;
+          frozen_deposits;
+          staking_balance;
+          frozen_deposits_limit;
+          delegated_contracts;
+          delegated_balance;
+          min_delegated_in_current_cycle;
+          total_delegated_stake;
+          staking_denominator;
+          deactivated;
+          grace_period;
+          pending_denunciations;
+          voting_info;
+          active_consensus_key;
+          pending_consensus_keys;
+        })
+      (merge_objs
+         (obj10
+            (req "full_balance" Tez.encoding)
+            (req "current_frozen_deposits" Tez.encoding)
+            (req "frozen_deposits" Tez.encoding)
+            (req "staking_balance" Tez.encoding)
+            (opt "frozen_deposits_limit" Tez.encoding)
+            (req "delegated_contracts" (list Alpha_context.Contract.encoding))
+            (req "delegated_balance" Tez.encoding)
+            (req
+               "min_delegated_in_current_cycle"
+               min_delegated_in_current_cycle_encoding)
+            (req "deactivated" bool)
+            (req "grace_period" Cycle.encoding))
+         (merge_objs
+            (obj3
+               (req "pending_denunciations" bool)
+               (req "total_delegated_stake" Tez.encoding)
+               (req "staking_denominator" Staking_pseudotoken.For_RPC.encoding))
+            (merge_objs
+               Vote.delegate_info_encoding
+               (obj2
+                  (req
+                     "active_consensus_key"
+                     Signature.Public_key_hash.encoding)
+                  (dft
+                     "pending_consensus_keys"
+                     (list
+                        (obj2
+                           (req "cycle" Cycle.encoding)
+                           (req "pkh" Signature.Public_key_hash.encoding)))
+                     [])))))
+
+  let check_delegate_registered ctxt pkh =
+    let open Lwt_result_syntax in
+    let*! result = Delegate.registered ctxt pkh in
+    if result then return_unit
+    else Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
+
+  module S = struct
+    let path =
+      RPC_path.(
+        open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
+
+    let info =
+      RPC_service.get_service
+        ~description:"Everything about a delegate."
+        ~query:RPC_query.empty
+        ~output:info_encoding
+        path
+
+    let delegated_balance =
+      RPC_service.get_service
+        ~description:
+          "Returns the sum (in mutez) of all balances of all the contracts \
+           that delegate to a given delegate. This excludes the delegate's own \
+           balance, its frozen deposits and its frozen bonds."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "delegated_balance")
+
+    let min_delegated_in_current_cycle =
+      RPC_service.get_service
+        ~description:
+          "Returns the minimum of delegated tez (in mutez) over the current \
+           cycle and the block level where this value was last updated (Level \
+           is `None` when decoding values from protocol O)."
+        ~query:RPC_query.empty
+        ~output:min_delegated_in_current_cycle_encoding
+        RPC_path.(path / "min_delegated_in_current_cycle")
+  end
+
+  let unstake_requests ctxt pkh =
+    let open Lwt_result_syntax in
+    let* result = Unstake_requests.prepare_finalize_unstake ctxt pkh in
+    match result with
+    | None -> return_none
+    | Some {finalizable; unfinalizable} ->
+        let* unfinalizable =
+          Unstake_requests.For_RPC
+          .apply_slash_to_unstaked_unfinalizable_stored_requests
+            ctxt
+            unfinalizable
+        in
+        return_some Unstake_requests.{finalizable; unfinalizable}
+
+  let delegated_balance ctxt pkh =
+    let open Lwt_result_syntax in
+    let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+    let* unstake_requests = unstake_requests ctxt (Implicit pkh) in
+    let* unstake_requests_to_other_delegates =
+      match unstake_requests with
+      | None -> return Tez.zero
+      | Some {finalizable; unfinalizable} ->
+          let* finalizable_sum =
+            List.fold_left_es
+              (fun acc (delegate, _, (amount : Tez.t)) ->
+                if Signature.Public_key_hash.(delegate <> pkh) then
+                  Lwt.return Tez.(acc +? amount)
+                else return acc)
+              Tez.zero
+              finalizable
+          in
+          let* unfinalizable_sum =
+            if Signature.Public_key_hash.(unfinalizable.delegate <> pkh) then
+              List.fold_left_es
+                (fun acc (_, (amount : Tez.t)) ->
+                  Lwt.return Tez.(acc +? amount))
+                Tez.zero
+                unfinalizable.requests
+            else return Tez.zero
+          in
+          Lwt.return Tez.(finalizable_sum +? unfinalizable_sum)
+    in
+    let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
+    let*? self_staking_balance =
+      Tez.(full_balance -? unstake_requests_to_other_delegates)
+    in
+    let*? sum = Tez.(staking_balance -? self_staking_balance) in
+    return sum
+
+  let info ctxt pkh =
+    let open Lwt_result_syntax in
+    let* () = check_delegate_registered ctxt pkh in
+    let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+    let* current_frozen_deposits = Delegate.current_frozen_deposits ctxt pkh in
+    let* frozen_deposits = Delegate.initial_frozen_deposits ctxt pkh in
+    let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
+    let* frozen_deposits_limit = Delegate.frozen_deposits_limit ctxt pkh in
+    let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
+    let* delegated_balance = delegated_balance ctxt pkh in
+    let* min_delegated_in_current_cycle =
+      Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh
+    in
+    let* total_delegated_stake =
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+        ctxt
+        ~delegate:pkh
+    in
+    let* staking_denominator =
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+        ctxt
+        ~delegate:pkh
+    in
+    let* deactivated = Delegate.deactivated ctxt pkh in
+    let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
+    let*! pending_denunciations =
+      Delegate.For_RPC.has_pending_denunciations ctxt pkh
+    in
+    let* voting_info = Vote.get_delegate_info ctxt pkh in
+    let* consensus_key = Delegate.Consensus_key.active_pubkey ctxt pkh in
+    let+ pendings = Delegate.Consensus_key.pending_updates ctxt pkh in
+    let pending_consensus_keys =
+      List.map (fun (cycle, pkh, _) -> (cycle, pkh)) pendings
+    in
+    {
+      full_balance;
+      current_frozen_deposits;
+      frozen_deposits;
+      staking_balance;
+      frozen_deposits_limit;
+      delegated_contracts;
+      delegated_balance;
+      min_delegated_in_current_cycle;
+      total_delegated_stake;
+      staking_denominator;
+      deactivated;
+      grace_period;
+      pending_denunciations;
+      voting_info;
+      active_consensus_key = consensus_key.consensus_pkh;
+      pending_consensus_keys;
+    }
+
+  let register () =
+    let open Lwt_result_syntax in
+    Registration.register1 ~chunked:false S.info (fun ctxt pkh () () ->
+        info ctxt pkh) ;
+    Registration.register1
+      ~chunked:false
+      S.delegated_balance
+      (fun ctxt pkh () () ->
+        let* () = check_delegate_registered ctxt pkh in
+        delegated_balance ctxt pkh) ;
+    Registration.register1
+      ~chunked:false
+      S.min_delegated_in_current_cycle
+      (fun ctxt pkh () () ->
+        let* () = check_delegate_registered ctxt pkh in
+        Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh)
+
+  let delegated_balance ctxt block pkh =
+    RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
+
+  let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
+
+  let min_delegated_in_current_cycle_encoding ctxt block pkh =
+    RPC_context.make_call1 S.min_delegated_in_current_cycle ctxt block pkh () ()
+end
+
 module Staking = struct
   let path =
     RPC_path.(
@@ -4130,6 +4461,15 @@ module Staking = struct
         ~query:RPC_query.empty
         ~output:stakers_encoding
         RPC_path.(path / "stakers")
+
+    let is_forbidden =
+      RPC_service.get_service
+        ~description:
+          "Returns true if the delegate is forbidden to participate in \
+           consensus."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.bool
+        RPC_path.(path / "is_forbidden")
   end
 
   let contract_stake ctxt ~delegator_contract ~delegate =
@@ -4151,16 +4491,16 @@ module Staking = struct
       return @@ Some (delegator_pkh, staked_balance)
     else return_none
 
-  let check_delegate_registered ctxt pkh =
-    Delegate.registered ctxt pkh >>= function
-    | true -> return_unit
-    | false ->
-        Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
+  let check_is_forbidden ctxt pkh =
+    let open Lwt_result_syntax in
+    return @@ Delegate.is_forbidden_delegate ctxt pkh
 
   let register () =
+    Registration.register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
+        check_is_forbidden ctxt pkh) ;
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
         let open Lwt_result_syntax in
-        let* () = check_delegate_registered ctxt pkh in
+        let* () = Delegates.check_delegate_registered ctxt pkh in
         let*! delegators = Delegate.delegated_contracts ctxt pkh in
         List.filter_map_es
           (fun delegator_contract ->
@@ -4226,6 +4566,7 @@ let () =
     (fun () -> Negative_level_offset)
 
 let register () =
+  let open Lwt_result_syntax in
   Scripts.register () ;
   Forge.register () ;
   Parse.register () ;
@@ -4237,6 +4578,7 @@ let register () =
   Sc_rollup.register () ;
   Dal.register () ;
   Staking.register () ;
+  Delegates.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
       if q.offset < 0l then Environment.Error_monad.tzfail Negative_level_offset
       else

@@ -63,7 +63,7 @@ let test_connect () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
@@ -133,7 +133,7 @@ let test_read_write () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let data = Bytes.of_string "test" in
@@ -192,7 +192,7 @@ let test_closed_by_peer_read_outgoing () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
@@ -248,7 +248,7 @@ let test_closed_by_peer_read_incoming () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
@@ -301,7 +301,7 @@ let test_locally_closed_read_outgoing () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
@@ -354,7 +354,7 @@ let test_locally_closed_read_incoming () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
@@ -406,7 +406,7 @@ let test_locally_closed_write_outgoing () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
@@ -458,7 +458,7 @@ let test_locally_closed_write_incoming () =
         (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
            Fatal error: exception Bad file descriptor` errors
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
       ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in

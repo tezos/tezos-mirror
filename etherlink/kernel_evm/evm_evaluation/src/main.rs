@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,19 +8,21 @@ mod helpers;
 mod models;
 mod runner;
 
+use models::SkipData;
 use std::{
     collections::HashMap,
     ffi::OsStr,
-    fs::OpenOptions,
+    fs::{read, read_to_string, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::helpers::construct_folder_path;
+use fillers::TestResult;
+use helpers::{construct_folder_path, OutputOptions};
 
-const SKIP_ANY: bool = true;
+pub const SKIP_DATA_FILE: &str = "skip_data.yml";
 
 pub fn find_all_json_tests(path: &Path) -> Vec<PathBuf> {
     WalkDir::new(path)
@@ -31,11 +33,16 @@ pub fn find_all_json_tests(path: &Path) -> Vec<PathBuf> {
         .collect::<Vec<PathBuf>>()
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ReportValue {
     pub successes: u16,
     pub failures: u16,
+    pub skipped: u16,
 }
+
+pub type ReportMap = HashMap<String, ReportValue>;
+
+pub type DiffMap = Option<HashMap<String, (TestResult, Option<TestResult>)>>;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "evm-evaluation", about = "Evaluate EVM's engine semantic.")]
@@ -62,31 +69,483 @@ pub struct Opt {
     #[structopt(
         short = "o",
         long = "output",
-        default_value = "evm_evaluation.regression",
-        about = "Specify the file where the logs will be outputed. By default it will be outputed to 'evm_evaluation.regression'."
+        about = "Specify the file where the logs will be outputed. \
+                 By default it will be outputed to 'evm_evaluation.regression' \
+                 (evm_evaluation.result with --result and evm_evaluation.diff with --diff)."
     )]
-    output: String,
+    output: Option<String>,
+    #[structopt(
+        short = "r",
+        long = "report-only",
+        about = "Output only the final report."
+    )]
+    report_only: bool,
+    #[structopt(
+        short = "h",
+        long = "from-scratch",
+        about = "Overwrite the target file where the logs will be outputed."
+    )]
+    from_scratch: bool,
+    #[structopt(
+        long = "result",
+        about = "Dump the result of the evaluation to be used for later diff."
+    )]
+    result: bool,
+    #[structopt(long = "diff", about = "Compare result with a former evaluation.")]
+    diff: Option<String>,
+    #[structopt(
+        long = "resources",
+        default_value = "./etherlink/kernel_evm/evm_evaluation/resources",
+        about = "Specify the path where the tool needs to retrieve its resources from."
+    )]
+    resources: String,
+    #[structopt(
+        short = "c",
+        long = "ci-mode",
+        about = "This argument is useful for the CI so the tool can act as a \
+                 non-regression job."
+    )]
+    ci_mode: bool,
+}
+
+fn generate_final_report(
+    output_file: &mut Option<File>,
+    report_map: &mut HashMap<String, ReportValue>,
+) {
+    let mut successes_total = 0;
+    let mut failure_total = 0;
+    let mut skipped_total = 0;
+    let mut final_report: HashMap<&str, Vec<(String, u16, u16, u16)>> = HashMap::new();
+
+    for (key, report_value) in report_map {
+        let insert_element = (
+            key.to_string(),
+            report_value.successes,
+            report_value.failures,
+            report_value.skipped,
+        );
+        successes_total += report_value.successes;
+        failure_total += report_value.failures;
+        skipped_total += report_value.skipped;
+        if report_value.successes != 0 || report_value.failures != 0 {
+            if report_value.failures == 0 {
+                let entry = if report_value.skipped == 0 {
+                    "Fully Successful Tests"
+                } else {
+                    "Fully Successful With Skipped Tests"
+                };
+                final_report
+                    .entry(entry)
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stMemExpandingEIP150Calls"
+                || key == "stEIP150singleCodeGasPrices"
+                || key == "stEIP150Specific"
+            {
+                final_report
+                    .entry("EIP-150")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stEIP1559" {
+                final_report
+                    .entry("EIP-1559")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stEIP158Specific"
+                || key == "stEIP2930"
+                || key == "stEIP3860-limitmeterinitcode"
+                || key == "stEIP3607"
+            {
+                final_report
+                    .entry("Other EIPs")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stPreCompiledContracts"
+                || key == "stPreCompiledContracts2"
+                || key == "stZeroKnowledge"
+                || key == "stZeroKnowledge2"
+                || key == "stStaticFlagEnabled"
+            {
+                final_report
+                    .entry("Precompiled Contracts")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "vmIOandFlowOperations"
+                || key == "vmTests"
+                || key == "vmArithmeticTest"
+                || key == "vmPerformance"
+                || key == "vmLogTest"
+                || key == "vmBitwiseLogicOperation"
+            {
+                final_report
+                    .entry("VM Specific")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stBadOpcode"
+                || key == "stSolidityTest"
+                || key == "stRecursiveCreate"
+                || key == "stCreateTest"
+                || key == "stCreate2"
+                || key == "stCallCodes"
+                || key == "stCodeCopyTest"
+                || key == "stCallCreateCallCodeTest"
+                || key == "stZeroCallsTest"
+                || key == "stSStoreTest"
+                || key == "stSLoadTest"
+                || key == "stStaticCall"
+                || key == "stExtCodeHash"
+                || key == "stRevertTest"
+                || key == "stShift"
+                || key == "stSelfBalance"
+                || key == "stStackTests"
+                || key == "stNonZeroCallsTest"
+                || key == "stZeroCallsRevert"
+                || key == "stRefundTest"
+                || key == "stSystemOperationsTest"
+                || key == "stCodeSizeLimit"
+                || key == "stInitCodeTest"
+                || key == "stReturnDataTest"
+            {
+                final_report
+                    .entry("Smart Contracts - Opcodes - Solidity")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stMemoryTest" || key == "stMemoryStressTest" {
+                final_report
+                    .entry("Memory")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stHomesteadSpecific"
+                || key == "stCallDelegateCodesCallCodeHomestead"
+                || key == "stCallDelegateCodesHomestead"
+                || key == "stDelegatecallTestHomestead"
+            {
+                final_report
+                    .entry("Homestead EIPs")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else {
+                final_report
+                    .entry("Arbitrary/Random Tests")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            }
+        }
+    }
+
+    write_out!(output_file, "@========= FINAL REPORT =========@");
+
+    for (section, items) in final_report {
+        write_out!(output_file, "\n••• {} •••\n", section);
+        for (key, successes, failures, skipped) in items {
+            let skipped_msg = if skipped == 0 {
+                String::new()
+            } else {
+                format!(" with {} test(s) skipped", skipped)
+            };
+            write_out!(
+                output_file,
+                "For sub-dir {}, there was(were) {} success(es) and {} failure(s){}.",
+                key,
+                successes,
+                failures,
+                skipped_msg
+            );
+        }
+    }
+
+    write_out!(
+        output_file,
+        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}\nSKIPPED IN TOTAL: {}",
+        successes_total,
+        failure_total,
+        skipped_total
+    );
+}
+
+fn load_former_result(path: &str) -> HashMap<String, (TestResult, Option<TestResult>)> {
+    let mut result_map: HashMap<String, (TestResult, Option<TestResult>)> =
+        HashMap::new();
+    for line in read_to_string(path).unwrap().lines() {
+        match fillers::parse_result(line) {
+            None => continue,
+            Some((full_name, result)) => {
+                result_map.insert(full_name, (result, None));
+            }
+        }
+    }
+    result_map
+}
+
+fn generate_diff(
+    output_file: &mut Option<File>,
+    diff_result_map: &HashMap<String, (TestResult, Option<TestResult>)>,
+) {
+    let mut empty = true;
+
+    for (test_case, (former_res, new_res)) in diff_result_map.iter() {
+        match new_res {
+            None => {
+                empty = false;
+                write_out!(output_file, "{}: UNPROCESSED", test_case)
+            }
+            Some(result) if former_res != result => {
+                empty = false;
+                write_out!(
+                    output_file,
+                    "{}: {:?} -> {:?}",
+                    test_case,
+                    former_res,
+                    result
+                )
+            }
+            _ => continue,
+        }
+    }
+
+    if empty {
+        write_out!(output_file, "None of the test evaluation was changed.")
+    }
+}
+
+pub fn check_skip(test_file_path: &Path) -> bool {
+    let file_name = test_file_path.file_name().unwrap().to_str().unwrap();
+
+    matches!(
+        file_name,
+        // Long tests (all passing)
+        | "CALLBlake2f_MaxRounds.json" // ✔
+        | "loopMul.json" // ✔
+
+        // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
+        | "chainId.json"
+
+        // Reason: EIP-2930 (https://eips.ethereum.org/EIPS/eip-2930) concerns optional
+        // access lists and we don't intend to implement them for now
+        | "addressOpcodes.json"
+        | "coinbaseT01.json"
+        | "coinbaseT2.json"
+        | "manualCreate.json"
+        | "storageCosts.json"
+        | "transactionCosts.json"
+        | "variedContext.json"
+
+        // Reason: those test the refund mechanism
+        // see https://gitlab.com/tezos/tezos/-/merge_requests/11835
+        | "refund_getEtherBack.json"
+        | "refund50_2.json"
+        | "refundSSTORE.json"
+        | "refund50_1.json"
+        | "refund_NoOOG_1.json"
+        | "refund_CallA.json"
+        | "refund50percentCap.json"
+        | "refund600.json"
+
+        // SKIPPED BECAUSE TESTS ARE EXPECTED TO BE RUNNED VIA AN EXTERNAL CLIENT
+
+        // Reason: Invalid transaction. The gas limit is set to less than 21000.
+        // These transactions are usually handled at the client level and directly rejected.
+        // Moreover, if we comply to what's expected by the test we'd remove the balance
+        // but the test is waiting for the nonce to stay untouched, this opens a clear
+        // possibility of potential replay attacks.
+        | "invalidTr.json"
+
+        // Reason: The gas price is computed with max_fee_per_gas. But max_fee_per_gas 
+        // is used when you don't know the base fee. Usually the client verifies if the 
+        // account has enough funds to pay the max gas price (computed with max_fee_per_gas)
+        // and if that isn't the case then the client directly rejects the transaction.
+        // But in the kernel we know the real gas price because we have a base fee.
+        // Therefore, the test does not pass because it checks if the account has enough funds, 
+        // which it doesn't, but with the known base fee the account does have enough funds 
+        // and the test should pass.
+        // max_gas_price = max_fee_per_gas x gas_limit
+        // real_gas_price = (base_fee + max_priority_fee_per_gas) x gas_limit
+        | "transactionIntinsicBug.json"
+    )
+}
+
+pub fn check_skip_parsing(test_file_path: &Path) -> bool {
+    let file_name = test_file_path.file_name().unwrap().to_str().unwrap();
+
+    matches!(
+        file_name,
+        // SKIPPED BECAUSE OF WRONG PARSING OF FILLER FILES
+
+        // ********** JSON ********** //
+
+        // The following test(s) is/are failing they need in depth debugging
+        // Reason: panicked at 'Invalid character 'N' at position 62'
+        | "gasCostBerlin.json"
+
+        // Reason: comments in the result field
+        | "static_CREATE_EmptyContractAndCallIt_0wei.json"
+        | "static_CREATE_EmptyContractWithStorageAndCallIt_0wei.json"
+        | "callToNonExistent.json"
+        | "CreateAndGasInsideCreate.json"
+        | "add11.json"
+
+        // Reason: inconsistent hex/dec field value
+        | "TouchToEmptyAccountRevert.json"
+        | "CREATE_EContract_ThenCALLToNonExistentAcc.json"
+        | "CREATE_EmptyContract.json"
+        | "StoreGasOnCreate.json"
+        | "OverflowGasRequire2.json"
+        | "StackDepthLimitSEC.json"
+
+        // ********** YAML ********** //
+
+        // Reason: invalid hex character: _
+        | "doubleSelfdestructTest.json"
+        | "clearReturnBuffer.json"
+        | "gasCost.json"
+
+        // Reason: invalid length 0, expected a (both 0x-prefixed or not) hex string or
+        // byte array containing between (0; 32] bytes
+        | "ZeroValue_SUICIDE_ToOneStorageKey.json"
+        | "ValueOverflow.json"
+
+        // Reason: invalid length 0, expected a (both 0x-prefixed or not) hex string or
+        // byte array containing between (0; 32] bytes
+        | "eqNonConst.json"
+        | "mulmodNonConst.json"
+        | "addmodNonConst.json"
+        | "smodNonConst.json"
+        | "callcodeNonConst.json"
+        | "mstoreNonConst.json"
+        | "modNonConst.json"
+        | "extcodesizeNonConst.json"
+        | "log1NonConst.json"
+        | "extcodecopyNonConst.json"
+        | "log2NonConst.json"
+        | "andNonConst.json"
+        | "log3NonConst.json"
+        | "sgtNonConst.json"
+        | "expNonConst.json"
+        | "mloadNonConst.json"
+        | "log0NonConst.json"
+        | "byteNonConst.json"
+        | "orNonConst.json"
+        | "codecopyNonConst.json"
+        | "gtNonConst.json"
+        | "signextNonConst.json"
+        | "ltNonConst.json"
+        | "sltNonConst.json"
+        | "balanceNonConst.json"
+        | "mstore8NonConst.json"
+        | "delegatecallNonConst.json"
+        | "iszeroNonConst.json"
+        | "subNonConst.json"
+        | "calldatacopyNonConst.json"
+        | "sha3NonConst.json"
+        | "sdivNonConst.json"
+        | "addNonConst.json"
+        | "notNonConst.json"
+        | "createNonConst.json"
+        | "xorNonConst.json"
+        | "calldataloadNonConst.json"
+        | "divNonConst.json"
+        | "returnNonConst.json"
+        | "mulNonConst.json"
+        | "callNonConst.json"
+        | "twoOps.json"
+    )
+}
+
+fn process_skip(
+    output: &OutputOptions,
+    output_file: &mut Option<File>,
+    report_map: &mut ReportMap,
+    report_key: &str,
+) {
+    report_map
+        .entry(report_key.to_owned())
+        .and_modify(|report_value| {
+            *report_value = ReportValue {
+                skipped: report_value.skipped + 1,
+                ..*report_value
+            };
+        });
+    if output.log {
+        write_out!(output_file, "\nSKIPPED\n")
+    };
 }
 
 pub fn main() {
     let opt = Opt::from_args();
-    let mut output_file = OpenOptions::new()
-        .append(true)
-        .truncate(false)
-        .create(true)
-        .open(&opt.output)
-        .unwrap();
+    let diff = opt.diff.is_some();
+    let output_name = match (opt.output.as_ref(), opt.result, diff) {
+        (Some(name), _, _) => name,
+        (_, true, _) => "evm_evaluation.result",
+        (_, _, true) => "evm_evaluation.diff",
+        _ => "evm_evaluation.regression",
+    };
+
+    let mut output_file = if cfg!(not(feature = "disable-file-logs")) {
+        Some(
+            OpenOptions::new()
+                .write(true)
+                .append(!(opt.from_scratch || opt.result || diff))
+                .truncate(opt.from_scratch || opt.result || diff)
+                .create(true)
+                .open(output_name)
+                .unwrap(),
+        )
+    } else {
+        None
+    };
     let folder_path =
         construct_folder_path("GeneralStateTests", &opt.eth_tests, &opt.sub_dir);
     let test_files = find_all_json_tests(&folder_path);
-    let mut report_map: HashMap<String, ReportValue> = HashMap::new();
+    let mut report_map: ReportMap = HashMap::new();
+    let mut diff_result_map = opt.diff.as_ref().map(|p| load_former_result(p));
 
-    writeln!(
-        output_file,
-        "Start running tests on: {}",
-        folder_path.to_str().unwrap()
-    )
-    .unwrap();
+    let output = OutputOptions {
+        summary: !(opt.result || diff),
+        log: !(opt.report_only || opt.result || diff),
+        result: opt.result,
+        diff,
+    };
+
+    if output.log {
+        write_out!(
+            output_file,
+            "Start running tests on: {}",
+            folder_path.to_str().unwrap()
+        );
+    }
+
+    let skip_data_path = Path::new(&opt.resources).join(SKIP_DATA_FILE);
+    let skip_data: SkipData = match read(&skip_data_path) {
+        Ok(reader) => serde_yaml::from_reader(&*reader)
+            .expect("Reading data(s) to skip should succeed."),
+        Err(_) => {
+            write_out!(output_file, "WARNING: the specified path [{}] can not be found, data(s) \
+                                   that should be skipped will not be and the outcome of the \
+                                   evaluation could be erroneous.", skip_data_path.display());
+            SkipData { datas: vec![] }
+        }
+    };
+
     for test_file in test_files.into_iter() {
         let splitted_path: Vec<&str> = test_file.to_str().unwrap().split('/').collect();
         let report_key = splitted_path
@@ -100,205 +559,26 @@ pub fn main() {
         if let Some(test) = &opt.test {
             let mut file_name = PathBuf::from(test);
             file_name.set_extension("json");
-            if test_file.file_name() == Some(OsStr::new(&file_name)) {
-                runner::run_test(
-                    &test_file,
-                    &mut report_map,
-                    report_key.to_owned(),
-                    &opt,
-                    &mut output_file,
-                )
-                .unwrap();
+            if test_file.file_name() != Some(OsStr::new(&file_name)) {
+                continue;
             }
+        };
+
+        if output.log {
+            write_out!(output_file, "---------- Test: {:?} ----------", &test_file);
+        }
+
+        if check_skip_parsing(&test_file) {
+            process_skip(&output, &mut output_file, &mut report_map, report_key);
             continue;
         }
 
-        writeln!(output_file, "---------- Test: {:?} ----------", test_file).unwrap();
-
-        if SKIP_ANY {
-            // Funky test with `bigint 0x00` value in json not possible to happen on
-            // Mainnet and require custom json parser.
-            if test_file.file_name() == Some(OsStr::new("ValueOverflow.json")) {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // The following test(s) is/are failing they need in depth debugging
-            // Reason: panicked at 'arithmetic operation overflow'
-            if test_file.file_name() == Some(OsStr::new("HighGasPrice.json"))
-                || test_file.file_name() == Some(OsStr::new("randomStatetest32.json"))
-                || test_file.file_name() == Some(OsStr::new("randomStatetest7.json"))
-                || test_file.file_name() == Some(OsStr::new("randomStatetest50.json"))
-                || test_file.file_name() == Some(OsStr::new("randomStatetest468.json"))
-                || test_file.file_name() == Some(OsStr::new("gasCostBerlin.json"))
-                || test_file.file_name() == Some(OsStr::new("underflowTest.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // The following test(s) is/are failing they need in depth debugging
-            // Reason: memory allocation of X bytes failed | 73289 IOT instruction (core dumped)
-            if test_file.file_name() == Some(OsStr::new("sha3.json")) {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Long tests ✔ (passing)
-            if test_file.file_name() == Some(OsStr::new("loopMul.json")) {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Oddly long checks on a test that do no relevant check (passing)
-            if test_file.file_name() == Some(OsStr::new("intrinsic.json")) {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Long tests ~ (outcome is unknown)
-            if test_file.file_name() == Some(OsStr::new("static_Call50000_sha256.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("static_Call50000_ecrec.json"))
-                || test_file.file_name() == Some(OsStr::new("static_Call50000.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Reason: panicked at 'attempt to add with overflow'
-            if let Some(file_name) = test_file.to_str() {
-                if file_name.contains("DiffPlaces.json") {
-                    writeln!(output_file, "\nSKIPPED\n").unwrap();
-                    continue;
-                }
-            }
-
-            // Reason: panicked at 'attempt to multiply with overflow'
-            if test_file.file_name()
-                == Some(OsStr::new("static_Call1024BalanceTooLow.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("static_Call1024BalanceTooLow2.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("static_Call1024PreCalls3.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Reason: panicked at 'attempt to add with overflow'
-            if test_file.file_name() == Some(OsStr::new("static_Call1024PreCalls.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("static_Call1024PreCalls2.json"))
-                || test_file.file_name() == Some(OsStr::new("diffPlaces.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // SKIPPED BECAUSE OF WRONG PARSING OF FILLER FILES
-
-            // ********** JSON ********** //
-
-            // Reason: comments in the result field
-            if test_file.file_name() == Some(OsStr::new("add11.json"))
-                || test_file.file_name() == Some(OsStr::new("add11.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("static_CREATE_EmptyContractAndCallIt_0wei.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new(
-                        "static_CREATE_EmptyContractWithStorageAndCallIt_0wei.json",
-                    ))
-                || test_file.file_name() == Some(OsStr::new("callToNonExistent.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("CreateAndGasInsideCreate.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Reason: invalid length 0, expected a (both 0x-prefixed or not) hex string or
-            // byte array containing between (0; 32] bytes
-            if test_file.file_name()
-                == Some(OsStr::new("ZeroValue_SUICIDE_ToOneStorageKey.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Reason: inconsistent hex/dec field value
-            if test_file.file_name() == Some(OsStr::new("TouchToEmptyAccountRevert.json"))
-                || test_file.file_name()
-                    == Some(OsStr::new("CREATE_EContract_ThenCALLToNonExistentAcc.json"))
-                || test_file.file_name() == Some(OsStr::new("CREATE_EmptyContract.json"))
-                || test_file.file_name() == Some(OsStr::new("StoreGasOnCreate.json"))
-                || test_file.file_name() == Some(OsStr::new("OverflowGasRequire2.json"))
-                || test_file.file_name() == Some(OsStr::new("StackDepthLimitSEC.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // ********** YAML ********** //
-
-            // Reason: invalid hex character: _
-            if test_file.file_name() == Some(OsStr::new("doubleSelfdestructTest.json"))
-                || test_file.file_name() == Some(OsStr::new("clearReturnBuffer.json"))
-                || test_file.file_name() == Some(OsStr::new("gasCost.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-
-            // Reason: invalid length 0, expected a (both 0x-prefixed or not) hex string or
-            // byte array containing between (0; 32] bytes
-            if test_file.file_name() == Some(OsStr::new("eqNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("mulmodNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("addmodNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("smodNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("callcodeNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("mstoreNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("modNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("extcodesizeNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("log1NonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("extcodecopyNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("log2NonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("andNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("log3NonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("sgtNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("expNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("mloadNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("log0NonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("byteNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("orNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("codecopyNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("gtNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("signextNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("ltNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("sltNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("balanceNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("mstore8NonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("delegatecallNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("iszeroNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("subNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("calldatacopyNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("sha3NonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("sdivNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("addNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("notNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("createNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("xorNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("calldataloadNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("divNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("returnNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("mulNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("callNonConst.json"))
-                || test_file.file_name() == Some(OsStr::new("twoOps.json"))
-            {
-                writeln!(output_file, "\nSKIPPED\n").unwrap();
-                continue;
-            }
-        }
+        let skip = if check_skip(&test_file) {
+            process_skip(&output, &mut output_file, &mut report_map, report_key);
+            true
+        } else {
+            false
+        };
 
         runner::run_test(
             &test_file,
@@ -306,28 +586,23 @@ pub fn main() {
             report_key.to_owned(),
             &opt,
             &mut output_file,
+            skip,
+            &mut diff_result_map,
+            &output,
+            &skip_data,
         )
         .unwrap();
     }
-    writeln!(output_file, "@@@@@ END OF TESTING @@@@@\n").unwrap();
 
-    writeln!(output_file, "@@@@@@ FINAL REPORT @@@@@@").unwrap();
-    let mut successes_total = 0;
-    let mut failure_total = 0;
-    for (key, report_value) in report_map {
-        successes_total += report_value.successes;
-        failure_total += report_value.failures;
-        writeln!(
-            output_file,
-            "For sub-dir {}, there was {} success(es) and {} failure(s).",
-            key, report_value.successes, report_value.failures
-        )
-        .unwrap();
+    if output.log {
+        write_out!(output_file, "@@@@@ END OF TESTING @@@@@\n");
     }
-    writeln!(
-        output_file,
-        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}",
-        successes_total, failure_total
-    )
-    .unwrap();
+
+    if let Some(map) = diff_result_map {
+        generate_diff(&mut output_file, &map)
+    }
+
+    if output.summary {
+        generate_final_report(&mut output_file, &mut report_map);
+    }
 }

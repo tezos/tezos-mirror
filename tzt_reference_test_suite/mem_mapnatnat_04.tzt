@@ -1,0 +1,3 @@
+code { MEM } ;
+input { Stack_elt nat 2 ; Stack_elt (map nat nat) { Elt 1 4 ; Elt 2 11 } } ;
+output { Stack_elt bool True }

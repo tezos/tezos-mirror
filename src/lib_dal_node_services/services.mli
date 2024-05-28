@@ -54,6 +54,19 @@ val post_commitment :
   ; query : unit >
   service
 
+(** This RPC should be used by a slot producer. It allows to produce a
+    commitment, a commitment proof and the shards from a slot. A
+    padding is added if the slot is not of the expected size
+    ([slot_size] from the Cryptobox). *)
+val post_slot :
+  < meth : [`POST]
+  ; input : string
+  ; output : Cryptobox.commitment * Cryptobox.commitment_proof
+  ; prefix : unit
+  ; params : unit
+  ; query : < padding : char > >
+  service
+
 (** Associate a commitment to a level and a slot index. See {!val:
     Slot_manager.associate_slot_id_with_commitment} for more details. *)
 val patch_commitment :
@@ -82,6 +95,17 @@ val get_commitment_proof :
   ; output : Cryptobox.commitment_proof
   ; prefix : unit
   ; params : unit * Cryptobox.commitment
+  ; query : unit >
+  service
+
+(** Compute the proof associated to the page whose index is given of the given
+    slot. *)
+val get_page_proof :
+  < input : Cryptobox.slot
+  ; meth : [`POST]
+  ; output : Cryptobox.page_proof
+  ; params : unit * Types.page_index
+  ; prefix : unit
   ; query : unit >
   service
 
@@ -173,13 +197,13 @@ val get_attestable_slots :
   ; query : unit >
   service
 
-(** A service for monitor_shards RPC *)
-val monitor_shards :
+(** Return the shard associated to the given index. *)
+val get_shard :
   < meth : [`GET]
   ; input : unit
-  ; output : Cryptobox.Commitment.t
+  ; output : Tezos_crypto_dal.Cryptobox.shard
   ; prefix : unit
-  ; params : unit
+  ; params : (unit * Tezos_crypto_dal.Cryptobox.commitment) * int
   ; query : unit >
   service
 
@@ -272,6 +296,15 @@ module P2P : sig
     val get_peer_info :
       < meth : [`GET]
       ; input : unit
+      ; output : Types.P2P.Peer.Info.t
+      ; prefix : unit
+      ; params : unit * P2p_peer.Id.t
+      ; query : unit >
+      service
+
+    val patch_peer :
+      < meth : [`PATCH]
+      ; input : [`Ban | `Trust | `Open] option
       ; output : Types.P2P.Peer.Info.t
       ; prefix : unit
       ; params : unit * P2p_peer.Id.t

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2021-2023 draganrakita
 //
 // SPDX-License-Identifier: MIT
@@ -9,7 +9,10 @@ pub mod spec;
 use bytes::Bytes;
 use primitive_types::{H160, H256, U256};
 use serde::Deserialize;
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use crate::models::deserializer::*;
 
@@ -37,6 +40,7 @@ impl SpecName {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
+    #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub balance: U256,
     #[serde(deserialize_with = "deserialize_str_as_bytes")]
     pub code: Bytes,
@@ -66,15 +70,39 @@ pub struct Fillers {
     pub expect: Vec<FillerResult>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Default)]
 pub struct FillerResult {
+    #[serde(default)]
+    pub indexes: FillerResultIndexes,
     pub network: Vec<String>,
     pub result: HashMap<String, AccountInfoFiller>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum IndexKind {
+    Label(String),
+    Range(i64, i64),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Default)]
+pub struct FillerResultIndexes {
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_indices")]
+    pub data: Vec<IndexKind>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_indices")]
+    pub gas: Vec<IndexKind>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_indices")]
+    pub value: Vec<IndexKind>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoFiller {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_opt_str_as_u256")]
     pub balance: Option<U256>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -94,6 +122,8 @@ pub struct AccountInfoFiller {
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct Info {
     pub source: String,
+    #[serde(default)]
+    pub labels: HashMap<usize, String>,
 }
 
 /// State test indexed state result deserialization.
@@ -119,6 +149,16 @@ pub struct TxPartIndices {
     pub value: usize,
 }
 
+impl fmt::Display for TxPartIndices {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "data_index: {}, gas_index: {}, value_index: {}",
+            self.data, self.gas, self.value
+        )
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitEnv {
@@ -127,6 +167,7 @@ pub struct UnitEnv {
     pub current_number: U256,
     pub current_timestamp: U256,
     pub current_base_fee: Option<U256>,
+    pub current_random: Option<H256>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -140,11 +181,11 @@ pub struct TransactionParts {
     #[serde(deserialize_with = "deserialize_maybe_empty")]
     pub to: Option<H160>,
     pub value: Vec<U256>,
-    pub max_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<U256>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct BlockEnv {
     pub number: U256,
     /// Coinbase or miner or address that created and signed the block.
@@ -153,6 +194,7 @@ pub struct BlockEnv {
     pub timestamp: U256,
     pub basefee: U256, // EIP1559
     pub gas_limit: U256,
+    pub prevrandao: Option<H256>,
 }
 
 impl Default for BlockEnv {
@@ -163,12 +205,13 @@ impl Default for BlockEnv {
             coinbase: H160::zero(),
             timestamp: U256::from(1),
             basefee: U256::zero(),
+            prevrandao: None,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct TxEnv {
     /// Caller or Author or tx signer
     pub caller: H160,
@@ -194,10 +237,16 @@ impl Default for TxEnv {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Env {
     pub block: BlockEnv,
     pub tx: TxEnv,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct SkipData {
+    #[serde(deserialize_with = "deserialize_vec_str_as_u8_vectors")]
+    pub datas: Vec<Vec<u8>>,
 }
 
 #[cfg(test)]

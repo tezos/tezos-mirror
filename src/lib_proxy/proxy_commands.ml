@@ -29,11 +29,15 @@ let group : Tezos_clic.group =
     title = "Commands querying proxy and light mode support";
   }
 
-let list_proxy_command_handler _ _ =
-  List.iter (fun (module Proxy : Registration.Proxy_sig) ->
-      Format.printf "%a@." Protocol_hash.pp Proxy.protocol_hash)
-  @@ Registration.get_all_registered () ;
-  Lwt_result_syntax.return_unit
+let list_proxy_command_handler _
+    (cctxt : #Tezos_client_base.Client_context.full) =
+  let open Lwt_result_syntax in
+  let*! () =
+    List.iter_s (fun (module Proxy : Registration.Proxy_sig) ->
+        cctxt#message "%a@." Protocol_hash.pp Proxy.protocol_hash)
+    @@ Registration.get_all_registered ()
+  in
+  return_unit
 
 let list_env_command (flag : string) : _ Tezos_clic.command =
   let open Tezos_clic in

@@ -20,7 +20,7 @@ version = "0.2.2"
 
 [features]
 default = ["abort", "debug", "std"]
-abort = []
+abort = ["std"]
 debug = []
 std = []
 proto-alpha=["tezos-smart-rollup-core/proto-alpha"]

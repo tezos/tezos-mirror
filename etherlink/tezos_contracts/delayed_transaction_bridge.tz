@@ -1,0 +1,33 @@
+{ parameter (pair (address %evm_rollup) (bytes %transaction)) ;
+  storage unit ;
+  code { UNPAIR ;
+         UNPAIR ;
+         AMOUNT ;
+         PUSH mutez 1000000 ;
+         SWAP ;
+         COMPARE ;
+         LT ;
+         IF { DROP 3 ;
+              PUSH string "Not enough tez to include the transaction in the delayed inbox" ;
+              FAILWITH }
+            { CONTRACT (or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes) ;
+              IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
+              PUSH mutez 0 ;
+              DIG 2 ;
+              RIGHT (pair bytes (ticket (pair nat (option bytes)))) ;
+              LEFT bytes ;
+              TRANSFER_TOKENS ;
+              PUSH address "tz1burnburnburnburnburnburnburjAYjjX" ;
+              CONTRACT unit ;
+              IF_NONE { PUSH string "Invalid burn address" ; FAILWITH } {} ;
+              PUSH mutez 1000000 ;
+              UNIT ;
+              TRANSFER_TOKENS ;
+              DIG 2 ;
+              NIL operation ;
+              DIG 3 ;
+              CONS ;
+              DIG 2 ;
+              CONS ;
+              PAIR } } }
+

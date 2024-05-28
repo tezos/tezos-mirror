@@ -75,6 +75,17 @@ module Events = struct
       ~pp2:pp_print_trace
       ("peer", P2p_peer.Id.encoding)
       ("failure", trace_encoding)
+
+  let send_p2p_message =
+    declare_2
+      ~section
+      ~name:(prefix "p2p_send")
+      ~msg:"Sending to {peer} P2P message {message}"
+      ~level:Debug
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:Transport_layer_interface.pp_p2p_message
+      ("peer", P2p_peer.Id.encoding)
+      ("message", Transport_layer_interface.p2p_message_encoding)
 end
 
 (** This module implements a cache of alternative peers (aka PX peers), that is,
@@ -280,6 +291,19 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
+let try_connect_point ?expected_peer_id p2p_layer point =
+  let open Lwt_syntax in
+  match P2p.pool p2p_layer with
+  | None -> return_unit
+  | Some pool ->
+      if Option.is_some @@ P2p_pool.Connection.find_by_point pool point then
+        return_unit (* already connected. *)
+      else
+        let* (_ : _ P2p.connection tzresult) =
+          P2p.connect ?expected_peer_id p2p_layer point
+        in
+        return_unit
+
 let try_connect p2p_layer px_cache ~px_peer ~origin =
   let open Lwt_syntax in
   (* If there is some [point] associated to [px_peer] and advertised by [origin]
@@ -306,9 +330,7 @@ let try_connect p2p_layer px_cache ~px_peer ~origin =
          This implementation will be hardened once we add the notion of "signed
          records" found, e.g., in Rust version, to check that the advertised
          (peer, point) pair alongside a timestamp are not faked. *)
-      let* (_ : _ P2p.connection tzresult) =
-        P2p.connect ~expected_peer_id:px_peer p2p_layer point
-      in
+      let* () = try_connect_point ~expected_peer_id:px_peer p2p_layer point in
       (match origin with
       | Trusted -> () (* Don't drop trusted points. *)
       | PX _ -> PX_cache.drop px_cache ~px_peer ~origin) ;
@@ -320,6 +342,11 @@ let try_connect p2p_layer px_cache ~px_peer ~origin =
     directives to the P2P layer to connect or disconnect peers are handled. *)
 let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
   let open Lwt_syntax in
+  (* only log sending of GS control messages  *)
+  let log_sending_message = function
+    | Message_with_header _ -> false
+    | _ -> true
+  in
   let rec loop output_stream =
     let* p2p_output = Worker.Stream.pop output_stream in
     let* () =
@@ -338,8 +365,13 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
               Events.(emit no_connection_for_peer to_peer)
           | Some conn -> (
               let* (res : unit tzresult) =
-                wrap_p2p_message p2p_layer p2p_message
-                |> P2p.send p2p_layer conn
+                let msg = wrap_p2p_message p2p_layer p2p_message in
+                let* () =
+                  if log_sending_message p2p_message then
+                    Events.(emit send_p2p_message (to_peer, msg))
+                  else return_unit
+                in
+                P2p.send p2p_layer conn msg
               in
               match res with
               | Ok () -> return_unit
@@ -351,6 +383,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin} ->
           try_connect p2p_layer px_cache ~px_peer:peer ~origin
+      | Connect_point {point} -> try_connect_point p2p_layer point
       | Forget {peer; origin} ->
           PX_cache.drop px_cache ~px_peer:peer ~origin:(PX origin) ;
           return_unit

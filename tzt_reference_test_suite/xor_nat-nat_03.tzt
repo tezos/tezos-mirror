@@ -1,0 +1,3 @@
+code { XOR } ;
+input { Stack_elt nat 1 ; Stack_elt nat 0 } ;
+output { Stack_elt nat 1 }

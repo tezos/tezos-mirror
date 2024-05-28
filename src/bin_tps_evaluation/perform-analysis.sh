@@ -14,8 +14,8 @@
 set -e
 
 if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <psql_indexer_dump_file> <start_date> <end_date>" >&2
-    exit 1
+  echo "Usage: $0 <psql_indexer_dump_file> <start_date> <end_date>" >&2
+  exit 1
 fi
 
 declare -r DATABASE_DUMP_FILE="$1"

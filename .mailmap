@@ -1,0 +1,303 @@
+# This file maps "correct" name/email to "wrong" name/email so that git shortlog
+# considers them as the same person.
+
+# When the same person appears at two different places in `git shortlog -se`,
+# please add an entry in this file. Please keep it sorted.
+
+# The following principles have been used:
+# - use the person full name if it appears at least once as is, or can be
+#   guessed from the e-mail address, capitalize it,
+# - use the person's most used e-mail,
+# - or use the person's up-to-date institutional e-mail if it makes more sense
+#   (e.g. @nomadic-labs.com rather than @tezcore.com).
+# For each person, always add a line to normalize the name, then lines to
+# normalize emails.
+
+Alain Mebsout <alain.mebsout@functori.com>
+Alain Mebsout <alain.mebsout@functori.com> <alainmebsout@gmail.com>
+
+Albin Coquereau <albin.coquereau@nomadic-labs.com>
+Albin Coquereau <albin.coquereau@nomadic-labs.com> <pro.acoquer@protonmail.com>
+
+Alvaro Garcia <alvarillogp@gmail.com>
+
+Anne-Laure Schmitt <al.schmitt@protonmail.com>
+
+Antonio Locascio <antonio.locascio@nomadic-labs.com>
+Antonio Locascio <antonio.locascio@nomadic-labs.com> <locascio.Antonio@nomadic-labs.com>
+
+Arnaud Bihan <arnaud.bihan@functori.com>
+
+Arthur Breitman <arthur.breitman+nospam@tezos.com>
+Arthur Breitman <arthur.breitman+nospam@tezos.com> <arthur.breitman@gmail.com>
+Arthur Breitman <arthur.breitman+nospam@tezos.com> <arthurb>
+Arthur Breitman <arthur.breitman+nospam@tezos.com> <Arthur Breitman>
+Arthur Breitman <arthur.breitman+nospam@tezos.com> Arthur B <a@b.c>
+Arthur Breitman <arthur.breitman+nospam@tezos.com> Tezos <contact@tezos.com>
+
+Asher Manning <ashermanning@yahoo.co.uk>
+
+Benjamin Canou <benjamin@canou.fr>
+Benjamin Canou <benjamin@canou.fr> <benjamin.canou@ocaml.pro>
+Benjamin Canou <benjamin@canou.fr> <benjamin@klakplok.net>
+
+Boubacar Sall <boubacar@nomadic-labs.com>
+
+Bruno Bernardo <bruno.bernardo@nomadic-labs.com>
+Bruno Bernardo <bruno.bernardo@nomadic-labs.com> <bernardobruno@gmail.com>
+Bruno Bernardo <bruno.bernardo@nomadic-labs.com> <bruno.bernardo@tezos.com>
+
+Çağdaş Bozman <cagdas.bozman@ocamlpro.com>
+
+Charles Dehlinger <charles.dehlinger@nomadic-labs.com>
+Charles Dehlinger <charles.dehlinger@nomadic-labs.com> <charles.dehlinger@tezcore.com>
+
+Clément Hurlin <clement.hurlin@tweag.io>
+
+Corneliu Hoffman <corneliuhoffman@gmail.com>
+
+Craig Ferguson <me@craigfe.io>
+Craig Ferguson <me@craigfe.io> <craig@tarides.com>
+
+Damian <damiancoding@gmail.com>
+
+Dan Bornside <dan.bornside@obsidian.systems>
+Dan Bornside <dan.bornside@obsidian.systems> <dan.bornside@gmail.com>
+
+Daniel Hines <d4hines@gmail.com>
+Daniel Hines <d4hines@gmail.com> <daniel@goldencube.info>
+Daniel Hines <d4hines@gmail.com> <goldencube@protonmail.com>
+
+Daniel Jean <daniel.jean@nomadic-labs.com>
+
+Danny Willems <be.danny.willems@gmail.com>
+Danny Willems <be.danny.willems@gmail.com> <contact@danny-willems.be>
+
+Etienne Marais <etienne.marais@nomadic-labs.com>
+
+Eugen Zalinescu <eugen.zalinescu@nomadic-labs.com>
+Eugen Zalinescu <eugen.zalinescu@nomadic-labs.com> <eugen.zalinescu@tezcore.com>
+Eugen Zalinescu <eugen.zalinescu@nomadic-labs.com> <eugen.zalinescu@tezos.com>
+
+G.B. Fefe <gb.fefe@protonmail.com>
+
+Gabriel Alfour <gabriel.alfour@gmail.com>
+
+Gauthier Sebille <gauthier@marigold.dev>
+Gauthier Sebille <gauthier@marigold.dev> <gauthier.sebille@gmail.com>
+
+Georges Dupéron <georges.duperon@nomadic-labs.com>
+Georges Dupéron <georges.duperon@nomadic-labs.com> <georges.duperon@tezcore.com>
+
+Germán Andrés Delbianco <german@nomadic-labs.com>
+
+Grégoire Henry <gregoire.henry@tezos.com>
+Grégoire Henry <gregoire.henry@tezos.com> <gregoire.henry@ocaml.pro>
+Grégoire Henry <gregoire.henry@tezos.com> <gregoire.henry@ocamlpro.com>
+Grégoire Henry <gregoire.henry@tezos.com> <greg@hnr.gr>
+
+Guillaume Bau <guillaume.bau@nomadic-labs.com>
+Guillaume Bau <guillaume.bau@nomadic-labs.com> <guillaume.bau@tezcore.com>
+
+Hai Nguyen Van <hai@nomadic-labs.com>
+Hai Nguyen Van <hai@nomadic-labs.com> <hai.nguyenvan.phie@gmail.com>
+
+Hiromasa Saito <hiromasa.saito@dailambda.jp>
+Hiromasa Saito <hiromasa.saito@dailambda.jp> <taisei@kmc.gr.jp>
+
+Hugo Heuzard <hugo.heuzard@nomadic-labs.com>
+Hugo Heuzard <hugo.heuzard@nomadic-labs.com> <hugo.heuzard@gmail.com>
+Hugo Heuzard <hugo.heuzard@nomadic-labs.com> <hugo.heuzard@lambda-coins.com>
+
+Ilias Garnier <ilias.garnier@nomadic-labs.com>
+Ilias Garnier <ilias.garnier@nomadic-labs.com> <ilias.garnier@tezcore.com>
+
+Ioana <ioana@tarides.com>
+Ioana <ioana@tarides.com> <domninac@gmail.com>
+
+Jacquin Mininger <jacquin.mininger@obsidian.systems>
+Jacquin Mininger <jacquin.mininger@obsidian.systems> <jacquin.mininger@gmail.com>
+
+Jamie Gabbay <jamie@nomadic-labs.com>
+
+Jev Björsell <jev@ecadlabs.com>
+
+Joachim Ansorg <github@joachim-ansorg.de>
+Joachim Ansorg <github@joachim-ansorg.de> <mail@ja-dev.eu>
+
+Joel Bjornson <joel.bjornson@trili.tech>
+Joel Bjornson <joel.bjornson@trili.tech> <joel.bjornson@gmail.com>
+
+Julien Coolen <julien.coolen@nomadic-labs.com>
+Julien Coolen <julien.coolen@nomadic-labs.com> <jtcoolen@pm.me>
+
+Julien Tesson <julien.tesson@nomadic-labs.com>
+Julien Tesson <julien.tesson@nomadic-labs.com> <julien.tesson@tezcore.com>
+
+Jun Furuse <jun.furuse@dailambda.jp>
+Jun Furuse <jun.furuse@dailambda.jp> <jun.furuse@gmail.com>
+
+Kazuhiro Kobayashi <kazuhiro.kobayashi@dailambda.jp>
+
+Keefer Taylor <keefer@keefertaylor.com>
+Keefer Taylor <keefer@keefertaylor.com> <keefer.t@gmail.com>
+
+Killian Delarue <killian.delarue@nomadic-labs.com>
+Killian Delarue <killian.delarue@nomadic-labs.com> <killian@nomadic-labs.com>
+Killian Delarue <killian.delarue@nomadic-labs.com> <killian.delarue@gmail.com>
+
+Konstantin Ivanov <martoon.hsk@gmail.com>
+
+Lacramioara Astefanoaei <lacramioara.astefanoaei@nomadic-labs.com>
+Lacramioara Astefanoaei <lacramioara.astefanoaei@nomadic-labs.com> <lacramioara.astefanoaei@tezcore.com>
+
+Lin Oshitani <linoshitani@gmail.com>
+
+Lý Kim Quyên <quyen@marigold.dev>
+Lý Kim Quyên <quyen@marigold.dev> <kim-quyen.ly@nomadic-labs.com>
+Lý Kim Quyên <quyen@marigold.dev> <kim-quyen.ly@tezcore.com>
+Lý Kim Quyên <quyen@marigold.dev> <kim.quyen.ly@tezos.com>
+Lý Kim Quyên <quyen@marigold.dev> <ly.kim.quyen@ens.fr>
+Lý Kim Quyên <quyen@marigold.dev> <lykimq@gmail.com>
+Lý Kim Quyên <quyen@marigold.dev> <1718826-lykimquyen@users.noreply.gitlab.com>
+
+Manas Jayanth <3097018+ManasJayanth@users.noreply.github.com>
+
+Marc Beaunardeau <marc.beunardeau@nomadic-labs.com>
+
+Marcin Pastudzki <marcin.pastudzki@tqtezos.com>
+Marcin Pastudzki <marcin.pastudzki@tqtezos.com> <marcin.pastudzki@gmail.com>
+Marcin Pastudzki <marcin.pastudzki@tqtezos.com> <svantimir@gmail.com>
+
+Martin Tomazic <martin.tomazic97@gmail.com>
+
+Mathias Bourgoin <mathias.bourgoin@nomadic-labs.com>
+Mathias Bourgoin <mathias.bourgoin@nomadic-labs.com> <mathias.bourgoin@gmail.com>
+Mathias Bourgoin <mathias.bourgoin@nomadic-labs.com> <mathias.bourgoin@tezcore.com>
+
+Matthew Boehm <github@matthewboehm.com>
+
+Mehdi Bouaziz <mehdi.bouaziz@nomadic-labs.com>
+
+Metanivek <metanivek@gmail.com>
+
+Michael Laporte <michael.laporte@ocamlpro.com>
+
+Miguel Ambrona <mac.ambrona@gmail.com>
+
+Mohamed Iguernlala <iguer@functori.com>
+Mohamed Iguernlala <iguer@functori.com> <iguer.pro@gmail.com>
+Mohamed Iguernlala <iguer@functori.com> <mohamed.iguernelala@ocaml.pro>
+Mohamed Iguernlala <iguer@functori.com> <mohamed.iguernlala@ocamlpro.com>
+
+Mujx <mujx@tuta.io>
+Mujx <mujx@tuta.io> <374817-mujx@users.noreply.gitlab.com>
+Mujx <mujx@tuta.io> <siderisk@auth.gr>
+
+Ngoguey42 <ngoguey@student.42.fr>
+Ngoguey42 <ngoguey@student.42.fr> <ngoguey42@free.fr>
+
+Nicolas Bacquey <nicolas.bacquey@tweag.io>
+Nicolas Bacquey <nicolas.bacquey@tweag.io> <nicolas.bacquey@yahoo.fr>
+
+Nicolas Raymond <nicolas.raymond@nomadic-labs.com> <nicolas.raymond@nomadic-labs.com>
+
+Nohmane Oulali <nohmane.oulali@nomadic-labs.com>
+Nohmane Oulali <nohmane.oulali@nomadic-labs.com> <nohmane.oulali@lambda-coins.com>
+Nohmane Oulali <nohmane.oulali@nomadic-labs.com> <11726174-neo.nl@users.noreply.gitlab.com>
+Nohmane Oulali <nohmane.oulali@nomadic-labs.com> <11726174-neo.nomadic@users.noreply.gitlab.com>
+
+Ole Krüger <ole.kruger@trili.tech>
+
+Ovidiu Deac <ovidiu@pointfree.ro>
+
+Pasqu4le <pasqu4le@gmail.com>
+
+Paul Laforgue <paul.laforgue@nomadic-labs.com>
+Paul Laforgue <paul.laforgue@nomadic-labs.com> <paul.laforgue@tezcore.com>
+
+Philippe Bidinger <philippe.bidinger@nomadic-labs.com>
+Philippe Bidinger <philippe.bidinger@nomadic-labs.com> <philippe.bidinger@tezcore.com>
+
+Philippe Wang <philippe.wang@nomadic-labs.com>
+Philippe Wang <philippe.wang@nomadic-labs.com> <philippe.wang@gmail.com>
+
+Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
+Pierre Boutillier <pierre.boutillier@nomadic-labs.com> <pierre.boutillier@ens-lyon.org>
+Pierre Boutillier <pierre.boutillier@nomadic-labs.com> <pierre.boutillier@laposte.net>
+
+Pierre-Emmanuel Cornilleau <pe.cornilleau@marigold.dev>
+
+Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
+Pierrick Couderc <pierrick.couderc@nomadic-labs.com> <pierrick@thrim.me>
+
+Pietro Abate <pietro.abate@nomadic-labs.com>
+Pietro Abate <pietro.abate@nomadic-labs.com> <pietro.abate@inria.fr>
+Pietro Abate <pietro.abate@nomadic-labs.com> <pietro.abate@pps.univ-paris-diderot.fr>
+Pietro Abate <pietro.abate@nomadic-labs.com> <pietro.abate@tezcore.com>
+
+Prometheansacrifice <2601505-prometheansacrifice@users.noreply.gitlab.com>
+
+Raphaël Cauderlier <raphael.cauderlier@nomadic-labs.com>
+Raphaël Cauderlier <raphael.cauderlier@nomadic-labs.com> <cauderlier@liafa.univ-paris-diderot.fr>
+
+Raphaël Proust <code@bnwr.net>
+
+Rémy El Sibaïe <remy.el-sibaie@nomadic-labs.com>
+Rémy El Sibaïe <remy.el-sibaie@nomadic-labs.com> <remy@nomadic-labs.com>
+
+Richard Bonichon <richard.bonichon@nomadic-labs.com>
+Richard Bonichon <richard.bonichon@nomadic-labs.com> <richard.bonichon@tweag.io>
+Richard Bonichon <richard.bonichon@nomadic-labs.com> <richard.bonichon@gmail.com>
+
+Rodi-Can Bozman <rodi.bozman@functori.com>
+Rodi-Can Bozman <rodi.bozman@functori.com> <rbozman.functori@gmail.com>
+
+Romain Bardou <romain@nomadic-labs.com>
+
+Roman Melnikov <roman.melnikov@serokell.io>
+
+Sebastien Mondet <seb@mondet.org>
+
+Solomon Lederer <solomon.lederer@ext.nomadic-labs.com>
+Solomon Lederer <solomon.lederer@ext.nomadic-labs.com> <sol.lederer@gmail.com>
+Solomon Lederer <solomon.lederer@ext.nomadic-labs.com> <sol.lederer@gmail.com>
+
+Sota Sato <sota.sato@dailambda.jp>
+Sota Sato <sota.sato@dailambda.jp> <ssigo1529@gmail.com>
+Sota Sato <sota.sato@dailambda.jp> <syogo8118@yahoo.co.jp>
+
+Steve Sanches <steve.sanches@nomadic-labs.com>
+
+Sylvain Ribstein <sylvain.ribstein@nomadic-labs.com>
+Sylvain Ribstein <sylvain.ribstein@nomadic-labs.com> <sylvain.ribstein@gmail.com>
+
+Tomáš Zemanovič <tomas@cryptium.ch>
+Tomáš Zemanovič <tomas@cryptium.ch> <tzemanovic@gmail.com>
+
+Venator <venator@luminar.fr>
+
+Victor Allombert <victor.allombert@nomadic-labs.com>
+Victor Allombert <victor.allombert@nomadic-labs.com> <victor.allombert@tezcore.com>
+
+Victor Dumitrescu <victor.dumitrescu@nomadic-labs.com>
+Victor Dumitrescu <victor.dumitrescu@nomadic-labs.com> <v.dumitrescu@outlook.com>
+
+Vincent Botbol <vincent.botbol@nomadic-labs.com>
+Vincent Botbol <vincent.botbol@nomadic-labs.com> <vincent.botbol@gmail.com>
+Vincent Botbol <vincent.botbol@nomadic-labs.com> <vincent.botbol@tezcore.com>
+
+Vivien Pelletier <vivien.pelletier@nomadic-labs.com>
+
+Xavier Van de Woestyne <xavier.vdw@gmail.com>
+
+Yann Regis-Gianas <yann@nomadic-labs.com>
+Yann Regis-Gianas <yann@nomadic-labs.com> <946787-yrg@users.noreply.gitlab.com>
+
+Yoshihiro Imai <y.imai@proof-ninja.co.jp>
+Yoshihiro Imai <y.imai@proof-ninja.co.jp> <yoshihiro503@proofcafe.org>
+
+Zach Shipko <zachshipko@gmail.com>
+
+# Who is b <b@b.net>?
+# Arthur Breitman? Bruno Bernardo? Benjamin Canou? Pierre Boutiller?

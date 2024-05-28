@@ -57,7 +57,7 @@ let test_cache_at_most_once ?supports ?query_string path =
       (sf
          "(Proxy) (%s) Cache at most once"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:["proxy"; "rpc"; "get"]
+    ~tags:[Tag.layer1; "proxy"; "rpc"; "get"]
     ?supports
   @@ fun protocol ->
   let* _, client = init ~protocol () in
@@ -148,7 +148,7 @@ let test_cache_at_most_once ~protocols =
   List.iter
     (fun (sub_path, query_string) ->
       test_cache_at_most_once
-        ~supports:Protocol.(Until_protocol (number Nairobi + 1))
+        ~supports:Protocol.(Until_protocol (number Oxford))
         ~query_string
         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
         protocols)
@@ -202,7 +202,7 @@ let test_context_suffix_no_rpc ?query_string path =
       (sf
          "(Proxy) (%s) No useless RPC call"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:["proxy"; "rpc"; "get"]
+    ~tags:[Tag.layer1; "proxy"; "rpc"; "get"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let env = String_map.singleton "TEZOS_LOG" "proxy_rpc->debug" in
@@ -274,7 +274,7 @@ let test_context_suffix_no_rpc ~protocols =
   let iter l f = List.iter f l in
   iter protocols @@ fun protocol ->
   let paths =
-    if Protocol.(number protocol <= number Nairobi + 1) then
+    if Protocol.(number protocol <= number Oxford) then
       (["helpers"; "endorsing_rights"], []) :: paths
     else paths
   in
@@ -324,7 +324,7 @@ let test_wrong_proto =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) Wrong proto"
-    ~tags:["proxy"; "initialization"]
+    ~tags:[Tag.layer1; "proxy"; "initialization"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   wrong_proto protocol client
@@ -333,7 +333,10 @@ let test_wrong_proto =
     Bake a few blocks in proxy mode.
  *)
 let test_bake =
-  Protocol.register_test ~__FILE__ ~title:"(Proxy) Bake" ~tags:["proxy"; "bake"]
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Proxy) Bake"
+    ~tags:[Tag.layer1; "proxy"; "bake"]
   @@ fun protocol ->
   let* node = Node.init [] in
   let* client = Client.init ~endpoint:(Node node) () in
@@ -353,7 +356,7 @@ let test_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) Transfer"
-    ~tags:["proxy"; "transfer"]
+    ~tags:[Tag.layer1; "proxy"; "transfer"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let* () =
@@ -542,7 +545,7 @@ module Location = struct
           (add_rpc_path_prefix ["votes"; "proposals"], []);
         ]
       in
-      if Protocol.(number protocol <= number Nairobi + 1) then
+      if Protocol.(number protocol <= number Oxford) then
         (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []) :: compared
       else compared
     in
@@ -658,7 +661,8 @@ let test_supported_protocols_like_mockup (mode : [< `Proxy | `Light]) =
       (sf
          "%s supported protocols are the same as the mockup protocols"
          mode_str)
-    ~tags:["client"; mode_str; "list"; "protocols"]
+    ~tags:[Tag.layer1; "client"; mode_str; "list"; "protocols"]
+    ~uses_node:false
   @@ fun () ->
   let client = Client.create () in
   let* mockup_protocols =
@@ -696,7 +700,7 @@ let test_split_key_heuristic =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) split_key heuristic"
-    ~tags:["proxy"; "rpc"; "get"]
+    ~tags:[Tag.layer1; "proxy"; "rpc"; "get"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let test_one (path, query_string) =

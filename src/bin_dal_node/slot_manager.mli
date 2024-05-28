@@ -29,7 +29,9 @@
    migration is done. *)
 include module type of Slot_manager_legacy
 
-type error += Invalid_slot_size of {provided : int; expected : int}
+type error +=
+  | Invalid_slot_size of {provided : int; expected : int}
+  | No_prover_SRS
 
 (** [add_commitment node_store slot cryptobox] computes the given [slot]'s
     commitment and adds the association "commitment -> slot" in the DAL's
@@ -68,7 +70,7 @@ val get_commitment_slot :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
+  (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof] registers the shards of the slot whose commitment is
@@ -81,12 +83,25 @@ val get_commitment_slot :
     In addition to decoding errors, the function returns [`Not_found]
     if there is no slot content for [commitment] in [node_store]. *)
 val add_commitment_shards :
-  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation ->
+  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation option ->
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   with_proof:bool ->
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
+
+(** This function publishes the given shards and their proofs. *)
+val publish_proved_shards :
+  published_level:int32 ->
+  slot_index:int ->
+  level_committee:
+    (level:int32 ->
+    Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
+  Dal_plugin.proto_parameters ->
+  (Cryptobox.commitment * int * Cryptobox.share tzresult) Seq_s.t ->
+  Cryptobox.shard_proof array ->
+  Gossipsub.Worker.t ->
+  unit tzresult Lwt.t
 
 (** This function publishes the shards of a commitment that is waiting for
     attestion on L1 if this node has those shards on disk and their proofs in
@@ -94,7 +109,7 @@ val add_commitment_shards :
 val publish_slot_data :
   level_committee:
     (level:int32 ->
-    Committee_cache.shard_indices Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
+    Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
   Store.node_store ->
   Gossipsub.Worker.t ->
   Cryptobox.t ->

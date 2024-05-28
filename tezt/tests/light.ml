@@ -68,10 +68,15 @@ let test_no_endpoint () =
   Test.register
     ~__FILE__
     ~title:"mode light no endpoint"
-    ~tags:["client"; "light"; "cli"]
+    ~tags:[Tag.layer1; "client"; "light"; "cli"]
+    ~uses_node:false
   @@ fun () ->
   let min_agreement = 1.0 in
-  let uris = List.map (fun port -> sf "http://localhost:%d" port) [666; 667] in
+  let uris =
+    List.map
+      (fun port -> sf "http://%s:%d" Constant.default_host port)
+      [666; 667]
+  in
   let endpoints =
     (* As the client should fail before contacting the node, we don't need
        to start a node in this test. Hence we pass an empty list of endpoints
@@ -94,7 +99,7 @@ let test_endpoint_not_in_sources () =
   Test.register
     ~__FILE__
     ~title:"mode light endpoint not in sources"
-    ~tags:["client"; "light"; "cli"]
+    ~tags:[Tag.layer1; "client"; "light"; "cli"]
   @@ fun () ->
   let min_agreement = 1.0 in
   let mk_node_endpoint rpc_port = Client.Node (Node.create ~rpc_port []) in
@@ -102,7 +107,7 @@ let test_endpoint_not_in_sources () =
    * We use the port to disambiguate, because disambiguating
    * with the host is complicated, because of Client.address
    * that delegates to Runner.address; which, to make it short,
-   * defaults the host to "localhost". *)
+   * defaults the host to "127.0.0.1". *)
   let endpoint = mk_node_endpoint 666 in
   let sources_ports = [667; 668] in
   let endpoints =
@@ -111,7 +116,9 @@ let test_endpoint_not_in_sources () =
   in
   let uris =
     (* URIs written to sources.json *)
-    List.map (fun port -> sf "http://localhost:%d" port) sources_ports
+    List.map
+      (fun port -> sf "http://%s:%d" Constant.default_host port)
+      sources_ports
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
@@ -135,7 +142,7 @@ let test_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) transfer"
-    ~tags:["light"; "client"; "transfer"]
+    ~tags:[Tag.layer1; "light"; "client"; "transfer"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   do_transfer client
@@ -144,7 +151,7 @@ let test_bake =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) bake"
-    ~tags:["light"; "client"; "bake"]
+    ~tags:[Tag.layer1; "light"; "client"; "bake"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   let giver = Constant.bootstrap1.alias in
@@ -215,7 +222,7 @@ module NoUselessRpc = struct
     Protocol.register_test
       ~__FILE__
       ~title:"(Light) No useless RPC call"
-      ~tags:["light"; "rpc"; "get"]
+      ~tags:[Tag.layer1; "light"; "rpc"; "get"]
     @@ fun protocol ->
     let* _, client = init_light ~protocol in
     let paths =
@@ -235,7 +242,7 @@ module NoUselessRpc = struct
       ]
     in
     let paths =
-      if Protocol.(number protocol <= number Nairobi + 1) then
+      if Protocol.(number protocol <= number Oxford) then
         (["helpers"; "endorsing_rights"], []) :: paths
       else paths
     in
@@ -256,7 +263,7 @@ let test_wrong_proto =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) Wrong proto"
-    ~tags:["light"; "proto"]
+    ~tags:[Tag.layer1; "light"; "proto"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   Proxy.wrong_proto protocol client

@@ -119,35 +119,26 @@ module Operations_source = struct
                 Lwt.return_none))
 end
 
-type block_kind =
-  | Fresh of Operation_pool.pool
-  | Reproposal of {
-      consensus_operations : packed_operation list;
-      payload_hash : Block_payload_hash.t;
-      payload_round : Round.t;
-      payload : Operation_pool.payload;
-    }
-
-type block_to_bake = {
-  predecessor : block_info;
-  round : Round.t;
-  delegate : Baking_state.consensus_key_and_delegate;
-  kind : block_kind;
-  force_apply : bool;
-}
-
 type action =
   | Do_nothing
-  | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
-  | Inject_preattestations of {
-      preattestations : (consensus_key_and_delegate * consensus_content) list;
+  | Prepare_block of {block_to_bake : block_to_bake}
+  | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
+  | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Prepare_consensus_votes of {
+      preattestations : unsigned_consensus_vote_batch;
+      attestations : unsigned_consensus_vote_batch;
     }
-  | Inject_attestations of {
-      attestations : (consensus_key_and_delegate * consensus_content) list;
+  | Inject_block of {
+      prepared_block : prepared_block;
+      force_injection : bool;
+      asynchronous : bool;
     }
+  | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
+  | Inject_attestations of {signed_attestations : signed_consensus_vote_batch}
   | Update_to_level of level_update
   | Synchronize_round of round_update
-  | Watch_proposal
+  | Watch_prequorum
+  | Watch_quorum
 
 and level_update = {
   new_level_proposal : proposal;
@@ -167,12 +158,17 @@ type t = action
 
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
+  | Prepare_block _ -> Format.fprintf fmt "prepare block"
+  | Prepare_preattestations _ -> Format.fprintf fmt "prepare preattestations"
+  | Prepare_attestations _ -> Format.fprintf fmt "prepare attestations"
+  | Prepare_consensus_votes _ -> Format.fprintf fmt "prepare consensus votes"
   | Inject_block _ -> Format.fprintf fmt "inject block"
-  | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
-  | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
+  | Inject_preattestation _ -> Format.fprintf fmt "inject preattestation"
+  | Inject_attestations _ -> Format.fprintf fmt "inject multiple attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
-  | Watch_proposal -> Format.fprintf fmt "watch proposal"
+  | Watch_prequorum -> Format.fprintf fmt "watch prequorum"
+  | Watch_quorum -> Format.fprintf fmt "watch quorum"
 
 let generate_seed_nonce_hash config delegate level =
   let open Lwt_result_syntax in
@@ -183,11 +179,11 @@ let generate_seed_nonce_hash config delegate level =
     return_some seed_nonce
   else return_none
 
-let sign_block_header state proposer unsigned_block_header =
+let sign_block_header global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  let force = state.global_state.config.force in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
+  let force = global_state.config.force in
   let {Block_header.shell; protocol_data = {contents; _}} =
     unsigned_block_header
   in
@@ -239,7 +235,8 @@ let sign_block_header state proposer unsigned_block_header =
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let inject_block ~state_recorder state block_to_bake ~updated_state =
+let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
+    =
   let open Lwt_result_syntax in
   let {
     predecessor;
@@ -256,10 +253,10 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
         prepare_forging_block
         (Int32.succ predecessor.shell.level, round, delegate))
   in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  let simulation_mode = state.global_state.validation_mode in
-  let round_durations = state.global_state.round_durations in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
+  let simulation_mode = global_state.validation_mode in
+  let round_durations = global_state.round_durations in
   let*? timestamp =
     Environment.wrap_tzresult
       (Round.timestamp_of_round
@@ -268,7 +265,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
          ~predecessor_round:predecessor.round
          ~round)
   in
-  let external_operation_source = state.global_state.config.extra_operations in
+  let external_operation_source = global_state.config.extra_operations in
   let*! extern_ops = Operations_source.retrieve external_operation_source in
   let simulation_kind, payload_round =
     match kind with
@@ -300,25 +297,23 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     Plugin.RPC.current_level
       cctxt
       ~offset:1l
-      (`Hash state.global_state.chain_id, `Hash (predecessor.hash, 0))
+      (`Hash global_state.chain_id, `Hash (predecessor.hash, 0))
   in
   let* seed_nonce_opt =
     generate_seed_nonce_hash
-      state.global_state.config.Baking_configuration.nonce
+      global_state.config.Baking_configuration.nonce
       consensus_key
       injection_level
   in
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
-  let user_activated_upgrades =
-    state.global_state.config.user_activated_upgrades
-  in
+  let user_activated_upgrades = global_state.config.user_activated_upgrades in
   (* Set liquidity_baking_toggle_vote for this block *)
   let {
     Baking_configuration.vote_file;
     liquidity_baking_vote;
     adaptive_issuance_vote;
   } =
-    state.global_state.config.per_block_votes
+    global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
   let*! {liquidity_baking_vote; adaptive_issuance_vote} =
@@ -333,31 +328,11 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
           ~per_block_vote_file
     | None -> Lwt.return default
   in
-  (* Cache last per-block votes to use in case of vote file errors *)
-  let updated_state =
-    {
-      updated_state with
-      global_state =
-        {
-          updated_state.global_state with
-          config =
-            {
-              updated_state.global_state.config with
-              per_block_votes =
-                {
-                  updated_state.global_state.config.per_block_votes with
-                  liquidity_baking_vote;
-                  adaptive_issuance_vote;
-                };
-            };
-        };
-    }
-  in
   let*! () =
     Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_vote
   in
   let*! () = Events.(emit vote_for_adaptive_issuance) adaptive_issuance_vote in
-  let chain = `Hash state.global_state.chain_id in
+  let chain = `Hash global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
     Shell_services.Blocks.resulting_context_hash
@@ -384,13 +359,13 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
       ~adaptive_issuance_vote
       ~user_activated_upgrades
       ~force_apply
-      state.global_state.config.fees
+      global_state.config.fees
       simulation_mode
       simulation_kind
-      state.global_state.constants.parametric
+      global_state.constants.parametric
   in
   let* signed_block_header =
-    sign_block_header state consensus_key unsigned_block_header
+    sign_block_header global_state consensus_key unsigned_block_header
   in
   let* () =
     match seed_nonce_opt with
@@ -399,102 +374,87 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
         return_unit
     | Some (_, nonce) ->
         let block_hash = Block_header.hash signed_block_header in
-        Baking_nonces.register_nonce cctxt ~chain_id block_hash nonce
+        Baking_nonces.register_nonce
+          cctxt
+          ~chain_id
+          block_hash
+          nonce
+          ~cycle:injection_level.cycle
+          ~level:injection_level.level
+          ~round
   in
-  let* () = state_recorder ~new_state:updated_state in
-  let*! () =
-    Events.(
-      emit injecting_block (signed_block_header.shell.level, round, delegate))
+  let baking_votes =
+    {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
   in
-  let* bh =
-    Node_rpc.inject_block
-      cctxt
-      ~force:state.global_state.config.force
-      ~chain:(`Hash state.global_state.chain_id)
-      signed_block_header
-      operations
-  in
-  let*! () =
-    Events.(
-      emit block_injected (bh, signed_block_header.shell.level, round, delegate))
-  in
-  return updated_state
+  return {signed_block_header; round; delegate; operations; baking_votes}
 
-let sign_consensus_votes state operations kind =
+let is_authorized (global_state : global_state) highwatermarks consensus_vote =
+  let {delegate = consensus_key, _; vote_consensus_content; _} =
+    consensus_vote
+  in
+  let level, round =
+    ( Raw_level.to_int32 vote_consensus_content.level,
+      vote_consensus_content.round )
+  in
+  let may_sign =
+    match consensus_vote.vote_kind with
+    | Preattestation ->
+        Baking_highwatermarks.may_sign_preattestation
+          highwatermarks
+          ~delegate:consensus_key.public_key_hash
+          ~level
+          ~round
+    | Attestation ->
+        Baking_highwatermarks.may_sign_attestation
+          highwatermarks
+          ~delegate:consensus_key.public_key_hash
+          ~level
+          ~round
+  in
+  may_sign || global_state.config.force
+
+let authorized_consensus_votes global_state
+    (unsigned_consensus_vote_batch : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  (* N.b. signing a lot of operations may take some time *)
-  (* Don't parallelize signatures: the signer might not be able to
-     handle concurrent requests *)
+  (* Hypothesis: all consensus votes have the same round and level *)
+  let {
+    batch_kind;
+    batch_content = ({level; round; _} : batch_content);
+    batch_branch = _;
+    unsigned_consensus_votes;
+  } =
+    unsigned_consensus_vote_batch
+  in
+  let level = Raw_level.to_int32 level in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  (* Hypothesis: all consensus votes have the same round and level *)
-  match operations with
-  | [] -> return_nil
-  | (_, (consensus_content : consensus_content)) :: _ ->
-      let level = Raw_level.to_int32 consensus_content.level in
-      let round = consensus_content.round in
-      (* Filter all operations that don't satisfy the highwatermark *)
-      let* authorized_consensus_votes =
-        cctxt#with_lock @@ fun () ->
+  (* Filter all operations that don't satisfy the highwatermark and
+     record the ones that do. *)
+  let* authorized_votes, unauthorized_votes =
+    cctxt#with_lock (fun () ->
         let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
-        let may_sign_consensus_vote =
-          match kind with
-          | `Preattestation -> Baking_highwatermarks.may_sign_preattestation
-          | `Attestation -> Baking_highwatermarks.may_sign_attestation
-        in
-        let*! authorized_operations =
-          List.filter_s
-            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
-              let may_sign =
-                may_sign_consensus_vote
-                  highwatermarks
-                  ~delegate:consensus_key.public_key_hash
-                  ~level
-                  ~round
-              in
-              if may_sign || state.global_state.config.force then
-                Lwt.return_true
-              else
-                let*! () =
-                  match kind with
-                  | `Preattestation ->
-                      Events.(
-                        emit
-                          skipping_preattestation
-                          ( delegate,
-                            [
-                              Baking_highwatermarks.Block_previously_preattested
-                                {round; level};
-                            ] ))
-                  | `Attestation ->
-                      Events.(
-                        emit
-                          skipping_attestation
-                          ( delegate,
-                            [
-                              Baking_highwatermarks.Block_previously_attested
-                                {round; level};
-                            ] ))
-                in
-                Lwt.return_false)
-            operations
+        let authorized_votes, unauthorized_votes =
+          List.partition
+            (fun consensus_vote ->
+              is_authorized global_state highwatermarks consensus_vote)
+            unsigned_consensus_votes
         in
         (* Record all consensus votes new highwatermarks as one batch *)
+        let delegates =
+          List.map
+            (fun {delegate = ck, _; _} -> ck.public_key_hash)
+            authorized_votes
+        in
+        let record_all_consensus_vote =
+          match batch_kind with
+          | Preattestation -> Baking_highwatermarks.record_all_preattestations
+          | Attestation -> Baking_highwatermarks.record_all_attestations
+        in
+        (* We exit the client's lock as soon as this function returns *)
         let* () =
-          let delegates =
-            List.map
-              (fun ((ck, _), _) -> ck.public_key_hash)
-              authorized_operations
-          in
-          let record_all_consensus_vote =
-            match kind with
-            | `Preattestation ->
-                Baking_highwatermarks.record_all_preattestations
-            | `Attestation -> Baking_highwatermarks.record_all_attestations
-          in
           record_all_consensus_vote
             highwatermarks
             cctxt
@@ -503,99 +463,144 @@ let sign_consensus_votes state operations kind =
             ~level
             ~round
         in
-        return authorized_operations
-      in
-      let forge_and_sign_consensus_vote : type a. _ -> a contents_list -> _ =
-       fun ((consensus_key, _) as delegate) contents ->
-        let shell =
-          (* The branch is the latest finalized block. *)
-          {
-            Tezos_base.Operation.branch =
-              state.level_state.latest_proposal.predecessor.shell.predecessor;
-          }
+        return (authorized_votes, unauthorized_votes))
+  in
+  let*! () =
+    List.iter_s
+      (fun {vote_kind; delegate; _} ->
+        let error =
+          match vote_kind with
+          | Preattestation ->
+              Baking_highwatermarks.Block_previously_preattested {round; level}
+          | Attestation ->
+              Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        let watermark =
-          match kind with
-          | `Preattestation ->
-              Operation.(to_watermark (Preattestation chain_id))
-          | `Attestation -> Operation.(to_watermark (Attestation chain_id))
+        Events.(
+          emit
+            skipping_consensus_vote
+            (vote_kind, delegate, level, round, [error])))
+      unauthorized_votes
+  in
+  return authorized_votes
+
+let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
+    signed_consensus_vote tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
+  let {vote_kind; vote_consensus_content; delegate = ck, _} =
+    unsigned_consensus_vote
+  in
+  let shell = {Tezos_base.Operation.branch} in
+  let watermark =
+    match vote_kind with
+    | Preattestation -> Operation.(to_watermark (Preattestation chain_id))
+    | Attestation -> Operation.(to_watermark (Attestation chain_id))
+  in
+  let (Contents_list contents) =
+    match vote_kind with
+    | Preattestation ->
+        Contents_list (Single (Preattestation vote_consensus_content))
+    | Attestation -> Contents_list (Single (Attestation vote_consensus_content))
+  in
+  let unsigned_operation = (shell, Contents_list contents) in
+  let unsigned_operation_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Operation.unsigned_encoding
+      unsigned_operation
+  in
+  let sk_uri = ck.secret_key_uri in
+  let* signature =
+    Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+  in
+  let protocol_data = Operation_data {contents; signature = Some signature} in
+  let signed_operation : Operation.packed = {shell; protocol_data} in
+  return {unsigned_consensus_vote; signed_operation}
+
+let sign_consensus_votes (global_state : global_state)
+    ({batch_kind; batch_content; batch_branch; _} as
+     unsigned_consensus_vote_batch :
+      unsigned_consensus_vote_batch) =
+  let open Lwt_result_syntax in
+  let* authorized_consensus_votes =
+    authorized_consensus_votes global_state unsigned_consensus_vote_batch
+  in
+  let* signed_consensus_votes =
+    List.filter_map_es
+      (fun ({delegate; vote_kind; vote_consensus_content; _} as
+           unsigned_consensus_vote) ->
+        let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
+        let*! signed_consensus_vote_r =
+          forge_and_sign_consensus_vote
+            global_state
+            ~branch:batch_branch
+            unsigned_consensus_vote
         in
-        let unsigned_operation = (shell, Contents_list contents) in
-        let unsigned_operation_bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Operation.unsigned_encoding
-            unsigned_operation
-        in
-        let level = Raw_level.to_int32 consensus_content.level in
-        let round = consensus_content.round in
-        let sk_uri = consensus_key.secret_key_uri in
-        let*! signature =
-          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-        in
-        match signature with
+        match signed_consensus_vote_r with
         | Error err ->
+            let level, round =
+              ( Raw_level.to_int32 vote_consensus_content.level,
+                vote_consensus_content.round )
+            in
             let*! () =
-              match kind with
-              | `Preattestation ->
-                  Events.(emit skipping_preattestation (delegate, err))
-              | `Attestation ->
-                  Events.(emit skipping_attestation (delegate, err))
+              Events.(
+                emit
+                  skipping_consensus_vote
+                  (vote_kind, delegate, level, round, err))
             in
             return_none
-        | Ok signature ->
-            let protocol_data =
-              Operation_data {contents; signature = Some signature}
-            in
-            let operation : Operation.packed = {shell; protocol_data} in
-            return_some (delegate, operation, level, round)
-      in
-      List.filter_map_es
-        (fun (delegate, consensus_content) ->
-          let event =
-            match kind with
-            | `Preattestation -> Events.signing_preattestation
-            | `Attestation -> Events.signing_attestation
-          in
-          let*! () = Events.(emit event delegate) in
-          match kind with
-          | `Attestation ->
-              forge_and_sign_consensus_vote
-                delegate
-                (Single (Attestation consensus_content))
-          | `Preattestation ->
-              forge_and_sign_consensus_vote
-                delegate
-                (Single (Preattestation consensus_content)))
-        authorized_consensus_votes
+        | Ok signed_consensus_vote -> return_some signed_consensus_vote)
+      authorized_consensus_votes
+  in
+  let*? signed_consensus_vote_batch =
+    make_signed_consensus_vote_batch
+      batch_kind
+      batch_content
+      ~batch_branch
+      signed_consensus_votes
+  in
+  return signed_consensus_vote_batch
 
-let inject_consensus_vote state preattestations kind =
+let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
+    =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let* signed_operations = sign_consensus_votes state preattestations kind in
-  (* TODO: add a RPC to inject multiple operations *)
-  let fail_inject_event, injected_event =
-    match kind with
-    | `Preattestation ->
-        (Events.failed_to_inject_preattestation, Events.preattestation_injected)
-    | `Attestation ->
-        (Events.failed_to_inject_attestation, Events.attestation_injected)
+  let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
+  let delegate = unsigned_consensus_vote.delegate in
+  let vote_consensus_content = unsigned_consensus_vote.vote_consensus_content in
+  let level, round =
+    ( Raw_level.to_int32 vote_consensus_content.level,
+      vote_consensus_content.round )
   in
+  protect
+    ~on_error:(fun err ->
+      let*! () =
+        Events.(
+          emit
+            failed_to_inject_consensus_vote
+            (unsigned_consensus_vote.vote_kind, delegate, err))
+      in
+      return_unit)
+    (fun () ->
+      let* oph =
+        Node_rpc.inject_operation
+          cctxt
+          ~chain:(`Hash chain_id)
+          signed_consensus_vote.signed_operation
+      in
+      let*! () =
+        Events.(
+          emit
+            consensus_vote_injected
+            (unsigned_consensus_vote.vote_kind, oph, delegate, level, round))
+      in
+      return_unit)
+
+let inject_consensus_votes state signed_consensus_vote_batch =
   List.iter_ep
-    (fun (delegate, operation, level, round) ->
-      protect
-        ~on_error:(fun err ->
-          let*! () = Events.(emit fail_inject_event (delegate, err)) in
-          return_unit)
-        (fun () ->
-          let* oph =
-            Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
-          in
-          let*! () =
-            Events.(emit injected_event (oph, delegate, level, round))
-          in
-          return_unit))
-    signed_operations
+    (inject_consensus_vote state)
+    signed_consensus_vote_batch.signed_consensus_votes
 
 let sign_dal_attestations state attestations =
   let open Lwt_result_syntax in
@@ -774,6 +779,98 @@ let get_and_inject_dal_attestations state =
   let* attestations = get_dal_attestations state in
   inject_dal_attestations state attestations
 
+let inject_block ?(force_injection = false) ?(asynchronous = true) state
+    prepared_block =
+  let open Lwt_result_syntax in
+  let {signed_block_header; round; delegate; operations; baking_votes} =
+    prepared_block
+  in
+  (* Cache last per-block votes to use in case of vote file errors *)
+  let new_state =
+    {
+      state with
+      global_state =
+        {
+          state.global_state with
+          config =
+            {
+              state.global_state.config with
+              per_block_votes =
+                {
+                  state.global_state.config.per_block_votes with
+                  liquidity_baking_vote = baking_votes.liquidity_baking_vote;
+                  adaptive_issuance_vote = baking_votes.adaptive_issuance_vote;
+                };
+            };
+        };
+    }
+  in
+  let inject_block () =
+    let*! () =
+      Events.(
+        emit injecting_block (signed_block_header.shell.level, round, delegate))
+    in
+    let* bh =
+      Node_rpc.inject_block
+        state.global_state.cctxt
+        ~force:state.global_state.config.force
+        ~chain:(`Hash state.global_state.chain_id)
+        signed_block_header
+        operations
+    in
+    let*! () =
+      Events.(
+        emit
+          block_injected
+          (bh, signed_block_header.shell.level, round, delegate))
+    in
+    return_unit
+  in
+  let now = Time.System.now () in
+  let block_time =
+    Time.System.of_protocol_exn signed_block_header.shell.timestamp
+  in
+  (* Blocks might be ready before their actual timestamp: when this
+     happens, we wait asynchronously until our clock reaches the
+     block's timestamp before injecting. *)
+  let* () =
+    let delay = Ptime.diff block_time now in
+    if Ptime.Span.(compare delay zero < 0) || force_injection then
+      inject_block ()
+    else
+      let*! () =
+        Events.(
+          emit
+            delayed_block_injection
+            (delay, signed_block_header.shell.level, round, delegate))
+      in
+      let t =
+        let*! _ =
+          protect
+            ~on_error:(fun err ->
+              let*! () =
+                Events.(
+                  emit
+                    block_injection_failed
+                    (Block_header.hash signed_block_header, err))
+              in
+              return_unit)
+            (fun () ->
+              let*! () = Lwt_unix.sleep (Ptime.Span.to_float_s delay) in
+              inject_block ())
+        in
+        Lwt.return_unit
+      in
+      let*! () =
+        if asynchronous then (
+          Lwt.dont_wait (fun () -> t) (fun _exn -> ()) ;
+          Lwt.return_unit)
+        else t
+      in
+      return_unit
+  in
+  return new_state
+
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
     state.global_state.constants.parametric.consensus_threshold
@@ -881,11 +978,35 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
       new_round_proposal.block.round
   else
     let new_round_state =
-      {current_round; current_phase = Idle; delayed_quorum = None}
+      {
+        current_round;
+        current_phase = Idle;
+        delayed_quorum = None;
+        early_attestations = [];
+        awaiting_unlocking_pqc = false;
+      }
     in
     let new_state = {state with round_state = new_round_state} in
     let*! new_state = handle_proposal new_state in
     return new_state
+
+let prepare_block_request state block_to_bake =
+  let open Lwt_result_syntax in
+  let request = Forge_and_sign_block block_to_bake in
+  state.global_state.forge_worker_hooks.push_request request ;
+  return state
+
+let prepare_preattestations_request state unsigned_preattestations =
+  let open Lwt_result_syntax in
+  let request = Forge_and_sign_preattestations {unsigned_preattestations} in
+  state.global_state.forge_worker_hooks.push_request request ;
+  return state
+
+let prepare_attestations_request state unsigned_attestations =
+  let open Lwt_result_syntax in
+  let request = Forge_and_sign_attestations {unsigned_attestations} in
+  state.global_state.forge_worker_hooks.push_request request ;
+  return state
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539
    Avoid updating the state here.
@@ -894,37 +1015,53 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
    TODO: https://gitlab.com/tezos/tezos/-/issues/4538
    Improve/clarify when the state is recorded.
 *)
-let rec perform_action ~state_recorder state (action : action) =
+let rec perform_action state (action : action) =
   let open Lwt_result_syntax in
   match action with
-  | Do_nothing ->
-      let* () = state_recorder ~new_state:state in
-      return state
-  | Inject_block {block_to_bake; updated_state} ->
-      inject_block state ~state_recorder block_to_bake ~updated_state
-  | Inject_preattestations {preattestations} ->
-      let* () = inject_consensus_vote state preattestations `Preattestation in
-      perform_action ~state_recorder state Watch_proposal
-  | Inject_attestations {attestations} ->
-      let* () = state_recorder ~new_state:state in
-      let* () = inject_consensus_vote state attestations `Attestation in
+  | Do_nothing -> return state
+  | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
+  | Prepare_preattestations {preattestations} ->
+      let* new_state = prepare_preattestations_request state preattestations in
+      (* We wait for preattestations to trigger the [Prequorum_reached]
+         event *)
+      perform_action new_state Watch_prequorum
+  | Prepare_attestations {attestations} ->
+      let* new_state = prepare_attestations_request state attestations in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
-      let*! () = start_waiting_for_attestation_quorum state in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4667
-         Also inject attestations for the migration block. *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
-         Don't inject multiple attestations? *)
-      let* () = get_and_inject_dal_attestations state in
+      perform_action new_state Watch_quorum
+  | Prepare_consensus_votes {preattestations; attestations} ->
+      let* state = prepare_preattestations_request state preattestations in
+      let* state = prepare_attestations_request state attestations in
+      (* We wait for preattestations to trigger the [Prequorum_reached]
+         event *)
+      perform_action state Watch_prequorum
+  | Inject_block {prepared_block; force_injection; asynchronous} ->
+      let* new_state =
+        inject_block ~force_injection ~asynchronous state prepared_block
+      in
+      return new_state
+  | Inject_preattestation {signed_preattestation} ->
+      let* () = inject_consensus_vote state signed_preattestation in
+      (* Here, we do not need to wait for the prequorum, it has
+         already been triggered by the
+         [Prepare_(preattestation|consensus_votes)] action *)
       return state
+  | Inject_attestations {signed_attestations} ->
+      let* () = inject_consensus_votes state signed_attestations in
+      let* () = get_and_inject_dal_attestations state in
+      (* We wait for attestations to trigger the [Quorum_reached]
+         event *)
+      perform_action state Watch_quorum
   | Update_to_level level_update ->
       let* new_state, new_action = update_to_level state level_update in
-      perform_action ~state_recorder new_state new_action
+      perform_action new_state new_action
   | Synchronize_round round_update ->
       let* new_state, new_action = synchronize_round state round_update in
-      perform_action ~state_recorder new_state new_action
-  | Watch_proposal ->
-      (* We wait for preattestations to trigger the
-           [Prequorum_reached] event *)
+      perform_action new_state new_action
+  | Watch_prequorum ->
       let*! () = start_waiting_for_preattestation_quorum state in
+      return state
+  | Watch_quorum ->
+      let*! () = start_waiting_for_attestation_quorum state in
       return state

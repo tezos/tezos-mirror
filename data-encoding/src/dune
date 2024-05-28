@@ -1,0 +1,32 @@
+(env
+ (release
+  (flags
+   (:standard -noassert))))
+
+(library
+ (name data_encoding)
+ (public_name data-encoding)
+ (js_of_ocaml)
+ (libraries
+  json-data-encoding
+  json-data-encoding-bson
+  zarith
+  zarith_stubs_js
+  ezjsonm
+  either
+  bigstringaf)
+ (preprocess
+  (pps ppx_hash)))
+
+(documentation
+ (package data-encoding)
+ (mld_files index tutorial))
+
+(rule
+ (targets tutorial.mld)
+ (deps tutorial.md)
+ (mode promote)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run md2mld %{deps}))))

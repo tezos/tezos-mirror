@@ -39,6 +39,7 @@ let test_big_map_arity =
     ~__FILE__
     ~title:"Test EMPTY_BIG_MAP arity error"
     ~tags:["client"; "michelson"; "typechecking"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script =

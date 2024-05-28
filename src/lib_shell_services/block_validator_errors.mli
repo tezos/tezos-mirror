@@ -75,6 +75,6 @@ type error +=
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
-  | Cannot_validate_while_shutting_down
+  | Cannot_process_request_while_shutting_down
 
 val invalid_block : Block_hash.t -> block_error -> error

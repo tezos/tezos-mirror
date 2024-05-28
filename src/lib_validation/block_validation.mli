@@ -47,8 +47,9 @@ type validation_store = {
   timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_finalized_block_level : Int32.t;
       (** Oldest block for which reorganizations can happen *)
+  last_preserved_block_level : Int32.t;
 }
 
 val may_patch_protocol :
@@ -197,6 +198,7 @@ val preapply :
   predecessor_max_operations_ttl:int ->
   predecessor_block_metadata_hash:Block_metadata_hash.t option ->
   predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+  cache:Tezos_protocol_environment.Context.source_of_cache ->
   operation list list ->
   ((Block_header.shell_header * error Preapply_result.t list)
   * (apply_result * Tezos_protocol_environment.Context.t))

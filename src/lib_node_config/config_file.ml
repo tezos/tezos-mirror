@@ -34,7 +34,8 @@ let default_data_dir = home // ".tezos-node"
 
 let default_rpc_port = 8732
 
-let default_max_active_rpc_connections = 100
+let default_max_active_rpc_connections =
+  RPC_server.Max_active_rpc_connections.default
 
 let default_metrics_port = 9932
 
@@ -128,6 +129,8 @@ let blockchain_network_mainnet =
           "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
         ( "PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc",
           "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" );
+        ( "PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz",
+          "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ" );
       ]
     ~default_bootstrap_peers:
       ["boot.tzinit.org"; "boot.tzboot.net"; "boot.tzbeta.net"]
@@ -170,7 +173,6 @@ let blockchain_network_ghostnet =
         "ghostnet.tzinit.org";
         "ghostnet.tzboot.net";
         "ghostnet.boot.ecadinfra.com";
-        "ghostnet.kaml.fr";
         "ghostnet.stakenow.de:9733";
       ]
 
@@ -357,12 +359,13 @@ and p2p = {
 
 and rpc = {
   listen_addrs : string list;
+  external_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
-  max_active_rpc_connections : int;
+  max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
 }
 
 and tls = {cert : string; key : string}
@@ -385,6 +388,7 @@ let default_p2p =
 let default_rpc =
   {
     listen_addrs = [];
+    external_listen_addrs = [];
     cors_origins = [];
     cors_headers = [];
     tls = None;
@@ -557,6 +561,7 @@ let rpc : rpc Data_encoding.t =
            cors_origins;
            cors_headers;
            listen_addrs;
+           external_listen_addrs;
            tls;
            acl;
            media_type;
@@ -567,24 +572,18 @@ let rpc : rpc Data_encoding.t =
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
       in
-      ( Some listen_addrs,
-        None,
-        cors_origins,
-        cors_headers,
-        cert,
-        key,
-        acl,
-        media_type,
-        max_active_rpc_connections ))
-    (fun ( listen_addrs,
-           legacy_listen_addr,
-           cors_origins,
-           cors_headers,
-           cert,
-           key,
-           acl,
-           media_type,
-           max_active_rpc_connections ) ->
+      let external_listen_addrs =
+        match external_listen_addrs with [] -> None | v -> Some v
+      in
+      ( (Some listen_addrs, external_listen_addrs, None, cors_origins),
+        (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
+      ))
+    (fun ( ( listen_addrs,
+             external_listen_addrs,
+             legacy_listen_addr,
+             cors_origins ),
+           (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
+         ) ->
       let tls =
         match (cert, key) with
         | None, _ | _, None -> None
@@ -600,8 +599,14 @@ let rpc : rpc Data_encoding.t =
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in
+      let external_listen_addrs =
+        Option.value
+          external_listen_addrs
+          ~default:default_rpc.external_listen_addrs
+      in
       {
         listen_addrs;
+        external_listen_addrs;
         cors_origins;
         cors_headers;
         tls;
@@ -609,49 +614,63 @@ let rpc : rpc Data_encoding.t =
         media_type;
         max_active_rpc_connections;
       })
-    (obj9
-       (opt
-          "listen-addrs"
-          ~description:
-            "Hosts to listen to. If the port is not specified, the default \
-             port 8732 will be assumed."
-          (list string))
-       (opt "listen-addr" ~description:"Legacy value: Host to listen to" string)
-       (dft
-          "cors-origin"
-          ~description:
-            "Cross Origin Resource Sharing parameters, see \
-             https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
-          (list string)
-          default_rpc.cors_origins)
-       (dft
-          "cors-headers"
-          ~description:
-            "Cross Origin Resource Sharing parameters, see \
-             https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
-          (list string)
-          default_rpc.cors_headers)
-       (opt
-          "crt"
-          ~description:"Certificate file (necessary when TLS is used)."
-          string)
-       (opt "key" ~description:"Key file (necessary when TLS is used)." string)
-       (dft
-          "acl"
-          ~description:"A list of RPC ACLs for specific listening addresses."
-          RPC_server.Acl.policy_encoding
-          default_rpc.acl)
-       (dft
-          "media-type"
-          ~description:"The media types supported by the server."
-          Media_type.Command_line.encoding
-          default_rpc.media_type)
-       (dft
-          "max_active_rpc_connections"
-          ~description:
-            "The maximum number of active connections per RPC endpoint."
-          int31
-          default_rpc.max_active_rpc_connections))
+    (merge_objs
+       (obj4
+          (opt
+             "listen-addrs"
+             ~description:
+               "Hosts to listen to. If the port is not specified, the default \
+                port 8732 will be assumed."
+             (list string))
+          (opt
+             "external-listen-addrs"
+             ~description:
+               "Hosts to listen to. If the port is not specified, the default \
+                port 8732 will be assumed."
+             (list string))
+          (opt
+             "listen-addr"
+             ~description:"Legacy value: Host to listen to"
+             string)
+          (dft
+             "cors-origin"
+             ~description:
+               "Cross Origin Resource Sharing parameters, see \
+                https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
+             (list string)
+             default_rpc.cors_origins))
+       (obj6
+          (dft
+             "cors-headers"
+             ~description:
+               "Cross Origin Resource Sharing parameters, see \
+                https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
+             (list string)
+             default_rpc.cors_headers)
+          (opt
+             "crt"
+             ~description:"Certificate file (necessary when TLS is used)."
+             string)
+          (opt
+             "key"
+             ~description:"Key file (necessary when TLS is used)."
+             string)
+          (dft
+             "acl"
+             ~description:"A list of RPC ACLs for specific listening addresses."
+             RPC_server.Acl.policy_encoding
+             default_rpc.acl)
+          (dft
+             "media-type"
+             ~description:"The media types supported by the server."
+             Media_type.Command_line.encoding
+             default_rpc.media_type)
+          (dft
+             "max_active_rpc_connections"
+             ~description:
+               "The maximum number of active connections per RPC endpoint."
+             RPC_server.Max_active_rpc_connections.encoding
+             default_rpc.max_active_rpc_connections)))
 
 let rpc_encoding = rpc
 
@@ -744,6 +763,9 @@ let encoding =
           ~description:"Configuration of the Prometheus metrics endpoint"
           (list string)
           default_config.metrics_addr))
+
+let () =
+  Data_encoding.Registration.register (Data_encoding.def "node-config" encoding)
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
@@ -838,7 +860,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
-    ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
+    ?(external_rpc_listen_addrs = []) ?(allow_all_rpc = [])
+    ?(media_type = Media_type.Command_line.Any)
     ?(max_active_rpc_connections = default_rpc.max_active_rpc_connections)
     ?(metrics_addr = []) ?operation_metadata_size_limit
     ?(private_mode = default_p2p.private_mode)
@@ -921,6 +944,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   and rpc : rpc =
     {
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
+      external_listen_addrs =
+        unopt_list
+          ~default:cfg.rpc.external_listen_addrs
+          external_rpc_listen_addrs;
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;

@@ -10,14 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-shell-libs"
-  "octez-proto-libs"
-  "tezos-protocol-genesis"
+  "octez-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-proto-libs" { = version }
+  "tezos-protocol-genesis" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific library for `tezos-client`"
+synopsis: "Tezos/Protocol: protocol specific library for `octez-client`"

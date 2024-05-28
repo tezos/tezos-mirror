@@ -237,8 +237,19 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
       | Found_boot_sector boot_sector -> return boot_sector
       | _ -> missing_boot_sector ())
 
-let find_whitelist _cctxt _rollup_address :
+let find_whitelist _cctxt ?block:_ _rollup_address :
     Signature.public_key_hash trace option tzresult Lwt.t =
   return None
 
 let find_last_whitelist_update _cctxt _rollup_address = return_none
+
+let get_commitment cctxt rollup_address commitment_hash =
+  let open Lwt_result_syntax in
+  let+ commitment =
+    Plugin.RPC.Sc_rollup.commitment
+      (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
+      (cctxt#chain, `Head 0)
+      (Sc_rollup_proto_types.Address.of_octez rollup_address)
+      (Sc_rollup_proto_types.Commitment_hash.of_octez commitment_hash)
+  in
+  Sc_rollup_proto_types.Commitment.to_octez commitment

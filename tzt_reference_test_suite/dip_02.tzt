@@ -1,0 +1,3 @@
+code { DUP ; DIP { ADD } } ;
+input { Stack_elt nat 15 ; Stack_elt nat 9 } ;
+output { Stack_elt nat 15 ; Stack_elt nat 24 }

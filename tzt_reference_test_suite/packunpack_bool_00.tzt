@@ -1,0 +1,3 @@
+code { PACK ; UNPACK bool } ;
+input { Stack_elt bool False } ;
+output { Stack_elt (option bool) (Some False) }

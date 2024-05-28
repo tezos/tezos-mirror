@@ -10,13 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezos-micheline-rewriting"
-  "tezos-benchmark"
-  "tezos-benchmark-type-inference-018-Proxford"
-  "tezos-protocol-018-Proxford"
+  "octez-libs" { = version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-type-inference-018-Proxford" { = version }
+  "tezos-protocol-018-Proxford" { = version }
   "hashcons"
-  "octez-protocol-018-Proxford-libs"
+  "octez-protocol-018-Proxford-libs" { = version }
   "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [

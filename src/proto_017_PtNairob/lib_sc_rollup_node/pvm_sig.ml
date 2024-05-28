@@ -31,8 +31,8 @@ open Alpha_context
 module type S = sig
   include
     Sc_rollup.PVM.S
-      with type context = Context.rw_index
-       and type state = Context.tree
+      with type context = Irmin_context.rw_index
+       and type state = Irmin_context.tree
        and type hash = Sc_rollup.State_hash.t
 
   (** Kind of the PVM. *)
@@ -76,7 +76,7 @@ module type S = sig
     val empty : unit -> state
 
     (** [find context] returns the PVM state stored in the [context], if any. *)
-    val find : _ Context.t -> state option Lwt.t
+    val find : _ Irmin_context.t -> state option Lwt.t
 
     (** [lookup state path] returns the data stored for the path [path] in the
         PVM state [state].  *)
@@ -84,8 +84,8 @@ module type S = sig
 
     (** [set context state] saves the PVM state [state] in the context and
         returns the updated context. Note: [set] does not perform any write on
-        disk, this information must be committed using {!val:Context.commit}. *)
-    val set : 'a Context.t -> state -> 'a Context.t Lwt.t
+        disk, this information must be committed using {!val:Irmin_context.commit}. *)
+    val set : 'a Irmin_context.t -> state -> 'a Irmin_context.t Lwt.t
   end
 
   (** Inspect durable state using a more specialised way of reading the
@@ -97,5 +97,18 @@ module type S = sig
     (** [lookup state path] returns the data stored for the path [path] in the
         PVM state [state].  *)
     val lookup : state -> string list -> bytes option Lwt.t
+  end
+
+  (** Expose unsafe state patching functions for manual intervention.
+      At the moment this feature is only used to increase the maximum number of
+      ticks of the WASM PVM in a non refutable setting.  *)
+  module Unsafe_patches : sig
+    type t
+
+    (** [of_patch p] returns the PVM patch if it has a corresponding one. *)
+    val of_patch : Pvm_patches.unsafe_patch -> t tzresult
+
+    (** [apply state patch] applies the unsafe patch [patch] on the state. *)
+    val apply : state -> t -> state Lwt.t
   end
 end

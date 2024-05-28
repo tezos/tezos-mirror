@@ -13,9 +13,15 @@ const { contracts_directory, compile_contract_file } = require("../lib/contract"
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 
+let mode = utils.bench_args(process.argv,
+    [
+        {flag: '--raw', desc: 'Generate the raw inputs', default: false},
+        {flag: '--for-tests', desc: 'Generate the raw inputs for Tezt tests', default: false},
+    ]
+);
+
 var faucet;
-var args = process.argv.slice(2)
-if (args.length == 1) {
+if (mode.extra.raw || mode.extra.forTests) {
     // for tests
     faucet = require('./players/tezt_bootstraped.json');
 } else {
@@ -87,14 +93,14 @@ for (let i = 0; i < TOO_MANY_TXS; i++) {
 }
 
 
-if (args.length == 1 && args[0] == "raw") {
+if (mode.extra.raw) {
     utils.print_raw_txs(transfer_txs)
     utils.print_raw_txs(txs)
-} else if (args.length == 1 && args[0] == "for-test") {
+} else if (mode.extra.forTests) {
     console.log("transfers")
     utils.print_raw_txs(transfer_txs)
     console.log("calls")
     utils.print_raw_txs(txs)
 } else {
-    utils.print_bench([transfer_txs.concat(txs)])
+    utils.print_bench([transfer_txs.concat(txs)], mode)
 }

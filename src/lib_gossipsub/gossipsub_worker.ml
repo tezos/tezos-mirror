@@ -32,7 +32,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   Gossipsub_intf.WORKER
     with module GS = C.GS
      and module Monad = C.Monad
-     and module Stream = C.Stream = struct
+     and module Stream = C.Stream
+     and module Point = C.Point = struct
   module GS = C.GS
   module Monad = C.Monad
   module Stream = C.Stream
@@ -41,6 +42,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   module Peer = GS.Peer
   module Message_id = GS.Message_id
   module Message = GS.Message
+  module Point = C.Point
 
   module Introspection = struct
     type stats = {
@@ -202,6 +204,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
     | Connect of {peer : Peer.t; origin : peer_origin}
+    | Connect_point of {point : Point.t}
     | Forget of {peer : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
@@ -215,6 +218,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
+    bootstrap_points : Point.Set.t;
     trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -241,7 +245,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | Message_with_header _ ->
               Introspection.update_count_sent_app_messages stats `Incr
           | Subscribe _ | Unsubscribe _ -> ())
-      | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
+      | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
       let maybe_emit to_peer =
@@ -257,7 +261,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                      IWant if the remote peer has a bootstrap profile. *)
                   false
               | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
-          | Connect _ | Disconnect _ | Forget _ | Kick _ -> true
+          | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ ->
+              true
         in
         if do_emit then (
           update_sent_stats stats message ;
@@ -571,8 +576,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
         (* Once every 15 hearbreat ticks, try to reconnect to trusted peers if
-           they are disconnected. *)
-        if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then
+           they are disconnected. Also try to reconnect to bootstrap points. *)
+        if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then (
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6636
 
              Put the value [15L] as a parameter. *)
@@ -585,6 +590,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             Seq.empty
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
+          let p2p_output_stream = state.p2p_output_stream in
+          Point.Set.iter
+            (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
+            state.bootstrap_points) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
@@ -761,12 +770,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            resolved. *)
         event_loop_promise
 
-  let make ?(events_logging = fun _event -> Monad.return ()) rng limits
-      parameters =
+  let make ?(events_logging = fun _event -> Monad.return ())
+      ?(bootstrap_points = []) rng limits parameters =
     {
       status = Starting;
       state =
         {
+          bootstrap_points = Point.Set.of_list bootstrap_points;
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           trusted_peers = Peer.Set.empty;
@@ -850,6 +860,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             | PX peer -> Peer.pp fmt peer
             | Trusted -> Format.fprintf fmt "(trusted)")
           origin
+    | Connect_point {point} ->
+        Format.fprintf fmt "Connect_point{point=%a}" Point.pp point
     | Forget {peer; origin} ->
         Format.fprintf
           fmt

@@ -10,9 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezos-dal-node-services"
-  "octez-shell-libs"
+  "octez-libs" { = version }
+  "tezos-dal-node-services" { = version }
+  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

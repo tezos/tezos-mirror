@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -8,12 +8,12 @@ script_dir="$(dirname "$ci_dir")"
 opam_repository_fork="git@github.com:tezos/opam-repository"
 opam_dir="opam-repository"
 
-log () {
-    echo '\e[1m'"$1"'\e[0m'
+log() {
+  printf '\e[1m%s\e[0m' "$1"
 }
 
-# shellcheck source=./scripts/ci/release.sh
-. "$ci_dir/release.sh"
+# shellcheck source=./scripts/ci/octez-release.sh
+. "$ci_dir/octez-release.sh"
 
 # set up ssh credentials to access github
 mkdir -p "$HOME/.ssh"
@@ -27,12 +27,12 @@ log "Done setting up credentials."
 # call opam-release.sh with the correct arguments
 echo "$script_dir/opam-release.sh" \
   "$opam_release_tag" \
-  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_package_name.tar.gz" \
+  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_source_package_name.tar.gz" \
   "$opam_dir"
 
 "$script_dir/opam-release.sh" \
   "$opam_release_tag" \
-  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_package_name.tar.gz" \
+  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_source_package_name.tar.gz" \
   "$opam_dir"
 
 # Matches the corresponding variable in /scripts/opam-release.sh.

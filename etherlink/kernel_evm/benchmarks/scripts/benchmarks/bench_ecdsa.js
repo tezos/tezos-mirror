@@ -20,4 +20,7 @@ for (var i = 0; i < 10; i++) {
     // they should be ignored by the precompiled contract and not impact the performances
     txs.push(build_precompile_call(ecdsa_precompile_address, input + long_string.slice(0, i * 32)));
 }
-utils.print_bench([txs])
+
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

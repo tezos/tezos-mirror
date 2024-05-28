@@ -26,7 +26,7 @@
 
 type state = {
   cctxt : Client_context.full;
-  fee_parameters : Operation_kind.fee_parameters;
+  fee_parameters : Configuration.fee_parameters;
   minimal_block_delay : int64;
   delay_increment_per_round : int64;
 }
@@ -37,10 +37,8 @@ include
      and type tag := Operation_kind.t
      and type operation := L1_operation.t
 
-(** Checks if an operation can be added as a pending operation in the specified mode.
-    If allowed, adds it to the pending operation. Return none when the operation is not
-    allowed in the mode. *)
+(** Checks if an operation can be added as a pending operation in the specified
+    mode. If allowed, adds it to the pending operation. Returns [None] when the
+    operation is not allowed in the mode. *)
 val check_and_add_pending_operation :
-  Configuration.mode ->
-  L1_operation.t ->
-  Inj_operation.hash option tzresult Lwt.t
+  Configuration.mode -> L1_operation.t -> Inj_operation.id option tzresult Lwt.t

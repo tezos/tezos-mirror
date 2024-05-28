@@ -55,6 +55,7 @@ let test_nonce_seed_revelation =
     ~__FILE__
     ~title:"Nonce seed revelation"
     ~tags:["nonce"; "seed"; "revelation"; Tag.memory_3k]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   (* Run a node and a baker.
      The node runs in archive mode to obtain metadata with [RPC.get_chain_block]. *)

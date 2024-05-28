@@ -137,7 +137,7 @@ end
 module Version : sig
   val init :
     version:string ->
-    commit_info:Node_version.commit_info ->
+    commit_info:Octez_node_version.commit_info ->
     ('a, 'b, 'c) P2p.t ->
     unit
 end

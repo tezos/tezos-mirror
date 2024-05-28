@@ -33,13 +33,13 @@
   octez-libs.crypto
   octez-libs.base.p2p-identity-file
   octez-shell-libs.shell-services
-  irmin-pack
-  irmin-pack.unix
-  irmin
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin
   prometheus-app
   prometheus
-  octez-protocol-017-PtNairob-libs.dal
   octez-protocol-018-Proxford-libs.dal
+  octez-protocol-019-PtParisB-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))

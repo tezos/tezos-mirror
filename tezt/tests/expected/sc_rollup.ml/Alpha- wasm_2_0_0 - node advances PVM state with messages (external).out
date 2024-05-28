@@ -33,10 +33,14 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
-{ "level": 2,
-  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"0"
+
 
 ./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -61,6 +65,22 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.530
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"55000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"55000000000"
 
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -87,6 +107,22 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.530
 
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"110000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"110000000000"
+
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -111,6 +147,22 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"165000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"165000000000"
 
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -137,6 +189,22 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"220000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"220000000000"
+
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -161,6 +229,22 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"275000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"275000000000"
 
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -187,6 +271,22 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"330000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"330000000000"
+
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -211,6 +311,22 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"385000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"385000000000"
 
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -237,6 +353,22 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"440000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"440000000000"
+
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -262,6 +394,22 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"495000000000"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"495000000000"
+
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -286,4 +434,12 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.607
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"550000000000"
 

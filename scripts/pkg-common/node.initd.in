@@ -35,7 +35,7 @@ fi
 # Defaults
 user=tezos
 group=tezos
-nodedir=/var/tezos/node
+nodedir=/var/tezos/.tezos-node
 logdir=/var/log/tezos
 rotateonstart=yes
 othercliopts_node=""

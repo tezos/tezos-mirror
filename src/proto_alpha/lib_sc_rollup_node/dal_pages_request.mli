@@ -26,6 +26,10 @@
 open Protocol
 open Alpha_context
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7070
+
+   Rework the interface of dal_pages_request.mli (see the issue for details). *)
+
 (** Access DAL slots and pages content.
 
     This module is a wrapper on top of {!Store.Dal_slot_pages} module to
@@ -54,10 +58,12 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
     [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val slot_pages :
-  dal_attestation_lag:int ->
+  Octez_smart_rollup.Rollup_constants.dal_constants ->
+  dal_activation_level:Raw_level.t option ->
   inbox_level:int32 ->
   _ Node_context.t ->
   Dal.slot_id ->
+  dal_attested_slots_validity_lag:int ->
   Dal.Page.content list option tzresult Lwt.t
 
 (** Retrieve the content of the page identified by the given ID from the store.
@@ -71,8 +77,10 @@ val slot_pages :
     [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val page_content :
-  dal_attestation_lag:int ->
+  Octez_smart_rollup.Rollup_constants.dal_constants ->
+  dal_activation_level:Raw_level.t option ->
   inbox_level:int32 ->
   _ Node_context.t ->
   Dal.Page.t ->
+  dal_attested_slots_validity_lag:int ->
   Dal.Page.content option tzresult Lwt.t

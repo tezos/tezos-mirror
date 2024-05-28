@@ -659,7 +659,7 @@ let test_operation_pool_ordering
   let* mempool =
     Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
-  let mgmt_ops = JSON.get "applied" mempool in
+  let mgmt_ops = JSON.get "validated" mempool in
 
   let filename = Filename.temp_file "opool_" ".json" in
   let json = JSON.as_list mgmt_ops in
@@ -716,7 +716,6 @@ let test_operation_pool_ordering
     block with the given [minimal_timestamp] flag. *)
 let baking_with_given_minimal_timestamp ~minimal_timestamp =
   Protocol.register_test
-    ~supports:Protocol.(From_protocol (number Nairobi))
     ~__FILE__
     ~title:(sf "Baking minimal timestamp (%b)" minimal_timestamp)
     ~tags:["baking"; "timestamp"]

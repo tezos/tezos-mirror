@@ -21,8 +21,8 @@ After a successful compilation, you should have the following binaries:
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
 - ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
-- ``octez-smart-rollup-{client,node}-*``: executables for using and running a smart rollup as Layer 2 (see :doc:`../active/smart_rollups`)
-- ``octez-smart-rollup-wasm-debugger``: debugger for smart rollup kernels (see :doc:`../active/smart_rollups`)
+- ``octez-smart-rollup-node``: executable for using and running a smart rollup node as Layer 2 (see :doc:`../shell/smart_rollup_node`);
+- ``octez-smart-rollup-wasm-debugger``: debugger for smart rollup kernels (see :doc:`../shell/smart_rollup_node`)
 - ``octez-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``octez-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
@@ -31,13 +31,13 @@ After a successful compilation, you should have the following binaries:
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to.
 More precisely, the suffix consists of the first 8 characters of the protocol hash; except for protocol Alpha, for which the suffix is simply ``-alpha``.
-For instance, ``octez-baker-PtNairob`` is the baker
-for the Nairobi protocol, and ``octez-baker-alpha`` is the baker
+For instance, ``octez-baker-Proxford`` is the baker
+for the Oxford protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
 
-Read The Manual
+Read the Manual
 ---------------
 
 All the Octez binaries provide the ``--help`` option to display information about their usage, including the available options and the possible parameters.
@@ -51,7 +51,7 @@ It is also possible to get information on a specific command in the manual with 
 
    octez-client man set
 
-To see the usage of one specific command, you may also type the command without arguments, which display its possible completions and options::
+To see the usage of one specific command, you may also type the command without arguments, which displays its possible completions and options::
 
    octez-client transfer
 
@@ -95,12 +95,12 @@ The gossip network is where all Tezos nodes exchange blocks and
 operations with each other (see :ref:`octez-admin-client` to monitor
 p2p connections).
 Using this peer-to-peer network, an operation originated by a user can
-hop several times through other nodes until it finds its way in a
+hop several times through other nodes until it finds its way into a
 block baked by a baker.
 Using the blocks it receives on the gossip network the node also
 keeps up to date the current *context*, that is the full state of
 the blockchain shared by all peers.
-Approximately every 30 seconds a new block is created and, when the node
+Approximately every 15 seconds a new block is created and, when the node
 receives it, it applies each operation in the block to its current
 context and computes a new context.
 The last block received on a chain is also called the *head* of that
@@ -124,6 +124,14 @@ concurrently and selects the best one based on its fitness (see
    process. Thus, an ``octez-validator`` process can appear while
    monitoring the active processes of the machine.
 
+.. warning::
+
+   To ensure the best conditions to run a node, we recommend users to use `NTP
+   <https://en.wikipedia.org/wiki/Network_Time_Protocol>`__ to avoid clock
+   drift. Clock drift may result in not being able to get recent blocks in case
+   of negative lag time, and in not being able to inject new blocks in case of
+   positive lag time.
+
 Node Identity
 ~~~~~~~~~~~~~
 
@@ -145,7 +153,7 @@ Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
 
 If you wish to run your node on a test network, now is also a good time
-to configure your node (see :ref:`builtin_networks`).
+to configure your node for it (see :doc:`../user/multinetwork`).
 
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
@@ -215,7 +223,7 @@ Many options of the node can be configured when running the node:
 
 - RPC parameters (e.g. the port number for listening to RPC requests using option ``--rpc-addr``)
 - The directory where the node stores local data (using option ``--data-dir``)
-- Network parameters (e.g. the number of connections to peers, using option ``--connections``)
+- Network parameters (e.g. the network to connect to, using option ``--network``, the number of connections to peers, using option ``--connections``)
 - Validator and mempool parameters
 - :ref:`Logging options <configure_node_logging>`.
 
@@ -225,7 +233,7 @@ The list of configurable options can be obtained using the following command::
 
 You can read more about the :doc:`node configuration <../user/node-configuration>` and its :ref:`private mode <private-mode>`.
 
-Besides listening from requests from the client,
+Besides listening to requests from the client,
 the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
 open incoming connections to that port.
 
@@ -252,7 +260,12 @@ Client
 
 Octez client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
-For example, after starting your node you can check if it has finished
+
+.. note::
+
+  The rest of this page assumes that you have launched a local node, as explained in the previous section. But it is useful to know that the client can be configured to interact with a public node instead, either using :doc:`the configuration file <../user/client-configuration>` or by supplying option ``-E <node-url>`` with `a public RPC node <https://docs.tezos.com/architecture/rpc#public-and-private-rpc-nodes>`__.
+
+After starting your local node you can check if it has finished
 synchronizing (see :doc:`../shell/sync`) using::
 
    octez-client bootstrapped
@@ -271,7 +284,7 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-The behaviour of the client can be customized using various mechanims, including command-line options, a configuration file, and environment variables. For details, refer to :doc:`../user/setup-client`.
+The behaviour of the client can be customized using various mechanisms, including command-line options, a configuration file, and environment variables. For details, refer to :doc:`../user/setup-client`.
 
 A Simple Wallet
 ~~~~~~~~~~~~~~~
@@ -322,7 +335,7 @@ Get Free Test Tokens
 ~~~~~~~~~~~~~~~~~~~~
 
 To test the networks and help users get familiar with the system, on
-:doc:`test networks<test_networks>` you can obtain free tokens from
+:ref:`test networks <test_networks>` you can obtain free tokens from
 :ref:`a faucet <faucet>`. Transfer some to Alice's address.
 
 Transfers and Receipts
@@ -341,7 +354,7 @@ Let's try::
   octez-client transfer 1 from alice to bob --dry-run
 
   Fatal error:
-    The operation will burn ꜩ0.257 which is higher than the configured burn cap (ꜩ0).
+    The operation will burn 0.257 tez which is higher than the configured burn cap (0 tez).
      Use `--burn-cap 0.257` to emit this operation.
 
 The client asks the node to validate the operation (without sending
@@ -352,7 +365,7 @@ Any storage on chain has a cost associated to it which should be
 accounted for either by paying a fee to a baker or by destroying
 (``burning``) some tez.
 This is particularly important to protect the system from spam.
-Because storing an address requires burning ꜩ0.257 and the client has
+Because storing an address requires burning 0.257 tez and the client has
 a default of 0, we need to explicitly set a cap on the amount that we
 allow to burn::
 
@@ -414,7 +427,7 @@ Fees are variable over time and depend on many factors but the Octez
 client selects a default for us.
 
 The last important bit of our receipt is the balance updates that
-resume which address is being debited or credited of a certain amount.
+resume which address is being debited or credited a certain amount.
 We see in this case that baker ``tz1Ke...yU`` is being credited one
 fee for each operation, that Bob's address ``tz1Rk...Ph`` gets 1 tez
 and that Alice pays the transfer, the burn, and the two fees.
@@ -440,17 +453,22 @@ included anymore in a block.
 Furthermore each operation has a counter that prevents replays so it is usually safe to re-emit an
 operation that seems lost.
 
+.. _block_explorers:
+
+Block Explorers
+~~~~~~~~~~~~~~~
+
+Once your transaction is included in a block, you can retrieve it in one of the `public block explorers <https://docs.tezos.com/developing/information/block-explorers>`__, which list the whole history of the different Tezos networks (mainnet or test networks).
 
 .. _originated-accounts:
 
 Implicit Accounts and Smart Contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts*.
+In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts* (see :doc:`../active/accounts` for more details).
 
-- The implicit accounts are the addresses starting with *tz1*, *tz2*,
-  and *tz3* we have used up to now. They are created with a transfer
-  operation to the account public key hash.
+- Addresses with a *tz* prefix, like the *tz1* public key hashes used above,  represent implicit accounts. They are created with a transfer
+  operation to the account's public key hash.
 
 - Smart contracts have addresses starting with *KT1* and are created
   with an origination operation. They don't have a corresponding
@@ -463,13 +481,13 @@ Let's originate our first contract and call it *id*::
                  running ./michelson_test_scripts/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
-The initial balance is ꜩ1, generously provided by implicit account
+The initial balance is 1 tez, generously provided by implicit account
 *alice*. The contract stores a Michelson program ``id.tz``
 (found in file :src:`michelson_test_scripts/attic/id.tz`), with
 Michelson value ``"hello"`` as initial storage (the extra quotes are
 needed to avoid shell expansion). The parameter ``--burn-cap``
 specifies the maximal fee the user is willing to pay for this
-operation, the actual fee being determined by the system.
+operation, while the actual fee is determined by the system.
 
 A Michelson contract is expressed as a pure function, mapping a pair
 ``(parameter, storage)`` to a pair ``(list_of_operations, storage)``.
@@ -497,7 +515,7 @@ Gas and Storage Costs
 ~~~~~~~~~~~~~~~~~~~~~
 
 A quick look at the balance updates on the receipt shows that on top of
-funding the contract with ꜩ1, *alice* was also charged an extra cost
+funding the contract with 1 tez, *alice* was also charged an extra cost
 that is burnt.
 This cost comes from the *storage* and is shown in the line
 ``Paid storage size diff: 46 bytes``, 41 for the contract and 5 for
@@ -519,7 +537,7 @@ To store more we'll need to pay more, you can try by passing a longer
 string.
 
 The other cost associated with running contracts is the *gas*, which
-measures *how long* does a program take to compute.
+measures *how long* a program takes to compute.
 Contrary to storage there is no cost per gas unit, a transfer can
 require as much gas as it wants, however a baker that has to choose
 among several transactions is much more likely to include a low gas
@@ -600,7 +618,7 @@ have to resort to RPCs.
 
 For example to check the value of important
 :ref:`constants <protocol_constants>` in Tezos, which may differ between Mainnet and other
-:ref:`test networks<test-networks>`, you can use::
+:ref:`test networks<test_networks>`, you can use::
 
    octez-client rpc get /chains/main/blocks/head/context/constants | jq
    {
@@ -622,12 +640,32 @@ An interesting block receipt is the one produced at the end of a
 cycle as many delegates receive back part of their unfrozen accounts.
 
 
-You can find more info in the :doc:`RPCs' page <../active/rpc>`.
+You can find more info on RPCs in the :doc:`RPCs' page <../active/rpc>`.
 
 Other binaries
 --------------
 
-In this short tutorial we will not use some other binaries, but let as briefly review their roles.
+In this short tutorial we will not use some other binaries, but let's briefly review their roles.
+
+.. _octez-admin-client:
+
+Admin Client
+~~~~~~~~~~~~
+
+The admin client enables you to interact with the peer-to-peer layer in order
+to:
+
+- check the status of the connections
+- force connections to known peers
+- ban/unban peers
+
+A useful command to debug a node that is not syncing is:
+
+::
+
+   octez-admin-client p2p stat
+
+The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
 Codec
 ~~~~~

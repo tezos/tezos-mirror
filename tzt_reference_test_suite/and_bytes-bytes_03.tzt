@@ -1,0 +1,3 @@
+code { AND } ;
+input { Stack_elt bytes 0x ; Stack_elt bytes 0x10 } ;
+output { Stack_elt bytes 0x }

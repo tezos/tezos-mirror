@@ -29,6 +29,44 @@ Currently, for the sake of simplicity, MIR parser is a bit more lenient wrt non-
 
 Additionally, annotations are currently ignored completely; thus, annotation rules are not verified.
 
+#### Micheline
+
+Micheline is implemented using non-owning approach for sequences and primitive applications,
+actual nodes are allocated in an arena.
+
+This is done mostly to avoid costs associated with allocating and subsequently
+freeing many small `Vec`s via the system allocator during
+parsing/deserialization, but it also simplifies pattern-matching in the
+typechecker somewhat.
+
+#### Lambdas
+
+Typechecked lambdas carry their Micheline representation. This is done to avoid
+dealing with (deprecated) annotations in the lambda body (e.g. on instructions
+etc), which have to be `PACK`ed. The protocol uses the same approach.
+
+##### Known differences from the protocol
+
+Lambda code (in Micheline representation) isn't normalized. As an example where this makes a difference, consider running `PACK` on the following lambda: `{PUSH (pair nat int bool) {0; -3; False}; DROP}`. The protocol normalizes `{0; -3; False}` to `Pair 0 (Pair -3 False)`; MIR doesn't, and instead uses `{0; -3; False}` verbatim.
+
+#### UNPACK/deserialization
+
+Implemented via a pretty run-of-the-mill recursive descent parser.
+
+`BytesIt` is introduced for simplicity (and avoiding allocations),
+`Iterator<Item = u8>` doesn't quite fit, because we need to chomp exact number
+of bytes (take will produce at most the requested number, which is not what we
+want), and producing variable-length slices from Iterator would require
+allocations.
+
+Extra care is taken to avoid unnecessary allocations in the common cases, to that effect `SmallVec` with a sensible on-stack buffer is used for variable-length fields. This wastes some on-stack memory, but this shouldn't be an issue. One kink is annotations are still always-allocating, amending this is left for future work.
+
+`BigInt` parser is reimplemented, as going through `Zarith` from
+`tezos_data_encoding` is more involved than it's worth. The code is loosely
+based on the one from `tezos_data_encoding`.
+
+There's an interaction with lambdas (and how they carry raw Micheline around): unpacking requires allocating Micheline long-term, which means interpreter needs access to an arena. Carrying it in Ctx doesn't quite pan out due to borrow checker (also, it doesn't quite match the lifetime semantics of the tzt runner), so it's passed around the interpreter via an extra argument.
+
 #### Gas consumption
 
 Gas counter is represented as the type `Gas`, containing an `Option<u32>` with the current milligas amount (or `None` after gas exhaustion). A mutable reference to the gas counter is passed to typechecker and interpreter.

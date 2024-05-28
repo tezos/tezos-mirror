@@ -1,0 +1,3 @@
+code { EDIV } ;
+input { Stack_elt mutez 102 ; Stack_elt mutez 3 } ;
+output { Stack_elt (option (pair nat mutez)) (Some (Pair 34 0)) }

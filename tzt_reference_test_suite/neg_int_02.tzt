@@ -1,0 +1,3 @@
+code { NEG } ;
+input { Stack_elt int 0 } ;
+output { Stack_elt int 0 }

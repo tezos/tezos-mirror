@@ -1,42 +1,42 @@
 
 trace
   - UNPAIR (interp) @ location: 10
-    [ (Pair (Pair "[CONTRACT_HASH]" 17 3) None) ]
+    [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 3) None) ]
   - UNPAIR (entry) @ location: 10
-    [ (Pair (Pair "[CONTRACT_HASH]" 17 3) None) ]
+    [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 3) None) ]
     - log/SWAP (exit) @ location: 10
-      [ (Pair "[CONTRACT_HASH]" 17 3)
+      [ (Ticket "[CONTRACT_HASH]" nat 17 3)
         None ]
   - SWAP (entry) @ location: 11
-    [ (Pair "[CONTRACT_HASH]" 17 3)
+    [ (Ticket "[CONTRACT_HASH]" nat 17 3)
       None ]
     - log/IF_NONE (exit) @ location: 11
       [ None
-        (Pair "[CONTRACT_HASH]" 17 3) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 3) ]
   - IF_NONE (entry) @ location: 12
     [ None
-      (Pair "[CONTRACT_HASH]" 17 3) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 3) ]
     - log/[halt] (exit) @ location: 12
-      [ (Pair "[CONTRACT_HASH]" 17 3) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 3) ]
   - [halt] (entry) @ location: 24
-    [ (Pair "[CONTRACT_HASH]" 17 3) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 3) ]
     - control: KCons
     - log/SOME (exit) @ location: 12
-      [ (Pair "[CONTRACT_HASH]" 17 3) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 3) ]
   - SOME (entry) @ location: 24
-    [ (Pair "[CONTRACT_HASH]" 17 3) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 3) ]
     - log/NIL (exit) @ location: 24
-      [ (Some (Pair "[CONTRACT_HASH]" 17 3)) ]
+      [ (Some (Ticket "[CONTRACT_HASH]" nat 17 3)) ]
   - NIL (entry) @ location: 25
-    [ (Some (Pair "[CONTRACT_HASH]" 17 3)) ]
+    [ (Some (Ticket "[CONTRACT_HASH]" nat 17 3)) ]
     - log/PAIR (exit) @ location: 25
       [ {}
-        (Some (Pair "[CONTRACT_HASH]" 17 3)) ]
+        (Some (Ticket "[CONTRACT_HASH]" nat 17 3)) ]
   - PAIR (entry) @ location: 27
     [ {}
-      (Some (Pair "[CONTRACT_HASH]" 17 3)) ]
+      (Some (Ticket "[CONTRACT_HASH]" nat 17 3)) ]
     - log/[halt] (exit) @ location: 27
-      [ (Pair {} (Some (Pair "[CONTRACT_HASH]" 17 3))) ]
+      [ (Pair {} (Some (Ticket "[CONTRACT_HASH]" nat 17 3))) ]
   - [halt] (entry) @ location: 9
-    [ (Pair {} (Some (Pair "[CONTRACT_HASH]" 17 3))) ]
+    [ (Pair {} (Some (Ticket "[CONTRACT_HASH]" nat 17 3))) ]
     - control: KNil

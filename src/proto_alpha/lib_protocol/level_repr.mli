@@ -94,6 +94,9 @@ val current_era : cycle_eras -> cycle_era
 (** Returns the first level of the oldest era *)
 val root_level : cycle_eras -> level
 
+(** Returns the cycle corresponding to a raw level *)
+val cycle_from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> Cycle_repr.t
+
 (** Returns the annotated level corresponding to a raw level *)
 val level_from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> level
 
@@ -116,6 +119,8 @@ module Internal_for_tests : sig
   val add_level : t -> int -> t
 
   val add_cycles : blocks_per_cycle:int -> t -> int -> t
+
+  val root : t
 end
 
 (**/**)

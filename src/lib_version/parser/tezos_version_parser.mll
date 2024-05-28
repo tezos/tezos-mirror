@@ -21,25 +21,42 @@
   (* for the doc of this structure refer to the file version.mli *)
   type additional_info =
     | Dev
+    | Beta of int
+    | Beta_dev of int
     | RC of int
     | RC_dev of int
     | Release [@@deriving show]
 
+  type product = Octez | Etherlink
+
+  let pp_product ppf = function
+  | Octez -> Format.fprintf ppf "Octez"
+  | Etherlink -> Format.fprintf ppf "Etherlink"
+
   type t = {
+    product: product;
     major : int;
     minor : int;
     additional_info : additional_info} [@@deriving show]
 
   let int s = int_of_string_opt s |> Option.value ~default: 0
 
-  let default = { major = 0 ; minor = 0 ; additional_info = Dev }
+  let default = { product = Octez; major = 0 ; minor = 0 ; additional_info = Dev }
 }
 
 let num = ['0'-'9']+
 
 rule version_tag = parse
-  | 'v'? (num as major) '.' (num as minor) ".0"?
-      { Some {
+  | ("octez" | "etherlink" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+      {
+        let product = match product with 
+          | "etherlink" -> Etherlink
+          | "octez" -> Octez
+          | _ -> (* this case cannot happen, see pattern above *)  
+                 assert false
+        in
+        Some {
+        product;
         major = int major;
         minor = int minor;
         additional_info = extra lexbuf }
@@ -52,6 +69,10 @@ and extra = parse
       { (RC (int rc)) }
   | "-rc" (num as rc) _
       { (RC_dev (int rc)) }
+  | "-beta" (num as beta) eof
+      { (Beta (int beta)) }
+  | "-beta" (num as beta) _
+      { (Beta_dev (int beta)) }
   | eof
       { Release }
   | _

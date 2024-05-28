@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Protocol_client_context
+open Baking_errors
 
 (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
@@ -117,27 +117,6 @@ type cache = {
   round_timestamps :
     (Timestamp.time * Round.t * consensus_key_and_delegate)
     Baking_cache.Round_timestamp_interval_cache.t;
-}
-
-type global_state = {
-  (* client context *)
-  cctxt : Protocol_client_context.full;
-  (* chain id *)
-  chain_id : Chain_id.t;
-  (* baker configuration *)
-  config : Baking_configuration.t;
-  (* protocol constants *)
-  constants : Constants.t;
-  (* round durations *)
-  round_durations : Round.round_durations;
-  (* worker that monitor and aggregates new operations *)
-  operation_worker : Operation_worker.t;
-  (* the validation mode used by the baker*)
-  validation_mode : validation_mode;
-  (* the delegates on behalf of which the baker is running *)
-  delegates : consensus_key list;
-  cache : cache;
-  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
 let prequorum_encoding =
@@ -308,6 +287,14 @@ type elected_block = {
   attestation_qc : Kind.attestation Operation.t list;
 }
 
+type prepared_block = {
+  signed_block_header : block_header;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  operations : Tezos_base.Operation.t list list;
+  baking_votes : Per_block_votes_repr.per_block_votes;
+}
+
 (* Updated only when we receive a block at a different level.
 
    N.B. it may be our own: implying that we should not update unless
@@ -365,10 +352,196 @@ let phase_encoding =
         (fun () -> Awaiting_attestations);
     ]
 
+type block_kind =
+  | Fresh of Operation_pool.pool
+  | Reproposal of {
+      consensus_operations : packed_operation list;
+      payload_hash : Block_payload_hash.t;
+      payload_round : Round.t;
+      payload : Operation_pool.payload;
+    }
+
+type block_to_bake = {
+  predecessor : block_info;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  kind : block_kind;
+  force_apply : bool;
+}
+
+type consensus_vote_kind = Attestation | Preattestation
+
+let consensus_vote_kind_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"preattestation"
+        unit
+        (function Preattestation -> Some () | _ -> None)
+        (fun () -> Preattestation);
+      case
+        (Tag 1)
+        ~title:"attestation"
+        unit
+        (function Attestation -> Some () | _ -> None)
+        (fun () -> Attestation);
+    ]
+
+let pp_consensus_vote_kind fmt = function
+  | Attestation -> Format.fprintf fmt "attestation"
+  | Preattestation -> Format.fprintf fmt "preattestation"
+
+type unsigned_consensus_vote = {
+  vote_kind : consensus_vote_kind;
+  vote_consensus_content : consensus_content;
+  delegate : consensus_key_and_delegate;
+}
+
+type batch_content = {
+  level : Raw_level.t;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+}
+
+type unsigned_consensus_vote_batch = {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  batch_branch : Block_hash.t;
+  unsigned_consensus_votes : unsigned_consensus_vote list;
+}
+
+let make_unsigned_consensus_vote_batch kind
+    ({level; round; block_payload_hash} as batch_content) ~batch_branch
+    delegates_and_slots =
+  let unsigned_consensus_votes =
+    List.map
+      (fun (delegate, slot) ->
+        let consensus_content = {level; round; slot; block_payload_hash} in
+        {vote_kind = kind; vote_consensus_content = consensus_content; delegate})
+      delegates_and_slots
+  in
+  {batch_kind = kind; batch_branch; batch_content; unsigned_consensus_votes}
+
+type signed_consensus_vote = {
+  unsigned_consensus_vote : unsigned_consensus_vote;
+  signed_operation : packed_operation;
+}
+
+type signed_consensus_vote_batch = {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  batch_branch : Block_hash.t;
+  signed_consensus_votes : signed_consensus_vote list;
+}
+
+type error += Mismatch_signed_consensus_vote_in_batch
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Baking_state.mismatch_signed_consensus_vote_in_batch"
+    ~title:"Mismatch signed consensus vote in batch"
+    ~description:"Consensus votes mismatch while creating a batch."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "There are batched consensus votes which are not of the same kind or \
+         do not have the same consensus content as the rest.")
+    Data_encoding.unit
+    (function Mismatch_signed_consensus_vote_in_batch -> Some () | _ -> None)
+    (fun () -> Mismatch_signed_consensus_vote_in_batch)
+
+let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
+    ~batch_branch signed_consensus_votes =
+  let open Result_syntax in
+  let* () =
+    List.iter_e
+      (fun {unsigned_consensus_vote; signed_operation = _} ->
+        error_when
+          (unsigned_consensus_vote.vote_kind <> batch_kind
+          || Raw_level.(
+               unsigned_consensus_vote.vote_consensus_content.level
+               <> batch_content.level)
+          || Round.(
+               unsigned_consensus_vote.vote_consensus_content.round
+               <> batch_content.round)
+          || Block_payload_hash.(
+               unsigned_consensus_vote.vote_consensus_content.block_payload_hash
+               <> batch_content.block_payload_hash))
+          Mismatch_signed_consensus_vote_in_batch)
+      signed_consensus_votes
+  in
+  return {batch_kind; batch_content; batch_branch; signed_consensus_votes}
+
+let make_singleton_consensus_vote_batch
+    (signed_consensus_vote : signed_consensus_vote) =
+  let {unsigned_consensus_vote; _} = signed_consensus_vote in
+  let batch_content =
+    {
+      level = unsigned_consensus_vote.vote_consensus_content.level;
+      round = unsigned_consensus_vote.vote_consensus_content.round;
+      block_payload_hash =
+        unsigned_consensus_vote.vote_consensus_content.block_payload_hash;
+    }
+  in
+  {
+    batch_kind = unsigned_consensus_vote.vote_kind;
+    batch_content;
+    batch_branch = signed_consensus_vote.signed_operation.shell.branch;
+    signed_consensus_votes = [signed_consensus_vote];
+  }
+
 type round_state = {
   current_round : Round.t;
   current_phase : phase;
   delayed_quorum : Kind.attestation operation list option;
+  early_attestations : signed_consensus_vote list;
+  awaiting_unlocking_pqc : bool;
+}
+
+type forge_event =
+  | Block_ready of prepared_block
+  | Preattestation_ready of signed_consensus_vote
+  | Attestation_ready of signed_consensus_vote
+
+type forge_request =
+  | Forge_and_sign_block of block_to_bake
+  | Forge_and_sign_preattestations of {
+      unsigned_preattestations : unsigned_consensus_vote_batch;
+    }
+  | Forge_and_sign_attestations of {
+      unsigned_attestations : unsigned_consensus_vote_batch;
+    }
+
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+  cancel_all_pending_tasks : unit -> unit;
+}
+
+type global_state = {
+  (* client context *)
+  cctxt : Protocol_client_context.full;
+  (* chain id *)
+  chain_id : Chain_id.t;
+  (* baker configuration *)
+  config : Baking_configuration.t;
+  (* protocol constants *)
+  constants : Constants.t;
+  (* round durations *)
+  round_durations : Round.round_durations;
+  (* worker that monitor and aggregates new operations *)
+  operation_worker : Operation_worker.t;
+  (* hooks to the consensus and block forge worker *)
+  mutable forge_worker_hooks : forge_worker_hooks;
+  (* the validation mode used by the baker*)
+  validation_mode : validation_mode;
+  (* the delegates on behalf of which the baker is running *)
+  delegates : consensus_key list;
+  cache : cache;
+  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
 type state = {
@@ -384,7 +557,7 @@ let update_current_phase state new_phase =
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
-  | Time_to_bake_next_level of {at_round : Round.t}
+  | Time_to_prepare_next_level_block of {at_round : Round.t}
 
 let timeout_kind_encoding =
   let open Data_encoding in
@@ -401,14 +574,14 @@ let timeout_kind_encoding =
         (fun ((), ending_round) -> End_of_round {ending_round});
       case
         (Tag 1)
-        ~title:"Time_to_bake_next_level"
+        ~title:"Time_to_prepare_next_level_block"
         (obj2
-           (req "kind" (constant "Time_to_bake_next_level"))
+           (req "kind" (constant "Time_to_prepare_next_level_block"))
            (req "round" Round.encoding))
         (function
-          | Time_to_bake_next_level {at_round} -> Some ((), at_round)
+          | Time_to_prepare_next_level_block {at_round} -> Some ((), at_round)
           | _ -> None)
-        (fun ((), at_round) -> Time_to_bake_next_level {at_round});
+        (fun ((), at_round) -> Time_to_prepare_next_level_block {at_round});
     ]
 
 type event =
@@ -418,6 +591,7 @@ type event =
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
       Operation_worker.candidate * Kind.attestation operation list
+  | New_forge_event of forge_event
   | Timeout of timeout_kind
 
 let event_encoding =
@@ -471,6 +645,93 @@ let event_encoding =
         (tup2 (constant "Timeout") timeout_kind_encoding)
         (function Timeout tk -> Some ((), tk) | _ -> None)
         (fun ((), tk) -> Timeout tk);
+    ]
+
+let vote_kind_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Preattestation"
+        unit
+        (function Preattestation -> Some () | _ -> None)
+        (fun () -> Preattestation);
+      case
+        (Tag 1)
+        ~title:"Attestation"
+        unit
+        (function Attestation -> Some () | _ -> None)
+        (fun () -> Attestation);
+    ]
+
+let unsigned_consensus_vote_encoding =
+  let open Data_encoding in
+  conv
+    (fun {vote_kind; vote_consensus_content; delegate} ->
+      (vote_kind, vote_consensus_content, delegate))
+    (fun (vote_kind, vote_consensus_content, delegate) ->
+      {vote_kind; vote_consensus_content; delegate})
+    (obj3
+       (req "vote_kind" vote_kind_encoding)
+       (req "vote_consensus_content" consensus_content_encoding)
+       (req "delegate" consensus_key_and_delegate_encoding))
+
+let signed_consensus_vote_encoding =
+  let open Data_encoding in
+  conv
+    (fun {unsigned_consensus_vote; signed_operation} ->
+      (unsigned_consensus_vote, signed_operation))
+    (fun (unsigned_consensus_vote, signed_operation) ->
+      {unsigned_consensus_vote; signed_operation})
+    (obj2
+       (req "unsigned_consensus_vote" unsigned_consensus_vote_encoding)
+       (req "signed_operation" (dynamic_size Operation.encoding)))
+
+let forge_event_encoding =
+  let open Data_encoding in
+  let prepared_block_encoding =
+    conv
+      (fun {signed_block_header; round; delegate; operations; baking_votes} ->
+        (signed_block_header, round, delegate, operations, baking_votes))
+      (fun (signed_block_header, round, delegate, operations, baking_votes) ->
+        {signed_block_header; round; delegate; operations; baking_votes})
+      (obj5
+         (req "header" (dynamic_size Block_header.encoding))
+         (req "round" Round.encoding)
+         (req "delegate" consensus_key_and_delegate_encoding)
+         (req
+            "operations"
+            (list (list (dynamic_size Tezos_base.Operation.encoding))))
+         (req "baking_votes" Per_block_votes.per_block_votes_encoding))
+  in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Block_ready"
+        (obj1 (req "signed_block" prepared_block_encoding))
+        (function
+          | Block_ready prepared_block -> Some prepared_block | _ -> None)
+        (fun prepared_block -> Block_ready prepared_block);
+      case
+        (Tag 1)
+        ~title:"Preattestation_ready"
+        (obj1 (req "signed_preattestation" signed_consensus_vote_encoding))
+        (function
+          | Preattestation_ready signed_preattestation ->
+              Some signed_preattestation
+          | _ -> None)
+        (fun signed_preattestation ->
+          Preattestation_ready signed_preattestation);
+      case
+        (Tag 2)
+        ~title:"Attestation_ready"
+        (obj1 (req "signed_attestation" signed_consensus_vote_encoding))
+        (function
+          | Attestation_ready signed_attestation -> Some signed_attestation
+          | _ -> None)
+        (fun signed_attestation -> Attestation_ready signed_attestation);
     ]
 
 (* Disk state *)
@@ -537,23 +798,6 @@ let record_state (state : state) =
   in
   let*! () = Lwt_unix.rename filename_tmp filename in
   return_unit
-
-type error += Broken_locked_values_invariant
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Baking_state.broken_locked_values_invariant"
-    ~title:"Broken locked values invariant"
-    ~description:
-      "The expected consistency invariant on locked values does not hold"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The expected consistency invariant on locked values does not hold")
-    Data_encoding.unit
-    (function Broken_locked_values_invariant -> Some () | _ -> None)
-    (fun () -> Broken_locked_values_invariant)
 
 let may_record_new_state ~previous_state ~new_state =
   let open Lwt_result_syntax in
@@ -876,6 +1120,19 @@ let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
             attesting_slot))
     (SlotMap.bindings own_delegate_slots)
 
+let pp_prepared_block fmt
+    {signed_block_header; delegate = consensus_key_and_delegate; _} =
+  Format.fprintf
+    fmt
+    "predecessor block hash: %a, payload hash: %a, level: %ld, delegate: %a"
+    Block_hash.pp
+    signed_block_header.shell.predecessor
+    Block_payload_hash.pp_short
+    signed_block_header.protocol_data.contents.payload_hash
+    signed_block_header.shell.level
+    pp_consensus_key_and_delegate
+    consensus_key_and_delegate
+
 let pp_level_state fmt
     {
       current_level;
@@ -917,16 +1174,26 @@ let pp_phase fmt = function
   | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_attestations -> Format.fprintf fmt "awaiting attestations"
 
-let pp_round_state fmt {current_round; current_phase; delayed_quorum} =
+let pp_round_state fmt
+    {
+      current_round;
+      current_phase;
+      delayed_quorum;
+      early_attestations;
+      awaiting_unlocking_pqc;
+    } =
   Format.fprintf
     fmt
-    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ dealyed quorum: %a@]"
+    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed quorum: %a,@ early \
+     attestations: %d,@ awaiting unlocking pqc: %b@]"
     Round.pp
     current_round
     pp_phase
     current_phase
     (pp_option Format.pp_print_int)
     (Option.map List.length delayed_quorum)
+    (List.length early_attestations)
+    awaiting_unlocking_pqc
 
 let pp fmt {global_state; level_state; round_state} =
   Format.fprintf
@@ -942,8 +1209,47 @@ let pp fmt {global_state; level_state; round_state} =
 let pp_timeout_kind fmt = function
   | End_of_round {ending_round} ->
       Format.fprintf fmt "end of round %a" Round.pp ending_round
-  | Time_to_bake_next_level {at_round} ->
-      Format.fprintf fmt "time to bake next level at round %a" Round.pp at_round
+  | Time_to_prepare_next_level_block {at_round} ->
+      Format.fprintf
+        fmt
+        "time to prepare next level block at round %a"
+        Round.pp
+        at_round
+
+let pp_forge_event fmt =
+  let open Format in
+  let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
+    fprintf
+      fmt
+      "for delegate %a at level %ld (round %a)"
+      pp_consensus_key_and_delegate
+      unsigned_consensus_vote.delegate
+      (Raw_level.to_int32 unsigned_consensus_vote.vote_consensus_content.level)
+      Round.pp
+      unsigned_consensus_vote.vote_consensus_content.round
+  in
+  function
+  | Block_ready {signed_block_header; round; delegate; _} ->
+      fprintf
+        fmt
+        "block ready for delegate: %a at level %ld (round: %a)"
+        pp_consensus_key_and_delegate
+        delegate
+        signed_block_header.shell.level
+        Round.pp
+        round
+  | Preattestation_ready signed_preattestation ->
+      fprintf
+        fmt
+        "preattestation ready %a"
+        pp_signed_consensus_vote
+        signed_preattestation
+  | Attestation_ready signed_attestation ->
+      fprintf
+        fmt
+        "attestation ready %a"
+        pp_signed_consensus_vote
+        signed_attestation
 
 let pp_event fmt = function
   | New_valid_proposal proposal ->
@@ -976,5 +1282,7 @@ let pp_event fmt = function
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
+  | New_forge_event forge_event ->
+      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
   | Timeout kind ->
       Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind

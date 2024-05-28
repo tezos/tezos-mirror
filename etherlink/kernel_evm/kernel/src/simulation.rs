@@ -1,25 +1,32 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
-use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
+use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
-    current_timestamp, parsable, parsing, retrieve_base_fee_per_gas, retrieve_chain_id,
+    current_timestamp, parsable, parsing, retrieve_block_fees, retrieve_chain_id,
     tick_model, CONFIG,
 };
 
+use evm::ExitReason;
+use evm_execution::handler::ExtendedExitReason;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
+use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
-use rlp::{Decodable, DecoderError, Rlp};
+use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
+use tezos_ethereum::rlp_helpers::{
+    append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
+    next,
+};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -30,13 +37,105 @@ pub const SIMULATION_SIMPLE_TAG: u8 = 1;
 pub const SIMULATION_CREATE_TAG: u8 = 2;
 // SIMULATION/CHUNK/NUM 2B/CHUNK
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
-/// Maximum gas used by the evaluation. Bounded to limit DOS on the rollup node
-/// Is used as default value if no gas is set.
-pub const MAX_EVALUATION_GAS: u64 = MAX_TRANSACTION_GAS_LIMIT;
 /// Tag indicating simulation is an evaluation.
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
+
+pub const OK_TAG: u8 = 0x1;
+pub const ERR_TAG: u8 = 0x2;
+
+const INCORRECT_SIGNATURE: &str = "Incorrect signature.";
+const INVALID_CHAIN_ID: &str = "Invalid chain id.";
+const NONCE_TOO_LOW: &str = "Nonce too low.";
+const CANNOT_PREPAY: &str = "Cannot prepay transaction.";
+const MAX_GAS_FEE_TOO_LOW: &str = "Max gas fee too low.";
+const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
+    is allocated. Try reducing its gas consumption or splitting the call in
+    multiple steps, if possible.";
+const GAS_LIMIT_TOO_LOW: &str = "Gas limit too low.";
+
+// Redefined Result as we cannot implement Decodable and Encodable traits on Result
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SimulationResult<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ExecutionResult {
+    value: Option<Vec<u8>>,
+    gas_used: Option<u64>,
+}
+
+type CallResult = SimulationResult<ExecutionResult, Vec<u8>>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ValidationResult {
+    address: H160,
+}
+
+impl<T: Encodable, E: Encodable> Encodable for SimulationResult<T, E> {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match self {
+            Self::Ok(value) => {
+                stream.append(&OK_TAG);
+                stream.append(value)
+            }
+            Self::Err(e) => {
+                stream.append(&ERR_TAG);
+                stream.append(e)
+            }
+        };
+    }
+}
+
+impl<T: Decodable, E: Decodable> Decodable for SimulationResult<T, E> {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        check_list(decoder, 2)?;
+
+        let mut it = decoder.iter();
+        match decode_field(&next(&mut it)?, "tag")? {
+            OK_TAG => Ok(Self::Ok(decode_field(&next(&mut it)?, "ok")?)),
+            ERR_TAG => Ok(Self::Err(decode_field(&next(&mut it)?, "error")?)),
+            _ => Err(DecoderError::Custom("Invalid execution tag")),
+        }
+    }
+}
+
+impl Encodable for ExecutionResult {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append(&self.value);
+        append_option_u64_le(&self.gas_used, stream);
+    }
+}
+
+impl Decodable for ExecutionResult {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        check_list(decoder, 2)?;
+
+        let mut it = decoder.iter();
+        let value = decode_field(&next(&mut it)?, "value")?;
+        let gas_used = decode_option_u64_le(&next(&mut it)?, "gas_used")?;
+        Ok(ExecutionResult { value, gas_used })
+    }
+}
+
+impl Encodable for ValidationResult {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.append(&self.address);
+    }
+}
+
+impl Decodable for ValidationResult {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        Ok(ValidationResult {
+            address: decode_field(decoder, "caller")?,
+        })
+    }
+}
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -77,6 +176,48 @@ pub struct Evaluation {
     pub data: Vec<u8>,
 }
 
+impl<T> From<EthereumError> for SimulationResult<T, String> {
+    fn from(err: EthereumError) -> Self {
+        let msg = format!("The transaction failed: {:?}.", err);
+        Self::Err(msg)
+    }
+}
+
+impl From<Result<Option<ExecutionOutcome>, EthereumError>>
+    for SimulationResult<CallResult, String>
+{
+    fn from(result: Result<Option<ExecutionOutcome>, EthereumError>) -> Self {
+        match result {
+            Ok(Some(ExecutionOutcome {
+                gas_used,
+                reason: ExtendedExitReason::Exit(ExitReason::Succeed(_)),
+                result,
+                ..
+            })) => Self::Ok(SimulationResult::Ok(ExecutionResult {
+                value: result,
+                gas_used: Some(gas_used),
+            })),
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::Exit(ExitReason::Revert(_)),
+                result,
+                ..
+            })) => Self::Ok(SimulationResult::Err(result.unwrap_or_default())),
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::OutOfTicks,
+                ..
+            })) => Self::Err(String::from(OUT_OF_TICKS_MSG)),
+            Ok(Some(ExecutionOutcome { reason, .. })) => {
+                let msg = format!("The transaction failed: {:?}.", reason);
+                Self::Err(msg)
+            }
+            Ok(None) => Self::Err(String::from(
+                "No outcome was produced when the transaction was ran",
+            )),
+            Err(err) => err.into(),
+        }
+    }
+}
+
 impl Evaluation {
     /// Unserialize bytes as RLP encoded data.
     pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
@@ -88,13 +229,19 @@ impl Evaluation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
-    ) -> Result<Option<ExecutionOutcome>, Error> {
-        let timestamp = current_timestamp(host);
-        let timestamp = U256::from(timestamp.as_u64());
+    ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
-        let block_constants =
-            BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas);
+        let block_fees = retrieve_block_fees(host)?;
+
+        let current_constants = match storage::read_current_block(host) {
+            Ok(block) => block.constants(chain_id, block_fees),
+            Err(_) => {
+                let timestamp = current_timestamp(host);
+                let timestamp = U256::from(timestamp.as_u64());
+                BlockConstants::first_block(timestamp, chain_id, block_fees)
+            }
+        };
+
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>();
@@ -105,24 +252,42 @@ impl Evaluation {
                 0,
                 tx_data_size,
             );
-        let outcome = evm_execution::run_transaction(
+
+        let gas_price = if let Some(gas_price) = self.gas_price {
+            U256::from(gas_price)
+        } else {
+            block_fees.base_fee_per_gas()
+        };
+
+        match run_transaction(
             host,
-            &block_constants,
+            &current_constants,
             &mut evm_account_storage,
             &precompiles,
             CONFIG,
             self.to,
             self.from.unwrap_or(default_caller),
             self.data.clone(),
-            self.gas
-                .map(|gas| u64::max(gas, MAX_EVALUATION_GAS))
-                .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
+            self.gas.or(Some(u64::MAX)),
+            gas_price,
             self.value,
             false,
             allocated_ticks,
-        )
-        .map_err(Error::Simulation)?;
-        Ok(outcome)
+            false,
+            false,
+        ) {
+            Ok(Some(outcome)) => {
+                let outcome =
+                    simulation_add_gas_for_fees(outcome, &block_fees, &self.data)
+                        .map_err(Error::Simulation)?;
+
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(Some(outcome)).into();
+
+                Ok(result)
+            }
+            result => Ok(result.into()),
+        }
     }
 }
 
@@ -173,58 +338,108 @@ struct TxValidation {
     transaction: EthereumTransactionCommon,
 }
 
-#[derive(Debug, PartialEq)]
-enum TxValidationOutcome {
-    Valid(H160),
-    NonceTooLow,
-    NotCorrectSignature,
-    InvalidChainId,
-    GasLimitTooHigh,
-    MaxGasFeeTooLow,
-}
-
 impl TxValidation {
+    // Run the transaction and ensure
+    // - it won't fail with  out-of-ticks
+    // - it won't fail due to not-enough gas fees to cover da fee
+    pub fn validate<Host: Runtime>(
+        host: &mut Host,
+        transaction: &EthereumTransactionCommon,
+        caller: &H160,
+    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
+        let chain_id = retrieve_chain_id(host)?;
+        let block_fees = retrieve_block_fees(host)?;
+
+        let current_constants = match storage::read_current_block(host) {
+            Ok(block) => block.constants(chain_id, block_fees),
+            Err(_) => {
+                let timestamp = current_timestamp(host);
+                let timestamp = U256::from(timestamp.as_u64());
+                BlockConstants::first_block(timestamp, chain_id, block_fees)
+            }
+        };
+
+        let mut evm_account_storage = account_storage::init_account_storage()
+            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
+        let precompiles = precompiles::precompile_set::<Host>();
+        let tx_data_size = transaction.data.len() as u64;
+        let allocated_ticks =
+            tick_model::estimate_remaining_ticks_for_transaction_execution(
+                0,
+                tx_data_size,
+            );
+
+        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
+            return Self::to_error(GAS_LIMIT_TOO_LOW);
+        };
+
+        match run_transaction(
+            host,
+            &current_constants,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            transaction.to,
+            *caller,
+            transaction.data.clone(),
+            Some(gas_limit), // gas could be omitted
+            block_fees.base_fee_per_gas(),
+            Some(transaction.value),
+            true,
+            allocated_ticks,
+            false,
+            false,
+        ) {
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::OutOfTicks,
+                ..
+            })) => Self::to_error(OUT_OF_TICKS_MSG),
+            Ok(None) => Self::to_error(CANNOT_PREPAY),
+            _ => Ok(SimulationResult::Ok(ValidationResult { address: *caller })),
+        }
+    }
+
+    pub fn to_error(
+        msg: &str,
+    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
+        Ok(SimulationResult::Err(String::from(msg)))
+    }
+
     /// Execute the simulation
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
-    ) -> Result<TxValidationOutcome, anyhow::Error> {
+    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let tx = &self.transaction;
         let evm_account_storage = account_storage::init_account_storage()?;
         // Get the caller
-        let Ok(caller) = tx.caller() else {return Ok(TxValidationOutcome::NotCorrectSignature)};
+        let Ok(caller) = tx.caller() else {return  Self::to_error(INCORRECT_SIGNATURE)};
         // Get the caller account
         let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
         let caller_account = evm_account_storage.get(host, &caller_account_path)?;
         // Get the nonce of the caller
         let caller_nonce = match &caller_account {
             Some(account) => account.nonce(host)?,
-            None => U256::zero(),
+            None => 0,
         };
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+        let block_fees = retrieve_block_fees(host)?;
         // Get the chain_id
         let chain_id = storage::read_chain_id(host)?;
         // Check if nonce is too low
         if tx.nonce < caller_nonce {
-            return Ok(TxValidationOutcome::NonceTooLow);
+            return Self::to_error(NONCE_TOO_LOW);
         }
         // Check if the chain id is correct
-        if tx.chain_id != chain_id {
-            return Ok(TxValidationOutcome::InvalidChainId);
-        }
-        // Check if the gas limit is not too high
-        if tx.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
-            return Ok(TxValidationOutcome::GasLimitTooHigh);
+        if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
+            return Self::to_error(INVALID_CHAIN_ID);
         }
         // Check if the gas price is high enough
-        if tx.max_fee_per_gas < base_fee_per_gas
-            || tx.max_fee_per_gas < tx.max_priority_fee_per_gas
-        {
-            return Ok(TxValidationOutcome::MaxGasFeeTooLow);
+        if tx.max_fee_per_gas < block_fees.base_fee_per_gas() {
+            return Self::to_error(MAX_GAS_FEE_TOO_LOW);
         }
-        // TODO: #6498
-        // check PRE_PAY condition
-        Ok(TxValidationOutcome::Valid(caller))
+        // Check if running the transaction (assuming it is valid) would run out
+        // of ticks, or fail validation for another reason.
+        Self::validate(host, tx, &caller)
     }
 }
 
@@ -240,7 +455,7 @@ impl TryFrom<&[u8]> for TxValidation {
 #[derive(Debug, PartialEq)]
 enum Message {
     Evaluation(Evaluation),
-    TxValidation(TxValidation),
+    TxValidation(Box<TxValidation>),
 }
 
 impl TryFrom<&[u8]> for Message {
@@ -252,7 +467,8 @@ impl TryFrom<&[u8]> for Message {
 
         match tag {
             EVALUATION_TAG => Evaluation::try_from(bytes).map(Message::Evaluation),
-            VALIDATION_TAG => TxValidation::try_from(bytes).map(Message::TxValidation),
+            VALIDATION_TAG => TxValidation::try_from(bytes)
+                .map(|tx| Message::TxValidation(Box::new(tx))),
             _ => Err(DecoderError::Custom("Unknown message to simulate")),
         }
     }
@@ -350,53 +566,6 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
     }
 }
 
-fn store_simulation_outcome<Host: Runtime>(
-    host: &mut Host,
-    outcome: Option<ExecutionOutcome>,
-) -> Result<(), anyhow::Error> {
-    log!(host, Debug, "outcome={:?} ", outcome);
-    match outcome {
-        Some(outcome) => {
-            storage::store_simulation_status(host, outcome.is_success)?;
-            storage::store_evaluation_gas(host, outcome.gas_used)?;
-            storage::store_simulation_result(host, outcome.result)
-        }
-        None => Ok(()),
-    }
-}
-
-fn store_tx_validation_outcome<Host: Runtime>(
-    host: &mut Host,
-    outcome: TxValidationOutcome,
-) -> Result<(), anyhow::Error> {
-    match outcome {
-        TxValidationOutcome::Valid(caller) => {
-            storage::store_simulation_status(host, true)?;
-            storage::store_simulation_result(host, Some(caller.to_fixed_bytes().to_vec()))
-        }
-        TxValidationOutcome::NonceTooLow => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Nonce too low.".to_vec()))
-        }
-        TxValidationOutcome::NotCorrectSignature => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Incorrect signature.".to_vec()))
-        }
-        TxValidationOutcome::InvalidChainId => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Invalid chain id.".to_vec()))
-        }
-        TxValidationOutcome::GasLimitTooHigh => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Gas limit too high.".to_vec()))
-        }
-        TxValidationOutcome::MaxGasFeeTooLow => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Max gas fee too low.".to_vec()))
-        }
-    }
-}
-
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
 ) -> Result<(), anyhow::Error> {
@@ -405,11 +574,11 @@ pub fn start_simulation_mode<Host: Runtime>(
     match simulation {
         Message::Evaluation(simulation) => {
             let outcome = simulation.run(host)?;
-            store_simulation_outcome(host, outcome)
+            storage::store_simulation_result(host, outcome)
         }
         Message::TxValidation(tx_validation) => {
             let outcome = tx_validation.run(host)?;
-            store_tx_validation_outcome(host, outcome)
+            storage::store_simulation_result(host, outcome)
         }
     }
 }
@@ -423,7 +592,9 @@ mod tests {
     };
     use tezos_smart_rollup_mock::MockHost;
 
-    use crate::{current_timestamp, retrieve_base_fee_per_gas, retrieve_chain_id};
+    use crate::{
+        current_timestamp, fees::gas_for_fees, retrieve_block_fees, retrieve_chain_id,
+    };
 
     use super::*;
 
@@ -509,16 +680,13 @@ mod tests {
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host);
+        let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        assert!(
-            base_fee_per_gas.is_ok(),
-            "base_fee_per_gas should be defined"
-        );
+        assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(
             timestamp,
             chain_id.unwrap(),
-            base_fee_per_gas.unwrap(),
+            block_fees.unwrap(),
         );
         let precompiles = precompiles::precompile_set::<Host>();
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
@@ -528,6 +696,10 @@ mod tests {
         let transaction_value = U256::from(0);
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
 
+        // gas limit was estimated using Remix on Shanghai network (256,842)
+        // plus a safety margin for gas accounting discrepancies
+        let gas_limit = 300_000;
+        let gas_price = U256::from(21000);
         // create contract
         let outcome = evm_execution::run_transaction(
             host,
@@ -538,10 +710,13 @@ mod tests {
             callee,
             caller,
             call_data,
-            Some(31000),
+            Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             false,
             DUMMY_ALLOCATED_TICKS,
+            false,
+            false,
         );
         assert!(outcome.is_ok(), "contract should have been created");
         let outcome = outcome.unwrap();
@@ -564,23 +739,23 @@ mod tests {
             gas_price: None,
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
-            gas: Some(10000),
+            gas: Some(100000),
             value: None,
         };
         let outcome = evaluation.run(&mut host);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
-        assert!(
-            outcome.is_some(),
-            "simulation should have produced some outcome"
-        );
-        let outcome = outcome.unwrap();
-        assert_eq!(
-            Some(vec![0u8; 32]),
-            outcome.result,
-            "simulation result should be 0"
-        );
+
+        if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+            value,
+            gas_used: _,
+        })) = outcome
+        {
+            assert_eq!(Some(vec![0u8; 32]), value, "simulation result should be 0");
+        } else {
+            panic!("evaluation should have reached outcome");
+        }
 
         // run simulation get
         let evaluation = Evaluation {
@@ -588,23 +763,22 @@ mod tests {
             gas_price: None,
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
-            gas: Some(10000),
+            gas: Some(111111),
             value: None,
         };
         let outcome = evaluation.run(&mut host);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
-        assert!(
-            outcome.is_some(),
-            "simulation should have produced some outcome"
-        );
-        let outcome = outcome.unwrap();
-        assert_eq!(
-            Some(vec![0u8; 32]),
-            outcome.result,
-            "evaluation result should be 0"
-        );
+        if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+            value,
+            gas_used: _,
+        })) = outcome
+        {
+            assert_eq!(Some(vec![0u8; 32]), value, "evaluation result should be 0");
+        } else {
+            panic!("evaluation should have reached outcome");
+        }
     }
 
     #[test]
@@ -626,16 +800,15 @@ mod tests {
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
-        assert!(
-            outcome.is_some(),
-            "simulation should have produced some outcome"
-        );
-        let outcome = outcome.unwrap();
-        assert_eq!(
-            Some(vec![0u8; 32]),
-            outcome.result,
-            "evaluation result should be 0"
-        );
+        if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+            value,
+            gas_used: _,
+        })) = outcome
+        {
+            assert_eq!(Some(vec![0u8; 32]), value, "evaluation result should be 0");
+        } else {
+            panic!("evaluation should have reached outcome");
+        }
     }
 
     #[test]
@@ -699,19 +872,6 @@ mod tests {
             parsed,
             "should have been parsed as complete simulation"
         );
-
-        if let Input::Simple(box_simple) = parsed {
-            if let Message::Evaluation(s) = *box_simple {
-                let res = s.run(&mut host).expect("simulation should run");
-                assert!(
-                    res.is_some(),
-                    "Simulation should have produced some outcome"
-                );
-                let res = res.unwrap();
-                return assert!(res.is_success, "simulation should have succeeded");
-            }
-        }
-        panic!("Parsing failed")
     }
 
     #[test]
@@ -767,19 +927,19 @@ mod tests {
 
             let signature = TxSignature::new(v, r, s).unwrap();
 
-            EthereumTransactionCommon {
-                type_: TransactionType::Legacy,
-                chain_id: 1337.into(),
-                nonce: 0.into(),
-                max_priority_fee_per_gas: U256::default(),
-                max_fee_per_gas: U256::default(),
-                gas_limit: 2000000,
-                to: Some(H160::default()),
-                value: U256::default(),
-                data: vec![],
-                signature: Some(signature),
-                access_list: Vec::default(),
-            }
+            EthereumTransactionCommon::new(
+                TransactionType::Legacy,
+                Some(1337.into()),
+                0,
+                U256::default(),
+                U256::default(),
+                2000000,
+                Some(H160::default()),
+                U256::default(),
+                vec![],
+                Vec::default(),
+                Some(signature),
+            )
         };
 
         let hex = "f8628080831e84809400000000000000000000000000000000000000008080820a96a00c4604516693aafd2e74a993c280455fcad144a414f5aa580d96f3c51d4428e5a0630fb7fc1af4c1c1a82cabb4ef9d12f8fc2e54a047eb3e3bdffc9d23cd07a94e";
@@ -799,9 +959,9 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(
-            Input::Simple(Box::new(Message::TxValidation(TxValidation {
+            Input::Simple(Box::new(Message::TxValidation(Box::new(TxValidation {
                 transaction: expected
-            }))),
+            })))),
             parsed,
             "should have been parsed as complete tx validation"
         );
@@ -815,20 +975,31 @@ mod tests {
     #[test]
     fn test_tx_validation_gas_price() {
         let mut host = MockHost::default();
+        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
+        let gas_price = U256::one();
+        let tx_data = vec![];
+        let tx_access_list = vec![];
+        let fee_gas = gas_for_fees(
+            block_fees.da_fee_per_byte(),
+            block_fees.minimum_base_fee_per_gas(),
+            tx_data.as_slice(),
+            tx_access_list.as_slice(),
+        )
+        .expect("Should have been able to compute gas for fee");
 
-        let transaction = EthereumTransactionCommon {
-            type_: TransactionType::Eip1559,
-            chain_id: U256::from(1),
-            nonce: U256::from(0),
-            max_priority_fee_per_gas: U256::zero(),
-            max_fee_per_gas: U256::from(1),
-            gas_limit: 21000,
-            to: Some(H160::zero()),
-            value: U256::zero(),
-            data: vec![],
-            access_list: vec![],
-            signature: None,
-        };
+        let transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(U256::from(1)),
+            0,
+            U256::zero(),
+            gas_price,
+            21000 + fee_gas,
+            Some(H160::zero()),
+            U256::zero(),
+            tx_data,
+            tx_access_list,
+            None,
+        );
         let signed = transaction
             .sign_transaction(
                 "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"
@@ -852,7 +1023,93 @@ mod tests {
             )
             .unwrap();
         let result = simulation.run(&mut host);
+        println!("{result:?}");
         assert!(result.is_ok());
-        assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
+        assert_eq!(
+            TxValidation::to_error(MAX_GAS_FEE_TOO_LOW).unwrap(),
+            result.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_tx_validation_da_fees_not_covered() {
+        let mut host = MockHost::default();
+        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
+
+        let transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(U256::from(1)),
+            0,
+            U256::from(0),
+            block_fees.base_fee_per_gas(),
+            21000, // not covering da_fee
+            Some(H160::zero()),
+            U256::zero(),
+            vec![],
+            vec![],
+            None,
+        );
+        let signed = transaction
+            .sign_transaction(
+                "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"
+                    .to_string(),
+            )
+            .unwrap();
+        let simulation = TxValidation {
+            transaction: signed,
+        };
+        storage::store_chain_id(&mut host, U256::from(1))
+            .expect("should be able to store a chain id");
+        let evm_account_storage = account_storage::init_account_storage().unwrap();
+        let _account = evm_account_storage
+            .get_or_create(
+                &host,
+                &account_storage::account_path(
+                    &address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let result = simulation.run(&mut host);
+
+        assert!(result.is_ok());
+        assert_eq!(
+            SimulationResult::Err(String::from(super::GAS_LIMIT_TOO_LOW)),
+            result.unwrap()
+        );
+    }
+
+    pub fn check_roundtrip<R: Decodable + Encodable + core::fmt::Debug + PartialEq>(
+        v: R,
+    ) {
+        let bytes = v.rlp_bytes();
+        let decoder = Rlp::new(&bytes);
+        println!("{:?}", bytes);
+        let decoded = R::decode(&decoder).expect("Value should be decodable");
+        assert_eq!(v, decoded, "Roundtrip failed on {:?}", v)
+    }
+
+    #[test]
+    fn test_simulation_result_encoding_roundtrip() {
+        let valid: SimulationResult<ValidationResult, String> =
+            SimulationResult::Ok(ValidationResult {
+                address: address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                    .unwrap(),
+            });
+        let call: SimulationResult<CallResult, String> =
+            SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+                value: Some(vec![0, 1, 2, 3]),
+                gas_used: Some(123),
+            }));
+        let revert: SimulationResult<CallResult, String> =
+            SimulationResult::Ok(SimulationResult::Err(vec![3, 2, 1, 0]));
+        let error: SimulationResult<CallResult, String> =
+            SimulationResult::Err(String::from("Un festival de GADTs"));
+
+        check_roundtrip(valid);
+        check_roundtrip(call);
+        check_roundtrip(revert);
+        check_roundtrip(error)
     }
 }

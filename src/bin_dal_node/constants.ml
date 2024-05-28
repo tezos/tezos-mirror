@@ -31,9 +31,11 @@ let shards_store_lru_size =
      cache. Each entry in the cache maintains two open file descriptors (one via
      regular file opening and one via mmap on the bitset region). Note that setting
      a too high value causes a "Too many open files" error. *)
+  let irmin_internals_entries_per_toplevel_entry = 3 in
   let number_of_slots = 256 in
   let number_of_remembered_levels = 1 in
-  number_of_slots * number_of_remembered_levels
+  irmin_internals_entries_per_toplevel_entry * number_of_slots
+  * number_of_remembered_levels
 
 (* Fewer cache sizes should be enough in practice,
    but we cache 50 since each cache entry has quite a small memory footprint. *)
@@ -52,3 +54,9 @@ let committee_cache_size = 50
 let shards_proofs_cache_size = 1024
 
 let shards_verification_sampling_frequency = 100
+
+let amplification_random_delay_min = 1.
+
+let amplification_random_delay_max = 2.
+
+let amplification_timeout = 120.

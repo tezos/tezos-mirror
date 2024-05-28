@@ -57,7 +57,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 11
+    "expected_env_version": 12
 }
 |}
 
@@ -876,6 +876,12 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
         "from_" ^ Protocol.tag from_protocol;
         "to_" ^ Protocol.tag to_protocol;
       ]
+    ~uses:
+      [
+        Protocol.accuser to_protocol;
+        Protocol.baker from_protocol;
+        Protocol.baker to_protocol;
+      ]
   @@ fun () ->
   let node_arguments = [Node.Synchronisation_threshold 0] in
   let to_protocol_hash = Protocol.hash to_protocol in
@@ -1145,11 +1151,13 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
   Log.info
     "Restart the node with a protocol override configuration for %s"
     test_proto_hash ;
-  Node.Config_file.(
-    update
-      node
-      (set_sandbox_network_with_user_activated_overrides
-         [(test_proto_hash, to_protocol_hash)])) ;
+  let* () =
+    Node.Config_file.(
+      update
+        node
+        (set_sandbox_network_with_user_activated_overrides
+           [(test_proto_hash, to_protocol_hash)]))
+  in
   let* () = Node.terminate node in
   let* () = Node.run node node_arguments in
   let* () = Node.wait_for_ready node in

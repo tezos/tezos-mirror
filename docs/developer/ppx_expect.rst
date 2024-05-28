@@ -147,6 +147,6 @@ Integration with Lwt
 ---------------------
 
 Ppx_expect can be used in combination with Lwt, see the
-`README <https://github.com/janestreet/ppx_expect/blob/master/README.org#lwt>`_.
+`package description <https://ocaml.org/p/ppx_expect/latest>`_.
 This integration has not been tested on the Octez codebase yet, hence some work will be
 needed to a have specific support for the codebase.

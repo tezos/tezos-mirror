@@ -19,5 +19,6 @@ txs.push(create.tx)
 txs.push(utils.send(player1, create.addr, 0, getSelector1))
 txs.push(utils.send(player1, create.addr, 0, getSelector2))
 
+let mode = utils.bench_args(process.argv);
 
-utils.print_bench([txs])
+utils.print_bench([txs], mode)

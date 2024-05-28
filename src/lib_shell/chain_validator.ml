@@ -556,14 +556,27 @@ let on_notify_branch w peer_id locator =
       Peer_validator.notify_branch pv locator ;
       return_ok_unit)
 
-let on_notify_head w peer_id (hash, header) mempool =
+let on_notify_head w peer_id (block_hash, header) mempool =
   let open Lwt_syntax in
   let nv = Worker.state w in
-  let* () = check_and_update_synchronisation_state w (hash, header) peer_id in
+  let* () =
+    check_and_update_synchronisation_state w (block_hash, header) peer_id
+  in
+  let* current_head = Store.Chain.current_head nv.parameters.chain_store in
   let* (r : (_, Empty.t) result) =
-    with_activated_peer_validator w peer_id (fun pv ->
-        Peer_validator.notify_head pv hash header ;
-        return_ok_unit)
+    (* To minimize unnecessary calls to notify_head, we do nothing
+       when the received block is actually the current head or it's
+       predecessor. *)
+    if
+      not
+        Block_hash.(
+          Store.Block.hash current_head = block_hash
+          || Store.Block.predecessor current_head = block_hash)
+    then
+      with_activated_peer_validator w peer_id (fun pv ->
+          Peer_validator.notify_head pv block_hash header ;
+          return_ok_unit)
+    else return_ok_unit
   in
   match r with
   | Ok () -> (
@@ -1004,7 +1017,7 @@ let validate_block w ?force hash block operations =
   let* () = assert_fitness_increases ?force w block in
   let* () = assert_checkpoint w (hash, block.Block_header.shell.level) in
   let*! v =
-    Block_validator.validate
+    Block_validator.precheck_and_apply
       ~canceler:(Worker.canceler w)
       ~notify_new_block:(notify_new_block w None)
       ~precheck_and_notify:true
@@ -1016,7 +1029,7 @@ let validate_block w ?force hash block operations =
   in
   match v with
   | Valid -> return_unit
-  | Invalid errs | Invalid_after_precheck errs -> Lwt.return_error errs
+  | Invalid errs | Unapplicable_after_precheck errs -> Lwt.return_error errs
 
 let bootstrapped w =
   let state = Worker.state w in

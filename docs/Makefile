@@ -15,16 +15,16 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = nairobi oxford
+NAMED_PROTOS  = oxford paris
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-nairobi_long  = PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
+paris_long    = PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ
 oxford_long   = ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-nairobi_short = PtNairob
+paris_short   = PtParisB
 oxford_short  = Proxford
 alpha_short   = alpha
 
@@ -42,6 +42,10 @@ full: odoc
 	# Same ordering constraint: html *after* odoc (see target "all")
 	${MAKE} html
 
+# Build html without odoc (if odoc already ran or if not checking custom roles)
+html: octez-gen docexes-gen
+	${MAKE} sphinx
+
 # Build the manuals for a given protocol
 %/octez-client.html:
 	@../octez-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
@@ -51,15 +55,12 @@ full: odoc
 	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-smart-rollup-node.html:
 	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/octez-smart-rollup-client.html:
-	@../octez-smart-rollup-client-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
 	 $(PROTOCOLS:%=%/octez-accuser.html) \
-	 $(PROTOCOLS:%=%/octez-smart-rollup-node.html) \
-	 $(PROTOCOLS:%=%/octez-smart-rollup-client.html)
+	 $(PROTOCOLS:%=%/octez-smart-rollup-node.html)
 	# generic
 	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
 	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
@@ -68,37 +69,44 @@ manuals: \
 	@ ../octez-dac-node man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-node.html
 	@ ../octez-dac-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-client.html
 	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
-		./scripts/man2txt.py > api/octez-node.txt
+		./scripts/man2txt.py -r > api/octez-node.txt
 	@../octez-proxy-server --help | grep -v '^Octez-proxy-server' | grep -v 'OCTEZ-PROXY-SERVER(1)' | \
-		./scripts/man2txt.py > api/octez-proxy-server.txt
+		./scripts/man2txt.py -r > api/octez-proxy-server.txt
 	@../octez-smart-rollup-node man -verbosity 3 -format html | \
 		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
+	@../octez-dal-node --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
+		./scripts/man2txt.py -r > api/octez-dal-node.txt
+	@../octez-dal-node config init --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
+		./scripts/man2txt.py > api/octez-dal-node-config-init.txt
 
 .PHONY: odoc
 odoc:
 	cd $$(pwd)/.. ; dune build @doc >docs/odoc.log 2>&1; \
-	  RESULT=$$?; (grep '^Error:' docs/odoc.log || true); exit $$RESULT
+	  RESULT=$$?; (grep -B1 '^Error:' docs/odoc.log || true); exit $$RESULT
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
+	@rm -rf $(CURDIR)/_build/api/odoc/_odocls
 
 odoc-lite:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
-	rsync --recursive --links --perms \
-		../scripts ../script-inputs ../src ../tezt ../vendors ../dune ../dune-project ../dune-workspace $(TMPDOCDIR)/
+	rsync --recursive --links --perms --exclude=target \
+		../scripts ../script-inputs ../src ../tezt ../irmin ../vendors ../dune ../dune-project ../dune-workspace $(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/remove-old-protocols.sh
 	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in $(TMPDOCDIR)/odoc.log"
 	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(TMPDOCDIR)/odoc.log 2>&1; \
 		RESULT=$$?; \
-		(grep '^Error:' $(TMPDOCDIR)/odoc.log || true) ; \
+		(grep -B1 '^Error:' $(TMPDOCDIR)/odoc.log || true) ; \
 		exit $$RESULT
 	rm -rf $(CURDIR)/_build/api/odoc
 	mkdir -p $(CURDIR)/_build/api
 	cp -r $(TOPBUILDDIR_ABS)/default/_doc $(CURDIR)/_build/api/odoc
+	rm -rf $(CURDIR)/_build/api/odoc/_odocls
 
 .PHONY: linkcheck
-linkcheck: html
+# Run this after make html
+linkcheck:
 	@echo "Running linkcheck, outputs messages to $(BUILDDIR)/output.txt"
 	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
 		RESULT=$$?; cat $(BUILDDIR)/output.txt; exit $$RESULT
@@ -108,15 +116,16 @@ fixlinkcheck:
 	@scripts/update_links.sh
 
 .PHONY: redirectcheck
-redirectcheck: html
+# Run this after make html
+redirectcheck:
 	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
 
 # xrefs should be checked:
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) nairobi
-	$(CHECKXREFS) -l oxford
+	$(CHECKXREFS) paris
+	$(CHECKXREFS) oxford
 	$(CHECKXREFS) -l alpha
 
 installcheck:
@@ -132,6 +141,7 @@ installcheck:
 	scripts/test_install_scripts.sh install-opam-focal
 	scripts/test_install_scripts.sh compile-release-sources-bullseye
 	scripts/test_install_scripts.sh compile-sources-bullseye
+	scripts/test_install_scripts.sh compile-sources-mantic
 
 # build dune targets together to avoid concurrent dunes
 docexes:
@@ -172,20 +182,24 @@ install-dependencies:
 user/node-config.json: user/node-config.sh
 	cd ..; ./docs/user/node-config.sh >docs/$@
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: api/errors.rst developer/metrics.csv user/node-config.json \
-		rpc p2p manuals install-dependencies
+# Pages generated by running Octez binaries
+octez-gen: developer/metrics.csv user/node-config.json manuals
+
+# Pages generated by the generators under docs/doc_gen/
+docexes-gen: api/errors.rst p2p rpc
+
+# Run Sphinx, assuming all generated pages have been built previously
+sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/nairobi" || true
+	@ln -s active "$(BUILDDIR)/oxford" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
 # In pylint, we ignore the following additional errors:
 # - C0330: pylint is wrong (https://github.com/psf/black/issues/48)
 PYLINTRC?=../.pylintrc
-PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint --disable C0330
+PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint
 
 # pycodestyle does not support pyproject.toml configuration for now
 # https://github.com/PyCQA/pydocstyle/issues/447
@@ -238,4 +252,4 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt nairobi/octez-*.html oxford/octez-*.html alpha/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt oxford/octez-*.html paris/octez-*.html alpha/octez-*.html

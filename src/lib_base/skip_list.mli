@@ -203,7 +203,13 @@ module type S = sig
      minimal from [cell] to [upper=Some up]. By minimality, the path
      is logarithmic. Consequently, since there is a direct pointer
      from [up] to [lower], the passe to [lower] is also
-     logarithmic. *)
+     logarithmic.
+
+     If a target cell [target_cell] exists, i.e. there is a cell such
+     that [compare target_cell = 0], then it is not necessary for
+     [deref] to return [Some cell] for all [cell] such that [compare
+     cell < 0]. If a [target_cell] does not exist, the lowest bound
+     for which [deref] must return [Some cell] is unknown. *)
     val search :
       deref:('ptr -> ('content, 'ptr) cell option result) ->
       compare:('content -> int) ->

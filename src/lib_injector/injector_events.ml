@@ -44,6 +44,7 @@ module Make
           ~msg:"[Warning] (ignored) in monitoring: {error}"
           ~level:Warning
           ("error", trace_encoding)
+          ~pp1:pp_print_trace
 
       let pp_key_alias =
         Format.(
@@ -154,7 +155,7 @@ module Make
         Format.fprintf
           ppf
           "@[%a@]"
-          (Format.pp_print_list Inj_operation.Hash.pp)
+          (Format.pp_print_list Inj_operation.Id.pp)
           operations
 
       let number_of_operations_in_queue =
@@ -163,7 +164,7 @@ module Make
           ~msg:
             "Injector's queue: there is currently {number_of_operations} \
              operations waiting to be injected"
-          ~level:Debug
+          ~level:Info
           ("number_of_operations", Data_encoding.int31)
 
       let considered_operations_info =
@@ -182,7 +183,7 @@ module Make
           ~msg:
             "Dropping operations: the following operations are dropped \
              {operations}"
-          ~level:Debug
+          ~level:Info
           ("operations", Data_encoding.list Operation.encoding)
           ~pp1:(pp_operations_list ~numbered:false)
 
@@ -190,7 +191,7 @@ module Make
         declare_2
           ~name:"simulating_operations"
           ~msg:"Simulating operations (force = {force}): {operations}"
-          ~level:Debug
+          ~level:Info
           ("operations", Data_encoding.list Operation.encoding)
           ("force", Data_encoding.bool)
           ~pp1:(pp_operations_list ~numbered:true)
@@ -240,14 +241,14 @@ module Make
         declare_1
           ~name:"total_injected_ops"
           ~msg:"Total {nb} operations injected in the last round"
-          ~level:Debug
+          ~level:Info
           ("nb", Data_encoding.int31)
 
       let add_pending =
         declare_1
           ~name:"add_pending"
           ~msg:"Add {operation} to pending"
-          ~level:Debug
+          ~level:Info
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
 
@@ -266,15 +267,15 @@ module Make
           ~level:Info
           ("block", Block_hash.encoding)
           ("level", Data_encoding.int32)
-          ("operations", Data_encoding.list Inj_operation.Hash.encoding)
+          ("operations", Data_encoding.list Inj_operation.Id.encoding)
           ~pp3:pp_operations_hash_list
 
       let revert_operations =
         declare_1
           ~name:"revert_operations"
           ~msg:"Reverting operations: {operations}"
-          ~level:Debug
-          ("operations", Data_encoding.list Inj_operation.Hash.encoding)
+          ~level:Info
+          ("operations", Data_encoding.list Inj_operation.Id.encoding)
           ~pp1:pp_operations_hash_list
 
       let confirmed_level =

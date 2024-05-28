@@ -1,0 +1,4 @@
+code { ADDRESS } ;
+input { Stack_elt (contract nat) "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+output { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+other_contracts { Contract "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" nat }

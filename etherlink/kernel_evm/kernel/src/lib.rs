@@ -1,63 +1,72 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
-use block::ComputationResult;
-use evm_execution::Config;
-use migration::MigrationStatus;
-use primitive_types::U256;
-use storage::{
-    is_sequencer, read_admin, read_base_fee_per_gas, read_chain_id, read_kernel_version,
-    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_ticketer, store_base_fee_per_gas, store_chain_id, store_kernel_version,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
-};
-use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
-
-use tezos_evm_logging::{log, Level::*};
-
-use crate::inbox::KernelUpgrade;
-use crate::migration::storage_migration;
-use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
-
-use crate::blueprint::{fetch, Queue};
+use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
-use crate::upgrade::upgrade_kernel;
-use crate::Error::UpgradeError;
+use crate::migration::storage_migration;
+use crate::stage_one::fetch;
+use crate::storage::read_sequencer_pool_address;
+use anyhow::Context;
+use delayed_inbox::DelayedInbox;
+use evm_execution::Config;
+use fallback_upgrade::fallback_backup_kernel;
+use inbox::StageOneStatus;
+use migration::MigrationStatus;
+use primitive_types::U256;
+use reveal_storage::{is_revealed_storage, reveal_storage};
+use safe_storage::WORLD_STATE_PATH;
+use storage::{
+    read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
+    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
+    read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
+    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+};
+use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::block::BlockFees;
+use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_entrypoint::kernel_entry;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 mod apply;
 mod block;
 mod block_in_progress;
 mod blueprint;
+mod blueprint_storage;
+mod configuration;
+mod delayed_inbox;
 mod error;
+mod event;
+mod fallback_upgrade;
+mod fees;
+mod gas_price;
 mod inbox;
 mod indexable_storage;
+mod internal_storage;
+mod linked_list;
 mod migration;
 mod mock_internal;
 mod parsing;
+mod reveal_storage;
 mod safe_storage;
 mod sequencer_blueprint;
 mod simulation;
+mod stage_one;
 mod storage;
 mod tick_model;
 mod upgrade;
 
+extern crate alloc;
+
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
 pub const CHAIN_ID: u32 = 1337;
-
-// Minimal base fee per gas
-pub const BASE_FEE_PER_GAS: u32 = 21_000;
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::shanghai();
@@ -65,7 +74,7 @@ pub const CONFIG: Config = Config::shanghai();
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
-    log!(host, Info, "Entering stage zero.");
+    log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
     storage_migration(host)
 }
@@ -84,109 +93,19 @@ pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
     Timestamp::from(seconds)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
-    is_sequencer: bool,
-) -> Result<Queue, anyhow::Error> {
-    log!(host, Info, "Entering stage one.");
-    log!(
-        host,
-        Info,
-        "Ticketer is {:?}. Administrator is {:?}",
-        ticketer,
-        admin
-    );
+    configuration: &mut Configuration,
+) -> Result<StageOneStatus, anyhow::Error> {
+    log!(host, Debug, "Entering stage one.");
+    log!(host, Debug, "Configuration: {}", configuration);
 
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-    // if rebooted, don't fetch inbox
-    let queue = fetch(host, smart_rollup_address, ticketer, admin, is_sequencer)?;
-
-    for (i, queue_elt) in queue.proposals.iter().enumerate() {
-        match queue_elt {
-            blueprint::QueueElement::Blueprint(b) => log!(
-                host,
-                Info,
-                "Blueprint {} contains {} transactions.",
-                i,
-                b.transactions.len()
-            ),
-            blueprint::QueueElement::BlockInProgress(bip) => log!(
-                host,
-                Info,
-                "Block in progress {} has {} transactions left.",
-                i,
-                bip.queue_length()
-            ),
-        }
-    }
-
-    Ok(queue)
-}
-
-fn produce_and_upgrade<Host: KernelRuntime>(
-    host: &mut Host,
-    queue: Queue,
-    kernel_upgrade: KernelUpgrade,
-    chain_id: U256,
-    base_fee_per_gas: U256,
-) -> Result<(), anyhow::Error> {
-    // Since a kernel upgrade was detected, in case an error is thrown
-    // by the block production, we exceptionally "recover" from it and
-    // still process the kernel upgrade.
-    // In case of a reboot request, the upgrade is delayed.
-    match block::produce(host, queue, chain_id, base_fee_per_gas) {
-        Ok(ComputationResult::RebootNeeded) => Ok(()),
-        Err(e) => {
-            log!(
-            host,
-            Error,
-            "{:?} happened during block production but a kernel upgrade was detected.",
-            e);
-            upgrade(host, kernel_upgrade)
-        }
-        Ok(ComputationResult::Finished) => upgrade(host, kernel_upgrade),
-    }
-}
-
-fn upgrade<Host: Runtime>(
-    host: &mut Host,
-    kernel_upgrade: KernelUpgrade,
-) -> Result<(), anyhow::Error> {
-    // TODO: #5873
-    // reboot before upgrade just in case
-    upgrade_kernel(host, kernel_upgrade.preimage_hash).context("Failed to upgrade kernel")
-}
-
-pub fn stage_two<Host: KernelRuntime>(
-    host: &mut Host,
-    queue: Queue,
-    chain_id: U256,
-    base_fee_per_gas: U256,
-) -> Result<(), anyhow::Error> {
-    log!(host, Info, "Entering stage two.");
-    let kernel_upgrade = queue.kernel_upgrade.clone();
-    if let Some(kernel_upgrade) = kernel_upgrade {
-        produce_and_upgrade(host, queue, kernel_upgrade, chain_id, base_fee_per_gas)
-    } else {
-        block::produce(host, queue, chain_id, base_fee_per_gas).map(|_| ())
-    }
-}
-
-fn retrieve_smart_rollup_address<Host: Runtime>(
-    host: &mut Host,
-) -> Result<[u8; 20], Error> {
-    match read_smart_rollup_address(host) {
-        Ok(smart_rollup_address) => Ok(smart_rollup_address),
-        Err(_) => {
-            let rollup_metadata = Runtime::reveal_metadata(host);
-            let address = rollup_metadata.raw_rollup_address;
-            store_smart_rollup_address(host, &address)?;
-            Ok(address)
-        }
-    }
+    fetch(host, smart_rollup_address, configuration)
 }
 
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
@@ -218,68 +137,130 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
         }
     }
 }
-fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    match read_base_fee_per_gas(host) {
-        Ok(base_fee_per_gas) => Ok(base_fee_per_gas),
-        Err(_) => {
-            let base_fee_per_gas = U256::from(BASE_FEE_PER_GAS);
-            store_base_fee_per_gas(host, base_fee_per_gas)?;
-            Ok(base_fee_per_gas)
-        }
-    }
-}
+fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
+        .unwrap_or_else(|_| crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
 
-pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
-    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-    let queue = if storage::was_rebooted(host)? {
-        // kernel was rebooted
-        log!(
-            host,
-            Info,
-            "Kernel was rebooted. Reboot left: {}\n",
-            host.reboot_left()?
-        );
-        storage::delete_reboot_flag(host)?;
-        log!(host, Info, "Read queue.");
-        storage::read_queue(host)?
-    } else {
-        // first kernel run of the level
-        match stage_zero(host)? {
-            MigrationStatus::None | MigrationStatus::Done => {
-                set_kernel_version(host)?;
-                let smart_rollup_address = retrieve_smart_rollup_address(host)
-                    .context("Failed to retrieve smart rollup address")?;
-                let ticketer = read_ticketer(host);
-                let admin = read_admin(host);
-                let is_sequencer = is_sequencer(host)?;
-                stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
-                    .context("Failed during stage 1")?
-            }
-            MigrationStatus::InProgress => return Ok(()),
+    let base_fee_per_gas = match read_base_fee_per_gas(host) {
+        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
+            base_fee_per_gas
+        }
+        _ => {
+            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+            minimum_base_fee_per_gas
         }
     };
 
-    let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
-    stage_two(host, queue, chain_id, base_fee_per_gas).context("Failed during stage 2")
+    let da_fee = match read_da_fee(host) {
+        Ok(da_fee) => da_fee,
+        Err(_) => {
+            let da_fee = U256::from(fees::DA_FEE_PER_BYTE);
+            store_da_fee(host, da_fee)?;
+            da_fee
+        }
+    };
+
+    let block_fees = BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee);
+
+    Ok(block_fees)
 }
 
-const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
+pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
-const ERRORS_PATH: RefPath = RefPath::assert_from(b"/errors");
+    // We always start by doing the migration if needed.
+    match stage_zero(host) {
+        Ok(MigrationStatus::None) => {
+            // No migration in progress. However as we want to have the kernel
+            // version written in the storage, we check for its existence
+            // at every kernel run.
+            // The alternative is to enforce every new kernels use the
+            // installer configuration to initialize this value.
+            set_kernel_version(host)?;
+        }
+        // If the migration is still in progress or was finished, we abort the
+        // current kernel run.
+        Ok(MigrationStatus::InProgress) => {
+            host.mark_for_reboot()?;
+            return Ok(());
+        }
+        Ok(MigrationStatus::Done) => {
+            // If a migrtion was finished, we update the kernel version
+            // in the storage.
+            set_kernel_version(host)?;
+            host.mark_for_reboot()?;
+            let configuration = fetch_configuration(host);
+            log!(
+                host,
+                Info,
+                "Configuration after migration: {}",
+                configuration
+            );
+            return Ok(());
+        }
+        Err(Error::UpgradeError(Fallback)) => {
+            // If the migration failed we backup to the previous kernel
+            // and force a reboot to reload the kernel.
+            fallback_backup_kernel(host)?;
+            host.mark_for_reboot()?;
+            return Ok(());
+        }
+        Err(err) => return Err(err.into()),
+    };
 
-fn log_error<Host: Runtime>(
-    host: &mut Host,
-    err: &anyhow::Error,
-) -> Result<(), anyhow::Error> {
-    let current_level = storage::read_current_block_number(host).unwrap_or_default();
-    let err_msg = format!("Error during block {}: {:?}", current_level, err);
+    // In the very worst case, we want to be able to upgrade the kernel at
+    // any time. The kernel upgrades are retrieved from the inbox, therefore
+    // we need be able to to always reach the inbox and the kernel upgrade
+    // message.
+    //
+    // Therefore, the code between here and block production is allowed to
+    // fail. It should already not be the case, but we do not want to
+    // take the risk.
 
-    let nb_errors = host.store_count_subkeys(&ERRORS_PATH)?;
-    let raw_error_path: Vec<u8> = format!("/{}", nb_errors + 1).into();
-    let error_path = OwnedPath::try_from(raw_error_path)?;
-    let error_path = concat(&ERRORS_PATH, &error_path)?;
+    // Fetch kernel metadata:
 
-    host.store_write_all(&error_path, err_msg.as_bytes())?;
+    // 1. Fetch the smart rollup address via the host function, it cannot fail.
+    let smart_rollup_address = Runtime::reveal_metadata(host).raw_rollup_address;
+    // 2. Fetch the per mode configuration of the kernel. Returns the default
+    //    configuration if it fails.
+    let mut configuration = fetch_configuration(host);
+    let sequencer_pool_address = read_sequencer_pool_address(host);
+
+    // Run the stage one, this is a no-op if the inbox was already consumed
+    // by another kernel run. This ensures that if the migration does not
+    // consume all reboots. At least one reboot will be used to consume the
+    // inbox.
+    if let StageOneStatus::Reboot =
+        stage_one(host, smart_rollup_address, &mut configuration)
+            .context("Failed during stage 1")?
+    {
+        host.mark_for_reboot()?;
+        return Ok(());
+    };
+
+    let block_fees = retrieve_block_fees(host)?;
+    // Start processing blueprints
+    #[cfg(not(feature = "benchmark-bypass-stage2"))]
+    {
+        log!(host, Debug, "Entering stage two.");
+        if let block::ComputationResult::RebootNeeded = block::produce(
+            host,
+            chain_id,
+            block_fees,
+            &mut configuration,
+            sequencer_pool_address,
+        )
+        .context("Failed during stage 2")?
+        {
+            host.mark_for_reboot()?;
+        }
+    }
+
+    #[cfg(feature = "benchmark-bypass-stage2")]
+    {
+        log!(host, Benchmarking, "Shortcircuiting computation");
+        return Ok(());
+    }
     Ok(())
 }
 
@@ -287,52 +268,42 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
-    let evm_subkeys = host
-        .store_count_subkeys(&EVM_PATH)
-        .expect("The kernel failed to read the number of /evm subkeys");
-    if evm_subkeys == 0 {
-        host.store_write(&EVM_PATH, "Un festival de GADT".as_bytes(), 0)
+
+    let reboot_counter = host
+        .reboot_left()
+        .expect("The kernel failed to get the number of reboot left");
+    if reboot_counter == 1000 {
+        tezos_smart_rollup_debug::debug_msg!(
+            host,
+            "------------------ Kernel Invocation ------------------\n"
+        )
+    }
+
+    let world_state_subkeys = host
+        .store_count_subkeys(&WORLD_STATE_PATH)
+        .expect("The kernel failed to read the number of /evm/world_state subkeys");
+
+    if world_state_subkeys == 0 {
+        host.store_write(&WORLD_STATE_PATH, "Un festival de GADT".as_bytes(), 0)
             .unwrap();
     }
 
-    host.store_copy(&EVM_PATH, &TMP_PATH)
-        .expect("The kernel failed to create the temporary directory");
+    if is_revealed_storage(host) {
+        reveal_storage(
+            host,
+            option_env!("EVM_SEQUENCER").map(|s| {
+                PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
+            }),
+            option_env!("EVM_ADMIN").map(|s| {
+                ContractKt1Hash::from_base58_check(s).expect("Failed parsing EVM_ADMIN")
+            }),
+        );
+    }
 
-    let mut internal_storage = InternalStorage();
-    let mut host = SafeStorage {
-        host,
-        internal: &mut internal_storage,
-    };
-    match main(&mut host) {
-        Ok(()) => {
-            host.promote_upgrade()
-                .expect("Potential kernel upgrade promotion failed");
-            host.promote(&EVM_PATH)
-                .expect("The kernel failed to promote the temporary directory")
-        }
-        Err(e) => {
-            if let Some(UpgradeError(Fallback)) = e.downcast_ref::<Error>() {
-                // All the changes from the failed migration are reverted.
-                host.revert()
-                    .expect("The kernel failed to delete the temporary directory");
-                host.fallback_backup_kernel()
-                    .expect("Fallback mechanism failed");
-            } else {
-                log_error(host.host, &e).expect("The kernel failed to write the error");
-                log!(host, Error, "The kernel produced an error: {:?}", e);
-                log!(
-                    host,
-                    Error,
-                    "The temporarily modified durable storage is discarded"
-                );
-
-                // TODO: https://gitlab.com/tezos/tezos/-/issues/5766
-                // If an input is consumed then an error happens, the input
-                // will be lost, this cannot happen in production.
-
-                host.revert()
-                    .expect("The kernel failed to delete the temporary directory")
-            }
+    match main(host) {
+        Ok(()) => (),
+        Err(err) => {
+            log!(host, Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }
@@ -341,30 +312,43 @@ kernel_entry!(kernel_loop);
 
 #[cfg(test)]
 mod tests {
-    use std::{ops::Rem, str::FromStr};
+    use std::str::FromStr;
 
-    use crate::mock_internal::MockInternal;
-    use crate::safe_storage::{KernelRuntime, SafeStorage};
+    use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::configuration::Configuration;
+    use crate::fees;
     use crate::{
-        blueprint::{Blueprint, Queue, QueueElement},
-        inbox::{KernelUpgrade, Transaction, TransactionContent},
-        stage_two, storage,
+        blueprint::Blueprint,
+        inbox::{Transaction, TransactionContent},
+        storage,
+        upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
     use primitive_types::{H160, U256};
+    use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::{
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
     };
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
-    const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
-    const TOO_MANY_TRANSACTIONS: u64 = 500;
+    const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
+    const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
-    fn set_balance<Host: KernelRuntime>(
+    fn dummy_block_fees() -> BlockFees {
+        BlockFees::new(
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            DUMMY_DA_FEE.into(),
+        )
+    }
+
+    fn set_balance<Host: Runtime>(
         host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
@@ -385,39 +369,6 @@ mod tests {
         }
     }
 
-    fn address_from_str(s: &str) -> Option<H160> {
-        let data = &hex::decode(s).unwrap();
-        Some(H160::from_slice(data))
-    }
-
-    fn dummy_eth(nonce: u64) -> EthereumTransactionCommon {
-        let nonce = U256::from(nonce);
-        let gas_price = U256::from(40000000000u64);
-        let gas_limit = 21000;
-        let value = U256::from(1);
-        let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
-        let tx = EthereumTransactionCommon {
-            type_: TransactionType::Legacy,
-            chain_id: U256::one(),
-            nonce,
-            max_fee_per_gas: gas_price,
-            max_priority_fee_per_gas: gas_price,
-            gas_limit,
-            to,
-            value,
-            data: vec![],
-            access_list: vec![],
-            signature: None,
-        };
-
-        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
-        tx.sign_transaction(
-            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
-                .to_string(),
-        )
-        .unwrap()
-    }
-
     fn hash_from_nonce(nonce: u64) -> TransactionHash {
         let nonce = u64::to_le_bytes(nonce);
         let mut hash = [0; 32];
@@ -425,38 +376,84 @@ mod tests {
         hash
     }
 
-    fn dummy_transaction(nonce: u64) -> Transaction {
+    fn wrap_transaction(nonce: u64, tx: EthereumTransactionCommon) -> Transaction {
         Transaction {
             tx_hash: hash_from_nonce(nonce),
-            content: TransactionContent::Ethereum(dummy_eth(nonce)),
+            content: TransactionContent::Ethereum(tx),
         }
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
-        QueueElement::Blueprint(Blueprint {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
+        Blueprint {
             transactions,
             timestamp: Timestamp::from(0i64),
-        })
+        }
+    }
+
+    const CREATE_LOOP_DATA: &str = "608060405234801561001057600080fd5b506101d0806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80630b7d796e14610030575b600080fd5b61004a600480360381019061004591906100c2565b61004c565b005b60005b81811015610083576001600080828254610069919061011e565b92505081905550808061007b90610152565b91505061004f565b5050565b600080fd5b6000819050919050565b61009f8161008c565b81146100aa57600080fd5b50565b6000813590506100bc81610096565b92915050565b6000602082840312156100d8576100d7610087565b5b60006100e6848285016100ad565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006101298261008c565b91506101348361008c565b925082820190508082111561014c5761014b6100ef565b5b92915050565b600061015d8261008c565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361018f5761018e6100ef565b5b60018201905091905056fea26469706673582212200cd6584173dbec22eba4ce6cc7cc4e702e00e018d340f84fc0ff197faf980ad264736f6c63430008150033";
+
+    const LOOP_1300: &str =
+        "0b7d796e0000000000000000000000000000000000000000000000000000000000000514";
+
+    const LOOP_4600: &str =
+        "0b7d796e00000000000000000000000000000000000000000000000000000000000011f8";
+
+    const TEST_SK: &str =
+        "84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502";
+
+    const TEST_ADDR: &str = "f0affc80a5f69f4a9a3ee01a640873b6ba53e539";
+
+    fn create_and_sign_transaction(
+        data: &str,
+        nonce: u64,
+        gas_limit: u64,
+        to: Option<H160>,
+        secret_key: &str,
+    ) -> EthereumTransactionCommon {
+        let data = hex::decode(data).unwrap();
+
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
+        let gas_for_fees =
+            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[])
+                .unwrap();
+
+        let unsigned_tx = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(DUMMY_CHAIN_ID),
+            nonce,
+            gas_price,
+            gas_price,
+            gas_limit + gas_for_fees,
+            to,
+            U256::zero(),
+            data,
+            vec![],
+            None,
+        );
+        unsigned_tx
+            .sign_transaction(String::from(secret_key))
+            .unwrap()
     }
 
     #[test]
     fn test_reboot_during_block_production() {
         // init host
-        let mut mock_host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = SafeStorage {
-            host: &mut mock_host,
-            internal: &mut internal,
-        };
+        let mut host = MockHost::default();
+
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&mut host).is_err(),
+            storage::read_current_block_number(&host).is_err(),
             "Should not have found current block number"
         );
 
         //provision sender account
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
         set_balance(
@@ -466,45 +463,116 @@ mod tests {
             sender_initial_balance,
         );
 
-        let mut transactions = vec![];
-        let mut proposals = vec![];
-        for n in 0..TOO_MANY_TRANSACTIONS {
-            transactions.push(dummy_transaction(n));
-            if n.rem(80) == 0 {
-                proposals.push(blueprint(transactions));
-                transactions = vec![];
-            }
+        // These transactions are generated with the loop.sol contract, which are:
+        // - create the contract
+        // - call `loop(1200)`
+        // - call `loop(4600)`
+        let create_transaction =
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
+        let loop_addr: H160 =
+            evm_execution::utilities::create_address_legacy(&sender, &0);
+        let loop_1200_tx =
+            create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
+        let loop_4600_tx = create_and_sign_transaction(
+            LOOP_4600,
+            2,
+            2_600_000,
+            Some(loop_addr),
+            TEST_SK,
+        );
+
+        let proposals = vec![
+            blueprint(vec![wrap_transaction(0, create_transaction)]),
+            blueprint(vec![
+                wrap_transaction(1, loop_1200_tx),
+                wrap_transaction(2, loop_4600_tx),
+            ]),
+        ];
+        // Store blueprints
+        for (i, blueprint) in proposals.into_iter().enumerate() {
+            store_inbox_blueprint_by_number(&mut host, blueprint, U256::from(i))
+                .expect("Should have stored blueprint");
         }
         // the upgrade mechanism should not start otherwise it will fail
         let broken_kernel_upgrade = KernelUpgrade {
             preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
+            activation_timestamp: Timestamp::from(1_000_000i64),
         };
-        let queue = Queue {
-            proposals,
-            kernel_upgrade: Some(broken_kernel_upgrade),
-        };
+        crate::upgrade::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
+            .expect("Should be able to store kernel upgrade");
+
+        let block_fees = dummy_block_fees();
 
         // If the upgrade is started, it should raise an error
-        stage_two(
+        let computation_result = crate::block::produce(
             &mut host,
-            queue,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            block_fees,
+            &mut Configuration::default(),
+            None,
         )
         .expect("Should have produced");
 
         // test there is a new block
-        assert!(
-            storage::read_current_block_number(&mut host)
-                .expect("should have found a block number")
-                > U256::zero(),
-            "There should have been multiple blocks registered"
+        assert_eq!(
+            storage::read_current_block_number(&host)
+                .expect("should have found a block number"),
+            U256::zero(),
+            "There should have been a block registered"
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
+        matches!(
+            computation_result,
+            crate::block::ComputationResult::RebootNeeded
         );
+    }
+
+    #[test]
+    fn load_block_fees_new() {
+        // Arrange
+        let mut host = MockHost::default();
+
+        // Act
+        let result = crate::retrieve_block_fees(&mut host);
+
+        // Assert
+        let expected = BlockFees::new(
+            fees::MINIMUM_BASE_FEE_PER_GAS.into(),
+            fees::MINIMUM_BASE_FEE_PER_GAS.into(),
+            fees::DA_FEE_PER_BYTE.into(),
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
+    }
+
+    #[test]
+    fn load_block_fees_with_minimum() {
+        let min_path =
+            RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas")
+                .into();
+
+        // Arrange
+        let mut host = MockHost::default();
+
+        let min_base_fee = U256::from(17);
+        let curr_base_fee = U256::from(20);
+        storage::store_base_fee_per_gas(&mut host, curr_base_fee).unwrap();
+        storage::write_u256(&mut host, &min_path, min_base_fee).unwrap();
+
+        // Act
+        let result = crate::retrieve_block_fees(&mut host);
+        let base_fee = storage::read_base_fee_per_gas(&mut host);
+
+        // Assert
+        let expected =
+            BlockFees::new(min_base_fee, curr_base_fee, fees::DA_FEE_PER_BYTE.into());
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
+
+        assert!(base_fee.is_ok());
+        assert_eq!(curr_base_fee, base_fee.unwrap());
     }
 }

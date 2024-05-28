@@ -1,0 +1,603 @@
+[
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - multiple keys set for batcher",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "batcher",
+      "client",
+      "etherlink",
+      "flaky",
+      "mode",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "35345443",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - maintenance of inbox in the rollup node (batcher)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "batcher",
+      "client",
+      "etherlink",
+      "flaky",
+      "inbox",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "65367524",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - garbage collection is triggered and finishes correctly (full) (many_gc)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "flaky",
+      "full",
+      "gc",
+      "many_gc",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "19331452",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - garbage collection is triggered and finishes correctly (full) (sparse_gc)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "flaky",
+      "full",
+      "gc",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node",
+      "sparse_gc",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "33881767",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "47686425",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "50781694",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "47063335",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "49742990",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
+    "tags": [
+      "admin_client",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "nairobi",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "47651539",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
+    "tags": [
+      "admin_client",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "nairobi",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "51357892",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
+    "tags": [
+      "admin_client",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "nairobi",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "47623735",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup_migration.ml",
+    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
+    "tags": [
+      "admin_client",
+      "client",
+      "etherlink",
+      "flaky",
+      "l2",
+      "migration",
+      "nairobi",
+      "node",
+      "oxford",
+      "refutation",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "48964707",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: check synchronization state",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "memory_3k",
+      "nairobi",
+      "node",
+      "sync",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "16300750",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: check synchronization state",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "memory_3k",
+      "node",
+      "oxford",
+      "sync",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "16649691",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: check synchronization state",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "memory_3k",
+      "node",
+      "sync",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "36087916",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: bootstrap: test threshold zero",
+    "tags": [
+      "admin_client",
+      "baker_ptnairob",
+      "bootstrap",
+      "client",
+      "flaky",
+      "nairobi",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "4423985",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: bootstrap: test threshold zero",
+    "tags": [
+      "admin_client",
+      "baker_proxford",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "oxford",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "4340126",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: test threshold zero",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "4356465",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: bootstrap: test threshold two",
+    "tags": [
+      "admin_client",
+      "baker_ptnairob",
+      "bootstrap",
+      "client",
+      "flaky",
+      "nairobi",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "16726823",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: bootstrap: test threshold two",
+    "tags": [
+      "admin_client",
+      "baker_proxford",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "oxford",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "16072740",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: test threshold two",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "16971438",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: bootstrap: test threshold stuck",
+    "tags": [
+      "admin_client",
+      "baker_ptnairob",
+      "bootstrap",
+      "client",
+      "flaky",
+      "nairobi",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "20761409",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: bootstrap: test threshold stuck",
+    "tags": [
+      "admin_client",
+      "baker_proxford",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "oxford",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "18520874",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: test threshold stuck",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "19775274",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: bootstrap: test threshold split view",
+    "tags": [
+      "admin_client",
+      "baker_ptnairob",
+      "bootstrap",
+      "client",
+      "flaky",
+      "nairobi",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "17401455",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: bootstrap: test threshold split view",
+    "tags": [
+      "admin_client",
+      "baker_proxford",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "oxford",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "18025475",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: test threshold split view",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "17944831",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: Check prevalidator start",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "nairobi",
+      "node",
+      "prevalidator",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "65048227",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: Check prevalidator start",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "oxford",
+      "prevalidator",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "65141501",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: Check prevalidator start",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "node",
+      "prevalidator",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "64804489",
+      "count": "1"
+    }
+  }
+]

@@ -1,0 +1,3 @@
+code { GT } ;
+input { Stack_elt string "42" } ;
+output (StaticError _) ;

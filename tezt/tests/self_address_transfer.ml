@@ -38,6 +38,7 @@ let test_self_address_transfer =
     ~__FILE__
     ~title:"Self address transfer"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _alias, send_contract_hash =

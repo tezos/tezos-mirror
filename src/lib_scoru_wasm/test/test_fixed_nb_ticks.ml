@@ -142,7 +142,11 @@ let test_stuck_in_init_kernel ~version () =
     Z.(succ (sub info.current_tick previous_max_nb_ticks))
   in
   let*! tree = Wasm.Internal_for_tests.set_max_nb_ticks new_max_nb_ticks tree in
-  let*! tree = Wasm.compute_step tree in
+  let*! tree =
+    Wasm.compute_step
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      tree
+  in
 
   (* Check is_stuck and current tick *)
   let*! info = Wasm.get_info tree in

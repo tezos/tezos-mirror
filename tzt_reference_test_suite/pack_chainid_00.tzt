@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt chain_id "NetXyuzvDo2Ugzb" } ;
+output { Stack_elt bytes 0x050a00000004f49af95b } ;

@@ -42,7 +42,8 @@ val get_global_smart_rollup_address : unit -> string RPC_core.t
 val get_global_block : ?block:string -> unit -> JSON.t RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
-val get_global_block_inbox : ?block:string -> unit -> JSON.t RPC_core.t
+val get_global_block_inbox :
+  ?block:string -> unit -> RPC.smart_rollup_inbox RPC_core.t
 
 (** RPC: [GET global/block/<block>/hash]. *)
 val get_global_block_hash : ?block:string -> unit -> JSON.t RPC_core.t
@@ -66,15 +67,15 @@ type slot_header = {level : int; commitment : string; index : int}
 val get_global_block_dal_slot_headers :
   ?block:string -> unit -> slot_header list RPC_core.t
 
-(** RPC: [GET local/batcher/queue] returns the queue of messages, as pairs of message
-    hash and binary message, in the batcher. *)
+(** RPC: [GET local/batcher/queue] returns the queue of messages, as pairs of
+    message id and binary message, in the batcher. *)
 val get_local_batcher_queue : unit -> (string * string) list RPC_core.t
 
-(** RPC: [GET local/batcher/queue/<msg_hash>] fetches the message whose hash is [hash]
-    from the queue. It returns the message together with the full JSON response
-    including the status.*)
-val get_local_batcher_queue_msg_hash :
-  msg_hash:string -> (string * string) RPC_core.t
+(** RPC: [GET local/batcher/queue/<msg_id>] fetches the message whose id is
+    [msg_id] from the queue. It returns the message together with the full JSON
+    response including the status.*)
+val get_local_batcher_queue_msg_id :
+  msg_id:string -> (string * string) RPC_core.t
 
 type simulation_result = {
   state_hash : string;
@@ -104,14 +105,10 @@ val post_global_block_simulate :
 val get_global_block_dal_processed_slots :
   ?block:string -> unit -> (int * string) list RPC_core.t
 
-type commitment = {
-  compressed_state : string;
-  inbox_level : int;
-  predecessor : string;
-  number_of_ticks : int;
+type commitment_and_hash = {
+  commitment : RPC.smart_rollup_commitment;
+  hash : string;
 }
-
-type commitment_and_hash = {commitment : commitment; hash : string}
 
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
@@ -119,30 +116,25 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-(** [commitment_from_json] parses a commitment from its JSON representation. *)
-val commitment_from_json : JSON.t -> commitment option
-
 (** [commitment_info_from_json] parses a commitment, its hash and
     the levels when the commitment was first published (if any) and included,
     from the JSON representation. *)
-val commitment_info_from_json : JSON.t -> commitment_info option
+val commitment_info_from_json : JSON.t -> commitment_info
 
 (** RPC: [GET global/last_stored_commitment] gets the last commitment with its hash
     stored by the rollup node.  *)
-val get_global_last_stored_commitment :
-  unit -> commitment_and_hash option RPC_core.t
+val get_global_last_stored_commitment : unit -> commitment_and_hash RPC_core.t
 
 (** RPC: [GET local/last_published_commitment] gets the last commitment published by the
     rollup node, with its hash and level when the commitment was first published
     and the level it was included. *)
-val get_local_last_published_commitment :
-  unit -> commitment_info option RPC_core.t
+val get_local_last_published_commitment : unit -> commitment_info RPC_core.t
 
 (** RPC: [GET local/commitments] gets commitment by its [hash] from the rollup node,
     with its hash and level when the commitment was first published and the
     level it was included. *)
 val get_local_commitments :
-  commitment_hash:string -> unit -> commitment_info option RPC_core.t
+  commitment_hash:string -> unit -> commitment_info RPC_core.t
 
 type gc_info = {last_gc_level : int; first_available_level : int}
 
@@ -153,3 +145,34 @@ val get_local_gc_info : unit -> gc_info RPC_core.t
     mapped to [key] for the [block] (default ["head"]). *)
 val get_global_block_state :
   ?block:string -> key:string -> unit -> bytes RPC_core.t
+
+type 'output_type durable_state_operation =
+  | Value : string option durable_state_operation
+  | Length : int64 option durable_state_operation
+  | Subkeys : string list durable_state_operation
+
+(** RPC: [GET global/block/<block>/durable/<pvm_kind>/<operation>] gets the
+    corresponding durable PVM state information (depending on [operation]) mapped to [key] for the [block]
+    (default ["head"]). *)
+val get_global_block_durable_state_value :
+  ?block:string ->
+  pvm_kind:string ->
+  operation:'a durable_state_operation ->
+  key:string ->
+  unit ->
+  'a RPC_core.t
+
+(** RPC: [POST local/batcher/injection] injects the [messages] in the queue the rollup
+    node's batcher and returns the list of message hashes injected. *)
+val post_local_batcher_injection :
+  messages:string list -> string list RPC_core.t
+
+type outbox_proof = {commitment_hash : string; proof : string}
+
+(** RPC: [GET global/block/<block>/helpers/proofs/outbox/<outbox_level>/messages] *)
+val outbox_proof_simple :
+  ?block:string ->
+  outbox_level:int ->
+  message_index:int ->
+  unit ->
+  outbox_proof option RPC_core.t

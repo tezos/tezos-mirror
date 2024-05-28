@@ -168,11 +168,15 @@ let register () =
     ~__FILE__
     ~title:"config init"
     ~tags:["config"; "init"]
+    ~uses_client:false
+    ~uses_admin_client:false
     test_config_init ;
   Test.register
     ~__FILE__
     ~title:"config update"
     ~tags:["config"; "update"]
+    ~uses_client:false
+    ~uses_admin_client:false
     test_config_update ;
   Test.register
     ~__FILE__
@@ -183,11 +187,15 @@ let register () =
     ~__FILE__
     ~title:"config reset"
     ~tags:["config"; "reset"]
+    ~uses_client:false
+    ~uses_admin_client:false
     test_config_reset ;
   Test.register
     ~__FILE__
     ~title:"config reset consistency"
     ~tags:["config"; "reset"]
+    ~uses_client:false
+    ~uses_admin_client:false
     test_config_reset_consistency ;
   Test.register
     ~__FILE__

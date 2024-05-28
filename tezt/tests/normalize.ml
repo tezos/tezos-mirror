@@ -40,6 +40,7 @@ let test_normalize_unparsing_mode =
     ~__FILE__
     ~title:"Test normalize in unparsing mode"
     ~tags:["client"; "normalize"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data = "{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}" in
@@ -57,6 +58,7 @@ let test_normalize_legacy_flag =
     ~__FILE__
     ~title:"Test normalize with legacy flag"
     ~tags:["client"; "normalize"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data = "{Elt %a 0 1}" in
@@ -76,6 +78,7 @@ let test_normalize_stack =
     ~__FILE__
     ~title:"Test Michelson stack normalization"
     ~tags:["client"; "normalize"]
+    ~uses_node:false
     ~supports:(From_protocol 17)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -129,6 +132,7 @@ let test_normalize_script =
     ~__FILE__
     ~title:"Test normalize script"
     ~tags:["client"; "normalize"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script =
@@ -147,6 +151,7 @@ let test_normalize_type =
     ~__FILE__
     ~title:"Test normalize type"
     ~tags:["client"; "normalize"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =

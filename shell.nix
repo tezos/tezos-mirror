@@ -24,6 +24,9 @@ let
 
       # Cross-compilation for RISC-V
       sources.riscv64Pkgs.clangStdenv.cc
+
+      # Formatter/LSP for Cargo manifests (and TOML in general)
+      pkgs.taplo
     ]
     ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
 
@@ -105,6 +108,7 @@ in
         cacert
         curl
         shellcheck
+        shfmt
         poetry
         kaitai-struct-compiler
         devPackageSet.ocaml-lsp-server

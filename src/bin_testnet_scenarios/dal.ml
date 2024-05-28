@@ -70,7 +70,7 @@ let publish_slot dal_node client source ~slot_size ~level ~slot_index =
       ~force:true
       [
         make ~source
-        @@ dal_publish_slot_header
+        @@ dal_publish_commitment
              ~index:slot_index
              ~commitment:commitment_hash
              ~proof;
@@ -194,15 +194,15 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
     (List.length attestations) ;
   return (num_published, num_attested)
 
-(* This scenario starts a L1 node and a DAL node on the given testnet (Dailynet
-   or Weeklynet), and it publishes slots for a number of levels and a number of
+(* This scenario starts a L1 node and a DAL node on the given testnet (currently
+   Weeklynet), and it publishes slots for a number of levels and a number of
    slot producers (both given as arguments to the test). At the end of the test,
    the average number of published respectively attested slots are shown (with
    Log.info).
 
    To run the test, one can use:
 
-   dune exec src/bin_testnet_scenarios/main.exe -- dal dailynet simple -a load -a save -a num_accounts=5 -a levels=10 -i
+   dune exec src/bin_testnet_scenarios/main.exe -- dal weeklynet simple -a load -a save -a num_accounts=5 -a levels=10 -i
 
    Use the arguments:
    - `load`: to load an existing data-dir saved (with `save`, see next) in a previous run of the script
@@ -280,10 +280,9 @@ let scenario_without_rollup_node node dal_node client _network_name
 
 let prepare_installer_kernel rollup_node =
   Sc_rollup_helpers.prepare_installer_kernel
-    ~base_installee:"./"
     ~preimages_dir:
       (Filename.concat (Sc_rollup_node.data_dir rollup_node) "wasm_2_0_0")
-    "dal_echo_kernel"
+    Constant.WASM.dal_echo_kernel
 
 (* Originate a rollup with alias [rollup_alias] running the "dal_echo_kernel" on
    the given [rollup_node]. *)
@@ -310,7 +309,7 @@ let originate_rollup client rollup_node rollup_alias =
 
    To run the test, one can use:
 
-   dune exec src/bin_testnet_scenarios/main.exe -- dal dailynet rollup -a load -a save -a num_accounts=5 -a levels=10 -a originate -i
+   dune exec src/bin_testnet_scenarios/main.exe -- dal weeklynet rollup -a load -a save -a num_accounts=5 -a levels=10 -a originate -i
 
    The additional `originate` argument is used to specify whether the rollup
    should be re-originated (if given) or not (if missing).
@@ -364,15 +363,7 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
       let* _boot_sector = prepare_installer_kernel rollup_node in
       unit
   in
-  let* () =
-    Sc_rollup_node.run rollup_node rollup_alias ["--log-kernel-debug"]
-  in
-  let rollup_client =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6531
-       Weeklynet starts with [Protocol.(previous_protocol Alpha)]. *)
-    Sc_rollup_client.create ~protocol:Protocol.Alpha rollup_node
-  in
-
+  let* () = Sc_rollup_node.run rollup_node rollup_alias [Log_kernel_debug] in
   let* first_level =
     let* crt = Node.get_level node in
     crt + 1 |> return
@@ -402,13 +393,14 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
            block. *)
         Sc_rollup_node.wait_for_level rollup_node (queried_level + 1)
       in
-      let*! value =
-        Sc_rollup_client.inspect_durable_state_value
-          rollup_client
-          ~block:(string_of_int queried_level)
-          ~pvm_kind:"wasm_2_0_0"
-          ~operation:Value
-          ~key:"/output/slot-0"
+      let* value =
+        Sc_rollup_node.RPC.call rollup_node
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~block:(string_of_int queried_level)
+             ~pvm_kind:"wasm_2_0_0"
+             ~operation:Value
+             ~key:"/output/slot-0"
+             ()
       in
       (match value with
       | None ->
@@ -543,7 +535,7 @@ let run_scenario network kind scenario =
   Test.register
     ~__FILE__
     ~title:(sf "Produce slots on %s %s" net_name kind_str)
-    ~tags:["dal"; net_name; kind_tag]
+    ~tags:[Tag.tezos2; "dal"; net_name; kind_tag]
   @@ fun () ->
   let load = Cli.get ~default:None (fun _ -> Some (Some ())) "load" in
   let save = Cli.get ~default:None (fun _ -> Some (Some ())) "save" in
@@ -564,7 +556,7 @@ let run_scenario network kind scenario =
   let network_url = Format.sprintf "https://teztnets.com/%s" network_name in
   let network_arg = Node.Network network_url in
   let network_baker =
-    (* a bootstrap delegate for both Dailynet and Weeklynet *)
+    (* a bootstrap delegate for Weeklynet *)
     "tz1foXHgRzdYdaLgX6XhpZGxbBv42LZ6ubvE"
   in
 
@@ -618,7 +610,5 @@ let run_scenario network kind scenario =
   save ~restart:false
 
 let register () =
-  run_scenario Dailynet `Simple scenario_without_rollup_node ;
   run_scenario Weeklynet `Simple scenario_without_rollup_node ;
-  run_scenario Dailynet `With_rollup scenario_with_rollup_node ;
   run_scenario Weeklynet `With_rollup scenario_with_rollup_node

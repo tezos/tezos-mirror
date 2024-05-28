@@ -53,6 +53,8 @@ type t = {
   discovery_addr : string option;
   rpc_listen_addrs : string list;
       (** a list of addresses to listen to RPC requests on *)
+  external_rpc_listen_addrs : string list;
+      (** a list of addresses to listen to RPC requests on *)
   private_mode : bool;
       (** enables the private mode, see
           https://tezos.gitlab.io/user/node-configuration.html#private-node *)
@@ -79,7 +81,7 @@ type t = {
       (** a list of RPC listening addresses for which a full
           access should be granted *)
   media_type : Media_type.Command_line.t;
-  max_active_rpc_connections : int option;
+  max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;

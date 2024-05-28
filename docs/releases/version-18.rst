@@ -30,7 +30,7 @@ v18 also fixes a concurrency issue in the logging infrastructure which can cause
 
 As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_alpha>` for more details.
 
-Version 18.1 fixes an issue that would result in corrupted full and rollup snapshots being exported.
+Version 18.1 fixes an issue that would result in corrupted full and rolling snapshots being exported.
 Thus, the snapshots version is bumped from ``6`` to ``7``.
 Note that snapshots exported by nodes running v18.1 are not retro-compatible. As a result, these cannot be imported by a node running earlier versions of Octez. However, a node running Octez v18.1 can still import v6 (and earlier) snapshots.
 

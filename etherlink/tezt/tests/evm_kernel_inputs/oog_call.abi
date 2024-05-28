@@ -1,0 +1,15 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "address payable",
+				"name": "_to",
+				"type": "address"
+			}
+		],
+		"name": "sendViaCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	}
+]

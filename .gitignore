@@ -49,8 +49,6 @@ __pycache__
 /tezos-smart-rollup-node-*
 /octez-smart-rollup-node*
 /octez-smart-rollup-sequencer-node
-/tezos-smart-rollup-client-*
-/octez-smart-rollup-client-*
 /octez-smart-rollup-wasm-*
 /octez-evm-node
 /tezos-dal-node
@@ -61,7 +59,9 @@ __pycache__
 /octogram
 /simulation-scenario
 /safety-checker
-/risc-v-sandbox
+
+/src/risc_v/risc-v-sandbox
+/src/risc_v/risc-v-dummy.elf
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -72,16 +72,9 @@ __pycache__
 /_coverage_output/*.coverage
 /_coverage_report
 
-contrib/kaitai-struct-files/doc
+client-libs/kaitai-struct-files/doc
 
-*.install
 .merlin
-
-*.deb
-*.rpm
-scripts/pkg-common/baker-binaries
-scripts/pkg-common/smartrollup-binaries
-scripts/pkg-common/client-binaries
 
 *~
 \#*\#
@@ -101,9 +94,6 @@ scripts/pkg-common/client-binaries
 **/.venv
 **/.mypy_cache/
 
-# Output of the update_opam_repo script
-opam_repo.patch
-
 # Rust
 target
 
@@ -111,15 +101,19 @@ evm_kernel.wasm
 evm_installer.wasm
 evm_kernel_unstripped.wasm
 evm-evaluation-assessor
-sequenced_kernel.wasm
 smart-rollup-installer
 _evm_installer_preimages/
 tx_kernel.wasm
 tx_kernel_dal.wasm
 tx-demo-collector
 dal_echo_kernel.wasm
-risc-v-dummy.elf
 sequencer.wasm
+evm_benchmark_kernel.wasm
+evm_unstripped_installer.wasm
+_evm_unstripped_installer_preimages/
+
+# etherlink
+/etherlink/kernels-*
 
 # Terraform
 

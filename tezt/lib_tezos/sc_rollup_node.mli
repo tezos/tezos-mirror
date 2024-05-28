@@ -54,6 +54,27 @@ type mode =
 
 type history_mode = Archive | Full
 
+(** Octez smart rollup node command-line arguments. *)
+type argument =
+  | Data_dir of string
+  | Rpc_addr of string
+  | Rpc_port of int
+  | Log_kernel_debug
+  | Log_kernel_debug_file of string
+  | Metrics_addr of string
+  | Injector_attempts of int
+  | Boot_sector_file of string
+  | Dac_observer of Dac_node.t
+  | Loser_mode of string
+  | No_degraded
+  | Gc_frequency of int
+  | History_mode of history_mode
+  | Dal_node of Dal_node.t
+  | Mode of mode
+  | Rollup of string
+  | Pre_images_endpoint of string
+  | Apply_unsafe_patches
+
 type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Returns the associated {!mode}, fails if the mode is not valid. *)
@@ -87,6 +108,10 @@ val string_of_history_mode : history_mode -> string
     so if you do not call [config_init] or generate the configuration file
     through some other means, your sc node will not listen.
 
+    [history_mode] is [full] by default to make the rollup runs the
+    GC, and the [gc_frequency] is [1] by default to make it runs on
+    every occasion during tests.
+
 *)
 val create :
   ?runner:Runner.t ->
@@ -96,11 +121,18 @@ val create :
   ?data_dir:string ->
   base_dir:string ->
   ?event_pipe:string ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
+  ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
+  ?password_file:string ->
   mode ->
   Node.t ->
   t
@@ -114,11 +146,18 @@ val create_with_endpoint :
   ?data_dir:string ->
   base_dir:string ->
   ?event_pipe:string ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
+  ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
+  ?password_file:string ->
   mode ->
   Client.endpoint ->
   t
@@ -148,6 +187,9 @@ val data_dir : t -> string
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
 
+(** Get the metrics address and port of a node. *)
+val metrics : t -> string * int
+
 val string_of_purpose : purpose -> string
 
 (** Wait until an sc node terminates and check its status.
@@ -161,7 +203,7 @@ val string_of_purpose : purpose -> string
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
 (** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
-    ?gc_frequency ?history_mode ?wait_ready node rollup_address arguments ]
+    ?wait_ready node rollup_address arguments ]
     launches the given smart contract rollup node for the rollup at
     [rollup_address] with the given extra arguments. [event_level] and
     [event_sections_levels] allow to select which events we want the node to
@@ -169,37 +211,19 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
     to use the legacy [run] command of the node (which requires a config file to
     exist). If [wait_ready] is [false], tezt does not wait for the node to be
     ready. If [restart] is [true], it will stop and restart the node if it is
-    already running. [gc_frequency] is [1] by default to make the rollup GC on
-    every occasion during tests. *)
+    already running.  *)
 val run :
   ?legacy:bool ->
   ?restart:bool ->
   ?mode:mode ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
-  ?loser_mode:string ->
-  ?allow_degraded:bool ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
   ?wait_ready:bool ->
   ?password_file:string ->
   t ->
   string ->
-  string list ->
+  argument list ->
   unit Lwt.t
-
-(** [spawn_run ?loser_mode ?allow_degraded node ?gc_frequency ?history_mode
-    rollup_address arguments] is a lightweight version of {!run} that spawns a
-    process. *)
-val spawn_run :
-  ?loser_mode:string ->
-  ?allow_degraded:bool ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
-  t ->
-  string ->
-  string list ->
-  Process.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
@@ -220,26 +244,12 @@ val kill : t -> unit Lwt.t
 (** Initialize the rollup node configuration file with
     [octez-sc-rollup-node-alpha config init].  Returns the name of the resulting
     configuration file. *)
-val config_init :
-  t ->
-  ?force:bool ->
-  ?loser_mode:string ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
-  string ->
-  string Lwt.t
+val config_init : ?force:bool -> t -> string -> string Lwt.t
 
 (** Initialize the rollup node configuration file with
     [octez-sc-rollup-node-alpha config init] and return the corresponding
     process. *)
-val spawn_config_init :
-  t ->
-  ?force:bool ->
-  ?loser_mode:string ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
-  string ->
-  Process.t
+val spawn_config_init : ?force:bool -> t -> string -> Process.t
 
 module Config_file : sig
   (** Sc node configuration files. *)
@@ -286,11 +296,11 @@ val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
     race conditions when setting up rollup infrastructure. On open testnets
     like weeklynet and dailynet, this does not happen because of the large
     block time. *)
-val unsafe_wait_sync : ?path_client:string -> ?timeout:float -> t -> int Lwt.t
+val unsafe_wait_sync : ?timeout:float -> t -> int Lwt.t
 
 (** Wait until the layer 1 of the sc node is synchronized with its
     underlying l1 node. *)
-val wait_sync : ?path_client:string -> t -> timeout:float -> int Lwt.t
+val wait_sync : t -> timeout:float -> int Lwt.t
 
 (** [wait_for ?where sc_node event_name filter] waits for the SCORU node
     [sc_node] to emit an event named [name] (usually this is the name the event
@@ -318,9 +328,19 @@ val change_node_mode : t -> mode -> t
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
 
-(** [export_snapshot rollup_node dir] creates a snapshot of the rollup node in
-    directory [dir]. *)
-val export_snapshot : t -> string -> string Runnable.process
+(** [export_snapshot ?compress_on_the_fly ?compact rollup_node dir] creates a
+    snapshot of the rollup node in directory [dir]. *)
+val export_snapshot :
+  ?compress_on_the_fly:bool ->
+  ?compact:bool ->
+  t ->
+  string ->
+  string Runnable.process
+
+(** [import_snapshot ?force rollup_node ~snapshot_file] imports the snapshot
+    [snapshot_file] in the rollup node [rollup_node].  *)
+val import_snapshot :
+  ?force:bool -> t -> snapshot_file:string -> unit Runnable.process
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t

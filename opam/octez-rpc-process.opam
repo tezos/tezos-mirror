@@ -10,9 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-shell-libs"
-  "octez-node-config"
+  "octez-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-node-config" { = version }
   "lwt" { >= "5.7.0" }
   "lwt-exit"
   "prometheus-app" { >= "1.2" }

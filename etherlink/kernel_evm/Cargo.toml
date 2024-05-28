@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 # SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
 #
 # SPDX-License-Identifier: MIT
 
 [workspace]
 
-members = ["ethereum", "kernel", "evm_execution", "evm_evaluation", "logging"]
+members = ["ethereum", "fa_bridge", "kernel", "evm_execution", "evm_evaluation", "logging"]
 
 [workspace.dependencies]
 
@@ -20,6 +21,7 @@ num-bigint = "0.3"
 num-traits = "0.2.8"
 ethereum = { version = "0.14.0", default-features = false }
 ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
+softfloat = "1.0.0"
 
 # serialization
 hex = "0.4"
@@ -30,6 +32,8 @@ rlp = "0.5.2"
 
 # ethereum VM
 evm = { version = "0.39.1", default-features = false }
+aurora-engine-modexp = { version = "1.0", default-features = false }
+bn = { package = "substrate-bn", version = "0.6", default-features = false }
 
 # crypto stuff
 sha2 = { version = "0.10.6", default-features = false }
@@ -42,11 +46,15 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
+fa-bridge = { path = "./fa_bridge" }
 tezos_ethereum = { path = "./ethereum" }
 evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
 
 # SDK
+tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", features = [
+  "proto-nairobi",
+] }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core", features = [
   "proto-nairobi",
 ] }

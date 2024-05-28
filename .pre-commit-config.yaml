@@ -1,0 +1,36 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ".*\\.t|tezt/tests/expected"
+      - id: end-of-file-fixer
+        exclude: "tezt/tests/expected|tezt/records|tzt_reference_test_suite|src/proto_[0-9][0-9][0-9]_.*/lib_protocol|src/proto_[0-9][0-9][0-9]_.*/parameters/dune|opam/"
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.9.0
+    hooks:
+      - id: shellcheck
+        args: [ "--external-sources" ]
+  - repo: https://github.com/cisagov/pre-commit-shfmt
+    rev: v0.0.2
+    hooks:
+      - id: shfmt
+        # These settings must mirror the ones set in `scripts/lint.sh`.
+        args: [ "-i", "2", "-sr", "-d" ]
+  - repo: https://github.com/arenadotio/pre-commit-ocamlformat
+    rev: 0439858
+    hooks:
+      - id: ocamlformat
+        args: [ "-i" ]
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.9.3
+    hooks:
+      - id: hadolint-docker
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.28.0
+    hooks:
+      - id: check-gitlab-ci
+        args: ["--verbose"]
+        files: '(\.gitlab-ci\.yml|\.gitlab/ci/.*\.yml)'

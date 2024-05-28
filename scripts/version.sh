@@ -26,18 +26,15 @@ export alpine_version='3.18'
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=cab7b39e74361fc16be1584ba4065eed73012151
+export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
 
 ## opam_repository is an additional, tezos-specific opam repository.
-## This value MUST be the same as `build_deps_image_version` in `.gitlab-ci.yml`
+## This value MUST be reflected in the `build_deps_image_version` variable
+## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-f84b4412bf92f81fa4d554aed624fa0a6a72ec96}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-73427137fb6186c0ba3abd5d93c524023c60fc01}"
 export opam_repository_git="$opam_repository_url.git"
 export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 
 ## Other variables, used both in Makefile and scripts
 export COVERAGE_OUTPUT=_coverage_output
-
-## The version of the rust-specific image which can be used to build Rust
-## artifacts of this repository.
-export rust_toolchain_image_version="rust-toolchain--${opam_repository_tag}"

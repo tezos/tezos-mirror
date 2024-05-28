@@ -54,6 +54,7 @@ let test_good_hash_data =
     ~__FILE__
     ~title:"hash data ... of type ... (good)"
     ~tags:["hash"; "data"; "mockup"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
@@ -150,6 +151,7 @@ let test_bad_hash_data =
     ~__FILE__
     ~title:"hash data ... of type ... (bad)"
     ~tags:["hash"; "data"; "mockup"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
@@ -179,6 +181,7 @@ let test_ugly_hash_data =
     ~__FILE__
     ~title:"hash data ... of type ... (ugly)"
     ~tags:["hash"; "data"; "mockup"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =

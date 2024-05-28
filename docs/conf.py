@@ -88,7 +88,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'nairobi',
+    'oxford',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -124,6 +124,10 @@ html_static_path = ['_static']
 
 html_css_files = [
     'css/custom.css',
+]
+
+html_js_files = [
+    'js/custom.js',
 ]
 
 html_extra_path = [
@@ -256,3 +260,5 @@ linkcheck_allowed_redirects = dict(
 html_domain_indices = False
 
 default_role = 'default'
+
+html_favicon = 'favicon.ico'

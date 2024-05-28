@@ -58,3 +58,29 @@ val memory_3k : string
 
 (** ["memory_4k"]: tag memory hungry tests ( >4 GB of memory ). *)
 val memory_4k : string
+
+(** ["time_sensitive"]: tag for time-sensitive tests.
+
+    They are executed with -j 1 to ensure that other tests do not
+    affect their executions. However, they are not particularly
+    cpu/memory-intensive hence they do not need to run on a particular
+    machine contrary to performance regression tests. *)
+val time_sensitive : string
+
+(** ["infrastructure"]: tag for tests owned by the Infrastructure product unit. *)
+val infrastructure : string
+
+(** ["layer1"]: tag for tests owned by the Layer 1 product unit. *)
+val layer1 : string
+
+(** ["tezos2"]: tag for tests owned by the Tezos 2 product unit. *)
+val tezos2 : string
+
+(** ["etherlink"]: tag for tests owned by the Etherlink product unit. *)
+val etherlink : string
+
+(** ["slow"]: tag for tests that are too slow for the CI's [before_merging]
+    pipelines and that will only be run on the scheduled pipeline.
+
+    This tag should be used for tests that take more than 2 minutes in the CI. *)
+val slow : string

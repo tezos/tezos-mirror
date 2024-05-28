@@ -1,0 +1,3 @@
+code { GET } ;
+input { Stack_elt nat 1 ; Stack_elt (map int int) { Elt 1 3 ; Elt 5 2 } } ;
+output (StaticError _)

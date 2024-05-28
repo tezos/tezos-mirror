@@ -30,6 +30,8 @@ open Environment
 
 type t = B of Block.t | I of Incremental.t
 
+val get_alpha_ctxt : ?policy:Block.baker_policy -> t -> context tzresult Lwt.t
+
 val branch : t -> Block_hash.t
 
 val pred_branch : t -> Block_hash.t
@@ -95,7 +97,9 @@ val get_first_different_baker :
   public_key_hash -> public_key_hash trace -> public_key_hash
 
 val get_first_different_bakers :
-  t -> (public_key_hash * public_key_hash) tzresult Lwt.t
+  ?excluding:public_key_hash list ->
+  t ->
+  (public_key_hash * public_key_hash) tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 
@@ -145,6 +149,17 @@ val get_denunciations :
   t ->
   (Signature.Public_key_hash.t * Denunciations_repr.item) list tzresult Lwt.t
 
+val get_denunciations_for_delegate :
+  t ->
+  Signature.Public_key_hash.t ->
+  Denunciations_repr.item list tzresult Lwt.t
+
+val estimated_shared_pending_slashed_amount :
+  t -> public_key_hash -> Tez.t tzresult Lwt.t
+
+val estimated_own_pending_slashed_amount :
+  t -> public_key_hash -> Tez.t tzresult Lwt.t
+
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
@@ -180,6 +195,15 @@ module Vote : sig
       Note that unlike most functions in the current module, this one
       does not call an RPC. *)
   val get_delegate_proposal_count : t -> public_key_hash -> int tzresult Lwt.t
+end
+
+module Dal : sig
+  val shards :
+    t ->
+    ?level:Raw_level.t ->
+    ?delegates:Signature.public_key_hash list ->
+    unit ->
+    Plugin.RPC.Dal.S.shards_output tzresult Lwt.t
 end
 
 module Contract : sig
@@ -227,7 +251,7 @@ module Contract : sig
 end
 
 module Delegate : sig
-  type info = Delegate_services.info = {
+  type info = Plugin.RPC.Delegates.info = {
     full_balance : Tez.t;
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
@@ -235,10 +259,12 @@ module Delegate : sig
     frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
+    min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
     total_delegated_stake : Tez.t;
     staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;
     grace_period : Cycle.t;
+    pending_denunciations : bool;
     voting_info : Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
@@ -246,7 +272,7 @@ module Delegate : sig
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
 
-  val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
+  val info : t -> public_key_hash -> Plugin.RPC.Delegates.info tzresult Lwt.t
 
   val full_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
 
@@ -271,7 +297,7 @@ module Delegate : sig
     t -> public_key_hash -> Delegate_services.consensus_keys_info tzresult Lwt.t
 
   val participation :
-    t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
+    t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
 
   (** This function might begin constructing a block. Use [policy] to
       specify a valid baker for the new block (default [By_round 0]) *)
@@ -332,6 +358,7 @@ type 'accounts init :=
   ?bootstrap_balances:int64 list ->
   ?bootstrap_delegations:Signature.Public_key_hash.t option list ->
   ?bootstrap_consensus_keys:Signature.Public_key.t option list ->
+  ?consensus_committee_size:int ->
   ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
@@ -431,3 +458,8 @@ val init_with_parameters2 :
 (** [default_raw_context] returns a [Raw_context.t] for use in tests
     below [Alpha_context] *)
 val default_raw_context : unit -> Raw_context.t tzresult Lwt.t
+
+(** [raw_context_from_constants] returns a [Raw_context.t] for use in tests
+    below [Alpha_context] *)
+val raw_context_from_constants :
+  Constants.Parametric.t -> Raw_context.t tzresult Lwt.t

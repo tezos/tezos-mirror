@@ -22,7 +22,6 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_client_alpha
   -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha_parameters
@@ -32,7 +31,13 @@
   test_constants
   test_frozen_bonds
   test_adaptive_issuance_launch
-  test_adaptive_issuance_roundtrip
+  test_scenario_base
+  test_scenario_stake
+  test_scenario_rewards
+  test_scenario_autostaking
+  test_scenario_slashing
+  test_scenario_slashing_stakers
+  test_scenario_deactivation
   test_liquidity_baking
   test_storage_functions
   test_storage

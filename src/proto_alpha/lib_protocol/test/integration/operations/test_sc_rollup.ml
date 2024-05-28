@@ -104,6 +104,7 @@ let get_game_status_result incr =
       | Some x -> x)
 
 let assert_equal_game_status ?game_status actual_game_status =
+  let open Lwt_result_syntax in
   match game_status with
   | None -> return_unit
   | Some game_status ->
@@ -163,8 +164,8 @@ let bake_timeout_period ?timeout_period_in_blocks block =
     context and contracts. *)
 let context_init ?commitment_period_in_blocks
     ?(sc_rollup_challenge_window_in_blocks = 10)
-    ?(timeout_period_in_blocks = 10) ?hard_gas_limit_per_operation
-    ?hard_gas_limit_per_block tup =
+    ?sc_rollup_max_active_outbox_levels ?(timeout_period_in_blocks = 10)
+    ?hard_gas_limit_per_operation ?hard_gas_limit_per_block tup =
   Context.init_with_constants_gen
     tup
     {
@@ -184,6 +185,12 @@ let context_init ?commitment_period_in_blocks
           arith_pvm_enable = true;
           private_enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+          max_active_outbox_levels =
+            Option.value
+              ~default:
+                Context.default_test_constants.sc_rollup
+                  .max_active_outbox_levels
+              sc_rollup_max_active_outbox_levels;
           commitment_period_in_blocks =
             Option.value
               ~default:
@@ -361,7 +368,8 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
       Script_ir_translator.parse_data
         ctxt
         ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-        ~allow_forged:true
+        ~allow_forged_tickets:true
+        ~allow_forged_lazy_storage_id:true
         parameters_ty
         (Environment.Micheline.root unparsed_parameters)
     in
@@ -1577,7 +1585,11 @@ let test_invalid_output_proof () =
 
 let test_execute_message_override_applied_messages_slot () =
   let open Lwt_result_syntax in
-  let* block, (baker, originator) = context_init Context.T2 in
+  (* Since we will create more blocks than the [max_active_outbox_levels]
+     parametric constant, we initialize it with a small enough value. *)
+  let* block, (baker, originator) =
+    context_init ~sc_rollup_max_active_outbox_levels:100l Context.T2
+  in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
   let* block, rollup =
@@ -2899,7 +2911,7 @@ let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
     (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:60 Context.T3
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:90 Context.T3
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
@@ -3641,6 +3653,10 @@ let tests =
       "check effect of disabled arith pvm flag"
       `Quick
       test_disable_arith_pvm_feature_flag;
+    Tztest.tztest
+      "check effect of disabled RISC-V pvm flag"
+      `Quick
+      test_disable_riscv_pvm_feature_flag;
     Tztest.tztest
       "can publish a commit, cement it and withdraw stake"
       `Quick

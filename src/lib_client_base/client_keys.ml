@@ -811,7 +811,8 @@ module Make (Signature : Signature_S) :
     let of_source s =
       let open Lwt_result_syntax in
       let*? pk_uri = make_pk_uri @@ Uri.of_string s in
-      return (pk_uri, None)
+      let public_key = Signature.Public_key.of_b58check_opt (Uri.path pk_uri) in
+      return (pk_uri, public_key)
 
     let to_source (t, _) = Lwt.return_ok (Uri.to_string t)
 

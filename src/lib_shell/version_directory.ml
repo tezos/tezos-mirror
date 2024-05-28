@@ -22,9 +22,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rpc_directory (node_version : Node_version.t) =
+let rpc_directory (node_version : Octez_node_version.t) =
   let dir = Tezos_rpc.Directory.empty in
   Tezos_rpc.Directory.gen_register
     dir
     Version_services.S.version
-    (fun () () () -> Tezos_rpc.Answer.return @@ (node_version : Node_version.t))
+    (fun () () () ->
+      Tezos_rpc.Answer.return @@ (node_version : Octez_node_version.t))

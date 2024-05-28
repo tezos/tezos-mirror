@@ -33,7 +33,6 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
 
 module Raw_context_tests = struct
   open Sapling_helpers.Common
@@ -646,14 +645,14 @@ module Interpreter_tests = struct
 
   let path = project_root // Filename.dirname __FILE__
 
-  (* In this test we use a contract which takes a list of transactions, applies
+  (* In this test, we use a contract which takes a list of transactions, applies
      all of them, and assert all of them are correct. It also enforces a 1-to-1
      conversion with mutez by asking an amount to shield and asking for a pkh to
      unshield.
      We create 2 keys a and b. We originate the contract, then do two lists of
      shield for a, then transfers several outputs to b while unshielding, then
      transfer all of b inputs to a while adding dummy inputs and outputs.
-     At last we fail we make a failing transaction. *)
+     At last, we fail by making a faulty transaction. *)
   let test_shielded_tez () =
     let open Lwt_result_wrap_syntax in
     let* genesis, baker, src0, src1 = init () in
@@ -668,7 +667,7 @@ module Interpreter_tests = struct
     in
     let wa = wallet_gen () in
     let list_transac, total =
-      shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
+      shield ~memo_size wa.sk 2 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
@@ -676,21 +675,23 @@ module Interpreter_tests = struct
       transac_and_sync ~memo_size b1 parameters total src0 dst baker
     in
     (* we shield again on another block, forging with the empty state *)
-    let list_transac, total =
-      shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
+    let list_transac, total' =
+      shield ~memo_size wa.sk 2 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
     let* b3, state =
-      transac_and_sync ~memo_size b2 parameters total src0 dst baker
+      transac_and_sync ~memo_size b2 parameters total' src0 dst baker
     in
     (* address that will receive an unshield *)
     let* balance_before_shield = Context.Contract.balance (B b3) src1 in
     (* address that will receive an unshield *)
     let wb = wallet_gen () in
-    let list_addr = gen_addr 15 wb.vk in
+    let list_addr = gen_addr 2 wb.vk in
+    (* Take the first two inputs *)
     let list_forge_input =
-      WithExceptions.List.init ~loc:__LOC__ 14 (fun pos_int ->
+      List.map
+        (fun pos_int ->
           let pos = Int64.of_int pos_int in
           let forge_input =
             snd
@@ -698,17 +699,21 @@ module Interpreter_tests = struct
               |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
+        (0 -- 4)
     in
     let list_forge_output =
       List.map
         (fun addr -> Tezos_sapling.Forge.make_output addr 1L (Bytes.create 8))
         list_addr
     in
-    let pkh = Context.Contract.pkh src1 in
+    let src1_pkh = Context.Contract.pkh src1 in
     let* incr = Incremental.begin_construction b3 in
     let alpha_ctxt = Incremental.alpha_ctxt incr in
     let*@ bound_data, _alpha_ctxt =
-      Script_ir_translator.pack_data alpha_ctxt Script_typed_ir.key_hash_t pkh
+      Script_ir_translator.pack_data
+        alpha_ctxt
+        Script_typed_ir.key_hash_t
+        src1_pkh
     in
     let hex_transac =
       to_hex
@@ -734,27 +739,26 @@ module Interpreter_tests = struct
     let* balance_after_shield = Context.Contract.balance (B b4) src1 in
     let diff_due_to_shield =
       Int64.sub
-        (Test_tez.to_mutez balance_after_shield)
-        (Test_tez.to_mutez balance_before_shield)
+        (Tez_helpers.to_mutez balance_after_shield)
+        (Tez_helpers.to_mutez balance_before_shield)
     in
     (* The balance after shield is obtained from the balance before shield by
        the shield specific update. *)
-    (* The inputs total [total] mutez and 15 of those are transfered in shielded tez *)
+    (* The inputs total [total] mutez and 2 of those are transfered in shielded tez *)
     let* () =
-      Assert.equal_int
-        ~loc:__LOC__
-        (Int64.to_int diff_due_to_shield)
-        (total - 15)
+      Assert.equal_int ~loc:__LOC__ (Int64.to_int diff_due_to_shield) (total - 2)
     in
     let list_forge_input =
-      WithExceptions.List.init ~loc:__LOC__ 15 (fun i ->
-          let pos = Int64.of_int (i + 14 + 14) in
+      List.map
+        (fun i ->
+          let pos = Int64.of_int (i + 5 + 5) in
           let forge_input =
             snd
               (Tezos_sapling.Forge.Input.get state pos wb.vk
               |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
+        (0 -- 1)
     in
     let addr_a =
       snd
@@ -762,12 +766,12 @@ module Interpreter_tests = struct
            wa.vk
            Tezos_sapling.Core.Client.Viewing_key.default_index
     in
-    let output = Tezos_sapling.Forge.make_output addr_a 15L (Bytes.create 8) in
+    let output = Tezos_sapling.Forge.make_output addr_a 2L (Bytes.create 8) in
     let hex_transac =
       to_hex
         (Tezos_sapling.Forge.forge_transaction
-           ~number_dummy_inputs:2
-           ~number_dummy_outputs:2
+           ~number_dummy_inputs:1
+           ~number_dummy_outputs:1
            list_forge_input
            [output]
            wb.sk
@@ -786,7 +790,7 @@ module Interpreter_tests = struct
     in
     (* Here we fail by doing the same transaction again*)
     let* incr = Incremental.begin_construction b in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let dst = Alpha_context.Contract.Originated dst in
     let* operation =
       Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
@@ -800,8 +804,6 @@ module Interpreter_tests = struct
     (* Here we fail by changing the field bound_data*)
     let orginal_transac =
       Tezos_sapling.Forge.forge_transaction
-        ~number_dummy_inputs:2
-        ~number_dummy_outputs:2
         list_forge_input
         [output]
         wb.sk
@@ -824,7 +826,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     let* incr = Incremental.begin_construction b in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let* operation =
       Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
     in
@@ -993,11 +995,11 @@ module Interpreter_tests = struct
         ~offset_nullifier:0L
         ()
     in
-    let fee = Test_tez.of_int 10 in
-    let*? amount_tez = Tez.one_mutez *? Int64.of_int 15 in
+    let fee = Tez_helpers.of_int 10 in
+    let*? amount_tez = Tez_helpers.(one_mutez *? Int64.of_int 15) in
     let* operation1 =
       Op.transaction
-        ~gas_limit:Max
+        ~gas_limit:High
         ~fee
         (B block_start)
         src
@@ -1012,7 +1014,7 @@ module Interpreter_tests = struct
     let*@ counter = Alpha_context.Contract.get_counter ctx pkh in
     let* operation2 =
       Op.transaction
-        ~gas_limit:Max
+        ~gas_limit:High
         ~counter
         ~fee
         (B block_start)
@@ -1050,7 +1052,8 @@ module Interpreter_tests = struct
         Script_ir_translator.parse_script
           ctx_without_gas_2
           ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-          ~allow_forged_in_storage:true
+          ~allow_forged_tickets_in_storage:true
+          ~allow_forged_lazy_storage_id_in_storage:true
           script
       in
       let*?@ id, _ctx_2 =
@@ -1109,7 +1112,7 @@ module Interpreter_tests = struct
     let* operation =
       Op.transaction
         ~gas_limit:Max
-        ~fee:(Test_tez.of_int 10)
+        ~fee:(Tez_helpers.of_int 10)
         (B b)
         src
         dst
@@ -1155,7 +1158,7 @@ module Interpreter_tests = struct
     let parameters_2 =
       Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let cdst = Contract.Originated dst in
     let* operation =
       Op.transaction
@@ -1194,7 +1197,8 @@ module Interpreter_tests = struct
       Script_ir_translator.parse_storage
         ctx_without_gas
         ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-        ~allow_forged:true
+        ~allow_forged_tickets:true
+        ~allow_forged_lazy_storage_id:true
         tytype
         ~storage:storage_lazy_expr
     in
@@ -1247,7 +1251,7 @@ module Interpreter_tests = struct
     let parameters =
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let dst = Contract.Originated dst in
     let* operation =
       Op.transaction ~gas_limit:Max ~fee (B b) src dst Tez.zero ~parameters
@@ -1286,7 +1290,7 @@ let tests =
     Tztest.tztest "bench_phases" `Slow Alpha_context_tests.test_bench_phases;
     Tztest.tztest
       "bench_phases_legacy"
-      `Quick
+      `Slow
       Alpha_context_tests.test_bench_phases_legacy;
     Tztest.tztest
       "bench_fold_over_same_token"

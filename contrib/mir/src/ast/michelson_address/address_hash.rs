@@ -5,7 +5,13 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::AddressError;
+//! Structures for [Tezos
+//! address](https://docs.tezos.com/smart-contracts/data-types/primitive-data-types#addresses)
+//! hash part, i.e. the part without the entrypoint.
+
+use crate::ast::michelson_key_hash::KeyHash;
+
+use super::{ByteReprError, ByteReprTrait};
 
 use tezos_crypto_rs::hash::{
     ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, Hash,
@@ -13,10 +19,13 @@ use tezos_crypto_rs::hash::{
 };
 
 macro_rules! address_hash_type_and_impls {
-    ($($con:ident($ty:ident)),* $(,)*) => {
-        #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
+    ($($(#[$meta:meta])* $con:ident($ty:ident)),* $(,)*) => {
+        /// A enum representing address hashes, like
+        /// `tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw` or
+        /// `KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye`.
+        #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
         pub enum AddressHash {
-            $($con($ty)),*
+            $($(#[$meta])* $con($ty)),*
         }
 
         $(impl From<$ty> for AddressHash {
@@ -28,7 +37,7 @@ macro_rules! address_hash_type_and_impls {
         impl AsRef<[u8]> for AddressHash {
             fn as_ref(&self) -> &[u8] {
                 match self {
-                    $(AddressHash::$con($ty(h)))|* => h,
+                    $(AddressHash::$con(h) => h.as_ref()),*
                 }
             }
         }
@@ -36,15 +45,7 @@ macro_rules! address_hash_type_and_impls {
         impl From<AddressHash> for Vec<u8> {
             fn from(value: AddressHash) -> Self {
                 match value {
-                    $(AddressHash::$con($ty(h)))|* => h,
-                }
-            }
-        }
-
-        impl AddressHash {
-            pub fn to_base58_check(&self) -> String {
-                match self {
-                    $(AddressHash::$con(h) => h.to_base58_check()),*
+                    $(AddressHash::$con(h) => h.into(),)*
                 }
             }
         }
@@ -52,32 +53,56 @@ macro_rules! address_hash_type_and_impls {
 }
 
 address_hash_type_and_impls! {
-    Tz1(ContractTz1Hash),
-    Tz2(ContractTz2Hash),
-    Tz3(ContractTz3Hash),
-    Tz4(ContractTz4Hash),
+    /// Variant for implicit addresses, `tz1...`, `tz2...`, etc.
+    Implicit(KeyHash),
+    /// Variant for smart contract addresses, `KT1...`.
     Kt1(ContractKt1Hash),
+    /// Variant for smart rollup addresses, `sr1...`.
     Sr1(SmartRollupHash),
 }
 
+impl From<ContractTz1Hash> for AddressHash {
+    fn from(x: ContractTz1Hash) -> Self {
+        Self::Implicit(x.into())
+    }
+}
+
+impl From<ContractTz2Hash> for AddressHash {
+    fn from(x: ContractTz2Hash) -> Self {
+        Self::Implicit(x.into())
+    }
+}
+
+impl From<ContractTz3Hash> for AddressHash {
+    fn from(x: ContractTz3Hash) -> Self {
+        Self::Implicit(x.into())
+    }
+}
+
+impl From<ContractTz4Hash> for AddressHash {
+    fn from(x: ContractTz4Hash) -> Self {
+        Self::Implicit(x.into())
+    }
+}
+
 impl TryFrom<&[u8]> for AddressHash {
-    type Error = AddressError;
+    type Error = ByteReprError;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::from_bytes(value)
     }
 }
 
 impl TryFrom<&str> for AddressHash {
-    type Error = AddressError;
+    type Error = ByteReprError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_base58_check(value)
     }
 }
 
-pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), AddressError> {
+pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), ByteReprError> {
     let size = data.len();
     if size < min_size {
-        Err(AddressError::WrongFormat(format!(
+        Err(ByteReprError::WrongFormat(format!(
             "address must be at least {min_size} {name} long, but it is {size} {name} long"
         )))
     } else {
@@ -86,24 +111,24 @@ pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(),
 }
 
 const TAG_IMPLICIT: u8 = 0;
-const TAG_KT1: u8 = 1;
+pub(crate) const TAG_KT1: u8 = 1;
 const TAG_SR1: u8 = 3;
-const TAG_TZ1: u8 = 0;
-const TAG_TZ2: u8 = 1;
-const TAG_TZ3: u8 = 2;
-const TAG_TZ4: u8 = 3;
-const PADDING_IMPLICIT: &[u8] = &[];
-const PADDING_SMART: &[u8] = &[0];
+const PADDING_ORIGINATED: &[u8] = &[0];
 
 impl AddressHash {
-    // all address hashes are 20 bytes in length
+    /// Byte size of a raw address hash.
+    /// All address hashes are 20 bytes in length.
     pub const HASH_SIZE: usize = 20;
-    // +2 for tags: implicit addresses use 2-byte, and KT1/sr1 add zero-byte
-    // padding to the end
+    /// Byte size for the Tezos representation of an address hash.
+    /// [Self::HASH_SIZE] + 2 for tags: implicit addresses use 2-byte tag, and
+    /// KT1/sr1 add zero-byte padding to the end
     pub const BYTE_SIZE: usize = Self::HASH_SIZE + 2;
+    /// Byte length of Base58 representation of address hashes.
     pub const BASE58_SIZE: usize = 36;
+}
 
-    pub fn from_base58_check(data: &str) -> Result<Self, AddressError> {
+impl ByteReprTrait for AddressHash {
+    fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
         use AddressHash::*;
 
         check_size(data.as_bytes(), Self::BASE58_SIZE, "characters")?;
@@ -111,39 +136,34 @@ impl AddressHash {
         Ok(match &data[0..3] {
             "KT1" => Kt1(HashTrait::from_b58check(data)?),
             "sr1" => Sr1(HashTrait::from_b58check(data)?),
-            "tz1" => Tz1(HashTrait::from_b58check(data)?),
-            "tz2" => Tz2(HashTrait::from_b58check(data)?),
-            "tz3" => Tz3(HashTrait::from_b58check(data)?),
-            "tz4" => Tz4(HashTrait::from_b58check(data)?),
-            s => return Err(AddressError::UnknownPrefix(s.to_owned())),
+            // tz1..tz4 are delegated to KeyHash
+            _ => Implicit(KeyHash::from_base58_check(data)?),
         })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AddressError> {
+    fn to_base58_check(&self) -> String {
+        use AddressHash::*;
+        match self {
+            Kt1(hash) => hash.to_base58_check(),
+            Sr1(hash) => hash.to_base58_check(),
+            Implicit(hash) => hash.to_base58_check(),
+        }
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ByteReprError> {
         use AddressHash::*;
 
         check_size(bytes, Self::BYTE_SIZE, "bytes")?;
         let validate_padding_byte = || match bytes.last().unwrap() {
             0 => Ok(()),
-            b => Err(AddressError::WrongFormat(format!(
+            b => Err(ByteReprError::WrongFormat(format!(
                 "address must be padded with byte 0x00, but it was padded with 0x{}",
                 hex::encode([*b])
             ))),
         };
         Ok(match bytes[0] {
             // implicit addresses
-            TAG_IMPLICIT => match bytes[1] {
-                TAG_TZ1 => Tz1(HashTrait::try_from_bytes(&bytes[2..])?),
-                TAG_TZ2 => Tz2(HashTrait::try_from_bytes(&bytes[2..])?),
-                TAG_TZ3 => Tz3(HashTrait::try_from_bytes(&bytes[2..])?),
-                TAG_TZ4 => Tz4(HashTrait::try_from_bytes(&bytes[2..])?),
-                _ => {
-                    return Err(AddressError::UnknownPrefix(format!(
-                        "0x{}",
-                        hex::encode(&bytes[..2])
-                    )))
-                }
-            },
+            TAG_IMPLICIT => Implicit(KeyHash::from_bytes(&bytes[1..])?),
             TAG_KT1 => {
                 validate_padding_byte()?;
                 Kt1(HashTrait::try_from_bytes(&bytes[1..bytes.len() - 1])?)
@@ -154,7 +174,7 @@ impl AddressHash {
                 Sr1(HashTrait::try_from_bytes(&bytes[1..bytes.len() - 1])?)
             }
             _ => {
-                return Err(AddressError::UnknownPrefix(format!(
+                return Err(ByteReprError::UnknownPrefix(format!(
                     "0x{}",
                     hex::encode(&bytes[..1])
                 )))
@@ -162,26 +182,20 @@ impl AddressHash {
         })
     }
 
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
+    fn to_bytes(&self, out: &mut Vec<u8>) {
         use AddressHash::*;
-        fn go(out: &mut Vec<u8>, tag: &[u8], hash: impl AsRef<Hash>, sep: &[u8]) {
-            out.extend_from_slice(tag);
+        fn originated_account(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<Hash>) {
+            out.push(tag);
             out.extend_from_slice(hash.as_ref());
-            out.extend_from_slice(sep);
+            out.extend_from_slice(PADDING_ORIGINATED);
         }
         match self {
-            Tz1(hash) => go(out, &[TAG_IMPLICIT, TAG_TZ1], hash, PADDING_IMPLICIT),
-            Tz2(hash) => go(out, &[TAG_IMPLICIT, TAG_TZ2], hash, PADDING_IMPLICIT),
-            Tz3(hash) => go(out, &[TAG_IMPLICIT, TAG_TZ3], hash, PADDING_IMPLICIT),
-            Tz4(hash) => go(out, &[TAG_IMPLICIT, TAG_TZ4], hash, PADDING_IMPLICIT),
-            Kt1(hash) => go(out, &[TAG_KT1], hash, PADDING_SMART),
-            Sr1(hash) => go(out, &[TAG_SR1], hash, PADDING_SMART),
+            Implicit(hash) => {
+                out.push(TAG_IMPLICIT);
+                hash.to_bytes(out);
+            }
+            Kt1(hash) => originated_account(out, TAG_KT1, hash),
+            Sr1(hash) => originated_account(out, TAG_SR1, hash),
         }
-    }
-
-    pub fn to_bytes_vec(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.to_bytes(&mut out);
-        out
     }
 }

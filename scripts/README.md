@@ -12,7 +12,6 @@ In particular, this includes scripts for:
  (`update_opam_repo.sh`, `opam-*.sh`)
 * generate base58 prefixes (`b58_prefix/`)
 * generate configuration code (in OCaml) to bootstrap a new network (`gen-genesis/`)
-* running quick checks as a git hook before commiting (`pre_commit/`)
 * preparing the environment for migration tests (`prepare_migration_test.ml`)
 * releasing static Octez binaries (`release/`)
 * snapshotting protocols, linking them to the build system (`snapshot_alpha.sh`, `link_protocol.sh`, `snapshot_alpha_and_link.sh`)

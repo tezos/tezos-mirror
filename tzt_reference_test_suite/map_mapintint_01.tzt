@@ -1,0 +1,3 @@
+code { MAP { CDR ; ADD ; DUP } } ;
+input { Stack_elt (map int int) { Elt 1 3 ; Elt 5 2 ; Elt 12 20 } ; Stack_elt int 0 } ;
+output { Stack_elt (map int int) { Elt 1 3 ; Elt 5 5 ; Elt 12 25 } ; Stack_elt int 25 }

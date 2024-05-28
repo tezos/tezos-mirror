@@ -51,11 +51,12 @@ struct
   open Parameters
   include Skip_list.Make (Parameters)
 
-  (* This represents cells of skip lists whose content are even
-     numbers from {!val:initial_value} and increase 2 by 2. *)
+  (* This represents cells of skip lists. *)
   type t = {size : int; cells : (int * (int, int) cell) list}
 
-  let deref list i = List.assoc ~equal:Int.equal i list.cells
+  let deref ?(lowest_known_cell = 0) list i =
+    if i < lowest_known_cell then None
+    else List.assoc ~equal:Int.equal i list.cells
 
   (* Must be an even number. See {!val:succ}. *)
   let initial_value = 10
@@ -106,9 +107,9 @@ struct
   let find list start stop =
     find ~deref:(deref list) ~cell_ptr:start ~target_index:(Z.of_int stop)
 
-  let search list start target_content =
+  let search ?lowest_known_cell list start target_content =
     search
-      ~deref:(deref list)
+      ~deref:(deref ?lowest_known_cell list)
       ~compare:(fun x -> Int.(compare x target_content))
       ~cell:start
 
@@ -120,7 +121,18 @@ struct
       ~target_ptr:stop
       path
 
+  (* This produces a skip lists whose content are even numbers from
+     {!val:initial_value} and increase 2 by 2. *)
   let rec nlist basis n = if n = 0 then zero else succ (nlist basis (n - 1))
+
+  (* This produces a skip lists whose content is just the index of the cell. *)
+  let rec nlist' basis n =
+    if n = 0 then {size = 1; cells = [(0, genesis 0)]}
+    else
+      let list = nlist' basis (n - 1) in
+      let prev_cell_ptr, prev_cell = head list in
+      let cell = next ~prev_cell ~prev_cell_ptr list.size in
+      {size = list.size + 1; cells = (list.size, cell) :: list.cells}
 
   let check_find i j =
     let l = nlist basis i in
@@ -370,6 +382,36 @@ let test_minimal_back_path () =
          (M.back_path l start target, expected_path))
        cases)
 
+(* This test ensures that if [j] is part of the skip list, then we can
+   produce a path from [i] to [j] without knowing any cell strictly
+   below [j]. *)
+let test_search_succeeds_even_if_deref_can_fail (basis, i, j) =
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  (* The list is equivalent to [0;1;2;3;...;i]. *)
+  let l = M.nlist' basis i in
+  match M.deref l i with
+  | None -> Test.fail "Unable to deref initial cell"
+  | Some start -> (
+      match M.search ~lowest_known_cell:j l start j with
+      | M.{last_cell = Nearest _; rev_path = _} ->
+          (* This is not supposed to happen since [j] is part of the Skip list. *)
+          Test.fail "Skip_list.search returned 'Nearest'"
+      | M.{last_cell = Found _; rev_path = _} ->
+          (* We do not check the validity of the path here and rely on
+             other tests for that. *)
+          ()
+      | M.{last_cell = No_exact_or_lower_ptr; rev_path = _} ->
+          (* This is not supposed to happen since [j] is part of the Skip list. *)
+          Test.fail "Skip_list.search returned 'No_exact_or_lower_ptr'"
+      | M.{last_cell = Deref_returned_none; rev_path = _} ->
+          (* We want to ensure that the [Skip_list.search] function
+             succeeds when [deref] is used on older cells than the
+             target one when it exists. Hence, this error should not
+             happen. *)
+          Test.fail "Skip_list.search returned 'Deref_returned_none'")
+
 let test_search_non_minimal_back_path () =
   let basis = 4 in
   let module M = TestNat (struct
@@ -500,6 +542,15 @@ let tests =
         let* j = 0 -- i in
         return (basis, i, j))
       test_skip_list_nat_check_path_with_search;
+    tztest_qcheck2
+      ~name:"Skip list: produce a path when deref is partial"
+      ~count:100
+      QCheck2.Gen.(
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+        let* i = pure 100 in
+        let* j = 0 -- i in
+        return (basis, i, j))
+      test_search_succeeds_even_if_deref_can_fail;
     tztest_qcheck2
       ~name:"Skip list: `search` won't produce invalid paths"
       ~count:10

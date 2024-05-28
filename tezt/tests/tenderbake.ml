@@ -198,6 +198,8 @@ let test_manual_bake =
           (["delay_increment_per_round"], `String_of_int 1);
           (["consensus_threshold"], `Int 45);
           (["consensus_committee_size"], `Int 67);
+          (* because [number_of_shards] has to be at most [consensus_committee_size] *)
+          (["dal_parametric"; "number_of_shards"], `Int 32);
         ]
       protocol
   in
@@ -283,7 +285,7 @@ let test_manual_bake =
   in
   let op_hashes =
     JSON.(
-      pending_ops |-> "applied" |> as_list
+      pending_ops |-> "validated" |> as_list
       |> List.map (fun op -> op |-> "hash" |> as_string))
   in
   Check.(list_mem string)
@@ -340,6 +342,8 @@ let test_manual_bake_null_threshold =
           (["delay_increment_per_round"], `String_of_int 1);
           (["consensus_threshold"], `Int 0);
           (["consensus_committee_size"], `Int 67);
+          (* because [number_of_shards] has to be at most [consensus_committee_size] *)
+          (["dal_parametric"; "number_of_shards"], `Int 32);
         ]
       protocol
   in

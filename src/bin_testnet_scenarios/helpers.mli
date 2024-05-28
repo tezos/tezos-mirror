@@ -28,8 +28,12 @@
 val wait_for_funded_key :
   Node.t -> Client.t -> Tez.t -> Account.key -> unit Lwt.t
 
-(** [setup_octez_node ~testnet ?runner ()] setups a new Octez node.
-    Bootstrap the node using the snapshot in [testnet.snapshot] if provided,
-    otherwise bootstrap itself. *)
+(** [setup_octez_node ~testnet ?runner ?metrics_port ()] setups a new
+    Octez node. Bootstrap the node using the snapshot in
+    [testnet.snapshot] if provided, otherwise bootstrap itself. *)
 val setup_octez_node :
-  testnet:Testnet.t -> ?runner:Runner.t -> unit -> (Client.t * Node.t) Lwt.t
+  testnet:Testnet.t ->
+  ?runner:Runner.t ->
+  ?metrics_port:int ->
+  unit ->
+  (Client.t * Node.t) Lwt.t

@@ -1,0 +1,3 @@
+code { UPDATE } ;
+input { Stack_elt int 2 ; Stack_elt bool True ; Stack_elt (set int) { 1 ; 3 ; 5 ; 7 } } ;
+output { Stack_elt (set int) { 1 ; 2 ; 3 ; 5 ; 7 } }

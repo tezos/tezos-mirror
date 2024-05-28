@@ -1,0 +1,25 @@
+[
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL rollup and node with L1 (mainnet_lag-3_time-5_preinject-10_slots-5)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "e2e",
+      "mainnet",
+      "node",
+      "slow",
+      "smart_rollup_node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "229765025",
+      "count": "1"
+    }
+  }
+]

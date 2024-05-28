@@ -120,6 +120,7 @@ let pre_boot boot_sector f =
   | Some boot_sector -> setup boot_sector @@ f
 
 let test_preboot () =
+  let open Lwt_result_syntax in
   [""; "1"; "1 2 +"]
   |> List.iter_es (fun boot_sector ->
          pre_boot boot_sector @@ fun _ctxt _state -> return_unit)
@@ -373,6 +374,8 @@ let test_reveal ~threshold ~inbox_level ~hash ~preimage_reveal_step
       metadata = Protocol.Raw_level_repr.root;
       dal_page = Protocol.Raw_level_repr.root;
       dal_parameters = Protocol.Raw_level_repr.root;
+      dal_attested_slots_validity_lag = 241_920;
+      (* 4 weeks with a 10 secs block time. *)
     }
   in
   let is_reveal_enabled =
@@ -550,22 +553,6 @@ let test_invalid_outbox_level () =
   ]
   |> List.iter_es (test_output_messages_proofs ~valid:false ~inbox_level)
 
-let test_initial_state_hash_arith_pvm () =
-  let open Alpha_context in
-  let open Lwt_result_syntax in
-  let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
-  let*! state = Sc_rollup_helpers.Arith_pvm.initial_state ~empty in
-  let*! hash = Sc_rollup_helpers.Arith_pvm.state_hash state in
-  let expected = Sc_rollup.ArithPVM.reference_initial_state_hash in
-  if Sc_rollup.State_hash.(hash = expected) then return_unit
-  else
-    failwith
-      "incorrect hash, expected %a, got %a"
-      Sc_rollup.State_hash.pp
-      expected
-      Sc_rollup.State_hash.pp
-      hash
-
 let dummy_internal_transfer address =
   let open Lwt_result_wrap_syntax in
   let open Alpha_context.Sc_rollup in
@@ -685,7 +672,16 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
   in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox.inbox in
   let dal_snapshot = Dal.Slots_history.genesis in
-  let dal_parameters = Default_parameters.constants_mainnet.dal in
+  let constants = Default_parameters.constants_mainnet in
+  let dal_parameters = constants.dal in
+  let dal_activation_level =
+    if constants.dal.feature_enable then
+      Some constants.sc_rollup.reveal_activation_level.dal_parameters
+    else None
+  in
+  let dal_attested_slots_validity_lag =
+    constants.sc_rollup.reveal_activation_level.dal_attested_slots_validity_lag
+  in
   let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
 
   let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
@@ -735,6 +731,8 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
        Raw_level.root
        dal_snapshot
        dal_parameters.cryptobox_parameters
+       ~dal_activation_level
+       ~dal_attested_slots_validity_lag
        ~dal_attestation_lag:dal_parameters.attestation_lag
        ~dal_number_of_slots:dal_parameters.number_of_slots
        ~is_reveal_enabled
@@ -779,10 +777,6 @@ let tests =
     Tztest.tztest "Valid output messages" `Quick test_valid_output_messages;
     Tztest.tztest "Invalid output messages" `Quick test_invalid_output_messages;
     Tztest.tztest "Invalid outbox level" `Quick test_invalid_outbox_level;
-    Tztest.tztest
-      "Initial state hash for Arith"
-      `Quick
-      test_initial_state_hash_arith_pvm;
     Tztest.tztest "Filter internal message" `Quick test_filter_internal_message;
     Tztest.tztest
       "Reveal below threshold"

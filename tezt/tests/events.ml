@@ -107,7 +107,7 @@ let check_client_events =
   Protocol.register_test
     ~__FILE__
     ~title:"Events: events from client"
-    ~tags:["check_client_events"]
+    ~tags:[Tag.layer1; "check_client_events"]
     test_emit_event
 
 let register ~protocols = check_client_events protocols

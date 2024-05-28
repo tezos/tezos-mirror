@@ -1,0 +1,33 @@
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+//
+// SPDX-License-Identifier: MIT
+
+// usage: node benchmarks/bench_linear_erc20.js <n>
+// if no argument <n> is given, count as 0 erc20 transfers, so only:
+// - provision of player1 address from faucet,
+// - contract creation
+// - minting of tockens
+
+const utils = require('../../utils');
+const { contracts_directory, compile_contract_file } = require("../../../lib/contract");
+let faucet = require('../../players/faucet.json');
+let player1 = require('../../players/player1.json');
+let player2 = require('../../players/player2.json');
+
+let txs = [];
+let contract = compile_contract_file(contracts_directory, "audit/memory_filler.sol")[0];
+let create_data = contract.bytecode;
+
+
+const run = function (runs) {
+    return contract.interface.encodeFunctionData("run", [runs])
+}
+
+let mode = utils.bench_args(process.argv, [{flag: '--count <n>', desc: 'Number of runs', default: 0}]);
+// player1 get 10_000 from faucet
+txs.push(utils.transfer(faucet, player1, 10000000))
+let create = utils.create(player1, 0, create_data);
+txs.push(create.tx);
+txs.push(utils.send(player1, create.addr, 0, run(mode.extra.count)))
+
+utils.print_bench([txs], mode)

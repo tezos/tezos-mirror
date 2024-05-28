@@ -12,6 +12,7 @@
   octez-libs.base.unix
   octez-shell-libs.client-base-unix
   octez-shell-libs.client-base
+  octez-node-config
   octez-libs.clic
   octez-libs.stdlib-unix
   octez-libs.event-logging
@@ -59,6 +60,9 @@
   (select void_for_linking-octez-protocol-018-Proxford-libs-client from
    (octez-protocol-018-Proxford-libs.client -> void_for_linking-octez-protocol-018-Proxford-libs-client.empty)
    (-> void_for_linking-octez-protocol-018-Proxford-libs-client.empty))
+  (select void_for_linking-octez-protocol-019-PtParisB-libs-client from
+   (octez-protocol-019-PtParisB-libs.client -> void_for_linking-octez-protocol-019-PtParisB-libs-client.empty)
+   (-> void_for_linking-octez-protocol-019-PtParisB-libs-client.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client from
    (octez-protocol-alpha-libs.client -> void_for_linking-octez-protocol-alpha-libs-client.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client.empty)))
@@ -93,4 +97,5 @@
    (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-017-PtNairob-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-019-PtParisB-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client.empty ""))))

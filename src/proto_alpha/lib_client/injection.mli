@@ -103,6 +103,7 @@ val inject_manager_operation :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?force:bool ->
+  ?safety_guard:Gas.Arith.integral ->
   source:Signature.Public_key_hash.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->

@@ -63,6 +63,7 @@ let false_op l1_dst rollup_id =
 (** [check_proto_error_f f t] checks that the first error of [t]
     satisfies the boolean function [f]. *)
 let check_proto_error_f f t =
+  let open Lwt_result_syntax in
   match t with
   | Environment.Ecoproto_error e :: _ when f e ->
       Assert.test_error_encodings e ;
@@ -148,7 +149,8 @@ let test_origination_fees () =
     + Data_encoding.Binary.length Zk_rollup.pending_list_encoding init_pl
   in
   let expected_fees =
-    Test_tez.(constants.parametric.cost_per_byte *! Int64.of_int expected_size)
+    Tez_helpers.(
+      constants.parametric.cost_per_byte *! Int64.of_int expected_size)
   in
   let* operation, _rollup =
     Op.zk_rollup_origination

@@ -84,13 +84,18 @@ let q_in_0_1 () =
 
 let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
   let open QCheck2.Gen in
+  let open Prevalidator_pending_operations in
   let* top_prio_value = oneofl [`High; `Medium; `Low] in
   match top_prio_value with
-  | `High -> pure `High
-  | `Medium -> pure `Medium
+  | `High -> pure High
+  | `Medium -> pure Medium
   | `Low ->
       let+ weights = small_list (q_in_0_1 ()) in
-      `Low weights
+      Low weights
+
+let status_gen () : Prevalidator_pending_operations.status QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  oneofl [Prevalidator_pending_operations.Fresh; Reclassified]
 
 (** [operation_with_hash_gen ?proto_gen ?block_hash_t ()] is a generator
     for parsable operations, i.e. values of type {!operation}.
@@ -117,12 +122,15 @@ let operation_with_hash_gen ?proto_gen ?block_hash_t () :
   let+ oph, op = raw_operation_with_hash_gen ?proto_gen ?block_hash_t () in
   Internal_for_tests.make_operation ~signature_checked oph op ()
 
-let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :
-    (unit operation * Prevalidator_pending_operations.priority) QCheck2.Gen.t =
+let operation_with_hash_and_status_and_priority_gen ?proto_gen ?block_hash_t ()
+    :
+    (unit operation * Prevalidator_pending_operations.status_and_priority)
+    QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* op = operation_with_hash_gen ?proto_gen ?block_hash_t () in
   let* priority = priority_gen () in
-  return (op, priority)
+  let* status = status_gen () in
+  return (op, Prevalidator_pending_operations.{status; priority})
 
 let raw_op_map_gen ?proto_gen ?block_hash_t () :
     Operation.t Operation_hash.Map.t QCheck2.Gen.t =

@@ -1,0 +1,17 @@
+code SPLIT_TICKET;
+input
+  {
+    Stack_elt (ticket string) (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 42) ;
+    Stack_elt (pair nat nat) (Pair 24 18) ;
+  } ;
+output
+  {
+    Stack_elt
+      (option (pair (ticket string) (ticket string)))
+      (Some
+         (Pair
+            (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 24)
+            (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 18)
+         )
+      ) ;
+  } ;

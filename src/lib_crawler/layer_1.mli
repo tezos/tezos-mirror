@@ -27,7 +27,9 @@
 (** This module allow to follow the layer 1 chain by subscribing to the head
     monitoring RPC offered by the Tezos node, reconnecting, etc. *)
 
-type error += Cannot_find_predecessor of Block_hash.t
+type error +=
+  | Cannot_find_predecessor of Block_hash.t
+  | Http_connection_error of (Cohttp.Code.status_code * string)
 
 (** The type of layer 1 followers. *)
 type t
@@ -47,14 +49,28 @@ val start :
   #Client_context.full ->
   t Lwt.t
 
-(** [shutdown t] properly shuts the layer 1 down. *)
+(** [create ~name ~reconnection_delay ?protocols cctxt] creates a Layer 1
+    context without connecting to a Tezos node. Use {!connect} to connect to
+    start monitoring heads. If [protocols] is provided, only heads of these
+    protocols will be monitored. *)
+val create :
+  name:string ->
+  reconnection_delay:float ->
+  ?protocols:Protocol_hash.t list ->
+  #Client_context.full ->
+  t
+
+(** [shutdown t] properly shuts the layer 1 down. This function is to be used on
+    exit. *)
 val shutdown : t -> unit Lwt.t
 
-(** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
+(** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection),
-    [iter_heads] terminates and returns the error.  *)
+    [iter_heads] terminates and returns the error. A [name] can be provided to
+    differentiate iterations on the same connection. *)
 val iter_heads :
+  ?name:string ->
   t ->
   (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t
@@ -62,6 +78,11 @@ val iter_heads :
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)
 val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
+
+(** [get_latest_head t] returns the latest L1 head if at least one was seen by
+    [t]. The head is the one sent by the heads monitoring RPC of the L1 node,
+    independently of how they were processed by the current process. *)
+val get_latest_head : t -> (Block_hash.t * Block_header.t) option
 
 (** {2 Helper functions for the Layer 1 chain} *)
 
@@ -107,6 +128,13 @@ val get_tezos_reorg_for_new_head :
   [`Head of Block_hash.t * int32 | `Level of int32] ->
   Block_hash.t * int32 ->
   (Block_hash.t * int32) Reorg.t tzresult Lwt.t
+
+(** [client_context_with_timeout ctxt timeout] creates a client context where
+    RPCs will be made with timeout [timeout] seconds. Calls that timeout will
+    resolve with an error [RPC_timeout] which will trigger a reconnection in
+    {!iter_heads}.  *)
+val client_context_with_timeout :
+  #Client_context.full -> float -> Client_context.full
 
 (**/**)
 

@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda (pair unit unit) (pair unit unit)) { DIP {UNIT}; SET_CAR } } ;
+output { Stack_elt bytes 0x050200000023051f0200000002034f0200000015041700000003402525034c04420000000425202540 } ;

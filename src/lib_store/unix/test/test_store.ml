@@ -246,34 +246,36 @@ let test_mem chain_store tbl =
   let*! () = test_not_mem "B6" in
   let*! () = test_not_mem "B8" in
   let* () =
-    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "A6") in
+    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "B7") in
     Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A8") ;
     return_unit
   in
   let*! () = test_mem "A2" in
-  let*! () = test_mem "A3" in
-  let*! () = test_mem "A6" in
-  let*! () = test_not_mem "A7" in
-  let*! () = test_not_mem "A8" in
-  let*! () = test_not_mem "B1" in
-  let*! () = test_not_mem "B6" in
-  let*! () = test_not_mem "B8" in
-  let* () =
-    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "B6") in
-    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A6") ;
-    return_unit
-  in
-  let*! () = test_mem "A2" in
   let*! () = test_not_mem "A3" in
-  let*! () = test_not_mem "A4" in
   let*! () = test_not_mem "A6" in
+  let*! () = test_not_mem "A7" in
   let*! () = test_not_mem "A8" in
   let*! () = test_mem "B1" in
   let*! () = test_mem "B6" in
+  let*! () = test_mem "B7" in
+  let*! () = test_not_mem "B8" in
+  let* () =
+    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "A8") in
+    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "B7") ;
+    return_unit
+  in
+  let*! () = test_mem "A2" in
+  let*! () = test_mem "A3" in
+  let*! () = test_mem "A4" in
+  let*! () = test_mem "A6" in
+  let*! () = test_mem "A8" in
+  let*! () = test_not_mem "B1" in
+  let*! () = test_not_mem "B6" in
+  let*! () = test_not_mem "B7" in
   let*! () = test_not_mem "B8" in
   let* () =
     let* prev_head = Store.Chain.set_head chain_store (vblock tbl "B8") in
-    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "B6") ;
+    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A8") ;
     return_unit
   in
   let*! () = test_mem "A2" in
@@ -283,6 +285,7 @@ let test_mem chain_store tbl =
   let*! () = test_not_mem "A8" in
   let*! () = test_mem "B1" in
   let*! () = test_mem "B6" in
+  let*! () = test_mem "B7" in
   let*! () = test_mem "B8" in
   return_unit
 
@@ -708,6 +711,180 @@ let test_block_of_identifier_success_savepoint chain_store table =
     chain_store
     table
 
+(* Tests the live blocks computation behaviour thanks to a dedicated
+   block history.
+
+     X - Y - Z ..... ------ -- A --- B
+                           \
+                            \- A' -- B'
+                            |     \- B''
+                            |- A''
+
+   level(X) = level(A) - max_op_ttl - 1 = level(B) - max_op_ttl - 2
+   level(Y) = level(A) - max_op_ttl     = level(B) - max_op_ttl - 1
+   level(Z) = level(A) - max_op_ttl + 1 = level(B) - max_op_ttl
+
+   Baking: A, A', B, B', B'' and A''.
+
+   A contains an operation targeting Y (valid)
+   A contains an operation targeting Z (valid)
+
+   B contains an operation targeting A (valid)
+   B contains an operation targeting Z (valid)
+
+   A' contains an operation targeting Y (valid)
+   A' contains an operation targeting Z (valid)
+
+   B' contains an operation targeting A (invalid)
+
+   B'' contains an operation targeting A' (valid)
+
+   A'' contains an operation targeting X (invalid)
+   A'' contains an operation targeting Y (valid)
+*)
+let test_live_blocks store_dir =
+  let open Tezos_protocol_alpha in
+  let open Lwt_result_syntax in
+  let accounts =
+    Stdlib.List.init 50 (fun _ -> Alpha_utils.Account.new_account ())
+  in
+  let max_operations_time_to_live = 4 in
+  let patch_context ctxt =
+    let constants : Protocol.Alpha_context.Constants.Parametric.t =
+      Default_parameters.
+        {
+          constants_test with
+          consensus_threshold = 0;
+          max_operations_time_to_live;
+        }
+    in
+    let test_parameters =
+      let open Tezos_protocol_alpha_parameters in
+      {
+        Default_parameters.(parameters_of_constants constants) with
+        bootstrap_accounts =
+          List.map
+            (fun acc ->
+              Alpha_utils.Account.account_to_bootstrap
+                ( acc,
+                  Protocol.Alpha_context.Tez.of_mutez_exn 100_000_000_000L,
+                  None ))
+            accounts;
+      }
+    in
+    Alpha_utils.patch_context
+      ctxt
+      ~json:(Default_parameters.json_of_parameters test_parameters)
+  in
+  let dst_store_dir = store_dir // "store" in
+  let dst_context_dir = store_dir // "context" in
+  let* store =
+    Store.init
+      ~patch_context
+      ~readonly:false
+      ~store_dir:dst_store_dir
+      ~context_dir:dst_context_dir
+      ~allow_testchains:false
+      genesis
+  in
+  let infinite_accounts = ref (Stdlib.Seq.cycle (List.to_seq accounts)) in
+  let mk_op branch =
+    let open Protocol.Alpha_context in
+    let c =
+      match !infinite_accounts () with
+      | Nil -> assert false
+      | Cons (c, r) ->
+          infinite_accounts := r ;
+          c
+    in
+    let counter = Manager_counter.Internal_for_tests.of_int 1 in
+    let operation = Delegation (Some c.pkh) in
+    make_operation ~source_pkh:c.pkh ~source_sk:c.sk ~counter ~branch operation
+  in
+  let chain_store = Store.main_chain_store store in
+  let*! genesis = Store.Chain.genesis_block chain_store in
+  let* block_x = Alpha_utils.bake chain_store genesis in
+  let* block_y = Alpha_utils.bake chain_store block_x in
+  let* block_z = Alpha_utils.bake chain_store block_y in
+  let* _, before_b =
+    Alpha_utils.bake_n chain_store (max_operations_time_to_live - 1) block_z
+  in
+  let mk_operations bl = [[]; []; []; List.map mk_op bl] in
+  let check ?(should_fail = false) block =
+    let bh = Store.Block.hash block in
+    let ops =
+      Store.Block.operations block
+      |> List.map (List.map (fun op -> Block_validation.mk_operation op))
+    in
+    let* pred = Store.Block.read_predecessor chain_store block in
+    let* live_blocks, live_operations =
+      Store.Chain.compute_live_blocks chain_store ~block:pred
+    in
+    let r =
+      Block_validation.check_liveness ~live_blocks ~live_operations bh ops
+    in
+    match r with
+    | Ok () ->
+        if should_fail then Assert.fail_msg "Error: unexpected success"
+        else return_unit
+    | Error _ ->
+        if should_fail then return_unit
+        else Assert.fail_msg "Error: unexpected failure"
+  in
+  let* block_a =
+    Alpha_utils.bake
+      ~operations:(mk_operations [block_y; block_z])
+      chain_store
+      before_b
+  in
+  let* () = check block_a in
+  let* block_a' =
+    Alpha_utils.bake
+      ~operations:(mk_operations [block_y; block_z])
+      chain_store
+      before_b
+  in
+  let* () = check block_a' in
+  let* block_b =
+    Alpha_utils.bake
+      ~operations:(mk_operations [block_a; block_z])
+      chain_store
+      block_a
+  in
+  let* () = check block_b in
+  let* block_b' =
+    Alpha_utils.bake ~operations:(mk_operations [block_a]) chain_store block_a'
+  in
+  let* () = check ~should_fail:true block_b' in
+  let* block_b'' =
+    Alpha_utils.bake ~operations:(mk_operations [block_a']) chain_store block_a'
+  in
+  let* () = check block_b'' in
+  let* block_a'' =
+    Alpha_utils.bake
+      ~operations:(mk_operations [block_x; block_y])
+      chain_store
+      before_b
+  in
+  let* () = check ~should_fail:true block_a'' in
+  return_unit
+
+let wrap_test_no_store (name, f) =
+  let open Lwt_syntax in
+  let prefix_dir = "tezos_indexed_store_test_" in
+  let run f =
+    let base_dir = Filename.temp_file prefix_dir "" in
+    let* () = Lwt_unix.unlink base_dir in
+    let* () = Lwt_unix.mkdir base_dir 0o700 in
+    f base_dir
+  in
+  Alcotest_lwt.test_case name `Quick (fun _ () ->
+      let* r = run f in
+      match r with
+      | Ok () -> return_unit
+      | Error err ->
+          Format.kasprintf Alcotest.fail "error: %a" pp_print_trace err)
+
 let tests =
   let test_tree_cases =
     List.map
@@ -755,6 +932,9 @@ let tests =
           test_block_of_identifier_success_savepoint );
       ]
   in
-  ("store", test_cases @ test_tree_cases)
+  let test_live_blocks =
+    List.map wrap_test_no_store [("live_blocks", test_live_blocks)]
+  in
+  ("store", test_cases @ test_tree_cases @ test_live_blocks)
 
 let () = Lwt_main.run (Alcotest_lwt.run ~__FILE__ "tezos-store" [tests])

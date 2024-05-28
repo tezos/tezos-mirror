@@ -45,7 +45,15 @@ let test_injection_and_activation () : unit =
   Test.register
     ~__FILE__
     ~title:"protocol injection and activation"
-    ~tags:["protocol"; "injection"; "activation"; "network"; "not_static"]
+    ~tags:
+      [
+        Tag.layer1;
+        "protocol";
+        "injection";
+        "activation";
+        "network";
+        "not_static";
+      ]
     ~uses:[Constant.octez_protocol_compiler]
   @@ fun () ->
   Log.info "Check protocol compiler and protocol availability" ;

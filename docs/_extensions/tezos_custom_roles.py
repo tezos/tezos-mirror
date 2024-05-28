@@ -195,14 +195,6 @@ def default_role(
 
     file = inliner.document.current_source
 
-    # TODO tezos/tezos#2170: suppress the following check when protocol O
-    # becomes active, because at that point, the pages for all active protocols
-    # will have been fixed automatically by snapshotting Alpha.
-
-    # skip pages of protocols other than Alpha, to avoid manual backporting
-    if re.search("/(active|lima|mumbai|nairobi)/", file):
-        return [node], []
-
     # skip automatically generated pages
     if re.match(".*[.]txt$", file):
         return [node], []

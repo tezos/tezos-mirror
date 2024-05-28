@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -77,6 +78,17 @@ module Contract_alias : sig
   val name : #Client_context.wallet -> Contract.t -> string tzresult Lwt.t
 
   val autocomplete : #Client_context.wallet -> string list tzresult Lwt.t
+end
+
+module Destination_alias : sig
+  val destination_parameter :
+    unit -> (Destination.t, #Client_context.wallet) Tezos_clic.parameter
+
+  val destination_param :
+    ?name:string ->
+    ?desc:string ->
+    ('a, (#Client_context.wallet as 'wallet)) Tezos_clic.params ->
+    (Destination.t -> 'a, 'wallet) Tezos_clic.params
 end
 
 (** [list_contracts cctxt] returns the concatenation of [contracts] and [accounts]

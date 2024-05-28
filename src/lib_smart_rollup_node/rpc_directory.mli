@@ -29,3 +29,10 @@ val top_directory : Node_context.rw -> unit Tezos_rpc.Directory.t
 
 (** The full RPC directory for the protocol agnostic rollup node. *)
 val directory : Node_context.rw -> unit Tezos_rpc.Directory.t
+
+(** Generate the OpenAPI description for the RPC API of the node. If [protocol]
+    is not specified, the API will be generated for the newest protocol. *)
+val generate_openapi :
+  ?protocol:Protocol_hash.t ->
+  #Client_context.full ->
+  Ezjsonm.value tzresult Lwt.t

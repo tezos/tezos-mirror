@@ -1,131 +1,136 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
-#![allow(dead_code)]
 
-use crate::blueprint::Queue;
+use crate::block_in_progress::BlockInProgress;
+use crate::event::Event;
 use crate::indexable_storage::IndexableStorage;
+use crate::simulation::SimulationResult;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
+use evm_execution::storage::blocks::add_new_block_hash;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
-use crate::block_in_progress::BlockInProgress;
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
+    TransactionHash, TransactionObject, TransactionReceipt,
 };
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 2;
-pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
+pub const STORAGE_VERSION: u64 = 11;
+pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
 
-const SMART_ROLLUP_ADDRESS: RefPath =
-    RefPath::assert_from(b"/metadata/smart_rollup_address");
+const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
 
-const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
-
-const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
-const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+const TICKETER: RefPath = RefPath::assert_from(b"/evm/ticketer");
+pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
+pub const SEQUENCER_GOVERNANCE: RefPath =
+    RefPath::assert_from(b"/evm/sequencer_governance");
+pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
+pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
+    RefPath::assert_from(b"/evm/kernel_security_governance");
+pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
 // Path to the block in progress, used between reboots
-const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
+const EVM_BLOCK_IN_PROGRESS: RefPath =
+    RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
-// flag denoting reboot
-const REBOOTED: RefPath = RefPath::assert_from(b"/reboot");
-
-const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
-pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
+const EVM_CURRENT_BLOCK: RefPath =
+    RefPath::assert_from(b"/evm/world_state/blocks/current");
+pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/world_state/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 
+const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
+
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/transactions_receipts");
+    RefPath::assert_from(b"/evm/world_state/transactions_receipts");
 
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
-    RefPath::assert_from(b"/transactions_objects");
+    RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
-const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
+const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 
-const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
+pub const EVM_BASE_FEE_PER_GAS: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/base_fee_per_gas");
+const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
+const EVM_DA_FEE: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
+const TICK_BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
+const TICK_BACKLOG_TIMESTAMP_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
+
+/// The sequencer pool is the designated account that the data-availability fees are sent to.
+///
+/// This may be updated by the governance mechanism over time. If it is not set, the data-availability
+/// fees are instead burned.
+pub const SEQUENCER_POOL_PATH: RefPath =
+    RefPath::assert_from(b"/evm/sequencer_pool_address");
+
+/// Path to the last L1 level seen.
+const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/evm/l1_level");
+
+const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/burned");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
-    RefPath::assert_from(b"/info_per_level/timestamp");
+    RefPath::assert_from(b"/evm/info_per_level/timestamp");
 /// Path to the number of timestamps read, use to compute the average block time.
 const EVM_INFO_PER_LEVEL_STATS_NUMBERS: RefPath =
-    RefPath::assert_from(b"/info_per_level/stats/numbers");
+    RefPath::assert_from(b"/evm/info_per_level/stats/numbers");
 /// Path to the sum of distance between blocks, used to compute the average block time.
 const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
-    RefPath::assert_from(b"/info_per_level/stats/total");
+    RefPath::assert_from(b"/evm/info_per_level/stats/total");
 
-pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
-pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
-pub const SIMULATION_GAS: RefPath = RefPath::assert_from(b"/simulation_gas");
+pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
 
-pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
-pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
+pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/evm/deposit_nonce");
 
 /// Path where all indexes are stored.
-const EVM_INDEXES: RefPath = RefPath::assert_from(b"/indexes");
+pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/evm/world_state/indexes");
 
 /// Path where Ethereum accounts are stored.
 const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
 
 /// Subpath where blocks are indexed.
-const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
+const BLOCKS_INDEX: RefPath = RefPath::assert_from(b"/blocks");
 
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
-/// The size of an address. Size in bytes.
-const ADDRESS_SIZE: usize = 20;
-/// The size of a 256 bit hash. Size in bytes.
-const HASH_MAX_SIZE: usize = 32;
-/// The size of status. Size in bytes.
-const TRANSACTION_RECEIPT_STATUS_SIZE: usize = 1;
-/// The size of type of the transaction. Size in bytes.
-const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
+// Path to the number of seconds until delayed txs are timed out.
+const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
+    RefPath::assert_from(b"/evm/delayed_inbox_timeout");
+
+// Path to the number of l1 levels that need to pass for a
+// delayed tx to be timed out.
+const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
+    RefPath::assert_from(b"/evm/delayed_inbox_min_levels");
+
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
-// Path to the queue left at end of previous reboot
-const QUEUE_IN_PROGRESS: RefPath = RefPath::assert_from(b"/queue");
-
-// Path to the flag denoting whether the kernel is in sequencer mode or not.
-const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
-
-// This function should be used when it makes sense that the value
-// stored under [path] can be empty.
-fn store_read_empty_safe<Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
-    offset: usize,
-    max_bytes: usize,
-) -> Result<Vec<u8>, Error> {
-    let stored_value_size = host.store_value_size(path)?;
-
-    if stored_value_size == 0 {
-        Ok(vec![])
-    } else {
-        host.store_read(path, offset, max_bytes)
-            .map_err(Error::from)
-    }
-}
+// Path to the tz1 administrating the sequencer. If there is nothing
+// at this path, the kernel is in proxy mode.
+pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
-    host: &mut Host,
+    host: &Host,
     path: &T,
     buffer: &mut [u8],
     expected_size: usize,
@@ -141,35 +146,13 @@ pub fn store_read_slice<Host: Runtime, T: Path>(
     }
 }
 
-pub fn read_smart_rollup_address<Host: Runtime>(
-    host: &mut Host,
-) -> Result<[u8; 20], Error> {
-    let mut buffer = [0u8; 20];
-    store_read_slice(host, &SMART_ROLLUP_ADDRESS, &mut buffer, 20)?;
-    Ok(buffer)
-}
-
-pub fn store_smart_rollup_address<Host: Runtime>(
-    host: &mut Host,
-    smart_rollup_address: &[u8; 20],
-) -> Result<(), Error> {
-    host.store_write(&SMART_ROLLUP_ADDRESS, smart_rollup_address, 0)
-        .map_err(Error::from)
-}
-
 /// Read a single unsigned 256 bit value from storage at the path given.
 fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, WORD_SIZE)?;
     Ok(Wei::from_little_endian(&bytes))
 }
 
-/// Read a single address value from storage at the path given.
-fn read_address(host: &impl Runtime, path: &OwnedPath) -> Result<H160, Error> {
-    let bytes = host.store_read(path, 0, ADDRESS_SIZE)?;
-    Ok(H160::from_slice(&bytes))
-}
-
-fn write_u256(
+pub fn write_u256(
     host: &mut impl Runtime,
     path: &OwnedPath,
     value: U256,
@@ -177,6 +160,17 @@ fn write_u256(
     let mut bytes: [u8; WORD_SIZE] = value.into();
     value.to_little_endian(&mut bytes);
     host.store_write(path, &bytes, 0).map_err(Error::from)
+}
+
+fn read_u64(host: &impl Runtime, path: &impl Path) -> Result<u64, Error> {
+    let mut bytes = [0; std::mem::size_of::<u64>()];
+    host.store_read_slice(path, 0, bytes.as_mut_slice())?;
+    Ok(u64::from_le_bytes(bytes))
+}
+
+fn write_u64(host: &mut impl Runtime, path: &impl Path, value: u64) -> Result<(), Error> {
+    host.store_write_all(path, value.to_le_bytes().as_slice())?;
+    Ok(())
 }
 
 pub fn block_path(hash: H256) -> Result<OwnedPath, Error> {
@@ -200,14 +194,14 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
 }
 
-pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+pub fn read_current_block_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_NUMBER)?;
     let mut buffer = [0_u8; 8];
     store_read_slice(host, &path, &mut buffer, 8)?;
     Ok(U256::from_little_endian(&buffer))
 }
 
-pub fn read_current_block_hash<Host: Runtime>(host: &mut Host) -> Result<H256, Error> {
+pub fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_HASH)?;
     let mut buffer = [0_u8; 32];
     store_read_slice(host, &path, &mut buffer, 32)?;
@@ -223,7 +217,7 @@ pub fn store_rlp<T: Encodable, Host: Runtime>(
     host.store_write_all(path, &bytes).map_err(Error::from)
 }
 
-fn read_rlp<T: Decodable, Host: Runtime>(
+pub fn read_rlp<T: Decodable, Host: Runtime>(
     host: &Host,
     path: &impl Path,
 ) -> Result<T, Error> {
@@ -298,10 +292,19 @@ fn store_current_block_nodebug<Host: Runtime>(
         block.number,
         block.hash,
     )?;
+    // We store the current block hash so the BLOCKHASH opcode can retrieve the block hash
+    // by its number and return it in the execution flow.
+    // The routine to clean the outdated hashes (see BLOCKHASH's spec.) is within [add_new_block_hash].
+    add_new_block_hash(host, block.number, block.hash)
+        .map_err(|_| Error::Storage(StorageError::BlockHashStorageFailed))?;
     // When storing the current block's infos we need to store it under the [evm/blocks/<block_hash>]
     store_block_by_hash(host, block)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_current_block<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
@@ -311,8 +314,9 @@ pub fn store_current_block<Host: Runtime>(
             log!(
                 host,
                 Info,
-                "Storing block {} containing {} transaction(s) for {} gas used.",
+                "Storing block {} at {} containing {} transaction(s) for {} gas used.",
                 block.number,
+                block.timestamp,
                 block.transactions.len(),
                 U256::to_string(&block.gas_used)
             );
@@ -324,32 +328,19 @@ pub fn store_current_block<Host: Runtime>(
         }
     }
 }
-
-pub fn store_simulation_result<Host: Runtime>(
+pub fn store_simulation_result<Host: Runtime, T: Encodable>(
     host: &mut Host,
-    result: Option<Vec<u8>>,
+    result: SimulationResult<T, String>,
 ) -> Result<(), anyhow::Error> {
-    if let Some(result) = result {
-        host.store_write(&SIMULATION_RESULT, &result, 0)?
-    }
-    Ok(())
+    let encoded = result.rlp_bytes();
+    host.store_write(&SIMULATION_RESULT, &encoded, 0)
+        .context("Failed to write the simulation result.")
 }
 
-pub fn store_evaluation_gas<Host: Runtime>(
-    host: &mut Host,
-    result: u64,
-) -> Result<(), Error> {
-    write_u256(host, &SIMULATION_GAS.into(), U256::from(result))
-}
-
-pub fn store_simulation_status<Host: Runtime>(
-    host: &mut Host,
-    result: bool,
-) -> Result<(), anyhow::Error> {
-    host.store_write(&SIMULATION_STATUS, &[result.into()], 0)
-        .context("Failed to write the simulation status.")
-}
-
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_transaction_receipt<Host: Runtime>(
     host: &mut Host,
     receipt: &TransactionReceipt,
@@ -362,11 +353,15 @@ pub fn store_transaction_receipt<Host: Runtime>(
     index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
     let receipt_path = receipt_path(&receipt.hash)?;
     let src: &[u8] = &receipt.rlp_bytes();
-    log!(host, Debug, "Storing receipt of size {}", src.len());
+    log!(host, Benchmarking, "Storing receipt of size {}", src.len());
     host.store_write_all(&receipt_path, src)?;
     Ok(src.len().try_into()?)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_transaction_object<Host: Runtime>(
     host: &mut Host,
     object: &TransactionObject,
@@ -375,7 +370,7 @@ pub fn store_transaction_object<Host: Runtime>(
     let encoded: &[u8] = &object.rlp_bytes();
     log!(
         host,
-        Debug,
+        Benchmarking,
         "Storing transaction object of size {}",
         encoded.len()
     );
@@ -595,7 +590,7 @@ pub fn store_chain_id<Host: Runtime>(
     write_u256(host, &EVM_CHAIN_ID.into(), chain_id)
 }
 
-pub fn read_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     read_u256(host, &EVM_CHAIN_ID.into())
 }
 
@@ -610,12 +605,102 @@ pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     read_u256(host, &EVM_BASE_FEE_PER_GAS.into())
 }
 
+pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+    read_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
+}
+
+pub fn read_tick_backlog(host: &impl Runtime) -> Result<u64, Error> {
+    read_u64(host, &TICK_BACKLOG_PATH)
+}
+
+pub fn store_tick_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+    write_u64(host, &TICK_BACKLOG_PATH, value)
+}
+
+pub fn read_tick_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
+    read_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH)
+}
+
+pub fn store_tick_backlog_timestamp(
+    host: &mut impl Runtime,
+    value: u64,
+) -> Result<(), Error> {
+    write_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH, value)?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
+    host: &mut Host,
+    price: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into(), price)
+}
+
+pub fn store_da_fee(
+    host: &mut impl Runtime,
+    base_fee_per_gas: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_DA_FEE.into(), base_fee_per_gas)
+}
+
+pub fn read_da_fee(host: &impl Runtime) -> Result<U256, Error> {
+    read_u256(host, &EVM_DA_FEE.into())
+}
+
+pub fn update_burned_fees(
+    host: &mut impl Runtime,
+    burned_fee: U256,
+) -> Result<(), Error> {
+    let path = &EVM_BURNED_FEES.into();
+    let current = read_u256(host, path).unwrap_or_else(|_| U256::zero());
+    let new = current.saturating_add(burned_fee);
+    write_u256(host, path, new)
+}
+
+#[cfg(test)]
+pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
+    let path = &EVM_BURNED_FEES.into();
+    read_u256(host, path).unwrap_or_else(|_| U256::zero())
+}
+
+pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
+    let mut bytes = [0; std::mem::size_of::<H160>()];
+    let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice()) else {
+        log!(host, Debug, "No sequencer pool address set");
+        return None;
+    };
+    Some(bytes.into())
+}
+
+pub fn store_sequencer_pool_address(
+    host: &mut impl Runtime,
+    address: H160,
+) -> Result<(), Error> {
+    let bytes = address.to_fixed_bytes();
+    host.store_write_all(&SEQUENCER_POOL_PATH, bytes.as_slice())?;
+    Ok(())
+}
+
 pub fn store_timestamp_path<Host: Runtime>(
     host: &mut Host,
     path: &OwnedPath,
     timestamp: &Timestamp,
 ) -> Result<(), Error> {
     host.store_write(path, &timestamp.i64().to_le_bytes(), 0)?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn read_l1_level<Host: Runtime>(host: &mut Host) -> Result<u32, Error> {
+    let mut buffer = [0u8; 4];
+    store_read_slice(host, &EVM_L1_LEVEL, &mut buffer, 4)?;
+    let level = u32::from_le_bytes(buffer);
+    Ok(level)
+}
+
+pub fn store_l1_level<Host: Runtime>(host: &mut Host, level: u32) -> Result<(), Error> {
+    host.store_write(&EVM_L1_LEVEL, &level.to_le_bytes(), 0)?;
     Ok(())
 }
 
@@ -660,7 +745,7 @@ pub fn store_last_info_per_level_timestamp<Host: Runtime>(
 }
 
 pub fn read_timestamp_path<Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
     path: &OwnedPath,
 ) -> Result<Timestamp, Error> {
     let mut buffer = [0u8; 8];
@@ -670,17 +755,9 @@ pub fn read_timestamp_path<Host: Runtime>(
 }
 
 pub fn read_last_info_per_level_timestamp<Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
 ) -> Result<Timestamp, Error> {
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
-}
-
-pub fn store_kernel_upgrade_nonce<Host: Runtime>(
-    host: &mut Host,
-    upgrade_nonce: u16,
-) -> Result<(), Error> {
-    host.store_write_all(&KERNEL_UPGRADE_NONCE, &upgrade_nonce.to_le_bytes())
-        .map_err(Error::from)
 }
 
 /// Get the index of accounts.
@@ -718,10 +795,7 @@ pub fn index_account(
     }
 }
 
-fn read_b58_kt1<Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
-) -> Option<ContractKt1Hash> {
+fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<ContractKt1Hash> {
     let mut buffer = [0; 36];
     store_read_slice(host, path, &mut buffer, 36).ok()?;
     let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
@@ -735,6 +809,22 @@ pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> 
 
 pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &ADMIN.into())
+}
+
+pub fn read_sequencer_governance<Host: Runtime>(
+    host: &mut Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &SEQUENCER_GOVERNANCE.into())
+}
+
+pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &KERNEL_GOVERNANCE.into())
+}
+
+pub fn read_kernel_security_governance<Host: Runtime>(
+    host: &mut Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE.into())
 }
 
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(
@@ -814,81 +904,154 @@ pub fn store_kernel_version<Host: Runtime>(
         .map_err(Error::from)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_block_in_progress<Host: Runtime>(
     host: &mut Host,
-    block: &BlockInProgress,
-) -> Result<(), anyhow::Error> {
-    let bytes: &[u8] = &block.rlp_bytes();
+    bip: &BlockInProgress,
+) -> anyhow::Result<()> {
+    let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
+    let bytes = &bip.rlp_bytes();
     log!(
         host,
-        Debug,
-        "Storing Block in Progress of size {}",
+        Benchmarking,
+        "Storing Block In Progress of size {}",
         bytes.len()
     );
-    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, bytes)
-        .context("Failed to store BlockInProgress")
+    host.store_write_all(&path, bytes)
+        .context("Failed to store current block in progress")
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn read_block_in_progress<Host: Runtime>(
-    host: &mut Host,
-) -> Result<BlockInProgress, anyhow::Error> {
-    let bytes = host
-        .store_read_all(&EVM_BLOCK_IN_PROGRESS)
-        .context("Failed to read stored BlockInProgress")?;
-    log!(
-        host,
-        Debug,
-        "Reading Block in Progress of size {}",
-        bytes.len()
-    );
-    let decoder = Rlp::new(bytes.as_slice());
-    BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
-}
-
-pub fn delete_block_in_progress<Host: Runtime>(
-    host: &mut Host,
-) -> Result<(), anyhow::Error> {
-    if host.store_read(&REBOOTED, 0, 0).is_ok() {
-        host.store_delete(&EVM_BLOCK_IN_PROGRESS)
-            .context("Failed to delete Block in progress")?
+    host: &Host,
+) -> anyhow::Result<Option<BlockInProgress>> {
+    let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
+    if let Some(ValueType::Value) = host.store_has(&path)? {
+        let bytes = host
+            .store_read_all(&path)
+            .context("Failed to read current block in progress")?;
+        log!(
+            host,
+            Benchmarking,
+            "Reading Block In Progress of size {}",
+            bytes.len()
+        );
+        let decoder = Rlp::new(bytes.as_slice());
+        let bip = BlockInProgress::decode(&decoder)
+            .context("Failed to decode current block in progress")?;
+        Ok(Some(bip))
+    } else {
+        Ok(None)
     }
-    Ok(())
 }
 
-pub fn add_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
-    host.store_write(&REBOOTED, &[1], 0)
-        .context("Failed to set reboot flag")
+pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&EVM_BLOCK_IN_PROGRESS)
+        .context("Failed to delete block in progress")
 }
 
-pub fn delete_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
-    host.store_delete(&REBOOTED)
-        .context("Failed to delete reboot flag")
+pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
+    if host.store_has(&SEQUENCER)?.is_some() {
+        let bytes = host.store_read_all(&SEQUENCER)?;
+        let Ok(tz1_b58) = String::from_utf8(bytes) else { return Ok(None) };
+        let Ok(tz1) = PublicKey::from_b58check(&tz1_b58) else { return Ok(None)};
+        Ok(Some(tz1))
+    } else {
+        Ok(None)
+    }
 }
 
-pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
-    Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
+pub fn remove_sequencer<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&SEQUENCER).map_err(Into::into)
 }
 
-pub fn store_queue<Host: Runtime>(
+pub fn store_sequencer<Host: Runtime>(
     host: &mut Host,
-    queue: &Queue,
-) -> Result<(), anyhow::Error> {
-    let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
-    host.store_write_all(&queue_path, &queue.rlp_bytes())
-        .context("Failed to store current queue")
+    public_key: &PublicKey,
+) -> anyhow::Result<()> {
+    let pk_b58 = PublicKey::to_b58check(public_key);
+    let bytes = String::as_bytes(&pk_b58);
+    host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
 }
 
-pub fn read_queue<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
-    let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
-    let bytes = host
-        .store_read_all(&queue_path)
-        .context("Failed to read current queue")?;
-    let decoder = Rlp::new(bytes.as_slice());
-    Queue::decode(&decoder).context("Failed to decode current queue")
+pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    if host.store_has(&EVENTS)?.is_some() {
+        host.store_delete(&EVENTS)
+            .context("Failed to delete old events")
+    } else {
+        Ok(())
+    }
 }
 
-pub(crate) mod internal_for_tests {
+pub fn store_event<Host: Runtime>(host: &mut Host, event: &Event) -> anyhow::Result<()> {
+    let index = IndexableStorage::new(&EVENTS)?;
+    index
+        .push_value(host, &event.rlp_bytes())
+        .map_err(Into::into)
+}
+
+pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> {
+    // The default timeout is 12 hours
+    let default_timeout = 43200;
+    if host.store_has(&EVM_DELAYED_INBOX_TIMEOUT)?.is_some() {
+        let mut buffer = [0u8; 8];
+        store_read_slice(host, &EVM_DELAYED_INBOX_TIMEOUT, &mut buffer, 8)?;
+        let timeout = u64::from_le_bytes(buffer);
+        log!(
+            host,
+            Debug,
+            "Using delayed inbox timeout of {} seconds ({} hours)",
+            timeout,
+            timeout / 3600
+        );
+        Ok(timeout)
+    } else {
+        log!(
+            host,
+            Debug,
+            "Using default delayed inbox timeout of {} seconds ({} hours)",
+            default_timeout,
+            default_timeout / 3600
+        );
+        Ok(default_timeout)
+    }
+}
+
+pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u32> {
+    let default_min_levels = 720;
+    if host.store_has(&EVM_DELAYED_INBOX_MIN_LEVELS)?.is_some() {
+        let mut buffer = [0u8; 4];
+        store_read_slice(host, &EVM_DELAYED_INBOX_MIN_LEVELS, &mut buffer, 4)?;
+        let min_levels = u32::from_le_bytes(buffer);
+        log!(
+            host,
+            Debug,
+            "Using delayed inbox minimum levels: {}",
+            min_levels
+        );
+        Ok(min_levels)
+    } else {
+        log!(
+            host,
+            Debug,
+            "Using default delayed inbox minimum levels: {}",
+            default_min_levels
+        );
+        Ok(default_min_levels)
+    }
+}
+
+#[cfg(test)]
+mod internal_for_tests {
     use super::*;
+
+    use tezos_ethereum::transaction::TransactionStatus;
 
     /// Reads status from the receipt in storage.
     pub fn read_transaction_receipt_status<Host: Runtime>(
@@ -897,15 +1060,6 @@ pub(crate) mod internal_for_tests {
     ) -> Result<TransactionStatus, Error> {
         let receipt = read_transaction_receipt(host, tx_hash)?;
         Ok(receipt.status)
-    }
-
-    /// Reads cumulative gas used from the receipt in storage.
-    pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
-        host: &mut Host,
-        tx_hash: &TransactionHash,
-    ) -> Result<U256, Error> {
-        let receipt = read_transaction_receipt(host, tx_hash)?;
-        Ok(receipt.cumulative_gas_used)
     }
 
     /// Reads a transaction receipt from storage.
@@ -918,33 +1072,54 @@ pub(crate) mod internal_for_tests {
         let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
         Ok(receipt)
     }
+
+    pub fn store_current_block_number<Host: Runtime>(
+        host: &mut Host,
+        block_number: U256,
+    ) -> Result<(), Error> {
+        let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
+        let number_path = concat(&current_block_path, &BLOCK_NUMBER)?;
+        let mut le_block_number: [u8; 32] = [0; 32];
+        block_number.to_little_endian(&mut le_block_number);
+        host.store_write(&number_path, &le_block_number, 0)
+            .map_err(Error::from)
+    }
 }
 
-pub fn is_sequencer<Host: Runtime>(host: &Host) -> Result<bool, Error> {
-    Ok(host.store_has(&SEQUENCER)?.is_some())
+#[cfg(test)]
+pub use internal_for_tests::*;
+
+/// Smart Contract of the delayed bridge
+///
+/// This smart contract is used to submit transactions to the rollup
+/// when in sequencer mode
+pub fn read_delayed_transaction_bridge<Host: Runtime>(
+    host: &Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &DELAYED_BRIDGE.into())
 }
 
 #[cfg(test)]
 mod tests {
     use tezos_smart_rollup_mock::MockHost;
 
-    use super::*;
     #[test]
-    fn test_reboot_flag() {
+    fn update_burned_fees() {
+        // Arrange
         let mut host = MockHost::default();
 
-        add_reboot_flag(&mut host).expect("Should have been able to set flag");
+        let fst = 17.into();
+        let snd = 19.into();
 
-        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
+        // Act
+        let result_fst = super::update_burned_fees(&mut host, fst);
+        let result_snd = super::update_burned_fees(&mut host, snd);
 
-        delete_reboot_flag(&mut host).expect("Should have been able to delete flag");
+        // Assert
+        assert!(result_fst.is_ok());
+        assert!(result_snd.is_ok());
 
-        assert!(
-            !was_rebooted(&mut host).expect("should not have failed without reboot flag")
-        );
-
-        add_reboot_flag(&mut host).expect("Should have been able to set flag");
-
-        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
+        let burned = super::read_burned_fees(&mut host);
+        assert_eq!(fst + snd, burned);
     }
 }

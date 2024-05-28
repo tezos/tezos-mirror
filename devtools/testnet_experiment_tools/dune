@@ -21,8 +21,7 @@
   -open Tezt
   -open Tezt.Base
   -open Tezos_client_base_unix
-  -open Tezos_stdlib_unix
-  -open Tezos_protocol_alpha)
+  -open Tezos_stdlib_unix)
  (modules testnet_experiment_tools format_baker_accounts))
 
 (library
@@ -36,14 +35,14 @@
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-libs.tezos-context
-  octez-protocol-017-PtNairob-libs.baking
-  octez-protocol-017-PtNairob-libs.client
-  octez-protocol-017-PtNairob-libs.client.commands
-  tezos-protocol-017-PtNairob.protocol
   octez-protocol-018-Proxford-libs.baking
   octez-protocol-018-Proxford-libs.client
   octez-protocol-018-Proxford-libs.client.commands
   tezos-protocol-018-Proxford.protocol
+  octez-protocol-019-PtParisB-libs.baking
+  octez-protocol-019-PtParisB-libs.client
+  octez-protocol-019-PtParisB-libs.client.commands
+  tezos-protocol-019-PtParisB.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -59,7 +58,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context)
- (modules sigs tool_017_PtNairob tool_018_Proxford tool_alpha))
+ (modules sigs tool_018_Proxford tool_019_PtParisB tool_alpha))
 
 (executable
  (name simulation_scenario)
@@ -141,7 +140,7 @@
  (libraries
   octez-libs.base
   octez-libs.clic
-  caqti-lwt
+  caqti-lwt.unix
   caqti-dynload
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix)

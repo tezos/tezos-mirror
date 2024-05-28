@@ -28,6 +28,7 @@ let test_gas_storage_limits =
     ~__FILE__
     ~title:"protocol limits"
     ~tags:["mockup"; "protocol"; "limits"]
+    ~uses_node:false
   @@ fun protocol ->
   let parameters = JSON.parse_file (Protocol.parameter_file protocol) in
   let gas_limit =

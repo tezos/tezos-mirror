@@ -26,6 +26,7 @@
   octez-shell-libs.context-ops
   octez-libs.rpc
   octez-libs.rpc-http
+  octez-libs.crypto-dal
   tezos-dal-node-services
   lwt-canceler
   lwt-exit
@@ -34,7 +35,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base.TzPervasives.Error_monad_legacy
   -open Tezos_protocol_018_Proxford
   -open Tezos_protocol_018_Proxford_lifted
   -open Tezos_protocol_plugin_018_Proxford
@@ -47,7 +48,8 @@
   -open Tezos_shell_context
   -open Tezos_context
   -open Tezos_context_ops
-  -open Tezos_rpc_http)
+  -open Tezos_rpc_http
+  -open Tezos_crypto_dal)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (library
@@ -71,7 +73,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base.TzPervasives.Error_monad_legacy
   -open Tezos_protocol_018_Proxford
   -open Tezos_protocol_018_Proxford_parameters
   -open Tezos_stdlib_unix

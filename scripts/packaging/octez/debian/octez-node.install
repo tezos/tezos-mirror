@@ -1,0 +1,2 @@
+binaries/octez-node /usr/bin/
+binaries/octez-proxy-server /usr/bin/

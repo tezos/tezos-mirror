@@ -1,7 +1,7 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-How to run Octez
-================
+Running Octez
+=============
 
 In this section, we discuss how to take part in the protocol that runs
 the network.
@@ -55,7 +55,7 @@ origination using the ``--delegate`` option:
 
 Once the contract is originated, the only way to stop or modify its
 delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
-:ref:`the Michelson documentation<MichelsonSetDelegate>` for more
+`the Michelson documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ for more
 details).
 
 
@@ -125,7 +125,7 @@ your implicit account::
 
    octez-client register key bob as delegate
 
-Once registered, you need to wait ``preserved_cycles + 2 = 7`` cycles
+Once registered, you need to wait ``consensus_rights_delay + 2 = 7`` cycles
 for your rights to be considered.
 
 There is a simple rpc that can be used to check your rights for every
@@ -143,7 +143,7 @@ baking rights at higher rounds, like 2 in the example above.
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
-If a delegate doesn't show any sign of activity for ``preserved_cycles``
+If a delegate doesn't show any sign of activity for ``consensus_rights_delay``
 it is marked **inactive** and its rights are removed.
 This mechanism is important to remove inactive delegates and reallocate
 their rights to the active ones so that the network is always working
@@ -153,7 +153,7 @@ operations during 5 cycles to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
-To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and attesting slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
+To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and attesting slots assigned to it, using a :ref:`Tezos block explorer <block_explorers>`.
 Alternatively, you may use the baking rights RPC and the attesting rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/attesting slots for a given delegate (see :ref:`example <DelegateRegistration>`).
 
 .. _baker_run:
@@ -227,14 +227,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PtNairob``, you can
+For instance, if the name is ``mainnet_baker-Proxford``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PtNairob
+    docker logs mainnet_baker-Proxford
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PtNairob -f
+    docker logs mainnet_baker-Proxford -f
 
 This allows you to know if you baked.
 You should see lines such as::

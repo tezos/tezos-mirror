@@ -57,7 +57,7 @@ let () =
   try
     Octez_protocol_compiler.Compiler.main
       Octez_protocol_compiler_native.Native.driver
-      Tezos_version_value.Bin_version.version_string ;
+      Tezos_version_value.Bin_version.octez_version_string ;
     Stdlib.exit 0
   with exn ->
     Format.eprintf "%a\n%!" Opterrors.report_error exn ;

@@ -5,7 +5,22 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Michelson lexer. The main lexer entrypoint is defined on the [Tok] type,
+//! specifically, `Tok::lexer`. See [Logos::lexer]. Generally, you don't need to
+//! call the lexer explicitly, [crate::parser::Parser] will do that for you.
+
+use std::borrow::Cow;
+
 use logos::Logos;
+pub mod errors;
+pub mod macros;
+
+pub use errors::*;
+use macros::*;
+use num_bigint::BigInt;
+use strum_macros::EnumCount;
+
+use crate::ast::Annotation;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -21,9 +36,11 @@ macro_rules! coalesce {
 /// provided, and defines `FromStr` implementation using stringified
 /// representation of the identifiers.
 macro_rules! defprim {
-    ($ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+    ($(#[$meta:meta])* $ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount)]
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms, missing_docs)]
+        #[repr(u8)]
+        $(#[$meta])*
         pub enum $ty {
             $($prim),*
         }
@@ -33,153 +50,186 @@ macro_rules! defprim {
                 match self {
                     $(
                         $ty::$prim => write!(f, "{}", coalesce!($($str)?, stringify!($prim))),
-                    )*
+                        )*
                 }
             }
         }
 
+
         impl std::str::FromStr for $ty {
-          type Err = PrimError;
-          fn from_str(s: &str) -> Result<Self, Self::Err> {
-              match s {
-                $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
-                _ => Err(PrimError(s.to_owned()))
-              }
-          }
+            type Err = PrimError;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
+                        _ => Err(PrimError(s.to_owned()))
+                }
+            }
         }
     };
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-#[error("unknown primitive: {0}")]
-pub struct PrimError(String);
-
 // NB: Primitives will be lexed as written, so capitalization matters.
+//
+// NB: Order matters too, it is used in binary serialization.
+// For the correct order, see
+// `src/proto_alpha/lib_protocol/michelson_v1_primitives.ml` file in this
+// repository, `prim_encoding` function.
+// TODO: https://gitlab.com/tezos/tezos/-/issues/6632
+// Add a test on ordering
 defprim! {
+    /// Micheline primitives.
     Prim;
-    parameter,
-    storage,
-    code,
-    int,
-    nat,
-    bool,
-    mutez,
-    string,
-    unit,
-    operation,
-    pair,
-    option,
-    list,
-    map,
-    True,
-    False,
-    Unit,
-    None,
-    Pair,
-    Some,
-    Elt,
-    PUSH,
-    INT,
-    GT,
-    LOOP,
-    DIP,
-    ADD,
-    DROP,
-    SWAP,
-    IF,
-    DUP,
-    FAILWITH,
-    UNIT,
-    CAR,
-    CDR,
-    PAIR,
-    IF_NONE,
-    SOME,
-    COMPARE,
-    AMOUNT,
-    NIL,
-    GET,
-    UPDATE,
-    UNPAIR,
-    CONS,
-    IF_CONS,
-    ITER,
-    or,
-    Left,
-    Right,
-    IF_LEFT,
-    contract,
-    address,
-    chain_id,
-    CHAIN_ID,
-    SELF,
+    parameter, storage, code, False, Elt, Left,
+    None, Pair, Right, Some, True, Unit,
+    PACK, UNPACK, BLAKE2B, SHA256, SHA512, ABS,
+    ADD, AMOUNT, AND, BALANCE, CAR, CDR,
+    CHECK_SIGNATURE, COMPARE, CONCAT, CONS,
+    CREATE_ACCOUNT, CREATE_CONTRACT, IMPLICIT_ACCOUNT, DIP,
+    DROP, DUP, EDIV, EMPTY_MAP, EMPTY_SET, EQ,
+    EXEC, FAILWITH, GE, GET, GT, HASH_KEY,
+    IF, IF_CONS, IF_LEFT, IF_NONE, INT, LAMBDA,
+    LE, LEFT, LOOP, LSL, LSR, LT, MAP,
+    MEM, MUL, NEG, NEQ, NIL, NONE, NOT,
+    NOW, OR, PAIR, PUSH, RIGHT, SIZE,
+    SOME, SOURCE, SENDER, SELF, STEPS_TO_QUOTA,
+    SUB, SWAP, TRANSFER_TOKENS, SET_DELEGATE, UNIT,
+    UPDATE, XOR, ITER, LOOP_LEFT, ADDRESS,
+    CONTRACT, ISNAT, CAST, RENAME, bool,
+    contract, int, key, key_hash, lambda, list,
+    map, big_map, nat, option, or, pair,
+    set, signature, string, bytes, mutez,
+    timestamp, unit, operation, address, SLICE,
+    DIG, DUG, EMPTY_BIG_MAP, APPLY, chain_id,
+    CHAIN_ID, LEVEL, SELF_ADDRESS, never, NEVER,
+    UNPAIR, VOTING_POWER, TOTAL_VOTING_POWER, KECCAK,
+    SHA3, PAIRING_CHECK, bls12_381_g1, bls12_381_g2,
+    bls12_381_fr, sapling_state, sapling_transaction_deprecated,
+    SAPLING_EMPTY_STATE, SAPLING_VERIFY_UPDATE, ticket,
+    TICKET_DEPRECATED, READ_TICKET, SPLIT_TICKET,
+    JOIN_TICKETS, GET_AND_UPDATE, chest, chest_key,
+    OPEN_CHEST, VIEW, view, constant, SUB_MUTEZ,
+    tx_rollup_l2_address, MIN_BLOCK_TIME, sapling_transaction,
+    EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
+    NAT,
+    // Unstable primitives (they are not part of a released protocol)
+    Transfer_tokens, Set_delegate, Create_contract, Emit,
+    // If you add anything here, see the note about the order above.
+}
+
+impl Prim {
+    /// Write the primitive identifier (as per Micheline binary encoding) into
+    /// the output vector.
+    pub fn encode(&self, out: &mut Vec<u8>) {
+        // Our [Prim] enum has its variants in the right order, so its
+        // discriminant should match the ID.
+        out.push(*self as u8)
+    }
 }
 
 defprim! {
+    /// Additional TZT primitives.
     TztPrim;
     Stack_elt,
     input,
     output,
     Failed,
     amount,
+    balance,
     MutezOverflow,
     GeneralOverflow,
     StaticError,
     #[token("self")]
     self_,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PrimWithTzt {
-    Prim(Prim),
-    TztPrim(TztPrim),
+    #[token("_")]
     Underscore,
-    // Including underscore spearately from TztPrim because the `defprim` macro won't work if we
-    // used a literal underscore there. parsing for this variant is handled specially in the
-    // `lex_prim` function as well.
+    other_contracts,
+    Contract,
 }
 
+/// Either a Micheline primitive, TZT primitive, or a macro lexeme.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Noun {
+    /// Micheline primitive.
+    Prim(Prim),
+    /// TZT primitive.
+    TztPrim(TztPrim),
+    /// Macro lexeme.
+    MacroPrim(Macro),
+}
+
+pub(crate) fn try_ann_from_str(value: &str) -> Option<Annotation> {
+    match value {
+        s @ ("@%" | "@%%" | "%@") => Some(Annotation::Special(Cow::Borrowed(s))),
+        s => match s.as_bytes()[0] {
+            b'@' => Some(Annotation::Variable(Cow::Borrowed(&s[1..]))),
+            b'%' => Some(Annotation::Field(Cow::Borrowed(&s[1..]))),
+            b':' => Some(Annotation::Type(Cow::Borrowed(&s[1..]))),
+            _ => None,
+        },
+    }
+}
+
+/// Tokens representing Michelson lexemes.
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
-pub enum Tok {
-    #[regex(r"[A-Za-z_]+", lex_prim)]
-    Prim(PrimWithTzt),
+pub enum Tok<'a> {
+    /// A primitive token: a Micheline primitive, TZT primitive, or a macro
+    /// token.
+    #[regex(r"[A-Za-z_][A-Za-z_0-9]*", lex_noun)]
+    Noun(Noun),
 
+    /// Number literal.
     #[regex("([+-]?)[0-9]+", lex_number)]
-    Number(i128),
+    Number(BigInt),
 
+    /// String literal.
     #[regex(r#""(\\.|[^\\"])*""#, lex_string)]
     String(String),
 
+    /// Bytes literal.
     #[regex(r#"0x[0-9a-fA-F]*"#, lex_bytes)]
     Bytes(Vec<u8>),
 
+    /// An annotation, see [Annotation].
     // regex as per https://tezos.gitlab.io/active/michelson.html#syntax
-    #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*")]
-    Annotation,
+    #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
+    Annotation(Annotation<'a>),
 
+    /// Left parenthesis `(`.
     #[token("(")]
     LParen,
+    /// Right parenthesis `)`.
     #[token(")")]
     RParen,
+    /// Left brace `{`.
     #[token("{")]
     LBrace,
+    /// Right brace `}`.
     #[token("}")]
     RBrace,
+    /// Semicolon.
     #[token(";")]
     Semi,
 }
 
-impl std::fmt::Display for Tok {
+impl std::fmt::Display for Noun {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
-            Tok::Prim(PrimWithTzt::TztPrim(p)) => p.fmt(f),
-            Tok::Prim(PrimWithTzt::Underscore) => write!(f, "_"),
+        match &self {
+            Noun::Prim(p) => p.fmt(f),
+            Noun::TztPrim(p) => p.fmt(f),
+            Noun::MacroPrim(m) => m.fmt(f),
+        }
+    }
+}
+
+impl std::fmt::Display for Tok<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Tok::Noun(noun) => noun.fmt(f),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Bytes(bs) => write!(f, "0x{}", hex::encode(bs)),
-            Tok::Annotation => write!(f, "<ann>"),
+            Tok::Annotation(ann) => write!(f, "{ann}"),
             Tok::LParen => write!(f, "("),
             Tok::RParen => write!(f, ")"),
             Tok::LBrace => write!(f, "{{"),
@@ -189,43 +239,29 @@ impl std::fmt::Display for Tok {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, thiserror::Error)]
-pub enum LexerError {
-    #[error("unknown token")]
-    UnknownToken,
-    #[error("parsing of numeric literal {0} failed")]
-    NumericLiteral(String),
-    #[error("forbidden character found in string literal \"{0}\"")]
-    ForbiddenCharacterIn(String),
-    #[error("undefined escape sequence: \"\\{0}\"")]
-    UndefinedEscape(char),
-    #[error(transparent)]
-    PrimError(#[from] PrimError),
-    #[error("invalid hex sequence: {0}")]
-    InvalidHex(#[from] hex::FromHexError),
-}
+type Lexer<'a> = logos::Lexer<'a, Tok<'a>>;
 
-impl Default for LexerError {
-    fn default() -> Self {
-        LexerError::UnknownToken
+fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
+    let slice = lex.slice();
+    let mut inner = Macro::lexer(slice);
+    let next = inner.next().ok_or_else(|| PrimError(slice.to_string()))?;
+    // check if lexed token is at EOF
+    if matches!(inner.next(), Some(_)) {
+        return Err(PrimError(slice.to_string()));
     }
+    next.map_err(|_| PrimError(slice.to_string()))
 }
 
-type Lexer<'a> = logos::Lexer<'a, Tok>;
-
-fn lex_prim(lex: &mut Lexer) -> Result<PrimWithTzt, LexerError> {
+fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
     lex.slice()
         .parse()
-        .map(PrimWithTzt::Prim)
-        .or_else(|_| lex.slice().parse().map(PrimWithTzt::TztPrim))
-        .or_else(|_| match lex.slice() {
-            "_" => Ok(PrimWithTzt::Underscore),
-            s => Err(PrimError(s.to_owned())),
-        })
-        .map_err(LexerError::from)
+        .map(Noun::Prim)
+        .or_else(|_| lex.slice().parse().map(Noun::TztPrim))
+        .or_else(|_| lex_macro(lex).map(Noun::MacroPrim))
+        .map_err(LexerError::PrimError)
 }
 
-fn lex_number(lex: &mut Lexer) -> Result<i128, LexerError> {
+fn lex_number(lex: &mut Lexer) -> Result<BigInt, LexerError> {
     lex.slice()
         .parse()
         .map_err(|_| LexerError::NumericLiteral(lex.slice().to_owned()))
@@ -275,6 +311,10 @@ fn lex_string(lex: &mut Lexer) -> Result<String, LexerError> {
 /// prefix and converts the digits pairwise to `u8`.
 fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
     Ok(hex::decode(&lex.slice()[2..])?)
+}
+
+fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Annotation<'a> {
+    try_ann_from_str(lex.slice()).expect("regex from annotation ensures it's valid")
 }
 
 #[cfg(test)]

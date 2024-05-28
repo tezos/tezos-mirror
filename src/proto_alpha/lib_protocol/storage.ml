@@ -123,13 +123,6 @@ module Tenderbake = struct
           (req "predecessor_payload" Block_payload_hash.encoding))
   end
 
-  module Endorsement_branch =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["endorsement_branch"]
-      end)
-      (Branch)
-
   module Attestation_branch =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
@@ -160,8 +153,9 @@ module Missed_attestations_info = struct
       (obj2 (req "remaining_slots" int31) (req "missed_levels" int31))
 end
 
+(* TODO #6918: move closer to its only use left after P *)
 module Slashed_deposits_history = struct
-  type slashed_percentage = Int_percentage.t
+  type slashed_percentage = Percentage.t
 
   (* invariant: sorted list *)
   type t = (Cycle_repr.t * slashed_percentage) list
@@ -171,12 +165,12 @@ module Slashed_deposits_history = struct
     list
       (obj2
          (req "cycle" Cycle_repr.encoding)
-         (req "slashed_percentage" Int_percentage.encoding))
+         (req "slashed_percentage" Percentage.encoding))
 
   let add cycle percentage history =
     let rec loop rev_prefix = function
       | (c, p) :: tl when Cycle_repr.(cycle = c) ->
-          let p = Int_percentage.add_bounded p percentage in
+          let p = Percentage.add_bounded p percentage in
           (* cycle found, do not change the order *)
           List.rev_append rev_prefix ((c, p) :: tl)
       | ((c, _) as hd) :: tl when Cycle_repr.(cycle > c) ->
@@ -191,7 +185,19 @@ module Slashed_deposits_history = struct
   let rec get cycle = function
     | (c, p) :: _ when Cycle_repr.(cycle = c) -> p
     | (c, _) :: tl when Cycle_repr.(cycle > c) -> get cycle tl
-    | _ -> Int_percentage.p0
+    | _ -> Percentage.p0
+end
+
+(* TODO #6918: Remove after P *)
+module Slashed_deposits_history__Oxford = struct
+  include Slashed_deposits_history
+
+  let encoding =
+    let open Data_encoding in
+    list
+      (obj2
+         (req "cycle" Cycle_repr.encoding)
+         (req "slashed_percentage" Percentage.encoding_legacy_in_o))
 end
 
 module Unstake_request = struct
@@ -294,16 +300,6 @@ module Contract = struct
       (struct
         let name = ["consensus_key"; "active"]
       end)
-      (Signature.Public_key)
-
-  (* TODO: remove this in P *)
-  module Pending_consensus_keys_up_to_Nairobi =
-    Make_indexed_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["consensus_key"; "pendings"]
-         end))
-         (Make_index (Cycle_repr.Index))
       (Signature.Public_key)
 
   module Staking_parameters =
@@ -452,15 +448,6 @@ module Contract = struct
       end)
       (Encoding.Z)
 
-  (* Remove me in P. *)
-  module Frozen_deposits_up_to_Nairobi =
-    Indexed_context.Make_map
-      (Registered)
-      (struct
-        let name = ["frozen_deposits"]
-      end)
-      (Deposits_repr)
-
   module Unstaked_frozen_deposits =
     Indexed_context.Make_map
       (Registered)
@@ -501,13 +488,14 @@ module Contract = struct
       end)
       (Tez_repr)
 
-  module Slashed_deposits =
+  (* TODO #6918: Remove after P *)
+  module Slashed_deposits__Oxford =
     Indexed_context.Make_map
-      (Registered)
+      (Ghost)
       (struct
         let name = ["slashed_deposits"]
       end)
-      (Slashed_deposits_history)
+      (Slashed_deposits_history__Oxford)
 
   module Bond_id_index =
     Make_indexed_subcontext
@@ -1105,7 +1093,7 @@ module Consensus_keys =
        end))
        (Public_key_hash_index)
 
-module Current_cycle_denunciations =
+module Pending_denunciations =
   Make_indexed_data_storage
     (Make_subcontext (Registered) (Raw_context)
        (struct
@@ -1114,25 +1102,29 @@ module Current_cycle_denunciations =
        (Public_key_hash_index)
     (Denunciations_repr)
 
+module Slashed_deposits =
+  Make_indexed_data_storage
+    (Make_subcontext (Registered) (Raw_context)
+       (struct
+         let name = ["slashed_deposits"]
+       end))
+       (Public_key_hash_index)
+    (Slashed_deposits_history)
+
 (** Per cycle storage *)
 
-type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
+type denounced = {
+  for_double_preattesting : bool;
+  for_double_attesting : bool;
+  for_double_baking : bool;
+}
 
-let default_slashed_level =
-  {for_double_attesting = false; for_double_baking = false}
-
-module Slashed_level = struct
-  type t = slashed_level
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {for_double_attesting; for_double_baking} ->
-        (for_double_attesting, for_double_baking))
-      (fun (for_double_attesting, for_double_baking) ->
-        {for_double_attesting; for_double_baking})
-      (obj2 (req "for_double_attesting" bool) (req "for_double_baking" bool))
-end
+let default_denounced =
+  {
+    for_double_preattesting = false;
+    for_double_attesting = false;
+    for_double_baking = false;
+  }
 
 module Cycle = struct
   module Indexed_context =
@@ -1143,31 +1135,38 @@ module Cycle = struct
          end))
          (Make_index (Cycle_repr.Index))
 
-  module Slashed_deposits =
+  module Already_denounced =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
-           let name = ["slashed_deposits"]
+           let name = ["already_denounced"]
          end))
-         (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
-      (Slashed_level)
-
-  (* Remove me in P. *)
-  module Selected_stake_distribution_up_to_Nairobi =
-    Indexed_context.Make_map
-      (Ghost)
+         (Pair
+            (Pair
+               (Make_index
+                  (Raw_level_repr.Index))
+                  (Make_index (Round_repr.Index)))
+               (Public_key_hash_index))
       (struct
-        let name = ["selected_stake_distribution"]
-      end)
-      (struct
-        type t = (Signature.Public_key_hash.t * Tez_repr.t) list
+        type t = denounced
 
         let encoding =
-          Data_encoding.(
-            Variable.list
-              (obj2
-                 (req "baker" Signature.Public_key_hash.encoding)
-                 (req "active_stake" Tez_repr.encoding)))
+          let open Data_encoding in
+          conv
+            (fun {
+                   for_double_preattesting;
+                   for_double_attesting;
+                   for_double_baking;
+                 } ->
+              (for_double_preattesting, for_double_attesting, for_double_baking))
+            (fun ( for_double_preattesting,
+                   for_double_attesting,
+                   for_double_baking ) ->
+              {for_double_preattesting; for_double_attesting; for_double_baking})
+            (obj3
+               (req "for_double_preattesting" bool)
+               (req "for_double_attesting" bool)
+               (req "for_double_baking" bool))
       end)
 
   module Selected_stake_distribution =
@@ -1186,15 +1185,6 @@ module Cycle = struct
                  (req "baker" Signature.Public_key_hash.encoding)
                  (req "active_stake" Stake_repr.encoding)))
       end)
-
-  (* Remove me in P. *)
-  module Total_active_stake_up_to_Nairobi =
-    Indexed_context.Make_map
-      (Ghost)
-      (struct
-        let name = ["total_active_stake"]
-      end)
-      (Tez_repr)
 
   module Total_active_stake =
     Indexed_context.Make_map
@@ -1319,78 +1309,30 @@ module Cycle = struct
       (Staking_parameters_repr)
 end
 
-module Slashed_deposits = Cycle.Slashed_deposits
+module Already_denounced = Cycle.Already_denounced
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
 module Stake = struct
-  module Staking_balance_up_to_Nairobi =
-    Make_indexed_data_snapshotable_storage
-      (Make_subcontext (Ghost) (Raw_context)
-         (struct
-           let name = ["staking_balance"]
-         end))
-         (Int31_index)
-      (Public_key_hash_index)
-      (Tez_repr)
-
   module Staking_balance =
-    Make_indexed_data_snapshotable_storage
+    Make_indexed_data_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
            let name = ["staking_balance"]
          end))
-         (Int31_index)
-      (Public_key_hash_index)
+         (Public_key_hash_index)
       (Full_staking_balance_repr)
 
   module Active_delegates_with_minimal_stake =
-    Make_indexed_data_snapshotable_storage
+    Make_data_set_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
-           (* This name is for historical reasons, when the stake was
-              expressed in rolls (that is, pre-Ithaca). *)
-           let name = ["active_delegate_with_one_roll"]
+           let name = ["active_delegates_with_minimal_stake"]
          end))
-         (Int31_index)
-      (Public_key_hash_index)
-      (struct
-        type t = unit
+         (Public_key_hash_index)
 
-        let encoding = Data_encoding.unit
-      end)
-
-  module Selected_distribution_for_cycle_up_to_Nairobi =
-    Cycle.Selected_stake_distribution_up_to_Nairobi
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
-  module Total_active_stake_up_to_Nairobi =
-    Cycle.Total_active_stake_up_to_Nairobi
   module Total_active_stake = Cycle.Total_active_stake
-
-  (* This is an index that is set to 0 by calls to
-     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and
-     incremented (by 1) by calls to {!val:Stake_storage.snapshot}.
-
-     {!val:Stake_storage.snapshot} is called in relation with constant
-     [blocks_per_stake_snapshot] in
-     {!val:Level_storage.may_snapshot_stake_distribution}.
-
-     That is, the increment is done every [blocks_per_stake_snaphot]
-     blocks and reset at the end of cycles. So, it goes up to
-     [blocks_per_cycle / blocks_per_stake_snaphot], which is currently
-     16 (= 8192/512 -- the concrete values can be found in
-     {!val:Default_parameters.constants_mainnet}), then comes back to
-     0, so that a UInt16 is big enough.
-
-     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is
-     checked in {!val:Constants_repr.check_constants} to fit in a
-     UInt16. *)
-  module Last_snapshot =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["last_snapshot"]
-      end)
-      (Encoding.UInt16)
 end
 
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
@@ -1669,8 +1611,7 @@ module Pending_migration = struct
       (struct
         type t = Receipt_repr.balance_updates
 
-        let encoding =
-          Receipt_repr.balance_updates_encoding_with_legacy_attestation_name
+        let encoding = Receipt_repr.balance_updates_encoding
       end)
 
   module Operation_results =

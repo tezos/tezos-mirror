@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (or unit bool) (Right True) } ;
+output { Stack_elt bytes 0x050508030a } ;

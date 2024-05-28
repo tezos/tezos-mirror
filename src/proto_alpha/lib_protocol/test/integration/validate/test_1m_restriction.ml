@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic-Labs. <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission  is hereby granted, free of charge, to any person obtaining a  *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -113,6 +95,7 @@ let positive_tests =
     pool should contain two operations with the same manager. It
     raises a Manager_restriction error. *)
 let two_op_from_same_manager_tests =
+  let open Lwt_result_syntax in
   let gen =
     QCheck2.Gen.quad
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -140,7 +123,6 @@ let two_op_from_same_manager_tests =
     ~name:"check conflicts between managers."
     ~gen
     (fun (ctxt_req, operation_req, operation_req2, mode) ->
-      let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op operation_req infos in
       let* op2 = select_op operation_req2 infos in
@@ -150,6 +132,7 @@ let two_op_from_same_manager_tests =
 (** Under 1M restriction, a batch of two operations cannot be replaced
    by two single operations. *)
 let batch_is_not_singles_tests =
+  let open Lwt_result_syntax in
   let gen =
     QCheck2.Gen.triple
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -165,7 +148,6 @@ let batch_is_not_singles_tests =
     ~name:"batch is not sequence of Single"
     ~gen
     (fun (ctxt_req, operation_req, mode) ->
-      let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op (fst operation_req) infos in
       let* op2 = select_op (snd operation_req) infos in

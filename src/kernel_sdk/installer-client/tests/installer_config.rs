@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -41,7 +41,7 @@ fn reveal_and_move_binary_config() {
     let root_hash = prepare_preimages(&original_kernel, save_preimages).unwrap();
 
     // Create config consisting of reveal and following move
-    let config = create_installer_config(root_hash, None).unwrap();
+    let config = create_installer_config(root_hash, None, None).unwrap();
     // Append config to the installer.wasm
     let kernel_with_config = with_config_program(config);
 
@@ -125,7 +125,8 @@ fn kernel_from_setup_file(host: &mut MockHost, setup_file: &str) -> Vec<u8> {
 
     // Create config consisting of reveal and following move, then move 2 more times from yaml config
     let config =
-        create_installer_config(root_hash, Some(OsString::from(setup_file))).unwrap();
+        create_installer_config(root_hash, Some(OsString::from(setup_file)), None)
+            .unwrap();
     // Append config to the installer.wasm
     let kernel_with_config = with_config_program(config);
 

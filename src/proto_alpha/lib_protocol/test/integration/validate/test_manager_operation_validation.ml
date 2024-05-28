@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic-Labs. <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission  is hereby granted, free of charge, to any person obtaining a  *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -45,6 +27,7 @@ open Manager_operation_helpers
     This test applies on manager operations that do not
     consume gas in their specific part of validate. *)
 let low_gas_limit_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [
@@ -80,6 +63,7 @@ let test_low_gas_limit infos kind =
     a gas limit too high fails at validate with an [Gas_limit_too_high]
     error. It applies on every kind of manager operation. *)
 let high_gas_limit_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error Gas.Gas_limit_too_high] -> return_unit
@@ -111,6 +95,7 @@ let test_high_gas_limit infos kind =
     too high fails at validation with [Storage_limit_too_high] error.
     It applies to every kind of manager operation. *)
 let high_storage_limit_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error Fees_storage.Storage_limit_too_high] ->
@@ -144,6 +129,7 @@ let test_high_storage_limit infos kind =
     stored in the current context -- fails with [Counter_in_the_future] error.
     It applies to every kind of manager operation. *)
 let high_counter_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error (Contract_storage.Counter_in_the_future _)] ->
@@ -177,6 +163,7 @@ let test_high_counter infos kind =
     [Counter_in_the_past] error. It applies to every kind of manager
     operation. *)
 let low_counter_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error (Contract_storage.Counter_in_the_past _)] ->
@@ -215,6 +202,7 @@ let test_low_counter infos kind =
     [Empty_implicit_contract] error. It applies on every kind of
     manager operation. *)
 let not_allocated_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract _)]
@@ -246,6 +234,7 @@ let test_not_allocated infos kind =
     contract fails at validation with [Unrevealed_manager_key].
     It applies on every kind of manager operation except [Revelation]. *)
 let unrevealed_key_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [
@@ -276,6 +265,7 @@ let test_unrevealed_key infos kind =
     source balance is lesser than the manager operation fee.
     It applies on every kind of manager operation. *)
 let high_fee_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [
@@ -314,6 +304,7 @@ let test_high_fee infos kind =
     then, validate fails with [Empty_implicit_delegated_contract] error.
     It applies to every kind of manager operation except [Revelation].*)
 let emptying_delegated_implicit_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [
@@ -355,6 +346,7 @@ let test_empty_implicit infos kind =
     with gas limit exceeds the available gas in the block.
     It applies to every kind of manager operation. *)
 let exceeding_block_gas_diagnostic ~mode (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match (errs, mode) with
     | ( [Environment.Ecoproto_error Gas.Block_quota_exceeded],
@@ -495,6 +487,7 @@ let test_low_gas_limit_no_consumer infos kind =
 (* Select the error according to the positionned flag.
    We assume that only one feature is disabled. *)
 let flag_expect_failure flags errs =
+  let open Lwt_result_syntax in
   match errs with
   | [
    Environment.Ecoproto_error
@@ -608,7 +601,9 @@ let tests =
         test_low_gas_limit_no_consumer,
         not_gas_consum,
         mk_default );
-      ("dal disabled", test_feature_flags, all, mk_flags disabled_dal);
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6967
+         Delete the test when not useful for sure. *)
+      (*  ("dal disabled", test_feature_flags, all, mk_flags disabled_dal); *)
       ( "scoru arith disabled",
         test_feature_flags,
         [K_Sc_rollup_origination],

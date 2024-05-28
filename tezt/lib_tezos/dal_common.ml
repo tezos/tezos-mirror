@@ -29,11 +29,14 @@ module Cryptobox = Tezos_crypto_dal.Cryptobox
 module Parameters = struct
   type t = {
     feature_enabled : bool;
+    incentives_enabled : bool;
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
     attestation_threshold : int;
     blocks_per_epoch : int;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6923
+           To be removed when [Protocol.previous_protocol Alpha >= P]. *)
   }
 
   let parameter_file protocol =
@@ -51,10 +54,18 @@ module Parameters = struct
     let attestation_threshold =
       JSON.(json |-> "attestation_threshold" |> as_int)
     in
-    let blocks_per_epoch = JSON.(json |-> "blocks_per_epoch" |> as_int) in
+    let blocks_per_epoch =
+      JSON.(json |-> "blocks_per_epoch" |> as_int_opt)
+      |> Option.value ~default:1
+    in
     let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
+    let incentives_enabled =
+      JSON.(json |-> "incentives_enable" |> as_bool_opt)
+      |> Option.value ~default:false
+    in
     {
       feature_enabled;
+      incentives_enabled;
       cryptobox =
         Cryptobox.Verifier.
           {number_of_shards; redundancy_factor; slot_size; page_size};
@@ -72,7 +83,7 @@ module Parameters = struct
 end
 
 module Committee = struct
-  type member = {attester : string; first_shard_index : int; power : int}
+  type member = {attester : string; indexes : int list}
 
   type t = member list
 
@@ -80,21 +91,22 @@ module Committee = struct
     let open Check in
     list
     @@ convert
-         (fun {attester; first_shard_index; power} ->
-           (attester, first_shard_index, power))
-         (tuple3 string int int)
+         (fun {attester; indexes} -> (attester, indexes))
+         (tuple2 string (list int))
 
-  let at_level node ~level =
+  let at_level node ?level ?delegates () =
     let* json =
-      Node.RPC.call node @@ RPC.get_chain_block_context_dal_shards ~level ()
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards ?level ?delegates ()
     in
     return
     @@ List.map
          (fun json ->
-           let pkh = JSON.(json |=> 0 |> as_string) in
-           let first_shard_index = JSON.(json |=> 1 |=> 0 |> as_int) in
-           let power = JSON.(json |=> 1 |=> 1 |> as_int) in
-           {attester = pkh; first_shard_index; power})
+           let attester = JSON.(json |-> "delegate" |> as_string) in
+           let indexes =
+             JSON.(json |-> "indexes" |> as_list |> List.map as_int)
+           in
+           {attester; indexes})
          (JSON.as_list json)
 end
 
@@ -119,17 +131,6 @@ module RPC_legacy = struct
   let slot_pages slot_header =
     make GET ["slot"; "pages"; slot_header] (fun pages ->
         pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
-
-  let shard ~slot_header ~shard_id =
-    make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
-    json |> JSON.encode
-
-  let shards ~slot_header shard_ids =
-    let data : RPC_core.data =
-      Data (`A (List.map (fun i -> `Float (float_of_int i)) shard_ids))
-    in
-    make ~data POST ["shards"; slot_header] (fun json ->
-        JSON.(json |> as_list |> List.map encode))
 end
 
 module Dal_RPC = struct
@@ -137,7 +138,10 @@ module Dal_RPC = struct
 
   type commitment = string
 
-  type operator_profile = Attester of string | Producer of int
+  type operator_profile =
+    | Attester of string
+    | Producer of int
+    | Observer of int
 
   type operator_profiles = operator_profile list
 
@@ -159,6 +163,15 @@ module Dal_RPC = struct
       status = json |-> "status" |> as_string;
     }
 
+  let slot_header_to_json_u h : JSON.u =
+    `O
+      [
+        ("slot_level", `Float (float_of_int h.slot_level));
+        ("slot_index", `Float (float_of_int h.slot_index));
+        ("commitment", `String h.commitment);
+        ("status", `String h.status);
+      ]
+
   let slot_headers_of_json json =
     JSON.as_list json |> List.map slot_header_of_json
 
@@ -176,6 +189,27 @@ module Dal_RPC = struct
     let data : RPC_core.data = Data (JSON.unannotate slot) in
     make ~data POST ["commitments"] JSON.as_string
 
+  (* Converts a possibly invalid UTF-8 string into a JSON object using
+     Data-encoding's unistring representation. *)
+  let unistring_to_json s =
+    let l =
+      String.to_seq s
+      |> Seq.map (fun c -> `Float (float_of_int @@ Char.code c))
+      |> List.of_seq
+    in
+    `O [("invalid_utf8_string", `A l)]
+
+  let post_slot slot =
+    let data : RPC_core.data = Data (unistring_to_json slot) in
+    make
+      ~data
+      POST
+      ["slot"]
+      JSON.(
+        fun json ->
+          ( json |-> "commitment" |> as_string,
+            json |-> "commitment_proof" |> as_string ))
+
   let patch_commitment commitment ~slot_level ~slot_index =
     let data : RPC_core.data =
       Data
@@ -190,7 +224,7 @@ module Dal_RPC = struct
   let get_commitment_slot commitment =
     make GET ["commitments"; commitment; "slot"] get_bytes_from_json_string_node
 
-  let put_commitment_shards ?(with_proof = false) commitment =
+  let put_commitment_shards ?(with_proof = true) commitment =
     let data : RPC_core.data = Data (`O [("with_proof", `Bool with_proof)]) in
     make ~data PUT ["commitments"; commitment; "shards"] as_empty_object_or_fail
 
@@ -220,12 +254,19 @@ module Dal_RPC = struct
             ("kind", `String "producer");
             ("slot_index", `Float (float_of_int slot_index));
           ]
+    | Observer slot_index ->
+        `O
+          [
+            ("kind", `String "observer");
+            ("slot_index", `Float (float_of_int slot_index));
+          ]
 
   let operator_profile_of_json json =
     let open JSON in
     match json |-> "kind" |> as_string with
     | "attester" -> Attester (json |-> "public_key_hash" |> as_string)
     | "producer" -> Producer (json |-> "slot_index" |> as_int)
+    | "observer" -> Observer (json |-> "slot_index" |> as_int)
     | _ -> failwith "invalid case"
 
   let profiles_of_json json =
@@ -308,6 +349,62 @@ module Dal_RPC = struct
 
   let delete_p2p_peer_disconnect ~peer_id =
     make DELETE ["p2p"; "peers"; "disconnect"; peer_id] as_empty_object_or_fail
+
+  let patch_p2p_peers_by_id ~peer_id ?acl () =
+    let data =
+      Option.map (fun acl -> RPC_core.Data (`O [("acl", `String acl)])) acl
+    in
+    make ?data PATCH ["p2p"; "peers"; "by-id"; peer_id] (fun _json -> ())
+
+  type topic = {topic_slot_index : int; topic_pkh : string}
+
+  let get_topics () =
+    let open JSON in
+    let as_topic json =
+      let topic_slot_index = get "slot_index" json |> as_int in
+      let topic_pkh = get "pkh" json |> as_string in
+      {topic_slot_index; topic_pkh}
+    in
+    make ~query_string:[] GET ["p2p"; "gossipsub"; "topics"] (fun json ->
+        JSON.(json |> as_list |> List.map as_topic))
+
+  let get_topics_peers ~subscribed =
+    let open JSON in
+    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let as_topic json =
+      let topic_slot_index = get "slot_index" json |> as_int in
+      let topic_pkh = get "pkh" json |> as_string in
+      {topic_slot_index; topic_pkh}
+    in
+    let as_topic_and_peers json =
+      let topic = get "topic" json |> as_topic in
+      let peers = get "peers" json |> as_list |> List.map as_string in
+      (topic, peers)
+    in
+    make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
+        JSON.(json |> as_list |> List.map as_topic_and_peers))
+
+  let get_gossipsub_connections () =
+    make ~query_string:[] GET ["p2p"; "gossipsub"; "connections"] (fun x -> x)
+
+  type peer_score = {peer : string; score : float}
+
+  let get_scores () =
+    make GET ["p2p"; "gossipsub"; "scores"] (fun json ->
+        JSON.(
+          json |> as_list
+          |> List.map (fun json ->
+                 {
+                   peer = get "peer" json |> as_string;
+                   score = get "score" json |> as_float;
+                 })))
+
+  let get_plugin_commitments_history_hash ~hash () =
+    make GET ["plugin"; "commitments_history"; "hash"; hash] Fun.id
+
+  let get_shard ~slot_header ~shard_id =
+    make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
+    json |> JSON.encode
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
@@ -403,19 +500,44 @@ module Helpers = struct
     |> List.filter (fun str -> not (str = String.empty))
     |> String.concat "\000"
 
+  let pp_cryptobox_error fmt = function
+    | `Fail message -> Format.fprintf fmt "Fail: %s" message
+    | `Not_enough_shards message ->
+        Format.fprintf fmt "Not enough shards: %s" message
+    | `Shard_index_out_of_range message ->
+        Format.fprintf fmt "Shard index out of range: %s" message
+    | `Invalid_shard_length message ->
+        Format.fprintf fmt "Invalid shard length: %s" message
+    | `Invalid_page -> Format.fprintf fmt "Invalid page"
+    | `Page_index_out_of_range -> Format.fprintf fmt "Page index out of range"
+    | `Invalid_degree_strictly_less_than_expected _ ->
+        Format.fprintf fmt "Invalid degree strictly less than expected"
+    | `Page_length_mismatch -> Format.fprintf fmt "Page length mismatch"
+    | `Slot_wrong_size message ->
+        Format.fprintf fmt "Slot wrong size: %s" message
+    | `Prover_SRS_not_loaded -> Format.fprintf fmt "Prover SRS not loaded"
+    | `Shard_length_mismatch -> Format.fprintf fmt "Shard length mismatch"
+    | `Invalid_shard -> Format.fprintf fmt "Invalid shard"
+
   let make_cryptobox
       ?(on_error =
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
       parameters =
-    let initialisation_parameters =
-      Cryptobox.Internal_for_tests.parameters_initialisation parameters
-    in
-    Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
+    Cryptobox.Internal_for_tests.init_prover_dal () ;
     match Cryptobox.make parameters with
     | Ok cryptobox -> cryptobox
-    | Error (`Fail msg) -> on_error msg
+    | Error (`Fail msg) ->
+        let parameters_json =
+          Data_encoding.Json.construct Cryptobox.parameters_encoding parameters
+        in
+        on_error
+        @@ Format.asprintf
+             "%s,@ parameters: %a"
+             msg
+             Data_encoding.Json.pp
+             parameters_json
 
-  let publish_slot_header ?counter ?force ?source ?fee ?error ~index ~commitment
+  let publish_commitment ?counter ?force ?source ?fee ?error ~index ~commitment
       ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
        Doing this here allows to keep the diff small as gas cost for
@@ -427,7 +549,7 @@ module Helpers = struct
         ?force
         [
           make ?source ?fee ?counter
-          @@ dal_publish_slot_header ~index ~commitment ~proof;
+          @@ dal_publish_commitment ~index ~commitment ~proof;
         ]
         client)
 
@@ -436,18 +558,23 @@ module Helpers = struct
       | Either.Left node -> Dal_RPC.Local.call node
       | Either.Right endpoint -> Dal_RPC.Remote.call endpoint
     in
-    let* commitment =
-      call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
-    in
-    let* () =
-      Dal_RPC.(
-        call dal_node_or_endpoint
-        @@ put_commitment_shards ?with_proof commitment)
-    in
-    let* proof =
-      Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
-    in
-    return (commitment, proof)
+    (* Use the POST /slot RPC except if shard proof computation is
+       explicitly deactivated with with_proof:false *)
+    match with_proof with
+    | None | Some true -> call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
+    | Some false ->
+        let* commitment =
+          call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
+        in
+        let* () =
+          Dal_RPC.(
+            call dal_node_or_endpoint
+            @@ put_commitment_shards ~with_proof:false commitment)
+        in
+        let* proof =
+          Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
+        in
+        return (commitment, proof)
 end
 
 module Commitment = struct
@@ -456,7 +583,8 @@ module Commitment = struct
         function
         | `Slot_wrong_size str ->
             Test.fail "Dal_common.dummy_commitment failed: %s" str
-        | `Invalid_degree_strictly_less_than_expected _ as commit_error ->
+        | ( `Invalid_degree_strictly_less_than_expected _
+          | `Prover_SRS_not_loaded ) as commit_error ->
             Test.fail "%s" (Cryptobox.string_of_commit_error commit_error))
       cryptobox message =
     let parameters = Cryptobox.Verifier.parameters cryptobox in
@@ -497,11 +625,14 @@ module Check = struct
     let pp_operator_profile ppf = function
       | Attester pkh -> Format.fprintf ppf "Attester %s" pkh
       | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index
+      | Observer slot_index -> Format.fprintf ppf "Observer %d" slot_index
     in
     let equal_operator_profile op1 op2 =
       match (op1, op2) with
       | Attester pkh1, Attester pkh2 -> String.equal pkh1 pkh2
       | Producer slot_index1, Producer slot_index2 ->
+          Int.equal slot_index1 slot_index2
+      | Observer slot_index1, Observer slot_index2 ->
           Int.equal slot_index1 slot_index2
       | _, _ -> false
     in
@@ -524,6 +655,19 @@ module Check = struct
       | _, _ -> false
     in
     Check.equalable pp equal
+
+  let topic_typ : topic Check.typ =
+    Check.convert
+      (fun {topic_slot_index; topic_pkh} -> (topic_slot_index, topic_pkh))
+      (Check.tuple2 Check.int Check.string)
+
+  let topics_peers_typ : (topic * string list) list Check.typ =
+    Check.list (Check.tuple2 topic_typ (Check.list Check.string))
+
+  let slot_header_typ : slot_header Check.typ =
+    Check.convert slot_header_to_json_u Check.json_u
+
+  let slot_headers_typ : slot_header list Check.typ = Check.list slot_header_typ
 end
 
 module RPC = Dal_RPC

@@ -113,8 +113,9 @@ let test_valid_double_baking_evidence () =
   in
   (* Check that the frozen deposits have been slashed at the end of the cycle. *)
   let* blk_eoc, end_cycle_metadata, _next_cycle =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker2)
+      2
       blk_final
   in
   let end_cycle_metadata =
@@ -124,10 +125,11 @@ let test_valid_double_baking_evidence () =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let autostaked = Block.autostaked baker1 end_cycle_metadata in
+  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Int64.of_int (p :> int) /! 100L)
+      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
   in
   Assert.equal_tez
@@ -188,8 +190,9 @@ let test_valid_double_baking_followed_by_double_attesting () =
       frozen_deposits_right_after
   in
   let* blk_eoc, metadata, _ =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker2)
+      2
       blk_final
   in
   let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
@@ -204,14 +207,12 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  let p =
-    (p_de :> int) + (p_db :> int)
-    (* assuming the sum doesn't exceed 100% *)
-  in
+  let p = Percentage.add_bounded p_de p_db in
+  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Int64.of_int p /! 100L)
+      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
@@ -268,8 +269,9 @@ let test_valid_double_attesting_followed_by_double_baking () =
       frozen_deposits_right_after
   in
   let* blk_eoc, end_cycle_metadata, _ =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker2)
+      2
       blk_with_db_evidence
   in
   let end_cycle_metadata =
@@ -286,14 +288,12 @@ let test_valid_double_attesting_followed_by_double_baking () =
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  let p =
-    (p_de :> int) + (p_db :> int)
-    (* assuming the sum doesn't exceed 100% *)
-  in
+  let p = Percentage.add_bounded p_de p_db in
+  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Int64.of_int p /! 100L)
+      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
@@ -308,7 +308,9 @@ let test_valid_double_attesting_followed_by_double_baking () =
    the reward. *)
 let test_payload_producer_gets_evidence_rewards () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_n ~consensus_threshold:0 10 () in
+  let* genesis, contracts =
+    Context.init_n ~consensus_threshold:0 ~consensus_committee_size:64 10 ()
+  in
   let* c = Context.get_constants (B genesis) in
   let p =
     c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
@@ -368,7 +370,7 @@ let test_payload_producer_gets_evidence_rewards () =
     Context.Delegate.full_balance (B b') baker2
   in
   let real_reward_right_after =
-    Test_tez.(full_balance_with_rewards_right_after -! full_balance)
+    Tez_helpers.(full_balance_with_rewards_right_after -! full_balance)
   in
   let* () =
     Assert.equal_tez
@@ -378,20 +380,20 @@ let test_payload_producer_gets_evidence_rewards () =
   in
   (* Slashing and rewarding happen at the end of the cycle. *)
   let* b', end_cycle_metadata, _ =
-    Block.bake_until_cycle_end_with_metadata ~policy:(By_account baker2) b'
+    Block.bake_until_n_cycle_end_with_metadata ~policy:(By_account baker2) 2 b'
   in
   let end_cycle_metadata =
     Option.value_f ~default:(fun () -> assert false) end_cycle_metadata
   in
   let autostaked = Block.autostaked baker1 end_cycle_metadata in
-
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
+  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Int64.of_int (p :> int) /! 100L)
+      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
   in
   (* the frozen deposits of the double-signer [baker1] are slashed *)
@@ -402,7 +404,8 @@ let test_payload_producer_gets_evidence_rewards () =
       expected_frozen_deposits_after
   in
   let slashed_amount =
-    Test_tez.(frozen_deposits_before -! (frozen_deposits_after -! autostaked))
+    Tez_helpers.(
+      frozen_deposits_before -! (frozen_deposits_after -! autostaked))
   in
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
@@ -413,18 +416,19 @@ let test_payload_producer_gets_evidence_rewards () =
       (Int64.of_int
          c.parametric.adaptive_issuance.global_limit_of_staking_over_baking)
   in
-  let evidence_reward = Test_tez.(slashed_amount /! divider) in
+  let evidence_reward = Tez_helpers.(slashed_amount /! divider) in
   let baked_blocks =
     Int64.of_int
       (Int32.to_int b'.header.shell.level - Int32.to_int b1.header.shell.level)
   in
   let expected_reward =
-    Test_tez.((baking_reward_fixed_portion *! baked_blocks) +! evidence_reward)
+    Tez_helpers.(
+      (baking_reward_fixed_portion *! baked_blocks) +! evidence_reward)
   in
   let* full_balance_with_rewards =
     Context.Delegate.full_balance (B b') baker2
   in
-  let real_reward = Test_tez.(full_balance_with_rewards -! full_balance) in
+  let real_reward = Tez_helpers.(full_balance_with_rewards -! full_balance) in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_reward real_reward in
   (* [baker1] did not produce the payload, it does not receive the reward for the
      evidence *)
@@ -433,7 +437,7 @@ let test_payload_producer_gets_evidence_rewards () =
   Assert.equal_tez
     ~loc:__LOC__
     full_balance_at_b'
-    Test_tez.(full_balance_at_b1 -! slashed_amount)
+    Tez_helpers.(full_balance_at_b1 -! slashed_amount)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -487,8 +491,8 @@ let test_too_early_double_baking_evidence () =
   double_baking (B b) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Too_early_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Block ->
+      | Validate_errors.Anonymous.Too_early_denunciation
+          {kind = Misbehaviour.Double_baking; _} ->
           true
       | _ -> false)
 
@@ -503,8 +507,8 @@ let test_too_late_double_baking_evidence () =
   double_baking (B blk) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Block ->
+      | Validate_errors.Anonymous.Outdated_denunciation
+          {kind = Misbehaviour.Double_baking; _} ->
           true
       | _ -> false)
 
@@ -586,8 +590,8 @@ let test_double_evidence () =
   let*! e = Block.bake ~operations:[evidence; evidence] blk in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
-          when kind = Validate_errors.Anonymous.Block ->
+        | Validate_errors.Anonymous.Conflicting_denunciation
+            {kind = Misbehaviour.Double_baking; _} ->
             true
         | _ -> false)
   in

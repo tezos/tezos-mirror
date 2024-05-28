@@ -9,9 +9,9 @@
   octez-libs.base
   bigstringaf
   fmt
-  irmin
-  irmin-pack
-  irmin-pack.unix
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
   logs.fmt
   octez-libs.stdlib-unix
   octez-libs.stdlib

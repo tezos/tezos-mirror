@@ -67,7 +67,9 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let proposal = state.level_state.latest_proposal in
   let*! () =
     Events.(
-      emit attempting_preattest_proposal state.level_state.latest_proposal)
+      emit
+        attempting_to_vote_for_proposal
+        (Preattestation, state.level_state.latest_proposal))
   in
   let* () =
     if force then return_unit
@@ -80,7 +82,9 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
       | Outdated_proposal -> cctxt#error "Cannot preattest an outdated proposal"
       | Valid_proposal -> return_unit
   in
-  let consensus_list = make_consensus_list state proposal in
+  let consensus_batch =
+    make_consensus_vote_batch state proposal Preattestation
+  in
   let*! () =
     cctxt#message
       "@[<v 2>Preattesting for:@ %a@]"
@@ -88,9 +92,14 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
         pp_print_list
           ~pp_sep:pp_print_space
           Baking_state.pp_consensus_key_and_delegate)
-      (List.map fst consensus_list)
+      (List.map
+         (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
+         consensus_batch.unsigned_consensus_votes)
   in
-  Baking_actions.inject_consensus_vote state consensus_list `Preattestation
+  let* signed_consensus_batch =
+    Baking_actions.sign_consensus_votes state.global_state consensus_batch
+  in
+  Baking_actions.inject_consensus_votes state signed_consensus_batch
 
 let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
@@ -101,7 +110,10 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
   let*! () =
-    Events.(emit attempting_attest_proposal state.level_state.latest_proposal)
+    Events.(
+      emit
+        attempting_to_vote_for_proposal
+        (Attestation, state.level_state.latest_proposal))
   in
   let* () =
     if force then return_unit
@@ -114,7 +126,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
       | Outdated_proposal -> cctxt#error "Cannot attest an outdated proposal"
       | Valid_proposal -> return_unit
   in
-  let consensus_list = make_consensus_list state proposal in
+  let consensus_batch = make_consensus_vote_batch state proposal Attestation in
   let*! () =
     cctxt#message
       "@[<v 2>Attesting for:@ %a@]"
@@ -122,14 +134,27 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
         pp_print_list
           ~pp_sep:pp_print_space
           Baking_state.pp_consensus_key_and_delegate)
-      (List.map fst consensus_list)
+      (List.map
+         (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
+         consensus_batch.unsigned_consensus_votes)
+  in
+  let* signed_consensus_batch =
+    Baking_actions.sign_consensus_votes state.global_state consensus_batch
   in
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_consensus_vote state consensus_list `Attestation
+  Baking_actions.inject_consensus_votes state signed_consensus_batch
 
-let bake_at_next_level state =
+let do_action (state, action) =
+  let open Lwt_result_syntax in
+  let* new_state = Baking_actions.perform_action state action in
+  let* () =
+    Baking_state.may_record_new_state ~previous_state:state ~new_state
+  in
+  return new_state
+
+let bake_at_next_level_event state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let*! baking_time =
@@ -151,7 +176,27 @@ let bake_at_next_level state =
           ~default:Lwt.return_unit
           (Baking_scheduling.sleep_until timestamp)
       in
-      return (Baking_state.Timeout (Time_to_bake_next_level {at_round = round}))
+      return
+        (Baking_state.Timeout
+           (Time_to_prepare_next_level_block {at_round = round}))
+
+let bake_at_next_level state =
+  let open Lwt_result_syntax in
+  let* event = bake_at_next_level_event state in
+  let*! state, action = State_transitions.step state event in
+  match action with
+  | Prepare_block {block_to_bake} ->
+      let* prepared_block =
+        Baking_actions.prepare_block state.global_state block_to_bake
+      in
+      let* new_state =
+        do_action
+          ( state,
+            Inject_block
+              {prepared_block; force_injection = false; asynchronous = false} )
+      in
+      return new_state
+  | _ -> assert false
 
 (* Simulate the end of the current round to bootstrap the automaton
    or attest the block if necessary *)
@@ -161,7 +206,7 @@ let first_automaton_event state =
   | Some _elected_block ->
       (* If there is an elected block we can directly bake at next
          level after waiting its date *)
-      bake_at_next_level state
+      bake_at_next_level_event state
 
 let attestations_attesting_power state attestations =
   let get_attestation_voting_power {slot; _} =
@@ -214,12 +259,6 @@ let state_attesting_power =
         Kind.attestation operation)
     -> consensus_content)
 
-let do_action (state, action) =
-  let state_recorder ~new_state =
-    Baking_state.may_record_new_state ~previous_state:state ~new_state
-  in
-  Baking_actions.perform_action ~state_recorder state action
-
 let propose_at_next_level ~minimal_timestamp state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
@@ -238,24 +277,28 @@ let propose_at_next_level ~minimal_timestamp state =
       Operation_worker.get_current_operations
         state.global_state.operation_worker
     in
-    let kind = Baking_actions.Fresh pool in
-    let block_to_bake : Baking_actions.block_to_bake =
+    let kind = Fresh pool in
+    let block_to_bake =
       {
-        Baking_actions.predecessor = state.level_state.latest_proposal.block;
+        predecessor = state.level_state.latest_proposal.block;
         round = minimal_round;
         delegate;
         kind;
         force_apply = state.global_state.config.force_apply;
       }
     in
-    let state_recorder ~new_state =
-      Baking_state.may_record_new_state ~previous_state:state ~new_state
+    let* prepared_block =
+      Baking_actions.prepare_block state.global_state block_to_bake
     in
     let* state =
-      Baking_actions.perform_action
-        ~state_recorder
-        state
-        (Inject_block {block_to_bake; updated_state = state})
+      do_action
+        ( state,
+          Inject_block
+            {
+              prepared_block;
+              force_injection = minimal_timestamp;
+              asynchronous = false;
+            } )
     in
     let*! () =
       cctxt#message
@@ -267,11 +310,7 @@ let propose_at_next_level ~minimal_timestamp state =
     in
     return state
   else
-    let* event = bake_at_next_level state in
-    let* state =
-      let*! action = State_transitions.step state event in
-      do_action action
-    in
+    let* state = bake_at_next_level state in
     let*! () = cctxt#message "Proposal injected" in
     return state
 
@@ -294,9 +333,9 @@ let attestation_quorum state =
        - Yes :: repropose block with right payload and preattestations for current round
        - No  :: repropose fresh block for current round *)
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
-    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
-    ?(minimal_timestamp = false) ?extra_operations ?context_path ?state_recorder
-    delegates =
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply
+    ?(force = false) ?(minimal_timestamp = false) ?extra_operations
+    ?context_path ?state_recorder delegates =
   let open Lwt_result_syntax in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
@@ -307,7 +346,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_byte
       ?context_path
       ?force_apply
-      ?force
+      ~force
       ?extra_operations
       ?state_recorder
       ()
@@ -374,7 +413,39 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                         round
                         state.level_state.latest_proposal
                     in
-                    let* state = do_action (state, action) in
+                    let* state =
+                      match action with
+                      | Prepare_block {block_to_bake} ->
+                          let* prepared_block =
+                            Baking_actions.prepare_block
+                              state.global_state
+                              block_to_bake
+                          in
+                          let* state =
+                            do_action
+                              ( state,
+                                Inject_block
+                                  {
+                                    prepared_block;
+                                    force_injection = force;
+                                    asynchronous = false;
+                                  } )
+                          in
+                          return state
+                      | Inject_block {prepared_block; _} ->
+                          let* state =
+                            do_action
+                              ( state,
+                                Inject_block
+                                  {
+                                    prepared_block;
+                                    force_injection = force;
+                                    asynchronous = false;
+                                  } )
+                          in
+                          return state
+                      | _ -> assert false
+                    in
                     let*! () =
                       cctxt#message
                         "Reproposed block at level %ld on round %a"
@@ -393,13 +464,13 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
-let repropose (cctxt : Protocol_client_context.full) ?force ?force_round
-    delegates =
+let repropose (cctxt : Protocol_client_context.full) ?(force = false)
+    ?force_round delegates =
   let open Lwt_result_syntax in
   let open Baking_state in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
-  let config = Baking_configuration.make ?force () in
+  let config = Baking_configuration.make ~force () in
   let* state = create_state cctxt ~config ~current_proposal delegates in
   (* Make sure the operation worker is populated to avoid empty blocks
      being proposed. *)
@@ -426,13 +497,31 @@ let repropose (cctxt : Protocol_client_context.full) ?force ?force_round
               round
               state.level_state.latest_proposal
           in
-          let* state = do_action (state, action) in
+          let* signed_block =
+            match action with
+            | Prepare_block {block_to_bake} ->
+                let* signed_block =
+                  Baking_actions.prepare_block state.global_state block_to_bake
+                in
+                let* _state =
+                  do_action
+                    ( state,
+                      Inject_block
+                        {
+                          prepared_block = signed_block;
+                          force_injection = force;
+                          asynchronous = false;
+                        } )
+                in
+                return signed_block
+            | _ -> assert false
+          in
           let*! () =
             cctxt#message
               "Reproposed block at level %ld on round %a"
-              state.level_state.current_level
+              signed_block.signed_block_header.shell.level
               Round.pp
-              state.round_state.current_round
+              signed_block.round
           in
           return_unit
       | None -> cctxt#error "No slots for current round")
@@ -448,9 +537,13 @@ let bake_using_automaton ~count config state heads_stream =
   let cctxt = state.global_state.cctxt in
   let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
+  let forge_event_stream =
+    state.global_state.forge_worker_hooks.get_forge_event_stream ()
+  in
   let loop_state =
     Baking_scheduling.create_loop_state
       ~heads_stream
+      ~forge_event_stream
       state.global_state.operation_worker
   in
   let stop_on_next_level_block = function
@@ -487,7 +580,10 @@ let rec baking_minimal_timestamp ~count state
   let cctxt = state.global_state.cctxt in
   let latest_proposal = state.level_state.latest_proposal in
   let own_attestations =
-    State_transitions.make_consensus_list state latest_proposal
+    State_transitions.make_consensus_vote_batch
+      state
+      latest_proposal
+      Attestation
   in
   let current_mempool =
     Operation_worker.get_current_operations state.global_state.operation_worker
@@ -514,9 +610,10 @@ let rec baking_minimal_timestamp ~count state
   in
   let total_voting_power =
     List.fold_left
-      (fun attestations own -> snd own :: attestations)
+      (fun attestations own ->
+        own.Baking_state.vote_consensus_content :: attestations)
       attestations_in_mempool
-      own_attestations
+      own_attestations.unsigned_consensus_votes
     |> attestations_attesting_power state
   in
   let consensus_threshold =
@@ -541,12 +638,14 @@ let rec baking_minimal_timestamp ~count state
     | Some first_potential_round -> return first_potential_round
   in
   let* signed_attestations =
-    Baking_actions.sign_consensus_votes state own_attestations `Attestation
+    Baking_actions.sign_consensus_votes state.global_state own_attestations
   in
   let pool =
     Operation_pool.add_operations
       current_mempool
-      (List.map (fun (_, x, _, _) -> x) signed_attestations)
+      (List.map
+         (fun signed_consensus -> signed_consensus.signed_operation)
+         signed_attestations.signed_consensus_votes)
   in
   let* own_dal_attestations = Baking_actions.get_dal_attestations state in
   let* signed_dal_attestations =
@@ -559,24 +658,24 @@ let rec baking_minimal_timestamp ~count state
          (fun (_delegate, op, _bitset, _published_level) -> op)
          signed_dal_attestations)
   in
-  let kind = Baking_actions.Fresh pool in
-  let block_to_bake : Baking_actions.block_to_bake =
+  let kind = Fresh pool in
+  let block_to_bake : block_to_bake =
     {
-      Baking_actions.predecessor = latest_proposal.block;
+      predecessor = latest_proposal.block;
       round = minimal_round;
       delegate;
       kind;
       force_apply = state.global_state.config.force_apply;
     }
   in
-  let state_recorder ~new_state =
-    Baking_state.may_record_new_state ~previous_state:state ~new_state
+  let* prepared_block =
+    Baking_actions.prepare_block state.global_state block_to_bake
   in
   let* new_state =
-    Baking_actions.perform_action
-      ~state_recorder
-      state
-      (Inject_block {block_to_bake; updated_state = state})
+    do_action
+      ( state,
+        Inject_block
+          {prepared_block; force_injection = true; asynchronous = false} )
   in
   let*! () = cctxt#message "Injected block at minimal timestamp" in
   if count <= 1 then return_unit
@@ -613,6 +712,8 @@ let rec baking_minimal_timestamp ~count state
                   Baking_state.current_round = Round.zero;
                   current_phase = Idle;
                   delayed_quorum = None;
+                  early_attestations = [];
+                  awaiting_unlocking_pqc = false;
                 };
             }
       | _ ->

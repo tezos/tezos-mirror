@@ -5,20 +5,27 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Utilities and types for representing a stack.
+
 use std::ops::{Index, IndexMut};
 use std::slice::SliceIndex;
 
 use crate::ast::*;
 
+/// Stack of [Type]s.
 pub type TypeStack = Stack<Type>;
-pub type IStack = Stack<TypedValue>;
+
+/// Stack of [TypedValue]s. Named `IStack` for "interpeter stack".
+pub type IStack<'a> = Stack<TypedValue<'a>>;
 
 /// Possibly failed type stack. Stacks are considered failed after
 /// always-failing instructions. A failed stack can be unified (in terms of
 /// typechecking) with any other stack.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FailingTypeStack {
+    /// The stack isn't failed.
     Ok(TypeStack),
+    /// The stack is failed.
     Failed,
 }
 
@@ -76,6 +83,40 @@ impl<T> Stack<T> {
         len.checked_sub(i + 1).expect("out of bounds stack access")
     }
 
+    /// Removes and returns the element at position `i` within the stack, where
+    /// 0 corresponds to the top, shifting all elements below it up. This has
+    /// worst-case complexity of O(n).
+    ///
+    /// # Panics
+    ///
+    /// When `i` is larger or equal to the length of the stack.
+    pub fn remove(&mut self, i: usize) -> T {
+        self.0.remove(self.vec_index(i))
+    }
+
+    /// Insert an element at i'th stack index, such that after the call there
+    /// are `i` number of elements before the newly inserted element. `insert(0,
+    /// x)` is equivalent to `push(x)`.
+    ///
+    /// This has to move elements of the stack after insertion, so worst-case
+    /// complexity is O(n).
+    ///
+    /// # Panics
+    ///
+    /// If `i` is larger than the length of the stack.
+    pub fn insert(&mut self, i: usize, e: T) {
+        if i > 0 {
+            // We subtract one from the index because since our stack is inverted, the insertion
+            // point is to the right of the index, instead of the left of it, as considered by the
+            // `insert` method of the `Vec`. So, we have to use an index that is one element further
+            // to the right, which in terms of stack index, means substracting one from the input
+            // index.
+            self.0.insert(self.vec_index(i - 1), e)
+        } else {
+            self.push(e)
+        }
+    }
+
     /// Push an element onto the top of the stack.
     pub fn push(&mut self, elt: T) {
         self.0.push(elt)
@@ -87,6 +128,7 @@ impl<T> Stack<T> {
     }
 
     /// Get the stack's element count.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -101,6 +143,30 @@ impl<T> Stack<T> {
             .truncate(len.checked_sub(size).expect("size too large in drop_top"));
     }
 
+    /// Removes the specified number of elements from the top of the stack and
+    /// returns them as an iterator over the removed items, starting with the stack's top.
+    ///
+    /// Panics if the `size` is larger than length of the stack.
+    ///
+    /// If you do not need the items, use `drop_top` instead.
+    #[must_use]
+    pub fn drain_top(&mut self, size: usize) -> impl DoubleEndedIterator<Item = T> + '_ {
+        let len = self.len();
+        self.0
+            .drain(len.checked_sub(size).expect("size too large in drain_top")..)
+            .rev()
+    }
+
+    /// Reserve additional space on the stack for at least `additional`
+    /// elements. Similar to [Vec::reserve].
+    ///
+    /// # Panics
+    ///
+    /// If the new capacity exceeds [isize::MAX] bytes.
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Borrow the stack content as an immutable slice. Note that stack top is
     /// the _rightmost_ element.
     pub fn as_slice(&self) -> &[T] {
@@ -108,6 +174,8 @@ impl<T> Stack<T> {
     }
 
     /// Split off the top `size` elements of the stack into a new `Stack`.
+    ///
+    /// # Panics
     ///
     /// Panics if the `size` is larger than length of the stack.
     pub fn split_off(&mut self, size: usize) -> Stack<T> {
@@ -138,21 +206,21 @@ impl<T> Stack<T> {
     }
 }
 
-/// Newtype for specifying the order of elements in a `Stack` vs elements in
-/// a `Vec`/slice. Used in the `From` trait for `Stack`. _First_ element of
-/// the `Vec` will end up at the _top_ of the stack. `from()` conversion has
-/// O(n) complexity. See also `TopIsLast<T>`.
+/// Newtype for specifying the order of elements in a [Stack] vs elements in
+/// a [Vec]/slice. Used in the [From] trait for [Stack]. _First_ element of
+/// the [Vec] will end up at the _top_ of the stack. `from()` conversion has
+/// O(n) complexity. See also [TopIsLast].
 ///
 /// `from_iter()` implementation is slightly inefficient, still O(n), but
 /// the constant is a bit higher than necessary. If you're worried about
-/// efficiency, consider using `TopIsLast` with an explicit `rev()`.
+/// efficiency, consider using [TopIsLast] with an explicit `rev()`.
 pub struct TopIsFirst<T>(pub Stack<T>);
 
-/// Newtype for specifying the order of elements in a `Stack` vs elements in
-/// a `Vec`/slice. Used in the `From` trait for `Stack`. _First_ element of
-/// the `Vec` will end up at the _bottom_ of the stack. `from()` conversion
+/// Newtype for specifying the order of elements in a [Stack] vs elements in
+/// a [Vec]/slice. Used in the [From] trait for [Stack]. _First_ element of
+/// the [Vec] will end up at the _bottom_ of the stack. `from()` conversion
 /// has O(1) complexity for vectors, O(n) for slices since those have to be
-/// cloned. See also `TopIsFirst<T>`
+/// cloned. See also [TopIsFirst].
 pub struct TopIsLast<T>(pub Stack<T>);
 
 impl<T> From<Vec<T>> for TopIsFirst<T> {
@@ -215,6 +283,31 @@ impl<T> IndexMut<usize> for Stack<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let i = self.vec_index(index);
         self.0.index_mut(i)
+    }
+}
+
+/// Owning [Stack] iterator.
+pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<T> IntoIterator for Stack<T> {
+    type IntoIter = IntoIter<T>;
+
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.0.into_iter().rev())
     }
 }
 
@@ -300,6 +393,34 @@ mod tests {
     }
 
     #[test]
+    fn remove() {
+        let mut stk = stk![1, 2, 3, 4];
+        stk.remove(1);
+        assert_eq!(stk, stk![1, 2, 4]);
+
+        stk.remove(2);
+        assert_eq!(stk, stk![2, 4]);
+
+        stk.remove(0);
+        assert_eq!(stk, stk![2]);
+    }
+
+    #[test]
+    fn insert() {
+        let mut stk = stk![1, 2, 3];
+        stk.insert(2, 10);
+        assert_eq!(stk, stk![1, 10, 2, 3]);
+
+        let mut stk = stk![];
+        stk.insert(0, 10);
+        assert_eq!(stk, stk![10]);
+
+        let mut stk = stk![1, 2, 3];
+        stk.insert(3, 10);
+        assert_eq!(stk, stk![10, 1, 2, 3]);
+    }
+
+    #[test]
     fn len() {
         let mut stk = stk![1, 2, 3];
         assert_eq!(stk.len(), 3);
@@ -315,10 +436,33 @@ mod tests {
     }
 
     #[test]
+    fn drain_top() {
+        let mut stk = stk![1, 2, 3, 4];
+        let drained = stk.drain_top(3);
+        assert_eq!(drained.collect::<Vec<_>>(), vec![4, 3, 2]);
+        assert_eq!(stk, stk![1]);
+    }
+
+    #[test]
+    fn drain_top_0() {
+        let mut stk = stk![1, 2, 3, 4];
+        let drained = stk.drain_top(0);
+        assert_eq!(drained.collect::<Vec<_>>(), vec![]);
+        assert_eq!(stk, stk![1, 2, 3, 4]);
+    }
+
+    #[test]
     #[should_panic(expected = "size too large in drop_top")]
     fn drop_top_out_of_bounds() {
         let mut stk = stk![1, 2, 3, 4];
         stk.drop_top(42);
+    }
+
+    #[test]
+    #[should_panic(expected = "size too large in drain_top")]
+    fn drain_top_out_of_bounds() {
+        let mut stk = stk![1, 2, 3, 4];
+        let _ = stk.drain_top(42);
     }
 
     #[test]

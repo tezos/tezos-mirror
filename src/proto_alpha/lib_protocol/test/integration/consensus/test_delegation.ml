@@ -38,7 +38,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 (*****************************************************************************)
 (* Bootstrap contracts
@@ -48,13 +48,17 @@ open Test_tez
    tests that use them. *)
 (*****************************************************************************)
 
-let expect_error err = function
+let expect_error err =
+  let open Lwt_result_syntax in
+  function
   | err0 :: _ when err = err0 -> return_unit
   | _ -> failwith "Unexpected successful result"
 
 let expect_alpha_error err = expect_error (Environment.Ecoproto_error err)
 
-let expect_no_change_registered_delegate_pkh pkh = function
+let expect_no_change_registered_delegate_pkh pkh =
+  let open Lwt_result_syntax in
+  function
   | Environment.Ecoproto_error (Delegate_storage.Contract.No_deletion pkh0) :: _
     when pkh0 = pkh ->
       return_unit
@@ -421,7 +425,8 @@ let tests_bootstrap_contracts =
     Tztest.tztest
       "bootstrap manager can be delegate (init origination, large fee)"
       `Quick
-      (delegate_to_bootstrap_by_origination ~fee:(Test_tez.of_int 10_000_000));
+      (delegate_to_bootstrap_by_origination
+         ~fee:(Tez_helpers.of_int 10_000_000));
     Tztest.tztest
       "originated bootstrap contract can be undelegated"
       `Quick
@@ -484,7 +489,9 @@ let tests_bootstrap_contracts =
    2/ Self-delegation fails if the contract has no credit. We try the
    two possibilities of 1a for non-credited contracts. *)
 
-let expect_unregistered_key pkh = function
+let expect_unregistered_key pkh =
+  let open Lwt_result_syntax in
+  function
   | Environment.Ecoproto_error (Delegate_storage.Unregistered_delegate pkh0)
     :: _
     when pkh = pkh0 ->

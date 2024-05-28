@@ -105,9 +105,6 @@ type ('a, 'b) error_container = {given : 'a; expected : 'b}
 
 open Error_monad
 
-(** [Dal_initialisation_twice], thrown by {!Config.init_dal}. *)
-type error += Dal_initialisation_twice
-
 (** [Failed_to_load_trusted_setup], thrown by {!Config.init_dal}. *)
 type error += Failed_to_load_trusted_setup of string
 
@@ -196,24 +193,29 @@ val polynomial_to_slot : t -> polynomial -> slot
      polynomial [p].
 
       Fails with [`Invalid_degree_strictly_less_than_expected _]
-      if the degree of [p] exceeds the SRS size. *)
+      if the degree of [p] exceeds the SRS size.
+
+      Fails with [`Prover_SRS_not_loaded] if the prover’s SRS is not loaded
+      (ie: [init_dal_verifier] has been used to load the SRS). *)
 val commit :
   t ->
   polynomial ->
   ( commitment,
-    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
-  )
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Prover_SRS_not_loaded ] )
   Result.t
 
 (** [pp_commit_error fmt error] pretty-prints the error returned by {!val:commit}. *)
 val pp_commit_error :
   Format.formatter ->
-  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container] ->
+  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+  | `Prover_SRS_not_loaded ] ->
   unit
 
 (** [string_of_commit_error error] returns an error string message for [error]. *)
 val string_of_commit_error :
-  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container] ->
+  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+  | `Prover_SRS_not_loaded ] ->
   string
 
 (** A portion of the data represented by a polynomial. *)
@@ -319,18 +321,66 @@ val verify_shard :
     | `Shard_index_out_of_range of string ] )
   Result.t
 
+(**
+    Batched version of verify_shard, for better verifier performance.
+    [verify_shard_multi t commitment shard_list proof_list]
+    returns [Ok ()]
+    if for all i List.nth i [shard] is an element of [shards_from_polynomial p]
+    where [commitment = commit t p] for some polynomial [p],
+    and the proofs are correctly generated.
+
+    The verification time smaller than calling List.lenght shard_list
+    times the verify_shard function.
+
+    Requires:
+    - The SRS (structured reference string) contained in [t]
+    should be the same as the one used to produce the [commitment]
+    and [proof].
+
+    Fails with:
+    - [Error `Invalid_shard] if the verification fails
+    - [Error `Invalid_degree_strictly_less_than_expected _] if the
+    SRS contained in [t] is too small to proceed with the verification
+    - [Error `Shard_length_mismatch] if one of the shard is not of the expected
+    length [shard_length] given for the initialisation of [t]
+    - [Error (`Shard_index_out_of_range msg)] if one of the shard index
+    is not within the range [0, number_of_shards - 1]
+    (where [number_of_shards] is found in [t]).
+
+    Ensures:
+    - [verify_shard_multi t commitment shard_list proof_list = Ok ()] if
+    and only if
+    [Array.mem (List.nth i shard_list) (shards_from_polynomial t polynomial]),
+    [precomputation = precompute_shards_proofs t],
+    [List.nth i proof_list = (prove_shards t ~precomputation ~polynomial).
+    (List. nth i (shard_list.index))], for all i
+    and [commitment = commit t p]. *)
+val verify_shard_multi :
+  t ->
+  commitment ->
+  shard list ->
+  shard_proof list ->
+  ( unit,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Invalid_shard
+    | `Shard_length_mismatch
+    | `Shard_index_out_of_range of string ] )
+  Result.t
+
 (** [prove_commitment t polynomial] produces a proof that the slot represented
     by [polynomial] has its size bounded by [slot_size] declared in [t].
 
     Fails with:
     - [Error `Invalid_degree_strictly_less_than_expected _] if the SRS
-    contained in [t] is too small to produce the proof *)
+    contained in [t] is too small to produce the proof
+    - [Error `Prover_SRS_not_loaded] if the prover’s SRS is not loaded
+    (ie: [init_dal_verifier] has been used to load the SRS). *)
 val prove_commitment :
   t ->
   polynomial ->
   ( commitment_proof,
-    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
-  )
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Prover_SRS_not_loaded ] )
   Result.t
 
 (** [prove_page t polynomial n] produces a proof for the [n]-th page of
@@ -345,6 +395,8 @@ val prove_commitment :
     - [Error (`Page_index_out_of_range msg)] if the page index
     is not within the range [0, slot_size/page_size - 1]
     (where [slot_size] and [page_size] are found in [t]).
+    - [Error `Prover_SRS_not_loaded] if the SRS has been loaded with
+    [init_dal_verifier].
 
     Ensures:
     - [verify_page t commitment ~page_index page page_proof = Ok ()] if
@@ -359,7 +411,8 @@ val prove_page :
   int ->
   ( page_proof,
     [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
-    | `Page_index_out_of_range ] )
+    | `Page_index_out_of_range
+    | `Prover_SRS_not_loaded ] )
   Result.t
 
 (** The precomputation used to produce shard proofs. *)
@@ -370,7 +423,12 @@ val shards_proofs_precomputation_encoding :
 
 (** [precomputation_shard_proofs t] returns the precomputation used to
    produce shard proofs. *)
-val precompute_shards_proofs : t -> shards_proofs_precomputation
+val precompute_shards_proofs :
+  t ->
+  ( shards_proofs_precomputation,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
+  )
+  Result.t
 
 (** [save_precompute_shards_proofs precomputation ~filename] saves the
    given [precomputation] to disk with the given [filename]. *)
@@ -425,16 +483,17 @@ val prove_shards :
 module Internal_for_tests : sig
   (** The initialisation parameters can be too large for testing
      purposes. This function creates an unsafe initialisation
-     parameters using [parameters]. The running time of this function
-     is linear with respect to [parameters.slot_size]. Order of magnitude can
-     be around 1 minute for a size of 1MiB. *)
-  val parameters_initialisation : parameters -> initialisation_parameters
+     parameters using default parameters designed to handle test cases. *)
+  val init_prover_dal : unit -> unit
 
-  (** Same as {!val:load_parameters} except it erase parameters if
-     they were already loaded. This is used to circumvent limitation
-     from test frameworks where tests with various parameters could be
-     run using the same binary. *)
-  val load_parameters : initialisation_parameters -> unit
+  (** This function creates an unsafe initialisation parameters for the
+      verifier using default parameters designed to handle test cases. *)
+  val init_verifier_dal : unit -> unit
+
+  (** This function loads in memory the default verifier SRS. The
+      difference with [init_verifier_dal] is that the latter loads a
+      SRS that should be only used for tests. *)
+  val init_verifier_dal_default : unit -> unit
 
   (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
@@ -499,13 +558,16 @@ module Internal_for_tests : sig
   val precomputation_equal :
     shards_proofs_precomputation -> shards_proofs_precomputation -> bool
 
-  val reset_initialisation_parameters : unit -> unit
-
   val encoded_share_size : t -> int
 
   (** [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
+
+  (** Same as [ensure_validity parameters], except that it returns an error if the
+      [parameters] aren't valid and doesn't check the SRS. *)
+  val ensure_validity_without_srs :
+    parameters -> (unit, [> `Fail of string]) result
 
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
@@ -521,7 +583,7 @@ end
 module Config : sig
   type t = Dal_config.t = {
     activated : bool;
-    use_mock_srs_for_testing : parameters option;
+    use_mock_srs_for_testing : bool;
     bootstrap_peers : string list;
   }
 
@@ -534,14 +596,16 @@ module Config : sig
      files [find_trusted_setup_files] and the optional log2 of the SRS size
      [srs_size_log2].
 
-      When [config.use_mock_srs_for_testing = None],
+      When [config.use_mock_srs_for_testing = false],
      [init_dal] loads [initialisation_parameters] from the files at the
      paths provided by [find_trusted_setup_files ()]. It is important that
      every time the primitives above are used, they are used with the very
      same initialization parameters. (To ensure this property, an integrity
      check is run.) In this case, [init_dal] can take several seconds
      to run. *)
-  val init_dal :
+  val init_verifier_dal : t -> unit Error_monad.tzresult
+
+  val init_prover_dal :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
     ?srs_size_log2:int ->
     t ->

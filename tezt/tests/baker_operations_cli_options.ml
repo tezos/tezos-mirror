@@ -104,7 +104,7 @@ let test_ignore_node_mempool =
   Protocol.register_test
     ~__FILE__
     ~title:"Ignore node mempool"
-    ~tags:["ignore"; "node"; "mempool"]
+    ~tags:[Tag.layer1; "ignore"; "node"; "mempool"]
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
   let sender = Constant.bootstrap4 in
@@ -158,7 +158,7 @@ let with_http_server file presence f =
   in
   Lwt.finalize
     (fun () ->
-      let base_uri = sf "http://localhost:%d/" port in
+      let base_uri = sf "http://%s:%d/" Constant.default_host port in
       f base_uri)
     (fun () ->
       Lwt.wakeup_later http_server_stopper () ;
@@ -235,7 +235,7 @@ let test_bake_empty_operations protocols =
      register_external_mempool
        ~title:("missing operations (" ^ description ^ ")")
        ~mempool
-       ~tags:["empty"]
+       ~tags:[Tag.layer1; "empty"]
        (fun node client mempool ->
          let* level = Node.get_level node in
          let* () = Client.bake_for_and_wait ~mempool client in
@@ -314,7 +314,7 @@ let test_bake_singleton_operations =
   in
   register_external_mempool
     ~title:"singleton operation"
-    ~tags:["singleton"]
+    ~tags:[Tag.layer1; "singleton"]
     ~mempool
   @@ fun _node client mempool ->
   (* Bake the file obtained through mempool, and note the balance diff it generates *)
@@ -337,7 +337,8 @@ let test_baker_external_operations =
   Protocol.register_test
     ~__FILE__
     ~title:"Baker external operations"
-    ~tags:["baker"; "external"; "operations"]
+    ~tags:[Tag.layer1; "baker"; "external"; "operations"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Init" ;
   let node_args = Node.[Synchronisation_threshold 0] in
@@ -499,14 +500,16 @@ let test_baker_state_recorder_memory =
   Protocol.register_test
     ~__FILE__
     ~title:"Baker state recorder - memory case"
-    ~tags:["baker"; "state"; "recorder"; "memory"]
+    ~tags:[Tag.layer1; "baker"; "state"; "recorder"; "memory"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol -> test_baker_state_recorder protocol false
 
 let test_baker_state_recorder_filesystem =
   Protocol.register_test
     ~__FILE__
     ~title:"Baker state recorder - filesystem case"
-    ~tags:["baker"; "state"; "recorder"; "filesystem"]
+    ~tags:[Tag.layer1; "baker"; "state"; "recorder"; "filesystem"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol -> test_baker_state_recorder protocol true
 
 let register ~protocols =

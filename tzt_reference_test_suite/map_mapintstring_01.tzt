@@ -1,0 +1,3 @@
+code { MAP { CDR ; SIZE } } ;
+input { Stack_elt (map int string) { Elt 1 "AB" } } ;
+output { Stack_elt (map int nat) { Elt 1 2 } }

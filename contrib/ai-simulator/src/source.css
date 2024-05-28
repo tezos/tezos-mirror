@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+table {
+  font-family: sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  color:white;
+}

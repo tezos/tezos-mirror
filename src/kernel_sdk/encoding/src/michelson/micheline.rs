@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -46,7 +47,7 @@ pub const MICHELINE_BYTES_TAG: u8 = 10;
 // Annotations
 // -----------
 
-mod annots {
+pub(crate) mod annots {
     use regex::Regex;
     use std::fmt;
     use tezos_data_encoding::enc::{self, BinResult, BinWriter};
@@ -56,7 +57,7 @@ mod annots {
     pub struct Annotation(String);
 
     #[derive(Debug, PartialEq, Eq, Clone, Default)]
-    pub struct Annotations(Vec<Annotation>);
+    pub struct Annotations(pub(crate) Vec<Annotation>);
 
     impl fmt::Display for Annotation {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

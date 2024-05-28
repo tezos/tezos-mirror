@@ -1,6 +1,7 @@
 open Bls
 open Utils
-open Commitment
+module Commit = Commitment.Commit
+module Commitment = Commitment.Commitment_G1
 
 (* Implements a batched version of the KZG10 scheme, described in Section 3 of
    the PlonK paper: https://eprint.iacr.org/2019/953.pdf *)
@@ -36,8 +37,6 @@ module Public_parameters = struct
 
   let get_commit_parameters {srs1; _} = srs1
 end
-
-module Commitment = Commitment
 
 (* polynomials to be committed *)
 type secret = Commitment.secret

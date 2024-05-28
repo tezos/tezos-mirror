@@ -35,7 +35,8 @@ type validation_result = Environment_context.validation_result = {
   fitness : Fitness.t;
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_finalized_block_level : Int32.t;
+  last_preserved_block_level : Int32.t;
 }
 
 type quota = Environment_context.quota = {max_size : int; max_op : int option}
@@ -60,6 +61,7 @@ module V8 = Environment_V8
 module V9 = Environment_V9
 module V10 = Environment_V10
 module V11 = Environment_V11
+module V12 = Environment_V12
 module Memory_context = Memory_context
 module Proxy_context = Proxy_context
 module Proxy_delegate = Proxy_delegate

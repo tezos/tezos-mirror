@@ -90,6 +90,11 @@ function compute_results(opcode, opcode_data) {
     let cardinal = results.length;
 
     let total_ticks = sumArray(opcode_data.map(({ ticks }) => ticks));
+    let average_ticks = total_ticks / opcode_data.length;
+    let ticksVarianceArray = opcode_data.map(({ ticks }) => (ticks - average_ticks) * (ticks - average_ticks));
+    let ticksVariance = sumArray(ticksVarianceArray) / ticksVarianceArray.length
+    let ticks_standard_deviation = Math.sqrt(ticksVariance);
+
     let total_gas = sumArray(opcode_data.map(({ gas }) => gas));
     let average_gas = total_gas / results.length;
 
@@ -111,6 +116,8 @@ function compute_results(opcode, opcode_data) {
         total_gas,
         average_gas,
         total_ticks,
+        average_ticks,
+        ticks_standard_deviation,
         inconsistencies,
         opcode
     };
@@ -160,6 +167,8 @@ function produce_opcodes_csv(result, file) {
         total_gas: "total_gas",
         average_gas: "average_gas",
         total_ticks: "total_ticks",
+        average_ticks: "average_ticks",
+        ticks_standard_deviation: "ticks_standard_deviation",
         inconsistencies: "inconsistent gas accounting"
     };
     let rows = [];

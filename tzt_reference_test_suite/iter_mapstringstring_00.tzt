@@ -1,0 +1,3 @@
+code { ITER { DUP ; DIP { CDR } ; CAR ; CONCAT ; SWAP ; CONCAT } } ;
+input { Stack_elt (map string string) { Elt "Hel" "lo" ; Elt "Wor" "ld" } ; Stack_elt string "" } ;
+output { Stack_elt string "HelloWorld" }

@@ -82,10 +82,9 @@ module Parameters :
      structures *)
   let fee_parameter {fee_parameters; _} _ = fee_parameters
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Decide if some batches must have all the operations succeed. See
-     {!Injector_common.Parameter.batch_must_succeed}. *)
-  let batch_must_succeed _ = `At_least_one
+  let safety_guard _ = None
+
+  let persist_operation _ = true
 
   let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
     let open Lwt_syntax in

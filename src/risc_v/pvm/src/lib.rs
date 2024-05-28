@@ -1,3 +1,5 @@
+pub mod state;
+
 use risc_v_interpreter::add;
 
 #[no_mangle]

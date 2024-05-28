@@ -35,7 +35,7 @@
     In our case, if the JSON schemas we read start to get more fields, we want
     to know; otherwise the resulting OpenAPI specification could be inaccurate. *)
 
-include Tezt.JSON
+include JSON
 
 let as_variant json =
   match as_object json with

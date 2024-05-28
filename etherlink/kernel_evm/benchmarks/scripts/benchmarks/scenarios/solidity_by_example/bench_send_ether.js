@@ -24,4 +24,6 @@ txs.push(utils.send(player1, create.addr, 1000, sendViaTransfer))
 txs.push(utils.send(player1, create.addr, 1000, sendViaSend))
 txs.push(utils.send(player1, create.addr, 1000, sendViaCall))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

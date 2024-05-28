@@ -35,7 +35,7 @@ type t = {
   node_ctxt : Node_context.ro;
   ctxt : Context.ro;
   inbox_level : int32;
-  state : Context.tree;
+  state : Context.pvmstate;
   reveal_map : string Utils.Reveal_hash_map.t option;
   nb_messages_inbox : int;
   level_position : level_position;

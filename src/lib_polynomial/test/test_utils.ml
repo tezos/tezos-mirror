@@ -1,6 +1,6 @@
 open Polynomial
 
-let () = Random.self_init ()
+let () = Random.set_state (Random.State.make [|42; 643; 54; 754|])
 
 let test_next_power_of_two () =
   let vectors = [(2, 2); (3, 4); (7, 8); (12, 16)] in

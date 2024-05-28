@@ -1,63 +1,63 @@
-#![cfg_attr(target_os = "none", no_std)]
-#![cfg_attr(target_os = "none", no_main)]
+mod sbi_crypto;
 
-#[cfg(target_os = "hermit")]
-use hermit as _;
+use tezos_crypto_rs::blake2b::digest_256;
+use tezos_smart_rollup::{
+    inbox::InboxMessage, kernel_entry, michelson::MichelsonUnit, prelude::*,
+    storage::path::OwnedPath, types::SmartRollupAddress,
+};
 
-extern crate alloc;
+pub fn entry(host: &mut impl Runtime) {
+    let msg = "Hello World\n";
+    debug_msg!(host, "{}", msg);
 
-#[cfg(not(target_os = "none"))]
-extern crate std;
+    let meta = host.reveal_metadata();
+    debug_msg!(host, "I am {}\n", SmartRollupAddress::new(meta.address()));
+    debug_msg!(host, "{:#?}\n", meta);
 
-mod actual_main;
-mod dumb_alloc;
+    let hash = digest_256(msg.as_bytes()).unwrap();
+    debug_msg!(host, "{:02X?}\n", hash);
 
-use tezos_smart_rollup::core_unsafe::rollup_host::RollupHost;
-
-#[inline]
-fn main_wrapper() -> ! {
-    #[cfg(target_arch = "riscv64")]
-    use tezos_smart_rollup::core_unsafe::riscv64_syscalls::exit;
-
-    #[cfg(not(target_arch = "riscv64"))]
-    use std::process::exit;
-
-    let host = unsafe { RollupHost::new() };
-    crate::actual_main::main(host);
-    exit(0)
-}
-
-#[cfg(all(target_arch = "riscv64", target_os = "none"))]
-mod bare_metal {
-    use crate::dumb_alloc;
-    use tezos_smart_rollup::core_unsafe::riscv64_syscalls::exit;
-
-    // This code runs before the main.
-    #[riscv_rt::pre_init]
-    unsafe fn pre_init() {
-        dumb_alloc::init();
+    unsafe {
+        assert_eq!(hash, sbi_crypto::blake2b_hash256(msg.as_bytes()));
     }
 
-    // We need a custom panic handler to ensure fatal errors are visible to the
-    // outside world.
-    #[panic_handler]
-    pub fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-        tezos_smart_rollup_panic_hook::panic_handler(info);
-        exit(1)
+    while let Some(msg) = host.read_input().expect("Want message") {
+        let (_, msg) = InboxMessage::<MichelsonUnit>::parse(msg.as_ref())
+            .expect("Failed to parse inbox message");
+        debug_msg!(host, "{:#?}\n", msg);
     }
 
-    // When targeting RISC-V bare-metal we need a custom entrypoint mechanism.
-    // Fortunateky, riscv-rt provides this for us.
-    #[allow(non_snake_case)]
-    #[riscv_rt::entry]
-    unsafe fn main() -> ! {
-        super::main_wrapper()
+    let path: OwnedPath = "/hello".as_bytes().to_vec().try_into().unwrap();
+    let () = host
+        .store_write(&path, msg.as_bytes(), 0)
+        .expect("Could not write to storage");
+    let read_msg = host
+        .store_read(&path, 0, msg.len())
+        .expect("Could not read from storage");
+    assert_eq!(read_msg.as_slice(), msg.as_bytes());
+
+    unsafe {
+        let public_key: [u8; 32] = [
+            171, 32, 104, 249, 65, 125, 118, 36, 210, 237, 61, 116, 43, 133, 16, 15, 177, 4, 114,
+            245, 84, 7, 13, 184, 49, 110, 76, 46, 147, 20, 137, 69,
+        ];
+        let secret_key: [u8; 32] = [
+            147, 228, 82, 23, 29, 245, 139, 43, 80, 32, 225, 196, 0, 239, 143, 245, 138, 203, 227,
+            208, 158, 63, 121, 41, 8, 220, 224, 224, 33, 132, 133, 237,
+        ];
+
+        let data = "Hello World".as_bytes();
+
+        let sig = sbi_crypto::ed25519_sign(&secret_key, data);
+        debug_msg!(host, "Signature is {sig:?}\n");
+
+        assert!(sbi_crypto::ed25519_verify(&public_key, &sig, data));
     }
+
+    debug_msg!(host, "Done\n");
+
+    // Drain the inbox, making the sandbox stop.
+    while host.read_input().map(|msg| msg.is_some()).unwrap_or(true) {}
 }
 
-// We can re-use the default mechanism around entrypoints when we're not
-// compiling to the bare-metal target.
-#[cfg(not(target_os = "none"))]
-fn main() {
-    main_wrapper();
-}
+kernel_entry!(entry);

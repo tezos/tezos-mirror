@@ -50,7 +50,7 @@ let bake_and_attest_once (_b_pred, b_cur) baker attester =
   | None -> assert false
   | Some (delegate, _slots) ->
       let*?@ round = Block.get_round b_cur in
-      Op.attestation ~round ~delegate b_cur >>=? fun attestation ->
+      let* attestation = Op.attestation ~round ~delegate b_cur in
       Block.bake_with_metadata
         ~policy:(By_account baker)
         ~operation:attestation
@@ -142,7 +142,7 @@ let test_participation ~sufficient_participation () =
       del2
       attesting_rewards
   in
-  let attesting_rewards = Test_tez.to_mutez attesting_rewards in
+  let attesting_rewards = Tez_helpers.to_mutez attesting_rewards in
   let expected_bal2_at_b =
     Int64.(sub (add bal2_at_pred_b attesting_rewards) autostaked)
   in
@@ -169,13 +169,14 @@ let test_participation_rpc () =
     expected_cycle_activity * numerator / denominator
   in
   let allowed_missed_slots = expected_cycle_activity - minimal_cycle_activity in
-  let attesting_reward_per_slot =
+  let*?@ attesting_reward_per_slot =
     Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
       csts.parametric
       ~reward_kind:Attesting_reward_per_slot
   in
   let expected_attesting_rewards =
-    Test_tez.(attesting_reward_per_slot *! Int64.of_int expected_cycle_activity)
+    Tez_helpers.(
+      attesting_reward_per_slot *! Int64.of_int expected_cycle_activity)
   in
   let* b1 = Block.bake ~policy:(By_account del1) b0 in
   let* _, _, _ =

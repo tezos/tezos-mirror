@@ -1,0 +1,3 @@
+code { ITER { CONS } } ;
+input { Stack_elt (list string) { "A" ; "B" ; "C" } ; Stack_elt (list string) { } } ;
+output { Stack_elt (list string) { "C" ; "B" ; "A" } }

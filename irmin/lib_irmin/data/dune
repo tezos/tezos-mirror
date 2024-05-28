@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name irmin_data)
+ (public_name octez-internal-libs.irmin.data)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bigstringaf
+  fmt))

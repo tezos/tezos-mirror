@@ -23,6 +23,7 @@ It contains the following libraries:
 - {{!module-Tezos_crypto}Tezos_crypto}: Library with all the cryptographic primitives used by Tezos
 - {{!module-Tezos_crypto_dal}Tezos_crypto_dal}: DAL cryptographic primitives
 - {{!module-Tezos_error_monad}Tezos_error_monad}: Error monad
+- {{!module-Tezos_error_monad_legacy}Tezos_error_monad_legacy}: Error monad (legacy)
 - {{!module-Tezos_event_logging}Tezos_event_logging}: Octez event logging library
 - {{!module-Tezos_event_logging_test_helpers}Tezos_event_logging_test_helpers}: Test helpers for the event logging library
 - {{!module-Tezos_expect_helper}Tezos_expect_helper}

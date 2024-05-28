@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Using bash so that we are able to use the time program.
 
 #############################################################################

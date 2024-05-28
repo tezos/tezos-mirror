@@ -375,22 +375,12 @@ let protocol_param_key = ["protocol_parameters"]
 let check_constants_consistency constants =
   let open Lwt_result_syntax in
   let open Constants_parametric_repr in
-  let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
-    constants
-  in
+  let {blocks_per_cycle; blocks_per_commitment; _} = constants in
   let* () =
     Error_monad.unless (blocks_per_commitment <= blocks_per_cycle) (fun () ->
         failwith
           "Inconsistent constants : blocks per commitment must be less than \
            blocks per cycle")
-  in
-  let* () =
-    Error_monad.unless
-      (blocks_per_cycle >= blocks_per_stake_snapshot)
-      (fun () ->
-        failwith
-          "Inconsistent constants : blocks per cycle must be superior than \
-           blocks per stake snapshot")
   in
   return_unit
 
@@ -563,7 +553,7 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
       `Lazy
       element_of_key
   in
-  let* validation, block_header_metadata =
+  let* (validation, block_header_metadata), operations_results =
     let*! r =
       let* vstate =
         begin_validation_and_application
@@ -577,15 +567,23 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
              })
           ~predecessor:(Store.Block.shell_header pred)
       in
-      let* vstate =
+      let* vstate, resultll =
         List.fold_left_es
-          (List.fold_left_es (fun vstate op ->
-               let* state, _result = validate_and_apply_operation vstate op in
-               return state))
-          vstate
+          (fun (vstate, resultll) l ->
+            let* vstate, resultl =
+              List.fold_left_es
+                (fun (vstate, resultl) op ->
+                  let* state, result = validate_and_apply_operation vstate op in
+                  return (state, result :: resultl))
+                (vstate, [])
+                l
+            in
+            return (vstate, List.rev resultl :: resultll))
+          (vstate, [])
           operations
       in
-      finalize_validation_and_application vstate (Some shell)
+      let* x = finalize_validation_and_application vstate (Some shell) in
+      return (x, List.rev resultll)
     in
     let*? r = Environment.wrap_tzresult r in
     return r
@@ -628,16 +626,24 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
   let block_header =
     {Tezos_base.Block_header.shell = header.shell; protocol_data}
   in
+  let operations_results =
+    List.map
+      (List.map
+         (Data_encoding.Binary.to_bytes_exn
+            Protocol.Main.operation_receipt_encoding))
+      operations_results
+  in
   let operations_metadata_hashes =
     Some
       (List.map
          (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
-         (WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])))
+         operations_results)
   in
   return
     ( block_header,
       block_header_metadata,
       block_hash_metadata,
+      operations_results,
       operations_metadata_hashes,
       resulting_context_hash,
       validation )
@@ -653,6 +659,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
   let* ( block_header,
          block_header_metadata,
          block_metadata_hash,
+         ops_metadata,
          ops_metadata_hashes,
          resulting_context_hash,
          validation ) =
@@ -665,20 +672,22 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
       pred_resulting_context_hash
   in
   let ops_metadata =
-    let operations_metadata =
-      WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])
-    in
     match ops_metadata_hashes with
     | Some metadata_hashes ->
         let res =
           WithExceptions.List.map2
             ~loc:__LOC__
-            (WithExceptions.List.map2 ~loc:__LOC__ (fun x y -> (x, y)))
-            operations_metadata
+            (WithExceptions.List.map2 ~loc:__LOC__ (fun x y ->
+                 (Block_validation.Metadata x, y)))
+            ops_metadata
             metadata_hashes
         in
         Block_validation.Metadata_hash res
-    | None -> Block_validation.(No_metadata_hash operations_metadata)
+    | None ->
+        let operations_metadata =
+          WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])
+        in
+        Block_validation.(No_metadata_hash operations_metadata)
   in
   let validation_result =
     {
@@ -688,7 +697,8 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
           timestamp = block_header.shell.timestamp;
           message = validation.Tezos_protocol_environment.message;
           max_operations_ttl = validation.max_operations_ttl;
-          last_allowed_fork_level = validation.last_allowed_fork_level;
+          last_finalized_block_level = validation.last_finalized_block_level;
+          last_preserved_block_level = validation.last_preserved_block_level;
         };
       block_metadata = (block_header_metadata, block_metadata_hash);
       ops_metadata;
@@ -716,6 +726,10 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         let*! () = Block_store.await_merging block_store in
         let* _ = Store.Chain.set_head chain_store b in
         let*! () = Block_store.await_merging block_store in
+        let context_index =
+          Store.context_index (Store.Chain.global_store chain_store)
+        in
+        let*! () = Context_ops.wait_gc_completion context_index in
         (match Block_store.get_merge_status block_store with
         | Merge_failed err -> Assert.fail_msg "%a" pp_print_trace err
         | Running | Not_running -> ()) ;

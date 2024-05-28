@@ -37,4 +37,6 @@ txs.push(utils.send(player1, create.addr, 0, get_extcodehash))
 txs.push(utils.send(player1, create.addr, 0, get_msize))
 txs.push(utils.send(player1, create.addr, 0, get_code))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

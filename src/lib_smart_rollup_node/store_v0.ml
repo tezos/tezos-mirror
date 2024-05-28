@@ -229,40 +229,6 @@ module Levels_to_hashes =
     end))
     (Tezos_store_shared.Block_key)
 
-(* Published slot headers per block hash,
-   stored as a list of bindings from `Dal_slot_index.t`
-   to `Dal.Slot.t`. The encoding function converts this
-   list into a `Dal.Slot_index.t`-indexed map. *)
-module Dal_slot_pages =
-  Irmin_store.Make_nested_map
-    (struct
-      let path = ["dal"; "slot_pages"]
-    end)
-    (struct
-      type key = Block_hash.t
-
-      let to_path_representation = Block_hash.to_b58check
-    end)
-    (struct
-      type key =
-        Octez_smart_rollup.Dal.Slot_index.t
-        * Octez_smart_rollup.Dal.Page_index.t
-
-      let encoding =
-        Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page_index.encoding)
-
-      let compare = Stdlib.compare
-
-      let name = "slot_index"
-    end)
-    (struct
-      type value = bytes
-
-      let encoding = Data_encoding.(bytes' Hex)
-
-      let name = "slot_pages"
-    end)
-
 (** stores slots whose data have been considered and pages stored to disk (if
     they are confirmed). *)
 module Dal_processed_slots =
@@ -340,48 +306,6 @@ module Dal_slots_headers =
    refers to the block where slots headers have been confirmed, not
    the block where they have been published.
 *)
-
-(** Confirmed DAL slots history. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_history =
-  Irmin_store.Make_append_only_map
-    (struct
-      let path = ["dal"; "confirmed_slots_history"]
-    end)
-    (struct
-      type key = Block_hash.t
-
-      let to_path_representation = Block_hash.to_b58check
-    end)
-    (struct
-      type value = Octez_smart_rollup.Dal.Slot_history.t
-
-      let name = "dal_slot_histories"
-
-      let encoding = Octez_smart_rollup.Dal.Slot_history.V1.encoding
-    end)
-
-(** Confirmed DAL slots histories cache. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_histories =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
-     Store single history points in map instead of whole history. *)
-    Irmin_store.Make_append_only_map
-      (struct
-        let path = ["dal"; "confirmed_slots_histories_cache"]
-      end)
-      (struct
-        type key = Block_hash.t
-
-        let to_path_representation = Block_hash.to_b58check
-      end)
-    (struct
-      type value = Octez_smart_rollup.Dal.Slot_history_cache.t
-
-      let name = "dal_slot_histories"
-
-      let encoding = Octez_smart_rollup.Dal.Slot_history_cache.V1.encoding
-    end)
 
 type 'a store = {
   l2_blocks : 'a L2_blocks.t;

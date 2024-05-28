@@ -86,6 +86,13 @@ type ('a, 'ctx) arg =
       kind : ('p, 'ctx) parameter;
     }
       -> ('p option, 'ctx) arg
+  | MultipleArg : {
+      doc : string;
+      label : label;
+      placeholder : string;
+      kind : ('p, 'ctx) parameter;
+    }
+      -> ('p list option, 'ctx) arg
   | DefArg : {
       doc : string;
       label : label;
@@ -195,6 +202,15 @@ let rec print_options_detailed :
         placeholder
         print_desc
         doc
+  | MultipleArg {label; placeholder; doc; _} ->
+      Format.fprintf
+        ppf
+        "@{<opt>%a <%s>@}: %a"
+        print_label
+        label
+        placeholder
+        print_desc
+        doc
   | DefArg {label; placeholder; doc; default; _} ->
       Format.fprintf
         ppf
@@ -219,7 +235,7 @@ let rec print_options_detailed :
 
 let rec has_args : type a ctx. (a, ctx) arg -> bool = function
   | Constant _ -> false
-  | Arg _ | DefArg _ | Switch _ -> true
+  | Arg _ | MultipleArg _ | DefArg _ | Switch _ -> true
   | Pair (speca, specb) -> has_args speca || has_args specb
   | Map {spec; _} -> has_args spec
 
@@ -229,6 +245,8 @@ let rec print_options_brief :
   | DefArg {label; placeholder; _} ->
       Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
   | Arg {label; placeholder; _} ->
+      Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
+  | MultipleArg {label; placeholder; _} ->
       Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
   | Switch {label; _} -> Format.fprintf ppf "[@{<opt>%a@}]" print_label label
   | Constant _ -> ()
@@ -759,6 +777,9 @@ let constant c = Constant c
 let arg ~doc ?short ~long ~placeholder kind =
   Arg {doc; label = {long; short}; placeholder; kind}
 
+let multiple_arg ~doc ?short ~long ~placeholder kind =
+  MultipleArg {doc; label = {long; short}; placeholder; kind}
+
 let default_arg ~doc ?short ~long ~placeholder ~default kind =
   DefArg {doc; placeholder; label = {long; short}; kind; default}
 
@@ -767,6 +788,8 @@ let map_arg ~f:converter spec = Map {spec; converter}
 let args1 a = a
 
 let args2 a b = Pair (a, b)
+
+let merge_options = args2
 
 let args3 a b c =
   map_arg
@@ -916,6 +939,40 @@ let args24 a b c d e f g h i j k l m n o p q r s t u v w x =
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args8 q r s t u v w x))
 
+let args25 a b c d e f g h i j k l m n o p q r s t u v w x y =
+  map_arg
+    ~f:
+      (fun _
+           ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+             (q, r, s, t, u, v, w, x, y) ) ->
+      Lwt_result_syntax.return
+        ( a,
+          b,
+          c,
+          d,
+          e,
+          f,
+          g,
+          h,
+          i,
+          j,
+          k,
+          l,
+          m,
+          n,
+          o,
+          p,
+          q,
+          r,
+          s,
+          t,
+          u,
+          v,
+          w,
+          x,
+          y ))
+    (args2 (args16 a b c d e f g h i j k l m n o p) (args9 q r s t u v w x y))
+
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
 (* Argument parsing *)
@@ -939,6 +996,19 @@ let rec parse_arg :
           in
           Some x
       | Some (_ :: _) -> tzfail (Multiple_occurrences ("--" ^ long, command)))
+  | MultipleArg {label = {long; short = _}; kind = {converter; _}; _} -> (
+      match StringMap.find_opt long args_dict with
+      | None | Some [] -> return_none
+      | Some l ->
+          let+ x =
+            List.map_es
+              (fun s ->
+                trace_eval (fun () ->
+                    Bad_option_argument ("--" ^ long, command))
+                @@ converter ctx s)
+              l
+          in
+          Some x)
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
       let*! r = converter ctx default in
       match r with
@@ -983,6 +1053,7 @@ let rec make_arities_dict :
   in
   match arg with
   | Arg {label; _} -> add label 1
+  | MultipleArg {label; _} -> add label 1
   | DefArg {label; _} -> add label 1
   | Switch {label; _} -> add label 0
   | Constant _c -> acc
@@ -1008,9 +1079,10 @@ let check_version_flag =
   | _ -> return_unit
 
 let add_occurrence long value acc =
-  match StringMap.find_opt long acc with
-  | Some v -> StringMap.add long v acc
-  | None -> StringMap.add long [value] acc
+  StringMap.update
+    long
+    (function Some v -> Some (v @ [value]) | None -> Some [value])
+    acc
 
 let make_args_dict_consume ?command spec args =
   let open Lwt_result_syntax in
@@ -1428,7 +1500,11 @@ let get_arg {long; short} =
 
 let rec list_args : type a ctx. (a, ctx) arg -> string list = function
   | Constant _ -> []
-  | Arg {label; _} | DefArg {label; _} | Switch {label; _} -> get_arg label
+  | Arg {label; _}
+  | MultipleArg {label; _}
+  | DefArg {label; _}
+  | Switch {label; _} ->
+      get_arg label
   | Pair (speca, specb) -> list_args speca @ list_args specb
   | Map {spec; _} -> list_args spec
 
@@ -1444,7 +1520,10 @@ let rec remaining_spec : type a ctx. StringSet.t -> (a, ctx) arg -> string list
     =
  fun seen -> function
   | Constant _ -> []
-  | Arg {label; _} | DefArg {label; _} | Switch {label; _} ->
+  | Arg {label; _}
+  | MultipleArg {label; _}
+  | DefArg {label; _}
+  | Switch {label; _} ->
       if StringSet.mem label.long seen then [] else get_arg label
   | Pair (speca, specb) -> remaining_spec seen speca @ remaining_spec seen specb
   | Map {spec; _} -> remaining_spec seen spec
@@ -1462,8 +1541,11 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
       when label.long = name ->
         let* p = complete_func autocomplete ctx in
         return_some p
+    | MultipleArg {kind = {autocomplete; _}; label; _} when label.long = name ->
+        let* p = complete_func autocomplete ctx in
+        return_some p
     | Switch {label; _} when label.long = name -> return_some []
-    | Arg _ | DefArg _ | Switch _ -> return_none
+    | Arg _ | MultipleArg _ | DefArg _ | Switch _ -> return_none
     | Pair (speca, specb) -> (
         let* resa = complete_spec name speca in
         match resa with

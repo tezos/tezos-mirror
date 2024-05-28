@@ -129,7 +129,8 @@ module Wrapped : S with type tree = wrapped_tree = struct
   let list (Wrapped_tree (t, b)) ?offset ?length key =
     let open Lwt.Syntax in
     let+ list = list b t ?offset ?length key in
-    List.map (fun (step, tree) -> (step, Wrapped_tree (tree, b))) list
+    List.rev
+    @@ List.rev_map (fun (step, tree) -> (step, Wrapped_tree (tree, b))) list
 
   let find (Wrapped_tree (t, b)) key = find b t key
 

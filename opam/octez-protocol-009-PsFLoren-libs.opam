@@ -10,12 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezos-protocol-009-PsFLoren"
-  "octez-shell-libs"
+  "octez-libs" { = version }
+  "tezos-protocol-009-PsFLoren" { = version }
+  "octez-shell-libs" { = version }
   "ppx_expect"
   "uri" { >= "3.1.0" }
-  "octez-proto-libs"
+  "octez-proto-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

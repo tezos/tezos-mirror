@@ -102,7 +102,8 @@ impl From<OwnedPath> for EthereumAccount {
 }
 
 /// Path where Ethereum accounts are stored
-pub const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/eth_accounts");
+pub const EVM_ACCOUNTS_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/eth_accounts");
 
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
@@ -138,6 +139,15 @@ const INDEXED_PATH: RefPath = RefPath::assert_from(b"/indexed");
 /// value back.
 const STORAGE_DEFAULT_VALUE: H256 = H256::zero();
 
+/// Default balance value for an account.
+const BALANCE_DEFAULT_VALUE: U256 = U256::zero();
+
+/// Default nonce value for an account.
+const NONCE_DEFAULT_VALUE: u64 = 0;
+
+/// Nonce is a u64 so its size is 8 bytes
+const NONCE_ENCODING_SIZE: usize = 8_usize;
+
 /// An account with no code - an "external" account, or an unused account has the zero
 /// hash as code hash.
 const CODE_HASH_BYTES: [u8; WORD_SIZE] = Decoder::Hex
@@ -150,13 +160,32 @@ pub const CODE_HASH_DEFAULT: H256 = H256(CODE_HASH_BYTES);
 fn read_u256(
     host: &impl Runtime,
     path: &impl Path,
-) -> Result<Option<U256>, AccountStorageError> {
-    let bytes = host.store_read(path, 0, WORD_SIZE)?;
+    default: U256,
+) -> Result<U256, AccountStorageError> {
+    match host.store_read_all(path) {
+        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(U256::from_little_endian(&bytes)),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(err) => Err(err.into()),
+    }
+}
 
-    if bytes.len() != WORD_SIZE {
-        Ok(None)
-    } else {
-        Ok(Some(U256::from_little_endian(&bytes)))
+/// Read a single unsigned 64 bit value from storage at the path given.
+fn read_u64(
+    host: &impl Runtime,
+    path: &impl Path,
+    default: u64,
+) -> Result<u64, AccountStorageError> {
+    match host.store_read(path, 0, 8) {
+        Ok(bytes) if bytes.len() == 8 => {
+            let bytes_array: [u8; 8] = bytes.try_into().map_err(|_| {
+                AccountStorageError::DurableStorageError(
+                    DurableStorageError::RuntimeError(RuntimeError::DecodingError),
+                )
+            })?;
+            Ok(u64::from_le_bytes(bytes_array))
+        }
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -164,13 +193,12 @@ fn read_u256(
 fn read_h256(
     host: &impl Runtime,
     path: &impl Path,
-) -> Result<Option<H256>, AccountStorageError> {
-    let bytes = host.store_read(path, 0, WORD_SIZE)?;
-
-    if bytes.len() != WORD_SIZE {
-        Ok(None)
-    } else {
-        Ok(Some(H256::from_slice(&bytes)))
+    default: H256,
+) -> Result<H256, AccountStorageError> {
+    match host.store_read_all(path) {
+        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(H256::from_slice(&bytes)),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -200,17 +228,9 @@ impl EthereumAccount {
 
     /// Get the **nonce** for the Ethereum account. Default value is zero, so an account will
     /// _always_ have this **nonce**.
-    pub fn nonce(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
+    pub fn nonce(&self, host: &impl Runtime) -> Result<u64, AccountStorageError> {
         let path = concat(&self.path, &NONCE_PATH)?;
-
-        match host.store_has(&path) {
-            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => {
-                let value = read_u256(host, &path)?;
-                Ok(value.unwrap_or(U256::zero()))
-            }
-            Ok(_) => Ok(U256::zero()),
-            Err(err) => Err(AccountStorageError::from(err)),
-        }
+        read_u64(host, &path, NONCE_DEFAULT_VALUE)
     }
 
     /// Increment the **nonce** by one. It is technically possible for this operation to overflow,
@@ -225,11 +245,26 @@ impl EthereumAccount {
         let old_value = self.nonce(host)?;
 
         let new_value = old_value
-            .checked_add(U256::one())
+            .checked_add(1)
             .ok_or(AccountStorageError::NonceOverflow)?;
 
-        let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
-        new_value.to_little_endian(&mut new_value_bytes);
+        let new_value_bytes: [u8; NONCE_ENCODING_SIZE] = new_value.to_le_bytes();
+
+        host.store_write_all(&path, &new_value_bytes)
+            .map_err(AccountStorageError::from)
+    }
+
+    pub fn decrement_nonce(
+        &mut self,
+        host: &mut impl Runtime,
+    ) -> Result<(), AccountStorageError> {
+        let path = concat(&self.path, &NONCE_PATH)?;
+
+        let old_value = self.nonce(host)?;
+
+        let new_value = old_value.checked_sub(1).unwrap_or_default();
+
+        let new_value_bytes: [u8; NONCE_ENCODING_SIZE] = new_value.to_le_bytes();
 
         host.store_write(&path, &new_value_bytes, 0)
             .map_err(AccountStorageError::from)
@@ -238,29 +273,20 @@ impl EthereumAccount {
     pub fn set_nonce(
         &mut self,
         host: &mut impl Runtime,
-        nonce: U256,
+        nonce: u64,
     ) -> Result<(), AccountStorageError> {
         let path = concat(&self.path, &NONCE_PATH)?;
 
-        let mut value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
-        nonce.to_little_endian(&mut value_bytes);
+        let value_bytes: [u8; NONCE_ENCODING_SIZE] = nonce.to_le_bytes();
 
-        host.store_write(&path, &value_bytes, 0)
+        host.store_write_all(&path, &value_bytes)
             .map_err(AccountStorageError::from)
     }
 
     /// Get the **balance** of an account in Wei held by the account.
     pub fn balance(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
         let path = concat(&self.path, &BALANCE_PATH)?;
-
-        match host.store_has(&path) {
-            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => {
-                let value = read_u256(host, &path)?;
-                Ok(value.unwrap_or(U256::zero()))
-            }
-            Ok(_) => Ok(U256::zero()),
-            Err(err) => Err(AccountStorageError::from(err)),
-        }
+        read_u256(host, &path, BALANCE_DEFAULT_VALUE).map_err(AccountStorageError::from)
     }
 
     /// Add an amount in Wei to the balance of an account. In theory, this can overflow if the
@@ -278,7 +304,7 @@ impl EthereumAccount {
             let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
             new_value.to_little_endian(&mut new_value_bytes);
 
-            host.store_write(&path, &new_value_bytes, 0)
+            host.store_write_all(&path, &new_value_bytes)
                 .map_err(AccountStorageError::from)
         } else {
             Err(AccountStorageError::BalanceOverflow)
@@ -302,12 +328,27 @@ impl EthereumAccount {
             let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
             new_value.to_little_endian(&mut new_value_bytes);
 
-            host.store_write(&path, &new_value_bytes, 0)
+            host.store_write_all(&path, &new_value_bytes)
                 .map_err(AccountStorageError::from)
                 .map(|_| true)
         } else {
             Ok(false)
         }
+    }
+
+    /// Set the balance of an account to an amount in Wei
+    pub fn set_balance(
+        &mut self,
+        host: &mut impl Runtime,
+        new_balance: U256,
+    ) -> Result<(), AccountStorageError> {
+        let path = concat(&self.path, &BALANCE_PATH)?;
+
+        let mut new_balance_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+        new_balance.to_little_endian(&mut new_balance_bytes);
+
+        host.store_write_all(&path, &new_balance_bytes)
+            .map_err(AccountStorageError::from)
     }
 
     /// Get the path to an index in durable storage for an account.
@@ -317,6 +358,19 @@ impl EthereumAccount {
         concat(&storage_path, &index_path).map_err(AccountStorageError::from)
     }
 
+    /// Clear the entire storage in durable storage for an account.
+    pub fn clear_storage(
+        &self,
+        host: &mut impl Runtime,
+    ) -> Result<(), AccountStorageError> {
+        let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
+        if host.store_has(&storage_path)?.is_some() {
+            host.store_delete(&storage_path)
+                .map_err(AccountStorageError::from)?
+        };
+        Ok(())
+    }
+
     /// Get the value stored in contract permanent storage at a given index for an account.
     pub fn get_storage(
         &self,
@@ -324,14 +378,7 @@ impl EthereumAccount {
         index: &H256,
     ) -> Result<H256, AccountStorageError> {
         let path = self.storage_path(index)?;
-
-        match host.store_has(&path)? {
-            Some(ValueType::Value | ValueType::ValueWithSubtree) => {
-                let value = read_h256(host, &path)?;
-                Ok(value.unwrap_or(STORAGE_DEFAULT_VALUE))
-            }
-            _ => Ok(STORAGE_DEFAULT_VALUE),
-        }
+        read_h256(host, &path, STORAGE_DEFAULT_VALUE).map_err(AccountStorageError::from)
     }
 
     /// Set the value associated with an index in durable storage. The result depends on the
@@ -357,7 +404,7 @@ impl EthereumAccount {
         if !to_default {
             let value_bytes = value.to_fixed_bytes();
 
-            host.store_write(&path, &value_bytes, 0)?;
+            host.store_write_all(&path, &value_bytes)?;
         }
 
         Ok(StorageEffect {
@@ -378,17 +425,19 @@ impl EthereumAccount {
 
         let value_bytes = value.to_fixed_bytes();
 
-        host.store_write(&path, &value_bytes, 0)
+        host.store_write_all(&path, &value_bytes)
             .map_err(AccountStorageError::from)
     }
 
-    // Return a boolean denoting whether the account has a code or not.
-    pub fn code_exists(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<Option<ValueType>, AccountStorageError> {
+    /// Find whether the account has any code associated with it.
+    pub fn code_exists(&self, host: &impl Runtime) -> Result<bool, AccountStorageError> {
         let path = concat(&self.path, &CODE_PATH)?;
-        host.store_has(&path).map_err(AccountStorageError::from)
+
+        match host.store_has(&path) {
+            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => Ok(true),
+            Ok(Some(ValueType::Subtree) | None) => Ok(false),
+            Err(err) => Err(err.into()),
+        }
     }
 
     /// Get the contract code associated with a contract. A contract can have zero length
@@ -397,11 +446,9 @@ impl EthereumAccount {
     pub fn code(&self, host: &impl Runtime) -> Result<Vec<u8>, AccountStorageError> {
         let path = concat(&self.path, &CODE_PATH)?;
 
-        match host.store_has(&path) {
-            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => host
-                .store_read_all(&path)
-                .map_err(AccountStorageError::from),
-            Ok(_) => Ok(vec![]),
+        match host.store_read_all(&path) {
+            Ok(bytes) => Ok(bytes),
+            Err(RuntimeError::PathNotFound) => Ok(vec![]),
             Err(err) => Err(AccountStorageError::from(err)),
         }
     }
@@ -410,15 +457,7 @@ impl EthereumAccount {
     /// stored when the code of a contract is set.
     pub fn code_hash(&self, host: &impl Runtime) -> Result<H256, AccountStorageError> {
         let path = concat(&self.path, &CODE_HASH_PATH)?;
-
-        match host.store_has(&path) {
-            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => {
-                let value = read_h256(host, &path)?;
-                Ok(value.unwrap_or(CODE_HASH_DEFAULT))
-            }
-            Ok(_) => Ok(CODE_HASH_DEFAULT),
-            Err(err) => Err(AccountStorageError::from(err)),
-        }
+        read_h256(host, &path, CODE_HASH_DEFAULT).map_err(AccountStorageError::from)
     }
 
     /// Get the size of a contract in number of bytes used for opcodes. This value is
@@ -446,7 +485,7 @@ impl EthereumAccount {
         let code_hash_bytes: [u8; WORD_SIZE] = code_hash.into();
         let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
 
-        host.store_write(&code_hash_path, &code_hash_bytes, 0)?;
+        host.store_write_all(&code_hash_path, &code_hash_bytes)?;
 
         let code_path = concat(&self.path, &CODE_PATH)?;
 
@@ -493,7 +532,7 @@ impl EthereumAccount {
         host: &mut impl Runtime,
     ) -> Result<(), DurableStorageError> {
         let path = concat(&self.path, &INDEXED_PATH)?;
-        host.store_write(&path, &[0_u8; 0], 0)
+        host.store_write_all(&path, &[0_u8; 0])
             .map_err(DurableStorageError::from)
     }
 }
@@ -533,10 +572,7 @@ mod test {
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
-        assert_eq!(
-            a1.nonce(&host).expect("Could not get nonce for account"),
-            U256::zero()
-        );
+        assert_eq!(a1.nonce(&host).expect("Could not get nonce for account"), 0);
 
         a1.increment_nonce(&mut host)
             .expect("Could not increment nonce");
@@ -551,10 +587,7 @@ mod test {
             .expect("Could not get account")
             .expect("Account does not exist");
 
-        assert_eq!(
-            a1.nonce(&host).expect("Could nnt get nonce for account"),
-            U256::one()
-        );
+        assert_eq!(a1.nonce(&host).expect("Could nnt get nonce for account"), 1);
     }
 
     #[test]
@@ -892,10 +925,7 @@ mod test {
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
-        assert_eq!(
-            a1.nonce(&host).expect("Could not get nonce for account"),
-            U256::zero()
-        );
+        assert_eq!(a1.nonce(&host).expect("Could not get nonce for account"), 0);
 
         a1.increment_nonce(&mut host)
             .expect("Could not increment nonce");

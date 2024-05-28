@@ -1,0 +1,3 @@
+code { COMPARE } ;
+input { Stack_elt string "" ; Stack_elt string "" } ;
+output { Stack_elt int 0 }

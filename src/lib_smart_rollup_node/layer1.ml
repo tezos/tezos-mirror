@@ -112,6 +112,8 @@ type nonrec t = {
   prefetch_blocks : int;  (** Number of blocks to prefetch by default. *)
 }
 
+let raw_l1_connection {l1; _} = l1
+
 let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
     ?(prefetch_blocks = l1_blocks_cache_size) cctxt =
   let open Lwt_result_syntax in
@@ -128,6 +130,22 @@ let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
   let cctxt = (cctxt :> Client_context.full) in
   return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
 
+let create ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
+    ?(prefetch_blocks = l1_blocks_cache_size) cctxt =
+  let open Result_syntax in
+  let* () =
+    if prefetch_blocks > l1_blocks_cache_size then
+      error_with
+        "Blocks to prefetch must be less than the cache size: %d"
+        l1_blocks_cache_size
+    else Ok ()
+  in
+  let l1 = create ~name ~reconnection_delay ?protocols cctxt in
+  let blocks_cache = Blocks_cache.create l1_blocks_cache_size in
+  let headers_cache = Blocks_cache.create l1_blocks_cache_size in
+  let cctxt = (cctxt :> Client_context.full) in
+  return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
+
 let shutdown {l1; _} = shutdown l1
 
 let cache_shell_header {headers_cache; _} hash header =
@@ -135,8 +153,9 @@ let cache_shell_header {headers_cache; _} hash header =
 
 let client_context {cctxt; _} = cctxt
 
-let iter_heads l1_ctxt f =
-  iter_heads l1_ctxt.l1 @@ fun (hash, {shell = {level; _} as header; _}) ->
+let iter_heads ?name l1_ctxt f =
+  iter_heads ?name l1_ctxt.l1
+  @@ fun (hash, {shell = {level; _} as header; _}) ->
   cache_shell_header l1_ctxt hash header ;
   f {hash; level; header}
 
@@ -144,6 +163,12 @@ let wait_first l1_ctxt =
   let open Lwt_syntax in
   let+ hash, {shell = {level; _} as header; _} = wait_first l1_ctxt.l1 in
   {hash; level; header}
+
+let get_latest_head l1_ctxt =
+  Option.map
+    (fun (hash, {Tezos_base.Block_header.shell = {level; _} as header; _}) ->
+      {hash; level; header})
+    (get_latest_head l1_ctxt.l1)
 
 let get_predecessor_opt ?max_read {l1; _} = get_predecessor_opt ?max_read l1
 

@@ -1,0 +1,4 @@
+code { CONTRACT nat } ;
+input { Stack_elt address "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" } ;
+output { Stack_elt (option (contract nat)) None } ;
+

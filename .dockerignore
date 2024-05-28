@@ -8,6 +8,7 @@ __pycache__
 **/_build
 _build_rust
 _opam
+!_opam/share/*
 _docker_build
 _snoop
 docs/api/tezos-client.html
@@ -76,12 +77,26 @@ _coverage_report
 .gitignore
 .gitlab-ci.yml
 
+# etherlink
+/etherlink/kernels-*
+
 # Rust
-target
+**/target
 
 evm_kernel.wasm
-sequenced_kernel.wasm
+evm_installer.wasm
+evm_kernel_unstripped.wasm
+evm-evaluation-assessor
+smart-rollup-installer
+_evm_installer_preimages/
+tx_kernel.wasm
+tx_kernel_dal.wasm
 tx-demo-collector
+dal_echo_kernel.wasm
+sequencer.wasm
+evm_benchmark_kernel.wasm
+evm_unstripped_installer.wasm
+_evm_unstripped_installer_preimages/
 
 # Terraform
 
@@ -122,3 +137,7 @@ terraform.rc
 
 # Terraform lock files
 *.lock.hcl
+
+# RISC-V
+/src/risc_v/risc-v-sandbox
+/src/risc_v/risc-v-dummy.elf

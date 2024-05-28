@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,6 +32,12 @@
     [Dev] means "Development Version".
     All non-release branches should use this.
 
+    [Beta] refers to a version that is not believed to be stable
+    but contains features for the next release.
+    For each release, the first beta version has number 1.
+
+    [Beta_dev] refers to a beta version "in development".
+
     [RC] means "Release Candidate".
     For each release, the first release candidate has number 1.
 
@@ -41,9 +47,14 @@
 
     [Release] means "no additional information".
     This is an actual released version.
-    No additional info is printed. *)
+    No additional info is printed.
+
+    Documentation on the semantics of version numbers is available
+    at [docs/releases/releases.rst]. *)
 type additional_info = Tezos_version_parser.additional_info =
   | Dev
+  | Beta of int
+  | Beta_dev of int
   | RC of int
   | RC_dev of int
   | Release
@@ -53,7 +64,13 @@ type additional_info = Tezos_version_parser.additional_info =
     The result is a string of the form ["+dev"], ["~rcX"], ["~rcX+dev"] or [""]. *)
 val string_of_additional_info : additional_info -> string
 
-(** Version information.
+(** Product information. *)
+type product = Tezos_version_parser.product = Octez | Etherlink
+
+(** Convert the product information to a string. *)
+val string_of_product : product -> string
+
+(** Version information of the [product].
 
     Major versions include significant new features and are usually
     released in new branches which start from master.
@@ -62,6 +79,7 @@ val string_of_additional_info : additional_info -> string
     branches which start from the previous release.
     When the major version is incremented, the minor version is reset to 0. *)
 type t = Tezos_version_parser.t = {
+  product : product;
   major : int;
   minor : int;
   additional_info : additional_info;
@@ -76,12 +94,24 @@ type t = Tezos_version_parser.t = {
     - [to_string { major = 7; minor = 0; additional_info = RC_dev 1 } = "7.0~rc1+dev"] *)
 val to_string : t -> string
 
+(** [to_json version commit_hash] json representation of a [version] and [commit_hash] as string.
+
+    Returns, as a string, a json object with the fields:
+    - [product], [major], [minor], [info] corresponding to the given fields of [version.]
+    - [hash], containing [commit_hash]. *)
+val to_json : t -> string -> string
+
 (** Version printer.
 
     [pp f x] prints [to_string x] in [f] *)
 val pp : Format.formatter -> t -> unit
 
-(* Parse an Octez version.
+(** A simpler version printer.
+
+    Same as [pp] but does not print the product name. *)
+val pp_simple : Format.formatter -> t -> unit
+
+(** Parse an Octez version.
 
    Returns None if the version cannot be parsed. *)
 val parse_version : string -> t option

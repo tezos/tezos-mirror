@@ -19,9 +19,10 @@ let create_data = erc1155_contract.bytecode;
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000000));
 for (let index = 0; index < 10; index++) {
-    let create = utils.create(player1, 0, create_data);
+    let create = utils.create(player1, 0, create_data, {gasLimit: 1000000000});
     txs.push(create.tx);
 }
 
+let mode = utils.bench_args(process.argv);
 
-utils.print_bench([txs])
+utils.print_bench([txs], mode)

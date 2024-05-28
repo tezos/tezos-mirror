@@ -47,11 +47,13 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
-let dal_parameters () =
+(* [is_fake] is true iff the mocked SRS is used. *)
+let dal_parameters ~is_fake =
+  let mode = if is_fake then "mock" else "real" in
   Test.register
     ~__FILE__
-    ~title:"Check the validity of DAL parameters"
-    ~tags:["dal"; "parameters"]
+    ~title:(sf "Check the validity of DAL parameters with %s SRS" mode)
+    ~tags:[Tag.tezos2; "dal"; "parameters"; mode]
   @@ fun () ->
   let open Dal.Cryptobox in
   let number_of_shards = Cli.get_int "number_of_shards" in
@@ -61,14 +63,40 @@ let dal_parameters () =
   let parameters =
     {number_of_shards; redundancy_factor; page_size; slot_size}
   in
-  Internal_for_tests.parameters_initialisation parameters
-  |> Internal_for_tests.load_parameters ;
-  match make parameters with
-  | Ok _ ->
-      Log.report "Set of parameters is valid" ;
-      unit
-  | Error (`Fail s) ->
-      Test.fail "The set of parameters is invalid. Reason:@.%s@." s
+  let dal_config =
+    let use_mock_srs_for_testing = is_fake in
+    Config.{activated = true; use_mock_srs_for_testing; bootstrap_peers = []}
+  in
+  let find_srs_files = Tezos_base.Dal_srs.find_trusted_setup_files in
+  let check_make error_msg =
+    match make parameters with
+    | Ok _ -> unit
+    | Error (`Fail s) -> Test.fail "%s. Reason:@.%s@." error_msg s
+  in
+  let* () =
+    let* res = Config.init_prover_dal ~find_srs_files dal_config in
+    match res with
+    | Ok () -> unit
+    | Error errs ->
+        Test.fail
+          "Could not init prover. Reason:@.%a@."
+          (Tezos_error_monad.Error_monad.TzTrace.pp_print_top
+             Tezos_error_monad.Error_monad.pp)
+          errs
+  in
+  let* () = check_make "The set of parameters is invalid for the verifier" in
+  let () =
+    match Config.init_verifier_dal dal_config with
+    | Ok () -> ()
+    | Error errs ->
+        Test.fail
+          "Could not init verifier. Reason:@.%a@."
+          (Tezos_error_monad.Error_monad.TzTrace.pp_print_top
+             Tezos_error_monad.Error_monad.pp)
+          errs
+  in
+  let* () = check_make "The set of parameters is invalid for the verifier." in
+  unit
 
 (** Start a layer 1 node on the given network, with the given data-dir and
     rpc-port if any. *)
@@ -101,7 +129,7 @@ let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
     match (net_addr, net_port) with
     | None, None -> None
     | Some addr, None -> Some (sf "%s:%d" addr @@ Port.fresh ())
-    | None, Some port -> Some (sf "127.0.0.1:%d" port)
+    | None, Some port -> Some (sf "%s:%d" Constant.default_host port)
     | Some addr, Some port -> Some (sf "%s:%d" addr port)
   in
   let public_addr =
@@ -113,7 +141,7 @@ let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
     match (metrics_addr, metrics_port) with
     | None, None -> None
     | Some addr, None -> Some (sf "%s:%d" addr @@ Port.fresh ())
-    | None, Some port -> Some (sf "127.0.0.1:%d" port)
+    | None, Some port -> Some (sf "%s:%d" Constant.default_host port)
     | Some addr, Some port -> Some (sf "%s:%d" addr port)
   in
 
@@ -342,7 +370,7 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
   let* level = Client.level client in
   loop level
 
-let _stake_or_unstake_half_balance client ~baker_alias =
+let stake_or_unstake_half_balance client ~baker_alias =
   let* baker = Client.show_address ~alias:baker_alias client in
   let* full_balance =
     Client.RPC.call client
@@ -391,11 +419,9 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* No need to check if baker_alias is already delegate. Re-registering an
      already registered delegate doesn't fail. *)
   let* _s = Client.register_delegate ~delegate:baker_alias client in
-  (* TODO: manual staking has been disabled in Oxford-2 (after being enabled in
-      rejected Oxford-1) in favor of automatic staking. So, this command
-      currently fails. But, it might be reactivated in protocol P.
-     let* () = _stake_or_unstake_half_balance client ~baker_alias in
-  *)
+  (* Manually stake a part of the baker's balance
+     after it is declared as delegate. *)
+  let* () = stake_or_unstake_half_balance client ~baker_alias in
   let baker = Baker.create ~protocol:Protocol.Alpha ~dal_node l1_node client in
   let* () = Baker.run baker in
   Lwt_unix.sleep Float.max_float
@@ -419,7 +445,7 @@ let slots_injector_test ~network =
   Test.register
     ~__FILE__
     ~title:(sf "Join %s and inject slots" network)
-    ~tags:["dal"; "slot"; "producer"; network]
+    ~tags:[Tag.tezos2; "dal"; "slot"; "producer"; network]
   @@ fun () ->
   let slot_index = Cli.get_int "slot-index" in
   let publisher_sk = Cli.get_string_opt "publisher-sk" in
@@ -451,7 +477,8 @@ let baker_test ~network =
   Test.register
     ~__FILE__
     ~title:(sf "Join %s and bake" network)
-    ~tags:["dal"; "baker"; network]
+    ~tags:[Tag.tezos2; "dal"; "baker"; network]
+    ~uses:[Protocol.baker Alpha]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in
   let dal_bootstrap_peers =
@@ -465,7 +492,8 @@ let baker_test ~network =
     ()
 
 let register () =
-  dal_parameters () ;
+  dal_parameters ~is_fake:true ;
+  dal_parameters ~is_fake:false ;
   List.iter
     (fun network ->
       slots_injector_test ~network ;

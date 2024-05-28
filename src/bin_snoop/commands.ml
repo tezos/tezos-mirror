@@ -1842,7 +1842,7 @@ let list_solvers, list_models =
   match result with
   | Ok global_options -> global_options
   | Error [Tezos_clic.Version] ->
-      let version = Tezos_version_value.Bin_version.version_string in
+      let version = Tezos_version_value.Bin_version.octez_version_string in
       Format.printf "%s\n" version ;
       exit 0
   | Error [Tezos_clic.Help command] ->

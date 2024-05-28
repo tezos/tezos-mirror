@@ -23,8 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    RISC-V Sandbox
+   Requirements: make -C src/risc_v build
+   Invocation:   dune exec tezt/tests/main.exe -- --file risc_v_sandbox.ml
+   Subject:      RISC-V integration and unit tests
+*)
+
 let test_dummy_kernel () =
-  Tezt_risc_v_sandbox.run_kernel ~kernel:(project_root // "risc-v-dummy.elf")
+  Tezt_risc_v_sandbox.run_kernel
+    ~input:"tezt/tests/riscv-tests/hermit-loader"
+    ~initrd:"src/risc_v/risc-v-dummy.elf"
+    ()
 
 let fold_dir_lwt ~f ~acc dirname =
   let open Unix in
@@ -49,7 +60,7 @@ let riscv_test_units =
   ["mi"; "si"; "ua"; "uc"; "ud"; "uf"; "ui"; "um"; "mzicbo"; "ssvnapot"; "uzfh"]
 
 let test_user_level_risc_v_unit_tests riscv_test_unit () =
-  let directory = project_root // "tezt/tests/riscv-tests/generated" in
+  let directory = "tezt/tests/riscv-tests/generated" in
   let is_in_unit program =
     program =~ rex (sf "rv64%s.*-?-.*" riscv_test_unit)
   in
@@ -64,7 +75,10 @@ let test_user_level_risc_v_unit_tests riscv_test_unit () =
         Lwt.catch
           (fun () ->
             let* () =
-              Tezt_risc_v_sandbox.run_kernel ~kernel:(directory // kernel)
+              Tezt_risc_v_sandbox.run_kernel
+                ~posix:true
+                ~input:(directory // kernel)
+                ()
             in
             Printf.ksprintf Regression.capture "%s: success" kernel ;
             Lwt.return_unit)
@@ -75,17 +89,18 @@ let test_user_level_risc_v_unit_tests riscv_test_unit () =
     kernels
 
 let test_inline_asm () =
-  let kernel =
-    project_root // "src/risc_v/tests/inline_asm/rv64-inline-asm-tests"
-  in
-  Tezt_risc_v_sandbox.run_kernel ~kernel
+  let input = "src/risc_v/tests/inline_asm/rv64-inline-asm-tests" in
+  Tezt_risc_v_sandbox.run_kernel ~posix:true ~input ()
 
 let register () =
-  Test.register
+  Regression.register
     ~__FILE__
     ~title:"Run the dummy kernel"
-    ~tags:["riscv"; "sandbox"]
+    ~tags:["riscv"; "sandbox"; "dummy"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
     test_dummy_kernel ;
   List.iter
     (fun test_unit ->
@@ -94,11 +109,17 @@ let register () =
         ~title:(sf "Run risc-v unit tests (%s)" test_unit)
         ~tags:["riscv"; "sandbox"; "unit"; test_unit]
         ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
+        ~uses_node:false
+        ~uses_client:false
+        ~uses_admin_client:false
         (test_user_level_risc_v_unit_tests test_unit))
     riscv_test_units ;
-  Test.register
+  Regression.register
     ~__FILE__
     ~title:"Run inline asm tests"
     ~tags:["riscv"; "sandbox"; "inline_asm"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
     test_inline_asm

@@ -77,7 +77,8 @@ let test_unparse_view () =
     Script_ir_translator.parse_and_unparse_script_unaccounted
       ctx
       ~legacy:true
-      ~allow_forged_in_storage:false
+      ~allow_forged_tickets_in_storage:false
+      ~allow_forged_lazy_storage_id_in_storage:false
       Readable
       ~normalize_types:true
       script
@@ -202,22 +203,25 @@ let test_parse_ty (type exp expc) ctxt node
   let allow_contract = true in
   let allow_ticket = true in
   let@ result =
-    Script_ir_translator.parse_ty
-      ctxt
-      ~legacy
-      ~allow_lazy_storage
-      ~allow_operation
-      ~allow_contract
-      ~allow_ticket
-      node
-    >>? fun (Script_typed_ir.Ex_ty actual, ctxt) ->
-    Gas_monad.run ctxt
-    @@ Script_ir_translator.ty_eq
-         ~error_details:(Informative (location node))
-         actual
-         expected
-    >>? fun (eq, ctxt) ->
-    eq >|? fun Eq -> ctxt
+    let* Script_typed_ir.Ex_ty actual, ctxt =
+      Script_ir_translator.parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        ~allow_ticket
+        node
+    in
+    let* eq, ctxt =
+      Gas_monad.run ctxt
+      @@ Script_ir_translator.ty_eq
+           ~error_details:(Informative (location node))
+           actual
+           expected
+    in
+    let+ Eq = eq in
+    ctxt
   in
   result
 
@@ -392,9 +396,16 @@ let test_unparse_comb_comparable_type () =
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let open Lwt_result_wrap_syntax in
   let elab_conf = Script_ir_translator_config.make ~legacy:false () in
-  let allow_forged = true in
+  let allow_forged_tickets = true in
+  let allow_forged_lazy_storage_id = true in
   let*@ actual, ctxt =
-    Script_ir_translator.parse_data ctxt ~elab_conf ~allow_forged ty node
+    Script_ir_translator.parse_data
+      ctxt
+      ~elab_conf
+      ~allow_forged_tickets
+      ~allow_forged_lazy_storage_id
+      ty
+      node
   in
   if equal actual expected then return ctxt
   else Alcotest.failf "Unexpected error: %s" loc
@@ -402,9 +413,16 @@ let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
 let test_parse_data_fails loc ctxt ty node =
   let open Lwt_result_wrap_syntax in
   let elab_conf = Script_ir_translator_config.make ~legacy:false () in
-  let allow_forged = false in
+  let allow_forged_tickets = false in
+  let allow_forged_lazy_storage_id = false in
   let*! result =
-    Script_ir_translator.parse_data ctxt ~elab_conf ~allow_forged ty node
+    Script_ir_translator.parse_data
+      ctxt
+      ~elab_conf
+      ~allow_forged_tickets
+      ~allow_forged_lazy_storage_id
+      ty
+      node
   in
   match result with
   | Ok _ -> Alcotest.failf "Unexpected typechecking success: %s" loc
@@ -923,10 +941,12 @@ let test_contract path ~ok ~ko () =
   match result with Ok _ -> ok () | Error t -> ko t
 
 let test_contract_success path =
+  let open Lwt_result_syntax in
   test_contract path ~ok:return ~ko:(fun t ->
       Alcotest.failf "Unexpected error: %a" Environment.Error_monad.pp_trace t)
 
 let test_contract_failure path =
+  let open Lwt_result_syntax in
   test_contract
     path
     ~ok:(fun () ->

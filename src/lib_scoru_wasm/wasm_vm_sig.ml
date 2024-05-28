@@ -34,6 +34,7 @@ module type Internal_for_tests = sig
     ?write_debug:Builtins.write_debug ->
     ?after_fast_exec:(unit -> unit) ->
     ?stop_at_snapshot:bool ->
+    wasm_entrypoint:string ->
     max_steps:int64 ->
     state ->
     (state * int64) Lwt.t
@@ -42,32 +43,39 @@ end
 module type Generic = sig
   type state
 
-  (** [compute_step_many ~max_steps pvm_state] forwards the VM by at most
-      [max_step] compute tick, yielding if it reaches the maximum number of
-      ticks for a toplevel kernel call. If the VM is expecting input, it gets
-      stuck. If the VM is already stuck, this function may raise an exception.
-      It is more efficient than [compute_step] if it has to be called for more
-      than one tick, but its resulting pvm_state will be stricly equivalent.
-      Returns a tuple containing the number of executed ticks and the new
-      pvm_state. *)
+  (** [compute_step_many ~wasm_entrypoint ~max_steps pvm_state] forwards the VM
+      by at most [max_step] compute tick, yielding if it reaches the maximum
+      number of ticks for executing [wasm_entrypoint].
+
+      If the VM is expecting input, it gets stuck. If the VM is already stuck,
+      this function may raise an exception. It is more efficient than
+      [compute_step] if it has to be called for more than one tick, but its
+      resulting pvm_state will be stricly equivalent. Returns a tuple
+      containing the number of executed ticks and the new pvm_state. *)
   val compute_step_many :
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     ?stop_at_snapshot:bool ->
+    wasm_entrypoint:string ->
     max_steps:int64 ->
     state ->
     (state * int64) Lwt.t
 
-  (** [compute_step pvm_state] forwards the VM by one compute tick. If the VM is
-      expecting input, it gets stuck. If the VM is already stuck, this function
-      may raise an exception. It is strictly equivalent to
-      [compute_step_many ~max_step=1 pvm_state]. *)
-  val compute_step : state -> state Lwt.t
+  (** [compute_step ~wasm_entrypoint pvm_state] forwards the VM by one compute
+      tick. If the VM is expecting input, it gets stuck. If the VM is already
+      stuck, this function may raise an exception.
 
-  (** [compute_step_with_debug ~debug_flag pvm_state] is exactly [compute_step]
-      but it has the ability to enable the debugging host functions. *)
+      It is strictly equivalent to [compute_step_many ~wasm_entrypoint ~max_step:1 pvm_state]. *)
+  val compute_step : wasm_entrypoint:string -> state -> state Lwt.t
+
+  (** [compute_step_with_debug ~wasm_entrypoint ~debug_flag pvm_state] is
+      exactly [compute_step ~wasm_entrypoint] but it has the ability to enable
+      the debugging host functions. *)
   val compute_step_with_debug :
-    write_debug:Builtins.write_debug -> state -> state Lwt.t
+    wasm_entrypoint:string ->
+    write_debug:Builtins.write_debug ->
+    state ->
+    state Lwt.t
 
   (** [set_input_step input_info message pvm_state] forwards the VM by one input
       tick. If the VM is not expecting input, it gets stuck. If the VM is
@@ -96,9 +104,9 @@ end
 module type S = sig
   include Generic with type state := pvm_state
 
-  (** [compute_step_many_until max_steps reveal_builtins write_debug should_continue pvm_state]
-      advances forwards the VM in the same manners as [compute_step_many]
-      as long as [should_continue] returns true.
+  (** [compute_step_many_until ~wasm_entrypoint ?max_steps ?reveal_builtins ?write_debug should_continue pvm_state]
+      advances forwards the VM in the same manners as [compute_step_many] as
+      long as [should_continue] returns true.
 
      Returns the new state and number of the executed ticks.
 
@@ -109,6 +117,7 @@ module type S = sig
       condition change in the code, but not in the test.
   *)
   val compute_step_many_until :
+    wasm_entrypoint:string ->
     ?max_steps:int64 ->
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->

@@ -764,8 +764,8 @@ let extract_error trace =
 
 let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
-    ~contract ~action ~tez_amount ?fee ?gas_limit ?storage_limit ?counter
-    ~fee_parameter () =
+    ~contract ~action ~tez_amount ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~fee_parameter () =
   contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
   let entrypoint, parameters = translate_action_to_argument action in
   Client_proto_context.transfer_with_script
@@ -784,6 +784,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ~entrypoint
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?counter
     ~fee_parameter
@@ -915,7 +916,7 @@ let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
 let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
     ~block ?confirmations ?dry_run ?verbose_signing ~sender ~source ~src_pk
     ~src_sk ~token_transfers ~fee_parameter ?counter ?default_fee
-    ?default_gas_limit ?default_storage_limit () =
+    ?default_gas_limit ?default_storage_limit ?safety_guard () =
   List.mapi_ep
     (prepare_single_token_transfer
        cctxt
@@ -941,6 +942,7 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
     ~fee:(Limit.of_option default_fee)
     ~gas_limit:(Limit.of_option default_gas_limit)
     ~storage_limit:(Limit.of_option default_storage_limit)
+    ?safety_guard
     ?counter
     ~src_pk
     ~src_sk

@@ -150,7 +150,8 @@ let finalize_application application_state _shell_header =
         context = application_state.context;
         fitness = application_state.fitness;
         max_operations_ttl = 0;
-        last_allowed_fork_level = 0l;
+        last_preserved_block_level = 0l;
+        last_finalized_block_level = 0l ;
       },
       () )
 
@@ -165,7 +166,8 @@ let init _chain_id context block_header =
       context;
       fitness;
       max_operations_ttl = 0;
-      last_allowed_fork_level = 0l;
+      last_finalized_block_level = 0l;
+      last_preserved_block_level = 0l;
     }
 
 let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_

@@ -27,7 +27,7 @@ module S = struct
     Tezos_rpc.Service.get_service
       ~description:"Get information on the node version"
       ~query:Tezos_rpc.Query.empty
-      ~output:Node_version.encoding
+      ~output:Octez_node_version.encoding
       Tezos_rpc.Path.(root / "version")
 end
 

@@ -42,6 +42,7 @@ let test_macros_tests parameterization protocols =
            (Hashtbl.hash storage)
            (Hashtbl.hash input))
       ~tags:["michelson"; "macros"]
+      ~uses_node:false
   @@ fun protocol ->
     let client = Client.create_with_mode Mockup in
     let* {storage = run_script_res_storage; _} =
@@ -153,6 +154,7 @@ let test_macros_failures protocols =
                (Hashtbl.hash storage)
                (Hashtbl.hash input))
           ~tags:["michelson"; "macros"]
+          ~uses_node:false
       @@ fun protocol ->
         let client = Client.create_with_mode Mockup in
         Client.spawn_run_script_at
@@ -204,6 +206,7 @@ let test_guestbook =
     ~__FILE__
     ~title:"test guestbook.tz"
     ~tags:["michelson"; "macros"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* guestbook, _address =
@@ -239,6 +242,7 @@ let test_big_map =
     ~__FILE__
     ~title:"test big_map"
     ~tags:["michelson"; "macros"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* big_map_contract, _address =
@@ -269,6 +273,7 @@ let test_big_map_get_add =
     ~__FILE__
     ~title:"test big_map_get_add"
     ~tags:["michelson"; "macros"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* big_map_contract, _address =
@@ -303,6 +308,7 @@ let test_macro_expansion protocols =
             ~__FILE__
             ~title:(sf "Macro expansion: %s" (Michelson_script.name_s script))
             ~tags:["michelson"; "macros"]
+            ~uses_node:false
             (fun protocol ->
               let client = Client.create_with_mode Mockup in
               let script_path = Michelson_script.path script in

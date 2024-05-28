@@ -52,6 +52,7 @@ let init_env () =
   return {block; baker; contract}
 
 let collect_token_amounts ctxt tickets =
+  let open Lwt_result_syntax in
   let accum (tokens, ctxt) ticket =
     let token, amount =
       Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
@@ -94,7 +95,8 @@ let ticket_balance_of_storage ctxt (contract : Alpha_context.Contract.t) =
             Script_ir_translator.parse_script
               ctxt
               ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-              ~allow_forged_in_storage:true
+              ~allow_forged_tickets_in_storage:true
+              ~allow_forged_lazy_storage_id_in_storage:true
               script
           in
           let*@ tokens, ctxt =

@@ -1,0 +1,36 @@
+{
+  "name": "ai-simulator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "watch": "watch 'npm run build' ./src/ ./site/",
+    "build": "esbuild src/source.js --bundle --outfile=site/app.js --format=esm",
+    "css": "npx tailwindcss -i ./src/source.css -o ./site/app.css",
+    "server": "npx http-server site/ -p 8080",
+    "serve": "browser-sync start --server 'site' --files 'site/*.html, site/*.css, site/*.js'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "0.20.0",
+    "http-server": "^14.1.1",
+    "jsdoc": "^4.0.2",
+    "tailwindcss": "^3.4.1"
+  },
+  "dependencies": {
+    "big-integer": "^1.6.52",
+    "big-rational": "^0.10.9",
+    "browser-sync": "^3.0.2",
+    "chart.js": "^4.4.1",
+    "chartjs-plugin-annotation": "^3.0.1",
+    "chartjs-plugin-dragdata": "^2.2.5",
+    "fraction.js": "^4.3.7",
+    "mathjs": "^12.3.0",
+    "prettier": "^3.2.5",
+    "serve": "^14.2.1",
+    "snabbdom": "^3.6.2",
+    "watch": "^1.0.2"
+  }
+}

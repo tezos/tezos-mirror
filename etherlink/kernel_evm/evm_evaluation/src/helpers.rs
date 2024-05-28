@@ -1,8 +1,29 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use std::path::{Path, PathBuf};
+
+pub struct OutputOptions {
+    pub log: bool,
+    pub summary: bool,
+    pub result: bool,
+    pub diff: bool,
+}
+
+pub struct LabelIndexes<'a> {
+    pub data_label: Option<&'a String>,
+    pub gas_label: Option<&'a String>,
+    pub value_label: Option<&'a String>,
+}
+
+pub fn string_of_hexa(bytes: &bytes::Bytes) -> String {
+    let mut hexa = String::from("0x");
+    for byte in bytes.into_iter() {
+        hexa.push_str(format!("{:02x?}", byte).as_str());
+    }
+    hexa
+}
 
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {
@@ -42,4 +63,43 @@ pub fn construct_folder_path(
     };
 
     path_buf
+}
+
+#[macro_export]
+macro_rules! write_host {
+    ($host: expr, $($args: expr),*) => {
+        {
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                writeln!(
+                    $host.buffer.borrow_mut(),
+                    "{}",
+                    { &alloc::format!($($args), *) },
+                ).unwrap()
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! write_out {
+    ($output_file: expr, $($args: expr),*) => {
+        {
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                if let Some(ref mut output) = $output_file {
+                    writeln!(
+                        output,
+                        "{}",
+                        { &alloc::format!($($args), *) },
+                    ).unwrap()
+                } else {
+                    println!(
+                        "{}",
+                        { &alloc::format!($($args), *) }
+                    )
+                }
+            }
+        }
+    };
 }

@@ -25,7 +25,7 @@
 
 module Request = struct
   type ('a, 'b) t =
-    | Register : string list -> (L2_message.hash list, error trace) t
+    | Register : string list -> (L2_message.id list, error trace) t
     | Produce_batches : (unit, error trace) t
 
   type view = View : _ t -> view

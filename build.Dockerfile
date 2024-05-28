@@ -1,7 +1,7 @@
 ARG BASE_IMAGE=registry.gitlab.com/tezos/opam-repository
 ARG BASE_IMAGE_VERSION
 ARG RUST_TOOLCHAIN_IMAGE
-ARG RUST_TOOLCHAIN_IMAGE_VERSION
+ARG RUST_TOOLCHAIN_IMAGE_TAG
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
@@ -24,6 +24,7 @@ COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
+COPY --chown=tezos:nogroup irmin tezos/irmin
 COPY --chown=tezos:nogroup etherlink tezos/etherlink
 COPY --chown=tezos:nogroup tezt tezos/tezt
 COPY --chown=tezos:nogroup opam tezos/opam
@@ -41,20 +42,21 @@ RUN while read -r protocol; do \
     cp tezos/src/proto_"$(echo "$protocol" | tr - _)"/parameters/*.json tezos/parameters/"$protocol"-parameters; \
     done < tezos/script-inputs/active_protocol_versions
 
-FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_VERSION} AS layer2-builder
+FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_TAG} AS layer2-builder
 WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
-COPY --chown=tezos:nogroup kernels.mk evm_kernel
+COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/
 COPY --chown=tezos:nogroup src evm_kernel/src
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
-RUN make -C evm_kernel -f kernels.mk build-deps \
-  && make -C evm_kernel -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/dailynet.yaml evm_installer.wasm \
-  && make -C evm_kernel -f kernels.mk evm_benchmark_installer.wasm
+RUN make -C evm_kernel -f etherlink.mk build-deps \
+  && make -C evm_kernel -f etherlink.mk EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
+  && make -C evm_kernel -f etherlink.mk evm_benchmark_kernel.wasm
 
 # We move the EVM kernel in the final image in a dedicated stage to parallelize
 # the two builder stages.
 FROM without-evm-artifacts as with-evm-artifacts
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_installer.wasm evm_kernel
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_installer_preimages/ evm_kernel/_evm_installer_preimages
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_unstripped_installer_preimages/ evm_kernel/_evm_unstripped_installer_preimages
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_benchmark_installer.wasm evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_benchmark_kernel.wasm evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/etherlink/config/benchmarking.yaml evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/etherlink/config/benchmarking_sequencer.yaml evm_kernel

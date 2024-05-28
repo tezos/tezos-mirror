@@ -24,7 +24,8 @@
   octez-protocol-alpha-libs.plugin
   octez-alcotezt
   tezt
-  octez-libs.test-helpers)
+  octez-libs.test-helpers
+  octez-libs.event-logging-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -44,7 +45,8 @@
   -open Tezos_protocol_alpha_parameters
   -open Tezos_protocol_plugin_alpha
   -open Octez_alcotezt
-  -open Tezos_test_helpers)
+  -open Tezos_test_helpers
+  -open Tezos_event_logging_test_helpers)
  (modules
   test
   test_snapshots
@@ -59,7 +61,6 @@
   test_store
   test_testchain
   test_utils
-  tezt_sink
   assert_lib))
 
 (executable

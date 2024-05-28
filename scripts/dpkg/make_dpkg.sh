@@ -23,7 +23,7 @@ staging_root=_dpkgstage
 
 # Checking prerequisites
 #
-if ! which dpkg-deb >/dev/null 2>&1; then
+if ! which dpkg-deb > /dev/null 2>&1; then
   echo "Needs to run on a system with dpkg-deb in path" >&2
   exit 2
 fi
@@ -43,7 +43,8 @@ for control_file in "$myhome"/*control.in; do
   #
   dpkg_name=${OCTEZ_PKGNAME}-${pg}
   init_name=${OCTEZ_REALNAME}-${pg}
-  dpkg_dir="${dpkg_name}_${pkg_vers}-${OCTEZ_PKGREV}_${dpkg_arch}"
+  dpkg_vers=$(echo "${pkg_vers}" | tr '~' '-')
+  dpkg_dir="${dpkg_name}_${dpkg_vers}-${OCTEZ_PKGREV}_${dpkg_arch}"
   dpkg_fullname="${dpkg_dir}.deb"
 
   binaries=$(fixBinaryList "${common}/${pg}-binaries")
@@ -104,13 +105,12 @@ for control_file in "$myhome"/*control.in; do
     fi
   done
 
-
   # init.d scripts
   #
   initdScripts "${common}/${pg}.initd.in" "${init_name}" "${staging_dir}"
-    if [ "$pg" = "baker" ]; then
+  if [ "$pg" = "baker" ]; then
     initdScripts "${common}/vdf.initd.in" octez-vdf "${staging_dir}"
-    fi
+  fi
 
   # Configuration files
   #

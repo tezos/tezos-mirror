@@ -119,14 +119,14 @@ let bake_wait_log ?level ?protocol ?mempool ?ignore_node_mempool node client =
 (* Get the hash of an operation from the json representing the operation. *)
 let get_hash op = JSON.(op |-> "hash" |> as_string)
 
-(* Get the list of hashes of the mempool's applied operations (using
+(* Get the list of hashes of the mempool's validated operations (using
    RPC get /chains/main/mempool/pending_operations that provides all
    the operations in the mempool). *)
-let get_applied_operation_hash_list client =
+let get_validated_operation_hash_list client =
   let* pending_ops =
     Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
-  return (List.map get_hash JSON.(pending_ops |-> "applied" |> as_list))
+  return (List.map get_hash JSON.(pending_ops |-> "validated" |> as_list))
 
 (* Assert that [json] represents an empty list. *)
 let check_json_is_empty_list ?(fail_msg = "") json =
@@ -152,7 +152,7 @@ let check_json_is_empty_list ?(fail_msg = "") json =
    Scenario:
    - Step 1: Start a node with event_level:debug, activate the protocol.
    - Step 2: Inject a transfer operation, test RPCs.
-     2a) pending_operations should contain one applied operation.
+     2a) pending_operations should contain one validated operation.
      2b) operations in block should be empty.
    - Step 3: Bake, test RPCs.
      3a) pending_operations should be empty.
@@ -181,13 +181,13 @@ let test_debug_level_misc =
       Constant.bootstrap2
   in
   Log.info "Injection done." ;
-  Log.info "2a) pending_operations should contain one applied operation." ;
-  let* applied_ophs = get_applied_operation_hash_list client_1 in
+  Log.info "2a) pending_operations should contain one validated operation." ;
+  let* validated_ophs = get_validated_operation_hash_list client_1 in
   Log.info "RPC.get_mempool_pending_operations done." ;
   let oph1 =
-    match applied_ophs with
+    match validated_ophs with
     | [x] -> x
-    | _ -> Test.fail "Expected exactly one applied operation in mempool."
+    | _ -> Test.fail "Expected exactly one validated operation in mempool."
   in
   Log.info "Hash of injected operation: %s" oph1 ;
   Log.info "2b) operations in block should be empty." ;
@@ -203,11 +203,11 @@ let test_debug_level_misc =
   let level = level + 1 in
   let* () = bake_wait_log ?level:(Some level) node_1 client_1 in
   Log.info "3a) pending_operations should be empty." ;
-  let* applied_ophs = get_applied_operation_hash_list client_1 in
+  let* validated_ophs = get_validated_operation_hash_list client_1 in
   Log.info "RPC.get_mempool_pending_operations done." ;
-  (match applied_ophs with
+  (match validated_ophs with
   | [] -> ()
-  | _ -> Test.fail "List of applied operations in mempool should be empty.") ;
+  | _ -> Test.fail "List of validated operations in mempool should be empty.") ;
   Log.info
     "3b) operations in block should contain the previously pending operation." ;
   let* ops = Client.RPC.call client_1 @@ RPC.get_chain_block_operations () in
@@ -222,7 +222,7 @@ let test_debug_level_misc =
           | _ ->
               Test.fail
                 "Fourth list returned by RPC.operations should contain only \
-                 the previously applied operation.")
+                 the previously validated operation.")
       | _ ->
           Test.fail
             "Fourth list returned by RPC.operations should contain exactly one \

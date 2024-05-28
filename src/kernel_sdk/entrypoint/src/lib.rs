@@ -8,7 +8,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(feature = "dlmalloc")]
+#[cfg(all(feature = "dlmalloc", not(target_arch = "riscv64")))]
 mod allocator {
     use dlmalloc::GlobalDlmalloc;
 
@@ -57,8 +57,26 @@ macro_rules! kernel_entry {
             let mut host = unsafe { RollupHost::new() };
             $kernel_run(&mut host)
         }
+
+        #[cfg(all(target_arch = "riscv64", target_os = "hermit"))]
+        pub fn main() -> ! {
+            $crate::set_panic_hook();
+            use $crate::RollupHost;
+            let mut host = unsafe { RollupHost::new() };
+            loop {
+                // TODO #6727: Capture and recover panics.
+                $kernel_run(&mut host);
+            }
+        }
     };
 }
 
 #[doc(hidden)]
+#[cfg(not(feature = "experimental-host-in-memory-store"))]
 pub use tezos_smart_rollup_core::rollup_host::RollupHost;
+
+pub(crate) mod host;
+
+#[doc(hidden)]
+#[cfg(feature = "experimental-host-in-memory-store")]
+pub use host::RollupHostWithInMemoryStorage as RollupHost;

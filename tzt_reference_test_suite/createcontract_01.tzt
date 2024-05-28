@@ -1,0 +1,22 @@
+code {
+       CREATE_CONTRACT
+         { code { DROP ; UNIT ; NIL operation ; PAIR } ;
+           storage unit ;
+           parameter unit }
+     } ;
+input {
+        Stack_elt (option key_hash) None ;
+        Stack_elt mutez 12 ;
+        Stack_elt unit Unit
+      } ;
+output {
+         Stack_elt
+           operation
+           (Create_contract
+              { code { DROP ; UNIT ; NIL operation ; PAIR } ; storage unit ; parameter unit }
+              None
+              12
+              Unit
+              _) ;
+         Stack_elt address _
+       }

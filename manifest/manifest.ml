@@ -230,7 +230,7 @@ module Dune = struct
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
-      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
+      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml ?wrapped
       (names : string list) =
     [
       V
@@ -302,6 +302,7 @@ module Dune = struct
           (match js_of_ocaml with
           | None -> E
           | Some flags -> S "js_of_ocaml" :: flags);
+          opt wrapped (fun x -> [S "wrapped"; S (string_of_bool x)]);
           opt library_flags (fun x -> [S "library_flags"; x]);
           opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
           opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
@@ -455,6 +456,20 @@ module Dune = struct
       ?enabled_if
       [S "target"; S target]
       ~action
+
+  let protobuf_rule filename_without_extension =
+    let proto_filename = filename_without_extension ^ ".proto" in
+    let compiled_filename = filename_without_extension ^ ".ml" in
+    target_rule
+      compiled_filename
+      ~deps:[[S ":proto"; S proto_filename]]
+      ~action:
+        [
+          S "run";
+          H [S "protoc"; S "-I"; S "."];
+          S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
+          S "%{proto}";
+        ]
 
   let install ?package files ~section =
     [
@@ -639,6 +654,7 @@ module Opam = struct
     build : build_instruction list;
     available : available;
     synopsis : string;
+    version : Version.t option;
     url : url option;
     description : string option;
     x_opam_monorepo_opam_provided : string list;
@@ -658,6 +674,7 @@ module Opam = struct
         build;
         available;
         synopsis;
+        version;
         url;
         description;
         x_opam_monorepo_opam_provided;
@@ -703,7 +720,7 @@ module Opam = struct
          In any case the following piece of code converts version constraints
          on optional dependencies into conflicts. *)
       let optional_dep_conflicts =
-        let negate_dependency_constraint dependency =
+        let negate_dependency_constraint (dependency : dependency) =
           match dependency.version with
           | True ->
               (* No conflict to introduce. *)
@@ -713,7 +730,9 @@ module Opam = struct
         List.filter_map negate_dependency_constraint depopts
       in
       let depopts =
-        let remove_constraint dependency = {dependency with version = True} in
+        let remove_constraint (dependency : dependency) =
+          {dependency with version = True}
+        in
         List.map remove_constraint depopts
       in
       let conflicts = conflicts @ optional_dep_conflicts in
@@ -922,6 +941,7 @@ module Opam = struct
            Format.pp_print_string)
         available ;
     pp_line "synopsis: %a" pp_string synopsis ;
+    Option.iter (pp_line "version: %a" pp_string) version ;
     Option.iter pp_url url ;
     Option.iter (pp_line "description: %a" pp_string) description
 end
@@ -1170,7 +1190,7 @@ module Target = struct
      name for [public_name] stanzas in [dune] and the name in [.opam] files. *)
   type full_name = {internal_name : string; public_name : string}
 
-  type preprocessor_dep = File of string
+  type preprocessor_dep = File of string | Glob_files of string
 
   type release_status = Unreleased | Experimental | Released | Auto_opam
 
@@ -1211,6 +1231,7 @@ module Target = struct
     inline_tests_deps : Dune.s_expr list option;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
+    wrapped : bool option;
     documentation : Dune.s_expr option;
     kind : kind;
     linkall : bool;
@@ -1223,6 +1244,7 @@ module Target = struct
     opam_doc : string option;
     opam_homepage : string option;
     opam_with_test : with_test;
+    opam_version : Version.t option;
     optional : bool;
     opens : string list;
     path : string;
@@ -1246,6 +1268,7 @@ module Target = struct
     extra_authors : string list;
     ctypes : Ctypes.t option;
     with_macos_security_framework : bool;
+    product : string;
   }
 
   and preprocessor =
@@ -1409,6 +1432,7 @@ module Target = struct
     ?inline_tests_deps:Dune.s_expr list ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
+    ?wrapped:bool ->
     ?documentation:Dune.s_expr ->
     ?linkall:bool ->
     ?modes:Dune.mode list ->
@@ -1421,6 +1445,7 @@ module Target = struct
     ?opam_doc:string ->
     ?opam_homepage:string ->
     ?opam_with_test:with_test ->
+    ?opam_version:Version.t ->
     ?optional:bool ->
     ?ppx_kind:Dune.ppx_kind ->
     ?ppx_runtime_libraries:t option list ->
@@ -1496,15 +1521,15 @@ module Target = struct
     in
     snd (collect deps)
 
-  let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
-      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
+  let internal ~product make_kind ?all_modules_except ?bisect_ppx
+      ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?inline_tests_deps ?js_compatible ?js_of_ocaml ?documentation
+      ?inline_tests_deps ?js_compatible ?js_of_ocaml ?wrapped ?documentation
       ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
       ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
-      ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
+      ?opam_version ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
       ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
       ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
       ?synopsis ?description ?(time_measurement_ppx = false)
@@ -1836,10 +1861,9 @@ module Target = struct
       | Experimental | Released | Auto_opam -> true
     then
       if
+        let prefixes = ["src/"; "tezt/"; "etherlink/"; "irmin/"] in
         not
-          (String.starts_with ~prefix:"src/" path
-          || String.starts_with ~prefix:"tezt/" path
-          || String.starts_with ~prefix:"etherlink/" path)
+          (List.exists (fun prefix -> String.starts_with ~prefix path) prefixes)
       then
         invalid_argf
           "A target has the release status %s but is located at %s which is \
@@ -1864,6 +1888,7 @@ module Target = struct
         inline_tests_deps;
         js_compatible;
         js_of_ocaml;
+        wrapped;
         documentation;
         kind;
         linkall;
@@ -1876,6 +1901,7 @@ module Target = struct
         opam_doc;
         opam_homepage;
         opam_with_test;
+        opam_version;
         optional;
         opens;
         path;
@@ -1900,6 +1926,7 @@ module Target = struct
         ctypes;
         with_macos_security_framework;
         tests_deps;
+        product;
       }
 
   let public_lib ?internal_name =
@@ -2145,6 +2172,7 @@ type tezt_target = {
   tezt_local_test_lib : target;
   preprocess : Target.preprocessor list;
   preprocessor_deps : Target.preprocessor_dep list;
+  product : string;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
@@ -2153,7 +2181,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
     ?synopsis ?opam_with_test ?dune_with_test
     ?(with_macos_security_framework = false) ?flags ?(dune = Dune.[])
-    ?(preprocess = []) ?(preprocessor_deps = []) modules =
+    ?(preprocess = []) ?(preprocessor_deps = []) ~product modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -2173,6 +2201,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
         ~linkall:true
         ?flags
         ~dune
+        ~product
         tezt_local_test_lib_name)
   in
   let tezt_target =
@@ -2196,6 +2225,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       tezt_local_test_lib;
       preprocess;
       preprocessor_deps;
+      product;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path ;
@@ -2268,6 +2298,7 @@ let register_tezt_targets ~make_tezt_exe =
                       [S "echo"; S ("let () = " ^ main ^ ".Test.run ()")];
                     ];
               ]
+          ~product:"tezt-tests"
       in
       ()
     in
@@ -2311,9 +2342,9 @@ module Sub_lib = struct
     documentation_type : documentation_entrypoint;
   }
 
-  type container = sub_lib list ref
+  type container = {mutable content : sub_lib list; product : string}
 
-  let make_container () = ref []
+  let make_container ~product = {content = []; product}
 
   let make_documentation ~package ~public_name ~name ~synopsis = function
     | Some docs when not (docs = Dune.[[S "package"; S package]]) ->
@@ -2356,7 +2387,8 @@ module Sub_lib = struct
         (* In case it's a sub_lib, we don't link anything *) ()
 
   (* Prints all the registered libs of a container package. *)
-  let pp_documentation_of_container ~header fmt registered_libs =
+  let pp_documentation_of_container ~header fmt
+      {content = registered_libs; product = _} =
     Format.fprintf
       fmt
       "%s%a"
@@ -2367,7 +2399,7 @@ module Sub_lib = struct
            String.compare
              (String.capitalize_ascii name1)
              (String.capitalize_ascii name2))
-         !registered_libs
+         registered_libs
 
   type maker = ?internal_name:string -> string Target.maker
 
@@ -2388,6 +2420,7 @@ module Sub_lib = struct
        ?inline_tests_deps
        ?js_compatible
        ?js_of_ocaml
+       ?wrapped
        ?documentation
        ?linkall
        ?modes
@@ -2400,6 +2433,7 @@ module Sub_lib = struct
        ?opam_doc
        ?opam_homepage
        ?opam_with_test
+       ?opam_version
        ?optional
        ?ppx_kind
        ?ppx_runtime_libraries
@@ -2422,6 +2456,7 @@ module Sub_lib = struct
        ?with_macos_security_framework
        ~path
        public_name ->
+    let product = container.product in
     if Option.is_some opam then
       invalid_arg "sub-libraries cannot be given custom `opam` parameters." ;
     let name =
@@ -2440,7 +2475,7 @@ module Sub_lib = struct
     if
       List.exists
         (fun registered -> String.equal registered.name name)
-        !container
+        container.content
     then
       invalid_arg
         (Format.sprintf
@@ -2449,8 +2484,9 @@ module Sub_lib = struct
            package
            (Option.value ~default:public_name internal_name)
            name)
-    else container := registered :: !container ;
+    else container.content <- registered :: container.content ;
     Target.public_lib
+      ~product
       (package ^ "." ^ public_name)
       ~path
       ~internal_name:name
@@ -2471,6 +2507,7 @@ module Sub_lib = struct
       ?inline_tests_deps
       ?js_compatible
       ?js_of_ocaml
+      ?wrapped
       ?documentation
       ?linkall
       ?modes
@@ -2482,6 +2519,7 @@ module Sub_lib = struct
       ?opam_doc
       ?opam_homepage
       ?opam_with_test
+      ?opam_version
       ?optional
       ?ppx_kind
       ?ppx_runtime_libraries
@@ -2501,6 +2539,33 @@ module Sub_lib = struct
       ?license
       ?extra_authors
       ?with_macos_security_framework
+end
+
+module Product (M : sig
+  val name : string
+end) =
+struct
+  let public_lib = Target.public_lib ~product:M.name
+
+  let private_lib = Target.private_lib ~product:M.name
+
+  let public_exe = Target.public_exe ~product:M.name
+
+  let public_exes = Target.public_exes ~product:M.name
+
+  let private_exe = Target.private_exe ~product:M.name
+
+  let private_exes = Target.private_exes ~product:M.name
+
+  let test = Target.test ~product:M.name
+
+  let tests = Target.tests ~product:M.name
+
+  module Sub_lib = struct
+    include Sub_lib
+
+    let make_container () = make_container ~product:M.name
+  end
 end
 
 (*****************************************************************************)
@@ -2657,7 +2722,11 @@ let generate_dune (internal : Target.internal) =
     List.map make_preprocessors internal.preprocess
   in
   let preprocessor_deps =
-    let make_pp_dep (Target.File filename) = Dune.file filename in
+    let make_pp_dep = function
+      | Target.File filename -> Dune.file filename
+      | Glob_files glob -> Dune.glob_files glob
+    in
+
     List.map make_pp_dep internal.preprocessor_deps
   in
   let modules =
@@ -2787,6 +2856,7 @@ let generate_dune (internal : Target.internal) =
       ?ctypes
       ~private_modules:internal.private_modules
       ?js_of_ocaml:internal.js_of_ocaml
+      ?wrapped:internal.wrapped
     :: documentation :: create_empty_files :: internal.dune)
 
 (* [Explicitly_unreleased i]: this opam package was explicitly specified not to be released
@@ -3022,15 +3092,17 @@ let generate_dune_files () =
 
    If [for_release] is [false] but [for_conflicts] is [true],
    ignore vendored libraries. *)
-let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
-    ~with_test ~optional (target : Target.t) : Opam.dependency list =
+let rec as_opam_dependency ~product ~for_release ~for_conflicts
+    ~(for_package : string) ~with_test ~optional (target : Target.t) :
+    Opam.dependency list =
   match target with
   | External {opam = None; _} -> []
-  | Internal {opam = Some package; _} ->
+  | Internal {opam = Some package; product = dep_product; _} ->
       if package = for_package then []
       else
         let version =
-          if for_release then Version.(Exactly Version) else Version.True
+          if product = dep_product then Version.(Exactly Version)
+          else Version.True
         in
         [{Opam.package; version; with_test; optional}]
   | Internal ({opam = None; _} as internal) ->
@@ -3039,6 +3111,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
       let deps = Target.all_internal_deps internal in
       List.concat_map
         (as_opam_dependency
+           ~product
            ~for_release
            ~for_conflicts
            ~for_package
@@ -3056,6 +3129,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
       List.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
         (as_opam_dependency
+           ~product
            ~for_release
            ~for_conflicts
            ~for_package
@@ -3064,6 +3138,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
            target)
   | Re_export target | Open (target, _) ->
       as_opam_dependency
+        ~product
         ~for_release
         ~for_conflicts
         ~for_package
@@ -3088,6 +3163,27 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     Opam.t =
   let for_release = release <> None in
   let map l f = List.map f l in
+  let product =
+    (* We check that all the internals belong to the same product (thus
+       enforcing that the granularity level of the product is bigger than the
+       granularity level of the opam packages). We also have to exclude the
+       "tezt-tests" product which is a dummy product used to bundle some tests
+       for the CI. *)
+    match
+      List.map (fun (i : Target.internal) -> i.product) internals
+      |> String_set.of_list |> String_set.elements
+      |> List.filter (function "tezt-tests" -> false | _ -> true)
+    with
+    | [] -> "tezt-tests"
+    | [product] -> product
+    | p1 :: p2 :: _ ->
+        error
+          "different product (%s, %s, etc.) in the same opam\n    (%s)"
+          p1
+          p2
+          for_package ;
+        exit 1
+  in
   let depends, x_opam_monorepo_opam_provided =
     List.split @@ map internals
     @@ fun internal ->
@@ -3101,6 +3197,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     let deps =
       List.concat_map
         (as_opam_dependency
+           ~product
            ~for_release
            ~for_conflicts:false
            ~for_package
@@ -3193,12 +3290,28 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     @@ fun internal ->
     List.concat_map
       (as_opam_dependency
+         ~product
          ~for_release
          ~for_conflicts:true
          ~for_package
          ~with_test:Never
          ~optional:false)
       internal.conflicts
+  in
+  let get_consistent_optional_value ~name
+      (get : Target.internal -> string option) : string option =
+    match
+      List.filter_map get internals |> String_set.of_list |> String_set.elements
+    with
+    | [] -> None
+    | [value] -> Some value
+    | value :: _ :: _ as list ->
+        error
+          "Package %s was declared with multiple different values for %s: %s\n"
+          for_package
+          name
+          (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
+        Some value
   in
   let get_consistent_value ~name ?default
       (get : Target.internal -> string option) =
@@ -3330,6 +3443,8 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     build;
     available;
     synopsis = get_consistent_value ~name:"synopsis" (fun x -> x.synopsis);
+    version =
+      get_consistent_optional_value ~name:"version" (fun x -> x.opam_version);
     url = Option.map (fun {url; _} -> url) release;
     description;
     x_opam_monorepo_opam_provided;
@@ -3342,6 +3457,7 @@ let generate_opam_meta_package opam_release_graph add_to_meta_package : Opam.t =
     | None -> []
     | Some target ->
         as_opam_dependency
+          ~product:"none-this-is-for-meta-package-dependencies"
           ~for_release:true
           ~for_conflicts:false
           ~for_package:"octez"
@@ -3381,6 +3497,7 @@ let generate_opam_meta_package opam_release_graph add_to_meta_package : Opam.t =
     build = [];
     available = Always;
     synopsis = "Main virtual package for Octez, an implementation of Tezos";
+    version = None;
     url = None;
     description = None;
     x_opam_monorepo_opam_provided = [];
@@ -3767,14 +3884,16 @@ let check_opam_with_test_consistency () =
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let packages_dir, release, remove_extra_files =
+let packages_dir, release, remove_extra_files, manifezt =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
   let sha512 = ref "" in
   let remove_extra_files = ref false in
   let version = ref "" in
-  let anon_fun _args = () in
+  let manifezt = ref false in
+  let anonymous_args = ref [] in
+  let anon_fun arg = anonymous_args := arg :: !anonymous_args in
   let spec =
     Arg.align
       [
@@ -3791,6 +3910,14 @@ let packages_dir, release, remove_extra_files =
         ( "--remove-extra-files",
           Arg.Set remove_extra_files,
           " Remove files that are neither generated nor excluded" );
+        ( "--manifezt",
+          Arg.Set manifezt,
+          " Expect a list of modified files on the command-line. Output a TSL \
+           expression to select Tezt tests that are impacted by those changes, \
+           then exit without generating any file." );
+        ( "--",
+          Arg.Rest anon_fun,
+          " Assume the remaining arguments are anonymous arguments." );
       ]
   in
   Arg.parse spec anon_fun usage_msg ;
@@ -3817,48 +3944,17 @@ let packages_dir, release, remove_extra_files =
         in
         Some {version; url = {url; sha256; sha512}}
   in
-  (!packages_dir, release, !remove_extra_files)
+  let manifezt =
+    match (!manifezt, !anonymous_args) with
+    | false, [] -> None
+    | false, head :: _ ->
+        prerr_endline ("Error: don't know what to do with: " ^ head) ;
+        exit 1
+    | true, files -> Some files
+  in
+  (!packages_dir, release, !remove_extra_files, manifezt)
 
-let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
-  Format.fprintf
-    fmt
-    {|@..rules_template__trigger_%s_opam_batch_%d:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: %d minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
-      when: delayed
-      start_in: %d minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '%s'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: %d minutes
-    - when: never # default
-|}
-    pipeline_type
-    batch_index
-    batch_index
-    batch_index
-    marge_restriction
-    batch_index
-
-let generate_opam_ci opam_release_graph =
+let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
      that will need to pass the public Opam CI. *)
   let contain_executables package =
@@ -3914,42 +4010,18 @@ let generate_opam_ci opam_release_graph =
     List.sort by_name l
   in
   (* Now [packages] is a list of [batch_index, package_name]
-     where [batch_index] is 0 for packages that we do not need to test. *)
-  write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
-  pp_do_not_edit ~comment_start:"#" fmt () ;
-  (* Output one template per batch. *)
-  let marge_restriction_exec = "$CI_MERGE_REQUEST_ID" in
-  let marge_restriction_all =
-    "$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == \"nomadic-margebot\""
-  in
-  for batch_index = 1 to batch_count do
-    print_opam_job_rules fmt batch_index "exec" marge_restriction_exec ;
-    print_opam_job_rules fmt batch_index "all" marge_restriction_all
-  done ;
-
-  (* Output one job per released package. *)
+     where [batch_index] is 0 for packages that we do not need to test.
+     Write the set of packages and whether they are executables to [script-inputs],
+     for consumption by the CI generator. *)
+  write "script-inputs/ci-opam-package-tests" @@ fun fmt ->
   let output_job (batch_index, package_name, is_executable) =
     if batch_index > 0 then
       Format.fprintf
         fmt
-        {|@.opam:%s:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_%s_opam_batch_%d%s
-  variables:
-    package: %s
-|}
+        "%s\t%s\t%d\n"
         package_name
         (if is_executable then "exec" else "all")
         batch_index
-        (* Tag below is added because the job in question does not work as is on
-           Gitlab Runner CI GCP. To remove once https://gitlab.com/tezos/tezos/-/issues/6584
-           is fixed. *)
-        (if package_name = "octez-shell-libs" then
-         "\n    - .tags_template__no_gcp"
-        else "")
-        package_name
-    else Format.fprintf fmt "@.# Ignoring unreleased package %s.\n" package_name
   in
   List.iter output_job packages
 
@@ -4038,6 +4110,7 @@ let generate_profiles ~default_profile =
           Printf.sprintf
             "Virtual package depending on Octez dependencies (profile: %s)"
             profile;
+        version = None;
         url = None;
         description =
           Some
@@ -4064,24 +4137,361 @@ let generate_profiles ~default_profile =
   in
   String_map.iter generate_profile merged
 
+(* File generated by the regression test in Tezt_wrapper. *)
+let tezt_runtime_dependency_tags_path =
+  "tezt/lib_wrapper/expected/tezt_wrapper.ml/runtime-dependency-tags.out"
+
+let read_lines_from_file path =
+  let ch = open_in path in
+  Fun.protect ~finally:(fun () -> close_in ch) @@ fun () ->
+  let rec loop acc =
+    match input_line ch with
+    | exception End_of_file -> List.rev acc
+    | line -> loop (line :: acc)
+  in
+  loop []
+
+let read_tezt_runtime_dependencies () =
+  Fun.flip
+    List.filter_map
+    (read_lines_from_file tezt_runtime_dependency_tags_path)
+  @@ fun line ->
+  if line = "" then None
+  else
+    (* Lines are of the form "tag: path" *)
+    match String.index_opt line ':' with
+    | None ->
+        failwith
+          (Printf.sprintf
+             "failed to parse %S: invalid line: %S"
+             tezt_runtime_dependency_tags_path
+             line)
+    | Some colon ->
+        let tag = String.sub line 0 colon in
+        let path =
+          String.sub line (colon + 1) (String.length line - colon - 1)
+          |> String.trim
+        in
+        Some (tag, path)
+
+(* Copied from [tezt/lib_wrapper/tezt_wrapper.ml] and adapted to remove ".." as well. *)
+let canonicalize_path path =
+  let rec simplify_parents acc = function
+    | [] -> List.rev acc
+    | ".." :: tail ->
+        let acc =
+          match acc with
+          | [] -> failwith ("cannot remove '..' from path: " ^ path)
+          | _ :: acc_tail -> acc_tail
+        in
+        simplify_parents acc tail
+    | head :: tail -> simplify_parents (head :: acc) tail
+  in
+  String.split_on_char '/' path
+  |> List.filter (function "" | "." -> false | _ -> true)
+  |> simplify_parents [] |> String.concat "/"
+
+(* Compute and print a Tezt TSL expression representing the set of tests
+   to run after [changed_files] changed.
+   [changed_files] is supposed to only contain files, not directories. *)
+let list_tests_to_run_after_changes ~(tezt_exe : target)
+    ~(tezt_exe_deps : target list) (changed_files : string list) =
+  (* Verbose mode can be activated for debugging this function
+     by setting the MANIFEZT_DEBUG environment variable to "true". *)
+  let debug = Sys.getenv_opt "MANIFEZT_DEBUG" = Some "true" in
+  if debug then List.iter (Printf.eprintf "changed file: %s\n%!") changed_files ;
+  (* [directory_has_directly_changed] tests whether a [dir],
+     that is supposed to be a directory, is considered to have been modified
+     without considering reverse dependencies.
+     I.e. it returns whether [changed_files] contains a file that is directly in [dir]. *)
+  let directory_has_directly_changed =
+    let changed_dirs =
+      String_set.of_list (List.map Filename.dirname changed_files)
+    in
+    fun (dir : string) -> String_set.mem dir changed_dirs
+  in
+  (* Same as [directory_has_directly_changed] but also consider changes
+     in subdirectories, recursively. *)
+  let directory_has_changed_recursively =
+    let changed_dirs =
+      let rec add acc path =
+        let dir = Filename.dirname path in
+        (* Stop when removing a prefix no longer reduces the size of the path.
+           Termination is thus guaranteed since the size strictly reduces towards 0.
+           Note that [Filename.dirname "" = "."] so the size can in fact grow. *)
+        if String.length dir >= String.length path then
+          (* Avoid infinite loops. *)
+          acc
+        else if String_set.mem dir acc then
+          (* No need to add recursively again. *)
+          acc
+        else
+          let acc = String_set.add dir acc in
+          (* Recursively add parents. *)
+          add acc dir
+      in
+      List.fold_left add String_set.empty changed_files
+    in
+    fun (dir : string) -> String_set.mem dir changed_dirs
+  in
+  (* [internal_has_changed] tells whether an internal [target]
+     is considered to have changed, directly or indirectly.
+     A target is considered to have changed:
+     - if [changed_files] contains a file in the directory of the target
+       (only directly: modifying a file in a subdirectory, such as "example/test/",
+       does not cause "example/" to be considered to have changed);
+     - if one of its dependencies is considered to have changed. *)
+  let rec internal_has_changed =
+    (* [id] associates a unique identifier to each target,
+       so that we can quickly know whether we already traversed it. *)
+    let id (target : Target.internal) =
+      target.path ^ ": "
+      ^
+      match target.kind with
+      | Public_library {internal_name; _} -> internal_name
+      | Private_library name -> name
+      | Public_executable ({internal_name; _}, _) -> internal_name
+      | Private_executable (name, _) -> name
+      | Test_executable {names = name, _; _} -> name
+    in
+    (* [cache] stores whether a target (identified by its [id]) was already traversed,
+       and if so, whether it is considered to have changed. This allows multiple calls
+       of [internal_has_changed] on the same [target] to not have to re-traverse the
+       whole dependency subtree. *)
+    let cache : bool String_map.t ref = ref String_map.empty in
+    fun (target : Target.internal) ->
+      let id = id target in
+      match String_map.find_opt id !cache with
+      | Some result -> result
+      | None ->
+          let result =
+            directory_has_directly_changed target.path
+            ||
+            let internal_deps =
+              List.filter_map
+                Target.get_internal
+                (Target.all_internal_deps target)
+            in
+            List.exists internal_has_changed internal_deps
+          in
+          cache := String_map.add id result !cache ;
+          result
+  in
+  (* Variant that works with non-internal targets too, by assuming they never change. *)
+  let target_has_changed (target : Target.t) =
+    match Target.get_internal target with
+    | Some internal -> internal_has_changed internal
+    | None -> false
+  in
+  (* Variant for optional targets. *)
+  let target_option_has_changed (target : target) =
+    match target with None -> false | Some target -> target_has_changed target
+  in
+  (* Variant for preprocessors. *)
+  let preprocessor_has_changed (preprocessor : Target.preprocessor) =
+    match preprocessor with
+    | PPS {targets; args = _} | Staged_PPS targets ->
+        List.exists target_has_changed targets
+  in
+  (* If a dependency of [tezt/tests/main.exe] is modified, all tests should be run.
+     But those dependencies include the libraries that define tests
+     (those that end in [_tezt_lib]). We assume that those only contain
+     test definitions, i.e. if they are modified, only their tests need to be run.
+     This leaves only [tezt_exe_deps] as the list of dependencies
+     that should trigger all tests. *)
+  let tezt_exe_dep_changed =
+    List.exists target_option_has_changed tezt_exe_deps
+  in
+  (* We will need the list of (tag, path) from Tezt [~uses] to deduce tags. *)
+  let runtime_dependencies = read_tezt_runtime_dependencies () in
+  (* [add_tag_for_path] will be called on each changed path.
+     It checks if there is an associated tag. *)
+  let tags = ref String_set.empty in
+  let add_tag_for_path path =
+    if debug then Printf.eprintf "- path has changed: %s\n%!" path ;
+    (* Search for a tag [tag] with path [tag_path] such that [tag_path] is equal to [path]
+       or to a parent directory of [path]. For instance, if tag ["michelson"]
+       corresponds to path ["michelson_test_scripts"] and if ["path"] is
+       ["michelson_test_scripts/opcodes/xor.tz"], tag ["michelson"] must be added. *)
+    let rec find_tag path =
+      ( Fun.flip List.iter runtime_dependencies @@ fun (tag, tag_path) ->
+        (* We are comparing paths that are canonical:
+           - Tezt_wrapper writes canonical paths in the list of runtime dependencies;
+           - the code below calls [add_tag_for_path] on canonical path. *)
+        if tag_path = path then tags := String_set.add tag !tags ) ;
+      let parent = Filename.dirname path in
+      (* See remark on comparing path lengths in [directory_has_changed_recursively]. *)
+      if String.length parent < String.length path then find_tag parent
+    in
+    find_tag path
+  in
+  (* If a file that changed directly matches a tag, add this tag.
+     This allows [~uses] to refer to static files or directories. *)
+  List.iter add_tag_for_path changed_files ;
+  (* Iterate over all internal targets to find the ones that changed
+     and see if they have an associated tag. *)
+  ( Fun.flip List.iter !Target.registered @@ fun (target : Target.internal) ->
+    if internal_has_changed target then (
+      if debug then Printf.eprintf "target changed: %s\n%!" target.path ;
+      match target.kind with
+      | Public_library _ | Private_library _ -> ()
+      | Public_executable names ->
+          Fun.flip List.iter (Ne_list.to_list names)
+          @@ fun {internal_name; public_name} ->
+          (* Assume the executable may be copied to the project root.
+             If [~release_status] is [Released] or [Experimental],
+             we know it will be copied by the Makefile; but dev executables
+             (as defined in the [Makefile] variable [DEV_EXECUTABLES]) are also copied,
+             and [~release_status] doesn't tell which executables are dev executables. *)
+          add_tag_for_path public_name ;
+          add_tag_for_path ("_build/install/default/bin" // public_name) ;
+          add_tag_for_path
+            ("_build/default" // target.path // (internal_name ^ ".exe"))
+      | Private_executable names | Test_executable {names; _} ->
+          Fun.flip List.iter (Ne_list.to_list names) @@ fun internal_name ->
+          add_tag_for_path
+            ("_build/default" // target.path // (internal_name ^ ".exe"))) ) ;
+  (* [file_has_changed] just checks if a [path] is in [changed_files].
+     It does not assume that [path] is canonical, so it has to make it canonical. *)
+  let file_has_changed path = List.mem (canonicalize_path path) changed_files in
+  (* [glob_has_changed] tests if, in a given directory [dir],
+     a [glob] matches files in [changed_files].
+     For now, this is an overapproximation because we do not want to implement
+     the whole glob syntax. Special characters are only special after the last "/",
+     so we can ignore what is after "/" and just check if something changed in
+     the directory. *)
+  let glob_has_changed ~rec_ dir glob =
+    let dir = canonicalize_path (dir // Filename.dirname glob) in
+    if rec_ then directory_has_changed_recursively dir
+    else directory_has_directly_changed dir
+  in
+  (* Iterate over all Tezt targets to find test files
+     that are directly or indirectly changed.
+     This does not find test files from tezt/tests,
+     because those do not result in a [tezt_target];
+     this is the special case of [make_tezt_exe]. *)
+  let test_files = ref String_set.empty in
+  ( Fun.flip String_map.iter !tezt_targets_by_path
+  @@ fun tezt_target_dir
+             {
+               opam = _;
+               lib_deps;
+               exe_deps;
+               js_deps;
+               dep_globs;
+               dep_globs_rec;
+               dep_files;
+               modules;
+               js_compatible = _;
+               modes = _;
+               synopsis = _;
+               opam_with_test = _;
+               dune_with_test = _;
+               with_macos_security_framework = _;
+               flags = _;
+               dune = _;
+               tezt_local_test_lib;
+               preprocess;
+               preprocessor_deps;
+               product = _;
+             } ->
+    if
+      List.exists target_option_has_changed lib_deps
+      || List.exists target_option_has_changed exe_deps
+      || List.exists target_option_has_changed js_deps
+      || target_option_has_changed tezt_local_test_lib
+      || List.exists preprocessor_has_changed preprocess
+      || List.exists
+           file_has_changed
+           (List.map (fun file -> tezt_target_dir // file) dep_files)
+      || List.exists
+           (function
+             | (File file : Target.preprocessor_dep) ->
+                 file_has_changed (tezt_target_dir // file)
+             | (Glob_files glob : Target.preprocessor_dep) ->
+                 glob_has_changed ~rec_:false tezt_target_dir glob)
+           preprocessor_deps
+      || List.exists (glob_has_changed ~rec_:false tezt_target_dir) dep_globs
+      || List.exists (glob_has_changed ~rec_:true tezt_target_dir) dep_globs_rec
+    then (
+      let path =
+        match tezt_local_test_lib with
+        | None ->
+            (* Function [tezt] always puts [Some] in [tezt_local_test_lib]. *)
+            assert false
+        | Some lib -> (
+            match Target.get_internal lib with
+            | None ->
+                (* Function [tezt] only puts internal targets in [tezt_local_test_lib]. *)
+                assert false
+            | Some internal -> internal.path)
+      in
+      if debug then Printf.eprintf "tezt target changed: %s\n%!" path ;
+      Fun.flip List.iter modules @@ fun module_name ->
+      let test_file = path // (module_name ^ ".ml") in
+      test_files := String_set.add test_file !test_files) ) ;
+  (* If a test in [tezt/tests] changes, it needs to be run.
+     The above analysis does not detect this because tezt/tests/main.exe is not a
+     [tezt_target], it has the special status of "the executable that gathers all tests".
+     Note that if a file in [tezt/tests] changes, it could be a helper for other tests,
+     so if one wants a safe overapproximation one needs to run all tests.
+     But it would mean that changing any file in [tezt/tests] would cause all tests to run,
+     which is unnecessary in most cases. The current implementation is thus a heuristic
+     where we assume that most files in [tezt/tests] are not helpers but files that register
+     tests. In other words, helpers should be put in [tezt/lib_tezos]. *)
+  (match tezt_exe with
+  | None -> failwith "make_tezt_exe returned no target"
+  | Some target -> (
+      match Target.get_internal target with
+      | None -> failwith "make_tezt_exe did not return an internal target"
+      | Some {path; _} ->
+          (* Filter [changed_files] to keep those that are in [path].
+             Add them to the list of files for which to run tests. *)
+          Fun.flip List.iter changed_files @@ fun file ->
+          if Filename.dirname file = path then
+            test_files := String_set.add file !test_files)) ;
+  let tsl =
+    if tezt_exe_dep_changed then "true"
+    else if String_set.is_empty !tags && String_set.is_empty !test_files then
+      "false"
+    else
+      let tags = String_set.elements !tags in
+      let files =
+        String_set.elements !test_files
+        |> List.map @@ fun file ->
+           if String.contains file '"' then
+             failwith ("not supported: path with \" character: " ^ file) ;
+           Printf.sprintf "file = \"%s\"" file
+      in
+      String.concat " || " (tags @ files)
+  in
+  print_string tsl ;
+  flush stdout
+
 let precheck () =
   check_circular_opam_deps () ;
   check_js_of_ocaml () ;
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
-let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
+let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
+    =
   Printexc.record_backtrace true ;
   try
-    register_tezt_targets ~make_tezt_exe ;
+    let tezt_exe = register_tezt_targets ~make_tezt_exe in
     precheck () ;
+    (match manifezt with
+    | None -> ()
+    | Some changes ->
+        list_tests_to_run_after_changes ~tezt_exe ~tezt_exe_deps changes ;
+        exit 0) ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;
     generate_package_json_file () ;
     let opam_release_graph = compute_opam_release_graph () in
-    generate_opam_ci opam_release_graph ;
+    generate_opam_ci_input opam_release_graph ;
     generate_executable_list "script-inputs/released-executables" Released ;
     generate_executable_list
       "script-inputs/experimental-executables"

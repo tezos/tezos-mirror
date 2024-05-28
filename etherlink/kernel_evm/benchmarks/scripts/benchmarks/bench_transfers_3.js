@@ -31,4 +31,6 @@ for (player1 of players) {
     }
 }
 
-utils.print_bench([txs_1.concat(txs_2)])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs_1.concat(txs_2)], mode)

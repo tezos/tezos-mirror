@@ -8,12 +8,22 @@
 use crate::transaction::{
     TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
 };
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
-use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_encoding::{public_key::PublicKey, timestamp::Timestamp};
 
 pub fn next<'a, 'v>(decoder: &mut RlpIterator<'a, 'v>) -> Result<Rlp<'a>, DecoderError> {
     decoder.next().ok_or(DecoderError::RlpIncorrectListLen)
+}
+
+pub fn check_list(decoder: &Rlp<'_>, length: usize) -> Result<(), DecoderError> {
+    if !decoder.is_list() {
+        Err(DecoderError::RlpExpectedToBeList)
+    } else if decoder.item_count() != Ok(length) {
+        Err(DecoderError::RlpIncorrectListLen)
+    } else {
+        Ok(())
+    }
 }
 
 pub fn decode_field<T: Decodable>(
@@ -48,6 +58,23 @@ pub fn decode_field_h256(
 ) -> Result<H256, DecoderError> {
     let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
     decode_h256(decoder).map_err(custom_err)
+}
+
+pub fn decode_h160(decoder: &Rlp<'_>) -> Result<H160, DecoderError> {
+    let bytes = decoder.data()?;
+    const H160_EXPECTED_LENGTH: usize = std::mem::size_of::<H160>();
+    let length = bytes.len();
+    if length == H160_EXPECTED_LENGTH {
+        Ok(H160::from_slice(bytes))
+    } else if length < H160_EXPECTED_LENGTH && length > 0 {
+        // there were missing 0 that encoding deleted
+        let missing = H160_EXPECTED_LENGTH - length;
+        let mut full = [0u8; H160_EXPECTED_LENGTH];
+        full[missing..].copy_from_slice(bytes);
+        Ok(H160::from(full))
+    } else {
+        Err(DecoderError::RlpInvalidLength)
+    }
 }
 
 pub fn decode_option<T: Decodable>(
@@ -178,6 +205,36 @@ pub fn append_u64_le<'a>(stream: &'a mut RlpStream, v: &u64) -> &'a mut RlpStrea
     stream.append(&v.to_le_bytes().to_vec())
 }
 
+pub fn decode_field_u32_le(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<u32, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, field_name)?;
+    let bytes_array: [u8; 4] = bytes.try_into().map_err(|_| {
+        DecoderError::Custom("Invalid conversion from vector of bytes to bytes.")
+    })?;
+    Ok(u32::from_le_bytes(bytes_array))
+}
+
+pub fn append_u32_le<'a>(stream: &'a mut RlpStream, v: &u32) -> &'a mut RlpStream {
+    stream.append(&v.to_le_bytes().to_vec())
+}
+
+pub fn decode_field_u16_le(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<u16, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, field_name)?;
+    let bytes_array: [u8; 2] = bytes
+        .try_into()
+        .map_err(|_| DecoderError::Custom("Field is not 2 bytes"))?;
+    Ok(u16::from_le_bytes(bytes_array))
+}
+
+pub fn append_u16_le<'a>(stream: &'a mut RlpStream, v: &u16) -> &'a mut RlpStream {
+    stream.append(&v.to_le_bytes().to_vec())
+}
+
 pub fn decode_transaction_hash(
     decoder: &Rlp<'_>,
 ) -> Result<TransactionHash, DecoderError> {
@@ -237,4 +294,81 @@ pub fn decode_timestamp(decoder: &Rlp<'_>) -> Result<Timestamp, DecoderError> {
     })?)
     .into();
     Ok(timestamp)
+}
+
+/// Hardcoding the option RLP encoding for u64 in little endian. This is
+/// unfortunately necessary as we cannot redefine the u64 encoding.
+pub fn append_option_u64_le(v: &Option<u64>, stream: &mut rlp::RlpStream) {
+    match v {
+        None => {
+            stream.begin_list(0);
+        }
+        Some(value) => {
+            stream.begin_list(1);
+            append_u64_le(stream, value);
+        }
+    }
+}
+
+/// See [append_option_u64_le]
+pub fn decode_option_u64_le(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<Option<u64>, DecoderError> {
+    let items = decoder.item_count()?;
+    match items {
+        1 => {
+            let mut it = decoder.iter();
+            Ok(Some(decode_field_u64_le(&next(&mut it)?, field_name)?))
+        }
+        0 => Ok(None),
+        _ => Err(DecoderError::RlpIncorrectListLen),
+    }
+}
+
+pub fn append_public_key(stream: &mut RlpStream, public_key: &PublicKey) {
+    let pk_b58 = PublicKey::to_b58check(public_key);
+    let pk_bytes = String::as_bytes(&pk_b58);
+    stream.append(&pk_bytes.to_vec());
+}
+
+pub fn decode_public_key(decoder: &Rlp<'_>) -> Result<PublicKey, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, "public_key")?;
+
+    let pk_b58 = String::from_utf8(bytes.to_vec()).map_err(|_| {
+        DecoderError::Custom(
+            "Invalid conversion from timestamp vector of bytes to bytes.",
+        )
+    })?;
+    let pk = PublicKey::from_b58check(&pk_b58).map_err(|_| {
+        DecoderError::Custom(
+            "Invalid conversion from timestamp vector of bytes to bytes.",
+        )
+    })?;
+    Ok(pk)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rlp_helpers::decode_h160;
+    use primitive_types::H160;
+    use rlp::{Rlp, RlpStream};
+
+    #[test]
+    fn roundtrip_h160() {
+        let partial_bytes: [u8; 16] = [1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0];
+        let full_bytes: [u8; 20] =
+            [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0];
+        let h160 = H160::from(full_bytes);
+
+        let mut stream = RlpStream::new();
+        stream.encoder().encode_value(&partial_bytes);
+        let encoded_bytes = stream.out();
+        let decoder = Rlp::new(&encoded_bytes);
+        let result_h160 = decode_h160(&decoder).unwrap();
+        let result_bytes = result_h160.as_fixed_bytes();
+
+        assert!(result_h160.eq(&h160));
+        assert!(result_bytes.eq(&full_bytes));
+    }
 }

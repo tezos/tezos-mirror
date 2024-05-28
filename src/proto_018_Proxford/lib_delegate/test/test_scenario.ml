@@ -613,7 +613,8 @@ let test_scenario_t4 () =
   let config =
     {
       default_config with
-      initial_seed = None;
+      initial_seed =
+        some_seed "rngG9pS9mbDWnz6YLUFrd8sbb9KMUzfAUMpSpnxNHY9BFnSB8L3zq";
       delegate_selection =
         [
           (1l, [(0l, bootstrap1); (1l, bootstrap2)]);
@@ -786,7 +787,6 @@ let test_scenario_f1 () =
             ] );
         ];
       timeout = 30;
-      debug = true;
     }
   in
   run
@@ -1745,30 +1745,229 @@ let test_scenario_m8 () =
       (1, (module Node_d_hooks));
     ]
 
+let compute_expected_injection_time config latest_proposal at_round =
+  let latest_proposal_block_time =
+    Option.value
+      ~default:Time.Protocol.epoch
+      (Option.map
+         (fun b -> b.Baking_state.shell.Block_header.timestamp)
+         latest_proposal)
+  in
+  let round = Protocol.Alpha_context.Round.to_int32 at_round in
+  let expected_delay =
+    Int64.of_int
+    @@
+    match round with
+    | 0l -> 0
+    | 1l -> Int64.to_int config.round0
+    | n ->
+        Int64.to_int config.round0
+        + Int32.(to_int (mul (pred n) (Int64.to_int32 config.round1)))
+  in
+  Time.Protocol.(add latest_proposal_block_time expected_delay)
+  |> Time.System.of_protocol_exn
+
+(*
+  Scenario M9
+
+  Two nodes: A, B
+
+  1. L1 - A proposes and reaches QC.
+  2. L1 - When QC is reached, observe that B emits time to prepare
+     event before the beginning of the round.
+  3. L2 - A observes the block from B and ends.
+*)
+let test_scenario_m9 () =
+  let stop_level = Int32.of_int 2 in
+  let node_b_qc = ref false in
+  let node_b_level = ref Int32.zero in
+  let bh : Block_hash.t option ref = ref None in
+  let stop_on_event0 = function
+    | Baking_state.New_head_proposal {block; _} ->
+        block.shell.level >= stop_level
+    | _ -> false
+  in
+  let config =
+    {
+      default_config with
+      delegate_selection = [(1l, [(0l, bootstrap1)]); (2l, [(0l, bootstrap2)])];
+      round0 = 3L;
+      round1 = 4L;
+    }
+  in
+  let module Node_a_hooks : Hooks = struct
+    include Default_hooks
+
+    let raise_error : string option ref = ref None
+
+    let block_round block_header =
+      let open Block_header in
+      match
+        Protocol.Alpha_context.Fitness.round_from_raw block_header.shell.fitness
+      with
+      | Error _ -> assert false
+      | Ok x -> x
+
+    let on_new_head ~block_hash ~block_header =
+      let open Block_header in
+      let block_round = block_round block_header in
+      let level = block_header.shell.level in
+      let is_round0 =
+        Protocol.Alpha_context.Round.equal
+          block_round
+          Protocol.Alpha_context.Round.zero
+      in
+      match level with
+      | 2l ->
+          raise_error :=
+            if
+              is_round0
+              && not (Block_hash.equal block_hash (Stdlib.Option.get !bh))
+            then Some "Block hash was not equal"
+            else if not is_round0 then
+              Some "Level 2 expected to have a block at round 0"
+            else None ;
+          Lwt.return @@ Some (block_hash, block_header)
+      | _ -> Lwt.return @@ Some (block_hash, block_header)
+
+    let stop_on_event = stop_on_event0
+
+    let check_chain_on_success ~chain:_ =
+      match !raise_error with
+      | Some err -> Stdlib.failwith err
+      | _ -> return_unit
+  end in
+  let module Node_b_hooks : Hooks = struct
+    include Default_hooks
+
+    let on_inject_block ~level:_ ~round:_ ~block_hash ~block_header ~operations
+        ~protocol_data:_ =
+      bh := Some block_hash ;
+      return (block_hash, block_header, operations, [Pass; Pass])
+
+    let latest_proposal : Baking_state.block_info option ref = ref None
+
+    let stop_on_event = function
+      | Baking_state.Quorum_reached _ when !node_b_level = 1l ->
+          node_b_qc := true ;
+          false
+      | Baking_state.Timeout timeout when !node_b_level = 1l -> (
+          match timeout with
+          | Time_to_prepare_next_level_block {at_round} ->
+              let expected_injection_time =
+                compute_expected_injection_time config !latest_proposal at_round
+              in
+              (* We should bake before the block's expected timestamp *)
+              if Time.System.(expected_injection_time >= now ()) then
+                Stdlib.failwith
+                  "bootstrap2 was expected to prepare the block before its \
+                   timestamp@." ;
+              if !node_b_qc then false
+              else
+                Stdlib.failwith "time to prepare emitted without observing qc"
+          | End_of_round _ ->
+              Stdlib.failwith "End of round timeout not expected")
+      | Baking_state.New_valid_proposal {block; _} ->
+          latest_proposal := Some block ;
+          node_b_level := block.shell.level ;
+          false
+      | event -> stop_on_event0 event
+  end in
+  run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
+
+(*
+   Scenario M10
+
+   Two nodes : A, B
+
+   1. Node A is the proposer at level 1, round 0, but is dead
+   2. Node B proposes at level 1, round 1, therefore the
+      Time_to_prepare_next_level_block was not called before its
+      timestamp.
+*)
+let test_scenario_m10 () =
+  let stop_level = 1l in
+  let stop_round = Protocol.Alpha_context.Round.(succ zero) in
+  let module Node_a_hooks : Hooks = struct
+    include Default_hooks
+
+    let stop_on_event _ = true (* Node A stops immediately. *)
+  end in
+  let config =
+    {
+      default_config with
+      round0 = 3L;
+      round1 = 4L;
+      delegate_selection = [(1l, [(0l, bootstrap1); (1l, bootstrap2)])];
+    }
+  in
+  let module Node_b_hooks : Hooks = struct
+    include Default_hooks
+
+    let latest_proposal : Baking_state.block_info option ref = ref None
+
+    let stop_on_event = function
+      | Baking_state.Timeout (Time_to_prepare_next_level_block {at_round}) ->
+          let expected_injection_time =
+            compute_expected_injection_time config !latest_proposal at_round
+          in
+          let current_time = Time.System.now () in
+          if Time.System.(current_time < expected_injection_time) then
+            Stdlib.failwith
+              "bootstrap2 was not supposed to prepare a block before the block \
+               expected injection time" ;
+          false
+      (* When we get to level = 1, round = 1, the time to prepare timeout should
+         not have been called *)
+      | Baking_state.New_head_proposal {block; _} ->
+          latest_proposal := Some block ;
+          let block_round = block.round in
+          block.shell.level >= stop_level && block_round = stop_round
+      | _ -> false
+  end in
+  run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
+
 let () =
-  Alcotest_lwt.run "mockup_baking" ~__FILE__
-  @@ List.map
-       (fun (title, body) ->
-         let open Tezos_base_test_helpers.Tztest in
-         (title, [tztest title `Quick body]))
-       [
-         (Protocol.name ^ ": reaches level 5", test_level_5);
-         ( Protocol.name ^ ": cannot progress without new head",
-           test_preattest_on_valid );
-         (Protocol.name ^ ": reset delayed pqc", test_reset_delayed_pqc);
-         (Protocol.name ^ ": scenario t1", test_scenario_t1);
-         (Protocol.name ^ ": scenario t2", test_scenario_t2);
-         (Protocol.name ^ ": scenario t3", test_scenario_t3);
-         (Protocol.name ^ ": scenario t4", test_scenario_t4);
-         (Protocol.name ^ ": scenario f1", test_scenario_f1);
-         (Protocol.name ^ ": scenario f2", test_scenario_f2);
-         (Protocol.name ^ ": scenario m1", test_scenario_m1);
-         (Protocol.name ^ ": scenario m2", test_scenario_m2);
-         (Protocol.name ^ ": scenario m3", test_scenario_m3);
-         (Protocol.name ^ ": scenario m4", test_scenario_m4);
-         (Protocol.name ^ ": scenario m5", test_scenario_m5);
-         (Protocol.name ^ ": scenario m6", test_scenario_m6);
-         (Protocol.name ^ ": scenario m7", test_scenario_m7);
-         (Protocol.name ^ ": scenario m8", test_scenario_m8);
-       ]
-  |> Lwt_main.run
+  let open Lwt_result_syntax in
+  (* Activate a sink to record baker's events *)
+  let t = lazy (Tezt_sink.activate ()) in
+  let proto_name =
+    String.lowercase_ascii Protocol.name
+    |> String.map (function '-' -> '_' | x -> x)
+  in
+  let register_test (title, test) =
+    Test.register
+      ~__FILE__
+      ~title
+      ~tags:[proto_name; "baker"; "mockup"; Tag.time_sensitive]
+    @@ fun () ->
+    let*! () = Lazy.force t in
+    let*! r = test () in
+    match r with
+    | Ok () -> unit
+    | Error errs -> Test.fail ~__LOC__ "%a" pp_print_trace errs
+  in
+  List.iter
+    register_test
+    [
+      (Protocol.name ^ ": reaches level 5", test_level_5);
+      ( Protocol.name ^ ": cannot progress without new head",
+        test_preattest_on_valid );
+      (Protocol.name ^ ": reset delayed pqc", test_reset_delayed_pqc);
+      (Protocol.name ^ ": scenario t1", test_scenario_t1);
+      (Protocol.name ^ ": scenario t2", test_scenario_t2);
+      (Protocol.name ^ ": scenario t3", test_scenario_t3);
+      (Protocol.name ^ ": scenario t4", test_scenario_t4);
+      (Protocol.name ^ ": scenario f1", test_scenario_f1);
+      (Protocol.name ^ ": scenario f2", test_scenario_f2);
+      (Protocol.name ^ ": scenario m1", test_scenario_m1);
+      (Protocol.name ^ ": scenario m2", test_scenario_m2);
+      (Protocol.name ^ ": scenario m3", test_scenario_m3);
+      (Protocol.name ^ ": scenario m4", test_scenario_m4);
+      (Protocol.name ^ ": scenario m5", test_scenario_m5);
+      (Protocol.name ^ ": scenario m6", test_scenario_m6);
+      (Protocol.name ^ ": scenario m7", test_scenario_m7);
+      (Protocol.name ^ ": scenario m8", test_scenario_m8);
+      (Protocol.name ^ ": scenario m9", test_scenario_m9);
+      (Protocol.name ^ ": scenario m10", test_scenario_m10);
+    ]

@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda int unit) { DUP; IFCMPGE {} {}; UNIT } } ;
+output { Stack_elt bytes 0x0502000000190321020000001003190328072c02000000000200000000034f } ;

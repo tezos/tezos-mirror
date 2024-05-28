@@ -20,8 +20,14 @@ val slot_attested : set:bool -> int -> unit
 (** Update the seen layer1 heads with the given value. *)
 val new_layer1_head : head_level:int32 -> unit
 
+(** A new layer1 head with the given round was seen. *)
+val new_layer1_head_round : head_round:int32 -> unit
+
 (** Update the finalized layer1 blocks with the given value. *)
 val layer1_block_finalized : block_level:int32 -> unit
+
+(** A new layer1 block with the given round was finalized. *)
+val layer1_block_finalized_round : block_round:int32 -> unit
 
 (** Update the shards verification time with the given value.  *)
 val update_shards_verification_time : float -> unit

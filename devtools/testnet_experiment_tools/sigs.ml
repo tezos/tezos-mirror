@@ -43,6 +43,7 @@ module type PROTO_TOOL = sig
     Tezos_protocol_environment.Context.t ->
     head_level:int32 ->
     block_time_target:int ->
+    patch_max_op_ttl:bool ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t
 end
 

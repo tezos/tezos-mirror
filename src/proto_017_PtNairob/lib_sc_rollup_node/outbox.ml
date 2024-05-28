@@ -25,6 +25,8 @@
 (*****************************************************************************)
 
 open Node_context
+open Context_sigs
+open Context_wrapper.Irmin
 
 let get_state_of_lcc node_ctxt =
   let open Lwt_result_syntax in
@@ -47,7 +49,12 @@ let proof_of_output node_ctxt output =
       failwith "Error producing outbox proof (no cemented state in the node)"
   | Some state -> (
       let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-      let*! proof = PVM.produce_output_proof node_ctxt.context state output in
+      let*! proof =
+        PVM.produce_output_proof
+          (of_node_context node_ctxt.context).index
+          (of_node_pvmstate state)
+          output
+      in
       match proof with
       | Ok proof ->
           let serialized_proof =

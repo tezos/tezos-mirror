@@ -408,7 +408,8 @@ module Alias (Entity : Entity) = struct
          the name of an existing %s, the client will look for a file \
          containing a %s, and if it does not exist, the argument will be read \
          as a raw %s.\n\
-         Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
+         Use 'alias:<name>', 'file:<path>' or 'text:<literal>' to disable \
+         autodetect."
         desc
         Entity.name
         Entity.name
@@ -427,7 +428,8 @@ module Alias (Entity : Entity) = struct
          the name of an existing %s, the client will look for a file \
          containing a %s, and if it does not exist, the argument will be read \
          as a raw %s.\n\
-         Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
+         Use 'alias:<name>', 'file:<path>' or 'text:<literal>' to disable \
+         autodetect."
         doc
         Entity.name
         Entity.name

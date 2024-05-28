@@ -49,6 +49,7 @@ class mock_wallet (entities : string) : Tezos_client_base.Client_context.wallet
 
     method load : type a.
         string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
+      let open Lwt_result_syntax in
       fun _alias_name ~default:_default _encoding ->
         let json = (Ezjsonm.from_string entities :> Data_encoding.json) in
         return @@ Data_encoding.Json.destruct _encoding json

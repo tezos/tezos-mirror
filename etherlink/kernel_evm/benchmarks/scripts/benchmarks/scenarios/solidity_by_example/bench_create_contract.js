@@ -12,8 +12,10 @@ let create_1 = contract.interface.encodeFunctionData("create", [player1.addr, "m
 
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000))
-let create = utils.create(player1, 0, create_data)
+let create = utils.create(player1, 0, create_data, {gasLimit: 10000000})
 txs.push(create.tx)
 txs.push(utils.send(player1, create.addr, 0, create_1))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

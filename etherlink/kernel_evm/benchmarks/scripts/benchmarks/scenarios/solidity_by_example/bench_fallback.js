@@ -24,4 +24,6 @@ let callFallback = contract2.interface.encodeFunctionData("callFallback", [creat
 txs.push(utils.send(player1, create2.addr, 1000, transferToFallback))
 txs.push(utils.send(player1, create2.addr, 1000, callFallback))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

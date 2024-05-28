@@ -10,6 +10,7 @@ use std::fs::read_to_string;
 
 use mir::parser::Parser;
 use mir::tzt::*;
+use typed_arena::Arena;
 
 fn run_test(file: &str) -> Result<(), String> {
     let contents = read_to_string(file).map_err(|e| e.to_string())?;
@@ -18,7 +19,8 @@ fn run_test(file: &str) -> Result<(), String> {
         .parse_tzt_test(&contents)
         .map_err(|e| e.to_string())?;
 
-    run_tzt_test(tzt_test).map_err(|e| format!("{}", e))
+    let arena = Arena::new();
+    run_tzt_test(tzt_test, &arena).map_err(|e| format!("{}", e))
 }
 
 fn main() {
@@ -50,9 +52,14 @@ mod tztrunner_tests {
     use mir::{parser::Parser, tzt::*};
     use TztTestError::*;
 
-    fn parse_tzt_test(s: &str) -> Result<TztTest, Box<dyn Error>> {
+    fn parse_tzt_test(s: &'static str) -> Result<TztTest, Box<dyn Error>> {
         let parser = Box::leak(Box::new(Parser::new()));
         parser.parse_tzt_test(s)
+    }
+
+    pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
+        let temp = Box::leak(Box::default());
+        mir::tzt::run_tzt_test(test, temp)
     }
 
     #[test]
@@ -145,6 +152,24 @@ mod tztrunner_tests {
             run_tzt_test(tzt_test),
             Err(ExpectedDifferentError(_, _))
         ));
+    }
+
+    #[test]
+    fn test_runner_implicit_parameter() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_IMPLICIT_PARAMETER).unwrap();
+        assert_eq!(run_tzt_test(tzt_test), Ok(()));
+    }
+
+    #[test]
+    fn test_runner_other_contracts() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_OTHER_CONTRACTS).unwrap();
+        assert_eq!(run_tzt_test(tzt_test), Ok(()));
+    }
+
+    #[test]
+    fn test_runner_self_is_known() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_SELF_IS_KNOWN).unwrap();
+        assert_eq!(run_tzt_test(tzt_test), Ok(()));
     }
 
     #[test]
@@ -250,4 +275,25 @@ mod tztrunner_tests {
     const TZT_SAMPLE_TC_FAIL_SPECIFIC: &str = r#"code { ADD } ;
         input { Stack_elt mutez 5 ; Stack_elt int 5 } ;
         output(StaticError "no matching overload for ADD on stack Stack([Int, Mutez])")"#;
+
+    const TZT_SAMPLE_IMPLICIT_PARAMETER: &str = r#"
+      code SELF;
+      input {};
+      self "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
+      output { Stack_elt (contract unit) "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" }
+    "#;
+
+    const TZT_SAMPLE_OTHER_CONTRACTS: &str = r#"
+      code { CONTRACT unit } ;
+      input { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+      output { Stack_elt (option (contract unit)) (Some "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d") } ;
+      other_contracts { Contract "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit }
+    "#;
+
+    const TZT_SAMPLE_SELF_IS_KNOWN: &str = r#"
+      code { CONTRACT unit } ;
+      input { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+      output { Stack_elt (option (contract unit)) (Some "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d") } ;
+      self "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+    "#;
 }

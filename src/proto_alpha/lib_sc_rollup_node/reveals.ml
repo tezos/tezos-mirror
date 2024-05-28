@@ -70,7 +70,48 @@ let proto_hash_to_dac_hash ((module Plugin) : Dac_plugin.t) proto_reveal_hash =
   |> Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
   |> Data_encoding.Binary.of_bytes_exn Plugin.encoding
 
-let get ~dac_client ~data_dir ~pvm_kind hash =
+let get_from_dac dac_client hash =
+  let dac_plugin =
+    WithExceptions.Option.get ~loc:__LOC__ @@ Dac_plugin.get Protocol.hash
+  in
+  Dac_observer_client.fetch_preimage
+    dac_client
+    dac_plugin
+    (proto_hash_to_dac_hash dac_plugin hash)
+
+let get_from_preimages_service ~pre_images_endpoint ~local_filename hash =
+  let open Lwt_result_syntax in
+  let hash_hex = Protocol.Sc_rollup_reveal_hash.to_hex hash in
+  let*! () = Interpreter_event.missing_pre_image ~hash:hash_hex in
+  let url =
+    Uri.with_path
+      pre_images_endpoint
+      String.(concat "/" [Uri.path pre_images_endpoint; hash_hex])
+  in
+  let*! resp, body = Cohttp_lwt_unix.Client.get url in
+  let*! body_str = Cohttp_lwt.Body.to_string body in
+  match resp.status with
+  | `OK ->
+      let contents_hash =
+        Reveal_hash.hash_string ~scheme:Reveal_hash.Blake2B [body_str]
+      in
+      if Reveal_hash.equal contents_hash hash then
+        let*! () =
+          Lwt_utils_unix.create_dir (Filename.dirname local_filename)
+        in
+        let*! () = Lwt_utils_unix.create_file local_filename body_str in
+        return_some body_str
+      else
+        let*! () =
+          Interpreter_event.fetched_incorrect_pre_image
+            ~expected_hash:hash_hex
+            ~content_hash:(Protocol.Sc_rollup_reveal_hash.to_hex contents_hash)
+        in
+        return_none
+  | #Cohttp.Code.status_code ->
+      tzfail (Layer_1.Http_connection_error (resp.status, body_str))
+
+let get ~dac_client ~pre_images_endpoint ~data_dir ~pvm_kind hash =
   let open Lwt_result_syntax in
   let* contents =
     let filename =
@@ -81,17 +122,25 @@ let get ~dac_client ~data_dir ~pvm_kind hash =
     | Some contents -> return contents
     | None -> (
         match dac_client with
-        | None ->
-            tzfail (Sc_rollup_node_errors.Could_not_open_preimage_file filename)
-        | Some dac_client ->
-            let dac_plugin =
-              WithExceptions.Option.get ~loc:__LOC__
-              @@ Dac_plugin.get Protocol.hash
-            in
-            Dac_observer_client.fetch_preimage
-              dac_client
-              dac_plugin
-              (proto_hash_to_dac_hash dac_plugin hash))
+        | Some dac_client -> get_from_dac dac_client hash
+        | None -> (
+            match pre_images_endpoint with
+            | None ->
+                tzfail
+                  (Sc_rollup_node_errors.Could_not_open_preimage_file filename)
+            | Some pre_images_endpoint -> (
+                let* contents =
+                  get_from_preimages_service
+                    ~pre_images_endpoint
+                    ~local_filename:filename
+                    hash
+                in
+                match contents with
+                | Some contents -> return contents
+                | None ->
+                    tzfail
+                      (Sc_rollup_node_errors.Could_not_open_preimage_file
+                         filename))))
   in
   let*? () =
     let contents_hash =

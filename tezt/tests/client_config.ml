@@ -63,7 +63,7 @@ let input_config_files : JSON.t option list =
       @@ `O
            [
              ("confirmations", `Float 1.0);
-             ("endpoint", `String "http://127.0.0.1:8732");
+             ("endpoint", `String (sf "http://%s:8732" Constant.default_host));
              ("remote_signer", `String "http://127.0.0.2");
              ("web_port", `Float 8080.0);
              ("password_filename", `String "/tmp/doesnt_exist");
@@ -86,7 +86,11 @@ let write_config_file client (config : JSON.t) =
 (* Tests that calling [[--config-file config_dict]? config init -o tmp_file]
    works and yields valid json. *)
 let test_config_init () =
-  Test.register ~__FILE__ ~title:"Config init" ~tags:["config"; "init"]
+  Test.register
+    ~__FILE__
+    ~title:"Config init"
+    ~tags:["config"; "init"]
+    ~uses_node:false
   @@ fun () ->
   let* client = Client.init () in
   iteri input_config_files @@ fun index input_config_opt ->
@@ -116,6 +120,7 @@ let test_config_init_roundtrip () =
     ~__FILE__
     ~title:"Config init roundtrip"
     ~tags:["config"; "init"]
+    ~uses_node:false
   @@ fun () ->
   Log.info "Config init roundtrip" ;
   let* client = Client.init () in
@@ -147,7 +152,11 @@ let test_config_init_roundtrip () =
 
 (* Tests of `octez-client config show` *)
 let test_config_show () =
-  Test.register ~__FILE__ ~title:"Config show" ~tags:["config"; "show"]
+  Test.register
+    ~__FILE__
+    ~title:"Config show"
+    ~tags:["config"; "show"]
+    ~uses_node:false
   @@ fun () ->
   let* client = Client.init () in
   Log.info "Config show" ;
@@ -167,6 +176,7 @@ let test_config_show_roundtrip () =
     ~__FILE__
     ~title:"Config show roundtrip"
     ~tags:["config"; "show"]
+    ~uses_node:false
   @@ fun () ->
   Log.info "Config show roundtrip" ;
   let* client = Client.init () in
@@ -174,7 +184,7 @@ let test_config_show_roundtrip () =
     [
       [];
       [
-        ("--endpoint", "http://127.0.0.1:9732");
+        ("--endpoint", sf "http://%s:9732" Constant.default_host);
         ("--wait", "3");
         ("--remote-signer", "http://10.0.0.2");
         ("--password-filename", "/tmp/doesnt_exist_either");
@@ -263,6 +273,7 @@ let test_config_validation () =
     ~__FILE__
     ~title:"Test the clients config validation"
     ~tags:["config"; "validation"]
+    ~uses_node:false
   @@ fun () ->
   let valid =
     [

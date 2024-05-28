@@ -153,10 +153,7 @@ balance*. Let us first (re)define these and related concepts.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.
-- The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE`` of
-  the active stake at the end of the cycle that precedes the consensus rights
-  snapshoting.
-  This amount represents the delegate's skin in the game: in the case that the
+- The *frozen deposit* represents the delegate's skin in the game: in the case that the
   delegate behaves badly, its frozen deposit is partly slashed (see
   :ref:`slashing_alpha`).
   The frozen deposits are updated at the end of each cycle.  It must be at least
@@ -187,21 +184,21 @@ unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``.
 When emitting such a command in cycle ``c``, it affects the automatic deposit at
 the end of this cycle, and thus the consensus rights set for cycle ``(c + 1) +
-PRESERVED_CYCLES + 1``.
+CONSENSUS_RIGHTS_DELAY + 1``.
 Since the deposit will be adjusted at the end of cycle ``c``, unstaked tokens
-will be available at cycle  ``c + 1 + PRESERVED_CYCLES + MAX_SLASHING_PERIOD``.
+will be available at cycle  ``c + 1 + CONSENSUS_RIGHTS_DELAY + MAX_SLASHING_PERIOD``.
 
-The active stake is computed ``PRESERVED_CYCLES`` in advance: at
-the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),
+The active stake is computed ``CONSENSUS_RIGHTS_DELAY`` in advance: at
+the end of cycle ``c`` for cycle ``c + 1 + CONSENSUS_RIGHTS_DELAY`` (as in Emmy*),
 before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
 
 ..
    This entails that a delegate which was participating until cycle ``c -
    1`` and is no longer participating in cycle ``c`,
    will lose its rights from cycle
-   ``c + 2 * PRESERVED_CYCLES + 2`` onwards -- at the end of cycle ``c +
-   PRESERVED_CYCLES``, the rights for cycle ``c + 2 *
-   PRESERVED_CYCLES + 1`` are computed, and only then is the delegate
+   ``c + 2 * CONSENSUS_RIGHTS_DELAY + 2`` onwards -- at the end of cycle ``c +
+   CONSENSUS_RIGHTS_DELAY``, the rights for cycle ``c + 2 *
+   CONSENSUS_RIGHTS_DELAY + 1`` are computed, and only then is the delegate
    declared passive. Here "participation" means *having baked a final
    block* or *having a preattestation or attestation included in a final
    block*.
@@ -276,7 +273,7 @@ behavior. Notable changes however are as follows:
 * Validators are rewarded instantaneously for baking blocks and including extra attestations, and not at the end of the cycle like in Emmy*.
 * At the end of a cycle ``c``, the following actions happen:
 
-  - the selection of the consensus committee cycle ``c + PRESERVED_CYCLES``, based on the current active stake distribution,
+  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution,
   - the distribution of attesting rewards,
   - the adjustment of frozen deposits.
 
@@ -331,7 +328,7 @@ CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
 Regarding the concrete values for rewards, we first fix the total reward per
 level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 4``, ``total_rewards`` is 20 tez.
+Assuming ``blocks_per_minute = 6``, ``total_rewards`` is 13.33 tez.
 We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
@@ -343,16 +340,16 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 5`` tez,
-(maximum) ``bonus = 5`` tez, and ``attesting_rewards = 10`` tez.
+Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 3.33`` tez,
+(maximum) ``bonus = 3.33`` tez, and ``attesting_rewards = 6.67`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional attestations included in a block). The rewards per
 attestation slot are ``attesting_rewards / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
-``5 / (7000 / 3) = 0.002143`` tez and an attesting
-rewards per slot of ``10 / 7000 = 0.001428`` tez.
+``3.33 / (7000 / 3) = 0.001427`` tez and an attesting
+rewards per slot of ``6.67 / 7000 = 0.000952`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
@@ -360,7 +357,7 @@ A. Also, B includes attestations with attesting power ``5251``. Then A receives
 the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
-Therefore B receives the bonus ``(5251 - 4667) * 0.002143 = 1.251512`` tez. (Note
+Therefore B receives the bonus ``(5251 - 4667) * 0.001428 = 0.833952`` tez. (Note
 that B only included attestations corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
 maximum 2333 extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose active stake at some cycle is 5% of the total stake. Note that
@@ -368,7 +365,7 @@ his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
 2,867,200`` slots. Assume also that the attesting power of C's attestations
 included during that cycle has been ``2,123,456`` slots. Given that this number is
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an attesting
-reward of ``2,867,200 * 0.001428 = 4094.3616`` tez for that cycle.
+reward of ``2,867,200 * 0.000952 = 2729.5744`` tez for that cycle.
 
 .. _slashing_alpha:
 
@@ -381,19 +378,30 @@ its attesting rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or it
 double (pre)attests (which means voting on two different proposals at the same
 level and round), a part of the frozen deposit is slashed. The slashed amount
-for double baking is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double
-(pre)attesting is a fixed percentage
-``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION`` of the frozen
-deposit. The payload producer that includes the misbehavior evidence is rewarded
-half of the slashed amount.
+for double baking and double (pre)attesting are fixed percentage of the frozen
+deposit: ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING`` and
+``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``.
+The payload producer that includes the misbehavior evidence is rewarded a
+seventh of the slashed amount, which corresponds to ``1 /
+(GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``.
+
+If a delegate's deposit is smaller than the slashed amount, the deposit is
+simply emptied.
 
 The evidence for double signing at a given level can be collected by any
 :ref:`accuser<def_accuser_alpha>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
-If a delegates' deposit is smaller than the slashed amount, the deposit is
-simply emptied, which leads to the delegate losing its baking and attesting
-rights for the rest of the cycle.
+If the recorded denunciation events in the previous and current cycle lead to
+slashing over 51% of the deposits, it immediately forbids the delegate to
+participate further in the consensus, either by baking or attesting.
+At the end of the first cycle in which both the sum of slashing events of a
+delegate over the last two cycles fall under the 51% threshold and its frozen
+deposits are at least half of its consensus rights for the given cycle, the
+delegate is allowed to participate again in the next cycle.
+
+The actual slashing and denunciation rewarding happen at the end of the cycle in
+which the denunciation has been included.
 
 We note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
@@ -419,25 +427,27 @@ Consensus related protocol parameters
    * - ``CONSENSUS_THRESHOLD``
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
-     - 15s
+     - 10s
    * - ``DELAY_INCREMENT_PER_ROUND``
-     - 8s
+     - 5s
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
    * - ``FROZEN_DEPOSITS_PERCENTAGE``
      - 10
    * - ``MAX_SLASHING_PERIOD``
      - 2 cycles
-   * - ``DOUBLE_BAKING_PUNISHMENT``
-     - 640 tez
+   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
+     - 5%
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``
      - 50%
    * - ``BAKING_REWARD_FIXED_PORTION``
-     - 5 tez
+     - 3.33 tez
    * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.002143 tez
+     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001429 tez
    * - ``ATTESTING_REWARD_PER_SLOT``
-     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.001428 tez
+     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000952 tez
+   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
+     - 5
 
 These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 

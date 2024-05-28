@@ -11,6 +11,7 @@
   octez-libs.tree-encoding
   octez-libs.base.unix
   octez-protocol-alpha-libs.client
+  cohttp-lwt-unix
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
   octez-l2-libs.smart-rollup

@@ -15,16 +15,15 @@ cd "$script_dir"/..
 new_version="$(basename "$1" | awk -F'_' '{print $2}')"
 new_hash="$(basename "$1" | awk -F'_' '{print $3}')"
 
-if [ -z "${new_version}" ] ; then
-    echo "$usage"
-    exit 1
+if [ -z "${new_version}" ]; then
+  echo "$usage"
+  exit 1
 fi
 
-if [ -z "${new_hash}" ] ; then
-    echo "$usage"
-    exit 1
+if [ -z "${new_hash}" ]; then
+  echo "$usage"
+  exit 1
 fi
-
 
 sed "/let alpha = active Name.alpha/i \  let _${new_version}_${new_hash} = active (Name.v \"${new_hash}\" ${new_version})\n" -i manifest/main.ml
 

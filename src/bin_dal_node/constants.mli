@@ -37,3 +37,19 @@ val shards_proofs_cache_size : int
 (** The frequency at which we sample the time spent in shards crypto
     verification. *)
 val shards_verification_sampling_frequency : int
+
+(** When receiving shards from the network, the DAL node does not
+    perform the amplification as soon as it has enough shards to do
+    the reconstruction but waits a bit in case the missing shards are
+    received from the network. The duration of the delay is picked at
+    random between [amplification_random_delay_min] and
+    [amplification_random_delay_max]. *)
+
+val amplification_random_delay_min : float
+
+val amplification_random_delay_max : float
+
+(* During amplification, if the forked process takes more time than
+   this timeout to send the proved shards, then amplification attempt
+   is aborted to avoid keeping a pending promise forever. *)
+val amplification_timeout : float

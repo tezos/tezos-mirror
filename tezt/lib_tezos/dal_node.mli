@@ -28,9 +28,16 @@
 (** DAL Node state *)
 type t
 
+(** Period for the shards to be kept in the storage
+    [Full] : never delete
+    [Auto] : period depending on the node profile
+    [Custom (i)] : keeps the shards during [i] blocks *)
+type history_mode = Full | Auto | Custom of int
+
 (** Creates a DAL node *)
 
 val create :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
@@ -46,6 +53,7 @@ val create :
   t
 
 val create_from_endpoint :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
@@ -106,8 +114,11 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** Send SIGKILL and wait for the process to terminate. *)
 val kill : t -> unit Lwt.t
 
+(** Send SIGSTOP to a daemon. Do not wait for the process to terminate. *)
+val stop : t -> unit Lwt.t
+
 (** Shows in stdout every events sent by the node *)
-val log_events : t -> unit
+val log_events : ?max_length:int -> t -> unit
 
 (** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
@@ -129,7 +140,9 @@ val init_config :
   ?peers:string list ->
   ?attester_profiles:string list ->
   ?producer_profiles:int list ->
+  ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
   t ->
   unit Lwt.t
 
@@ -150,8 +163,20 @@ module Config_file : sig
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
 
-(** Read the content of the node's identity file. *)
-val read_identity : t -> JSON.t
+(** Read the peer id from the node's identity file. *)
+val read_identity : t -> string
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
+
+(** Wait for a node to receive a given number of connections.
+
+    [wait_for_connections node n] waits until [node] receives [n]
+    ["new_connection.v0"] events. *)
+val wait_for_connections : t -> int -> unit Lwt.t
+
+(** Wait for a node to receive a disconnection for some peer_id.
+
+    [wait_for_disconnection node peer_id] waits until [node] receives a
+    ["disconnected.v0"] event from the given peer id. *)
+val wait_for_disconnection : t -> peer_id:string -> unit Lwt.t

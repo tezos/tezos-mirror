@@ -1,0 +1,3 @@
+code { INT } ;
+input { Stack_elt string "4" } ;
+output (StaticError _)

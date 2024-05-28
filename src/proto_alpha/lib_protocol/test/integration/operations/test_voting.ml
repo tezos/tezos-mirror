@@ -104,6 +104,7 @@ let protos =
 (** {2 Helper functions} *)
 
 let assert_period_kinds expected_kinds kind loc =
+  let open Lwt_result_syntax in
   if
     List.exists
       (fun expected_kind -> Stdlib.(expected_kind = kind))
@@ -123,6 +124,7 @@ let assert_period_kinds expected_kinds kind loc =
 let assert_period_kind expected_kind = assert_period_kinds [expected_kind]
 
 let assert_period_index expected_index index loc =
+  let open Lwt_result_syntax in
   if expected_index = index then return_unit
   else
     Alcotest.failf
@@ -132,6 +134,7 @@ let assert_period_index expected_index index loc =
       index
 
 let assert_period_position expected_position position loc =
+  let open Lwt_result_syntax in
   if position = expected_position then return_unit
   else
     Alcotest.failf
@@ -141,6 +144,7 @@ let assert_period_position expected_position position loc =
       position
 
 let assert_period_remaining expected_remaining remaining loc =
+  let open Lwt_result_syntax in
   if remaining = expected_remaining then return_unit
   else
     Alcotest.failf
@@ -259,7 +263,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
   (* Note that some of these tests assume (more or less) that the
      accounts remain active during a voting period, which roughly
      translates to the following condition being assumed to hold:
-     `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
+     `blocks_per_voting_period <= consensus_rights_delay * blocks_per_cycle.`
      We also set baking and attesting rewards to zero in order to
      ease accounting of exact baker stake. *)
   Context.init_gen
@@ -275,7 +279,6 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
         baking_reward_fixed_portion_weight = 1;
         seed_nonce_revelation_tip_weight = 1;
         vdf_revelation_tip_weight = 1;
-        liquidity_baking_subsidy_weight = 1;
       }
     ~nonce_revelation_threshold:2l
 
@@ -323,11 +326,15 @@ let wrong_error expected_error_name actual_error_trace loc =
     Error_monad.pp_print_trace
     actual_error_trace
 
-let missing_signature loc = function
+let missing_signature loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error Operation.Missing_signature] -> return_unit
   | err -> wrong_error "Missing_signature" err loc
 
-let invalid_signature loc = function
+let invalid_signature loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error Operation.Invalid_signature] -> return_unit
   | err -> wrong_error "Invalid_signature" err loc
 
@@ -345,25 +352,35 @@ let wrong_voting_period_index ~current_index ~op_index loc = function
       Assert.equal_int32 ~loc:(make_loc __LOC__) provided op_index
   | err -> wrong_error "Wrong_voting_period_index" err loc
 
-let wrong_voting_period_kind loc = function
+let wrong_voting_period_kind loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error (Wrong_voting_period_kind _)] -> return_unit
   | err -> wrong_error "Wrong_voting_period_kind" err loc
 
-let proposals_from_unregistered_delegate loc = function
+let proposals_from_unregistered_delegate loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error (Proposals_from_unregistered_delegate _)] ->
       return_unit
   | err -> wrong_error "Proposals_from_unregistered_delegate" err loc
 
-let ballot_from_unregistered_delegate loc = function
+let ballot_from_unregistered_delegate loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error (Ballot_from_unregistered_delegate _)] ->
       return_unit
   | err -> wrong_error "Ballot_from_unregistered_delegate" err loc
 
-let source_not_in_vote_listings loc = function
+let source_not_in_vote_listings loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error Source_not_in_vote_listings] -> return_unit
   | err -> wrong_error "Source_not_in_vote_listings" err loc
 
-let empty_proposals loc = function
+let empty_proposals loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error Empty_proposals] -> return_unit
   | err -> wrong_error "Empty_proposals" err loc
 
@@ -375,7 +392,9 @@ let proposals_contain_duplicate duplicate_proposal loc = function
         duplicate_proposal
   | err -> wrong_error "Proposals_contain_duplicate" err loc
 
-let too_many_proposals loc = function
+let too_many_proposals loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error (Too_many_proposals _)] -> return_unit
   | err -> wrong_error "Too_many_proposals" err loc
 
@@ -387,7 +406,9 @@ let already_proposed already_proposed_proposal loc = function
         already_proposed_proposal
   | err -> wrong_error "Already_proposed" err loc
 
-let conflicting_proposals loc = function
+let conflicting_proposals loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error (Conflicting_proposals _)] -> return_unit
   | err -> wrong_error "Conflicting_proposals" err loc
 
@@ -408,11 +429,15 @@ let ballot_for_wrong_proposal ~current_proposal ~op_proposal loc = function
         submitted
   | err -> wrong_error "Ballot_for_wrong_proposal" err loc
 
-let already_submitted_a_ballot loc = function
+let already_submitted_a_ballot loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error Already_submitted_a_ballot] -> return_unit
   | err -> wrong_error "Already_submitted_a_ballot" err loc
 
-let conflicting_ballot loc = function
+let conflicting_ballot loc =
+  let open Lwt_result_syntax in
+  function
   | [Environment.Ecoproto_error (Conflicting_ballot _)] -> return_unit
   | err -> wrong_error "Conflicting_ballot" err loc
 
@@ -945,11 +970,11 @@ let test_supermajority_in_proposal there_is_a_winner () =
       minimal_stake
   in
   let*? bal3 =
-    if there_is_a_winner then Test_tez.( *? ) minimal_stake 3L
+    if there_is_a_winner then Tez_helpers.( *? ) minimal_stake 3L
     else
       let open Result_syntax in
-      let* t = Test_tez.( *? ) minimal_stake 2L in
-      Test_tez.( +? ) (Test_tez.of_mutez_exn initial_balance) t
+      let* t = Tez_helpers.( *? ) minimal_stake 2L in
+      Tez_helpers.( +? ) (Tez_helpers.of_mutez initial_balance) t
   in
   let* op3 =
     Op.transaction
@@ -1014,7 +1039,7 @@ let test_quorum_in_proposal has_quorum () =
     else Int64.(sub (of_int32 min_proposal_quorum) 10L)
   in
   let bal =
-    Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.of_mutez_exn
+    Int64.(div (mul total_tokens quorum) 100_00L) |> Tez_helpers.of_mutez
   in
   let* op2 = Op.transaction (B b) del2 del1 bal in
   let* b = Block.bake ~policy ~operation:op2 b in
@@ -1226,33 +1251,27 @@ let test_voting_power_updated_each_voting_period () =
   let baker2 = Context.Contract.pkh con2 in
   let baker3 = Context.Contract.pkh con3 in
   (* Retrieve balance of con1 *)
-  let open Test_tez in
+  let open Tez_helpers in
   let* balance1 = Context.Contract.balance (B genesis) con1 in
   let* frozen_deposits1 =
     Context.Delegate.current_frozen_deposits (B genesis) baker1
   in
   let*? full_balance1 = balance1 +? frozen_deposits1 in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ full_balance1 (of_mutez_exn init_bal1)
-  in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance1 (of_mutez init_bal1) in
   (* Retrieve balance of con2 *)
   let* balance2 = Context.Contract.balance (B genesis) con2 in
   let* frozen_deposits2 =
     Context.Delegate.current_frozen_deposits (B genesis) baker2
   in
   let*? full_balance2 = balance2 +? frozen_deposits2 in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ full_balance2 (of_mutez_exn init_bal2)
-  in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance2 (of_mutez init_bal2) in
   (* Retrieve balance of con3 *)
   let* balance3 = Context.Contract.balance (B genesis) con3 in
   let* frozen_deposits3 =
     Context.Delegate.current_frozen_deposits (B genesis) baker3
   in
   let*? full_balance3 = balance3 +? frozen_deposits3 in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ full_balance3 (of_mutez_exn init_bal3)
-  in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance3 (of_mutez init_bal3) in
   (* Auxiliary assert_voting_power *)
   let assert_voting_power ~loc n block baker =
     let* voting_power = get_voting_power block baker in
@@ -1292,7 +1311,7 @@ let test_voting_power_updated_each_voting_period () =
   (* Retrieve balance of con1 *)
   let* balance1 = Context.Contract.balance (B block) con1 in
   (* Assert balance has changed by deducing the amount *)
-  let*? balance1_after_deducing_amount = of_mutez_exn init_bal1 -? amount in
+  let*? balance1_after_deducing_amount = of_mutez init_bal1 -? amount in
   let* frozen_deposit1 =
     Context.Delegate.current_frozen_deposits (B block) baker1
   in
@@ -1303,7 +1322,7 @@ let test_voting_power_updated_each_voting_period () =
   (* Retrieve balance of con2 *)
   let* balance2 = Context.Contract.balance (B block) con2 in
   (* Assert balance has changed by adding amount *)
-  let*? balance2_after_adding_amount = of_mutez_exn init_bal2 +? amount in
+  let*? balance2_after_adding_amount = of_mutez init_bal2 +? amount in
   let* frozen_deposit2 =
     Context.Delegate.current_frozen_deposits (B block) baker2
   in

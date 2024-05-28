@@ -393,12 +393,7 @@ module Real = struct
     | Ok v ->
         Events.(emit__dont_wait__use_with_care message_trysent)
           ((P2p_conn.info conn).peer_id, v) ;
-        if v then (
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-             the counter should be moved to P2p_conn instead *)
-          Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
-          net.sent_msg_hook conn m) ;
+        if v then net.sent_msg_hook conn m ;
         v
     | Error err ->
         Events.(emit__dont_wait__use_with_care trysending_message_error)
@@ -440,7 +435,6 @@ module Real = struct
              if if_conn conn then broadcast_encode conn alt_buf then_msg
              else broadcast_encode conn buf msg
        in
-       Prometheus.Counter.inc_one P2p_metrics.Messages.broadcast_message_sent ;
        P2p_conn.write_encoded_now
          conn
          (P2p_socket.copy_encoded_message encoded_msg)

@@ -1,0 +1,54 @@
+[
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "p2p-swap-disable",
+    "tags": [
+      "memory_4k",
+      "node",
+      "p2p",
+      "swap"
+    ],
+    "successful_runs": {
+      "total_time": "21682667",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: bootstrap: many nodes bootstrap",
+    "tags": [
+      "admin_client",
+      "baker_ptnairob",
+      "bootstrap",
+      "client",
+      "memory_4k",
+      "nairobi",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "40361526",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: bootstrap: many nodes bootstrap",
+    "tags": [
+      "admin_client",
+      "baker_proxford",
+      "bootstrap",
+      "client",
+      "memory_4k",
+      "node",
+      "oxford",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "40455245",
+      "count": "1"
+    }
+  }
+]

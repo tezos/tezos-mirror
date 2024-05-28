@@ -218,6 +218,7 @@ let register ~protocols =
         ~title:(sf "Bls12_381 contract primitives, %s: store" Class.name)
         ~tags:
           ["michelson"; "crypto"; "contract"; "bls12_381"; Class.name; "store"]
+        ~uses_node:false
         (fun protocol ->
           let open Class in
           let state = Random.State.make [||] in
@@ -229,6 +230,7 @@ let register ~protocols =
         ~title:(sf "Bls12_381 contract primitives, %s: add" Class.name)
         ~tags:
           ["michelson"; "crypto"; "contract"; "bls12_381"; Class.name; "add"]
+        ~uses_node:false
         (fun protocol ->
           let open Class in
           let state = Random.State.make [||] in
@@ -241,6 +243,7 @@ let register ~protocols =
         ~title:(sf "Bls12_381 contract primitives, %s: mul" Class.name)
         ~tags:
           ["michelson"; "crypto"; "contract"; "bls12_381"; Class.name; "mul"]
+        ~uses_node:false
         (fun protocol ->
           let open Class in
           let state = Random.State.make [||] in
@@ -254,6 +257,7 @@ let register ~protocols =
         ~title:(sf "Bls12_381 contract primitives, %s: negate" Class.name)
         ~tags:
           ["michelson"; "crypto"; "contract"; "bls12_381"; Class.name; "negate"]
+        ~uses_node:false
         (fun protocol ->
           let open Class in
           let state = Random.State.make [||] in
@@ -267,6 +271,7 @@ let register ~protocols =
     ~__FILE__
     ~title:(sf "Bls12_381 contract primitives: pairing_check empty")
     ~tags:["michelson"; "crypto"; "contract"; "bls12_381"; "pairing_check"]
+    ~uses_node:false
     (fun protocol ->
       let* client = Client.init_mockup ~protocol () in
       check_pairing_check protocol client [])
@@ -275,6 +280,7 @@ let register ~protocols =
     ~__FILE__
     ~title:(sf "Bls12_381 contract primitives: pairing_check(pos, pos)")
     ~tags:["michelson"; "crypto"; "contract"; "bls12_381"; "pairing_check"]
+    ~uses_node:false
     (fun protocol ->
       let state = Random.State.make [||] in
       let* client = Client.init_mockup ~protocol () in
@@ -287,6 +293,7 @@ let register ~protocols =
     ~__FILE__
     ~title:(sf "Bls12_381 contract primitives: pairing_check(neg, pos)")
     ~tags:["michelson"; "crypto"; "contract"; "bls12_381"; "pairing_check"]
+    ~uses_node:false
     (fun protocol ->
       let state = Random.State.make [||] in
       let* client = Client.init_mockup ~protocol () in
@@ -299,6 +306,7 @@ let register ~protocols =
     ~__FILE__
     ~title:(sf "Bls12_381 contract primitives: pairing_check(pos, neg)")
     ~tags:["michelson"; "crypto"; "contract"; "bls12_381"; "pairing_check"]
+    ~uses_node:false
     (fun protocol ->
       let state = Random.State.make [||] in
       let* client = Client.init_mockup ~protocol () in
@@ -320,6 +328,7 @@ let register ~protocols =
         "pairing_check";
         "signature_aggregation";
       ]
+    ~uses_node:false
     (fun protocol ->
       let* client = Client.init_mockup ~protocol () in
       repeat random_iterations @@ fun () ->
@@ -355,6 +364,7 @@ let register ~protocols =
     ~__FILE__
     ~title:(sf "Bls12_381 contract primitives: test_groth16")
     ~tags:["michelson"; "crypto"; "contract"; "bls12_381"; "groth16"]
+    ~uses_node:false
     (fun protocol ->
       let* client = Client.init_mockup ~protocol () in
 
@@ -398,6 +408,7 @@ let register ~protocols =
       (sf
          "Bls12_381 contract primitives: fr bytes parameters more than 32 bytes")
     ~tags:["michelson"; "crypto"; "contract"; "bls12_381"; "fr"]
+    ~uses_node:false
     (fun protocol ->
       let* client = Client.init_mockup ~protocol () in
 

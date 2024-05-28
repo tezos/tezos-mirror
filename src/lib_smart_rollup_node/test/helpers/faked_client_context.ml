@@ -89,6 +89,7 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
     method load_passwords = None
 
     method read_file fname =
+      let open Lwt_result_syntax in
       match String.Hashtbl.find filesystem fname with
       | None -> failwith "faked_wallet: cannot read file (%s)" fname
       | Some (content, _mtime) -> return content
@@ -125,6 +126,7 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
 
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
+      let open Lwt_result_syntax in
       fun alias_name list encoding ->
         let filename = self#filename alias_name in
         let json = Data_encoding.Json.construct encoding list in

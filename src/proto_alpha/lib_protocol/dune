@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V11.Make(Name)()\n")))
+   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V12.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_alpha)
@@ -48,9 +48,8 @@
   Bitset
   Bounded_history_repr
   Context_binary_proof
-  Misbehaviour
   Ratio_repr
-  Int_percentage
+  Percentage
   Michelson_v1_primitives
   Slot_repr
   Cycle_repr
@@ -151,6 +150,7 @@
   Carbonated_map_costs
   Carbonated_map
   Staking_parameters_repr
+  Misbehaviour_repr
   Denunciations_repr
   Raw_context_intf
   Raw_context
@@ -182,6 +182,7 @@
   Contract_delegate_storage
   Stake_storage
   Unstaked_frozen_deposits_storage
+  Pending_denunciations_storage
   Unstake_requests_storage
   Staking_pseudotokens_storage
   Contract_storage
@@ -196,7 +197,9 @@
   Delegate_sampler
   Delegate_rewards
   Delegate_missed_attestations_storage
+  Already_denounced_storage
   Forbidden_delegates_storage
+  Slash_percentage
   Delegate_slashed_deposits_storage
   Staking
   Delegate_cycles
@@ -208,7 +211,6 @@
   Liquidity_baking_migration
   Sc_rollup_errors
   Sc_rollup_inbox_storage
-  Remove_zero_amount_ticket_migration_for_o
   Legacy_script_patches
   Sapling_validator
   Global_constants_storage
@@ -342,9 +344,8 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
-  misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
-  int_percentage.ml int_percentage.mli
+  percentage.ml percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -448,6 +449,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
@@ -479,6 +481,7 @@
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
+  pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
@@ -494,7 +497,9 @@
   delegate_rewards.ml delegate_rewards.mli
   delegate_missed_attestations_storage.ml
   delegate_missed_attestations_storage.mli
+  already_denounced_storage.ml already_denounced_storage.mli
   forbidden_delegates_storage.ml forbidden_delegates_storage.mli
+  slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   delegate_cycles.ml delegate_cycles.mli
@@ -506,7 +511,6 @@
   liquidity_baking_migration.ml liquidity_baking_migration.mli
   sc_rollup_errors.ml
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
-  remove_zero_amount_ticket_migration_for_o.ml
   legacy_script_patches.ml
   sapling_validator.ml
   global_constants_storage.ml global_constants_storage.mli
@@ -641,9 +645,8 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
-  misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
-  int_percentage.ml int_percentage.mli
+  percentage.ml percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -747,6 +750,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
@@ -778,6 +782,7 @@
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
+  pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
@@ -793,7 +798,9 @@
   delegate_rewards.ml delegate_rewards.mli
   delegate_missed_attestations_storage.ml
   delegate_missed_attestations_storage.mli
+  already_denounced_storage.ml already_denounced_storage.mli
   forbidden_delegates_storage.ml forbidden_delegates_storage.mli
+  slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   delegate_cycles.ml delegate_cycles.mli
@@ -805,7 +812,6 @@
   liquidity_baking_migration.ml liquidity_baking_migration.mli
   sc_rollup_errors.ml
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
-  remove_zero_amount_ticket_migration_for_o.ml
   legacy_script_patches.ml
   sapling_validator.ml
   global_constants_storage.ml global_constants_storage.mli
@@ -924,9 +930,8 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
-  misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
-  int_percentage.ml int_percentage.mli
+  percentage.ml percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -1030,6 +1035,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
@@ -1061,6 +1067,7 @@
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
+  pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
@@ -1076,7 +1083,9 @@
   delegate_rewards.ml delegate_rewards.mli
   delegate_missed_attestations_storage.ml
   delegate_missed_attestations_storage.mli
+  already_denounced_storage.ml already_denounced_storage.mli
   forbidden_delegates_storage.ml forbidden_delegates_storage.mli
+  slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   delegate_cycles.ml delegate_cycles.mli
@@ -1088,7 +1097,6 @@
   liquidity_baking_migration.ml liquidity_baking_migration.mli
   sc_rollup_errors.ml
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
-  remove_zero_amount_ticket_migration_for_o.ml
   legacy_script_patches.ml
   sapling_validator.ml
   global_constants_storage.ml global_constants_storage.mli

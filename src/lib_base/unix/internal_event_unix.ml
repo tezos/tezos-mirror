@@ -117,16 +117,18 @@ let close () =
 
 open Filename.Infix
 
-let default_daily_logs_at ~daily_logs_path =
+let default_daily_logs_at ~daily_logs_path ~section_prefixes =
   Internal_event_config.make_config_uri
     ~create_dirs:true
     ~daily_logs:7
     ~level:Info
     ~format:"pp-rfc5424"
+    ~section_prefixes
     (`Path (daily_logs_path // "daily.log"))
 
 let make_default_internal_events ~rules ~verbosity ~colors
-    ~(log_output : Logs_simple_config.Output.t) ~daily_logs_path =
+    ~(log_output : Logs_simple_config.Output.t) ~daily_logs_path
+    ~daily_logs_section_prefixes =
   (* By default the node has two logs output:
      - on the configured [log_output] using the configured [verbosity] and
        a short pretty printing
@@ -164,13 +166,18 @@ let make_default_internal_events ~rules ~verbosity ~colors
   let sinks =
     match daily_logs_path with
     | Some daily_logs_path ->
-        let internal_logs_events = default_daily_logs_at ~daily_logs_path in
+        let internal_logs_events =
+          default_daily_logs_at
+            ~section_prefixes:daily_logs_section_prefixes
+            ~daily_logs_path
+        in
         internal_logs_events :: sinks
     | None -> sinks
   in
   Internal_event_config.make_custom sinks
 
 let make_with_defaults ?verbosity ?enable_default_daily_logs_at
+    ?(daily_logs_section_prefixes = [])
     ?(log_cfg = Logs_simple_config.default_cfg) () =
   make_default_internal_events
     ~rules:log_cfg.rules
@@ -178,6 +185,7 @@ let make_with_defaults ?verbosity ?enable_default_daily_logs_at
     ~colors:log_cfg.colors
     ~log_output:log_cfg.output
     ~daily_logs_path:enable_default_daily_logs_at
+    ~daily_logs_section_prefixes
 
 let init ?config:(internal_events = make_with_defaults ()) () =
   let open Lwt_syntax in
@@ -185,5 +193,5 @@ let init ?config:(internal_events = make_with_defaults ()) () =
   return_unit
 
 let enable_default_daily_logs_at ~daily_logs_path =
-  let uri = default_daily_logs_at ~daily_logs_path in
+  let uri = default_daily_logs_at ~section_prefixes:[] ~daily_logs_path in
   Internal_event.All_sinks.activate uri

@@ -395,6 +395,7 @@ let test_expand_is_idempotent =
 (** [bottom_up_fold_cps] does not stack overflow even when
     given large values. *)
 let test_fold_does_not_stack_overflow =
+  let open Lwt_result_syntax in
   tztest "bottom_up_fold_cps: does not stack overflow" `Quick (fun () ->
       let node = grow 1_000_000 @@ Int ((), Z.zero) in
       return @@ ignore

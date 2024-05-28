@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -69,6 +69,18 @@ impl<Expr: Michelson> From<Vec<OutboxMessageTransaction<Expr>>>
 {
     fn from(batch: Vec<OutboxMessageTransaction<Expr>>) -> Self {
         Self { batch }
+    }
+}
+
+impl<Expr: Michelson> From<OutboxMessageTransaction<Expr>> for OutboxMessage<Expr> {
+    fn from(transaction: OutboxMessageTransaction<Expr>) -> Self {
+        Self::AtomicTransactionBatch(vec![transaction].into())
+    }
+}
+
+impl<Expr: Michelson> From<Vec<OutboxMessageTransaction<Expr>>> for OutboxMessage<Expr> {
+    fn from(batch: Vec<OutboxMessageTransaction<Expr>>) -> Self {
+        Self::AtomicTransactionBatch(batch.into())
     }
 }
 
@@ -331,10 +343,7 @@ mod test {
         // garbage (to be ignored) tail
         bytes.extend_from_slice([10; 1000].as_slice());
 
-        assert!(matches!(
-            OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()),
-            Err(_)
-        ));
+        assert!(OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()).is_err());
     }
 
     #[test]
@@ -346,10 +355,7 @@ mod test {
         // garbage (to be ignored) tail
         bytes.extend_from_slice([10; 1000].as_slice());
 
-        assert!(matches!(
-            OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()),
-            Err(_)
-        ));
+        assert!(OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()).is_err());
     }
 
     fn transaction_one() -> OutboxMessageTransaction<StringTicket> {

@@ -197,7 +197,7 @@ let test_full_fetch_issues_request _ () =
   else
     let open Lwt_syntax in
     let requester = init_full_requester () in
-    Test_request.clear_registered_requests () ;
+    Test_request.reinitialize () ;
     Alcotest.(
       check
         (list (tuple3 unit p2p_peer_id (list testable_test_key)))
@@ -230,6 +230,128 @@ let test_full_fetch_issues_request _ () =
         @@ List.hd !Test_request.registered_requests)) ;
     Lwt.cancel f1 ;
     Lwt.return_unit
+
+(** Creates a requester. Clears registered requests, then asserts that
+    [!Test_request.registered_requests] is empty. Add 4 peers to active.
+    Fetches the key "baz" 3 times with 3 different peers. Check that the 3
+    first registered request are on different peers and that the unused peer
+    has not been requested.
+*)
+let test_full_fetch_request_unrequested_peers_first _ () =
+  let open Lwt_syntax in
+  let make_peer i =
+    match
+      P2p_peer.Id.(
+        of_string (Stdlib.String.make size (Char.chr (Char.code '0' + i))))
+    with
+    | Ok p -> p
+    | _ -> assert false
+  in
+  let requestable_peers =
+    P2p_peer.Set.of_list (WithExceptions.List.init ~loc:__LOC__ 3 make_peer)
+  in
+  let unused_peer = make_peer 4 in
+  let requester = init_full_requester () in
+  Test_request.reinitialize () ;
+  (* To ensure that there is not a second request sent before all fetches has
+     been done, the initial delay is raised. *)
+  Test_request.initial_delay_val := Time.System.Span.of_seconds_exn 0.1 ;
+  Alcotest.(
+    check
+      (list (tuple3 unit p2p_peer_id (list testable_test_key)))
+      "should have no requests"
+      []
+      !Test_request.registered_requests) ;
+  Test_request.active_peers := P2p_peer.Set.add unused_peer requestable_peers ;
+  (* Fetch one time for each peer that should be requested for this data. *)
+  let fetch_promises =
+    P2p_peer.Set.fold
+      (fun peer promises ->
+        Test_Requester.fetch
+          ~peer
+          ~timeout:
+            (WithExceptions.Option.to_exn
+               ~none:Not_found
+               (Ptime.Span.of_float_s 1.))
+          requester
+          "baz"
+          precheck_pass
+        :: promises)
+      requestable_peers
+      []
+  in
+  (* Wait that all fetches time out to ensure that all requests have been done
+     before checking them. *)
+  let* fetches_tzresults = Lwt_result_syntax.all fetch_promises in
+  check
+    bool
+    "all fetch requests should have timed out"
+    true
+    (match fetches_tzresults with
+    | Error errs ->
+        Format.eprintf "size: %d@." (List.length errs) ;
+        List.for_all
+          (function [Test_Requester.Timeout "baz"] -> true | _ -> false)
+          errs
+    | _ -> false) ;
+  check
+    bool
+    "unused_peer should not have been used"
+    false
+    (List.exists
+       (fun (_, peer, _) -> peer = unused_peer)
+       !Test_request.registered_requests) ;
+  (* Look over the list of requests to get the set of peers requested and
+     determine if all requestable peers have been requested once before any
+     peer has been requested a second time. *)
+  let seen_peers, ok =
+    List.fold_right
+      (fun request (seen_peers, ok) ->
+        match (ok, request) with
+        | true, ((), peer, ["baz"]) ->
+            if P2p_peer.Set.equal seen_peers requestable_peers then
+              (* If all requestable peers have been already requested,
+                 these peers can be requested multiple times. *)
+              (P2p_peer.Set.add peer seen_peers, ok)
+            else if P2p_peer.Set.mem peer seen_peers then
+              (* If not all requestable peers have been requested, no peer
+                 should be requested a second time. *)
+              (seen_peers, false)
+            else
+              (* A peer has been requested for the first time, it is added to
+                 the seen peers. *)
+              (P2p_peer.Set.add peer seen_peers, ok)
+        | _ -> (seen_peers, false))
+      !Test_request.registered_requests
+      (P2p_peer.Set.empty, true)
+  in
+  Alcotest.(
+    check
+      (tuple3
+         ((* The chronological list of requests.
+             It is useful to diagnostic any result. *)
+          list
+            (tuple3 unit p2p_peer_id (list testable_test_key)))
+         ((* The set of requestable peers is expected and compared to the set
+             of requested peers.
+             It permits to determine that all requestable peers and only these
+             peers have been requested. *)
+          list
+            p2p_peer_id)
+         (* True if each requestable peer has been requested before any peer
+            has been requested a second time. It is expected to be true. *)
+         bool)
+      "all requestable_peers should be requested once before rerequesting a \
+       peer"
+      ( !Test_request.registered_requests,
+        List.of_seq (P2p_peer.Set.to_seq requestable_peers),
+        true )
+      ( !Test_request.registered_requests,
+        List.of_seq (P2p_peer.Set.to_seq seen_peers),
+        ok )) ;
+  (* Clean up. *)
+  Test_request.reinitialize () ;
+  Lwt.return_unit
 
 (** Creates a requester. Injects ("foo", 1), key "foo" is known.
     Removes this data from the memory table. This key is now unknown.
@@ -722,6 +844,10 @@ let () =
             "test inject: already in requested"
             `Quick
             test_full_requester_test_inject_requested;
+          Alcotest_lwt.test_case
+            "test inject: request unrequested peers first"
+            `Quick
+            test_full_fetch_request_unrequested_peers_first;
           Alcotest_lwt.test_case
             "test inject: otherwise"
             `Quick

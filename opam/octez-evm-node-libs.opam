@@ -12,8 +12,16 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-smart-rollup-wasm-debugger-plugin"
+  "ocaml-protoc-plugin" { >= "4.5.0" }
+  "caqti-lwt" { >= "2.0.1" }
+  "crunch" { >= "3.3.0" }
+  "re" { >= "1.10.0" }
   "octez-version"
+  "lwt-watcher" { = "0.2" }
   "lwt-exit"
+  "caqti"
+  "caqti-driver-sqlite3" { >= "2.0.1" }
+  "octez-shell-libs"
   "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
 ]

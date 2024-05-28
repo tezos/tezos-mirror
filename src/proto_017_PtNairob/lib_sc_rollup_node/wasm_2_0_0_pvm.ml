@@ -32,7 +32,7 @@ open Alpha_context
     It is imperative that this is aligned with the protocol's implementation.
 *)
 module Wasm_2_0_0_proof_format =
-  Context.Proof
+  Irmin_context.Proof
     (struct
       include Sc_rollup.State_hash
 
@@ -64,6 +64,9 @@ end
 
 module Make_backend (Tree : TreeS) = struct
   include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
 
   let reveal_exn reveal =
     match
@@ -120,7 +123,7 @@ module type Durable_state = sig
 end
 
 module Make_durable_state
-    (T : Tezos_tree_encoding.TREE with type tree = Context.tree) :
+    (T : Tezos_tree_encoding.TREE with type tree = Irmin_context.tree) :
   Durable_state with type state = T.tree = struct
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
@@ -159,7 +162,9 @@ end
 module Durable_state =
   Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
-module Impl : Pvm_sig.S = struct
+type unsafe_patch = Increase_max_nb_ticks of int64
+
+module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
   module PVM =
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
@@ -168,12 +173,35 @@ module Impl : Pvm_sig.S = struct
 
   let new_dissection = Game_helpers.Wasm.new_dissection
 
-  module State = Context.PVMState
+  module State = Irmin_context.PVMState
 
   module Inspect_durable_state = struct
     let lookup state keys =
       let key = "/" ^ String.concat "/" keys in
       Durable_state.lookup state key
+  end
+
+  module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
+
+  module Unsafe_patches = struct
+    type t = unsafe_patch
+
+    let of_patch (p : Pvm_patches.unsafe_patch) =
+      match p with
+      | Increase_max_nb_ticks max_nb_ticks ->
+          Ok (Increase_max_nb_ticks max_nb_ticks)
+
+    let apply state (Increase_max_nb_ticks max_nb_ticks) =
+      let open Lwt_syntax in
+      let* registered_max_nb_ticks = Backend.Unsafe.get_max_nb_ticks state in
+      let max_nb_ticks = Z.of_int64 max_nb_ticks in
+      if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
+        Format.ksprintf
+          invalid_arg
+          "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
+          (Z.to_string registered_max_nb_ticks)
+          (Z.to_string max_nb_ticks) ;
+      Backend.Unsafe.set_max_nb_ticks max_nb_ticks state
   end
 
   let string_of_status : status -> string = function
@@ -188,10 +216,11 @@ module Impl : Pvm_sig.S = struct
         Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
     | Computing -> "Computing"
 
-  module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
-
   let eval_many ~reveal_builtins ~write_debug =
-    Backend.compute_step_many ~reveal_builtins ~write_debug
+    Backend.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~reveal_builtins
+      ~write_debug
 end
 
 include Impl

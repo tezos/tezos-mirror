@@ -1,0 +1,3 @@
+code { ITER { ADD } } ;
+input { Stack_elt string "abc" } ;
+output (StaticError _) ;

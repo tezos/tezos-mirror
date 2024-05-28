@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -27,10 +27,14 @@ fn main() -> Result<(), ClientError> {
             let output = Path::new(&output);
             let preimages_dir = Path::new(&preimages_dir);
 
-            let root_hash = preimages::content_to_preimages(upgrade_to, preimages_dir)?;
+            let kernel =
+                std::fs::read(upgrade_to).map_err(preimages::Error::ContentFile)?;
+
+            let root_hash = preimages::content_to_preimages(kernel, preimages_dir)?;
             let root_hash_hex = hex::encode(root_hash.as_ref());
 
-            let config = create_installer_config(root_hash, setup_file)?;
+            let config =
+                create_installer_config(root_hash, setup_file, Some(preimages_dir))?;
             let kernel = installer::with_config_program(config);
 
             output::save_kernel(output, &kernel).map_err(ClientError::SaveInstaller)?;

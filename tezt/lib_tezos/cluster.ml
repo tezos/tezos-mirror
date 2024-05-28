@@ -30,14 +30,14 @@ let fresh_name () =
   incr next_name ;
   "cluster" ^ string_of_int index
 
-let create ?path ?name count ?rpc_local arguments =
+let create ?path ?name count ?rpc_external arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   List.map
     (fun i ->
       Node.create
         ?path
         ~name:(name ^ "." ^ string_of_int i)
-        ?rpc_local
+        ?rpc_external
         arguments)
     (range 1 count)
 

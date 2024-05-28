@@ -29,6 +29,7 @@ module Cryptobox = Tezos_crypto_dal.Cryptobox
 module Parameters : sig
   type t = {
     feature_enabled : bool;
+    incentives_enabled : bool;
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
@@ -63,7 +64,7 @@ module Helpers : sig
   val make_cryptobox :
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
-  val publish_slot_header :
+  val publish_commitment :
     ?counter:int ->
     ?force:bool ->
     ?source:Account.key ->
@@ -83,6 +84,22 @@ module Helpers : sig
     ?with_proof:bool ->
     slot ->
     (string * string) Lwt.t
+
+  val pp_cryptobox_error :
+    Format.formatter ->
+    [ `Fail of string
+    | `Invalid_degree_strictly_less_than_expected of 'a
+    | `Invalid_page
+    | `Invalid_shard_length of string
+    | `Not_enough_shards of string
+    | `Page_index_out_of_range
+    | `Page_length_mismatch
+    | `Shard_index_out_of_range of string
+    | `Slot_wrong_size of string
+    | `Shard_length_mismatch
+    | `Prover_SRS_not_loaded
+    | `Invalid_shard ] ->
+    unit
 end
 
 module RPC_legacy : sig
@@ -94,14 +111,6 @@ module RPC_legacy : sig
 
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
   val slot_pages : string -> string list RPC_core.t
-
-  (** [shard ~slot_header ~shard_id] gets a shard from
-        a given slot header and shard id *)
-  val shard : slot_header:string -> shard_id:int -> string RPC_core.t
-
-  (** [shards ~slot_header shard_ids] gets a subset of shards from a given
-        slot header *)
-  val shards : slot_header:string -> int list -> string list RPC_core.t
 end
 
 module RPC : sig
@@ -110,7 +119,10 @@ module RPC : sig
   type commitment = string
 
   (** Profiles that operate on shards/slots. *)
-  type operator_profile = Attester of string | Producer of int
+  type operator_profile =
+    | Attester of string
+    | Producer of int
+    | Observer of int
 
   (** List of operator profiles.  *)
   type operator_profiles = operator_profile list
@@ -174,7 +186,7 @@ module RPC : sig
   val get_profiles : unit -> profiles RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
-        statuses know about the given commitment. The resulting list can be filtered by a
+        statuses known about the given commitment. The resulting list can be filtered by a
         given header publication level and slot index. *)
   val get_commitment_headers :
     ?slot_level:int ->
@@ -213,6 +225,36 @@ module RPC : sig
        identity is given. *)
   val delete_p2p_peer_disconnect : peer_id:string -> unit RPC_core.t
 
+  (**  Call RPC "PATCH /p2p/peers/by-id/<peer_id>" to patch the ACL of the node
+       whose identity is given. Ignores the output of the RPC. *)
+  val patch_p2p_peers_by_id :
+    peer_id:string -> ?acl:string -> unit -> unit RPC_core.t
+
+  type topic = {topic_slot_index : int; topic_pkh : string}
+
+  (** Call RPC "GET /p2p/gossipsub/topics" to list the topics *)
+  val get_topics : unit -> topic list RPC_core.t
+
+  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
+     each topic. *)
+  val get_topics_peers :
+    subscribed:bool -> (topic * string list) list RPC_core.t
+
+  val get_gossipsub_connections : unit -> JSON.t RPC_core.t
+
+  type peer_score = {peer : string; score : float}
+
+  (** Call RPC "GET /p2p/gossipsub/scores" to list the scores of peers with a
+     known score. *)
+  val get_scores : unit -> peer_score list RPC_core.t
+
+  (** Call RPC /plugin/commitments_history/hash/[hash]. *)
+  val get_plugin_commitments_history_hash :
+    hash:string -> unit -> JSON.t RPC_core.t
+
+  (** Call /shard/<hash>/<shard-id> *)
+  val get_shard : slot_header:string -> shard_id:int -> string RPC_core.t
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
   module Remote : RPC_core.CALLERS with type uri_provider := remote_uri_provider
@@ -223,6 +265,7 @@ module Commitment : sig
     ?on_error:
       ([ `Invalid_degree_strictly_less_than_expected of
          (int, int) Cryptobox.error_container
+       | `Prover_SRS_not_loaded
        | `Slot_wrong_size of Helpers.slot ] ->
       Cryptobox.commitment * Cryptobox.commitment_proof) ->
     Cryptobox.t ->
@@ -239,15 +282,22 @@ module Commitment : sig
 end
 
 module Committee : sig
-  type member = {attester : string; first_shard_index : int; power : int}
+  type member = {attester : string; indexes : int list}
 
   type t = member list
 
   val typ : t Check.typ
 
-  val at_level : Node.t -> level:int -> t Lwt.t
+  val at_level :
+    Node.t -> ?level:int -> ?delegates:string list -> unit -> t Lwt.t
 end
 
 module Check : sig
   val profiles_typ : RPC.profiles Check.typ
+
+  val topics_peers_typ : (RPC.topic * string list) list Check.typ
+
+  val slot_header_typ : RPC.slot_header Check.typ
+
+  val slot_headers_typ : RPC.slot_header list Check.typ
 end

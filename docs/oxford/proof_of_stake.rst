@@ -64,8 +64,8 @@ transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant
 like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
 manager and consensus keys are listed.
 
-On test-network only, if the :ref:`adaptive issuance <adaptive_issuance_oxford>`
-feature is activated, it grants delegators the ability to become
+On test-network only, if the adaptive issuance feature is activated,
+it grants delegators the ability to become
 'stakers' by placing security deposits. These deposits would contribute to their
 delegate's stake and could be subject to slashing penalties if their delegate
 misbehaves.  The staking power of funds placed by stakers and delegates is twice
@@ -74,6 +74,7 @@ that of delegated funds.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_oxford:
 
 A delegate can be marked as either active or passive. A passive
@@ -92,6 +93,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_oxford:
 
 Random seed
@@ -103,6 +105,7 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _snapshots:
 .. _snapshots_oxford:
 
 Stake snapshots
@@ -126,6 +129,7 @@ cycle ``n``.
 Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE``
 and frozen deposits greater than ``MINIMAL_FROZEN_STAKE`` is snapshotted.
 
+.. _rights:
 .. _rights_oxford:
 
 Slot selection
@@ -158,6 +162,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _ps_constants:
 .. _ps_constants_oxford:
 
 Proof-of-stake parameters
@@ -188,8 +193,6 @@ The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
-
-The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_oxford>`.
 
 Other presentation of the Tezos' proof-of-stake mechanism can be
 found in the

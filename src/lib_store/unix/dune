@@ -10,7 +10,7 @@
   octez-libs.base
   octez-libs.version
   index
-  irmin-pack
+  octez-internal-libs.irmin_pack
   octez-shell-libs.store.shared
   octez-proto-libs.protocol-environment
   octez-libs.tezos-context

@@ -233,11 +233,6 @@ Example tests:
  - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
    execute them locally, run ``dune build @src/lib_requester/runtest`` in
    the Octez root.
- - Integration tests for the P2P layer in the shell.  For instance
-   :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
-   processes that exercise large parts of the P2P layer.  To execute
-   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
-   root.
 
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
@@ -476,12 +471,13 @@ only coverage has changed -- not the underlying source files.
 Executing tests through the GitLab CI
 -------------------------------------
 
-All tests are executed on all branches for each commit.  For
-instances, to see the latest runs of the CI on the master branch,
-visit `this page
-<https://gitlab.com/tezos/tezos/-/commits/master>`_. Each commit is
-annotated with a green checkmark icon if the CI passed, and a red
-cross icon if not. You can click the icon for more details.
+To execute the tests on a merge request, the ``trigger`` job needs to be
+manually executed. To trigger it, go to the GitLab merge request page. Click
+the grey gear in the leftmost circle of the pipeline, then click the ``Play``
+button. If necessary, Marge-bot will trigger the merge request pipeline before
+merging it. For instances, to see the latest runs of the CI, visit `this page
+<https://gitlab.com/tezos/tezos/-/pipelines?scope=finished>`_. You can click
+the status of a pipeline for more details.
 
 The results of the test suite on terminated pipelines is presented on
 the details of the merge request page corresponding to the
@@ -495,9 +491,13 @@ runner parallelism while limiting the number of jobs per
 pipeline. The grain used varies slightly for different types of
 tests:
 
+.. _gitlab_tezt_ci:
+
 Tezt integration and regression tests
-   Tezt tests are grouped in 3 batch jobs. New tests increases the
-   size of the last batch.
+   By default, Tezt tests are grouped in several batch jobs named ``tezt`` and
+   are executed in merge request pipelines. According to the tags attached to them,
+   the tests can be handled differently. The description of these tags can be
+   found in :src:`src/lib_test/tag.mli`.
 
 The OCaml package tests (Alcotest & QCheck)
    The OCaml package tests are regrouped in a set of jobs per protocol package,
@@ -508,29 +508,21 @@ Adding tests to the CI
 
 When adding a new test that should be run in the CI (which should be
 the case for most automatic tests), you need to make sure that it is
-properly specified in the :src:`.gitlab-ci.yml` file. The procedure
-for doing this depends on the type of test you've added:
+properly configured. The procedure for doing this depends on the type
+of test you've added:
 
 Tezt integration and regression tests
   New Tezt tests will be included automatically in the CI.
-  To rebalance the Tezt batches, run (from the root of the Octez repository):
-  ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
-  Any non-protocol tests located in a folder named ``src/**/test/`` will be
-  picked up automatically by the CI. No intervention is necessary.
-
-  Protocol tests must be added to :src:`.gitlab/ci/jobs/test/unit.yml` under the
-  protocol that they are testing. For example, to run a new protocol test for
-  ``proto_XXX_YYYYYYYY``, add the corresponding
-  ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
-  ``make`` invocation.
+  Any tests located in a folder named ``src/**/test/`` that are
+  executed through ``dune runtest`` will be picked up automatically by
+  the CI. No intervention is necessary.
 
 Other
   For other types of tests, you need to manually modify the
-  :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
-  Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_.
+  CI configuration. Please refer to the CI configuration's README
+  (:src:`ci/README.md`) for more information.
 
 Test coverage in merge requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -631,3 +623,8 @@ follow this convention:
    directory structure.
 
 4. OCaml comments must be valid ``ocamldoc`` `special comments <https://ocaml.org/manual/ocamldoc.html#s:ocamldoc-comments>`_.
+
+5. If a test takes 2 minutes or more on the CI, it should be tagged as ``slow``
+   (see :ref:`Tezt integration and regression tests<gitlab_tezt_ci>`). Note
+   that tests with tag ``slow`` do not run automatically in the CI of merge
+   requests.

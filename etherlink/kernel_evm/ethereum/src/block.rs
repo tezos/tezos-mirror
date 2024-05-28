@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -17,13 +17,57 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
+/// Container for fee calculation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockFees {
+    minimum_base_fee_per_gas: U256,
+    base_fee_per_gas: U256,
+    da_fee_per_byte: U256,
+}
+
+impl BlockFees {
+    /// Setup fee information for the current block
+    pub const fn new(
+        minimum_base_fee_per_gas: U256,
+        base_fee_per_gas: U256,
+        da_fee_per_byte: U256,
+    ) -> Self {
+        Self {
+            minimum_base_fee_per_gas,
+            base_fee_per_gas,
+            da_fee_per_byte,
+        }
+    }
+
+    /// The base fee per gas for doing a transaction within the current block.
+    #[inline(always)]
+    pub const fn base_fee_per_gas(&self) -> U256 {
+        self.base_fee_per_gas
+    }
+
+    /// The minimum base fee per gas
+    #[inline(always)]
+    pub const fn minimum_base_fee_per_gas(&self) -> U256 {
+        self.minimum_base_fee_per_gas
+    }
+
+    /// The da fee per byte charged per transaction.
+    #[inline(always)]
+    pub const fn da_fee_per_byte(&self) -> U256 {
+        self.da_fee_per_byte
+    }
+
+    /// Update the base fee per gas
+    pub fn set_base_fee_per_gas(&mut self, price: U256) {
+        self.base_fee_per_gas = price
+    }
+}
+
 /// All data for an Ethereum block.
 ///
-/// This data does not change for the duration of the block. All balues are
+/// This data does not change for the duration of the block. All values are
 /// updated when the block is finalized and may change for the next block.
 pub struct BlockConstants {
-    /// Price of one unit of gas in Wei
-    pub gas_price: U256,
     /// The number of the current block
     pub number: U256,
     /// Who is the beneficiary of the current block
@@ -33,27 +77,36 @@ pub struct BlockConstants {
     /// Mining difficulty of the current block. This relates to PoW, and we can set
     /// Gas limit for the current block.
     pub gas_limit: u64,
-    /// The base fee per gas for doing a transaction.
-    pub base_fee_per_gas: U256,
+    /// Basis of fee calculation when performing transactions in the current block.
+    pub block_fees: BlockFees,
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
     /// main net, or some other net). We can use it to identify rollup EVM kernel.
     pub chain_id: U256,
+    /// A random number depending on previous block
+    /// NB: this field is not relevant for Etherlink but is required to enable other
+    /// relevant test from the Ethereum test suit
+    pub prevrandao: Option<H256>,
 }
 
 impl BlockConstants {
     /// Return the first block of the chain (genisis).
     /// TODO find suitable values for gas_limit et.c.
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
-    pub fn first_block(timestamp: U256, chain_id: U256, base_fee_per_gas: U256) -> Self {
+    pub fn first_block(timestamp: U256, chain_id: U256, block_fees: BlockFees) -> Self {
         Self {
-            gas_price: U256::one(),
             number: U256::zero(),
             coinbase: H160::zero(),
             timestamp,
             gas_limit: 1u64,
-            base_fee_per_gas,
+            block_fees,
             chain_id,
+            prevrandao: None,
         }
+    }
+
+    #[inline(always)]
+    pub const fn base_fee_per_gas(&self) -> U256 {
+        self.block_fees.base_fee_per_gas
     }
 }
 
@@ -133,16 +186,16 @@ impl L2Block {
         }
     }
 
-    pub fn constants(&self, chain_id: U256, base_fee_per_gas: U256) -> BlockConstants {
+    pub fn constants(&self, chain_id: U256, block_fees: BlockFees) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         BlockConstants {
-            gas_price: U256::one(),
             number: self.number,
             coinbase: H160::zero(),
             timestamp,
             gas_limit: self.gas_limit.unwrap_or(1u64),
-            base_fee_per_gas,
+            block_fees,
             chain_id,
+            prevrandao: None,
         }
     }
 
@@ -214,7 +267,7 @@ impl Encodable for L2Block {
         let transactions_bytes: Vec<Vec<u8>> =
             self.transactions.iter().map(|x| x.to_vec()).collect();
         s.append_list::<Vec<u8>, _>(&transactions_bytes);
-        s.append(&self.gas_used);
+        append_u256_le(s, &self.gas_used);
         append_timestamp(s, self.timestamp);
     }
 }

@@ -38,7 +38,8 @@ let test_rpc_list =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) RPC list"
-    ~tags:["mockup"; "client"; "rpc"]
+    ~tags:["mockup"; "client"; "rpc"; "describe"; "slow"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
@@ -52,6 +53,7 @@ let test_rpc_header_shell =
     ~__FILE__
     ~title:"(Mockup) RPC header/shell"
     ~tags:["mockup"; "client"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.shell_header client in
@@ -89,6 +91,7 @@ let test_transfer =
     ~__FILE__
     ~title:"(Mockup) Transfer"
     ~tags:["mockup"; "client"; "transfer"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -117,6 +120,7 @@ let test_calling_contract_with_global_constant_success =
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant success"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -142,6 +146,7 @@ let test_calling_contract_with_global_constant_failure =
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let storage = "0" in
@@ -164,6 +169,7 @@ let test_register_global_constant_success =
     ~__FILE__
     ~title:"(Mockup) Register Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -178,6 +184,7 @@ let test_register_global_constant_failure =
     ~__FILE__
     ~title:"(Mockup) Register Global Constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -196,6 +203,7 @@ let test_originate_contract_with_global_constant_success =
     ~__FILE__
     ~title:"(Mockup) Originate Contract with Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -220,6 +228,7 @@ let test_typechecking_and_normalization_work_with_constants =
     ~__FILE__
     ~title:"(Mockup) Typechecking and normalization work with constants"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -242,6 +251,7 @@ let test_simple_baking_event =
     ~__FILE__
     ~title:"(Mockup) Transfer (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client =
@@ -265,6 +275,7 @@ let test_same_transfer_twice =
     ~__FILE__
     ~title:"(Mockup) Same transfer twice (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client =
@@ -290,6 +301,7 @@ let test_transfer_same_participants =
     ~__FILE__
     ~title:"(Mockup) Transfer same participants (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client =
@@ -323,6 +335,7 @@ let test_multiple_baking =
     ~__FILE__
     ~title:"(Mockup) Multi transfer/multi baking (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   (* For the equality test below to hold, alice, bob and baker must be
      different accounts. Here, alice is bootstrap1, bob is bootstrap2 and
@@ -354,7 +367,7 @@ let test_multiple_baking =
           (Tez.to_string alice_balance)
           (Tez.to_string bob_balance) ;
       return ())
-    (range 1 10)
+    (range 1 5)
 
 let perform_migration ~protocol ~next_protocol ~next_constants ~pre_migration
     ~post_migration =
@@ -398,6 +411,7 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
     ~__FILE__
     ~title:(sf "(Mockup) Migration (%s)" info)
     ~tags:["mockup"; "migration"]
+    ~uses_node:false
     (fun () ->
       match migration_spec with
       | None -> (
@@ -487,6 +501,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
          (Protocol.name migrate_from)
          (Protocol.name migrate_to))
     ~tags:["mockup"; "migration"]
+    ~uses_node:false
     (fun () ->
       let constants_path =
         ["chains"; "main"; "blocks"; "head"; "context"; "constants"]
@@ -525,6 +540,7 @@ let test_origination_from_unrevealed_fees =
     ~__FILE__
     ~title:"(Mockup) origination fees from unrevealed"
     ~tags:["mockup"; "client"; "transfer"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =
@@ -562,6 +578,7 @@ let test_multiple_transfers =
     ~__FILE__
     ~title:"(Mockup) multiple transfer simulation"
     ~tags:["mockup"; "client"; "multiple"; "transfer"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let batch_line =
@@ -589,6 +606,7 @@ let test_empty_block_baking =
     ~__FILE__
     ~title:"(Mockup) Transfer (empty, asynchronous)"
     ~tags:["mockup"; "client"; "empty"; "bake_for"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, _amount, _receiver = transfer_data in
   let* client =
@@ -603,6 +621,7 @@ let test_storage_from_file =
     ~__FILE__
     ~title:"(Mockup) Load storage and input from file."
     ~tags:["mockup"; "client"; "run_script"]
+    ~uses_node:false
   @@ fun protocol ->
   Format.printf "%s" @@ Unix.getcwd () ;
   let* client = Client.init_mockup ~protocol () in
@@ -625,6 +644,7 @@ let test_list_mockup_protocols () =
     ~__FILE__
     ~title:"(Mockup) List mockup protocols."
     ~tags:["mockup"; "client"; "protocols"]
+    ~uses_node:false
   @@ fun () ->
   let client = Client.create_with_mode Client.Mockup in
   let* protocols = Client.list_protocols `Mockup client in
@@ -639,6 +659,7 @@ let test_create_mockup_dir_exists_nonempty =
     ~__FILE__
     ~title:"(Mockup) Create mockup in existing base dir"
     ~tags:["mockup"; "client"; "base_dir"]
+    ~uses_node:false
   @@ fun protocol ->
   let base_dir = Temp.dir "mockup_dir" in
   write_file ~contents:"" (base_dir // "whatever") ;
@@ -655,6 +676,7 @@ let test_retrieve_addresses =
     ~__FILE__
     ~title:"(Mockup) Retrieve addresses"
     ~tags:["mockup"; "client"; "wallet"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* addresses = Client.list_known_addresses client in
@@ -677,6 +699,7 @@ let test_create_mockup_already_initialized =
     ~__FILE__
     ~title:"(Mockup) Create mockup when already initialized."
     ~tags:["mockup"; "client"; "base_dir"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =
@@ -686,13 +709,14 @@ let test_create_mockup_already_initialized =
   in
   unit
 
-(* Tests [tezos-client create mockup]s [--protocols-constants]
+(* Tests [octez-client create mockup]s [--protocols-constants]
    argument. The call must succeed. *)
 let test_create_mockup_custom_constants =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Create mockup with mockup-custom protocol constants."
     ~tags:["mockup"; "client"; "mockup_protocol_constants"]
+    ~uses_node:false
   @@ fun protocol ->
   let iter = Fun.flip Lwt_list.iter_s in
   (* [chain_id] is the string to pass for field [chain_id]. It's
@@ -776,13 +800,14 @@ let mockup_bootstrap_account_of_json json : mockup_bootstrap_account =
 let mockup_bootstrap_accounts_of_json json =
   List.map mockup_bootstrap_account_of_json (JSON.as_list json)
 
-(* Tests [tezos-client create mockup --bootstrap-accounts]
+(* Tests [octez-client create mockup --bootstrap-accounts]
    argument. The call must succeed. *)
 let test_create_mockup_custom_bootstrap_accounts =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Create mockup with mockup-custom bootstrap accounts."
     ~tags:["mockup"; "client"; "mockup_bootstrap_accounts"]
+    ~uses_node:false
   @@ fun protocol ->
   let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
   JSON.encode_to_file_u
@@ -805,7 +830,7 @@ let test_create_mockup_custom_bootstrap_accounts =
 
 let rmdir dir = Process.spawn "rm" ["-rf"; dir] |> Process.check
 
-(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+(* Executes [octez-client --base-dir /tmp/mdir create mockup] when
    [/tmp/mdir] looks like a dubious base directory. Checks that a warning
    is printed. *)
 let test_transfer_bad_base_dir =
@@ -813,6 +838,7 @@ let test_transfer_bad_base_dir =
     ~__FILE__
     ~title:"(Mockup) Transfer bad base dir."
     ~tags:["mockup"; "client"; "initialization"]
+    ~uses_node:false
   @@ fun protocol ->
   Log.info "First create mockup with an empty base dir" ;
   let base_dir = Temp.dir "mockup-dir" in
@@ -841,19 +867,20 @@ let test_transfer_bad_base_dir =
   in
   unit
 
-(* Executes [tezos-client --mode mockup config show] in a state where
+(* Executes [octez-client --mode mockup config show] in a state where
    it should succeed. *)
 let test_config_show_mockup =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Show config."
     ~tags:["mockup"; "client"; "config"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.config_show ~protocol client in
   unit
 
-(* Executes [tezos-client --mode mockup config show] when base dir is
+(* Executes [octez-client --mode mockup config show] when base dir is
    NOT a mockup. It should fail as this is dangerous (the default base
    directory could contain sensitive data, such as private keys) *)
 let test_config_show_mockup_fail =
@@ -861,19 +888,21 @@ let test_config_show_mockup_fail =
     ~__FILE__
     ~title:"(Mockup) Show config failure."
     ~tags:["mockup"; "client"; "config"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () = rmdir (Client.base_dir client) in
   let* _ = Client.spawn_config_show ~protocol client |> Process.check_error in
   unit
 
-(* Executes [tezos-client config init mockup] in a state where it
+(* Executes [octez-client config init mockup] in a state where it
    should succeed *)
 let test_config_init_mockup =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Mockup config initialization."
     ~tags:["mockup"; "client"; "config"; "initialization"]
+    ~uses_node:false
   @@ fun protocol ->
   let protocol_constants = Temp.file "protocol-constants.json" in
   let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
@@ -885,7 +914,7 @@ let test_config_init_mockup =
   let (_ : JSON.t) = JSON.parse_file bootstrap_accounts in
   unit
 
-(* Executes [tezos-client config init mockup] when base dir is NOT a
+(* Executes [octez-client config init mockup] when base dir is NOT a
    mockup. It should fail as this is dangerous (the default base
    directory could contain sensitive data, such as private keys) *)
 let test_config_init_mockup_fail =
@@ -893,6 +922,7 @@ let test_config_init_mockup_fail =
     ~__FILE__
     ~title:"(Mockup) Mockup config initialization failure."
     ~tags:["mockup"; "client"; "config"; "initialization"]
+    ~uses_node:false
   @@ fun protocol ->
   let protocol_constants = Temp.file "protocol-constants.json" in
   let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
@@ -917,6 +947,7 @@ let test_transfer_rpc =
     ~__FILE__
     ~title:"(Mockup) Mockup transfer RPC."
     ~tags:["mockup"; "client"; "transfer"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let get_balance (key : Account.key) =
@@ -948,6 +979,7 @@ let test_proto_mix =
     ~__FILE__
     ~title:"(Mockup) Mockup mixed protocols."
     ~tags:["mockup"; "client"; "transfer"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let protos1, protos2 =
     match Protocol.previous_protocol protocol with
@@ -1152,14 +1184,19 @@ let test_create_mockup_config_show_init_roundtrip protocols =
     let constant_parametric_constants : JSON.t =
       JSON.annotate ~origin:"constant_parametric_constants"
       @@ `O
-           [
-             (* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
-             ("consensus_threshold", `Float 0.0);
-           ]
+           ((* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
+            ("consensus_threshold", `Float 0.0)
+           ::
+           (if Protocol.number protocol >= 019 then
+            [
+              (* Constraint: 0 <= max_slashing_per_block <= 10_000 *)
+              ("max_slashing_per_block", `Float 10_000.0);
+            ]
+           else []))
     in
-    (* To fulfill the requirement that [blocks_per_epoch] divides
-       [blocks_per_cycle], we set [blocks_per_cycle] to 1, for simplicity (even
-       if the default value is also 1). *)
+    (* To fulfill the requirement that [blocks_per_epoch], present in protocols
+       up to O, divides [blocks_per_cycle], we set [blocks_per_cycle] to 1, for
+       simplicity (even if the default value is also 1). *)
     let updated_dal_parametric =
       let dal_parametric_constants_succ =
         JSON.(parametric_constants_succ |-> "dal_parametric")
@@ -1185,13 +1222,64 @@ let test_create_mockup_config_show_init_roundtrip protocols =
              ("chain_id", `String "NetXaFDF7xZQCpR");
            ]
     in
+    (* Since adaptive rewards use [Q.t], the numerators and denominators should be co-primes. *)
+    let co_primed_adaptive_rewards : JSON.t =
+      let adaptive_rewards_succ =
+        JSON.(parametric_constants_succ |-> "adaptive_rewards_params")
+      in
+      if JSON.is_null adaptive_rewards_succ then
+        JSON.annotate ~origin:"no_adaptive_rewards" `Null
+      else
+        let simplify_field obj =
+          match JSON.as_object_opt obj with
+          | Some [("numerator", numerator); ("denominator", denominator)] ->
+              let numerator = JSON.as_int numerator in
+              let denominator = JSON.as_int denominator in
+              let Q.{num; den} = Q.(numerator // denominator) in
+              JSON.annotate ~origin:"simplify_field"
+              @@ `O
+                   [
+                     ("numerator", `String (Z.to_int num |> string_of_int));
+                     ("denominator", `String (Z.to_int den |> string_of_int));
+                   ]
+          | _ -> obj
+        in
+        let all_fields = JSON.as_object adaptive_rewards_succ in
+        let co_primed_adaptive_rewards_params =
+          JSON.annotate ~origin:"new_adaptive_rewards_params"
+          @@ `O
+               (List.map
+                  (fun (field_name, obj) ->
+                    (field_name, JSON.unannotate (simplify_field obj)))
+                  all_fields)
+        in
+        let new_adaptive_rewards_params =
+          JSON.merge_objects
+            adaptive_rewards_succ
+            co_primed_adaptive_rewards_params
+        in
+        JSON.annotate ~origin:"co_primed_adaptive_rewards"
+        @@ `O
+             [
+               ( "adaptive_rewards_params",
+                 JSON.unannotate new_adaptive_rewards_params );
+             ]
+    in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6923
+       remove when `blocks_per_epoch` is not used anymore in tests *)
+    let parametric_constants_succ =
+      if Protocol.number protocol > 018 then parametric_constants_succ
+      else JSON.merge_objects parametric_constants_succ updated_dal_parametric
+    in
     return
       JSON.(
         merge_objects
           (merge_objects
-             (merge_objects parametric_constants_succ updated_dal_parametric)
-             constant_parametric_constants)
-          mockup_constants)
+             (merge_objects
+                parametric_constants_succ
+                constant_parametric_constants)
+             mockup_constants)
+          co_primed_adaptive_rewards)
   in
 
   let get_state_using_config_show_mockup ~protocol mockup_client =
@@ -1259,24 +1347,17 @@ let test_create_mockup_config_show_init_roundtrip protocols =
         protocol_constants = JSON.parse_file protocol_constants;
       }
   in
-  let compute_expected_amounts protocol bootstrap_accounts protocol_constants =
+  let compute_expected_amounts bootstrap_accounts protocol_constants =
     let convert =
-      if protocol > Protocol.Nairobi then
-        let limit_of_delegation_over_baking =
-          JSON.(
-            protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
-        in
-        let limit_of_delegation_over_baking_plus_1 =
-          Int64.of_int (limit_of_delegation_over_baking + 1)
-        in
-        fun amount ->
-          Tez.(amount - (amount /! limit_of_delegation_over_baking_plus_1))
-      else
-        let frozen_deposits_percentage =
-          JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
-        in
-        let pct = 100 - frozen_deposits_percentage in
-        fun amount -> Tez.(of_mutez_int (pct * to_mutez amount / 100))
+      let limit_of_delegation_over_baking =
+        JSON.(
+          protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
+      in
+      let limit_of_delegation_over_baking_plus_1 =
+        Int64.of_int (limit_of_delegation_over_baking + 1)
+      in
+      fun amount ->
+        Tez.(amount - (amount /! limit_of_delegation_over_baking_plus_1))
     in
     List.map
       (fun account -> {account with amount = convert account.amount})
@@ -1352,6 +1433,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
        ("(Mockup) Create mockup config show / init roundtrip "
       ^ parametrization_suffix)
      ~tags:(["mockup"; "client"; "base_dir"; "roundtrip"] @ tags)
+     ~uses_node:false
    @@ fun protocol ->
    let* protocol_constants_opt, parameter_file_opt =
      match param_value param_protocol_constants with
@@ -1416,7 +1498,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      | Some initial_bootstrap_accounts ->
          let expected_amounts =
            compute_expected_amounts
-             protocol
              initial_bootstrap_accounts
              initial_state.protocol_constants
          in
@@ -1470,7 +1551,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
 
    let expected_amounts =
      compute_expected_amounts
-       protocol
        initial_state.bootstrap_accounts
        initial_state.protocol_constants
    in

@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt string "abc" } ;
+output { Stack_elt bytes 0x050100000003616263 } ;

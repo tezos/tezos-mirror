@@ -490,7 +490,7 @@ end) : S = struct
          necessary. But since this piece of code won't be used in a
          carbonated function, we prefer to keep a simple implementation
          for the moment. *)
-      let rec aux rev_path cell ix =
+      let rec aux rev_path cell last_candidate ix =
         (* Below, we call the [target] the cell for which [compare target = 0]. *)
 
         (* Invariant:
@@ -499,6 +499,7 @@ end) : S = struct
            - ix >= 0
            - if cell <> genesis => ix < List.length (back_pointers cell)
            - \exists path' rev_path = cell:path'
+           - last_candidate = None <-> ix = 0
         *)
         let back_pointers_length = FallbackArray.length cell.back_pointers in
         if back_pointers_length = 0 then
@@ -517,10 +518,35 @@ end) : S = struct
           in
           let* derefed = deref candidate_ptr in
           match derefed with
-          | None ->
-              (* If we cannot dereference a pointer, We stop the search
-                 and returns the current path. *)
-              return {rev_path; last_cell = Deref_returned_none}
+          | None -> (
+              (* It is important to assume that [deref] can fail while
+                 producing a minimal path. This is to ensure that when
+                 computing a path from cell [cell] to the target cell
+                 (assuming the target cell is part of the list), it is
+                 sufficient to know cells only from the target cell up
+                 to the initial one.
+
+                 To do so, we remember whether we have seen a
+                 candidate towards the target cell when [ix > 0].
+
+                 If [deref] fails when [ix=0], it means we are unable
+                 to produce a path up to the target cell because some
+                 cell between the target cell up to the initial cell
+                 is unknown.
+
+                 If [deref] fails when [ix>0], then we already have
+                 computed a [last_candidate] cell on the path (for at
+                 index [ix-1]) which means this candidate is actually
+                 the best one. *)
+              match last_candidate with
+              | None ->
+                  (* ix = 0 *)
+                  (* If we cannot dereference a pointer, We stop the search
+                     and return the current path. *)
+                  return {rev_path; last_cell = Deref_returned_none}
+              | Some next_cell ->
+                  let rev_path = next_cell :: rev_path in
+                  aux rev_path next_cell None 0)
           | Some next_cell -> (
               let comparison = compare next_cell.content in
               if comparison = 0 then
@@ -530,11 +556,11 @@ end) : S = struct
               else if comparison > 0 then
                 if ix < back_pointers_length - 1 then
                   (* There might be a short path by dereferencing the next pointer. *)
-                  aux rev_path cell (ix + 1)
+                  aux rev_path cell (Some next_cell) (ix + 1)
                 else
                   (* The last pointer is still above the target. We are on the good track, *)
                   let rev_path = next_cell :: rev_path in
-                  aux rev_path next_cell 0
+                  aux rev_path next_cell None 0
               else if ix = 0 then
                 (* We found a cell lower than the target. *)
                 (* The first back pointers gives a cell below the target *)
@@ -559,7 +585,7 @@ end) : S = struct
                     assert false
                 | Some good_next_cell ->
                     let rev_path = good_next_cell :: rev_path in
-                    aux rev_path good_next_cell 0)
+                    aux rev_path good_next_cell None 0)
       in
       let comparison = compare cell.content in
       if Compare.Int.(comparison = 0) then
@@ -568,7 +594,7 @@ end) : S = struct
       else if Compare.Int.(comparison < 0) then
         return
           {rev_path = [cell]; last_cell = Nearest {lower = cell; upper = None}}
-      else aux [cell] cell 0
+      else aux [cell] cell None 0
   end
 
   include Make_monadic (struct

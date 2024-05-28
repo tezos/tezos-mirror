@@ -149,7 +149,14 @@ let double_consensus_wrong_slot
 
 let attest_utils =
   ( Client.attest_for,
-    Operation.Consensus.attestation ~use_legacy_name:true,
+    (fun ~slot ~level ~round ~block_payload_hash ->
+      Operation.Consensus.attestation
+        ~use_legacy_name:true
+        ~slot
+        ~level
+        ~round
+        ~block_payload_hash
+        ()),
     double_attestation_waiter,
     get_consensus_operation_name )
 
@@ -163,8 +170,7 @@ let double_attestation_wrong_slot =
   Protocol.register_test
     ~__FILE__
     ~title:"double attestation using wrong slot"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "attestation"; "accuser"; "slot"; "node"]
+    ~tags:[Tag.layer1; "double"; "attestation"; "accuser"; "slot"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_slot attest_utils protocol
 
@@ -172,8 +178,7 @@ let double_preattestation_wrong_slot =
   Protocol.register_test
     ~__FILE__
     ~title:"double preattestation using wrong slot"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "preattestation"; "accuser"; "slot"; "node"]
+    ~tags:[Tag.layer1; "double"; "preattestation"; "accuser"; "slot"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_slot preattest_utils protocol
 
@@ -230,8 +235,15 @@ let double_attestation_wrong_block_payload_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"double attestation using wrong block_payload_hash"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "attestation"; "accuser"; "block_payload_hash"; "node"]
+    ~tags:
+      [
+        Tag.layer1;
+        "double";
+        "attestation";
+        "accuser";
+        "block_payload_hash";
+        "node";
+      ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash attest_utils protocol
@@ -240,8 +252,15 @@ let double_preattestation_wrong_block_payload_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"double preattestation using wrong block_payload_hash"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "preattestation"; "accuser"; "block_payload_hash"; "node"]
+    ~tags:
+      [
+        Tag.layer1;
+        "double";
+        "preattestation";
+        "accuser";
+        "block_payload_hash";
+        "node";
+      ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash preattest_utils protocol
@@ -293,8 +312,7 @@ let double_attestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
     ~title:"double attestation using wrong branch"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "attestation"; "accuser"; "branch"; "node"]
+    ~tags:[Tag.layer1; "double"; "attestation"; "accuser"; "branch"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch attest_utils protocol
 
@@ -302,8 +320,7 @@ let double_preattestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
     ~title:"double preattestation using wrong branch"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "preattestation"; "accuser"; "branch"; "node"]
+    ~tags:[Tag.layer1; "double"; "preattestation"; "accuser"; "branch"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch preattest_utils protocol
 
@@ -314,8 +331,7 @@ let operation_too_old =
   Protocol.register_test
     ~__FILE__
     ~title:"operation too old"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["accuser"; "old"; "operation"]
+    ~tags:[Tag.layer1; "accuser"; "old"; "operation"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -361,6 +377,7 @@ let operation_too_old =
       ~level
       ~round:3
       ~block_payload_hash
+      ()
   in
   let waiter = consensus_operation_too_old_waiter accuser in
   let* _ =
@@ -382,8 +399,7 @@ let operation_too_far_in_future =
   Protocol.register_test
     ~__FILE__
     ~title:"operation too far in the future"
-    ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["accuser"; "future"; "operation"]
+    ~tags:[Tag.layer1; "accuser"; "future"; "operation"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -439,6 +455,7 @@ let operation_too_far_in_future =
       ~level
       ~round:0
       ~block_payload_hash
+      ()
   in
   let waiter = consensus_operation_too_far_in_future_waiter accuser in
   let* _ =

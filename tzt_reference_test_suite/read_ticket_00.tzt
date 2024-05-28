@@ -1,0 +1,7 @@
+code READ_TICKET;
+input { Stack_elt (ticket string) (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 42) } ;
+output
+  {
+    Stack_elt (pair address string nat) (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 42) ;
+    Stack_elt (ticket string) (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 42) ;
+  } ;

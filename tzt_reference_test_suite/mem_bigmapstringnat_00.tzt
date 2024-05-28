@@ -1,0 +1,4 @@
+code { MEM } ;
+input { Stack_elt string "bar" ; Stack_elt (big_map string nat) 10 ; Stack_elt (big_map string nat) 10 } ;
+output { Stack_elt bool False ; Stack_elt (big_map string nat) 10 } ;
+big_maps { Big_map 10 string nat { Elt "foo" 1 } }

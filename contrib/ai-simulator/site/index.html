@@ -1,0 +1,494 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="app.css" rel="stylesheet">
+    <link href="https://research-development.nomadic-labs.com/favicon.ico" rel="icon"
+          sizes="100x100" type="image/gif"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src=" https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.3/dist/chartjs-plugin-dragdata.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </head>
+  <body class="bg-black">
+    <canvas id="chartJSContainer" class="w-full min-w-full min-w-screen"></canvas>
+    <table class="table-fixed text-center min-w-full">
+      <thead>
+        <tr>
+          <th class="border">Cycle</th>
+          <th class="border">Start</th>
+          <th class="border">End</th>
+
+          <th class="border">Total supply</th>
+          <th class="border">Total frozen stake</th>
+          <th class="border">Total delegated</th>
+
+          <th class="border">Staked ratio</th>
+          <th class="border">Min. ratio</th>
+          <th class="border">Max. ratio</th>
+
+          <th class="border">Static</th>
+          <th class="border">Dynamic</th>
+          <th class="border">Issuance rate</th>
+
+          <th class="border">Reward coeff</th>
+          <th class="border">Yearly rate</th>
+
+          <th class="border">Attesting reward per slot</th>
+          <th class="border">Baking reward fixed portion</th>
+          <th class="border">Baking reward bonus per slot</th>
+          <th class="border">Seed nonce revelation tip</th>
+          <th class="border">Vdf revelation tip</th>
+
+          <th class="border">Baking power</th>
+
+          <th class="border">Number of blocks</th>
+          <th class="border">Number of attestations</th>
+
+          <th class="border">Rewards from baking fixed portion</th>
+          <th class="border">Rewards from baking bonus</th>
+          <th class="border">Rewards from attestations</th>
+          <th class="border">Rewards from nonce revelations</th>
+          <th class="border">Rewards from vdf revelations</th>
+
+          <th class="border">Rewards from own staking</th>
+          <th class="border">Rewards from third party staking</th>
+          <th class="border">Rewards from edge of baking over staking</th>
+          <th class="border">Rewards from delegating</th>
+
+          <th class="border">Total rewards</th>
+
+          <th class="border">Own staked balance</th>
+          <th class="border">Third party staked balance</th>
+
+          <th class="border">Own spendable balance</th>
+          <th class="border">Third party delegated balance</th>
+
+        </tr>
+      </thead>
+      <tbody id="report"></tbody>
+    </table>
+    <script type="module">
+      Chart.defaults.color = '#fff';
+      Chart.defaults.borderColor = '#454347';
+      Chart.defaults.backgroundColor = 'transparent';
+
+    /*
+     * This is the main script that generates the AI data report.
+     *
+     * The script is divided into two parts:
+     * - The first part is the configuration of the simulator and of a delegate.
+     * - The second part is the generation of the AI data report.
+     *
+     * The simulator is configured with the following parameters:
+     * - proto: The protocol parameters. Here we use the mainnet parameters for Paris Protocol.
+     * - chain: The global chain characteristics. Here we use the following parameters:
+     *    - AI activation cycle: The cycle at which the AI is activated.
+     *    - Total frozen stake: An array containing total frozen stake for each cycle.
+     *    - Total supply: An array containing total supply for each cycle.
+     *    - Total delegated: An array containing total delegated tez for each cycle.
+     */
+      import {Simulator, Delegate} from './app.js';
+
+      const config = {
+        // Paris Protocol parameters - no need to change these values.
+          proto: {
+              attestation_rewards: 10_240,
+              base_total_issued_per_minute: 80_007_812,
+              blocks_per_cycle: 24576,
+              blocks_per_commitment: 192,
+              bonus_baking_rewards: 5_120,
+              consensus_committee_size: 7000,
+              consensus_rights_delay: 2,
+              consensus_threshold: 4667,
+              fixed_baking_rewards: 5_120,
+              max_bonus: 0.05,
+              minimal_block_delay: 10,
+              nonce_revelation_tip: 1,
+              vdf_tip: 1,
+              max_limit_of_staking_over_baking: 5,
+          },
+        // initial values for the chain
+          chain: {
+              ai_activation_cycle: 5,
+          },
+      };
+
+      // Creation of the simulator using the above configuration.
+      const simulator = new Simulator(config);
+
+      simulator.set_total_supply(0, 997_513_562_000_000);
+      simulator.set_total_staked(config.proto.consensus_rights_delay + 1, 67_263_199_000_000);
+      simulator.set_total_delegated(0, 604961288973100);
+
+      // Creation of a delegate, whose stake's evolution will be displayed in the data table.
+
+      // Delegate configuration.
+      const delegate_config = {
+        // cycle at which the delegate starts to register.
+        delegate_registration_cycle: 9,
+        // delegate's parameters:
+        delegate_policy: {
+          // how much external stake the delegate accepts (must be between 0 and 5).
+          limit_of_staking_over_baking: 3,
+          // ratio of the staker's rewards that the delegate keeps for itself.
+          edge_of_baking_over_staking: 0.01, // 1%
+        },
+      };
+
+      /* Creation of a delegate with the given config.
+      *  One could create many delegates to compare
+      *  the effect of different parameters.
+      */
+      const delegate = new Delegate(simulator, delegate_config);
+
+      /* Warning: the delegate.set_* methods must be used in the order of the cycles.
+      *
+      *  Setting a value for a given cycle overrides values previously set for future cycles
+      *  It should be fixed in a future version.
+      */
+
+      // Set the initial balances of the delegate.
+      delegate.set_own_staked_balance(9, 10_000_000_000);
+      delegate.set_third_party_staked_balance(9, 20_000_000_000);
+      delegate.set_own_spendable_balance(9, 20_000_000_000);
+      delegate.set_third_party_delegated_balance(9, 30_000_000_000);
+
+      // Simulate an unstake of 4000 tez at cycle 15
+      delegate.set_own_staked_balance(15, delegate.estimated_own_staked_balance(15) - 4_000_000_000);
+      // the unstake tez are unstaked-frozen-deposits, not spendable,
+      // but they also count as delegated tez.
+      // we didn't model the unstaked-frozen-deposits, as they have no effects on staking rights.
+      delegate.set_own_spendable_balance(15, delegate.estimated_own_spendable_balance(15) + 4_000_000_000);
+
+      // Simulate an external stake of 1000 tez  at cycle 20
+      delegate.set_third_party_staked_balance(20, delegate.estimated_third_party_staked_balance(20) + 1_000_000_000);
+
+      // Simulate the departure of a staker with 1_000 tez at cycle 21
+      delegate.set_third_party_staked_balance(21, delegate.estimated_third_party_staked_balance(21) - 1_000_000_000);
+      delegate.set_third_party_delegated_balance(21, delegate.third_party_delegated_balance(21) + 1_000_000_000);
+      delegate.set_third_party_delegated_balance(25, delegate.third_party_delegated_balance(25) - 1_000_000_000);
+
+
+
+      const gen_idx = (start, end) => {
+          let arr = [];
+          for(let i = start; i <= end; i++) { arr.push(i); }
+          return arr;
+      }
+
+
+      // Start cycle and max cycle
+      const start_cycle = 0
+      const max_cycle = 100
+
+      // Array whose values correspond to the cycles, starting from 0 to max_cycle.
+      const idx = gen_idx(start_cycle, max_cycle);
+
+      // Array used to mask values before the AI activation cycle.
+      const idx_mask = Array(config.chain.ai_activation_cycle).fill(null);
+
+      // Array whose values are the cycles starting from the AI activation cycle to max_cycle.
+      const idx_ai = gen_idx(config.chain.ai_activation_cycle, max_cycle);
+
+      // Helpers
+      const mutez_to_tez = (x) => Math.round(x / 1_000_000);
+
+      const chart_config = {
+          type: 'line',
+          data: {
+              labels: idx,
+              datasets: [
+                  {
+                      label: 'Total supply',
+                      borderColor: 'rgb(175, 92, 92)',
+                      yAxisID: 'y1',
+                      data: idx.map((i) => mutez_to_tez(simulator.total_supply(i))),
+                      order: 2,
+                  },
+                  {
+                      label: 'Total frozen stake',
+                      borderColor: 'rgb(75, 192, 92)',
+                      yAxisID: 'y1',
+                      data: idx.map((i) => mutez_to_tez(simulator.total_staked_balance(i))),
+                      order: 2,
+                  },
+                  {
+                      label: 'Total delegated',
+                      borderColor: 'rgb(128, 0, 128)',
+                      yAxisID: 'y1',
+                      data: idx.map((i) => mutez_to_tez(simulator.total_delegated_balance(i))),
+                      order: 2,
+                  },
+                  {
+                      label: 'Staked ratio',
+                      yAxisID: 'y4',
+                      data: idx.map((i) => simulator.staked_ratio_for_next_cycle(i).toDecimal(4)),
+                      borderColor: 'rgb(75, 192, 192)',
+                      order: 1,
+                      pointHitRadius: 25,
+                      tension: 0.2,
+                  },
+                  {
+                      label: 'Min issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.minimum_ratio(i).toDecimal(4))),
+                      borderColor: 'rgb(0, 0, 150)',
+                      order: 2,
+                      fill: {
+                          target: 'origin',
+                          above: 'rgb(5, 5, 5, 0.6)'
+                      }
+                  },
+                  {
+                      label: 'Max issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.maximum_ratio(i).toDecimal(4))),
+                      borderColor: 'rgb(150, 0, 0)',
+                      order: 2,
+                      fill: {
+                          target: {value: 0.1},
+                          below: 'rgb(5, 5, 5, 0.6)'
+                      }
+                  },
+                  {
+                      label: 'Issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4))),
+                      borderColor: 'rgb(150, 150, 20)',
+                      order: 1
+                  },
+                  {
+                      label: 'Upper ratio target',
+                      yAxisID: 'y2',
+                      data: idx_mask.concat(idx_ai.map((_) => 0.52)),
+                      borderColor: 'rgb(0, 150, 0)',
+                      order: 2,
+                      borderWidth: 1,
+                      fill: {
+                          target: {value: 0.48},
+                          above: 'rgb(0, 100, 0, 0.3)'
+                      }
+                  },
+                  {
+                      label: 'Lower ratio target',
+                      yAxisID: 'y2',
+                      data: idx_mask.concat(idx_ai.map((_) => 0.48)),
+                      borderColor: 'rgb(0, 150, 0)',
+                      order: 2,
+                      borderWidth: 1,
+                  },
+              ]
+          },
+          options: {
+              scales: {
+                  y1: {
+                      display: false,
+                      dragData: false,
+                  },
+                  y2: {
+                      type: 'linear',
+                      position: 'left',
+                      max: 1,
+                      min: 0,
+                      dragData: false,
+                  },
+                  y3: {
+                      type: 'linear',
+                      position: 'right',
+                      max: 0.1,
+                      min: 0.0,
+                      dragData: false,
+                  },
+                  y4: {
+                      display: false,
+                      type: 'linear',
+                      display: false,
+                      max: 1,
+                      min: 0,
+                  },
+              },
+              responsive: true,
+              plugins: {
+                annotation: {
+                  annotations: {
+                    line_ai_launch: {
+                      type: 'line',
+                      xMin: simulator.initial_period_start_cycle,
+                      xMax: simulator.initial_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                      borderWidth: 1,
+                    },
+                    line_transition_period_start_cycle: {
+                      type: 'line',
+                      xMin: simulator.transition_period_start_cycle,
+                      xMax: simulator.transition_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                      borderWidth: 1,
+                    },
+                    line_final_period_start_cycle: {
+                      type: 'line',
+                      xMin: simulator.final_period_start_cycle,
+                      xMax: simulator.final_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                       borderWidth: 1,
+                    },
+                  }
+                },
+                dragData: {
+                  round: 5,
+                  showTooltip: true,
+                  onDrag: function(e, datasetIndex, index, value) {
+                    simulator.set_staked_ratio_at(index, value);
+                    window.chart.data.datasets[1].data =
+                        idx.map((i) => mutez_to_tez(simulator.total_staked_balance(i)));
+                    window.chart.data.datasets[6].data =
+                        idx_mask.concat(idx_ai.map((i) =>
+                            simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4)));
+                  },
+                  onDragEnd: function(e, datasetIndex, index, value) {
+                    tableBody.innerHTML = "";
+                    delegate.clear();
+                    gen_report();
+                  },
+                },
+              }
+          }
+      };
+
+      const before_activation_cycle_color = "text-white";
+      const activation_cycle_color = "text-yellow-600";
+      const initial_period_color = "text-blue-600";
+      const transition_period_color = "text-green-600";
+      const final_period_color = "text-white";
+
+      const dispatch_period_color = (cycle) => {
+          if (simulator.is_ai_activated(cycle)) {
+            if (cycle == config.chain.ai_activation_cycle) {
+              return activation_cycle_color
+            }
+            if (simulator.is_in_initial_period(cycle)) {
+              return initial_period_color
+            }
+            if (simulator.is_in_transition_period(cycle)) {
+              return transition_period_color
+            }
+            if (simulator.is_in_final_period(cycle)) {
+              return final_period_color
+            }
+          } else {
+            return before_activation_cycle_color
+          }
+       };
+
+      const with_period_color = (el, cycle) =>
+        el.classList.add(dispatch_period_color(cycle));
+
+      const new_cell_for = (parent, content = null, d = 3) => {
+          let el = document.createElement("td");
+          el.classList.add("border");
+          el.textContent = content;
+          parent.appendChild(el);
+          return el
+      };
+
+      const tableBody = document.getElementById("report");
+      function print_tez(x) {
+        // if x is a number, we format it as a tez amount
+        if (typeof x === 'number') {
+          return (new Intl.NumberFormat().format(Math.round(x / 1_000_000))+" tz");
+        }
+        return x;
+      }
+
+      // Generates the AI data report.
+      function gen_report() {
+        idx.forEach((cycle) => {
+          let new_row = document.createElement("tr");
+          new_row.classList.add("hover:bg-gray-600");
+
+          let new_cell = (content) => new_cell_for(new_row, content);
+
+          with_period_color(new_cell(cycle), cycle);
+
+          let first_block = 1 + config.proto.blocks_per_cycle * cycle;
+          let last_block = first_block + config.proto.blocks_per_cycle - 1;
+
+          new_cell(first_block);
+          new_cell(last_block);
+
+          new_cell(print_tez(simulator.total_supply(cycle)));
+          new_cell(print_tez(simulator.total_staked_balance(cycle)));
+          new_cell(print_tez(simulator.total_delegated_balance(cycle)));
+
+          new_cell(simulator.staked_ratio_for_next_cycle(cycle).toDecimal(3));
+
+          if (simulator.is_ai_activated(cycle)) {
+              new_cell(simulator.minimum_ratio(cycle).toDecimal(4));
+              new_cell(simulator.maximum_ratio(cycle).toDecimal(4));
+              new_cell(simulator.static_rate_for_next_cycle(cycle).toDecimal(3));
+              new_cell(simulator.dynamic_rate_for_next_cycle(cycle).toDecimal(3));
+              new_cell(simulator.issuance_rate_for_next_cycle(cycle).toDecimal(3));
+          } else {
+              new_cell();
+              new_cell();
+              new_cell();
+              new_cell();
+              new_cell();
+          }
+
+          new_cell(simulator.reward_coeff(cycle).toDecimal(3));
+
+          new_cell(simulator.current_yearly_rate_value(cycle).toDecimal(3));
+          new_cell(print_tez(simulator.attestation_reward_per_slot(cycle)));
+          new_cell(print_tez(simulator.baking_reward_fixed_portion(cycle)));
+          new_cell(print_tez(simulator.baking_reward_bonus_per_slot(cycle)));
+          new_cell(print_tez(simulator.seed_nonce_revelation_tip(cycle)));
+          new_cell(print_tez(simulator.vdf_revelation_tip(cycle)));
+
+          const { baking_power } = delegate.baking_power(cycle);
+
+          new_cell(baking_power.toDecimal(5));
+
+          const estimated_rewards = delegate.estimated_rewards(cycle);
+
+          new_cell(estimated_rewards.estimated_number_of_blocks_baked);
+          new_cell(estimated_rewards.estimated_number_of_attestations);
+
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_fixed_portion_baking));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_baking_bonus));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_attestations));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_nonce_revelation));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_vdf_revelation));
+
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_own_staking));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_third_party_staking));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_edge_of_baking_over_staking));
+
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_delegating));
+
+          new_cell(print_tez(estimated_rewards.estimated_total_rewards));
+
+          new_cell(print_tez(delegate.estimated_own_staked_balance(cycle)));
+          new_cell(print_tez(delegate.estimated_third_party_staked_balance(cycle)));
+
+          new_cell(print_tez(delegate.estimated_own_spendable_balance(cycle)));
+          new_cell(print_tez(delegate.third_party_delegated_balance(cycle)));
+
+          tableBody.appendChild(new_row);
+        });
+      };
+
+      document.addEventListener('DOMContentLoaded', function() {
+          var ctx = document.getElementById('chartJSContainer').getContext('2d');
+          window.chart = new Chart(ctx, chart_config);
+          gen_report();
+      });
+
+    </script>
+  </body>
+</html>

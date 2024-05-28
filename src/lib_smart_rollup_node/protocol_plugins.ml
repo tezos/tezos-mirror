@@ -46,6 +46,8 @@ type proto_plugin = (module Protocol_plugin_sig.S)
 let proto_plugins : proto_plugin Protocol_hash.Table.t =
   Protocol_hash.Table.create 7
 
+let last_registered = ref None
+
 let register (plugin : proto_plugin) =
   let module Plugin = (val plugin) in
   if Protocol_hash.Table.mem proto_plugins Plugin.protocol then
@@ -55,10 +57,16 @@ let register (plugin : proto_plugin) =
        Did you register it manually multiple times?"
       Protocol_hash.pp
       Plugin.protocol ;
+  last_registered := Some Plugin.protocol ;
   Protocol_hash.Table.add proto_plugins Plugin.protocol plugin
 
 let registered_protocols () =
   Protocol_hash.Table.to_seq_keys proto_plugins |> List.of_seq
+
+let last_registered () =
+  match !last_registered with
+  | None -> Stdlib.failwith "No protocol plugins registered"
+  | Some p -> p
 
 let proto_plugin_for_protocol protocol =
   Protocol_hash.Table.find proto_plugins protocol
@@ -83,14 +91,21 @@ let proto_plugin_for_block node_ctxt block_hash =
   let* level = Node_context.level_of_hash node_ctxt block_hash in
   proto_plugin_for_level node_ctxt level
 
-let last_proto_plugin node_ctxt =
+let last_proto_plugin_opt node_ctxt =
   let open Lwt_result_syntax in
   let* protocol = Node_context.last_seen_protocol node_ctxt in
   match protocol with
-  | None -> failwith "No known last protocol, cannot get plugin"
+  | None -> return_none
   | Some protocol ->
       let*? plugin = proto_plugin_for_protocol protocol in
-      return plugin
+      return_some plugin
+
+let last_proto_plugin node_ctxt =
+  let open Lwt_result_syntax in
+  let* plugin = last_proto_plugin_opt node_ctxt in
+  match plugin with
+  | None -> failwith "No known last protocol, cannot get plugin"
+  | Some plugin -> return plugin
 
 module Constants_cache =
   Aches_lwt.Lache.Make_result

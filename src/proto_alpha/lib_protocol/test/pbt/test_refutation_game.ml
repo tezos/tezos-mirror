@@ -1569,7 +1569,7 @@ let test_perfect_against_sol_hater =
 let test_perfect_against_eol_hater =
   test_game ~p1_strategy:Perfect ~p2_strategy:EOL_hater ()
 
-let test_perfect_against_info_hater =
+let _test_perfect_against_info_hater =
   test_game ~p1_strategy:Perfect ~p2_strategy:Info_hater ()
 
 let test_perfect_against_nostalgic =
@@ -1632,7 +1632,10 @@ let tests =
         test_perfect_against_eager;
         test_perfect_against_sol_hater;
         test_perfect_against_eol_hater;
-        test_perfect_against_info_hater;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6839
+           an issue with the generator / assume of this test makes it run for ~15 minutes.
+           Disactivating until we find the root cause. *)
+        (* test_perfect_against_info_hater; *)
         test_perfect_against_nostalgic;
         test_cut_at_level;
       ] )

@@ -8,4 +8,4 @@
  (libraries
   ezjsonm
   json-data-encoding
-  tezt))
+  tezt.json))

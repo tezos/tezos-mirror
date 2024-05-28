@@ -11,8 +11,8 @@
   octez-libs.tezos-context.encoding
   octez-libs.context.sigs
   octez-libs.tezos-context.merkle_proof_encoding
-  irmin
-  irmin-pack)
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin_pack)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

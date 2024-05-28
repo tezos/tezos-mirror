@@ -1,0 +1,3 @@
+code { FAILWITH } ;
+input { Stack_elt (list operation) {} } ;
+output (StaticError _)

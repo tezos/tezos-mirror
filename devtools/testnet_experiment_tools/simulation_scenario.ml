@@ -109,6 +109,14 @@ let op_per_mempool_arg =
     ~placeholder:"integer"
     positive_int_parameter
 
+let max_op_ttl_arg =
+  switch
+    ~doc:
+      "Patch the 'max-operation-time-to-live' constant proportionally to the \
+       new block time value. Disabled by default."
+    ~long:"patch-max-op-ttl"
+    ()
+
 let block_time_param =
   param
     ~name:"block-time-target"
@@ -300,7 +308,7 @@ let run_injector (cctxt : Client_context.full) ~op_per_mempool
     ~min_manager_queues
     ~operations_file_path
 
-let patch_block_time ~data_dir ~block_time_target =
+let patch_block_time ~data_dir ~block_time_target ~patch_max_op_ttl =
   let open Lwt_result_syntax in
   let open Tezos_store_unix in
   use_data_dir data_dir @@ fun () ->
@@ -329,6 +337,7 @@ let patch_block_time ~data_dir ~block_time_target =
       resulting_head_ctxt
       ~head_level:(Store.Block.level head)
       ~block_time_target
+      ~patch_max_op_ttl
   in
   (* 4. Shadow the current head's resulting context by commiting the
      modified one associated so that the new constants are now the one
@@ -445,11 +454,16 @@ let commands =
          cannot be run twice on a same octez-node data directory. Warning: all \
          testnet nodes must apply this patch otherwise they will fail to agree \
          on the new resulting chain's state."
-      no_options
+      (args1 max_op_ttl_arg)
       (prefixes ["patch"; "time"]
       @@ data_dir_param @@ prefix "to" @@ block_time_param @@ stop)
-      (fun () data_dir block_time_target (_cctxt : Client_context.full) ->
-        let* () = patch_block_time ~data_dir ~block_time_target in
+      (fun patch_max_op_ttl
+           data_dir
+           block_time_target
+           (_cctxt : Client_context.full) ->
+        let* () =
+          patch_block_time ~data_dir ~block_time_target ~patch_max_op_ttl
+        in
         return_unit);
   ]
 

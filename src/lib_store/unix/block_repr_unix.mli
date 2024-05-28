@@ -73,11 +73,11 @@ val raw_get_block_level : bytes -> int32
     predecessor's hash of the block contained in [block_buffer]. *)
 val raw_get_block_predecessor : bytes -> Block_hash.t
 
-(** [raw_get_last_allowed_fork_level block_buffer] introspects the
-    last allowed fork level of the block's metadata contained in
+(** [raw_get_last_preserved_block_level block_buffer] introspects the
+    last preserved block level of the block's metadata contained in
     [block_buffer] if there is any. Returns [None] if no metadata is
     present. *)
-val raw_get_last_allowed_fork_level : bytes -> int -> int32 option
+val raw_get_last_preserved_block_level : bytes -> int -> int32 option
 
 (** [raw_get_context block_buffer] introspects the
     context of the block contained in

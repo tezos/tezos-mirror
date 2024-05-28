@@ -61,6 +61,9 @@ type fetch_block_rpc =
   unit ->
   block tzresult Lwt.t
 
+(** Returns the raw L1 connection to allow for monitoring by others. *)
+val raw_l1_connection : t -> Layer_1.t
+
 (** [start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols cctxt]
     connects to a Tezos node and starts monitoring new heads. One can iterate on
     the heads by calling {!iter_heads} on its result. [reconnection_delay] gives
@@ -77,18 +80,35 @@ val start :
   #Client_context.full ->
   t tzresult Lwt.t
 
+(** Same as {!start} but does not start monitoring L1 blocks. *)
+val create :
+  name:string ->
+  reconnection_delay:float ->
+  l1_blocks_cache_size:int ->
+  ?protocols:Protocol_hash.t trace ->
+  ?prefetch_blocks:int ->
+  #Client_context.full ->
+  t tzresult
+
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
 
-(** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
-    chain. In case of a disconnection with the layer 1 node, it reconnects
+(** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer
+    1 chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection) it,
-    [iter_heads] terminates and returns the error.  *)
-val iter_heads : t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+    [iter_heads] terminates and returns the error. A [name] can be provided to
+    differentiate iterations on the same connection. *)
+val iter_heads :
+  ?name:string -> t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)
 val wait_first : t -> header Lwt.t
+
+(** [get_latest_head t] returns the latest L1 head if at least one was seen by
+    [t]. The head is the one sent by the heads monitoring RPC of the L1 node,
+    independently of how they were processed by the current process. *)
+val get_latest_head : t -> header option
 
 val get_predecessor_opt :
   ?max_read:int ->

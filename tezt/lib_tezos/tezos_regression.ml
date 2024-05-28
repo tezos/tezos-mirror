@@ -48,8 +48,10 @@ let replace_variables string =
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
       (* Ports are non-deterministic when using -j. *)
-      ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
-      ("/127.0.0.1:\\d{4,5}/", "/127.0.0.1:[PORT]/");
+      ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
+      ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
+      ("/\\[::1\\]:\\d{4,5}/", "/[HOST]:[PORT]/");
+      ("sandbox/src/main.rs:\\d+:\\d+:", "sandbox/src/main.rs:[LOCATION]:");
     ]
   in
   List.fold_left
@@ -86,6 +88,20 @@ let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
 let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()
 
 let rpc_hooks : RPC_core.rpc_hooks =
-  let on_request input = replace_variables input |> Regression.capture in
-  let on_response output = replace_variables output |> Regression.capture in
+  let open RPC_core in
+  let on_request verb ~uri data =
+    Regression.capture (sf "%s %s" (show_verb verb) (replace_variables uri)) ;
+    match data with
+    | None -> ()
+    | Some (Data data) ->
+        Regression.capture "Content-type: application/json" ;
+        Regression.capture (JSON.encode_u data)
+    | Some (File f) ->
+        Regression.capture
+        @@ sf "Content-type: application/json (file %s)" (Filename.basename f)
+  in
+  let on_response status ~body =
+    Regression.capture (Cohttp.Code.string_of_status status) ;
+    Regression.capture (replace_variables body)
+  in
   {on_request; on_response}

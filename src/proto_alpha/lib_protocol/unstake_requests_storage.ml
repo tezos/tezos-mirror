@@ -68,9 +68,12 @@ let prepared_finalize_unstake_encoding :
        (req "finalizable" finalizable_encoding)
        (req "unfinalizable" stored_requests_encoding))
 
-let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
+let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
+    =
   let first_cycle_to_apply_slash = from_cycle in
-  let last_cycle_to_apply_slash = Cycle_repr.add from_cycle preserved_cycles in
+  let last_cycle_to_apply_slash =
+    Cycle_repr.add from_cycle slashable_deposits_period
+  in
   (* [slashing_history] is sorted so slashings always happen in the same order. *)
   List.fold_left
     (fun remain (slashing_cycle, slashing_percentage) ->
@@ -91,9 +94,13 @@ let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
 let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
     contract =
   let open Lwt_result_syntax in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
   let max_slashing_period = Constants_repr.max_slashing_period in
-  let preserved_plus_slashing = preserved_cycles + max_slashing_period in
+  let slashable_plus_denunciation_delay =
+    slashable_deposits_period + max_slashing_period
+  in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let current_cycle =
     if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle
@@ -103,17 +110,33 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
   match requests_opt with
   | None | Some {delegate = _; requests = []} -> return_none
   | Some {delegate; requests} -> (
-      match Cycle_repr.sub current_cycle preserved_plus_slashing with
+      match Cycle_repr.sub current_cycle slashable_plus_denunciation_delay with
       | None (* no finalizable cycle *) ->
           return_some {finalizable = []; unfinalizable = {delegate; requests}}
       | Some greatest_finalizable_cycle ->
           let* slashing_history_opt =
-            Storage.Contract.Slashed_deposits.find
-              ctxt
-              (Contract_repr.Implicit delegate)
+            Storage.Slashed_deposits.find ctxt delegate
           in
           let slashing_history =
             Option.value slashing_history_opt ~default:[]
+          in
+          (* Oxford values *)
+          let* slashing_history_opt_o =
+            Storage.Contract.Slashed_deposits__Oxford.find
+              ctxt
+              (Contract_repr.Implicit delegate)
+          in
+          let slashing_history_o =
+            Option.value slashing_history_opt_o ~default:[]
+            |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+          in
+
+          let slashing_history =
+            List.fold_left
+              (fun acc (cycle, percentage) ->
+                Storage.Slashed_deposits_history.add cycle percentage acc)
+              slashing_history_o
+              slashing_history
           in
           let finalizable, unfinalizable_requests =
             List.partition_map
@@ -122,7 +145,7 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
                 if Cycle_repr.(request_cycle <= greatest_finalizable_cycle) then
                   let new_amount =
                     apply_slashes
-                      ~preserved_cycles
+                      ~slashable_deposits_period
                       slashing_history
                       ~from_cycle:request_cycle
                       request_amount
@@ -159,67 +182,36 @@ let add ctxt ~contract ~delegate cycle amount =
 module For_RPC = struct
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in
-    let current_level = Raw_context.current_level ctxt in
-    let cycle_eras = Raw_context.cycle_eras ctxt in
-    let is_last_of_cycle = Level_repr.last_of_cycle ~cycle_eras current_level in
-    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    let slashable_deposits_period =
+      Constants_storage.slashable_deposits_period ctxt
+    in
+    let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
+    let slashing_history = Option.value slashing_history_opt ~default:[] in
+
+    (* Oxford values *)
     let* slashing_history_opt =
-      Storage.Contract.Slashed_deposits.find
+      Storage.Contract.Slashed_deposits__Oxford.find
         ctxt
         (Contract_repr.Implicit delegate)
     in
-    let slashing_history = Option.value slashing_history_opt ~default:[] in
-    (* Remove slashes that haven't been applied yet *)
+    let slashing_history_o =
+      Option.value slashing_history_opt ~default:[]
+      |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+    in
+
     let slashing_history =
-      if not is_last_of_cycle then
-        List.filter
-          (fun (cycle, _) -> Cycle_repr.(cycle < current_level.cycle))
-          slashing_history
-      else slashing_history
-    in
-    (* We get the current cycle's denunciations for events in the previous cycle,
-       and remove them from the slashing events (since they haven't been applied yet).
-       Another solution would be to add the slashing cycle in Storage.Contract.Slashed_deposits,
-       but since it's only used for this specific RPC, let's not. *)
-    let* denunciations_opt =
-      Storage.Current_cycle_denunciations.find ctxt delegate
-    in
-    let denunciations = Option.value denunciations_opt ~default:[] in
-    let not_yet_slashed_pct =
-      if is_last_of_cycle then Int_percentage.p0
-      else
-        List.fold_left
-          (fun acc Denunciations_repr.{misbehaviour; misbehaviour_cycle; _} ->
-            match (misbehaviour_cycle, misbehaviour) with
-            | Current, _ -> acc
-            | Previous, Double_baking ->
-                Int_percentage.add_bounded
-                  acc
-                  (Constants_storage
-                   .percentage_of_frozen_deposits_slashed_per_double_baking
-                     ctxt)
-            | Previous, Double_attesting ->
-                Int_percentage.add_bounded
-                  acc
-                  (Constants_storage
-                   .percentage_of_frozen_deposits_slashed_per_double_attestation
-                     ctxt))
-          Int_percentage.p0
-          denunciations
-    in
-    let slashing_history =
-      List.map
-        (fun (cycle, pct) ->
-          if Cycle_repr.(succ cycle = current_level.cycle) then
-            (cycle, Int_percentage.(sub_bounded pct not_yet_slashed_pct))
-          else (cycle, pct))
+      List.fold_left
+        (fun acc (cycle, percentage) ->
+          Storage.Slashed_deposits_history.add cycle percentage acc)
+        slashing_history_o
         slashing_history
     in
+
     List.map_es
       (fun (request_cycle, request_amount) ->
         let new_amount =
           apply_slashes
-            ~preserved_cycles
+            ~slashable_deposits_period
             slashing_history
             ~from_cycle:request_cycle
             request_amount

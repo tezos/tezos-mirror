@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (option unit) None } ;
+output { Stack_elt bytes 0x050306 } ;

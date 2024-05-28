@@ -26,9 +26,6 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
    use another storage solution that irmin as we don't need backtracking *)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4097
-   Add an interface to this module *)
-
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
@@ -82,23 +79,46 @@ module Value_size_hooks = struct
 end
 
 module Shards = struct
-  include Key_value_store
+  module KVS = Key_value_store
 
-  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) t
+  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
+
+  let file_layout ~root_dir commitment =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+
+       Make Key-Value store layout resilient to crypto parameters change.  Also,
+       putting a value not far from the real number of shards allows saving disk
+       storage. *)
+    let number_of_shards = 4096 in
+    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
+    let filepath = Filename.concat root_dir commitment_string in
+    Key_value_store.layout
+      ~encoded_value_size:(Value_size_hooks.share_size ())
+      ~encoding:Cryptobox.share_encoding
+      ~filepath
+      ~eq:Stdlib.( = )
+      ~index_of:Fun.id
+      ~number_of_keys_per_file:number_of_shards
+      ()
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
   let are_shards_available store commitment shard_indexes =
-    List.for_all_s (value_exists store commitment) shard_indexes
+    List.for_all_es
+      (KVS.value_exists store file_layout commitment)
+      shard_indexes
 
-  let save_and_notify shards_store shards_watcher commitment shards =
+  let save_and_notify shards_store commitment shards =
     let open Lwt_result_syntax in
     let shards =
       Seq.map
         (fun {Cryptobox.index; share} -> (commitment, index, share))
         shards
     in
-    let* () = write_values shards_store shards |> Errors.other_lwt_result in
+    let* () =
+      KVS.write_values shards_store file_layout shards
+      |> Errors.other_lwt_result
+    in
     let*! () =
       List.of_seq shards
       |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
@@ -109,31 +129,27 @@ module Shards = struct
 
        DAL/Node: rehaul the store  abstraction & notification system.
     *)
-    return @@ Lwt_watcher.notify shards_watcher commitment
+    return_unit
 
   let read_all shards_store commitment ~number_of_shards =
     Seq.ints 0
     |> Seq.take_while (fun x -> x < number_of_shards)
     |> Seq.map (fun shard_index -> (commitment, shard_index))
-    |> read_values shards_store
+    |> KVS.read_values shards_store file_layout
+
+  let read_value store commitment shard_id =
+    KVS.read_value store file_layout commitment shard_id
+
+  let read_values store keys = KVS.read_values store file_layout keys
+
+  let count_values store commitment =
+    KVS.count_values store file_layout commitment
+
+  let remove store commitment = KVS.remove_file store file_layout commitment
 
   let init node_store_dir shard_store_dir =
-    let open Lwt_syntax in
-    let ( // ) = Filename.concat in
-    let dir_path = node_store_dir // shard_store_dir in
-    let+ () =
-      if not (Sys.file_exists dir_path) then Lwt_utils_unix.create_dir dir_path
-      else return_unit
-    in
-    init ~lru_size:Constants.shards_store_lru_size (fun commitment ->
-        let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-        let filepath = dir_path // commitment_string in
-        directory
-          ~encoded_value_size:(Value_size_hooks.share_size ())
-          Cryptobox.share_encoding
-          filepath
-          Stdlib.( = )
-          Fun.id)
+    let root_dir = Filename.concat node_store_dir shard_store_dir in
+    KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
 end
 
 module Shard_proofs_cache =
@@ -150,31 +166,32 @@ module Shard_proofs_cache =
 type node_store = {
   store : t;
   shard_store : Shards.t;
-  shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
 
-(** [open_shards_stream node_store] opens a stream that should be notified when
-    the storage is updated with new shards. *)
-let open_shards_stream {shards_watcher; _} =
-  Lwt_watcher.create_stream shards_watcher
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+
+   handle with_proof flag -> store proofs on disk? *)
+let save_shard_proofs node_store commitment shard_proofs =
+  Shard_proofs_cache.replace
+    node_store.in_memory_shard_proofs
+    commitment
+    shard_proofs
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
-  let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let*! shard_store = Shards.init base_dir shard_store_dir in
+  let* shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
       shard_store;
       store;
-      shards_watcher;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }
@@ -238,17 +255,6 @@ module Legacy = struct
       val headers : Cryptobox.commitment -> Path.t
 
       val header : Cryptobox.commitment -> Types.slot_id -> Path.t
-
-      val shards : Cryptobox.commitment -> Path.t
-
-      type shard_index := int
-
-      val shard :
-        Cryptobox.commitment ->
-        redundancy_factor:int ->
-        number_of_shards:int ->
-        shard_index ->
-        Path.t
     end
 
     module Level : sig
@@ -298,17 +304,6 @@ module Legacy = struct
         let open Types in
         let prefix = headers commitment in
         prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
-
-      let shards commitment =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / "shards"
-
-      let shard commitment ~redundancy_factor ~number_of_shards index =
-        let prefix = shards commitment in
-        let parameters_repr =
-          Printf.sprintf "%d-%d" redundancy_factor number_of_shards
-        in
-        prefix / "parameters" / parameters_repr / "index" / Int.to_string index
     end
 
     module Level = struct
@@ -317,7 +312,7 @@ module Legacy = struct
       let slots_indices slot_level = root / Int32.to_string slot_level
 
       let headers index =
-        let open Types in
+        let open Types.Slot_id in
         slots_indices index.slot_level / Int.to_string index.slot_index
 
       let accepted_header index =
@@ -419,7 +414,9 @@ module Legacy = struct
           in
           (* This invariant should hold. *)
           assert (Int32.equal published_level block_level) ;
-          let index = Types.{slot_level = published_level; slot_index} in
+          let index =
+            Types.Slot_id.{slot_level = published_level; slot_index}
+          in
           let header_path = Path.Commitment.header commitment index in
           let*! () =
             set
@@ -488,7 +485,7 @@ module Legacy = struct
     let unattested_str = encode_header_status `Unattested in
     List.iter_s
       (fun slot_index ->
-        let index = Types.{slot_level = published_level; slot_index} in
+        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
         let status_path = Path.Level.accepted_header_status index in
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
@@ -521,7 +518,7 @@ module Legacy = struct
   let get_commitment_by_published_level_and_index ~level ~slot_index node_store
       =
     let open Lwt_result_syntax in
-    let index = Types.{slot_level = level; slot_index} in
+    let index = Types.Slot_id.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
       find node_store.store @@ Path.Level.accepted_header_commitment index
     in
@@ -540,7 +537,7 @@ module Legacy = struct
         List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
       in
       List.filter
-        (fun {Types.slot_level = l; slot_index = i} ->
+        (fun {Types.Slot_id.slot_level = l; slot_index = i} ->
           keep_field l slot_level && keep_field i slot_index)
         indexes
       |> return
@@ -656,7 +653,10 @@ module Legacy = struct
     let slot_ids =
       List.rev_map
         (fun (index, _tree) ->
-          {Types.slot_level = published_level; slot_index = int_of_string index})
+          {
+            Types.Slot_id.slot_level = published_level;
+            slot_index = int_of_string index;
+          })
         slots_indices
     in
     let* accu = get_other_headers slot_ids store [] in
@@ -680,13 +680,4 @@ module Legacy = struct
         List.filter_map
           (fun header -> if header.Types.status = hs then Some header else None)
           accu
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
-
-     handle with_proof flag -> store proofs on disk? *)
-  let save_shard_proofs node_store commitment shard_proofs =
-    Shard_proofs_cache.replace
-      node_store.in_memory_shard_proofs
-      commitment
-      shard_proofs
 end

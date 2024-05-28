@@ -473,22 +473,9 @@ module Start_octez_node = struct
       dal_cryptobox_parameters;
     }
 
-  let config_dal_srs node dal_cryptobox_parameters =
-    let p = dal_cryptobox_parameters in
-    let dal_cryptobox : Tezos_crypto_dal.Cryptobox.parameters =
-      {
-        slot_size = int_of_string p.slot_size;
-        page_size = int_of_string p.page_size;
-        redundancy_factor = int_of_string p.redundancy_factor;
-        number_of_shards = int_of_string p.number_of_shards;
-      }
-    in
+  let config_dal_srs node _dal_cryptobox_parameters =
     let config : Tezos_crypto_dal_octez_dal_config.Dal_config.t =
-      {
-        activated = true;
-        use_mock_srs_for_testing = Some dal_cryptobox;
-        bootstrap_peers = [];
-      }
+      {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
     in
     Node.Config_file.update
       node
@@ -524,7 +511,11 @@ module Start_octez_node = struct
         l1_node_args
     in
     let* () = Node.config_init node [] in
-    Option.iter (config_dal_srs node) dal_cryptobox_parameters ;
+    let* () =
+      match dal_cryptobox_parameters with
+      | None -> unit
+      | Some parameters -> config_dal_srs node parameters
+    in
     let* () =
       match snapshot with
       | Some snapshot ->
@@ -1712,17 +1703,7 @@ module Start_rollup_node = struct
         (Agent_state.http_client state)
         args.path_rollup_node
     in
-    let* path_client =
-      Http_client.local_path_from_agent_uri
-        (Agent_state.http_client state)
-        args.path_client
-    in
     let l1_endpoint = octez_endpoint state args.endpoint in
-    let metrics_port =
-      match args.metrics_port with
-      | Some x -> int_of_string x
-      | _ -> Port.fresh ()
-    in
     let rollup_node =
       Sc_rollup_node.(
         create_with_endpoint
@@ -1730,6 +1711,7 @@ module Start_rollup_node = struct
           ~rpc_host:"0.0.0.0"
           ?data_dir:args.data_dir_path
           ?rpc_port:(Option.map int_of_string args.rpc_port)
+          ?metrics_port:(Option.map int_of_string args.metrics_port)
           ~path
           (mode_of_string args.mode)
           ~default_operator:args.operator
@@ -1738,20 +1720,18 @@ module Start_rollup_node = struct
     in
     let kernel_log_args =
       match args.kernel_log_path with
-      | Some path -> ["--log-kernel-debug"; "--log-kernel-debug-file"; path]
+      | Some path ->
+          Sc_rollup_node.[Log_kernel_debug; Log_kernel_debug_file path]
       | None -> []
     in
-    let* () =
-      Sc_rollup_node.run rollup_node args.address
-      @@ ["--metrics-addr"; sf "0.0.0.0:%d" metrics_port]
-      @ kernel_log_args
-    in
+    let* () = Sc_rollup_node.run rollup_node args.address kernel_log_args in
 
-    let* _ = Sc_rollup_node.unsafe_wait_sync ~path_client rollup_node in
+    let* _ = Sc_rollup_node.unsafe_wait_sync rollup_node in
     Agent_state.add
       (Rollup_node_k (Sc_rollup_node.name rollup_node))
       rollup_node
       state ;
+    let _metric_addr, metrics_port = Sc_rollup_node.metrics rollup_node in
     return
       {
         name = Sc_rollup_node.name rollup_node;
@@ -3149,7 +3129,7 @@ let publish_slot_info_encoding =
 type 'uri publish_dal_slot = {
   slot_info : publish_slot_info;
   target_published_level : string option;
-      (** We target the inclusion of the publish slot header operation at this
+      (** We target the inclusion of the publish commitment operation at this
           level, so the operation should be inject at least one level before. *)
   l1_node_uri : 'uri;
       (** An URI to a Layer 1 node. If [None], we target the next level. *)

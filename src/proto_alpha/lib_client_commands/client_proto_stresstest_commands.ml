@@ -494,7 +494,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
 let inject_contents (cctxt : Protocol_client_context.full) branch sk contents =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding_with_legacy_attestation_name
+      Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
   let signature =
@@ -504,9 +504,7 @@ let inject_contents (cctxt : Protocol_client_context.full) branch sk contents =
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Operation.encoding_with_legacy_attestation_name
-      (Operation.pack op)
+    Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
   Shell_services.Injection.operation cctxt bytes
 
@@ -802,7 +800,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       let*! () = save_injected_operations cctxt state in
       stat_on_exit cctxt state
     else
-      let start = Mtime_clock.elapsed () in
+      let start = Mtime_clock.counter () in
       let*! () =
         log Debug (fun () ->
             cctxt#message "launch.loop: invoke sample_transfer")
@@ -816,8 +814,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       in
       let* () = inject_transfer cctxt parameters state transfer in
       incr injected ;
-      let stop = Mtime_clock.elapsed () in
-      let elapsed = Mtime.Span.(to_s stop -. to_s start) in
+      let elapsed = Time.Monotonic.Span.to_float_s (Mtime_clock.count start) in
       let remaining = dt -. elapsed in
       let*! () =
         if remaining <= 0.0 then

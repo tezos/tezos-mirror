@@ -27,6 +27,7 @@
 
 open Protocol
 open Alpha_context
+open Context_wrapper.Irmin
 
 (** This function computes the inclusion/membership proof of the page
       identified by [page_id] in the slot whose data are provided in
@@ -54,7 +55,8 @@ let page_membership_proof params page_index slot_data =
         | `Fail s -> "Fail " ^ s
         | `Page_index_out_of_range -> "Page_index_out_of_range"
         | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
-        | `Invalid_degree_strictly_less_than_expected _ as commit_error ->
+        | ( `Invalid_degree_strictly_less_than_expected _
+          | `Prover_SRS_not_loaded ) as commit_error ->
             Cryptobox.string_of_commit_error commit_error)
 
 (** When the PVM is waiting for a Dal page input, this function attempts to
@@ -109,7 +111,7 @@ let metadata (node_ctxt : _ Node_context.t) =
   Sc_rollup.Metadata.{address; origination_level}
 
 let generate_proof (node_ctxt : _ Node_context.t)
-    (game : Octez_smart_rollup.Game.t) start_state =
+    (game : Octez_smart_rollup.Game.t) (start_state : Context.pvmstate) =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let snapshot =
@@ -120,26 +122,18 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let snapshot_level_int32 =
     (Octez_smart_rollup.Inbox.Skip_list.content game.inbox_snapshot).level
   in
-  let get_snapshot_head () =
-    let+ hash = Node_context.hash_of_level node_ctxt snapshot_level_int32 in
-    Layer1.{hash; level = snapshot_level_int32}
-  in
   let* context =
     let* start_hash = Node_context.hash_of_level node_ctxt game.inbox_level in
     let+ context = Node_context.checkout_context node_ctxt start_hash in
     Context.index context
   in
   let* dal_slots_history =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
-    else return Dal.Slots_history.genesis
+    (* DAL is not activated in Nairobi *)
+    return Dal.Slots_history.genesis
   in
   let* dal_slots_history_cache =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
-    else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
+    (* DAL is not activated in Nairobi *)
+    return (Dal.Slots_history.History_cache.empty ~capacity:0L)
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
@@ -155,19 +149,20 @@ let generate_proof (node_ctxt : _ Node_context.t)
       ~dal_attestation_lag
       node_ctxt
       dal_parameters
-      start_state
+      (of_node_pvmstate start_state)
   in
   let module P = struct
     include PVM
 
-    let context = context
+    let context : context = (of_node_context context).index
 
-    let state = start_state
+    let state = of_node_pvmstate start_state
 
     let reveal hash =
       let open Lwt_syntax in
       let* res =
         Reveals.get
+          ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
           ~data_dir:node_ctxt.data_dir
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           ~hash
@@ -231,7 +226,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
     end
   end in
   let metadata = metadata node_ctxt in
-  let*! start_tick = PVM.get_tick start_state in
+  let*! start_tick = PVM.get_tick (of_node_pvmstate start_state) in
   let* proof =
     trace
       (Sc_rollup_node_errors.Cannot_produce_proof

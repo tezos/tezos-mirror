@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt signature "edsigtYnaoM7bF49AAP1NV5gYH6ZADZhm9C6sXbohQ77CeRncdMoiHqCsbfkjiXfyxoE8uyTgaza5HU58SMQ5iZLwjYspcMF1Q1" } ;
+output { Stack_elt bytes 0x050a00000040077cfc77676c4dc63a208061056e8969cb859d804f286826efa2c9e12a844cd2bb96ed25afc901691d3f0b7fe0b3472d25e83233dae94f3ddca4a2fc9250c80b } ;

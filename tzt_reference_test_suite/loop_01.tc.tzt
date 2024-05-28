@@ -1,0 +1,3 @@
+code { PUSH bool False; LOOP { } } ;
+input { } ;
+output (StaticError _)

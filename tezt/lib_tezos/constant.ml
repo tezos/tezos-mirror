@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,11 +25,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let octez_client = "./octez-client"
+(* Some constants such as [octez_client] are automatically added to [~uses],
+   so they have to be defined in the wrapper library.
+   [Constant] merely provides an alias. *)
+let octez_client = Uses.octez_client
 
-let octez_admin_client = "./octez-admin-client"
+let octez_admin_client = Uses.octez_admin_client
 
-let octez_node = "./octez-node"
+let octez_node = Uses.octez_node
 
 let octez_proxy_server =
   Uses.make ~tag:"proxy_server" ~path:"./octez-proxy-server"
@@ -59,6 +63,53 @@ let octez_injector_server =
     ~path:
       "./_build/default/contrib/octez_injector_server/octez_injector_server.exe"
 
+let smart_rollup_installer =
+  Uses.make ~tag:"smart_rollup_installer" ~path:"smart-rollup-installer"
+
+(* The following is unused because even though the WASM debugger is released,
+   there are no tests for it yet, except [tezt/tests/binaries.ml].
+   However, this test requires the executables it tests to be declared with
+   [Uses.make] so that they are registered in the lookup table of [Uses]. *)
+let _octez_smart_rollup_wasm_debugger =
+  Uses.make ~tag:"wasm_debugger" ~path:"./octez-smart-rollup-wasm-debugger"
+
+module WASM = struct
+  let dal_echo_kernel =
+    Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm"
+
+  let debug_kernel =
+    Uses.make
+      ~tag:"debug_kernel"
+      ~path:"etherlink/kernel_evm/kernel/tests/resources/debug_kernel.wasm"
+
+  (* Note: this should probably depend on the protocol,
+     and thus be in the [Protocol] module? *)
+  let echo =
+    Uses.make
+      ~tag:"echo"
+      ~path:
+        "src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm"
+
+  let evm_kernel = Uses.make ~tag:"evm_kernel" ~path:"evm_kernel.wasm"
+
+  let failed_migration =
+    Uses.make
+      ~tag:"failed_migration"
+      ~path:"etherlink/kernel_evm/kernel/tests/resources/failed_migration.wasm"
+
+  let ghostnet_evm_kernel =
+    Uses.make
+      ~tag:"ghostnet_evm_kernel"
+      ~path:
+        "etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm"
+
+  let ghostnet_evm_commit = "d517020b58afef0e15c768ee0b5acbda1786cdd8"
+
+  let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm"
+
+  let tx_kernel_dal = Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm"
+end
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)
@@ -69,6 +120,16 @@ let released_executables = "./script-inputs/released-executables"
 (* We use the [experimental-executables] script input as source of
    experimental executable binaries to test. *)
 let experimental_executables = "./script-inputs/experimental-executables"
+
+(** Default hostname to use for endpoints when no specific one is required. *)
+let default_host =
+  (* The value of [default_host] is set to ["127.0.0.1"] because the
+     alternatives have the following drawbacks :
+     - Using ["localhost"] leads to an extra consumption of RAM
+       (https://gitlab.com/tezos/tezos/-/issues/6789).
+     - There are or were some problems with IPv6 on GCP.
+  *)
+  "127.0.0.1"
 
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)

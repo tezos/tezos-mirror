@@ -47,7 +47,7 @@ let parameters_encoding =
 
 type t = {
   activated : bool;
-  use_mock_srs_for_testing : parameters option;
+  use_mock_srs_for_testing : bool;
   bootstrap_peers : string list;
 }
 
@@ -59,10 +59,10 @@ let encoding : t Data_encoding.t =
     (fun (activated, use_mock_srs_for_testing, bootstrap_peers) ->
       {activated; use_mock_srs_for_testing; bootstrap_peers})
     (obj3
-       (req "activated" bool)
-       (req "use_mock_srs_for_testing" (option parameters_encoding))
+       (dft "activated" bool true)
+       (dft "use_mock_srs_for_testing" bool false)
        (req "bootstrap_peers" (list string)))
   [@@coverage off]
 
 let default =
-  {activated = false; use_mock_srs_for_testing = None; bootstrap_peers = []}
+  {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}

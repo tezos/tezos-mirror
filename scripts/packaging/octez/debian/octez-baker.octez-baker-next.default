@@ -1,0 +1,7 @@
+
+# Data Directory
+# we use the datadir defined in /etc/default/octez-node
+
+# Other options
+# Keep the daemon process alive
+RUNTIME_OPTS="--keep-alive"

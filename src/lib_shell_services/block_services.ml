@@ -797,7 +797,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       mk_version_informations
         ~supported:[version_0; version_1]
         ~latest:Version_1
-        ~default:Version_0
+        ~default:Version_1
         ()
 
     let metadata_query =
@@ -806,8 +806,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           object
             method version = version
           end)
-      |+ field "version" (version_arg metadata_versions) Version_0 (fun t ->
-             t#version)
+      |+ field
+           "version"
+           (version_arg metadata_versions)
+           metadata_versions.default
+           (fun t -> t#version)
       |> seal
 
     let metadata =
@@ -876,7 +879,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       mk_version_informations
         ~supported:[version_0; version_1]
         ~latest:Version_1
-        ~default:Version_0
+        ~default:Version_1
         ()
 
     let force_operation_metadata_query =
@@ -1151,7 +1154,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           mk_version_informations
             ~supported:[version_0; version_1]
             ~latest:Version_1
-            ~default:Version_0
+            ~default:Version_1
             ()
 
         let operations_query =
@@ -1305,87 +1308,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         unprocessed : Next_proto.operation Operation_hash.Map.t;
       }
 
-      let version_0_encoding =
-        conv
-          (fun {
-                 validated;
-                 refused;
-                 outdated;
-                 branch_refused;
-                 branch_delayed;
-                 unprocessed;
-               } ->
-            ( validated,
-              refused,
-              outdated,
-              branch_refused,
-              branch_delayed,
-              unprocessed ))
-          (fun ( validated,
-                 refused,
-                 outdated,
-                 branch_refused,
-                 branch_delayed,
-                 unprocessed ) ->
-            {
-              validated;
-              refused;
-              outdated;
-              branch_refused;
-              branch_delayed;
-              unprocessed;
-            })
-          (obj6
-             (req
-                "applied"
-                (list
-                   (conv
-                      (fun (hash, (op : Next_proto.operation)) ->
-                        ((hash, op.shell), op.protocol_data))
-                      (fun ((hash, shell), protocol_data) ->
-                        (hash, {shell; protocol_data}))
-                      (merge_objs
-                         (merge_objs
-                            (obj1 (req "hash" Operation_hash.encoding))
-                            (dynamic_size Operation.shell_header_encoding))
-                         (dynamic_size
-                            Next_proto
-                            .operation_data_encoding_with_legacy_attestation_name)))))
-             (req
-                "refused"
-                (Operation_hash.Map.encoding
-                   (merge_objs
-                      (dynamic_size
-                         next_operation_encoding_with_legacy_attestation_name)
-                      (obj1 (req "error" Tezos_rpc.Error.encoding)))))
-             (req
-                "outdated"
-                (Operation_hash.Map.encoding
-                   (merge_objs
-                      (dynamic_size
-                         next_operation_encoding_with_legacy_attestation_name)
-                      (obj1 (req "error" Tezos_rpc.Error.encoding)))))
-             (req
-                "branch_refused"
-                (Operation_hash.Map.encoding
-                   (merge_objs
-                      (dynamic_size
-                         next_operation_encoding_with_legacy_attestation_name)
-                      (obj1 (req "error" Tezos_rpc.Error.encoding)))))
-             (req
-                "branch_delayed"
-                (Operation_hash.Map.encoding
-                   (merge_objs
-                      (dynamic_size
-                         next_operation_encoding_with_legacy_attestation_name)
-                      (obj1 (req "error" Tezos_rpc.Error.encoding)))))
-             (req
-                "unprocessed"
-                (Operation_hash.Map.encoding
-                   (dynamic_size
-                      next_operation_encoding_with_legacy_attestation_name))))
-
-      let version_1_encoding ~use_legacy_name ~use_validated =
+      let pending_operations_encoding ~use_legacy_name ~use_validated =
         let next_operation_encoding =
           if use_legacy_name then
             next_operation_encoding_with_legacy_attestation_name
@@ -1467,10 +1390,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                          next_operation_encoding)))))
 
       let version_2_encoding =
-        version_1_encoding ~use_legacy_name:false ~use_validated:true
+        pending_operations_encoding ~use_legacy_name:false ~use_validated:true
 
       let version_1_encoding =
-        version_1_encoding ~use_legacy_name:true ~use_validated:false
+        pending_operations_encoding ~use_legacy_name:true ~use_validated:false
 
       (* This encoding should be always the one by default. *)
       let encoding = version_1_encoding
@@ -1479,12 +1402,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         mk_version_informations
           ~supported:
             [
-              version_0;
               {version = Version_1; use_legacy_attestation_name = true};
               {version = Version_2; use_legacy_attestation_name = false};
             ]
           ~latest:Version_2
-          ~default:Version_1
+          ~default:Version_2
           ()
 
       let pending_query =
@@ -1492,7 +1414,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         query
           (fun
             version
-            applied
             validated
             refused
             outdated
@@ -1502,8 +1423,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ->
             object
               method version = version
-
-              method applied = applied
 
               method validated = validated
 
@@ -1522,15 +1441,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (version_arg pending_operations_versions)
              pending_operations_versions.default
              (fun t -> t#version)
-        |+ opt_field
-             ~descr:
-               "(DEPRECATED use validated instead) Include validated operations"
-               (* https://gitlab.com/tezos/tezos/-/issues/5891
-                  applied is deprecated and should be removed in a future
-                  version of Octez *)
-             "applied"
-             Tezos_rpc.Arg.bool
-             (fun t -> t#applied)
         |+ field
              ~descr:"Include validated operations (true by default)"
              "validated"
@@ -1573,8 +1483,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         encoding_versioning
           ~encoding_name:"pending_operations"
           ~latest_encoding:(Version_2, version_2_encoding)
-          ~old_encodings:
-            [(Version_0, version_0_encoding); (Version_1, version_1_encoding)]
+          ~old_encodings:[(Version_1, version_1_encoding)]
 
       let pending_operations path =
         Tezos_rpc.Service.get_service
@@ -1618,7 +1527,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         mk_version_informations
           ~supported:[version_0; version_1]
           ~latest:Version_1
-          ~default:Version_0
+          ~default:Version_1
           ()
 
       let mempool_query =
@@ -1626,7 +1535,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         query
           (fun
             version
-            applied
             validated
             refused
             outdated
@@ -1636,8 +1544,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ->
             object
               method version = version
-
-              method applied = applied
 
               method validated = validated
 
@@ -1656,15 +1562,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (version_arg monitor_operations_versions)
              monitor_operations_versions.default
              (fun t -> t#version)
-        |+ opt_field
-             ~descr:
-               "(DEPRECATED use validated instead) Include validated operations"
-               (* https://gitlab.com/tezos/tezos/-/issues/5891
-                  applied is deprecated and should be removed in a future
-                  version of Octez *)
-             "applied"
-             Tezos_rpc.Arg.bool
-             (fun t -> t#applied)
         |+ field
              ~descr:"Include validated operations (set by default)"
              "validated"
@@ -1825,7 +1722,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let f = make_call0 S.raw_header ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
 
-  let metadata ctxt ?(version = Version_0) =
+  let metadata ctxt ?(version = S.metadata_versions.default) =
     let open Lwt_result_syntax in
     let f = make_call0 S.metadata ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
@@ -2095,8 +1992,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (object
              method version = version
 
-             method applied = None
-
              method validated = validated
 
              method refused = refused
@@ -2138,8 +2033,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ((), chain)
           (object
              method version = version
-
-             method applied = None
 
              method validated = validated
 

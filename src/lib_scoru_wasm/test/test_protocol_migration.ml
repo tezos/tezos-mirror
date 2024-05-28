@@ -62,11 +62,18 @@ let test_protocol_migration_message ~from_version ~to_version
 let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
   | Nairobi -> "Nairobi"
   | Oxford -> "Oxford"
+  | Paris -> "Paris"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =
   List.map
     (fun (from_version, to_version, protocol) ->
+      (* This pattern match is introduced in order to not typecheck if
+         a new version is added.
+         If you end up here because of this, please add a protocol migration
+         test for you new version. *)
+      (match from_version with
+      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 -> ()) ;
       tztest
         (sf
            "protocol migration message handling by the WASM PVM (%s)"
@@ -76,7 +83,9 @@ let tests =
            ~from_version
            ~to_version
            ~after_protocol_activation:protocol))
-    [(V0, V1, Nairobi); (V1, V2, Oxford); (V2, V3, Proto_alpha)]
+    [
+      (V2, V4, Proto_alpha); (V2, V4, Paris); (V1, V2, Oxford); (V0, V1, Nairobi);
+    ]
 
 let () =
   Alcotest_lwt.run

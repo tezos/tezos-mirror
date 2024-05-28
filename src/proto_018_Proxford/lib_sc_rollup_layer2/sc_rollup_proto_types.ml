@@ -453,8 +453,13 @@ module Constants = struct
 
   let reveal_activation_level_of_octez
       Octez_smart_rollup.Rollup_constants.
-        {blake2B; metadata; dal_page; dal_parameters} : reveal_activation_level
-      =
+        {
+          blake2B;
+          metadata;
+          dal_page;
+          dal_parameters;
+          dal_attested_slots_validity_lag = _;
+        } : reveal_activation_level =
     {
       raw_data = {blake2B = Raw_level.of_int32_exn blake2B};
       metadata = Raw_level.of_int32_exn metadata;
@@ -471,5 +476,6 @@ module Constants = struct
       metadata = Raw_level.to_int32 metadata;
       dal_page = Raw_level.to_int32 dal_page;
       dal_parameters = Raw_level.to_int32 dal_parameters;
+      dal_attested_slots_validity_lag = Int32.max_int;
     }
 end

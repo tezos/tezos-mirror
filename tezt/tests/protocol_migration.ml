@@ -65,11 +65,40 @@ let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
   let* client = Client.(init ?name:client_name ~endpoint:(Node node) ()) in
   Lwt.return (client, node)
 
+(** [block_check ?level ~expected_block_type ~migrate_to ~migrate_from client]
+    is generic check that a block of type [expected_block_type] contains
+    (protocol) metatadata conforming to its type at [level]. **)
+let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
+  let block =
+    match level with Some level -> Some (string_of_int level) | None -> None
+  in
+  let* metadata =
+    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
+  in
+  let protocol = metadata.protocol in
+  let next_protocol = metadata.next_protocol in
+  (match expected_block_type with
+  | `Migration ->
+      Check.(
+        (next_protocol = Protocol.hash migrate_to)
+          string
+          ~error_msg:"expected next protocol to be %R, got %L") ;
+      Check.(
+        (protocol = Protocol.hash migrate_from)
+          string
+          ~error_msg:"expected (from) protocol to be %R, got %L")
+  | `Non_migration ->
+      Check.(
+        (next_protocol = protocol)
+          string
+          ~error_msg:"expected a non migration block ")) ;
+  Lwt.return_unit
+
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
-let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
-    ~migration_level ~migrate_from ~migrate_to ~baked_blocks_after_migration ()
-    =
+let perform_protocol_migration ?node_name ?client_name ?parameter_file
+    ~blocks_per_cycle ~migration_level ~migrate_from ~migrate_to
+    ~baked_blocks_after_migration () =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
@@ -81,43 +110,35 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
       ()
   in
   Log.info "Node %s initialized" (Node.name node) ;
-  let* () = Client.activate_protocol ~protocol:migrate_from client in
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from client ?parameter_file
+  in
   Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
   (* Bake until migration *)
   let* () =
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
   in
   (* Ensure that the block before migration *)
-  let* pre_migration_block =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_metadata ~block:(Int.to_string migration_level) ()
-  in
   Log.info "Checking migration block consistency" ;
-  Check.(
-    (pre_migration_block.protocol = Protocol.hash migrate_from)
-      string
-      ~error_msg:"expected protocol = %R, got %L") ;
-  Check.(
-    (pre_migration_block.next_protocol = Protocol.hash migrate_to)
-      string
-      ~error_msg:"expected next_protocol = %R, got %L") ;
+  let* () =
+    block_check
+      ~expected_block_type:`Migration
+      client
+      ~migrate_from
+      ~migrate_to
+      ~level:migration_level
+  in
   let* () = Client.bake_for_and_wait client in
   (* Ensure that we migrated *)
-  let* migration_block =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_metadata
-         ~block:(Int.to_string (migration_level + 1))
-         ()
-  in
   Log.info "Checking migration block consistency" ;
-  Check.(
-    (migration_block.protocol = Protocol.hash migrate_to)
-      string
-      ~error_msg:"expected protocol = %R, got %L") ;
-  Check.(
-    (migration_block.next_protocol = Protocol.hash migrate_to)
-      string
-      ~error_msg:"expected next_protocol = %R, got %L") ;
+  let* () =
+    block_check
+      ~expected_block_type:`Non_migration
+      client
+      ~migrate_from
+      ~migrate_to
+      ~level:(migration_level + 1)
+  in
   (* Test that we can still bake after migration *)
   let* () =
     repeat baked_blocks_after_migration (fun () ->
@@ -129,7 +150,11 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
-  let preserved_cycles = JSON.(get "preserved_cycles" parameters |> as_int) in
+  let consensus_rights_delay =
+    if Protocol.number migrate_to > Protocol.number Protocol.Oxford then
+      JSON.(get "consensus_rights_delay" parameters |> as_int)
+    else JSON.(get "preserved_cycles" parameters |> as_int)
+  in
   for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
     Test.register
       ~__FILE__
@@ -142,7 +167,8 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
         ~migration_level
         ~migrate_from
         ~migrate_to
-        ~baked_blocks_after_migration:(2 * preserved_cycles * blocks_per_cycle)
+        ~baked_blocks_after_migration:
+          (2 * consensus_rights_delay * blocks_per_cycle)
         ()
     in
     unit
@@ -274,7 +300,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   Log.info "Reconstruct full node3" ;
   let node3 = Node.create ~name:"node3" node_params in
   let* () = Node.config_init node3 node_params in
-  Node.Config_file.update node3 patch_config ;
+  let* () = Node.Config_file.update node3 patch_config in
   let* () = Node.snapshot_import node3 file_full in
   let* () = Node.reconstruct node3 in
   let* () = Node.run node3 node_params in
@@ -292,35 +318,6 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   let* () = connect (client3, node3) (client0, node0) in
   let* () = synchronize node1 [node0; node2; node3] in
   unit
-
-(** [block_check ~level ~expected_block_type ~migrate_to ~migrate_from client]
-    is generic check that a block of type [expected_block_type] contains
-    (protocol) metatadata conforming to its type at [level]. **)
-let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
-  let block =
-    match level with Some level -> Some (string_of_int level) | None -> None
-  in
-  let* metadata =
-    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
-  in
-  let protocol = metadata.protocol in
-  let next_protocol = metadata.next_protocol in
-  (match expected_block_type with
-  | `Migration ->
-      Check.(
-        (next_protocol = Protocol.hash migrate_to)
-          string
-          ~error_msg:"expected next protocol to be %R, got %L") ;
-      Check.(
-        (protocol = Protocol.hash migrate_from)
-          string
-          ~error_msg:"expected (from) protocol to be %R, got %L")
-  | `Non_migration ->
-      Check.(
-        (next_protocol = protocol)
-          string
-          ~error_msg:"expected a non migration block ")) ;
-  Lwt.return_unit
 
 (** Number of elements in [l] that satisfy the predicate [p]. *)
 let list_count_p p l =
@@ -447,6 +444,7 @@ let test_migration_with_bakers ?(migration_level = 4)
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
+    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
   @@ fun () ->
   let* client, node =
     user_migratable_node_init ~migration_level ~migrate_to ()
@@ -545,6 +543,7 @@ let test_forked_migration_manual ?(migration_level = 4)
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
+    ~uses:[Protocol.baker migrate_to]
     ~title:
       (Printf.sprintf
          "manually forked migration blocks from %s to %s"
@@ -745,6 +744,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
+    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
     ~title:
       (Printf.sprintf
          "baker forked migration blocks from %s to %s"
@@ -932,9 +932,590 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   in
   check_blocks ~level_from ~level_to
 
+let check_baking_rights client nb_cycles_to_check ?nb_cycles_is_valid () =
+  let check_baking_rights_rpc ~expect_failure ~cycle () =
+    let*? process =
+      Client.RPC.spawn client
+      @@ RPC.get_chain_block_helper_baking_rights ~cycle ()
+    in
+    let* () = Process.check ~expect_failure process in
+    Log.info
+      "Checked the baking rights for cycle = %s (expect_failure = %s)"
+      (Int.to_string cycle)
+      (Bool.to_string expect_failure) ;
+    unit
+  in
+
+  let* level =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
+  let nb_cycles_is_valid =
+    match nb_cycles_is_valid with Some x -> x | None -> nb_cycles_to_check
+  in
+  Lwt_list.iter_s
+    (fun cycle ->
+      let expect_failure = cycle > level.cycle + nb_cycles_is_valid in
+      check_baking_rights_rpc ~expect_failure ~cycle ())
+    (range level.cycle (level.cycle + nb_cycles_to_check))
+
+let test_migration_from_oxford_for_whole_cycle ~migrate_from ~migrate_to =
+  if Protocol.number migrate_from = Protocol.number Protocol.Oxford then (
+    let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let consensus_rights_delay =
+      JSON.(get "consensus_rights_delay" parameters |> as_int)
+    in
+    let preserved_cycles = 5 in
+    Log.info
+      "consensus_rights_delay = %d and preserved_cycles = %d"
+      consensus_rights_delay
+      preserved_cycles ;
+    for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
+      Test.register
+        ~__FILE__
+        ~title:
+          (Printf.sprintf
+             "protocol migration from Oxford at level %d"
+             migration_level)
+        ~tags:["protocol"; "migration"; "sandbox"; "baking_rights"]
+      @@ fun () ->
+      let* parameter_file =
+        let parameters = [(["preserved_cycles"], `Int preserved_cycles)] in
+        let base = Either.Right (migrate_from, None) in
+        Protocol.write_parameter_file ~base parameters
+      in
+      let* client, _node =
+        perform_protocol_migration
+          ~parameter_file
+          ~blocks_per_cycle
+          ~migration_level
+          ~migrate_from
+          ~migrate_to
+          ~baked_blocks_after_migration:0
+          ()
+      in
+      let* () =
+        check_baking_rights
+          client
+          preserved_cycles
+          ~nb_cycles_is_valid:consensus_rights_delay
+          ()
+      in
+      (* Test that we can still bake after migration *)
+      let* () =
+        repeat
+          (2 * consensus_rights_delay * blocks_per_cycle)
+          (fun () -> Client.bake_for_and_wait client)
+      in
+      let* () =
+        check_baking_rights
+          client
+          preserved_cycles
+          ~nb_cycles_is_valid:consensus_rights_delay
+          ()
+      in
+      unit
+    done)
+
+(* Test the migration from Oxford when there are denunciations. The
+   two main goals of this test are:
+
+   - Ensure that the storage stitching doesn't crash when the entries
+   related to recent denunciations and slashings are non-empty.
+
+   - Test the changes in the semantics of duplicate denunciations:
+
+     + In Oxford, a delegate can be denounced at most once for double
+     attesting at a given level, no matter the round; in Paris, they
+     can be denounced for each round of each level. Which semantics is
+     used depends on the level of the double signing event, rather
+     than the level at which the denunciation is included.
+
+     + In Oxford, double attestations and double preattestations are
+     bundled together for the purpose of duplicate denunciations,
+     whereas in Paris they are considered separate. Which semantics is
+     used depends on the protocol during which the first denunciation
+     on a given level has been baked into a block.
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/7081
+   Things that are **not currently tested**, but would be nice to
+   test:
+
+   - Check when the related slashings happen and their value. Note
+   that currently, the cumulated slashing will quickly exceed 100%. To
+   be able to observe more details, we probably want to either switch
+   from double attestations to double bakings (or a mix of both) to
+   reduce the slashed amount, or denounce various delegates in turn
+   instead of always [bootstrap1]. *)
+let test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration with denunciations"
+    ~tags:["protocol"; "migration"; "double"; "attestation"]
+  @@ fun () ->
+  if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
+    Test.fail
+      "This test is designed for the migration from Oxford to Paris. Other \
+       protocols have a different semantics for duplicate denunciations so the \
+       test would fail." ;
+  let blocks_per_cycle = 4 in
+  let migration_level = 2 * blocks_per_cycle in
+  Log.info
+    "blocks_per_cycle=%d, migration_level=%d"
+    blocks_per_cycle
+    migration_level ;
+  Log.info "Start node and client." ;
+  let* client, node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info "Activate protocol %s." (Protocol.name migrate_from) ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (* The nonce revelation threshold must be strictly smaller
+           than blocks_per_cycle and strictly positive. *)
+        (["nonce_revelation_threshold"], `Int (blocks_per_cycle / 2));
+      ]
+  in
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from ~parameter_file client
+  in
+
+  (* Helper functions *)
+  let inject ?error denunciation =
+    (* We can't use [Operation.Anonymous.operation] to craft the
+       operation once and for all, then [Operation.inject] to try and
+       inject it multiple times: if we do this, the operation will
+       remain exactly the same, and the injection RPC will ignore it
+       silently. Instead, calling [Operation.Anonymous.inject] crafts
+       a new operation with the same parameters but a new branch at
+       each level, which ensures that the mempool handles it as its
+       own new operation and we can observe errors such as
+       [already_denounced]. *)
+    Operation.Anonymous.inject ?error denunciation client
+  in
+  (* Craft and inject a denunciation for a double (pre)attestation
+     that happened at the given level and round. *)
+  let mk_and_inject_kind ?error ~misbehaviour_level ~misbehaviour_round kind =
+    let* op =
+      Operation.Anonymous.make_double_consensus_evidence_with_distinct_bph
+        ~kind
+        ~misbehaviour_level
+        ~misbehaviour_round
+        ~culprit:Constant.bootstrap1
+        client
+    in
+    let* (`OpHash _) = inject ?error op in
+    return op
+  in
+  (* By default, we craft denunciations for double attestations. *)
+  let mk_and_inject ?error ~misbehaviour_level ~misbehaviour_round () =
+    mk_and_inject_kind
+      ?error
+      ~misbehaviour_level
+      ~misbehaviour_round
+      Double_attestation_evidence
+  in
+  let mk_and_inject_pre ?error ~misbehaviour_level ~misbehaviour_round () =
+    mk_and_inject_kind
+      ?error
+      ~misbehaviour_level
+      ~misbehaviour_round
+      Double_preattestation_evidence
+  in
+  let keys =
+    (* The keys to use for baking. Don't bake with [bootstrap1]
+       because it's going to be denounced and consequently
+       forbidden. *)
+    Constant.
+      [
+        bootstrap2.public_key_hash;
+        bootstrap3.public_key_hash;
+        bootstrap4.public_key_hash;
+        bootstrap5.public_key_hash;
+      ]
+  in
+  let bake () = Client.bake_for_and_wait ~keys client in
+  let bake_until_level target_level =
+    Client.bake_until_level ~target_level ~keys ~node client
+  in
+
+  let level_0a = 1 and level_0b = 2 in
+  Log.info "Inject a denunciation on level %d (cycle 0)." level_0a ;
+  let* denun_0a =
+    mk_and_inject ~misbehaviour_level:level_0a ~misbehaviour_round:0 ()
+  in
+
+  Log.info "Bake until right before the migration." ;
+  let* () = bake_until_level (migration_level - 1) in
+  Log.info "We are now in cycle 1." ;
+  let* current_level =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
+  Check.((current_level.cycle = 1) ~__LOC__ int)
+    ~error_msg:"Expected cycle=%R, got %L" ;
+  let level_1a = blocks_per_cycle + 1 in
+  let level_1b = blocks_per_cycle + 2 in
+  let level_1c = blocks_per_cycle + 3 in
+  (* [blocks_per_cycle] needs to be large enough that [level_1c] is
+     still in cycle 1. *)
+  assert (current_level.level >= level_1c) ;
+  Log.info
+    "Inject denunciations on level %d (cycle 1) rounds 0 and 1, and on level \
+     %d round 3, but no denunciations on level %d. Also inject a denunciation \
+     on level %d (cycle 0), and check that the previous denunciation on level \
+     %d (cycle 0) can't be injected again."
+    level_1a
+    level_1b
+    level_1c
+    level_0b
+    level_0a ;
+  let* denun_1a_round0 =
+    mk_and_inject ~misbehaviour_level:level_1a ~misbehaviour_round:0 ()
+  and* denun_1a_round1 =
+    mk_and_inject ~misbehaviour_level:level_1a ~misbehaviour_round:1 ()
+  and* denun_1b_round3 =
+    mk_and_inject ~misbehaviour_level:level_1b ~misbehaviour_round:3 ()
+  and* denun_0b =
+    mk_and_inject ~misbehaviour_level:level_0b ~misbehaviour_round:0 ()
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_0a in
+
+  Log.info
+    "Bake one block and check that it is the migration block. This also brings \
+     us into cycle 2." ;
+  let* () = bake () in
+  let* level = Node.get_level node in
+  Check.((level = migration_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+
+  Log.info "Check that bootstrap1 is forbidden to bake." ;
+  let* is_forbidden =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_is_forbidden
+         Constant.bootstrap1.public_key_hash
+  in
+  assert is_forbidden ;
+  let* () =
+    Process.check_error
+      ~msg:
+        (rex
+           (Format.sprintf
+              "Delegate %s has committed too many misbehaviours; it is \
+               temporarily not allowed to bake/preattest/attest."
+              Constant.bootstrap1.public_key_hash))
+    @@ Client.spawn_bake_for ~keys:[Constant.bootstrap1.public_key_hash] client
+  in
+  Log.info
+    "Can't inject again any of the previous cycle 1 denunciations, nor \
+     denunciations on the same levels even with a different round. As to the \
+     denunciations on cycle 0, they are now outdated anyway." ;
+  let* (`OpHash _) = inject ~error:Operation.already_denounced denun_1a_round0
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_1a_round1
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_1b_round3
+  and* (_denun_1a_round5 : Operation.Anonymous.t) =
+    mk_and_inject
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1a
+      ~misbehaviour_round:5
+      ()
+  and* (_denun_1b_round0 : Operation.Anonymous.t) =
+    mk_and_inject
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1b
+      ~misbehaviour_round:0
+      ()
+  and* (`OpHash _) = inject ~error:Operation.outdated_denunciation denun_0a
+  and* (`OpHash _) = inject ~error:Operation.outdated_denunciation denun_0b in
+  let level_2a = (2 * blocks_per_cycle) + 1 in
+  Log.info
+    "Can still inject a denunciation on level %d (cycle 1), that has not been \
+     denounced at all. Also inject a denunciation on level %d (cycle 2)."
+    level_1c
+    level_2a ;
+  let* denun_1c =
+    mk_and_inject ~misbehaviour_level:level_1c ~misbehaviour_round:0 ()
+  and* denun_2a =
+    mk_and_inject ~misbehaviour_level:level_2a ~misbehaviour_round:0 ()
+  in
+  Log.info
+    "Bake a block so that the previous denunciations are applied. The same \
+     denunciations can't be reinjected. Can't inject a new denunciation on \
+     level %d (cycle 1) either, even with a new round, because the duplicate \
+     semantics of protocol %s wrt rounds is still used for cycle 1. But can \
+     inject a denunciation on level %d (cycle 2) with another round."
+    level_1c
+    (Protocol.name migrate_from)
+    level_2a ;
+  let* () = bake () in
+  let* (`OpHash _) = inject ~error:Operation.already_denounced denun_1c
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_2a
+  and* (_denun_1c_round1 : Operation.Anonymous.t) =
+    mk_and_inject
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1c
+      ~misbehaviour_round:1
+      ()
+  and* (_denun_2a_round1 : Operation.Anonymous.t) =
+    mk_and_inject ~misbehaviour_level:level_2a ~misbehaviour_round:1 ()
+  in
+  Log.info
+    "The denunciation on level %d (cycle 1) was injected during protocol %s \
+     when attestations and preattestations were bundled together for the \
+     purpose of duplicate denunciations, so we can't inject a denunciation on \
+     double preattestations for the same level. On the other hand, the \
+     denunciation on level %d (still cycle 1) was injected during protocol %s \
+     so we can inject a separate denunciation on preattestations. And \
+     obviously, so can we for level %d (cycle 2)."
+    level_1a
+    (Protocol.name migrate_from)
+    level_1c
+    (Protocol.name migrate_to)
+    level_2a ;
+  let* (_ : Operation.Anonymous.t) =
+    mk_and_inject_pre
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1a
+      ~misbehaviour_round:10
+      ()
+  and* (_ : Operation.Anonymous.t) =
+    mk_and_inject_pre ~misbehaviour_level:level_1c ~misbehaviour_round:0 ()
+  and* (_ : Operation.Anonymous.t) =
+    mk_and_inject_pre ~misbehaviour_level:level_2a ~misbehaviour_round:0 ()
+  in
+
+  Log.info "Bake 5 more cycles to ensure that everything works fine." ;
+  let* () = bake_until_level ((7 * blocks_per_cycle) + 1) in
+  unit
+
+(** Test deactivation delay changes between Oxford and Paris.
+ - Checks that with PreservedCycles = 5, the grace period is 10 cycles for new delegates.
+ - Ensures migrations don't change the grace period for existing delegates.
+ - After migration, with CONSENUS_RIGHTS_DELAY = 2, checks that the grace period is 4 cycles for new delegates.
+ - Ensures an inactive delegate is correctly deactivated after the grace period, after migration.
+*)
+let test_migration_deactivation_delays ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration with deactivations"
+    ~tags:["protocol"; "migration"; "deactivation"]
+  @@ fun () ->
+  if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
+    Test.fail
+      "This test is designed for the migration from Oxford to Paris. Other \
+       protocols have a different semantics for duplicate denunciations so the \
+       test would fail." ;
+  let blocks_per_cycle = 4 in
+  let migration_level = 8 * blocks_per_cycle in
+  Log.info
+    "blocks_per_cycle=%d, migration_level=%d"
+    blocks_per_cycle
+    migration_level ;
+  Log.info "Start node and client." ;
+  let* client, node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info "Activate protocol %s." (Protocol.name migrate_from) ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["preserved_cycles"], `Int 5);
+        (* The nonce revelation threshold must be strictly smaller
+           than blocks_per_cycle and strictly positive. *)
+        (["nonce_revelation_threshold"], `Int (blocks_per_cycle / 2));
+      ]
+  in
+
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from ~parameter_file client
+  in
+  let* delegate1 = Client.gen_keys client in
+  let* delegate2 = Client.gen_keys client in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 1000000)
+      ~receiver:delegate1
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.(of_mutez_int 64250)
+      client
+  in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 1000000)
+      ~receiver:delegate2
+      ~giver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.(of_mutez_int 64250)
+      client
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  let* _ = Client.register_delegate ~delegate:delegate1 client in
+
+  let keys =
+    (* The keys to use for baking. Don't bake with [bootstrap1]
+       because it's going to be deactivated. *)
+    Constant.
+      [
+        bootstrap2.public_key_hash;
+        bootstrap3.public_key_hash;
+        bootstrap4.public_key_hash;
+        bootstrap5.public_key_hash;
+      ]
+  in
+
+  let* grace_period =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_grace_period
+         Constant.bootstrap1.public_key_hash
+  in
+
+  Log.info
+    "Bootstrap1 Grace period at startup: %d."
+    (grace_period |> JSON.as_int) ;
+
+  let bake () = Client.bake_for_and_wait ~keys client in
+  let* () = bake () in
+  let bake_until_level target_level =
+    Client.bake_until_level ~target_level ~keys ~node client
+  in
+  let bake_until_cycle target_cycle =
+    Client.bake_until_cycle ~target_cycle ~keys ~node client
+  in
+  let bake_until_cycle_end target_cycle =
+    Client.bake_until_cycle_end ~target_cycle ~keys ~node client
+  in
+
+  Log.info "Check new delegate grace delay is 10 cycles" ;
+  let* () = bake_until_cycle 1 in
+
+  let grace_delay node delegate =
+    let* delegate_key = Client.show_address client ~alias:delegate in
+    let* grace_period =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_grace_period
+           delegate_key.public_key_hash
+    in
+    let* level = Node.get_level node in
+    let grace_period = grace_period |> JSON.as_int in
+    let grace_delay = grace_period - (level / blocks_per_cycle) in
+    Log.info
+      "%s grace period : %d (for %d cycles)."
+      delegate
+      grace_period
+      grace_delay ;
+    return (grace_period, grace_delay)
+  in
+  let* delegate1_grace_period, delegate1_grace_delay =
+    grace_delay node delegate1
+  in
+  assert (delegate1_grace_delay = 10) ;
+
+  Log.info "Bake until right before the migration." ;
+  let* () = bake_until_level (migration_level - 1) in
+
+  Log.info "Check that bootstrap1 is not deactivated." ;
+  let* is_deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         Constant.bootstrap1.public_key_hash
+  in
+  assert (not (JSON.as_bool is_deactivated)) ;
+
+  let* grace_period_before =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_grace_period
+         Constant.bootstrap2.public_key_hash
+  in
+
+  Log.info
+    "Bootstrap2 Grace period before migration: %d."
+    (grace_period_before |> JSON.as_int) ;
+
+  Log.info
+    "Bake one block and check that it is the migration block. This also brings \
+     us into cycle 8." ;
+  let* () = bake () in
+  let* level = Node.get_level node in
+  Check.((level = migration_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  assert (level / blocks_per_cycle = 8) ;
+
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+
+  Log.info "Check consensus rights delay after migration." ;
+  let* constants =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(constants |-> "consensus_rights_delay" |> as_int)
+  in
+  Log.info
+    "After migration: CONSENSUS_RIGHTS_DELAY = %d."
+    consensus_rights_delay ;
+  assert (consensus_rights_delay = 2) ;
+
+  Log.info "Register delegate2 as delegate." ;
+  let* _ = Client.register_delegate ~delegate:delegate2 client in
+  Log.info "Bake until delegate2 is registered." ;
+  let* () = bake_until_cycle 9 in
+
+  let* _, gd = grace_delay node delegate2 in
+  assert (gd = 4) ;
+
+  let* grace_period_after =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_grace_period
+         Constant.bootstrap2.public_key_hash
+  in
+
+  Log.info "Check bootstrap2 grace period has not changed." ;
+  assert (JSON.(as_int grace_period_after = as_int grace_period_before)) ;
+
+  Log.info
+    "Wait until last block of bootstrap1 grace_period (at cycle %d)"
+    (delegate1_grace_period + 1) ;
+  let* () = bake_until_cycle_end delegate1_grace_period in
+  let* level = Node.get_level node in
+  assert (level / blocks_per_cycle = 11) ;
+
+  Log.info "Check bootstrap1 is not yet deactivated." ;
+  let* is_deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         Constant.bootstrap1.public_key_hash
+  in
+  Log.info "bootstrap1 is deactivated: %s" (JSON.encode is_deactivated) ;
+  assert (not (is_deactivated |> JSON.as_bool)) ;
+
+  Log.info "Bake one more block to deactivate bootstrap1." ;
+  let* () = bake () in
+  let* level = Node.get_level node in
+  assert (level / blocks_per_cycle = 12) ;
+
+  Log.info "Check bootstrap1 is deactivated." ;
+  let* is_deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         Constant.bootstrap1.public_key_hash
+  in
+  Log.info "bootstrap1 is deactivated: %s" (JSON.encode is_deactivated) ;
+  assert (is_deactivated |> JSON.as_bool) ;
+  unit
+
 let register ~migrate_from ~migrate_to =
+  test_migration_from_oxford_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
-  test_migration_with_snapshots ~migrate_from ~migrate_to
+  test_migration_with_snapshots ~migrate_from ~migrate_to ;
+  if Protocol.number migrate_from = Protocol.number Protocol.Oxford then (
+    test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to ;
+    test_migration_deactivation_delays ~migrate_from ~migrate_to)

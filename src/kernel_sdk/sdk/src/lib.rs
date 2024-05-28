@@ -10,6 +10,9 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
+extern crate hermit;
+
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
 
 pub mod host {
@@ -83,9 +86,9 @@ pub use tezos_smart_rollup_encoding::inbox;
 #[cfg(feature = "data-encoding")]
 #[doc(inline)]
 pub use tezos_smart_rollup_encoding::michelson;
+
 #[cfg(feature = "data-encoding")]
-#[doc(inline)]
-pub use tezos_smart_rollup_encoding::outbox;
+pub mod outbox;
 
 pub mod storage {
     //! Durable Storage allows state to be persisted between

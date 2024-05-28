@@ -27,7 +27,7 @@ open Injector_sigs
 
 type state = {
   cctxt : Client_context.full;
-  fee_parameters : Operation_kind.fee_parameters;
+  fee_parameters : Configuration.fee_parameters;
   minimal_block_delay : int64;
   delay_increment_per_round : int64;
 }
@@ -86,24 +86,38 @@ module Parameters :
     |> Option.value
          ~default:(Configuration.default_fee_parameter operation_kind)
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Decide if some batches must have all the operations succeed. See
-     {!Injector_sigs.Parameter.batch_must_succeed}. *)
-  let batch_must_succeed _ = `At_least_one
+  let safety_guard = function
+    | Operation.Publish _ ->
+        (* Gas consumption of commitment publication can increase if there are
+           already commitments for the same level in the context. The value 300
+           was inferred empirically by looking at gas consumption on a running
+           rollup, and is sufficient to cover the difference in the case where a
+           commitment for the same level already exists. *)
+        Some 300
+    | Timeout _ | Refute _ ->
+        (* We increase safety of refutation game operations by precaution. *)
+        Some 300
+    | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
+        None
 
-  let retry_unsuccessful_operation _state (_op : Operation.t) status =
+  let persist_operation (op : Operation.t) =
+    match op with
+    | Cement _ | Publish _
+    (* Cement and Publish commitments don't need to be persisted as they are
+       requeued by the node automatically. *)
+    | Refute _ | Timeout _
+    (* Refutation game operations don't need to be persisted as they are
+       requeued by the node automatically depending on the state of the game on
+       L1 on startup. *) ->
+        false
+    | Add_messages _ | Recover_bond _ | Execute_outbox_message _ -> true
+
+  let retry_unsuccessful_operation _state (op : Operation.t) status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->
         (* Always retry backtracked or skipped operations, or operations that
            are on another branch because of a reorg:
-
-           - Commitments are always produced on finalized blocks. They don't
-             need to be recomputed, and as such are valid in another branch.
-
-           - The cementation operations should be re-injected because the node
-             only keeps track of the last cemented level and the last published
-             commitment, without rollbacks.
 
            - Messages posted to an inbox should be re-emitted (i.e. re-queued)
              in case of a fork.
@@ -119,9 +133,16 @@ module Parameters :
     | Failed error -> (
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
            Think about which operations should be retried and when. *)
-        match classify_trace error with
-        | Permanent | Outdated -> return Forget
-        | Branch | Temporary -> return Retry)
+        match op with
+        | Cement _ | Publish _ ->
+            (* Cement and Publish commitments can be forgotten to free up the
+               injector as they are requeued by the node automatically. *)
+            return Forget
+        | Refute _ | Timeout _ | Add_messages _ | Recover_bond _
+        | Execute_outbox_message _ -> (
+            match classify_trace error with
+            | Permanent | Outdated -> return Forget
+            | Branch | Temporary -> return Retry))
     | Never_included ->
         (* Forget operations that are never included *)
         return Forget

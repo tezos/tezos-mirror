@@ -477,7 +477,7 @@ let testchain_is_deprecated =
     ~msg:"The option `p2p.enable_testchain` is deprecated."
     ()
 
-let warn_deprecated_fields (config : Config_file.t) =
+let warn_deprecated_testchain (config : Config_file.t) =
   when_ config.p2p.enable_testchain ~event:testchain_is_deprecated ~payload:()
   |> Lwt_result.return
 
@@ -490,7 +490,7 @@ let validation_passes ignore_testchain_warning =
     validate_connections;
     warn_maintenance_deactivated;
   ]
-  @ if ignore_testchain_warning then [] else [warn_deprecated_fields]
+  @ if ignore_testchain_warning then [] else [warn_deprecated_testchain]
 
 let validate_passes ?(ignore_testchain_warning = false) config =
   List.concat_map_es

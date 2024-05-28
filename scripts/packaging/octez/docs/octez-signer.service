@@ -1,0 +1,22 @@
+# This is a systemd user Service
+
+# Must be placed in ~/.config/systemd/user/
+# Start the signer as : `systemctl --user start octez-signer`
+# Enable to run it permanently as : `systemctl --user enable octez-signer`
+# Allow to run unsupervised: loginctl enable-linger ubuntu
+
+# See the logs using : `journalctl --user -u octez-signer.service`
+
+[Unit]
+Description=Octez-signer
+Documentation=https://tezos.gitlab.io/
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/octez-signer --require-authentication launch socket signer -a 127.0.0.1
+
+[Install]
+WantedBy=default.target

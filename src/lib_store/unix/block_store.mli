@@ -237,7 +237,7 @@ val store_block :
   block_store -> Block_repr.t -> Context_hash.t -> unit tzresult Lwt.t
 
 (** [cement_blocks ?check_consistency ~write_metadata block_store
-    chunk_iterator]
+    chunk_iterator ~cycle_range]
 
     Wrapper of {!Cemented_block_store.cement_blocks}. *)
 val cement_blocks :
@@ -245,6 +245,7 @@ val cement_blocks :
   write_metadata:bool ->
   block_store ->
   Cemented_block_store.chunk_iterator ->
+  cycle_range:int32 * int32 ->
   unit tzresult Lwt.t
 
 (** [move_floating_store block_store ~src ~dst_kind] closes the
@@ -365,7 +366,7 @@ val register_gc_callback :
 val register_split_callback :
   block_store -> (unit -> unit tzresult Lwt.t) option -> unit
 
-(** [split_context block_store new_head_lafl] calls the callback
+(** [split_context block_store new_head_lpbl] calls the callback
     registered by [register_split_callback] if any. *)
 val split_context : t -> Int32.t -> unit tzresult Lwt.t
 

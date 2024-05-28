@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module RetryClient : Cohttp_lwt.S.Client with type ctx = Cohttp_lwt_unix.Net.ctx
+
 include RPC_client.S

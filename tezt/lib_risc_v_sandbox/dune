@@ -5,7 +5,8 @@
  (name tezt_risc_v_sandbox)
  (package tezt-risc-v-sandbox)
  (libraries
-  octez-libs.tezt-wrapper)
+  octez-libs.tezt-wrapper
+  tezt-tezos)
  (flags
   (:standard)
   -open Tezt_wrapper

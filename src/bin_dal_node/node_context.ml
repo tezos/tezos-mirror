@@ -25,18 +25,15 @@
 
 exception Status_already_ready
 
-type head_info = {
-  proto : int; (* the [proto_level] from the head's shell header *)
-  level : int32;
-}
-
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   plugin_proto : int; (* the [proto_level] of the plugin *)
-  last_seen_head : head_info option;
+  last_processed_level : int32 option;
+  skip_list_cells_store : Skip_list_cells_store.t;
+  mutable ongoing_amplifications : Types.Slot_id.Set.t;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -78,17 +75,11 @@ let init config store gs_worker transport_layer cctxt metrics_server =
     metrics_server;
   }
 
-let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
+let set_ready ctxt plugin skip_list_cells_store cryptobox
+    shards_proofs_precomputation proto_parameters plugin_proto =
   let open Result_syntax in
   match ctxt.status with
   | Starting ->
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-
-         Instead of recompute those parameters, they could be stored
-         (for a given cryptobox). *)
-      let shards_proofs_precomputation =
-        Cryptobox.precompute_shards_proofs cryptobox
-      in
       let* () =
         Profile_manager.validate_slot_indexes
           ctxt.profile_ctxt
@@ -102,7 +93,9 @@ let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
             proto_parameters;
             shards_proofs_precomputation;
             plugin_proto;
-            last_seen_head = None;
+            last_processed_level = None;
+            skip_list_cells_store;
+            ongoing_amplifications = Types.Slot_id.Set.empty;
           } ;
       return_unit
   | Ready _ -> raise Status_already_ready
@@ -112,6 +105,22 @@ let update_plugin_in_ready ctxt plugin proto =
   | Starting -> ()
   | Ready ready_ctxt ->
       ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
+
+let next_shards_level_to_gc ctxt ~current_level =
+  match ctxt.config.history_mode with
+  | Full -> Int32.zero
+  | Rolling {blocks = `Some n} ->
+      Int32.(max zero (sub current_level (of_int n)))
+  | Rolling {blocks = `Auto} -> (
+      match ctxt.status with
+      | Starting -> Int32.zero
+      | Ready {proto_parameters; _} ->
+          let n =
+            Profile_manager.get_default_shard_store_period
+              proto_parameters
+              ctxt.profile_ctxt
+          in
+          Int32.(max zero (sub current_level (of_int n))))
 
 type error += Node_not_ready
 
@@ -135,17 +144,36 @@ let get_ready ctxt =
   | Ready ctxt -> Ok ctxt
   | Starting -> fail [Node_not_ready]
 
-let update_last_seen_head ctxt head_info =
+let update_last_processed_level ctxt ~level =
   let open Result_syntax in
   match ctxt.status with
   | Ready ready_ctxt ->
-      ctxt.status <- Ready {ready_ctxt with last_seen_head = Some head_info} ;
+      ctxt.status <- Ready {ready_ctxt with last_processed_level = Some level} ;
       return_unit
   | Starting -> fail [Node_not_ready]
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
-let set_profile_ctxt ctxt pctxt = ctxt.profile_ctxt <- pctxt
+let load_profile_ctxt ctxt =
+  let open Lwt_syntax in
+  let base_dir = Configuration_file.store_path ctxt.config in
+  let* res = Profile_manager.load_profile_ctxt ~base_dir in
+  match res with
+  | Ok pctxt -> return_some pctxt
+  | Error err ->
+      let* () = Event.(emit loading_profiles_failed err) in
+      return_none
+
+let set_profile_ctxt ctxt ?(save = true) pctxt =
+  let open Lwt_syntax in
+  ctxt.profile_ctxt <- pctxt ;
+  if save then
+    let base_dir = Configuration_file.store_path ctxt.config in
+    let* res = Profile_manager.save_profile_ctxt ctxt.profile_ctxt ~base_dir in
+    match res with
+    | Ok () -> return_unit
+    | Error err -> Event.(emit saving_profiles_failed err)
+  else return_unit
 
 let get_config ctxt = ctxt.config
 
@@ -167,11 +195,6 @@ let fetch_committee ctxt ~level =
   | None ->
       let*? {plugin = (module Plugin); _} = get_ready ctxt in
       let+ committee = Plugin.get_committee cctxt ~level in
-      let committee =
-        Tezos_crypto.Signature.Public_key_hash.Map.map
-          (fun (start_index, offset) -> Committee_cache.{start_index; offset})
-          committee
-      in
       Committee_cache.add cache ~level ~committee ;
       committee
 
@@ -180,11 +203,7 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let+ committee = fetch_committee ctxt ~level in
   match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
   | None -> []
-  | Some {start_index; offset} ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4540
-         Consider returning some abstract representation of [(s, n)]
-         instead of [int list] *)
-      Stdlib.List.init offset (fun i -> start_index + i)
+  | Some indexes -> indexes
 
 let version {config; _} =
   let network_name = config.Configuration_file.network_name in
@@ -217,6 +236,9 @@ module P2P = struct
 
   let get_peer_info {transport_layer; _} peer =
     Gossipsub.Transport_layer.get_peer_info transport_layer peer
+
+  let patch_peer {transport_layer; _} peer acl =
+    Gossipsub.Transport_layer.patch_peer transport_layer peer acl
 
   module Gossipsub = struct
     let get_topics {gs_worker; _} =

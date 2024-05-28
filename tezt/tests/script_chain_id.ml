@@ -35,6 +35,7 @@ let test_chain_id_opcode =
     ~__FILE__
     ~title:"Chain ID Opcode"
     ~tags:["client"; "contract"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* chain_id_alias, _contract =
@@ -58,6 +59,7 @@ let test_chain_id_authentication =
     ~__FILE__
     ~title:"Chain ID Authentication"
     ~tags:["client"; "contract"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   Log.info "Originate contract" ;

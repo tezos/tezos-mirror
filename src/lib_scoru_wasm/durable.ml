@@ -153,7 +153,8 @@ let count_subtrees tree key = T.length tree @@ key_contents key
 let list tree key =
   let open Lwt.Syntax in
   let+ subtrees = T.list tree @@ key_contents key in
-  List.map (fun (name, _) -> if name = "@" then "" else name) subtrees
+  List.rev
+  @@ List.rev_map (fun (name, _) -> if name = "@" then "" else name) subtrees
 
 let delete ?(edit_readonly = false) ~kind tree key =
   if not edit_readonly then assert_key_writeable key ;

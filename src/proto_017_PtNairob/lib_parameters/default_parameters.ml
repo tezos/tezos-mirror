@@ -335,6 +335,7 @@ let constants_sandbox =
     endorsing_reward_per_slot (* 2_604 mutez *);
     max_slashing_period = 2;
     frozen_deposits_percentage = 5;
+    max_operations_time_to_live = 8;
   }
 
 let constants_test =
@@ -384,6 +385,7 @@ let constants_test =
       (* not 10 so that multiplication and
          divisions do not easily get
          intermingled *);
+    max_operations_time_to_live = 8;
   }
 
 let test_commitments =

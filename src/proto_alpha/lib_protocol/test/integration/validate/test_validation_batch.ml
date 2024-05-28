@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic-Labs. <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission  is hereby granted, free of charge, to any person obtaining a  *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -40,6 +22,7 @@ open Manager_operation_helpers
 (** Revelation should not occur elsewhere than in first position
    in a batch.*)
 let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [
@@ -103,6 +86,7 @@ let batch_in_the_middle infos kind1 kind2 =
 
 (** A batch of manager operation contains at most one Revelation.*)
 let batch_two_reveals_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expected_failure errs =
     match errs with
     | [
@@ -166,6 +150,7 @@ let batch_two_reveals infos kind =
 
 (** Every manager operation in a batch concerns the same source.*)
 let batch_two_sources_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_sources]
@@ -382,7 +367,7 @@ let batch_empty_at_end infos kind1 kind2 =
   let source = contract_of (get_source infos) in
   let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let* init_bal = Context.Contract.balance (B infos.ctxt.block) source in
-  let half_init_bal = Test_tez.(init_bal /! 2L) in
+  let half_init_bal = Tez_helpers.(init_bal /! 2L) in
   let* reveal =
     mk_reveal
       {(operation_req_default K_Reveal) with counter = Some counter}

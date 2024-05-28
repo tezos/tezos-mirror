@@ -25,10 +25,8 @@
 
 module Fr = Bls12_381.Fr
 module G1 = Bls12_381.G1
-
-module Poly = Octez_bls12_381_polynomial.Internal_for_tests.Polynomial_unsafe
-
-module Srs = Octez_bls12_381_polynomial.Internal_for_tests.Srs_unsafe
+module Poly = Octez_bls12_381_polynomial.Polynomial
+module Srs = Octez_bls12_381_polynomial.Srs.Srs_g1
 
 let test_get () =
   let srs = Srs.generate_insecure 1 Fr.one in

@@ -63,9 +63,9 @@ let nack_test () =
     ~tags:
       [
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5903
-           The tests using forked processes are flaky, EBADF error is raised.
+           The tests using forked processes are ci_disabled, EBADF error is raised.
         *)
-        Tag.flaky;
+        Tag.ci_disabled;
         "p2p";
         "socket";
         "nack";
@@ -117,9 +117,9 @@ module Self_identification = struct
       ~tags:
         [
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5903
-             The tests using forked processes are flaky, EBADF error is raised.
+             The tests using forked processes are ci_disabled, EBADF error is raised.
           *)
-          Tag.flaky;
+          Tag.ci_disabled;
           "p2p";
           "socket";
           "self_identification";
@@ -174,9 +174,9 @@ module Self_identification = struct
       ~tags:
         [
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5903
-             The tests using forked processes are flaky, EBADF error is raised.
+             The tests using forked processes are ci_disabled, EBADF error is raised.
           *)
-          Tag.flaky;
+          Tag.ci_disabled;
           "p2p";
           "socket";
           "self_identification";

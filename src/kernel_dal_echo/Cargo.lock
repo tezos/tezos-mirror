@@ -745,8 +745,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
+name = "tezos-smart-rollup-constants"
+version = "0.2.2"
+
+[[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
+dependencies = [
+ "tezos-smart-rollup-constants",
+]
 
 [[package]]
 name = "tezos-smart-rollup-debug"
@@ -764,6 +771,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "num-traits",
+ "regex",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",

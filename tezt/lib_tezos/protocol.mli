@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Nairobi | Oxford | Alpha
+type t = Paris | Oxford | Alpha
 
 val encoding : t Data_encoding.t
 
@@ -86,11 +86,7 @@ val parameter_file : ?constants:constants -> t -> string
 val accuser : t -> Uses.t
 
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
-val baker : t -> string
-
-(** Get the path of the smart rollup client of a protocol, such as
-    ["./octez-smart-rollup-client-alpha"]. *)
-val sc_rollup_client : t -> string
+val baker : t -> Uses.t
 
 (** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
 
@@ -232,6 +228,9 @@ val register_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_node:bool ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
   t list ->
@@ -246,6 +245,9 @@ val register_long_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_node:bool ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
   ?team:string ->
   executors:Long_test.executor list ->
@@ -264,6 +266,9 @@ val register_regression_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_node:bool ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
   t list ->

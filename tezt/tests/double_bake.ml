@@ -38,10 +38,10 @@ let is_operation_in_operations ops oph =
   let ops_list = ops |=> 2 |> as_list in
   List.exists (fun e -> e |-> "hash" |> as_string = oph) ops_list
 
-let is_operation_in_applied_mempool mempool oph =
+let is_operation_in_validated_mempool mempool oph =
   let open JSON in
-  let applied_list = as_list (mempool |-> "applied") in
-  List.exists (fun e -> e |-> "hash" |> as_string = oph) applied_list
+  let validated_list = as_list (mempool |-> "validated") in
+  List.exists (fun e -> e |-> "hash" |> as_string = oph) validated_list
 
 (* Matches events where the message is of the form:
    "double baking evidence injected <operation_hash>".
@@ -96,7 +96,7 @@ let wait_for_denunciation_injection node client accuser =
   let* mempool =
     Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
-  if is_operation_in_applied_mempool mempool oph then return oph
+  if is_operation_in_validated_mempool mempool oph then return oph
   else Test.fail "the denunciation operation was rejected by the mempool"
 
 (* This tests aims to detect a double baking evidence with an

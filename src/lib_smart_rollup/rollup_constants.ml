@@ -37,6 +37,7 @@ type reveal_activation_level = {
   metadata : int32;
   dal_page : int32;
   dal_parameters : int32;
+  dal_attested_slots_validity_lag : int32;
 }
 
 type sc_rollup_constants = {

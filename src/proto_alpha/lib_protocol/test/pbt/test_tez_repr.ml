@@ -32,7 +32,7 @@
 *)
 
 open Protocol.Alpha_context
-open Test_tez
+open Tez_helpers
 
 let z_mutez_min = Z.zero
 

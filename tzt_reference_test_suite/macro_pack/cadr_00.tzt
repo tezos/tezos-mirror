@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda (pair unit (pair (pair unit unit) unit)) unit) CDADR } ;
+output { Stack_elt bytes 0x050200000006031703160317 } ;

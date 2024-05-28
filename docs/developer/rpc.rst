@@ -1,11 +1,17 @@
 JSON/RPC interface
 ==================
 
-The Octez node provides a JSON/RPC interface. Note that it is an RPC,
-and it is JSON based, but it does not follow the “JSON-RPC” protocol. It
-is not active by default and it must be explicitly activated with the
-``--rpc-addr`` option. Typically, if you are not trying to run a local
-network and just want to explore the RPC, you would run:
+The Octez node provides a JSON/RPC interface. Note that it is an RPC
+interface, and it is JSON based, but it does not follow the “JSON-RPC”
+protocol. It is not active by default and it must be explicitly
+activated with the ``--rpc-addr`` option. In that case, an RPC server
+is started by the node. It is also possible to run an RPC server that
+is external to the node, as a separate process, thanks to the
+``--external-rpc-addr`` command. However, it is not recommended to use
+``--external-rpc-addr`` as the external RPC server is not yet stable.
+
+As an example, if you are not trying to run a public RPC node, but you
+just want to explore the RPC interface on your own, you would run:
 
 ::
 
@@ -73,4 +79,4 @@ A useful tool to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.
 RPC versions
 ------------
 
-See :doc:`../user/versioning` and :ref:`RPC-versioning-dev`.
+See :doc:`../introduction/versioning` and :ref:`RPC-versioning-dev`.

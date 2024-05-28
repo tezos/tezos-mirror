@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+for s in baker accuser; do
+  for p in active next; do
+    # Check if the daemon is active before stopping it
+    if systemctl is-active --quiet "octez-$s-$p.service"; then
+      # Set a flag in a temporary file to indicate the daemon was running
+      echo "1" > "/var/lib/octez-baker/$s-$p-daemon_was_running"
+      echo "Stopping octez-$s-$p"
+      sudo systemctl stop "octez-$s-$p.service"
+    fi
+  done
+done

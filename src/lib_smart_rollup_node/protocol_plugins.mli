@@ -34,6 +34,12 @@ val register : proto_plugin -> unit
 (** Returns the list of registered protocols. *)
 val registered_protocols : unit -> Protocol_hash.t list
 
+(** Returns the last registered protocol.
+
+    NOTE: This is the last protocol with which the rollup node is linked
+    against, and this is decided only by the order in [manifest/main.ml]. *)
+val last_registered : unit -> Protocol_hash.t
+
 (** {2 Using the correct protocol plugin} *)
 
 (** Return the protocol plugin for a given protocol (or an error if not
@@ -58,6 +64,11 @@ val proto_plugin_for_block :
 (** Returns the plugin corresponding to the last protocol seen by the rollup
     node. *)
 val last_proto_plugin : _ Node_context.t -> proto_plugin tzresult Lwt.t
+
+(** Same as {!last_proto_plugin} but returns [None] if the rollup node has not
+    registered any protocol information yet *)
+val last_proto_plugin_opt :
+  _ Node_context.t -> proto_plugin option tzresult Lwt.t
 
 (** {2 Safe protocol specific constants}
 

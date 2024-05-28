@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Legacy_monad_globals
 open Lwt_result_syntax
 open Tezos_shell_services
 open Tezos_client_alpha
@@ -281,7 +280,7 @@ let compute_current_round_duration round_durations
       ~round:(Round.succ round)
   in
   let _end = Timestamp.to_seconds _end in
-  ok (Ptime.Span.of_int_s Int64.(sub _end start |> to_int))
+  Ok (Ptime.Span.of_int_s Int64.(sub _end start |> to_int))
 
 let one_minute = Ptime.Span.of_int_s 60
 
@@ -835,7 +834,7 @@ let cycle_eras_encoding =
       | Error _ -> Error "Invalid cycle eras")
     (Data_encoding.list cycle_era_encoding)
 
-let patch_block_time ctxt ~head_level ~block_time_target =
+let patch_block_time ctxt ~head_level ~block_time_target ~patch_max_op_ttl =
   let pf = Format.printf in
   let open Environment in
   let patch_flag_key = ["patch_flag"] in
@@ -889,7 +888,10 @@ let patch_block_time ctxt ~head_level ~block_time_target =
       (max 0 (log speedup_ratio /. log 2. |> int_of_float))
   in
   let max_operations_time_to_live =
-    float constants.max_operations_time_to_live *. speedup_ratio |> int_of_float
+    if patch_max_op_ttl then
+      float constants.max_operations_time_to_live *. speedup_ratio
+      |> int_of_float
+    else constants.max_operations_time_to_live
   in
   let minimal_block_delay =
     Period_repr.of_seconds_exn (Int64.of_int block_time_target)

@@ -21,63 +21,63 @@ OPAM_DIR="$HOME"/.opam
 mkdir -p "$OPAM_LOGS"
 
 rsync --recursive --prune-empty-dirs \
-      "$OPAM_SWITCH_PREFIX"/.opam-switch/build \
-      --include="*/" \
-      --include '*.output' \
-      --exclude '*' \
-      "$OPAM_LOGS/output"
+  "$OPAM_SWITCH_PREFIX"/.opam-switch/build \
+  --include="*/" \
+  --include '*.output' \
+  --exclude '*' \
+  "$OPAM_LOGS/output"
 
 rsync --recursive "$OPAM_DIR"/log \
-      --include "*/" \
-      --include '*.info' \
-      --include '*.out' \
-      --exclude '*' "$OPAM_LOGS"
+  --include "*/" \
+  --include '*.info' \
+  --include '*.out' \
+  --exclude '*' "$OPAM_LOGS"
 
- # for ease of readability, produce a merged log
-merged=$(mktemp);
+# for ease of readability, produce a merged log
+merged=$(mktemp)
 
 IFS=$(printf '\n') \
-   find "$OPAM_LOGS" -type f |
-    # Sort files by modification time
-    while read -r file; do
-        printf '%d %s\n' "$(stat -c +%Y "$file")" "$file"
-    done | sort -k1nr | cut -f 2- -d ' ' |
-    while read -r file; do
-        echo "------------------- $file -------------------"
-        cat "$file"
-    done > "$merged"
+  find "$OPAM_LOGS" -type f |
+  # Sort files by modification time
+  while read -r file; do
+    printf '%d %s\n' "$(stat -c +%Y "$file")" "$file"
+  done | sort -k1nr | cut -f 2- -d ' ' |
+  while read -r file; do
+    echo "------------------- $file -------------------"
+    cat "$file"
+  done > "$merged"
 
 merged_html="$OPAM_LOGS"/merged_output.html
 (
-    echo "<html><body><pre>"
-    cat "$merged"
-    echo "</pre></body></html>"
+  echo "<html><body><pre>"
+  cat "$merged"
+  echo "</pre></body></html>"
 ) > "${merged_html}"
 
 if [ "$CI_JOB_STATUS" != 'success' ]; then
-    merged_output_url=$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/file/"$OPAM_LOGS"/merged_output.html
+  merged_output_url=$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/file/"$OPAM_LOGS"/merged_output.html
 
-    cutoff_head=40
-    cutoff_tail=960
+  cutoff_head=40
+  cutoff_tail=960
 
-    # Print the first $cutoff_head lines
-    header="-- Job was non-successful (job status: ${CI_JOB_STATUS:-N/A}), merged output:"
-    echo -e "\e[0Ksection_start:$(date +%s):merged_opam_output_head[collapsed=false]\r\e[0K$header"
-    echo ""
-    head -n $cutoff_head "$merged"
-    echo -e "\e[0Ksection_end:$(date +%s):merged_opam_output_head\r\e[0K"
+  # Print the first $cutoff_head lines
+  header="-- Job was non-successful (job status: ${CI_JOB_STATUS:-N/A}), merged output:"
+  echo -e "\e[0Ksection_start:$(date +%s):merged_opam_output_head[collapsed=false]\r\e[0K$header"
+  echo ""
+  head -n $cutoff_head "$merged"
+  echo -e "\e[0Ksection_end:$(date +%s):merged_opam_output_head\r\e[0K"
 
-    # Then print the remaining $cutoff_tail lines in a collapsed section
-    line_count=$(wc -l "$merged" | cut -d' ' -f1)
-    if [ "$line_count" -gt $(( cutoff_head )) ]; then
-        header="... more merged opam output:"
-        echo -e "\e[0Ksection_start:$(date +%s):merged_opam_output_tail[collapsed=true]\r\e[0K$header"
-        tail -n+$((cutoff_head + 1)) "$merged" | head -n$cutoff_tail
-        echo -e "\e[0Ksection_end:$(date +%s):merged_opam_output_tail\r\e[0K"
-    fi
+  # Then print the remaining $cutoff_tail lines in a collapsed section
+  line_count=$(wc -l "$merged" | cut -d' ' -f1)
+  if [ "$line_count" -gt $((cutoff_head)) ]; then
+    header="... more merged opam output:"
+    echo -e "\e[0Ksection_start:$(date +%s):merged_opam_output_tail[collapsed=true]\r\e[0K$header"
+    tail -n+$((cutoff_head + 1)) "$merged" | head -n$cutoff_tail
+    echo -e "\e[0Ksection_end:$(date +%s):merged_opam_output_tail\r\e[0K"
+  fi
 
-    # If there are even more lines, link to the artifacts
-    if [ "$line_count" -gt $(( cutoff_head + cutoff_tail )) ]; then
-        echo "... see artifacts for full output at $merged_output_url";
-    fi
+  # If there are even more lines, link to the artifacts
+  if [ "$line_count" -gt $((cutoff_head + cutoff_tail)) ]; then
+    echo "... see artifacts for full output at $merged_output_url"
+  fi
 fi

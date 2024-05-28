@@ -1,31 +1,13 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic-Labs. <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission  is hereby granted, free of charge, to any person obtaining a  *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 (** {2 Constants} *)
 
@@ -93,7 +75,7 @@ type manager_operation_kind =
   | K_Sc_rollup_timeout
   | K_Sc_rollup_execute_outbox_message
   | K_Sc_rollup_recover_bond
-  | K_Dal_publish_slot_header
+  | K_Dal_publish_commitment
   | K_Zk_rollup_origination
   | K_Zk_rollup_publish
   | K_Zk_rollup_update
@@ -184,7 +166,7 @@ let kind_to_string = function
   | K_Sc_rollup_add_messages -> "Sc_rollup_add_messages"
   | K_Sc_rollup_execute_outbox_message -> "Sc_rollup_execute_outbox_message"
   | K_Sc_rollup_recover_bond -> "Sc_rollup_recover_bond"
-  | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
+  | K_Dal_publish_commitment -> "Dal_publish_commitment"
   | K_Zk_rollup_origination -> "Zk_rollup_origination"
   | K_Zk_rollup_publish -> "Zk_rollup_publish"
   | K_Zk_rollup_update -> "Zk_rollup_update"
@@ -402,7 +384,7 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
   let hard_gas_limit_per_block =
     match hard_gas_limit_per_block with
     | Some gb -> gb
-    | None -> Gas.Arith.(integral_of_int_exn 5_200_000)
+    | None -> Default_parameters.constants_mainnet.hard_gas_limit_per_block
   in
   let dal = {params.constants.dal with feature_enable = flags.dal} in
   let sc_rollup =
@@ -723,11 +705,15 @@ let mk_reveal (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     pk
 
-let sc_rollup_of = function
+let sc_rollup_of =
+  let open Lwt_result_syntax in
+  function
   | Some sc_rollup -> return sc_rollup
   | None -> failwith "Sc_rollup not created in this context"
 
-let zk_rollup_of = function
+let zk_rollup_of =
+  let open Lwt_result_syntax in
+  function
   | Some zk_rollup -> return zk_rollup
   | None -> failwith "Zk_rollup not created in this context"
 
@@ -896,15 +882,14 @@ let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
     sc_rollup
     staker
 
-let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
+let mk_dal_publish_commitment (oinfos : operation_req) (infos : infos) =
   let slot_index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
   let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
   let slot =
-    Dal.Operations.Publish_slot_header.
-      {slot_index; commitment; commitment_proof}
+    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
   in
-  Op.dal_publish_slot_header
+  Op.dal_publish_commitment
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit
     ?counter:oinfos.counter
@@ -999,7 +984,7 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Sc_rollup_timeout -> mk_sc_rollup_timeout
     | K_Sc_rollup_execute_outbox_message -> mk_sc_rollup_execute_outbox_message
     | K_Sc_rollup_recover_bond -> mk_sc_rollup_return_bond
-    | K_Dal_publish_slot_header -> mk_dal_publish_slot_header
+    | K_Dal_publish_commitment -> mk_dal_publish_commitment
     | K_Zk_rollup_origination -> mk_zk_rollup_origination
     | K_Zk_rollup_publish -> mk_zk_rollup_publish
     | K_Zk_rollup_update -> mk_zk_rollup_update
@@ -1365,7 +1350,7 @@ let subjects =
     K_Sc_rollup_timeout;
     K_Sc_rollup_execute_outbox_message;
     K_Sc_rollup_recover_bond;
-    K_Dal_publish_slot_header;
+    K_Dal_publish_commitment;
     K_Zk_rollup_origination;
     K_Zk_rollup_publish;
     K_Zk_rollup_update;
@@ -1377,7 +1362,7 @@ let is_consumer = function
   | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
   | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
-  | K_Dal_publish_slot_header | K_Zk_rollup_origination | K_Zk_rollup_publish
+  | K_Dal_publish_commitment | K_Zk_rollup_origination | K_Zk_rollup_publish
   | K_Zk_rollup_update ->
       false
   | K_Transaction | K_Origination | K_Register_global_constant
@@ -1400,6 +1385,6 @@ let is_disabled flags = function
   | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->
       flags.scoru_arith = false
-  | K_Dal_publish_slot_header -> flags.dal = false
+  | K_Dal_publish_commitment -> flags.dal = false
   | K_Zk_rollup_origination | K_Zk_rollup_publish | K_Zk_rollup_update ->
       flags.zkru = false

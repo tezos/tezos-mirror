@@ -114,7 +114,7 @@ let operators_encoding =
   conv
     Map.bindings
     (fun l -> List.to_seq l |> Map.of_seq)
-    (Utils.dictionary_encoding
+    (Dictionary_encoding.dictionary_encoding
        ~keys:all
        ~string_of_key:to_string_ex_purpose
        ~key_of_string:of_string_exn_ex_purpose

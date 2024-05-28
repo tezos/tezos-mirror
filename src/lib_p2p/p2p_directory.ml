@@ -32,17 +32,6 @@ let build_rpc_directory net =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
   (* Network : Global *)
-  (* DEPRECATED: use [version] from "lib_shell_services/version_services"
-     instead. *)
-  let dir =
-    Tezos_rpc.Directory.register0 dir P2p_services.S.version (fun () () ->
-        return (P2p.announced_version net))
-  in
-  let dir =
-    (* DEPRECATED: use [version] instead. *)
-    Tezos_rpc.Directory.register0 dir P2p_services.S.versions (fun () () ->
-        return [P2p.announced_version net])
-  in
   let dir =
     Tezos_rpc.Directory.register0 dir P2p_services.S.self (fun () () ->
         match P2p.pool net with
@@ -201,52 +190,6 @@ let build_rpc_directory net =
                  (P2p_pool.Peers.info pool peer_id))
   in
   let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Peers.S.ban
-      (fun peer_id () () ->
-        let open Lwt_syntax in
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Peers.untrust pool peer_id ;
-            let* () = P2p_pool.Peers.ban pool peer_id in
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Peers.S.unban
-      (fun peer_id () () ->
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Peers.unban pool peer_id ;
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Peers.S.trust
-      (fun peer_id () () ->
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Peers.trust pool peer_id ;
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Peers.S.untrust
-      (fun peer_id () () ->
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Peers.untrust pool peer_id ;
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
     Tezos_rpc.Directory.register1
       dir
       P2p_services.Peers.S.banned
@@ -356,52 +299,6 @@ let build_rpc_directory net =
   let dir =
     Tezos_rpc.Directory.gen_register1
       dir
-      P2p_services.Points.S.ban
-      (fun point () () ->
-        let open Lwt_syntax in
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Points.untrust pool point ;
-            let* () = P2p_pool.Points.ban pool point in
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Points.S.unban
-      (fun point () () ->
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Points.unban pool point ;
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Points.S.trust
-      (fun point () () ->
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Points.trust pool point ;
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
-      P2p_services.Points.S.untrust
-      (fun point () () ->
-        match P2p.pool net with
-        | None -> Tezos_rpc.Answer.fail [P2p_errors.P2p_layer_disabled]
-        | Some pool ->
-            P2p_pool.Points.untrust pool point ;
-            Tezos_rpc.Answer.return_unit)
-  in
-  let dir =
-    Tezos_rpc.Directory.gen_register1
-      dir
       P2p_services.Points.S.banned
       (fun point () () ->
         match P2p.pool net with
@@ -428,20 +325,12 @@ let build_rpc_directory net =
   in
   (* Network : Greylist *)
   let dir =
-    Tezos_rpc.Directory.register0 dir P2p_services.ACL.S.clear (fun () () ->
-        match P2p.pool net with
-        | None -> tzfail P2p_errors.P2p_layer_disabled
-        | Some pool ->
-            P2p_pool.acl_clear pool ;
-            return_unit)
-  in
-  let dir =
     Tezos_rpc.Directory.register0
       dir
       P2p_services.ACL.S.clear_delete
       (fun () () ->
         match P2p.pool net with
-        | None -> failwith "The P2P layer is disabled."
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             P2p_pool.acl_clear pool ;
             return_unit)

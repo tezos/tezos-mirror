@@ -27,12 +27,43 @@
 
 (** This module describes the execution context of the node. *)
 
-type lcc = {commitment : Commitment.Hash.t; level : int32}
+type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
 
-type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
+type genesis_info = Metadata.genesis_info = {
+  level : int32;
+  commitment_hash : Commitment.Hash.t;
+}
 
 (** Abstract type for store to force access through this module. *)
 type 'a store constraint 'a = [< `Read | `Write > `Read]
+
+(** Exposed functions to manipulate Node_context store outside of this module *)
+module Node_store : sig
+  (** [load mode ~index_buffer_size ~l2_blocks_cache_size directory]
+    loads a store form the data persisted [directory] as described in
+    {!Store_sigs.load} *)
+  val load :
+    'a Store_sigs.mode ->
+    index_buffer_size:int ->
+    l2_blocks_cache_size:int ->
+    string ->
+    'a store tzresult Lwt.t
+
+  (** [close_store store] closes the store *)
+  val close : 'a store -> unit tzresult Lwt.t
+
+  (** [check_and_set_history_mode store history_mode] checks the
+    compatibility between given history mode and that of the store.
+    History mode can be converted from Archive to Full. Trying to
+    convert from Full to Archive will trigger an error.*)
+  val check_and_set_history_mode :
+    'a Store_sigs.mode ->
+    'a store ->
+    Configuration.history_mode option ->
+    unit tzresult Lwt.t
+
+  val of_store : 'a Store.t -> 'a store
+end
 
 type debug_logger = string -> unit Lwt.t
 
@@ -56,6 +87,12 @@ type private_info = {
           is public then it's None. *)
 }
 
+type sync_info = {
+  on_synchronized : unit Lwt_condition.t;
+  mutable processed_level : int32;
+  sync_level_input : int32 Lwt_watcher.input;
+}
+
 type 'a t = {
   config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
@@ -75,11 +112,11 @@ type 'a t = {
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Kind.t;  (** Kind of the smart rollup. *)
+  unsafe_patches : Pvm_patches.t;  (** Patches to apply to the PVM. *)
   lockfile : Lwt_unix.file_descr;
       (** A lock file acquired when the node starts. *)
   store : 'a store;  (** The store for the persistent storage. *)
-  context : 'a Context.index;
-      (** The persistent context for the rollup node. *)
+  context : 'a Context.t;  (** The persistent context for the rollup node. *)
   lcc : ('a, lcc) Reference.t;
       (** Last cemented commitment on L1 (independently of synchronized status
           of rollup node) and its level. *)
@@ -98,6 +135,7 @@ type 'a t = {
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
       (** Watcher for the L2 chain, which enables RPC services to access
           a stream of L2 blocks. *)
+  sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
 
 (** Read/write node context {!t}. *)
@@ -146,30 +184,8 @@ val check_op_in_whitelist_or_bailout_mode :
 *)
 val get_fee_parameter : _ t -> Operation_kind.t -> Injector_common.fee_parameter
 
-(** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
-    initializes the rollup representation. The rollup origination level and kind
-    are fetched via an RPC call to the layer1 node that [cctxt] uses for RPC
-    requests.
-*)
-val init :
-  #Client_context.full ->
-  data_dir:string ->
-  irmin_cache_size:int ->
-  index_buffer_size:int ->
-  ?log_kernel_debug_file:string ->
-  ?last_whitelist_update:Z.t * Int32.t ->
-  'a Store_sigs.mode ->
-  Layer1.t ->
-  genesis_info ->
-  lcc:lcc ->
-  lpc:Commitment.t option ->
-  Kind.t ->
-  current_protocol ->
-  Configuration.t ->
-  'a t tzresult Lwt.t
-
-(** Closes the store, context and Layer 1 monitor. *)
-val close : _ t -> unit tzresult Lwt.t
+(** The path for the lockfile used when starting and running the node. *)
+val global_lockfile_path : data_dir:string -> string
 
 (** The path for the lockfile used in block processing. *)
 val processing_lockfile_path : data_dir:string -> string
@@ -193,6 +209,10 @@ val readonly : _ t -> ro
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** {2 Abstraction over store} *)
+
+(** [get_history_mode t] returns the current history mode for the rollup
+    node. *)
+val get_history_mode : _ t -> Configuration.history_mode tzresult Lwt.t
 
 (** {3 Layer 2 blocks} *)
 
@@ -519,18 +539,6 @@ val save_slot_status :
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)
 
-val find_confirmed_slots_history :
-  _ t -> Block_hash.t -> Dal.Slot_history.t option tzresult Lwt.t
-
-val save_confirmed_slots_history :
-  rw -> Block_hash.t -> Dal.Slot_history.t -> unit tzresult Lwt.t
-
-val find_confirmed_slots_histories :
-  _ t -> Block_hash.t -> Dal.Slot_history_cache.t option tzresult Lwt.t
-
-val save_confirmed_slots_histories :
-  rw -> Block_hash.t -> Dal.Slot_history_cache.t -> unit tzresult Lwt.t
-
 (** [gc node_ctxt level] triggers garbage collection for the node in accordance
     with [node_ctxt.config.gc_parameters]. Upon completion, all data for L2
     levels lower than [level] will be removed. *)
@@ -544,6 +552,10 @@ val get_gc_levels : _ t -> Store.Gc_levels.levels tzresult Lwt.t
     [level] is before the first non garbage collected level. *)
 val check_level_available : _ t -> int32 -> unit tzresult Lwt.t
 
+val get_last_context_split_level : _ t -> int32 option tzresult Lwt.t
+
+val save_context_split_level : rw -> int32 -> unit tzresult Lwt.t
+
 (** {2 Helpers} *)
 
 (** [make_kernel_logger event ?log_kernel_debug_file logs_dir] returns two
@@ -556,21 +568,23 @@ val make_kernel_logger :
   string ->
   ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
 
-(**/**)
+(** {2 Synchronization tracking} *)
+
+(** [is_synchronized node_ctxt] returns [true] iff the rollup node has processed
+    the latest available L1 head. *)
+val is_synchronized : _ t -> bool
+
+(** [wait_synchronized node_ctxt] is a promise that resolves when the rollup
+    node whose state is [node_ctxt] is synchronized with L1. If the node is
+    already synchronized, it resolves immediately. *)
+val wait_synchronized : _ t -> unit Lwt.t
 
 module Internal_for_tests : sig
-  (** Create a node context which really stores data on disk but does not
-      connect to any layer 1 node. It is meant to be used in unit tests for the
-      rollup node functions. *)
-  val create_node_context :
-    #Client_context.full ->
-    current_protocol ->
-    data_dir:string ->
-    Kind.t ->
-    Store_sigs.rw t tzresult Lwt.t
+  val write_protocols_in_store :
+    [> `Write] store -> Store.Protocols.value -> unit tzresult Lwt.t
 
   (** Extract the underlying store from the node context. This function is
-      unsafe to use outside of tests as it breaks the abstraction barrier
-      provided by the [Node_context]. *)
+           unsafe to use outside of tests as it breaks the abstraction barrier
+           provided by the [Node_context]. *)
   val unsafe_get_store : 'a t -> 'a Store.t
 end

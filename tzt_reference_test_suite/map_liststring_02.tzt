@@ -1,0 +1,3 @@
+code { MAP { PUSH bool True ; IF { FAILWITH } { } } } ;
+input { Stack_elt (list string) {  } } ;
+output { Stack_elt (list string) {  } }

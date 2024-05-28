@@ -31,6 +31,9 @@ type verb = GET | PUT | POST | PATCH | DELETE
 (** Data type for RPCs. *)
 type data = Data of JSON.u | File of string
 
+(** Convert verb to string. *)
+val show_verb : verb -> string
+
 (** RPC descriptions.
 
 ['result] is the type of values returned by the RPC after decoding. *)
@@ -97,14 +100,14 @@ type 'a response = {
 val check_string_response :
   ?body_rex:string -> code:int -> string response -> unit
 
-(** RPCs can have some hooks attached when requested. *)
+(** Callbacks that can be specified when calling RPCs.
+
+    [on_request] is called before each RPC call, and
+    [on_response] is called after each successful RPC call
+    (errors like 404 Not Found are considered successful RPC calls). *)
 type rpc_hooks = {
-  on_request : string -> unit;
-      (** A hook is invoked for every request line,
-      and the string parameter represents the request message. *)
-  on_response : string -> unit;
-      (** A hook is invoked for every response line,
-          receiving the body of an HTTP response as a string parameter. *)
+  on_request : verb -> uri:string -> data option -> unit;
+  on_response : Cohttp.Code.status_code -> body:string -> unit;
 }
 
 module type CALLERS = sig

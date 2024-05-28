@@ -1,0 +1,3 @@
+code { CAR } ;
+input { Stack_elt int 42 } ;
+output (StaticError _);

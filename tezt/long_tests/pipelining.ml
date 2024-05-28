@@ -41,11 +41,11 @@ let manager_kind_to_string = function
 
 (* These operations numbers are computed to consume the maximum number of gas
    unit in a block without exceeding the `hard_gas_limit_per_block` from the
-   protocol (2.6M gas unit since Mumbai). *)
+   protocol (1.73M gas unit since P). *)
 let number_of_operation_from_manager_kind = function
-  | `Transfer -> 2500 (* x1040 gas units *)
-  | `Origination -> 26 (* x100_000 gas units *)
-  | `Call -> 3 (* x850_000 gas units *)
+  | `Transfer -> 1666 (* x1040 gas units *)
+  | `Origination -> 17 (* x100_000 gas units *)
+  | `Call -> 2 (* x850_000 gas units *)
 
 let protocols = Protocol.all
 
@@ -160,9 +160,11 @@ let bake_for ?(keys = []) ?(wait_for_flush = false) ~empty ~protocol node client
 let init_node () =
   let node = Node.create Node.[Synchronisation_threshold 0; Connections 2] in
   let* () = Node.config_init node [] in
-  Node.Config_file.update
-    node
-    (Node.Config_file.set_prevalidator ~operations_request_timeout:100.) ;
+  let* () =
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_prevalidator ~operations_request_timeout:100.)
+  in
   let* () =
     Node.run
       ~event_sections_levels:

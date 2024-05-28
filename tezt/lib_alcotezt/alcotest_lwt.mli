@@ -36,10 +36,7 @@
 (** Return type for tests. *)
 type return = unit Lwt.t
 
-(** Speed levels.
-
-    In Alcotest, one can ask not to run slow tests with [-q] from the command-line.
-    In Tezt, the equivalent is [-a quick]. *)
+(** Speed levels. Same as {!Alcotest.speed_level}. *)
 type speed_level = [`Quick | `Slow]
 
 (** Test cases.

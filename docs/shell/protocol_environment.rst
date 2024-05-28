@@ -56,6 +56,7 @@ Here is a quick description of each file in this environment, all located under
 
 The API can be found in :package-api:`tezos-protocol-environment <octez-proto-libs/Tezos_protocol_environment/index.html>`
 
+.. _environment_versions:
 
 Environment versions
 --------------------

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::safe_storage::InternalRuntime;
+use crate::internal_storage::InternalRuntime;
 use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::runtime::RuntimeError;

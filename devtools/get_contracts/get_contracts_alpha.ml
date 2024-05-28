@@ -133,7 +133,8 @@ module Proto = struct
         @@ Script_ir_translator.parse_data
              ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
              ctxt
-             ~allow_forged
+             ~allow_forged_tickets:allow_forged
+             ~allow_forged_lazy_storage_id:allow_forged
              ty
              expr
       in

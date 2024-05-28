@@ -82,14 +82,19 @@ impl TxSignature {
     /// ie a transaction that encodes the `chain_id` in the value `v`, this
     /// should not be used for EIP-1559 or EIP-2930 transaction for example.
     /// The boolean correspond to parity `0` or `1`.
-    fn legacy_compute_parity(&self, chain_id: U256) -> Result<bool, TxSigError> {
+    fn legacy_compute_parity(&self, chain_id: Option<U256>) -> Result<bool, TxSigError> {
         let err = TxSigError::Parity(ParityError::V(self.v));
-        let chain_id_encoding = chain_id
-            .checked_mul(U256::from(2))
-            .ok_or_else(|| err.clone())?
-            .checked_add(U256::from(35))
-            .ok_or_else(|| err.clone())?;
-        let parity = self.v.checked_sub(chain_id_encoding);
+        let parity = match chain_id {
+            Some(chain_id) => {
+                let chain_id_encoding = chain_id
+                    .checked_mul(U256::from(2))
+                    .ok_or_else(|| err.clone())?
+                    .checked_add(U256::from(35))
+                    .ok_or_else(|| err.clone())?;
+                self.v.checked_sub(chain_id_encoding)
+            }
+            None => self.v.checked_sub(U256::from(27)),
+        };
         match parity {
             Some(p) if p < U256::from(2) => Ok(p == U256::one()),
             _ => Err(err),
@@ -100,7 +105,7 @@ impl TxSignature {
     /// and that is possible to restore parity from `chain_id` and `v`
     pub fn signature_legacy(
         &self,
-        chain_id: U256,
+        chain_id: Option<U256>,
     ) -> Result<(Signature, RecoveryId), TxSigError> {
         let r = h256_to_scalar(self.r.to_owned());
         let s = h256_to_scalar(self.s.to_owned());
@@ -137,15 +142,20 @@ impl TxSignature {
     }
 
     /// compute v from parity and chain_id
-    fn compute_v(chain_id: U256, parity: u8) -> Option<U256> {
-        if chain_id == U256::zero() {
-            // we don't support transactions with unpresented chain_id
-            None
-        } else {
-            let chain_id_encoding = chain_id
-                .checked_mul(U256::from(2))?
-                .checked_add(U256::from(35))?;
-            U256::from(parity).checked_add(chain_id_encoding)
+    fn compute_v(chain_id: Option<U256>, parity: u8) -> Option<U256> {
+        match chain_id {
+            Some(chain_id) => {
+                if chain_id == U256::zero() {
+                    // we don't support transactions with unpresented chain_id
+                    None
+                } else {
+                    let chain_id_encoding = chain_id
+                        .checked_mul(U256::from(2))?
+                        .checked_add(U256::from(35))?;
+                    U256::from(parity).checked_add(chain_id_encoding)
+                }
+            }
+            None => U256::from(parity).checked_add(U256::from(27)),
         }
     }
 
@@ -165,12 +175,15 @@ impl TxSignature {
     pub fn sign_legacy(
         msg: &Message,
         string_sk: String,
-        chain_id: U256,
+        chain_id: Option<U256>,
     ) -> Result<Self, TxSigError> {
         let (sig, recovery_id) = Self::sign_secp256k1(msg, string_sk)?;
         let parity: u8 = recovery_id.into();
-        let v = Self::compute_v(chain_id, parity)
-            .ok_or(TxSigError::Parity(ParityError::ChainId(chain_id)))?;
+        let v = Self::compute_v(chain_id, parity).ok_or_else(|| {
+            TxSigError::Parity(ParityError::ChainId(
+                chain_id.unwrap_or_else(|| U256::from(0)),
+            ))
+        })?;
 
         let (r, s) = (H256::from(sig.r.b32()), H256::from(sig.s.b32()));
         Ok(TxSignature { v, r, s })

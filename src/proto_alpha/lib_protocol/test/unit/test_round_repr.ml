@@ -174,7 +174,7 @@ let process_test_case (round_durations, ios, _) =
           (Period_repr.to_seconds dur))
       ios.round_duration
   in
-  let open Internals_for_test in
+  let open Internal_for_tests in
   (* test [round_and_offset] *)
   let* () =
     List.iter_es
@@ -595,7 +595,7 @@ let round_and_offset_oracle (round_durations : Round_repr.Durations.t)
           bin_search min_r (Round_repr.to_int32 round)
         else
           return
-            Round_repr.Internals_for_test.
+            Round_repr.Internal_for_tests.
               {
                 round;
                 offset =
@@ -632,7 +632,7 @@ let test_round_and_offset_correction =
       in
       let@ expected = round_and_offset_oracle round_duration ~level_offset in
       let computed =
-        Round_repr.Internals_for_test.round_and_offset
+        Round_repr.Internal_for_tests.round_and_offset
           round_duration
           ~level_offset
       in

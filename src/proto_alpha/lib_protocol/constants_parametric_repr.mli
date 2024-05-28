@@ -27,10 +27,10 @@
 
 type dal = {
   feature_enable : bool;
+  incentives_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
-  blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
 
@@ -44,6 +44,7 @@ type sc_rollup_reveal_activation_level = {
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
   dal_parameters : Raw_level_repr.t;
+  dal_attested_slots_validity_lag : int;
 }
 
 type sc_rollup = {
@@ -107,8 +108,20 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  issuance_ratio_min : (* Maximum yearly issuance rate *) Q.t;
-  issuance_ratio_max : (* Minimum yearly issuance rate *) Q.t;
+  issuance_ratio_final_min : (* Minimum yearly issuance rate *) Q.t;
+  issuance_ratio_final_max : (* Maximum yearly issuance rate *) Q.t;
+  issuance_ratio_initial_min :
+    (* Minimum yearly issuance rate at adaptive issuance activation *) Q.t;
+  issuance_ratio_initial_max :
+    (* Maximum yearly issuance rate at adaptive issuance activation *) Q.t;
+  initial_period :
+    (* Period in cycles during which the minimum and maximum yearly
+       issuance rate values stay at their initial values *)
+    int;
+  transition_period :
+    (* Period in cycles during which the minimum and maximum yearly
+       issuance rate values decrease/increase until they reach their global values *)
+    int;
   max_bonus : (* Maximum issuance bonus value *) Issuance_bonus_repr.max_bonus;
   growth_rate : (* Bonus value's growth rate *) Q.t;
   center_dz : (* Center for bonus *) Q.t;
@@ -134,6 +147,12 @@ type adaptive_issuance = {
     (* If set to true, a stake/unstake/finalize operation will be triggered for
        all delegate at end of cycle. *)
     bool;
+  force_activation :
+    (* For testing purposes. If set to true, the adaptive issuance feature is
+       enabled without waiting to reach the launch_ema_threshold.*)
+    bool;
+  ns_enable : (* If set to true, enables the NS feature *)
+              bool;
 }
 
 type issuance_weights = {
@@ -147,17 +166,23 @@ type issuance_weights = {
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
   attesting_reward_weight : int;
-  liquidity_baking_subsidy_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
 }
 
 type t = {
-  preserved_cycles : int;
+  (* Number of cycles after which computed consensus rights are used to actually
+     participate in the consensus *)
+  consensus_rights_delay : int;
+  (* Number of past cycles about which the protocol hints the shell that it should
+     keep them in its history. *)
+  blocks_preservation_cycles : int;
+  (* Number of cycles after which submitted delegate parameters are being
+     used. *)
+  delegate_parameters_activation_delay : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
-  blocks_per_stake_snapshot : int32;
   cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
@@ -173,6 +198,7 @@ type t = {
   (* in centile of a percentage *)
   quorum_max : int32;
   min_proposal_quorum : int32;
+  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -184,9 +210,10 @@ type t = {
   (* in slots *)
   limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
-  percentage_of_frozen_deposits_slashed_per_double_baking : Int_percentage.t;
-  percentage_of_frozen_deposits_slashed_per_double_attestation :
-    Int_percentage.t;
+  percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
+  percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
+  max_slashing_per_block : Percentage.t;
+  max_slashing_threshold : int;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;
@@ -203,3 +230,9 @@ type t = {
 }
 
 val encoding : t Data_encoding.encoding
+
+val update_sc_rollup_parameter : block_time:int -> sc_rollup -> sc_rollup
+
+module Internal_for_tests : sig
+  val sc_rollup_encoding : sc_rollup Data_encoding.t
+end

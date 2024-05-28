@@ -22,11 +22,11 @@
   tezos-dac-lib
   tezos_dac_node_lib
   octez-l2-libs.layer2_store
-  irmin-pack
-  irmin-pack.unix
-  irmin
-  octez-protocol-017-PtNairob-libs.dac
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin
   octez-protocol-018-Proxford-libs.dac
+  octez-protocol-019-PtParisB-libs.dac
   (select void_for_linking-octez-protocol-alpha-libs-dac from
    (octez-protocol-alpha-libs.dac -> void_for_linking-octez-protocol-alpha-libs-dac.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dac.empty)))

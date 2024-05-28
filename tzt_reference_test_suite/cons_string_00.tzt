@@ -1,0 +1,3 @@
+code { CONS } ;
+input { Stack_elt string "Hello" ; Stack_elt (list string) { "World" } } ;
+output { Stack_elt (list string) { "Hello" ; "World" } }

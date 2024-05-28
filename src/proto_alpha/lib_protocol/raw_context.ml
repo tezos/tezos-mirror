@@ -87,18 +87,19 @@ module Raw_consensus = struct
   type t = {
     current_attestation_power : int;
         (** Number of attestation slots recorded for the current block. *)
-    allowed_attestations : (consensus_pk * int) Slot_repr.Map.t option;
-        (** Attestations rights for the current block. Only an attestation
-            for the lowest slot in the block can be recorded. The map
-            associates to each initial slot the [pkh] associated to this
-            slot with its power. This is [None] only in mempool mode. *)
-    allowed_preattestations : (consensus_pk * int) Slot_repr.Map.t option;
+    allowed_attestations : (consensus_pk * int * int) Slot_repr.Map.t option;
+        (** Attestations rights for the current block. Only an attestation for
+            the lowest slot in the block can be recorded. The map associates to
+            each initial slot the [pkh] associated to this slot with its
+            consensus attestation power and DAL attestation power. This is
+            [None] only in mempool mode. *)
+    allowed_preattestations : (consensus_pk * int * int) Slot_repr.Map.t option;
         (** Preattestations rights for the current block. Only a preattestation
-            for the lowest slot in the block can be recorded. The map
-            associates to each initial slot the [pkh] associated to this
-            slot with its power. This is [None] only in mempool mode, or in
-            application mode when there is no locked round (so the block
-            cannot contain any preattestations). *)
+            for the lowest slot in the block can be recorded. The map associates
+            to each initial slot the [pkh] associated to this slot with its
+            consensus attestation power and DAL attestation power. This is
+            [None] only in mempool mode, or in application mode when there is no
+            locked round (so the block cannot contain any preattestations). *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -222,18 +223,6 @@ module Raw_consensus = struct
     {t with attestation_branch = Some attestation_branch}
 end
 
-type dal_committee = {
-  pkh_to_shards :
-    (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-  shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
-}
-
-let empty_dal_committee =
-  {
-    pkh_to_shards = Signature.Public_key_hash.Map.empty;
-    shard_to_pkh = Dal_attestation_repr.Shard_map.empty;
-  }
-
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -272,7 +261,7 @@ type back = {
          - We need to provide an incentive to avoid byzantines to post
      dummy slot headers. *)
   dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
-  dal_committee : dal_committee;
+  dal_cryptobox : Dal.t option;
   adaptive_issuance_enable : bool;
 }
 
@@ -885,13 +874,14 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_attestation_slot_accountability =
           Dal_attestation_repr.Accountability.init
-            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_committee = empty_dal_committee;
+            ~number_of_slots:
+              constants.Constants_parametric_repr.dal.number_of_slots;
+        dal_cryptobox = None;
         adaptive_issuance_enable;
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
+type previous_protocol = Genesis of Parameters_repr.t | ParisB_019
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -907,8 +897,7 @@ let check_and_update_protocol_version ctxt =
         else if Compare.String.(s = "genesis") then
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
-        else if Compare.String.(s = "nairobi_017") then
-          return (Nairobi_017, ctxt)
+        else if Compare.String.(s = "paris_019") then return (ParisB_019, ctxt)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -947,10 +936,10 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp chain_id ctxt =
+let prepare_first_block ~level ~timestamp _chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
-  let* ctxt =
+  let* ctxt, previous_proto_constants =
     match previous_proto with
     | Genesis param ->
         let*? first_level = Raw_level_repr.of_int32 level in
@@ -965,65 +954,34 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         let*? cycle_eras = Level_repr.create_cycle_eras [cycle_era] in
         let* ctxt = set_cycle_eras ctxt cycle_eras in
         let*! result = add_constants ctxt param.constants in
-        return result
-    | Nairobi_017 ->
+        return (result, None)
+    | ParisB_019 ->
         let*! c = get_previous_protocol_constants ctxt in
 
-        let cryptobox_parameters =
-          {
-            Dal.page_size = c.dal.cryptobox_parameters.page_size;
-            number_of_shards = c.dal.cryptobox_parameters.number_of_shards;
-            slot_size = c.dal.cryptobox_parameters.slot_size;
-            redundancy_factor = c.dal.cryptobox_parameters.redundancy_factor;
-          }
-        in
         let dal =
           Constants_parametric_repr.
             {
               feature_enable = c.dal.feature_enable;
+              incentives_enable = c.dal.incentives_enable;
               number_of_slots = c.dal.number_of_slots;
-              attestation_lag = 4;
+              attestation_lag = c.dal.attestation_lag;
               attestation_threshold = c.dal.attestation_threshold;
-              blocks_per_epoch = 1l;
-              cryptobox_parameters;
+              cryptobox_parameters = c.dal.cryptobox_parameters;
             }
         in
-        (* This test prevents the activation of the protocol if the
-           set of parameters given for the DAL is invalid. *)
-        let*? () =
-          if dal.feature_enable then
-            match Dal.make cryptobox_parameters with
-            | Ok _cryptobox -> ok ()
-            | Error (`Fail explanation) ->
-                error (Dal_errors_repr.Dal_cryptobox_error {explanation})
-          else ok ()
-        in
-        let dal_activation_level =
-          if c.dal.feature_enable then Raw_level_repr.root
-          else if dal.feature_enable then
-            (* First level of the protocol with dal activated. *)
-            Raw_level_repr.of_int32_exn (Int32.succ level)
-          else
-            (* Deactivate the reveal if the dal is not enabled.
-
-               assert (not (c.dal.feature_enable || dal.feature_enable))
-
-               We set the activation level to [pred max_int] to deactivate
-               the feature. The [pred] is needed to not trigger an encoding
-               exception with the value [Int32.int_min] (see
-               tezt/tests/mockup.ml). *)
-            Raw_level_repr.of_int32_exn Int32.(pred max_int)
-        in
-        (* When stitching from Oxford and after, [Raw_level_repr.root]
-           should be replaced by the previous value, that is
-           [c.reveal_activation_level.*]. *)
         let reveal_activation_level :
             Constants_parametric_repr.sc_rollup_reveal_activation_level =
+          let prev = c.sc_rollup.reveal_activation_level in
+          let raw_data =
+            Constants_parametric_repr.{blake2B = prev.raw_data.blake2B}
+          in
           {
-            raw_data = {blake2B = Raw_level_repr.root};
-            metadata = Raw_level_repr.root;
-            dal_page = dal_activation_level;
-            dal_parameters = dal_activation_level;
+            raw_data;
+            metadata = prev.metadata;
+            dal_page = prev.dal_page;
+            dal_parameters = prev.dal_parameters;
+            dal_attested_slots_validity_lag =
+              prev.dal_attested_slots_validity_lag;
           }
         in
         let sc_rollup =
@@ -1048,8 +1006,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               max_number_of_parallel_games =
                 c.sc_rollup.max_number_of_parallel_games;
               reveal_activation_level;
-              private_enable = true;
-              riscv_pvm_enable = false;
+              private_enable = c.sc_rollup.private_enable;
+              riscv_pvm_enable = c.sc_rollup.riscv_pvm_enable;
             }
         in
         let zk_rollup =
@@ -1058,76 +1016,100 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               enable = c.zk_rollup.enable;
               origination_size = c.zk_rollup.origination_size;
               min_pending_to_process = c.zk_rollup.min_pending_to_process;
-              max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
+              max_ticket_payload_size = c.zk_rollup.max_ticket_payload_size;
             }
         in
 
         let adaptive_rewards_params =
           Constants_parametric_repr.
             {
-              issuance_ratio_min = Q.(5 // 10_000) (* 0.05% *);
-              issuance_ratio_max = Q.(5 // 100);
-              max_bonus =
-                Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.(5 // 100);
-              growth_rate = Q.(1 // 100);
-              center_dz = Q.(50 // 100);
-              radius_dz = Q.(2 // 100);
+              issuance_ratio_final_min =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_final_min;
+              issuance_ratio_final_max =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_final_max;
+              issuance_ratio_initial_min =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_initial_min;
+              issuance_ratio_initial_max =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_initial_max;
+              initial_period =
+                c.adaptive_issuance.adaptive_rewards_params.initial_period;
+              transition_period =
+                c.adaptive_issuance.adaptive_rewards_params.transition_period;
+              max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
+              growth_rate =
+                c.adaptive_issuance.adaptive_rewards_params.growth_rate;
+              center_dz = c.adaptive_issuance.adaptive_rewards_params.center_dz;
+              radius_dz = c.adaptive_issuance.adaptive_rewards_params.radius_dz;
             }
         in
-
         let adaptive_issuance =
           Constants_parametric_repr.
             {
-              global_limit_of_staking_over_baking = 5;
-              edge_of_staking_over_delegation = 2;
-              launch_ema_threshold =
-                (if Chain_id.equal Constants_repr.mainnet_id chain_id then
-                 (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l
-                else (* 5% for testnets *) 100_000_000l);
+              global_limit_of_staking_over_baking =
+                c.adaptive_issuance.global_limit_of_staking_over_baking;
+              edge_of_staking_over_delegation =
+                c.adaptive_issuance.edge_of_staking_over_delegation;
+              launch_ema_threshold = 0l;
               adaptive_rewards_params;
-              activation_vote_enable = false;
-              autostaking_enable = true;
+              activation_vote_enable =
+                c.adaptive_issuance.activation_vote_enable;
+              autostaking_enable = c.adaptive_issuance.autostaking_enable;
+              force_activation = c.adaptive_issuance.force_activation;
+              ns_enable = c.adaptive_issuance.ns_enable;
             }
         in
         let issuance_weights =
-          let c_gen =
-            Constants_repr.Generated.generate
-              ~consensus_committee_size:c.consensus_committee_size
+          let ({
+                 base_total_issued_per_minute;
+                 baking_reward_fixed_portion_weight;
+                 baking_reward_bonus_weight;
+                 attesting_reward_weight;
+                 seed_nonce_revelation_tip_weight;
+                 vdf_revelation_tip_weight;
+               }
+                : Constants_parametric_previous_repr.issuance_weights) =
+            c.issuance_weights
           in
-          c_gen.issuance_weights
+          {
+            Constants_parametric_repr.base_total_issued_per_minute;
+            baking_reward_fixed_portion_weight;
+            baking_reward_bonus_weight;
+            attesting_reward_weight;
+            seed_nonce_revelation_tip_weight;
+            vdf_revelation_tip_weight;
+          }
         in
-
-        let percentage_of_frozen_deposits_slashed_per_double_baking =
-          Int_percentage.p5
-        in
-        let percentage_of_frozen_deposits_slashed_per_double_attestation =
-          Int_percentage.of_ratio_bounded
-            c.ratio_of_frozen_deposits_slashed_per_double_attestation
-        in
-        let limit_of_delegation_over_baking =
-          (100 / c.frozen_deposits_percentage) - 1
-        in
-        let minimal_frozen_stake =
-          Tez_repr.(
-            div_exn c.minimal_stake (limit_of_delegation_over_baking + 1))
+        let consensus_rights_delay =
+          (* Any network should now use 2 cycle for the consensus_rights_delay *)
+          if Compare.Int.(c.consensus_rights_delay >= 2) then 2
+          else c.consensus_rights_delay
         in
 
         let direct_ticket_spending_enable = false in
-
+        let Constants_repr.Generated.{max_slashing_threshold; _} =
+          Constants_repr.Generated.generate
+            ~consensus_committee_size:c.consensus_committee_size
+        in
         let constants =
           Constants_parametric_repr.
             {
-              preserved_cycles = c.preserved_cycles;
+              consensus_rights_delay;
+              blocks_preservation_cycles = 1;
+              delegate_parameters_activation_delay =
+                c.delegate_parameters_activation_delay;
               blocks_per_cycle = c.blocks_per_cycle;
               blocks_per_commitment = c.blocks_per_commitment;
               nonce_revelation_threshold = c.nonce_revelation_threshold;
-              blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
               cycles_per_voting_period = c.cycles_per_voting_period;
               hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
               hard_gas_limit_per_block = c.hard_gas_limit_per_block;
               proof_of_work_threshold = c.proof_of_work_threshold;
               minimal_stake = c.minimal_stake;
-              minimal_frozen_stake;
+              minimal_frozen_stake = c.minimal_frozen_stake;
               vdf_difficulty = c.vdf_difficulty;
               origination_size = c.origination_size;
               max_operations_time_to_live = c.max_operations_time_to_live;
@@ -1138,6 +1120,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               quorum_min = c.quorum_min;
               quorum_max = c.quorum_max;
               min_proposal_quorum = c.min_proposal_quorum;
+              liquidity_baking_subsidy = c.liquidity_baking_subsidy;
               liquidity_baking_toggle_ema_threshold =
                 c.liquidity_baking_toggle_ema_threshold;
               minimal_block_delay = c.minimal_block_delay;
@@ -1145,9 +1128,14 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               consensus_committee_size = c.consensus_committee_size;
               consensus_threshold = c.consensus_threshold;
               minimal_participation_ratio = c.minimal_participation_ratio;
-              limit_of_delegation_over_baking;
-              percentage_of_frozen_deposits_slashed_per_double_baking;
-              percentage_of_frozen_deposits_slashed_per_double_attestation;
+              limit_of_delegation_over_baking =
+                c.limit_of_delegation_over_baking;
+              percentage_of_frozen_deposits_slashed_per_double_baking =
+                c.percentage_of_frozen_deposits_slashed_per_double_baking;
+              percentage_of_frozen_deposits_slashed_per_double_attestation =
+                c.percentage_of_frozen_deposits_slashed_per_double_attestation;
+              max_slashing_per_block = Percentage.p100;
+              max_slashing_threshold;
               (* The `testnet_dictator` should absolutely be None on mainnet *)
               testnet_dictator = c.testnet_dictator;
               initial_seed = c.initial_seed;
@@ -1163,7 +1151,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             }
         in
         let*! ctxt = add_constants ctxt constants in
-        return ctxt
+        return (ctxt, Some c)
   in
   let+ ctxt =
     prepare
@@ -1173,7 +1161,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
       ~timestamp
       ~adaptive_issuance_enable:false
   in
-  (previous_proto, ctxt)
+  (previous_proto, previous_proto_constants, ctxt)
 
 let activate ctxt h =
   let open Lwt_syntax in
@@ -1540,9 +1528,9 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  val allowed_attestations : t -> (consensus_pk * int) slot_map option
+  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
 
-  val allowed_preattestations : t -> (consensus_pk * int) slot_map option
+  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
 
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
@@ -1552,8 +1540,8 @@ module type CONSENSUS = sig
 
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int) slot_map option ->
+    allowed_attestations:(consensus_pk * int * int) slot_map option ->
+    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
     t
 
   val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
@@ -1680,22 +1668,32 @@ module Dal = struct
 
   let make ctxt =
     let open Result_syntax in
-    let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
-      ctxt.back.constants
-    in
-    match Dal.make cryptobox_parameters with
-    | Ok cryptobox -> return cryptobox
-    | Error (`Fail explanation) ->
-        tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation})
+    (* Dal.make takes some time (on the order of 10ms) so we memoize
+       its result to avoid calling it more than once per block. *)
+    match ctxt.back.dal_cryptobox with
+    | Some cryptobox -> return (ctxt, cryptobox)
+    | None -> (
+        let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
+          ctxt.back.constants
+        in
+        match Dal.make cryptobox_parameters with
+        | Ok cryptobox ->
+            let back = {ctxt.back with dal_cryptobox = Some cryptobox} in
+            return ({ctxt with back}, cryptobox)
+        | Error (`Fail explanation) ->
+            tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
   let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
 
-  let record_attested_shards ctxt attestation shards =
+  let number_of_shards ctxt =
+    ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
+
+  let record_number_of_attested_shards ctxt attestation number =
     let dal_attestation_slot_accountability =
-      Dal_attestation_repr.Accountability.record_attested_shards
+      Dal_attestation_repr.Accountability.record_number_of_attested_shards
         ctxt.back.dal_attestation_slot_accountability
         attestation
-        shards
+        number
     in
     {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
 
@@ -1716,7 +1714,7 @@ module Dal = struct
     | Some (dal_slot_fee_market, updated) ->
         if not updated then
           tzfail
-            (Dal_errors_repr.Dal_publish_slot_header_duplicate {slot_header})
+            (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
         else return {ctxt with back = {ctxt.back with dal_slot_fee_market}}
 
   let candidates ctxt =
@@ -1734,108 +1732,6 @@ module Dal = struct
       ctxt.back.dal_attestation_slot_accountability
       ~threshold
       ~number_of_shards
-
-  type committee = dal_committee = {
-    pkh_to_shards :
-      (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
-  }
-
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
-
-     A committee is selected by the callback function
-     [pkh_from_tenderbake_slot]. We use a callback because of circular
-     dependencies. It is not clear whether it will be the final choice
-     for the DAL committee. The current solution is a bit hackish but
-     should work. If we decide to differ from the Tenderbake
-     committee, one could just draw a new committee.
-
-     The problem with drawing a new committee is that it is not
-     guaranteed that everyone in the DAL committee will be in the
-     Tenderbake committee. Consequently, either we decide to have a
-     new consensus operation which does not count for Tenderbake,
-     and/or we take into account for the model of DAL that at every
-     level, a percentage of DAL attestations cannot be received. *)
-  let compute_committee ctxt pkh_from_tenderbake_slot =
-    let open Lwt_result_syntax in
-    let Constants_parametric_repr.
-          {
-            dal = {cryptobox_parameters = {number_of_shards; _}; _};
-            consensus_committee_size;
-            _;
-          } =
-      ctxt.back.constants
-    in
-    (* We first draw a committee by drawing slots from the Tenderbake
-       committee. To have a compact representation of slots, we can
-       sort the Tenderbake slots by [pkh], so that a committee is
-       actually only an interval. This is done by recomputing a
-       committee from the first one. *)
-    let update_committee committee pkh ~slot_index ~power =
-      {
-        pkh_to_shards =
-          Signature.Public_key_hash.Map.update
-            pkh
-            (function
-              | None -> Some (slot_index, power)
-              | Some (initial_shard_index, old_power) ->
-                  Some (initial_shard_index, old_power + power))
-            committee.pkh_to_shards;
-        shard_to_pkh =
-          List.fold_left
-            (fun shard_to_pkh slot ->
-              Dal_attestation_repr.Shard_map.add slot pkh shard_to_pkh)
-            committee.shard_to_pkh
-            Misc.(slot_index --> (slot_index + (power - 1)));
-      }
-    in
-    let rec compute_power index committee =
-      if Compare.Int.(index < 0) then return committee
-      else
-        let shard_index = index mod consensus_committee_size in
-        let*? slot = Slot_repr.of_int shard_index in
-        let* _ctxt, pkh = pkh_from_tenderbake_slot slot in
-        (* The [Slot_repr] module is related to the Tenderbake committee. *)
-        let slot_index = Slot_repr.to_int slot in
-        (* An optimisation could be to return only [pkh_to_shards] map
-           because the second one is not used. This can be done later
-           on, if it is a good optimisation. *)
-        let committee = update_committee committee pkh ~slot_index ~power:1 in
-        compute_power (index - 1) committee
-    in
-    (* This committee is an intermediate to compute the final DAL
-       committee. This one only projects the Tenderbake committee into
-       the DAL committee. The next one reorders the slots so that they
-       are grouped by public key hash. *)
-    let* unordered_committee =
-      compute_power (number_of_shards - 1) empty_dal_committee
-    in
-    let dal_committee =
-      Signature.Public_key_hash.Map.fold
-        (fun pkh (_, power) (total_power, committee) ->
-          let committee =
-            update_committee committee pkh ~slot_index:total_power ~power
-          in
-          let new_total_power = total_power + power in
-          (new_total_power, committee))
-        unordered_committee.pkh_to_shards
-        (0, empty_dal_committee)
-      |> snd
-    in
-    return dal_committee
-
-  let init_committee ctxt committee =
-    {ctxt with back = {ctxt.back with dal_committee = committee}}
-
-  let shards_of_attester ctxt ~attester:pkh =
-    let rec make acc (initial_shard_index, power) =
-      if Compare.Int.(power <= 0) then List.rev acc
-      else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)
-    in
-    Signature.Public_key_hash.Map.find_opt
-      pkh
-      ctxt.back.dal_committee.pkh_to_shards
-    |> Option.map (fun pre_shards -> make [] pre_shards)
 end
 
 (* The type for relative context accesses instead from the root. In order for

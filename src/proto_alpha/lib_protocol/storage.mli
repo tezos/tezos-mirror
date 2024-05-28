@@ -52,7 +52,7 @@ module Block_round : Simple_single_data_storage with type value = Round_repr.t
 type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
 module Slashed_deposits_history : sig
-  type slashed_percentage = Int_percentage.t
+  type slashed_percentage = Percentage.t
 
   type t = (Cycle_repr.t * slashed_percentage) list
 
@@ -69,6 +69,10 @@ module Slashed_deposits_history : sig
       0 if there is no such cycle. *)
   val get : Cycle_repr.t -> t -> slashed_percentage
 end
+
+(* TODO #6918: Remove after P *)
+module Slashed_deposits_history__Oxford :
+    module type of Slashed_deposits_history
 
 module Unstake_request : sig
   type request = Cycle_repr.t * Tez_repr.t
@@ -151,13 +155,6 @@ module Contract : sig
        and type value = Signature.Public_key.t
        and type t := Raw_context.t
 
-  (** The pending consensus key of a delegate *)
-  module Pending_consensus_keys_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Signature.Public_key.t
-       and type t := Raw_context.t * Contract_repr.t
-
   (** The delegate of a contract, if any. *)
   module Delegate :
     Indexed_data_storage
@@ -177,24 +174,13 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  (** The part of a delegate balance that can't be used. The total
-     balance is frozen_deposits.current_amount + balance. It also stores
-     the initial frozen balance in frozen_deposits.initial_amount. We
-     have current_amount <= initial_amount and current_amount <
-     initial_amount iff the delegate was slashed. *)
-  module Frozen_deposits_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Contract_repr.t
-       and type value = Deposits_repr.t
-       and type t := Raw_context.t
-
   (** Tez that were part of frozen deposits (either [own_frozen] or
       [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
       They won't be part of the stake for future distributions.
-      For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
+      For cycles [current_cycle - consensus_rights_delay - max_slashing_period + 1] to
       [current_cycle] they are still slashable.
-      For cycle [current_cycle - preserved_cycles - max_slashing_period] they are
+      For cycle [current_cycle - consensus_rights_delay - max_slashing_period] they are
       not slashable anymore and hence any other older cycles must be squashed
       into this one at cycle end. *)
   module Unstaked_frozen_deposits :
@@ -226,7 +212,7 @@ module Contract : sig
        and type t := Raw_context.t
 
   (** If there is a value, the frozen balance for the contract won't
-     exceed it (starting in preserved_cycles + 1). *)
+     exceed it (starting in consensus_rights_delay + 1). *)
   module Frozen_deposits_limit :
     Indexed_data_storage
       with type key = Contract_repr.t
@@ -278,22 +264,8 @@ module Contract : sig
        and type value = Z.t
        and type t := Raw_context.t
 
-  (** History of slashed deposits: an associative list of cycles to slashed
-      percentages.
-
-      This storage is inefficient but is not expected to grow large (as of
-      2023-05-22, the last slashing on mainnet dates back to:
-      - 2021-12-17 for double baking (154 events in total),
-      - 2019-08-08 for double endorsing (24 events in total).
-
-      The slashing percentages are used to compute the real value of stake
-      withdrawals.
-      Currently there is no limit to the age of the events we need to store
-      because there is no such limit for stake withdrawals.
-      At worst we can revisit this decision in a later protocol amendment (in
-      25 cycles) or clean up this storage manually or automatically.
-  *)
-  module Slashed_deposits :
+  (* TODO #6918: Remove after P *)
+  module Slashed_deposits__Oxford :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Slashed_deposits_history.t
@@ -468,7 +440,7 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-(** Set of all active consensus keys in cycle `current + preserved_cycles + 1` *)
+(** Set of all active consensus keys in cycle `current + consensus_rights_delay + 1` *)
 module Consensus_keys :
   Data_set_storage
     with type t := Raw_context.t
@@ -481,25 +453,55 @@ module Pending_consensus_keys :
      and type key = Contract_repr.t
      and type value = Signature.public_key
 
-(** All denunciations of the current cycle that will have an effect (slashing,
-    reward), i.e. all below 100%, deferred to the cycle end. *)
-module Current_cycle_denunciations :
+(** All denunciations of the current and previous cycles that will have an effect
+    (slashing, reward), i.e. all below 100%, deferred to the end of their
+    slashing period. *)
+module Pending_denunciations :
   Indexed_data_storage
     with type t := Raw_context.t
      and type key = Signature.public_key_hash
      and type value = Denunciations_repr.t
 
-type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
+(** History of slashed deposits: an associative list of cycles to slashed
+    percentages.
 
-(** [slashed_level] with all fields being [false]. *)
-val default_slashed_level : slashed_level
+    This storage is inefficient but is not expected to grow large (as of
+    2023-11-28, the last slashing on mainnet dates back to:
+    - 2021-12-17 for double baking (154 events in total),
+    - 2019-08-08 for double endorsing (24 events in total).
+    Since slashings are here grouped by baker and cycle, there would only be
+    a few elements in each list.
 
-(** Set used to avoid slashing multiple times the same event *)
+    The slashing percentages are used to compute the real value of stake
+    withdrawals.
+    Currently there is no limit to the age of the events we need to store
+    because there is no such limit for stake withdrawals.
+    At worst we can revisit this decision in a later protocol amendment (in
+    25 cycles) or clean up this storage manually or automatically. *)
 module Slashed_deposits :
   Indexed_data_storage
+    with type t := Raw_context.t
+     and type key = Signature.public_key_hash
+     and type value = Slashed_deposits_history.t
+
+(** This type is used to track which denunciations have already been
+    recorded, to avoid slashing multiple times the same event. *)
+type denounced = {
+  for_double_preattesting : bool;
+  for_double_attesting : bool;
+  for_double_baking : bool;
+}
+
+(** {!denounced} with all fields set to [false]. *)
+val default_denounced : denounced
+
+(** Set used to avoid slashing multiple times the same event *)
+module Already_denounced :
+  Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
-     and type key = Raw_level_repr.t * Signature.Public_key_hash.t
-     and type value = slashed_level
+     and type key =
+      (Raw_level_repr.t * Round_repr.t) * Signature.Public_key_hash.t
+     and type value = denounced
 
 module Pending_staking_parameters :
   Indexed_data_storage
@@ -508,44 +510,19 @@ module Pending_staking_parameters :
      and type value = Staking_parameters_repr.t
 
 module Stake : sig
-  (** The map of all the staking balances of all delegates, including
-     those with less than
-     {!Constants_parametric_repr.minimal_stake}. It might be large *)
-  module Staking_balance_up_to_Nairobi :
-    Indexed_data_snapshotable_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Tez_repr.t
-       and type snapshot = int
-       and type t := Raw_context.t
-
   (** The map of all the stake of all delegates, including those with
       less than {!Constants_parametric_repr.minimal_stake}. It might
       be large. *)
   module Staking_balance :
-    Indexed_data_snapshotable_storage
+    Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = Full_staking_balance_repr.t
-       and type snapshot = int
        and type t := Raw_context.t
 
-  (** This is a set, encoded in a map with value unit. This should be
-     fairly small compared to staking balance *)
+  (** This should be fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
-    Indexed_data_snapshotable_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = unit
-       and type snapshot = int
-       and type t := Raw_context.t
-
-  (** Counter of stake storage snapshots taken since last cycle *)
-  module Last_snapshot :
-    Single_data_storage with type value = int and type t := Raw_context.t
-
-  (* Remove me in P. *)
-  module Selected_distribution_for_cycle_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
+    Data_set_storage
+      with type elt = Signature.Public_key_hash.t
        and type t := Raw_context.t
 
   (** List of active stake *)
@@ -553,13 +530,6 @@ module Stake : sig
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
-       and type t := Raw_context.t
-
-  (* Remove me in P. *)
-  module Total_active_stake_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Tez_repr.t
        and type t := Raw_context.t
 
   (** Sum of the active stakes of all the delegates with
@@ -824,16 +794,6 @@ module Tenderbake : sig
       the grandparent hash) used to verify the validity of
       attestations. *)
   module Attestation_branch :
-    Single_data_storage
-      with type value = Block_hash.t * Block_payload_hash.t
-       and type t := Raw_context.t
-
-  (** Similar to [Attestation_branch] but only used for the stitching from
-      Nairobi.
-
-      TODO: https://gitlab.com/tezos/tezos/-/issues/6082
-      This should be removed once in the next protocol. *)
-  module Endorsement_branch :
     Single_data_storage
       with type value = Block_hash.t * Block_payload_hash.t
        and type t := Raw_context.t

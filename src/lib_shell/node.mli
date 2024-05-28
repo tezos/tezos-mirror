@@ -26,7 +26,7 @@
 
 type t
 
-val get_version : t -> Tezos_version.Node_version.t
+val get_version : t -> Tezos_version.Octez_node_version.t
 
 type config = {
   genesis : Genesis.t;
@@ -58,7 +58,7 @@ val create :
   ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
   version:string ->
-  commit_info:Node_version.commit_info ->
+  commit_info:Octez_node_version.commit_info ->
   config ->
   Shell_limits.peer_validator_limits ->
   Shell_limits.block_validator_limits ->
@@ -74,7 +74,7 @@ val shutdown : t -> unit Lwt.t
     [commit_info] and [node] contain all informations required to build such a
     directory. *)
 val build_rpc_directory :
-  node_version:Tezos_version.Node_version.t ->
-  commit_info:Node_version.commit_info ->
+  node_version:Tezos_version.Octez_node_version.t ->
+  commit_info:Octez_node_version.commit_info ->
   t ->
   unit Tezos_rpc.Directory.t

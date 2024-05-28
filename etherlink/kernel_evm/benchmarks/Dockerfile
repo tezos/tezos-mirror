@@ -24,8 +24,5 @@ RUN chmod +x command.sh
 # install scripts dependencies
 RUN npm install --omit=optional
 
-# override the debug entrypoint
-ENTRYPOINT [""]
-
 # launch benchmarking
-CMD ["./command.sh"]
+ENTRYPOINT ["./command.sh"]

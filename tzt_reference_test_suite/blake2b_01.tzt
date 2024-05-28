@@ -1,0 +1,3 @@
+code BLAKE2B;
+input { Stack_elt bytes 0xdeadbeef };
+output { Stack_elt bytes 0xf3e925002fed7cc0ded46842569eb5c90c910c091d8d04a1bdf96e0db719fd91 }
