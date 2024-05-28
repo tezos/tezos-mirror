@@ -101,6 +101,7 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
     if shell_header_level <= !last_notified_level then return_unit
     else if Int32.equal shell_header_level 1l then (
       stream_push (Some (hash, shell_header)) ;
+      last_notified_level := shell_header_level ;
       return_unit)
     else
       let* pred_hash, pred_level =
