@@ -134,6 +134,13 @@ let blockchain_network_mainnet =
       ]
     ~default_bootstrap_peers:
       ["boot.tzinit.org"; "boot.tzboot.net"; "boot.tzbeta.net"]
+    ~dal_config:
+      {
+        activated = true;
+        use_mock_srs_for_testing = false;
+        bootstrap_peers =
+          ["dalboot.mainnet.tzinit.org"; "dalboot.mainnet.tzboot.net"];
+      }
 
 let blockchain_network_ghostnet =
   make_blockchain_network
@@ -175,6 +182,13 @@ let blockchain_network_ghostnet =
         "ghostnet.boot.ecadinfra.com";
         "ghostnet.stakenow.de:9733";
       ]
+    ~dal_config:
+      {
+        activated = true;
+        use_mock_srs_for_testing = false;
+        bootstrap_peers =
+          ["dalboot.ghostnet.tzinit.org"; "dalboot.ghostnet.tzboot.net"];
+      }
 
 let blockchain_network_sandbox =
   make_blockchain_network
@@ -204,6 +218,8 @@ let blockchain_network_sandbox =
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:sandbox_user_activated_upgrades
+    ~dal_config:
+      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
 
 let blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
