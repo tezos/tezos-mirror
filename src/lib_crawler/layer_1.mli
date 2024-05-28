@@ -141,6 +141,9 @@ val get_tezos_reorg_for_new_head :
 val client_context_with_timeout :
   #Client_context.full -> float -> Client_context.full
 
+(** Returns true iff a connection error is present in the given error trace. *)
+val is_connection_error : error trace -> bool
+
 (**/**)
 
 module Internal_for_tests : sig
