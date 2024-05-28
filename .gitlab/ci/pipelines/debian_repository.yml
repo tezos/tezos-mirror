@@ -19,7 +19,7 @@ oc.docker-build-debian-dependencies:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - .gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh
+  - ./scripts/ci/build-debian-packages-dependencies.sh
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -44,7 +44,7 @@ oc.docker-build-ubuntu-dependencies:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - .gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh
+  - ./scripts/ci/build-debian-packages-dependencies.sh
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -67,7 +67,7 @@ oc.build-debian:
   - $TAGS
   dependencies: []
   script:
-  - .gitlab/ci/jobs/packaging/build-debian-packages.sh
+  - ./scripts/ci/build-debian-packages.sh
   variables:
     DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
@@ -90,7 +90,7 @@ oc.build-ubuntu:
   - $TAGS
   dependencies: []
   script:
-  - .gitlab/ci/jobs/packaging/build-debian-packages.sh
+  - ./scripts/ci/build-debian-packages.sh
   variables:
     DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu

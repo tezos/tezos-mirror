@@ -47,7 +47,7 @@ let jobs =
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
-      [".gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh"]
+      ["./scripts/ci/build-debian-packages-dependencies.sh"]
   in
   let job_docker_build_debian_dependencies : tezos_job =
     make_job_docker_build_debian_dependencies
@@ -73,7 +73,7 @@ let jobs =
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-      [".gitlab/ci/jobs/packaging/build-debian-packages.sh"]
+      ["./scripts/ci/build-debian-packages.sh"]
   in
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages

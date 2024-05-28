@@ -19,14 +19,14 @@ used by the Debian packaging tools.
 The CI runs two scripts to build the dependencies images and the packages
 themselves.
 
-The first, `.gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh`
+The first, `scripts/ci/build-debian-packages-dependencies.sh`
 gets as input a distribution/release/architecture triplet and creates a Docker
 image with all the needed dependencies specific to this triplet and a value of
 the variable `opam_repository_tag` as specified in `scripts/version.sh`. This
 is to make sure that we fix the opam dependencies from a given lockfile based
 on a certain state of the `ocaml/opam-repository`.
 
-The second, `.gitlab/ci/jobs/packaging/build-debian-packages.sh` is executed by
+The second, `scripts/ci/build-debian-packages.sh` is executed by
 the CI in the Docker images created by the script above and compiles the
 binaries and creates the Debian packages.
 
