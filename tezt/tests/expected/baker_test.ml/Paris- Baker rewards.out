@@ -1,7 +1,7 @@
 
 ./octez-client rpc get /chains/main/blocks/head/metadata
-{ "protocol": "PtParisBpr4Kn15JRo69h1hvaXEbTwbdw9JsNYRgkF9x11z4q3U",
-  "next_protocol": "PtParisBpr4Kn15JRo69h1hvaXEbTwbdw9JsNYRgkF9x11z4q3U",
+{ "protocol": "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ",
+  "next_protocol": "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ",
   "test_chain_status": { "status": "not_running" }, "max_operations_ttl": 2,
   "max_operation_data_length": 32768, "max_block_header_length": 289,
   "max_operation_list_length":
