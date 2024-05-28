@@ -77,17 +77,15 @@ let export_snapshot {path = _; repo} hash ~path =
 module PVMState = struct
   type value = tree
 
-  let key = ["pvm_state"]
-
   let empty () = Storage.empty ()
 
-  let find ctxt = Storage.find ctxt.tree key
+  let find ctxt = Storage.find ctxt.tree Storage.pvm_state_key
 
   let lookup tree path = Storage.lookup tree path
 
   let set ctxt state =
     let open Lwt_syntax in
-    let+ tree = Storage.set ctxt.tree key state in
+    let+ tree = Storage.set ctxt.tree Storage.pvm_state_key state in
     {ctxt with tree}
 end
 

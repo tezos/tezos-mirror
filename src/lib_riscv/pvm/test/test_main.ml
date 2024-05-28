@@ -6,6 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tests = [("Storage", [("Simple test", `Quick, Test_storage.test_simple)])]
+let tests =
+  [
+    ( "Storage",
+      [
+        ("Simple test", `Quick, Test_storage.test_simple);
+        ("Simple state test", `Quick, Test_storage.test_state_simple);
+      ] );
+  ]
 
 let () = Alcotest_lwt.run ~__FILE__ "RISC-V PVM" tests |> Lwt_main.run

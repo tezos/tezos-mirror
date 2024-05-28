@@ -19,3 +19,12 @@ let test_simple () =
       assert (Storage.Id.equal id id2) ;
       let* () = Storage.close repo in
       return_unit)
+
+let test_state_simple () =
+  let open Lwt_syntax in
+  let empty = Storage.empty () in
+  let* found_empty = Storage.find empty Storage.pvm_state_key in
+  assert (Option.equal Storage.State.equal found_empty (Some empty)) ;
+  let* set_empty = Storage.set empty Storage.pvm_state_key empty in
+  assert (Storage.State.equal set_empty empty) ;
+  return_unit
