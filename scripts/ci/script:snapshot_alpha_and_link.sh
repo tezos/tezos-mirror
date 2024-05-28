@@ -8,7 +8,7 @@ new_proto_version=$(printf "%03d" $((last_proto_version + 1)))
 
 make octez-protocol-compiler
 ./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" next
-./scripts/remove-old-protocols.sh
+./scripts/slim-mode.sh on
 make
 
 dune build src/proto_"${new_proto_version}"_*/

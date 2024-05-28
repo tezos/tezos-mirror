@@ -62,7 +62,10 @@ The release of a new protocol requires some manual configuration in the CI:
 - The old ``n-1`` protocol must be removed from those being built and tested
 
 This is done by adding and removing the respective protocols to
-``active_protocol_versions``, :src:`scripts/remove-old-protocols.sh` will ``rm`` the appropriate older protocol.
+:src:`script-inputs/active_protocol_versions` and :src:`script-inputs/slim-mode-dune`,
+which is done by defining the protocols with the right functions
+(typically ``active`` or ``frozen``) in :src:`manifest/product_octez.ml`
+and running ``make -C manifest``.
 
 **Final Tests and sign-off:**
 
