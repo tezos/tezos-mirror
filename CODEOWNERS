@@ -28,10 +28,10 @@
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
+# @abate = Pietro Abate
 # @ACoquereau = Albin Coquereau
 # @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
-# @bsall = Boubacar Sall
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
@@ -63,7 +63,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @andrea.cerone @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
