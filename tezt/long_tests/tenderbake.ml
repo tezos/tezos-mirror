@@ -30,6 +30,8 @@
    Subject: Checking performance for Tenderbake bakers
 *)
 
+let team = Team.layer1
+
 module Time = Tezos_base.Time.System
 
 let lwt_ignore p =
@@ -311,6 +313,7 @@ module Rounds = struct
       ~__FILE__
       ~title:test
       ~tags:["tenderbake"; "basic"]
+      ~team
       ~uses:[Protocol.baker protocol]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
@@ -462,6 +465,7 @@ module Long_dynamic_bake = struct
       ~__FILE__
       ~title:(test topology)
       ~tags:["tenderbake"; "dynamic"; string_of_topology topology]
+      ~team
       ~uses:[Protocol.baker protocol]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))

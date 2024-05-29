@@ -55,7 +55,7 @@ let test_tezt_tests_suite_load_time ~executors () =
     ~executors
   @@ fun () ->
   let* () = Process.run "dune" ["build"; "tezt/tests/main.exe"] in
-  Long_test.time_lwt ~repeat:5 tezt_load_time @@ fun () ->
+  Long_test.time_and_check_regression_lwt ~repeat:5 tezt_load_time @@ fun () ->
   let* () =
     (* [--list] will ensure that we register all tests, and so get a
        reasonable estimation of start up time. [--only 1] is passed to
