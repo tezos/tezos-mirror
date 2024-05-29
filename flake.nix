@@ -10,10 +10,6 @@
       flake = false;
       url = "github:ocaml/opam-repository";
     };
-    tezos-opam-repository = {
-      flake = false;
-      url = "gitlab:tezos/opam-repository";
-    };
     rust-overlay.url = "github:oxalica/rust-overlay/b037d65c988421b54024e62691eace4f2fe623bc";
   };
 
@@ -23,7 +19,6 @@
     flake-utils,
     opam-nix-integration,
     opam-repository,
-    tezos-opam-repository,
     rust-overlay,
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -37,7 +32,7 @@
         };
 
         sources = {
-          inherit pkgs opam-repository tezos-opam-repository;
+          inherit pkgs opam-repository;
 
           riscv64Pkgs = import nixpkgs {
             crossSystem.config = "riscv64-unknown-linux-gnu";
@@ -84,14 +79,11 @@
               source ${self}/scripts/version.sh
 
               opam_repo_flake="github:ocaml/opam-repository/$full_opam_repository_tag"
-              tezos_opam_repo_flake="gitlab:tezos/opam-repository/$opam_repository_tag"
 
-              if ! ( ${checkFlakeLock} ${opam-repository} $opam_repo_flake opam-repository && \
-                     ${checkFlakeLock} ${tezos-opam-repository} $tezos_opam_repo_flake tezos-opam-repository );
+              if ! ( ${checkFlakeLock} ${opam-repository} $opam_repo_flake opam-repository );
               then
                 nix flake lock \
                   --override-input opam-repository $opam_repo_flake \
-                  --override-input tezos-opam-repository $tezos_opam_repo_flake \
                   2> /dev/null > /dev/null
 
                 echo Or copy the 'flake.lock' from CI artifacts.

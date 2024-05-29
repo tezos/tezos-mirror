@@ -47,8 +47,8 @@
     {}
     ''
       mkdir -p $out/share/zcash-params
-      cp ${sources.tezos-opam-repository}/zcash-params/sapling-output.params $out/share/zcash-params
-      cp ${sources.tezos-opam-repository}/zcash-params/sapling-spend.params $out/share/zcash-params
+      cp ${./images/opam-repository/zcash-params/sapling-output.params} $out/share/zcash-params
+      cp ${./images/opam-repository/zcash-params/sapling-spend.params} $out/share/zcash-params
     '';
 
   mkFrameworkFlags = frameworks:
