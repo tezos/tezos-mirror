@@ -347,8 +347,7 @@ let changeset_opam_jobs =
         "**/*.opam";
         ".gitlab/ci/jobs/packaging/opam:prepare.yml";
         ".gitlab/ci/jobs/packaging/opam_package.yml";
-        "manifest/manifest.ml";
-        "manifest/main.ml";
+        "manifest/*.ml*";
         "scripts/opam-prepare-repo.sh";
         "scripts/version.sh";
       ])
