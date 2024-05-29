@@ -4,7 +4,10 @@
 
 use crate::{
     bits::Bits64,
-    exec_env::posix::Posix,
+    exec_env::{
+        posix::{Posix, PosixState},
+        EcallOutcome, ExecutionEnvironment, ExecutionEnvironmentState,
+    },
     kernel_loader,
     machine_state::{
         bus::{
@@ -15,9 +18,10 @@ use crate::{
         registers::{FRegister, FValue},
         AccessType,
     },
-    machine_state::{mode, registers::XRegister, MachineError, MachineState},
+    machine_state::{
+        mode, registers::XRegister, MachineError, MachineState, MachineStateLayout, StepManyResult,
+    },
     program::Program,
-    pvm::{EvalError, EvalManyResult, Pvm, PvmLayout},
     state_backend::{
         memory_backend::{InMemoryBackend, SliceManager},
         Backend, Elem, Layout,
@@ -27,10 +31,14 @@ use crate::{
 use derive_more::{Error, From};
 use std::{collections::BTreeMap, ops::RangeBounds};
 
-type PvmStateLayout<ML = M1G> = PvmLayout<Posix, ML>;
+type TestStepperLayout<ML = M1G> = (
+    <Posix as ExecutionEnvironment>::Layout,
+    MachineStateLayout<ML>,
+);
 
 pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
-    pvm: Pvm<Posix, ML, SliceManager<'a>>,
+    machine_state: MachineState<ML, SliceManager<'a>>,
+    exec_env_state: PosixState<SliceManager<'a>>,
 }
 
 #[derive(Clone, Debug)]
@@ -59,63 +67,62 @@ pub enum TestStepperError {
 impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     /// In order to create an [Interpreter], a memory backend must first be generated.
     /// Currently, the size of the main memory to be allocated is fixed at 1GB.
-    pub fn create_backend() -> InMemoryBackend<PvmStateLayout<ML>> {
-        InMemoryBackend::<PvmStateLayout<ML>>::new().0
+    pub fn create_backend() -> InMemoryBackend<TestStepperLayout<ML>> {
+        InMemoryBackend::<TestStepperLayout<ML>>::new().0
     }
 
-    fn bind_states(
-        backend: &'a mut InMemoryBackend<PvmStateLayout<ML>>,
-    ) -> Pvm<Posix, ML, SliceManager<'a>> {
-        let placed = PvmStateLayout::<ML>::placed().into_location();
-        let space = backend.allocate(placed);
-        Pvm::bind(space)
+    fn bind_states(backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>) -> Self {
+        let placed = TestStepperLayout::<ML>::placed().into_location();
+        let (exec_env_space, machine_state_space) = backend.allocate(placed);
+        let exec_env_state = PosixState::bind(exec_env_space);
+        let machine_state = MachineState::bind(machine_state_space);
+        Self {
+            exec_env_state,
+            machine_state,
+        }
     }
 
     pub fn effective_translation_alg(
         &self,
         access_type: &AccessType,
     ) -> Option<TranslationAlgorithm> {
-        self.pvm
-            .machine_state
-            .effective_translation_alg(access_type)
+        self.machine_state.effective_translation_alg(access_type)
     }
 
     /// Obtain the translated address of pc.
     pub fn translate_instruction_address(&self, pc: Address) -> Result<Address, Exception> {
-        self.pvm
-            .machine_state
-            .translate(pc, AccessType::Instruction)
+        self.machine_state.translate(pc, AccessType::Instruction)
     }
 
     pub fn read_bus<E: Elem>(&self, address: Address) -> Result<E, OutOfBounds> {
-        self.pvm.machine_state.bus.read(address)
+        self.machine_state.bus.read(address)
     }
 
     pub fn read_xregister(&self, reg: XRegister) -> u64 {
-        self.pvm.machine_state.hart.xregisters.read(reg)
+        self.machine_state.hart.xregisters.read(reg)
     }
 
     pub fn read_fregister(&self, reg: FRegister) -> FValue {
-        self.pvm.machine_state.hart.fregisters.read(reg)
+        self.machine_state.hart.fregisters.read(reg)
     }
 
     pub fn read_csregister<V: Bits64>(&self, reg: CSRegister) -> V {
-        self.pvm.machine_state.hart.csregisters.read::<V>(reg)
+        self.machine_state.hart.csregisters.read::<V>(reg)
     }
 
     pub fn read_pc(&self) -> u64 {
-        self.pvm.machine_state.hart.pc.read()
+        self.machine_state.hart.pc.read()
     }
 
     pub fn read_mode(&self) -> mode::Mode {
-        self.pvm.machine_state.hart.mode.read_default()
+        self.machine_state.hart.mode.read_default()
     }
 
     /// Initialise an interpreter with a given [program], starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
     pub fn new(
-        backend: &'a mut InMemoryBackend<PvmStateLayout<ML>>,
+        backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
@@ -128,28 +135,32 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     /// and the fully parsed program.
     #[inline]
     pub fn new_with_parsed_program(
-        backend: &'a mut InMemoryBackend<PvmStateLayout<ML>>,
+        backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
-        let mut pvm = Self::bind_states(backend);
+        let mut stepper = Self::bind_states(backend);
 
         // By default the Posix EE expects to exit in a specific privilege mode.
-        pvm.exec_env_state.set_exit_mode(mode);
+        stepper.exec_env_state.set_exit_mode(mode);
 
         // The interpreter needs a program to run.
         let elf_program = Program::<ML>::from_elf(program)?;
-        pvm.machine_state
+        stepper
+            .machine_state
             .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
 
-        Ok((Self { pvm }, elf_program.parsed()))
+        Ok((stepper, elf_program.parsed()))
     }
 
-    fn handle_step_result(&mut self, result: EvalManyResult) -> TestStepperResult {
+    fn handle_step_result(
+        &mut self,
+        result: StepManyResult<(EnvironException, String)>,
+    ) -> TestStepperResult {
         match result.error {
             // An error was encountered in the evaluation function.
-            Some(EvalError { cause, error }) => TestStepperResult::Exception {
+            Some((cause, error)) => TestStepperResult::Exception {
                 cause,
                 steps: result.steps,
                 message: Some(error),
@@ -158,7 +169,7 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
             // Evaluation function returned without error.
             None => {
                 // Check if the machine has exited.
-                if let Some(code) = self.pvm.exec_env_state.exit_code() {
+                if let Some(code) = self.exec_env_state.exit_code() {
                     Exit {
                         code: code as usize,
                         steps: result.steps,
@@ -181,9 +192,18 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     where
         F: FnMut(&MachineState<ML, SliceManager<'a>>) -> bool,
     {
-        let mut result =
-            self.pvm
-                .eval_range(&mut Default::default(), step_bounds, &mut should_continue);
+        let mut result = self.machine_state.step_range_handle(
+            step_bounds,
+            &mut should_continue,
+            |machine_state, exc| match self.exec_env_state.handle_call(
+                machine_state,
+                &mut Default::default(),
+                exc,
+            ) {
+                EcallOutcome::Fatal { message } => Err((exc, message)),
+                EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
+            },
+        );
         result.steps = result.steps.saturating_add(steps_done);
         self.handle_step_result(result)
     }
