@@ -96,7 +96,7 @@ pub struct StructLog {
     pub gas: u64,
     pub gas_cost: u64,
     pub depth: u16,
-    pub error: Vec<u8>,
+    pub error: Option<Vec<u8>>,
     pub stack: Option<Vec<H256>>,
     pub return_data: Option<Vec<u8>>,
     pub memory: Option<Vec<u8>>,
@@ -135,7 +135,7 @@ impl Decodable for StructLog {
         let gas: u64 = decode_field_u64_le(&next(&mut it)?, "gas")?;
         let gas_cost: u64 = decode_field_u64_le(&next(&mut it)?, "gas")?;
         let depth: u16 = decode_field_u16_le(&next(&mut it)?, "depth")?;
-        let error: Vec<u8> = decode_field(&next(&mut it)?, "error")?;
+        let error: Option<Vec<u8>> = decode_field(&next(&mut it)?, "error")?;
         let stack: Option<Vec<H256>> =
             decode_option_canonical(&next(&mut it)?, "stack", decode_list)?;
         let return_data: Option<Vec<u8>> = decode_field(&next(&mut it)?, "return_data")?;
@@ -193,7 +193,7 @@ pub mod tests {
             gas: 97,
             gas_cost: 100,
             depth: 3,
-            error: vec![25, 11, 97],
+            error: Some(vec![25, 11, 97]),
             stack: Some(vec![H256::from([33; 32]), H256::from([35; 32])]),
             return_data: Some(vec![25, 11, 97]),
             memory: Some(vec![25, 11, 97]),

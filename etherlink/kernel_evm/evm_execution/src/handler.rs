@@ -298,7 +298,7 @@ fn trace<Host: Runtime>(
     gas: u64,
     gas_cost: u64,
     depth: usize,
-    error: Vec<u8>,
+    error: Option<Vec<u8>>,
     stack: Vec<H256>,
     memory: Vec<u8>,
     storage: Vec<StorageMapItem>,
@@ -704,12 +704,16 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
             let error = if let Err(Capture::Exit(reason)) = &step_result {
                 match &reason {
-                    ExitReason::Error(exit) => format!("{:?}", exit).as_bytes().to_vec(),
-                    ExitReason::Fatal(exit) => format!("{:?}", exit).as_bytes().to_vec(),
-                    _ => vec![],
+                    ExitReason::Error(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    ExitReason::Fatal(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    _ => None,
                 }
             } else {
-                vec![]
+                None
             };
 
             trace(
