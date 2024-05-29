@@ -16,7 +16,6 @@ use crate::internal_storage::InternalRuntime;
 use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::storage;
 use crate::storage::init_account_index;
-use crate::tick_model::{maximum_ticks_per_blueprint, ticks_for_next_blueprint};
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
@@ -186,18 +185,9 @@ fn compute<Host: Runtime>(
     Ok(ComputationResult::Finished)
 }
 
-fn has_enough_ticks_for_next_blueprint(
-    tick_counter: &TickCounter,
-    limits: &Limits,
-) -> bool {
-    maximum_ticks_per_blueprint()
-        < limits.maximum_allowed_ticks.saturating_sub(tick_counter.c)
-}
-
 enum BlueprintParsing {
     Next(Box<BlockInProgress>),
     None,
-    RebootNeeded,
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
@@ -210,17 +200,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<BlueprintParsing, anyhow::Error> {
-    // The size of a blueprint will be limited by the sum of the size of 512kB,
-    // if we cannot read it during this kernel_run, we simply abort and enforce a reboot.
-    if !has_enough_ticks_for_next_blueprint(tick_counter, &config.limits) {
-        return Ok(BlueprintParsing::RebootNeeded);
-    }
-
     let (blueprint, size) = read_next_blueprint(host, config)?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
-    let ticks = tick_counter
-        .c
-        .saturating_add(ticks_for_next_blueprint(size as u64));
     match blueprint {
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
@@ -242,7 +223,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 blueprint,
                 current_block_number,
                 current_block_parent_hash,
-                ticks,
+                tick_counter.c,
             );
 
             tezos_evm_logging::log!(
@@ -485,15 +466,6 @@ pub fn produce<Host: Runtime>(
                     tick_counter.c
                 );
                 return Ok(ComputationResult::Finished);
-            }
-            BlueprintParsing::RebootNeeded => {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                );
-                return Ok(ComputationResult::RebootNeeded);
             }
         };
         // We are going to execute a new block, we copy the storage to allow
