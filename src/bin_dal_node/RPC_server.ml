@@ -39,6 +39,7 @@ let call_handler2 ctxt handler =
 type error +=
   | Cryptobox_error of string * string
   | Post_slot_too_large of {expected : int; got : int}
+  | No_prover_profile
 
 let () =
   register_error_kind
@@ -70,7 +71,16 @@ let () =
     Data_encoding.(obj2 (req "expected" int31) (req "got" int31))
     (function
       | Post_slot_too_large {expected; got} -> Some (expected, got) | _ -> None)
-    (fun (expected, got) -> Post_slot_too_large {expected; got})
+    (fun (expected, got) -> Post_slot_too_large {expected; got}) ;
+  register_error_kind
+    `Permanent
+    ~id:"no_prover_profile"
+    ~title:"No prover profile"
+    ~description:
+      "The DAL node does not have a prover profile to accept slots injection."
+    Data_encoding.unit
+    (function No_prover_profile -> Some () | _ -> None)
+    (fun () -> No_prover_profile)
 
 module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
