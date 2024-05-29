@@ -1514,7 +1514,7 @@ let test_commitment_scenario ?supports ?commitment_period ?challenge_window
     ?commitment_period
     ?challenge_window
     {
-      tags = ["commitment"; Tag.memory_3k] @ extra_tags;
+      tags = ["commitment"] @ extra_tags;
       variant = Some variant;
       description = "rollup node - correct handling of commitments";
     }

@@ -333,7 +333,7 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?regression ?(tags = [team; Tag.memory_3k])
+let scenario_with_layer1_node ?regression ?(tags = [team])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
     ?(dal_enable = true) ?event_sections_levels ?node_arguments
