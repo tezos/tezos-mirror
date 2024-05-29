@@ -307,10 +307,10 @@ fn trace<Host: Runtime>(
         let opcode = opcode.as_u8();
         let pc: u64 = pc.try_into().unwrap_or_default();
         let depth: u16 = depth.try_into().unwrap_or_default();
-        let stack = tracer.disable_stack.then_some(stack);
+        let stack = (!tracer.disable_stack).then_some(stack);
         let return_data = tracer.enable_return_data.then_some(return_data);
         let memory = tracer.enable_memory.then_some(memory);
-        let storage = tracer.disable_storage.then_some(storage);
+        let storage = (!tracer.disable_storage).then_some(storage);
 
         let struct_log = StructLog {
             pc,
