@@ -349,7 +349,7 @@ let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     (fun () -> body protocol)
 
 let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?supports ?team ~executors ~timeout ?additional_tags body
+    ?uses_admin_client ?supports ~team ~executors ~timeout ?additional_tags body
     protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses =
@@ -363,7 +363,7 @@ let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     ?uses_node
     ?uses_client
     ?uses_admin_client
-    ?team
+    ~team
     ~executors
     ~timeout
     (fun () -> body protocol)

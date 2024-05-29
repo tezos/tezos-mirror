@@ -151,7 +151,7 @@ let init () =
     Log.warn
       "Grafana is not configured: Grafana dashboards will not be updated."
 
-(* [?team] argument of the test that is currently running. *)
+(* [~team] argument of the test that is currently running. *)
 let current_team : string option ref = ref None
 
 module Alerts : sig
@@ -258,7 +258,7 @@ let with_timeout timeout promise () =
 type current_test = {
   title : string;
   filename : string;
-  team : string option;
+  team : string;
   mutable data_points : InfluxDB.data_point list String_map.t;
   mutable alert_count : int;
 }
@@ -389,7 +389,7 @@ let alert_s ?category ~log message =
         let () = Alerts.dump alert_cfg in
         let slack_webhook_url =
           match !current_test with
-          | Some {team = Some team; _} -> (
+          | Some {team; _} -> (
               match
                 String_map.find_opt team alert_cfg.team_slack_webhook_urls
               with
@@ -912,11 +912,7 @@ let x86_executor2 = Executor "x86_executor2"
 let block_replay_executor = Executor "block_replay_testing_executor1"
 
 let make_tags team executors tags =
-  let misc_tags =
-    match team with
-    | None -> "long" :: tags
-    | Some team -> "long" :: team :: tags
-  in
+  let misc_tags = "long" :: team :: tags in
   let executor_tags = List.map (fun (Executor x) -> x) executors in
   executor_tags @ misc_tags
 
@@ -943,13 +939,13 @@ let wrap_body title filename team timeout body argument =
       unit)
 
 let register ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?team ~executors ~timeout body =
+    ?uses_admin_client ~team ~executors ~timeout body =
   if String.contains title '\n' then
     invalid_arg
       "Long_test.register: long test titles cannot contain newline characters" ;
   let tags = make_tags team executors tags in
   let body () =
-    current_team := team ;
+    current_team := Some team ;
     body ()
   in
   Test.register

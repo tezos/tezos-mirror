@@ -250,7 +250,7 @@ val register_long_test :
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
-  ?team:string ->
+  team:string ->
   executors:Long_test.executor list ->
   timeout:Long_test.timeout ->
   ?additional_tags:(t -> string list) ->

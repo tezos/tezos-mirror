@@ -91,8 +91,8 @@ val block_replay_executor : executor
 
     Alerts are only sent if the relevant configuration is set (see {!alert}).
     [team] specifies which Slack webhook to use to send alerts.
-    If [team] is not specified, or if [team] doesn't have a corresponding
-    entry in the configuration file, the default Slack webhook is used.
+    If [team] doesn't have a corresponding entry in the configuration file,
+    the default Slack webhook is used.
 
     @raise Invalid_arg if [title] contains a newline character. *)
 val register :
@@ -103,7 +103,7 @@ val register :
   ?uses_node:bool ->
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
-  ?team:string ->
+  team:string ->
   executors:executor list ->
   timeout:timeout ->
   (unit -> unit Lwt.t) ->
