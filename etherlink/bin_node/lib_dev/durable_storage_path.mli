@@ -91,3 +91,8 @@ module Evm_events : sig
   (** Path to the nth event of the kernel. *)
   val nth_event : int -> path
 end
+
+module Trace_transaction : sig
+  (** Path where is stored the input of the tracer. *)
+  val input : path
+end

@@ -160,6 +160,11 @@ end) : Services_backend_sig.Backend = struct
               Ethereum_types.pp_block_hash
               hash)
 
+  module Tracer = struct
+    let trace_transaction ~block_number:_ ~transaction_hash:_ ~config:_ =
+      Lwt_result_syntax.tzfail Tracer_types.Not_supported
+  end
+
   let smart_rollup_address = Base.smart_rollup_address
 end
 

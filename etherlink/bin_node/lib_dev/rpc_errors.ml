@@ -85,3 +85,16 @@ let limit_exceeded reason hash =
 
 let json_rpc_version_not_supported reason =
   JSONRPC.{code = -32006; message = reason; data = None}
+
+let trace_transaction_not_found hash =
+  internal_error
+    (Format.asprintf "Transaction %a not found" Ethereum_types.pp_hash hash)
+
+let trace_block_not_found block_number =
+  resource_unavailable
+    (Format.asprintf
+       "Block %a unavailable for replay"
+       Ethereum_types.pp_quantity
+       block_number)
+
+let trace_not_found = internal_error "Trace not available"

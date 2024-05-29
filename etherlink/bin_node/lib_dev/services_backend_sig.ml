@@ -134,6 +134,12 @@ module type S = sig
     Ethereum_types.hex tzresult Lwt.t
 
   val smart_rollup_address : string
+
+  (** [trace_transaction hash tracer] replays the block containing the
+      transaction [hash], and traces this transaction with the specified
+      [tracer]. *)
+  val trace_transaction :
+    Ethereum_types.hash -> Tracer_types.config -> unit tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -151,6 +157,8 @@ module type Backend = sig
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
+  module Tracer : Tracer_sig.Backend
+
   val smart_rollup_address : string
 end
 
@@ -161,6 +169,13 @@ module Make (Backend : Backend) : S = struct
   include Simulator.Make (Backend.SimulatorBackend)
 
   let block_param_to_block_number = Backend.block_param_to_block_number
+
+  include
+    Tracer_sig.Make
+      (struct
+        let transaction_receipt = transaction_receipt
+      end)
+      (Backend.Tracer)
 
   let smart_rollup_address = Backend.smart_rollup_address
 end
