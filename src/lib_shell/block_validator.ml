@@ -413,13 +413,10 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
       return_ok_unit
 
 let errors_contains_inode_error errors =
-  let rex = Str.regexp_string "unknown inode key" in
+  let rex = Re.compile (Re.Perl.re "unknown inode key") in
   let is_inode_error = function
     | Exn (Failure s) -> (
-        try
-          let _ = Str.search_forward rex s 0 in
-          true
-        with Not_found -> false)
+        match Re.exec rex s with _ -> true | exception Not_found -> false)
     | _ -> false
   in
   List.exists is_inode_error errors
