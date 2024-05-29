@@ -346,9 +346,6 @@ type t = {
       (* The length of the array is the number of shards per slot *)
 }
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
-
-   handle with_proof flag -> store proofs on disk? *)
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace
     node_store.cache
