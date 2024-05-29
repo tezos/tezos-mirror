@@ -562,7 +562,12 @@ module Helpers = struct
         Cryptobox.Config.default
     in
     match init with
-    | Error _ -> on_error @@ Format.asprintf "init_prover_dal failed."
+    | Error e ->
+        on_error
+        @@ Format.asprintf
+             "init_prover_dal failed: %a@."
+             Tezos_error_monad.Error_monad.pp_print_trace
+             e
     | Ok () -> (
         match Cryptobox.make parameters with
         | Ok cryptobox -> return cryptobox
