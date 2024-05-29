@@ -23,6 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error +=
+  | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:
+      "operation.cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate"
+    ~title:
+      "Cannot unstake with unfinalizable unstake requests to another delegate"
+    ~description:
+      "Cannot unstake with unfinalizable unstake requests to another delegate"
+    Data_encoding.unit
+    (function
+      | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
+        ->
+          Some ()
+      | _ -> None)
+    (fun () ->
+      Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate)
+
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
@@ -165,12 +186,22 @@ let update = Storage.Contract.Unstake_requests.update
 let add ctxt ~contract ~delegate cycle amount =
   let open Lwt_result_syntax in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
-  let requests =
+  let*? requests =
     match requests_opt with
-    | None -> []
-    | Some {delegate = request_delegate; requests} ->
-        assert (Signature.Public_key_hash.(delegate = request_delegate)) ;
-        requests
+    | None -> Ok []
+    | Some {delegate = request_delegate; requests} -> (
+        match requests with
+        | [] -> Ok []
+        | _ ->
+            if Signature.Public_key_hash.(delegate <> request_delegate) then
+              (* This would happen if the staker was allowed to stake towards
+                 a new delegate while having unfinalizable unstake requests,
+                 which is not allowed: it will fail earlier. Also, unstaking
+                 for 0 tez is a noop and does not change the state of the storage,
+                 so it does not allow to reach this error either. *)
+              Result_syntax.tzfail
+                Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
+            else Ok requests)
   in
   let*? requests = Storage.Unstake_request.add cycle amount requests in
   let unstake_request = Storage.Unstake_request.{delegate; requests} in

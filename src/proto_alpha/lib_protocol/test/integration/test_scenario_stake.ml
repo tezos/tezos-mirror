@@ -301,6 +301,51 @@ let odd_behavior =
   in
   loop 20 one_cycle
 
+(* Test changing delegate to self delegation while having staked funds. *)
+let change_delegate_to_self =
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `Force --> begin_test ["delegate"]
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker"
+        ~funder:"delegate"
+        (Amount (Tez.of_mutez 2_000_000_000_000L))
+  --> set_delegate "staker" (Some "delegate")
+  --> wait_delegate_parameters_activation --> stake "staker" Half --> next_cycle
+  --> set_delegate "staker" (Some "staker")
+  (* Can't stake: "A contract tries to stake to its delegate while
+     having unstake requests to a previous delegate that cannot be
+     finalized yet. Try again in a later cycle (no more than
+     consensus_rights_delay + max_slashing_period)." *)
+  --> assert_failure (stake "staker" Half)
+  --> unstake "staker" Max_tez
+  --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
+  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+  --> assert_failure (stake "staker" Half)
+  --> next_cycle
+  (* The unstake request from changing delegates is now finalizable. *)
+  --> assert_failure
+        (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> assert_success
+        (* Can directly stake again, which automatically finalizes,
+           even though the finalizable unstaked request is about a
+           previous delegate. *)
+        (stake "staker" Half
+        --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> (Tag "finalize"
+       --> (* Explicitly finalize, so that we can check that the balances
+              are identical to the beginning. This proves that changing
+              delegates has indeed unstaked all staked funds. *)
+       finalize "staker"
+       --> check_snapshot_balances "init"
+       --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+      |+ Tag "don't finalize" --> Empty)
+  --> stake "staker" Half --> unstake "staker" Half --> stake "staker" Half
+
 (* Test changing delegates while having staked funds. *)
 let change_delegate =
   let init_params =
@@ -327,6 +372,7 @@ let change_delegate =
      finalized yet. Try again in a later cycle (no more than
      consensus_rights_delay + max_slashing_period)." *)
   --> assert_failure (stake "staker" Half)
+  --> unstake "staker" Max_tez
   --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
   --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
   --> assert_failure (stake "staker" Half)
@@ -340,14 +386,20 @@ let change_delegate =
            previous delegate. *)
         (stake "staker" Half
         --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
-  --> (* Explicitly finalize, so that we can check that the balances
-         are identical to the beginning. This proves that changing
-         delegates has indeed unstaked all staked funds. *)
-  finalize "staker"
-  --> check_snapshot_balances "init"
-  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
-  --> (* Staking again is also possible. *) stake "staker" Half
-  --> check_snapshot_balances "after_stake"
+  --> (Tag "finalize"
+       --> (* Explicitly finalize, so that we can check that the balances
+              are identical to the beginning. This proves that changing
+              delegates has indeed unstaked all staked funds. *)
+       finalize "staker"
+       --> check_snapshot_balances "init"
+       --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+       --> (* Staking again is also possible. *) stake "staker" Half
+       --> check_snapshot_balances "after_stake"
+      |+ Tag "don't finalize" --> stake "staker" Half)
+  --> (Tag "finally, unstake" --> unstake "staker" Half
+      |+ Tag "finally, change delegate one last time"
+         --> set_delegate "staker" (Some "delegate1")
+      |+ Tag "finally, unset delegate" --> set_delegate "staker" None)
 
 let unset_delegate =
   let init_params =
@@ -534,6 +586,7 @@ let tests =
        ("Test full balance in finalizable", full_balance_in_finalizable);
        ("Test stake unstake every cycle", odd_behavior);
        ("Test change delegate", change_delegate);
+       ("Test change delegate to self", change_delegate_to_self);
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
