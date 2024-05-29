@@ -4,7 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 use cli::ExitMode;
-use octez_riscv::{machine_state::mode::Mode, traps::EnvironException, InterpreterResult};
+use octez_riscv::{
+    machine_state::mode::Mode, stepper::test::InterpreterResult, traps::EnvironException,
+};
 use std::error::Error;
 
 mod cli;

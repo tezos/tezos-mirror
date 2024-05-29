@@ -16,7 +16,7 @@ use octez_riscv::{
         mode::Mode,
         AccessType,
     },
-    Interpreter, InterpreterResult,
+    stepper::test::{Interpreter, InterpreterResult},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::collections::{BTreeMap, HashMap, HashSet};

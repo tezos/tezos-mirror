@@ -4,7 +4,7 @@
 
 use core::fmt;
 use enum_tag::EnumTag;
-use octez_riscv::{parser::instruction::Instr, InterpreterResult};
+use octez_riscv::{parser::instruction::Instr, stepper::test::InterpreterResult};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},

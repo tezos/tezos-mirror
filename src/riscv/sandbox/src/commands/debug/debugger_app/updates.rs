@@ -7,7 +7,7 @@ use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use octez_riscv::{
     machine_state::{bus::Address, csregisters::CSRegister, AccessType},
     parser::{instruction::Instr, parse},
-    InterpreterResult,
+    stepper::test::InterpreterResult,
 };
 use std::{collections::HashMap, ops::Range};
 

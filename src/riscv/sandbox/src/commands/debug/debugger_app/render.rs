@@ -17,7 +17,7 @@ use octez_riscv::{
         },
         registers,
     },
-    InterpreterResult,
+    stepper::test::InterpreterResult,
 };
 use ratatui::{
     prelude::*,

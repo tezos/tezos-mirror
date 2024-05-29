@@ -9,8 +9,7 @@ use octez_riscv::{
         mode::Mode,
         registers::{gp, XRegister, XValue},
     },
-    Interpreter,
-    InterpreterResult::*,
+    stepper::test::{Interpreter, InterpreterResult::*},
 };
 use std::fs;
 

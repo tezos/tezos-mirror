@@ -15,7 +15,7 @@ use octez_riscv::{
     exec_env::posix::Posix,
     machine_state::bus::Address,
     parser::{instruction::Instr, parse},
-    Interpreter, InterpreterResult,
+    stepper::test::{Interpreter, InterpreterResult},
 };
 use std::{error::Error, path::Path};
 
