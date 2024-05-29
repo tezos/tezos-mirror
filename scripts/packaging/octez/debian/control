@@ -87,12 +87,12 @@ Description: Octez experimental binaries
  octez software suite.
  .
  This package installs:
- - octez-snoop: is a tool for benchmarking and fitting statistical models
-   which predict the performance of any piece of code of interest.
- - octez-smart-rollup-wasm-debugger: runs Smart Rollups in debug mode to
-   make it easier to test and observe them.
- - octez-protocol-compiler: used by the node to compile new protocols on
-   the fly, and that can be used for developing new protocols.
+  * octez-snoop: is a tool for benchmarking and fitting statistical models
+    which predict the performance of any piece of code of interest.
+  * octez-smart-rollup-wasm-debugger: runs Smart Rollups in debug mode to
+    make it easier to test and observe them.
+  * octez-protocol-compiler: used by the node to compile new protocols on
+    the fly, and that can be used for developing new protocols.
 
 Package: octez-smart-rollup-node
 Architecture: amd64 arm64
