@@ -146,7 +146,7 @@ struct
       let file_manager = get_file_manager config in
       let dict = Dict.init file_manager |> Errs.raise_if_error in
       let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
-      let lru = Brassaia_pack_unix.Lru.create config in
+      let lru = Some (Brassaia_pack_unix.Lru.create config) in
       let store = Inode.init ~config ~file_manager ~dict ~dispatcher ~lru in
       let store_contents =
         Contents_store.init ~config ~file_manager ~dict ~dispatcher ~lru
