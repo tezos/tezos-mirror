@@ -2,7 +2,7 @@
 
 set -ex
 
-./scripts/remove-old-protocols.sh .trash
+./scripts/slim-mode.sh on
 make all
-./scripts/restore-old-protocols.sh .trash
+./scripts/slim-mode.sh off
 make -C docs -j octez-gen

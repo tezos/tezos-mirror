@@ -26,9 +26,7 @@ Remove Accuser, Baker
 ---------------------
 
 These daemons are no longer needed. Thus, the code in
-``bin_{accuser,baker}/`` can be safely removed and
-``script-inputs/active_testing_protocol_versions`` should be
-modified accordingly.
+``bin_{accuser,baker}/`` can be safely removed.
 
 Remove Protocol Tests
 ---------------------
