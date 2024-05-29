@@ -4,7 +4,7 @@
 
 use crate::{
     bits::Bits64,
-    exec_env::{posix::Posix, ExecutionEnvironment},
+    exec_env::posix::Posix,
     kernel_loader,
     machine_state::{
         bus::{
@@ -27,10 +27,10 @@ use crate::{
 use derive_more::{Error, From};
 use std::{collections::BTreeMap, ops::RangeBounds};
 
-type PvmStateLayout<EE = Posix, ML = M1G> = PvmLayout<EE, ML>;
+type PvmStateLayout<ML = M1G> = PvmLayout<Posix, ML>;
 
-pub struct TestStepper<'a, EE: ExecutionEnvironment = Posix, ML: MainMemoryLayout = M1G> {
-    pvm: Pvm<EE, ML, SliceManager<'a>>,
+pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
+    pvm: Pvm<Posix, ML, SliceManager<'a>>,
 }
 
 #[derive(Clone, Debug)]
@@ -56,17 +56,17 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-impl<'a, EE: ExecutionEnvironment, ML: MainMemoryLayout> TestStepper<'a, EE, ML> {
+impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     /// In order to create an [Interpreter], a memory backend must first be generated.
     /// Currently, the size of the main memory to be allocated is fixed at 1GB.
-    pub fn create_backend() -> InMemoryBackend<PvmStateLayout<EE, ML>> {
-        InMemoryBackend::<PvmStateLayout<EE, ML>>::new().0
+    pub fn create_backend() -> InMemoryBackend<PvmStateLayout<ML>> {
+        InMemoryBackend::<PvmStateLayout<ML>>::new().0
     }
 
     fn bind_states(
-        backend: &'a mut InMemoryBackend<PvmStateLayout<EE, ML>>,
-    ) -> Pvm<EE, ML, SliceManager<'a>> {
-        let placed = PvmStateLayout::<EE, ML>::placed().into_location();
+        backend: &'a mut InMemoryBackend<PvmStateLayout<ML>>,
+    ) -> Pvm<Posix, ML, SliceManager<'a>> {
+        let placed = PvmStateLayout::<ML>::placed().into_location();
         let space = backend.allocate(placed);
         Pvm::bind(space)
     }
@@ -110,14 +110,12 @@ impl<'a, EE: ExecutionEnvironment, ML: MainMemoryLayout> TestStepper<'a, EE, ML>
     pub fn read_mode(&self) -> mode::Mode {
         self.pvm.machine_state.hart.mode.read_default()
     }
-}
 
-impl<'a, ML: MainMemoryLayout> TestStepper<'a, Posix, ML> {
     /// Initialise an interpreter with a given [program], starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
     pub fn new(
-        backend: &'a mut InMemoryBackend<PvmStateLayout<Posix, ML>>,
+        backend: &'a mut InMemoryBackend<PvmStateLayout<ML>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
@@ -130,7 +128,7 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, Posix, ML> {
     /// and the fully parsed program.
     #[inline]
     pub fn new_with_parsed_program(
-        backend: &'a mut InMemoryBackend<PvmStateLayout<Posix, ML>>,
+        backend: &'a mut InMemoryBackend<PvmStateLayout<ML>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,

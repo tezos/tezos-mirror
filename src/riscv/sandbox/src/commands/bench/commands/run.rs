@@ -12,7 +12,6 @@ use crate::{
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
-    exec_env::posix::Posix,
     machine_state::bus::Address,
     parser::{instruction::Instr, parse},
     stepper::test::{TestStepper, TestStepperResult},
@@ -116,8 +115,8 @@ fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchD
 }
 
 fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
-    let contents = fs::read(path)?;
-    let mut backend = TestStepper::<'_, Posix>::create_backend();
+    let contents = std::fs::read(path)?;
+    let mut backend = TestStepper::<'_>::create_backend();
     let mut interpreter = TestStepper::new(
         &mut backend,
         &contents,

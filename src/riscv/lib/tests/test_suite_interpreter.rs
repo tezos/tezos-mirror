@@ -5,7 +5,6 @@
 
 use goldenfile::Mint;
 use octez_riscv::{
-    exec_env::posix::Posix,
     machine_state::{
         mode::Mode,
         registers::{gp, XRegister, XValue},
@@ -39,7 +38,7 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
     let mut golden = mint.new_goldenfile(format!("{path}.out")).unwrap();
 
     let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
-    let mut backend = TestStepper::<'_, Posix>::create_backend();
+    let mut backend = TestStepper::<'_>::create_backend();
     let mut interpreter =
         TestStepper::new(&mut backend, &contents, None, exit_mode).expect("Boot failed");
 
