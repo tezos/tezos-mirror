@@ -127,12 +127,12 @@ let jobs =
       ~stage:Stages.manual
       ~rules:[job_rule ~when_:Manual ()]
       ~interruptible:false
-      ~cache:[{key = "kernels"; paths = ["cargo/"]}]
       [
         "make -f kernels.mk publish-sdk-deps";
         (* Manually set SSL_CERT_DIR as default setting points to empty dir *)
         "SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk";
       ]
+    |> enable_cargo_cache
   in
   (* arm builds are manual on the master branch pipeline *)
   let build_arm_rules = [job_rule ~when_:Manual ~allow_failure:Yes ()] in

@@ -290,6 +290,12 @@ let enable_kernels =
   Tezos_ci.append_variables
     [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
 
+(** {2 Caches} *)
+
+(* Common GitLab CI caches *)
+
+let enable_cargo_cache = append_cache {key = "cargo"; paths = [cargo_home]}
+
 (** {2 Changesets} *)
 
 (** Modifying these files will unconditionally execute all conditional jobs. *)

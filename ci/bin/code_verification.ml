@@ -351,8 +351,6 @@ let jobs pipeline_type =
         | On_changes changes ->
             [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
   in
-  (* Common GitLab CI caches *)
-  let cache_kernels = {key = "kernels"; paths = ["cargo/"]} in
   (* Collect coverage trace producing jobs *)
   let jobs_with_coverage_output = ref [] in
   (* Add variables for bisect_ppx output and store the traces as an
@@ -576,8 +574,8 @@ let jobs pipeline_type =
              "src/riscv/riscv-dummy.elf";
              "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
            ])
-      ~cache:[cache_kernels; {key = "kernels-sccache"; paths = ["_sccache"]}]
-    |> enable_kernels |> enable_sccache
+      ~cache:[{key = "kernels-sccache"; paths = ["_sccache"]}]
+    |> enable_kernels |> enable_cargo_cache |> enable_sccache
   in
   (* Fetch records for Tezt generated on the last merge request pipeline
          on the most recently merged MR and makes them available in artifacts
@@ -1464,8 +1462,7 @@ let jobs pipeline_type =
           ~stage:Stages.test
           ~rules:(make_rules ~dependent:true ~changes ())
           script
-          ~cache:[cache_kernels]
-        |> enable_kernels
+        |> enable_kernels |> enable_cargo_cache
       in
       let job_test_kernels : tezos_job =
         make_job_kernel

@@ -236,12 +236,12 @@ oc.build_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-  - key: kernels
-    paths:
-    - cargo/
   - key: kernels-sccache
     paths:
     - _sccache
+  - key: cargo
+    paths:
+    - $CI_PROJECT_DIR/.cargo
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
@@ -6840,9 +6840,9 @@ test_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
@@ -6860,9 +6860,9 @@ test_etherlink_kernel:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo
   script:
   - make -f etherlink.mk check
   - make -f etherlink.mk test
@@ -6880,9 +6880,9 @@ test_etherlink_firehose:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo
   script:
   - make -C etherlink/firehose check
   variables:
@@ -6899,9 +6899,9 @@ test_riscv_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo
   script:
   - make -C src/riscv check
   - make -C src/riscv test
@@ -6920,9 +6920,9 @@ test_evm_compatibility:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
   - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests

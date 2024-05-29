@@ -266,9 +266,9 @@ publish_kernel_sdk:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo
   interruptible: false
   script:
   - make -f kernels.mk publish-sdk-deps
