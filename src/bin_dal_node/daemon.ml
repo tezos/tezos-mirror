@@ -316,13 +316,11 @@ module Handler = struct
 
   (* This function removes from the store all the slots (and their shards)
      published at level exactly [Node_context.next_level_to_gc_slots_and_shards
-     ~head_level]. *)
-  let remove_old_level_slots_and_shards proto_parameters ctxt head_level =
+     ~current_level]. *)
+  let remove_old_level_slots_and_shards proto_parameters ctxt current_level =
     let open Lwt_syntax in
     let oldest_level =
-      Node_context.next_level_to_gc_slots_and_shards
-        ctxt
-        ~current_level:head_level
+      Node_context.next_level_to_gc_slots_and_shards ctxt ~current_level
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
@@ -364,13 +362,11 @@ module Handler = struct
 
   (* This function removes from the store all the skip list cells attested at
      level exactly [Node_context.next_level_to_gc_skip_list_cells
-     ~head_level]. *)
-  let remove_old_level_skip_list_cells ctxt head_level =
+     ~current_level]. *)
+  let remove_old_level_skip_list_cells ctxt current_level =
     let open Lwt_result_syntax in
     let oldest_level =
-      Node_context.next_level_to_gc_skip_list_cells
-        ctxt
-        ~current_level:head_level
+      Node_context.next_level_to_gc_skip_list_cells ctxt ~current_level
     in
     let*? ready_ctxt = Node_context.get_ready ctxt in
     Skip_list_cells_store.remove
@@ -541,34 +537,30 @@ module Handler = struct
           match next_final_head with
           | None -> Lwt.fail_with "L1 crawler lib shut down"
           | Some (_finalized_hash, finalized_shell_header) ->
+              let level = finalized_shell_header.level in
               let* () =
                 Node_context.may_add_plugin
                   ctxt
                   cctxt
                   ~proto_level:finalized_shell_header.proto_level
-                  ~block_level:finalized_shell_header.level
+                  ~block_level:level
               in
               Gossipsub.Worker.Validate_message_hook.set
                 (gossipsub_app_messages_validation
                    ctxt
                    cryptobox
-                   finalized_shell_header.level
+                   level
                    proto_parameters.attestation_lag) ;
               let*! () =
-                remove_old_level_slots_and_shards
-                  proto_parameters
-                  ctxt
-                  finalized_shell_header.level
+                remove_old_level_slots_and_shards proto_parameters ctxt level
               in
               let* () =
                 if should_store_skip_list_cells ctxt then
-                  remove_old_level_skip_list_cells
-                    ctxt
-                    finalized_shell_header.level
+                  remove_old_level_skip_list_cells ctxt level
                 else return_unit
               in
               let* () =
-                if finalized_shell_header.level = 1l then
+                if level = 1l then
                   (* We do not process the block at level 1, as it will not
                      contain DAL information, and it has no round. *)
                   return_unit
