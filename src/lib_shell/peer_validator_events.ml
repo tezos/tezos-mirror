@@ -256,3 +256,15 @@ let insufficient_history =
     ~level:Notice
     ("peer", P2p_peer.Id.encoding)
     ~pp1:P2p_peer.Id.pp
+
+(* warning level events *)
+let retry_application_after_context_error =
+  declare_2
+    ~section
+    ~name:"retry_application_after_context_error"
+    ~msg:"retrying application of block {hash} from {peer} after context error"
+    ~level:Warning
+    ~pp1:P2p_peer.Id.pp
+    ~pp2:Block_hash.pp
+    ("peer", P2p_peer.Id.encoding)
+    ("hash", Block_hash.encoding)

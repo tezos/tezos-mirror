@@ -40,6 +40,10 @@ Node
   that returns the consumed output's indexes for the given outbox
   level. (MR :gl:`!12776`)
 
+- Restart the block application/peer validation once when encountering a context
+  error to mitigate the error crashing by replaying the application/validation
+  before raising an uncaught failure (MR :gl:`!13398` and :gl:`!13437`)
+
 Client
 ------
 
