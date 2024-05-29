@@ -19,8 +19,8 @@ libraries are usually trivial to deal with.  Crypto libraries written
 in C/C++ need extra work to provides the corresponsing javascript
 stubs.
 
-We track the libraries compatibility in the manifest file
-``manifest/main.ml`` and enfore that all transitive dependencies of a
+We track the libraries compatibility in the manifest files
+``manifest/`` and enfore that all transitive dependencies of a
 JS-compatible library are JS-compatible.  A library is JS-compatible if it
 has ``~js_compile:true`` or ``~js_of_ocaml``.
 
@@ -120,7 +120,7 @@ initialized.
 Adding a JavaScript dependency
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Edit ``manifest/main.ml`` to add a ``Npm.t`` dependency to an ocaml library.
+- Edit ``manifest/`` files to add a ``Npm.t`` dependency to an ocaml library.
 - Update the manifest ``make -C manifest``.
 - Optionally edit ``.npmrc`` at the root of the repo to add a new npm registry.
 - Call ``npm install`` to update ``package-lock.json``

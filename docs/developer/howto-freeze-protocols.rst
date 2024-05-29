@@ -17,7 +17,7 @@ The various pieces of code to be removed are within directory
 Update Manifest
 ---------------
 
-In :src:`manifest/main.ml`, look for ``let alpha = active Name.alpha``.
+In :src:`manifest/product_octez.ml`, look for ``let alpha = active Name.alpha``.
 In one of the lines above it is the declaration of the protocol you are freezing.
 Replace ``active`` by ``frozen`` for this protocol.
 Run the manifest with ``make -C manifest``.
