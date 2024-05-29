@@ -19,6 +19,8 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+let cargo_home = Gitlab_ci.Predefined_vars.(show ci_project_dir) // "cargo"
+
 (* Define [stages:]
 
    The "manual" stage exists to fix a UI problem that occurs when mixing
@@ -280,11 +282,7 @@ let enable_sccache ?error_log ?idle_timeout ?log
 (** Add common variables used by jobs compiling kernels *)
 let enable_kernels =
   Tezos_ci.append_variables
-    [
-      ("CC", "clang");
-      ("CARGO_HOME", "$CI_PROJECT_DIR/cargo");
-      ("NATIVE_TARGET", "x86_64-unknown-linux-musl");
-    ]
+    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
 
 (** {2 Changesets} *)
 

@@ -127,8 +127,6 @@ let jobs =
       ~stage:Stages.manual
       ~rules:[job_rule ~when_:Manual ()]
       ~interruptible:false
-      ~variables:
-        [("CARGO_HOME", Predefined_vars.(show ci_project_dir) // "cargo")]
       ~cache:[{key = "kernels"; paths = ["cargo/"]}]
       [
         "make -f kernels.mk publish-sdk-deps";

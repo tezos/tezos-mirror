@@ -60,6 +60,7 @@ let variables : variables =
        set to true in the opam jobs where we want to run the tests
        --with-test. *)
     ("RUNTEZTALIAS", "false");
+    ("CARGO_HOME", Common.cargo_home);
   ]
 
 (* Register pipelines types. Pipelines types are used to generate

@@ -273,5 +273,3 @@ publish_kernel_sdk:
   script:
   - make -f kernels.mk publish-sdk-deps
   - SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk
-  variables:
-    CARGO_HOME: $CI_PROJECT_DIR/cargo

@@ -249,7 +249,6 @@ oc.build_kernels:
   - make -C src/riscv/tests/ build
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     RUSTC_WRAPPER: sccache
@@ -6847,7 +6846,6 @@ test_kernels:
   - make -f kernels.mk test
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
 test_etherlink_kernel:
@@ -6868,7 +6866,6 @@ test_etherlink_kernel:
   - make -f etherlink.mk test
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
 test_etherlink_firehose:
@@ -6888,7 +6885,6 @@ test_etherlink_firehose:
   - make -C etherlink/firehose check
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
 test_riscv_kernels:
@@ -6910,7 +6906,6 @@ test_riscv_kernels:
   - make -C src/riscv audit
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
 test_evm_compatibility:
@@ -6933,7 +6928,6 @@ test_evm_compatibility:
     -c
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
 oc.unit:non-proto-x86_64:
