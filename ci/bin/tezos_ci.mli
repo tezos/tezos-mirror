@@ -388,3 +388,8 @@ val append_variables :
 
     Throws error when applied to {!trigger_job}s. *)
 val append_script : string list -> tezos_job -> tezos_job
+
+(** Append to the [cache:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
+val append_cache : Gitlab_ci.Types.cache -> tezos_job -> tezos_job

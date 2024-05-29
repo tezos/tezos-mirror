@@ -928,3 +928,14 @@ let append_script script tezos_job =
          (name_of_tezos_job tezos_job))
     tezos_job
   @@ fun job -> {job with script = job.script @ script}
+
+let append_cache cache tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[add_artifacts] attempting to append a cache to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
+  let caches = Option.value ~default:[] job.cache in
+  {job with cache = Some (caches @ [cache])}
