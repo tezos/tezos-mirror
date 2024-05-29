@@ -48,8 +48,6 @@ type full_evm_setup = {
   kernel_root_hash : string;
 }
 
-let hex_256_of n = Printf.sprintf "%064x" n
-
 let hex_256_of_address acc =
   let s = acc.Eth_account.address in
   (* strip 0x and convert to lowercase *)
@@ -152,7 +150,11 @@ let get_value_in_storage sc_rollup_node address nth =
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
        ~pvm_kind
        ~operation:Sc_rollup_rpc.Value
-       ~key:(Durable_storage_path.storage address ~key:(hex_256_of nth) ())
+       ~key:
+         (Durable_storage_path.storage
+            address
+            ~key:(Helpers.hex_256_of_int nth)
+            ())
        ()
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
@@ -162,7 +164,11 @@ let check_str_in_storage ~evm_setup ~address ~nth ~expected =
   unit
 
 let check_nb_in_storage ~evm_setup ~address ~nth ~expected =
-  check_str_in_storage ~evm_setup ~address ~nth ~expected:(hex_256_of expected)
+  check_str_in_storage
+    ~evm_setup
+    ~address
+    ~nth
+    ~expected:(Helpers.hex_256_of_int expected)
 
 let get_storage_size sc_rollup_node ~address =
   let* storage =
@@ -1135,14 +1141,14 @@ let test_l2_deploy_erc20 =
     [
       ( address,
         [transfer_event_topic; zero_address; hex_256_of_address sender],
-        "0x" ^ hex_256_of amount );
+        "0x" ^ Helpers.hex_256_of_int amount );
     ]
   in
   let burn_logs sender amount =
     [
       ( address,
         [transfer_event_topic; hex_256_of_address sender; zero_address],
-        "0x" ^ hex_256_of amount );
+        "0x" ^ Helpers.hex_256_of_int amount );
     ]
   in
   (* sender mints 42 *)
@@ -3676,12 +3682,16 @@ let test_rpc_getStorageAt =
   let* () = check_tx_succeeded ~endpoint ~tx in
   let*@ hex_value = Rpc.get_storage_at ~address ~pos:"0x0" evm_node in
   Check.(
-    (Durable_storage_path.no_0x hex_value = hex_256_of expected_value0) string)
+    (Durable_storage_path.no_0x hex_value
+    = Helpers.hex_256_of_int expected_value0)
+      string)
     ~error_msg:"Expected %R, but got %L" ;
   let pos = Helpers.mapping_position sender.address 1 in
   let*@ hex_value = Rpc.get_storage_at ~address ~pos evm_node in
   Check.(
-    (Durable_storage_path.no_0x hex_value = hex_256_of expected_value1) string)
+    (Durable_storage_path.no_0x hex_value
+    = Helpers.hex_256_of_int expected_value1)
+      string)
     ~error_msg:"Expected %R, but got %L" ;
   unit
 
@@ -3916,7 +3926,7 @@ let test_rpc_getLogs =
     [
       ( address,
         [transfer_event_topic; hex_256_of_address sender; zero_address],
-        "0x" ^ hex_256_of amount );
+        "0x" ^ Helpers.hex_256_of_int amount );
     ]
   in
   (* sender mints 42 *)

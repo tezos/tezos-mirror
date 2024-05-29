@@ -47,6 +47,8 @@ let mapping_position index map_position =
 
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
+let hex_256_of_int n = Printf.sprintf "%064x" n
+
 let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node

@@ -3518,6 +3518,71 @@ let test_trace_transaction_on_invalid_transaction =
           ~error_msg:"traceTransaction failed with the wrong error")) ;
   unit
 
+let check_trace expect_null expected_returned_value receipt trace =
+  (* Checks that each opcode log are either all empty or non empty, considering
+     the configuration. *)
+  let check_struct_logs expect_null log =
+    let check_field field =
+      if expect_null then
+        Check.(
+          JSON.(log |-> field |> JSON.unannotate = `Null)
+            json_u
+            ~error_msg:
+              (Format.sprintf
+                 "Field %s was expected to be null, but gor %%L instead"
+                 field))
+      else
+        Check.(
+          JSON.(log |-> field |> JSON.unannotate <> `Null)
+            json_u
+            ~error_msg:
+              (Format.sprintf "Field %s wasn't expected to be null" field))
+    in
+    check_field "memory" ;
+    check_field "storage" ;
+    check_field "memSize" ;
+    check_field "stack" ;
+    check_field "returnData"
+  in
+  let failed = JSON.(trace |-> "failed" |> as_bool) in
+  let gas_used = JSON.(trace |-> "gas" |> as_int64) in
+  let returned_value =
+    JSON.(trace |-> "returnValue" |> as_string |> Durable_storage_path.no_0x)
+  in
+  let logs = JSON.(trace |-> "structLogs" |> as_list) in
+  Check.(
+    (failed <> receipt.Transaction.status)
+      bool
+      ~error_msg:"The trace has a different status than in the receipt") ;
+  Check.(
+    (gas_used = receipt.gasUsed)
+      int64
+      ~error_msg:"Trace reported %L gas used, but the trace reported %R") ;
+
+  (* Whether we don't expect a value and we get "0x", or we expect a value and
+     it is encoded into a H256. *)
+  (match expected_returned_value with
+  | Some value ->
+      let expected_value = Helpers.hex_256_of_int value in
+      Check.(
+        (returned_value = expected_value)
+          string
+          ~error_msg:
+            "The transaction returned the value %L, but %R was expected")
+  | None ->
+      Check.(
+        (returned_value = "")
+          string
+          ~error_msg:"The transaction shouldn't return a value, but returned %L")) ;
+
+  (* Checks the logs are consistent with the configuration (its an all in or
+     all out). *)
+  Check.((logs <> []) (list json) ~error_msg:"Logs shouldn't be empty") ;
+  List.iter
+    (check_struct_logs expect_null)
+    JSON.(trace |-> "structLogs" |> as_list) ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
