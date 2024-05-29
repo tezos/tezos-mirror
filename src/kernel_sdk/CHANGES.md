@@ -13,6 +13,8 @@
 - Removes deprecated `proto-nairobi` feature flag.
 - Stabilise `OutboxMessage::WhitelistUpdate`.
 - Add `entrypoint` procedural macro to mark the kernel entrypoint function.
+- Add `extra` feature flag, for functionalility not-expected to be used by kernels directly.
+- Add `utils::inbox` module, containing helpers for constructing inboxes for testing, and manipulating `inbox.json` files.
 
 ### Installer client/kernel
 

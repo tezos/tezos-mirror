@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-mod file;
+//! Utilities for constructing inboxes & dealing with the `inbox.json` file,
+//! used as inputs for both the *wasm debugger* and *RISC-V sandbox*.
+
+pub mod file;
 
 use self::file::{InboxFile, Message};
 use std::{collections::LinkedList, error::Error, path::Path};
@@ -31,7 +34,10 @@ impl InboxBuilder {
     }
 
     /// Load inbox messages from a JSON file.
-    pub fn load_from_file(&mut self, path: impl AsRef<Path>) -> Result<&mut Self, Box<dyn Error>> {
+    pub fn load_from_file(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<&mut Self, Box<dyn Error>> {
         let inbox_messages = InboxFile::load(path.as_ref())
             .map_err(|err| {
                 format!(
@@ -106,7 +112,8 @@ impl InboxBuilder {
 
     /// Inject an external message.
     pub fn insert_external(&mut self, data: impl AsRef<[u8]>) -> &mut Self {
-        let msg: InboxMessage<michelson::MichelsonUnit> = InboxMessage::External(data.as_ref());
+        let msg: InboxMessage<michelson::MichelsonUnit> =
+            InboxMessage::External(data.as_ref());
         let mut data = Vec::new();
         msg.serialize(&mut data)
             .expect("Failed to serialise external message");

@@ -173,7 +173,8 @@ mod test {
 
         #[test]
         fn u64_to_f64_conv(u in any::<u64>()) {
-            assert_eq!(u as f64, u64_to_f64(u).into());
+            let f: f64 = u64_to_f64(u).into();
+            assert_eq!(u as f64, f);
         }
 
         #[test]

@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::{InboxFile, Message};
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use http::{HeaderMap, Method, Uri};
 use jstz_crypto::{keypair_from_passphrase, public_key::PublicKey, secret_key::SecretKey};
@@ -11,6 +10,7 @@ use jstz_proto::operation::{Content, DeployFunction, Operation, RunFunction, Sig
 use serde::{Serialize, Serializer};
 use std::error::Error;
 use std::path::Path;
+use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
 
 const FA2: &str = include_str!("../../fa2.js");
 

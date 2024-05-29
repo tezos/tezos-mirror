@@ -31,6 +31,7 @@ features = [
   "data-encoding",
   "proto-alpha",
   "experimental-host-in-memory-store",
+  "extra"
 ]
 
 [workspace.dependencies.jstz_kernel]

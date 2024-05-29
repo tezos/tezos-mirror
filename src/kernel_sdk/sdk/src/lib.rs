@@ -13,6 +13,10 @@ extern crate alloc;
 #[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
 extern crate hermit;
 
+#[cfg(feature = "extra")]
+#[doc(inline)]
+pub use tezos_smart_rollup_utils as utils;
+
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
 pub use tezos_smart_rollup_macros::entrypoint;
 
