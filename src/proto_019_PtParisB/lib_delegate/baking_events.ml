@@ -1046,17 +1046,24 @@ module Nonces = struct
       ()
 
   let ignore_failed_nonce_migration =
-    declare_1
+    declare_3
       ~section
       ~name:"ignore_failed_nonce_migration"
       ~level:Warning
       ~msg:
-        "There is not enough block history to complete the migration. Try \
-         starting from an older snapshot or providing more block history. The \
-         nonces from the following blocks will not be migrated:\n\
-         {failed} "
+        "Found orphaned nonces while migrating baking nonces to the new file \
+         format. Please review the list of associated blocks. If the block is \
+         older than the last cycle or if it was not included, the file at \
+         '{legacy_nonces_file}' and '{orphaned_nonces_file}'should be archived \
+         and then removed. If the block is in the current or last cycle, you \
+         must start from a snapshot that is old enough to boostrap those \
+         blocks to avoid losing some of your baking rewards. Blocks associated \
+         with orphaned nonces:\n\
+         {failed}"
       ~pp1:(Format.pp_print_list Block_hash.pp)
       ("failed", Data_encoding.list Block_hash.encoding)
+      ("legacy_nonces_file", Data_encoding.string)
+      ("orphaned_nonces_file", Data_encoding.string)
 
   let outdated_nonce =
     declare_1
