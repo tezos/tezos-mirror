@@ -5,7 +5,7 @@
 
 use cli::ExitMode;
 use octez_riscv::{
-    machine_state::mode::Mode, stepper::test::InterpreterResult, traps::EnvironException,
+    machine_state::mode::Mode, stepper::test::TestStepperResult, traps::EnvironException,
 };
 use std::error::Error;
 
@@ -15,8 +15,8 @@ mod console;
 mod inbox;
 mod table;
 
-fn format_status(result: &InterpreterResult) -> String {
-    use InterpreterResult::*;
+fn format_status(result: &TestStepperResult) -> String {
+    use TestStepperResult::*;
     match result {
         Exit { code: 0, .. } => "Ok (exit code = 0)".to_string(),
         Exit { code, .. } => format!("Failed with exit code = {}", code),

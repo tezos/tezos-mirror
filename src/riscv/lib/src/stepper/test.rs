@@ -29,12 +29,12 @@ use std::{collections::BTreeMap, ops::RangeBounds};
 
 type PvmStateLayout<EE = Posix, ML = M1G> = PvmLayout<EE, ML>;
 
-pub struct Interpreter<'a, EE: ExecutionEnvironment = Posix, ML: MainMemoryLayout = M1G> {
+pub struct TestStepper<'a, EE: ExecutionEnvironment = Posix, ML: MainMemoryLayout = M1G> {
     pvm: Pvm<EE, ML, SliceManager<'a>>,
 }
 
 #[derive(Clone, Debug)]
-pub enum InterpreterResult {
+pub enum TestStepperResult {
     /// Execution has not finished. Returns the number of steps executed.
     Running(usize),
     /// Program exited. Returns exit code and number of steps executed.
@@ -48,15 +48,15 @@ pub enum InterpreterResult {
     },
 }
 
-use InterpreterResult::*;
+use TestStepperResult::*;
 
 #[derive(Debug, From, Error, derive_more::Display)]
-pub enum InterpreterError {
+pub enum TestStepperError {
     KernelLoadingError(kernel_loader::Error),
     MachineError(MachineError),
 }
 
-impl<'a, EE: ExecutionEnvironment, ML: MainMemoryLayout> Interpreter<'a, EE, ML> {
+impl<'a, EE: ExecutionEnvironment, ML: MainMemoryLayout> TestStepper<'a, EE, ML> {
     /// In order to create an [Interpreter], a memory backend must first be generated.
     /// Currently, the size of the main memory to be allocated is fixed at 1GB.
     pub fn create_backend() -> InMemoryBackend<PvmStateLayout<EE, ML>> {
@@ -112,7 +112,7 @@ impl<'a, EE: ExecutionEnvironment, ML: MainMemoryLayout> Interpreter<'a, EE, ML>
     }
 }
 
-impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
+impl<'a, ML: MainMemoryLayout> TestStepper<'a, Posix, ML> {
     /// Initialise an interpreter with a given [program], starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
@@ -121,7 +121,7 @@ impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
-    ) -> Result<Self, InterpreterError> {
+    ) -> Result<Self, TestStepperError> {
         Ok(Self::new_with_parsed_program(backend, program, initrd, mode)?.0)
     }
 
@@ -134,7 +134,7 @@ impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
-    ) -> Result<(Self, BTreeMap<u64, String>), InterpreterError> {
+    ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
         let mut pvm = Self::bind_states(backend);
 
         // By default the Posix EE expects to exit in a specific privilege mode.
@@ -148,10 +148,10 @@ impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
         Ok((Self { pvm }, elf_program.parsed()))
     }
 
-    fn handle_step_result(&mut self, result: EvalManyResult) -> InterpreterResult {
+    fn handle_step_result(&mut self, result: EvalManyResult) -> TestStepperResult {
         match result.error {
             // An error was encountered in the evaluation function.
-            Some(EvalError { cause, message }) => InterpreterResult::Exception {
+            Some(EvalError { cause, message }) => TestStepperResult::Exception {
                 cause,
                 steps: result.steps,
                 message: Some(message),
@@ -179,7 +179,7 @@ impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
         steps_done: usize,
         step_bounds: &impl RangeBounds<usize>,
         mut should_continue: F,
-    ) -> InterpreterResult
+    ) -> TestStepperResult
     where
         F: FnMut(&MachineState<ML, SliceManager<'a>>) -> bool,
     {
@@ -191,7 +191,7 @@ impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
     }
 
     /// Run at most `max` steps.
-    pub fn run(&mut self, max: usize) -> InterpreterResult {
+    pub fn run(&mut self, max: usize) -> TestStepperResult {
         self.run_accum(0, &..=max, |_| true)
     }
 
@@ -201,7 +201,7 @@ impl<'a, ML: MainMemoryLayout> Interpreter<'a, Posix, ML> {
         &mut self,
         steps: impl RangeBounds<usize>,
         should_continue: F,
-    ) -> InterpreterResult
+    ) -> TestStepperResult
     where
         F: FnMut(&MachineState<ML, SliceManager<'a>>) -> bool,
     {

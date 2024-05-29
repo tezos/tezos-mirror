@@ -16,7 +16,7 @@ use octez_riscv::{
         mode::Mode,
         AccessType,
     },
-    stepper::test::{Interpreter, InterpreterResult},
+    stepper::test::{TestStepper, TestStepperResult},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -110,7 +110,7 @@ impl TranslationState {
 }
 
 struct DebuggerState {
-    pub interpreter: InterpreterResult,
+    pub interpreter: TestStepperResult,
     pub prev_pc: Address,
     pub translation: TranslationState,
 }
@@ -125,7 +125,7 @@ struct ProgramView<'a> {
 
 pub struct DebuggerApp<'a> {
     title: &'a str,
-    interpreter: &'a mut Interpreter<'a>,
+    interpreter: &'a mut TestStepper<'a>,
     program: ProgramView<'a>,
     state: DebuggerState,
 }
@@ -155,9 +155,9 @@ impl Instruction {
 
 impl<'a> DebuggerApp<'a> {
     pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
-        let mut backend = Interpreter::<'_, Posix>::create_backend();
+        let mut backend = TestStepper::<'_, Posix>::create_backend();
         let (mut interpreter, prog) =
-            Interpreter::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
+            TestStepper::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
         let symbols = kernel_loader::get_elf_symbols(contents)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
@@ -167,7 +167,7 @@ impl<'a> DebuggerApp<'a> {
     }
 
     fn new(
-        interpreter: &'a mut Interpreter<'a>,
+        interpreter: &'a mut TestStepper<'a>,
         title: &'a str,
         program: &'a BTreeMap<u64, String>,
         symbols: HashMap<u64, &'a str>,
@@ -183,7 +183,7 @@ impl<'a> DebuggerApp<'a> {
                 symbols,
             ),
             state: DebuggerState {
-                interpreter: InterpreterResult::Running(0),
+                interpreter: TestStepperResult::Running(0),
                 prev_pc: 0,
                 translation: TranslationState {
                     mode: SATPModeState::Bare,

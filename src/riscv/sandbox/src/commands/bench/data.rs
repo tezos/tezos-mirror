@@ -4,7 +4,7 @@
 
 use core::fmt;
 use enum_tag::EnumTag;
-use octez_riscv::{parser::instruction::Instr, stepper::test::InterpreterResult};
+use octez_riscv::{parser::instruction::Instr, stepper::test::TestStepperResult};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -18,11 +18,11 @@ pub(super) struct BenchData {
     pub(super) duration: Duration,
     pub(super) steps: usize,
     pub(super) instr_count: Option<InstructionData>,
-    pub(super) run_result: InterpreterResult,
+    pub(super) run_result: TestStepperResult,
 }
 
 impl BenchData {
-    pub fn from_simple(data: SimpleBenchData, run_result: InterpreterResult) -> Self {
+    pub fn from_simple(data: SimpleBenchData, run_result: TestStepperResult) -> Self {
         BenchData {
             duration: data.duration,
             steps: data.steps,
@@ -37,7 +37,7 @@ impl BenchData {
     pub fn from_fine(
         data: FineBenchData,
         duration: Duration,
-        run_result: InterpreterResult,
+        run_result: TestStepperResult,
     ) -> Self {
         let steps = data.instr_list.values().map(|d| d.len()).sum();
 

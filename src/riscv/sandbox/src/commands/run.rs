@@ -6,15 +6,15 @@
 use crate::{cli::RunOptions, format_status, posix_exit_mode};
 use octez_riscv::{
     exec_env::posix::Posix,
-    stepper::test::{Interpreter, InterpreterResult},
+    stepper::test::{TestStepper, TestStepperResult},
 };
 use std::error::Error;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let path = opts.input;
     let contents = std::fs::read(path)?;
-    let mut backend = Interpreter::<'_, Posix>::create_backend();
-    let mut interpreter = Interpreter::new(
+    let mut backend = TestStepper::<'_, Posix>::create_backend();
+    let mut interpreter = TestStepper::new(
         &mut backend,
         &contents,
         None,
@@ -22,7 +22,7 @@ pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     )?;
 
     match interpreter.run(opts.common.max_steps) {
-        InterpreterResult::Exit { code: 0, .. } => Ok(()),
+        TestStepperResult::Exit { code: 0, .. } => Ok(()),
         result => Err(format_status(&result).into()),
     }
 }
