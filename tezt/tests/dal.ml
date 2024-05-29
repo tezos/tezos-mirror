@@ -3214,13 +3214,42 @@ let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
 
-let check_new_connection_event ~main_node ~other_node ~is_trusted =
+(** Wait for a connection event between [main_node] and
+    [other_node]. The optional argument [other_peer_id] can be used to
+    ignore the connection events which are not between these two
+    nodes. When this optional argument is given, it must be the peer
+    of [other_node]; this assumption is checked by this function
+    after the reception of the connection event. *)
+let check_new_connection_event ~main_node ?other_peer_id ~other_node ~is_trusted
+    () =
+  let* peer_id =
+    wait_for_gossipsub_worker_event
+      ~name:"new_connection"
+      main_node
+      (fun event ->
+        let*?? peer_id = JSON.(event |-> "peer" |> as_string_opt) in
+        let*?? () =
+          check_expected is_trusted JSON.(event |-> "trusted" |> as_bool)
+        in
+        match other_peer_id with
+        | None ->
+            (* No expected peer id, event is considered valid and its peer id is returned *)
+            Some peer_id
+        | Some other_peer_id ->
+            if other_peer_id = peer_id then Some peer_id
+            else
+              (* A connection was received from an unexpected peer,
+                 discard the event. *)
+              None)
+  in
   let* other_node_id = Dal_node.read_identity other_node in
-  wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
-      let*?? () =
-        check_expected other_node_id JSON.(event |-> "peer" |> as_string)
-      in
-      check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
+  let () =
+    Check.(peer_id = other_node_id)
+      ~__LOC__
+      Check.string
+      ~error_msg:"Expected a connection from the peer of id %R, got %L."
+  in
+  unit
 
 let check_disconnection_event dal_node ~peer_id =
   wait_for_gossipsub_worker_event
@@ -3487,6 +3516,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
       ~main_node:dal_node1
       ~other_node:dal_node2
       ~is_trusted:false
+      ()
   in
   let* () = Dal_node.run dal_node2 in
   Log.info
@@ -3952,12 +3982,14 @@ let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
       ~main_node:dal_node2
       ~other_node:dal_node3
       ~is_trusted:false
+      ()
   in
   let check_conn_event_from_3_to_2 =
     check_new_connection_event
       ~main_node:dal_node3
       ~other_node:dal_node2
       ~is_trusted:false
+      ()
   in
   let* () = List.map (Dal_node.run ~wait_ready:true) nodes |> Lwt.join in
   Log.info "Bake a block and then another two to finalize it." ;
@@ -4050,18 +4082,24 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
       ~main_node:dal_node1
       ~other_node:dal_node2
       ~is_trusted:false
+      ~other_peer_id:id_dal_node2
+      ()
   in
   let check_conn_event_from_1_to_3 =
     check_new_connection_event
       ~main_node:dal_node1
       ~other_node:dal_node3
       ~is_trusted:false
+      ~other_peer_id:id_dal_node3
+      ()
   in
   let check_conn_event_from_2_to_3 =
     check_new_connection_event
       ~main_node:dal_node2
       ~other_node:dal_node3
       ~is_trusted:false
+      ~other_peer_id:id_dal_node3
+      ()
   in
 
   (* Disconnect all the nodes. *)
