@@ -71,6 +71,6 @@
 #
 # Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
 #
-/CODEOWNERS         @murbard @romain.nl
-/docs/CODEOWNERS    @murbard @romain.nl
-/.gitlab/CODEOWNERS @murbard @romain.nl
+/CODEOWNERS         @murbard @romain.nl @arvidnl
+/docs/CODEOWNERS    @murbard @romain.nl @arvidnl
+/.gitlab/CODEOWNERS @murbard @romain.nl @arvidnl
