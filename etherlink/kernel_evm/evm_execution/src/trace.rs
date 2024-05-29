@@ -6,12 +6,11 @@
 use primitive_types::{H160, H256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{
-    append_u16_le, append_u64_le, check_list, decode_field, next,
+    append_option_canonical, append_u16_le, append_u64_le, check_list, decode_field, next,
 };
 #[cfg(test)]
 use tezos_ethereum::rlp_helpers::{
-    decode_field_u16_le, decode_field_u64_le, decode_list, decode_option,
-    decode_option_explicit,
+    decode_field_u16_le, decode_field_u64_le, decode_list, decode_option_canonical,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -113,22 +112,10 @@ impl Encodable for StructLog {
         append_u64_le(stream, &self.gas_cost);
         append_u16_le(stream, &self.depth);
         stream.append(&self.error);
-        match &self.stack {
-            Some(stack) => stream.append_list(stack),
-            None => stream.append_empty_data(),
-        };
-        match &self.return_data {
-            Some(return_data) => stream.append(return_data),
-            None => stream.append_empty_data(),
-        };
-        match &self.memory {
-            Some(memory) => stream.append(memory),
-            None => stream.append_empty_data(),
-        };
-        match &self.storage {
-            Some(storage) => stream.append_list(storage),
-            None => stream.append_empty_data(),
-        };
+        append_option_canonical(stream, &self.stack, |s, l| s.append_list(l));
+        stream.append(&self.return_data);
+        stream.append(&self.memory);
+        append_option_canonical(stream, &self.storage, |s, l| s.append_list(l));
     }
 }
 
@@ -150,11 +137,11 @@ impl Decodable for StructLog {
         let depth: u16 = decode_field_u16_le(&next(&mut it)?, "depth")?;
         let error: Vec<u8> = decode_field(&next(&mut it)?, "error")?;
         let stack: Option<Vec<H256>> =
-            decode_option_explicit(&next(&mut it)?, "stack", decode_list)?;
-        let return_data: Option<Vec<u8>> = decode_option(&next(&mut it)?, "return_data")?;
-        let memory: Option<Vec<u8>> = decode_option(&next(&mut it)?, "memory")?;
+            decode_option_canonical(&next(&mut it)?, "stack", decode_list)?;
+        let return_data: Option<Vec<u8>> = decode_field(&next(&mut it)?, "return_data")?;
+        let memory: Option<Vec<u8>> = decode_field(&next(&mut it)?, "memory")?;
         let storage: Option<Vec<StorageMapItem>> =
-            decode_option_explicit(&next(&mut it)?, "storage", decode_list)?;
+            decode_option_canonical(&next(&mut it)?, "storage", decode_list)?;
 
         Ok(Self {
             pc,
