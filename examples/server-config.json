@@ -1,21 +1,24 @@
 {
-    "db": "sqlite3:db",
-    "max_batch_size": 10,
+    "db": "sqlite3:teztale.sqlite",
     "interfaces": [
         {
+            "address": "127.0.0.1",
             "port": 8880
-        }
-    ],
-    "admins": [
-        {
-            "login": "admin",
-            "password": "secret"
         }
     ],
     "users": [
         {
-            "login": "archiver",
-            "password": "secret"
+            "login": "TEZTALE_ARCHIVER_LOGIN",
+            "password": "TEZTALE_ARCHIVER_PASSWORD"
         }
-    ]
+    ],
+    "admins": [
+        {
+            "login": "TEZTALE_ADMIN_LOGIN",
+            "password": "TEZTALE_ADMIN_PASSWORD"
+        }
+    ],
+    "max_batch_size": 1000,
+    "public_directory": "../teztale-dataviz/dist/",
+    "verbosity": "DEBUG"
 }
