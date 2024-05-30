@@ -27,6 +27,14 @@ open Protocol
 open Alpha_context
 open Baking_state
 
+let sleep_until_block_timestamp prepared_block =
+  match
+    Baking_scheduling.sleep_until
+      prepared_block.signed_block_header.shell.timestamp
+  with
+  | Some waiter -> waiter
+  | None -> Lwt.return_unit
+
 let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     ~current_proposal delegates =
   let open Lwt_result_syntax in
@@ -189,6 +197,7 @@ let bake_at_next_level state =
       let* prepared_block =
         Baking_actions.prepare_block state.global_state block_to_bake
       in
+      let*! () = sleep_until_block_timestamp prepared_block in
       let* new_state =
         do_action
           ( state,
@@ -290,6 +299,7 @@ let propose_at_next_level ~minimal_timestamp state =
     let* prepared_block =
       Baking_actions.prepare_block state.global_state block_to_bake
     in
+    let*! () = sleep_until_block_timestamp prepared_block in
     let* state =
       do_action
         ( state,
@@ -421,6 +431,9 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                               state.global_state
                               block_to_bake
                           in
+                          let*! () =
+                            sleep_until_block_timestamp prepared_block
+                          in
                           let* state =
                             do_action
                               ( state,
@@ -433,6 +446,9 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                           in
                           return state
                       | Inject_block {prepared_block; _} ->
+                          let*! () =
+                            sleep_until_block_timestamp prepared_block
+                          in
                           let* state =
                             do_action
                               ( state,
@@ -503,6 +519,7 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
                 let* signed_block =
                   Baking_actions.prepare_block state.global_state block_to_bake
                 in
+                let*! () = sleep_until_block_timestamp signed_block in
                 let* _state =
                   do_action
                     ( state,
@@ -671,6 +688,7 @@ let rec baking_minimal_timestamp ~count state
   let* prepared_block =
     Baking_actions.prepare_block state.global_state block_to_bake
   in
+  let*! () = sleep_until_block_timestamp prepared_block in
   let* new_state =
     do_action
       ( state,
