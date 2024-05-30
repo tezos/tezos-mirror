@@ -164,6 +164,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
       ?timeout
       ?whitelist_enable
       ?rpc_external
+      ~riscv_pvm_enable:(kind = "riscv")
       protocol
   in
   let* sc_rollup =
@@ -649,7 +650,7 @@ let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client ?event_name
         | Lwt_unix.Timeout ->
             Test.fail
               "Timeout of %f seconds reached when waiting for event %a to \
-               happens."
+               happen."
               timeout
               (Format.pp_print_option Format.pp_print_string)
               event_name
@@ -1467,6 +1468,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
                 no_parse_bad_fingerprint.wasm  - Stuck state due to parse error
           *)
           unit
+      | "riscv" -> unit
       | _otherwise -> raise (Invalid_argument kind)
     in
 
@@ -4451,6 +4453,7 @@ let test_rpcs ~kind
         Check.((kernel_subkeys = ["boot.wasm"; "env"]) (list string))
           ~error_msg:"The key's subkeys are %L but should be %R" ;
         return ()
+    | "riscv" -> return ()
     | _ -> failwith "incorrect kind"
   in
   let* _status =
@@ -5904,18 +5907,17 @@ let start_rollup_node_with_encrypted_key ~kind =
   unit
 
 let register_riscv ~protocols =
-  (* TODO https://app.asana.com/0/0/1206991649221091/f
-   * change this to `Protocol.(From_protocol 019)` once RISC-V storage layer
-   * is implemented *)
-  let supports = Protocol.(Between_protocols (19, 19)) in
-  test_rollup_node_boots_into_initial_state protocols ~supports ~kind:"riscv" ;
+  let kind = "riscv" in
+  test_origination ~kind protocols ;
+  test_rpcs ~kind protocols ;
+  test_rollup_node_boots_into_initial_state protocols ~kind ;
+  test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;
+  test_rollup_node_advances_pvm_state protocols ~kind ~internal:true ;
   test_commitment_scenario
-    ~supports
-    ~extra_tags:["modes"; "operator"]
-    ~variant:"operator_publishes"
-    (mode_publish Operator true)
+    ~variant:"commitment_is_stored"
+    commitment_stored
     protocols
-    ~kind:"riscv"
+    ~kind
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -6053,7 +6055,7 @@ let register ~protocols =
     ~internal:false ;
 
   (* Specific riscv PVM tezt *)
-  register_riscv ~protocols ;
+  register_riscv ~protocols:[Protocol.Alpha] ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
