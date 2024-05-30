@@ -32,12 +32,12 @@ macro_rules! xregister_line {
             format!("   {0} ({0:?}): ", $reg).into(),
             format!(
                 "{} ",
-                $self.interpreter.machine_state().hart.xregisters.read($reg)
+                $self.stepper.machine_state().hart.xregisters.read($reg)
             )
             .fg(super::YELLOW),
             format!(
                 "0x{:x}",
-                $self.interpreter.machine_state().hart.xregisters.read($reg)
+                $self.stepper.machine_state().hart.xregisters.read($reg)
             )
             .fg(super::ORANGE),
         ])
@@ -50,12 +50,12 @@ macro_rules! fregister_line {
             format!("   {0} ({0:?}): ", $reg).into(),
             format!(
                 "{} ",
-                u64::from($self.interpreter.machine_state().hart.fregisters.read($reg))
+                u64::from($self.stepper.machine_state().hart.fregisters.read($reg))
             )
             .fg(super::YELLOW),
             format!(
                 "0x{:x}",
-                u64::from($self.interpreter.machine_state().hart.fregisters.read($reg))
+                u64::from($self.stepper.machine_state().hart.fregisters.read($reg))
             )
             .fg(super::ORANGE),
         ])
@@ -242,7 +242,7 @@ where
         use CSRegister as CSR;
 
         let mstatus: MStatus = self
-            .interpreter
+            .stepper
             .machine_state()
             .hart
             .csregisters
@@ -385,13 +385,13 @@ where
         use csregisters::*;
 
         let frm: CSRRepr = self
-            .interpreter
+            .stepper
             .machine_state()
             .hart
             .csregisters
             .read(CSRegister::frm);
         let fflags: CSRRepr = self
-            .interpreter
+            .stepper
             .machine_state()
             .hart
             .csregisters
@@ -422,7 +422,7 @@ where
                 format!(" {0:>6}: ", CSRegister::fcsr).into(),
                 format!(
                     "0x{:02x}",
-                    self.interpreter
+                    self.stepper
                         .machine_state()
                         .hart
                         .csregisters
@@ -462,7 +462,7 @@ where
             .border_set(border::THICK);
         let pc_line = Line::from(vec![
             "   PC: ".into(),
-            format!("{:x}", self.interpreter.machine_state().hart.pc.read()).fg(ORANGE),
+            format!("{:x}", self.stepper.machine_state().hart.pc.read()).fg(ORANGE),
         ]);
         let TranslationState {
             mode,
@@ -482,7 +482,7 @@ where
             "   Mode: ".into(),
             format!(
                 "{:?}",
-                self.interpreter.machine_state().hart.mode.read_default()
+                self.stepper.machine_state().hart.mode.read_default()
             )
             .fg(BLUE),
         ]);

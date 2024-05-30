@@ -49,9 +49,9 @@ where
 
     /// Returns the physical program counter, and if the translation algorithm is faulting
     fn update_pc_after_step(&mut self) -> (Address, bool) {
-        let raw_pc = self.interpreter.machine_state().hart.pc.read();
+        let raw_pc = self.stepper.machine_state().hart.pc.read();
         let res @ (pc, _faulting) = match self
-            .interpreter
+            .stepper
             .machine_state()
             .translate(raw_pc, AccessType::Instruction)
         {
@@ -67,11 +67,11 @@ where
     /// Updates the state of [`super::TranslationState`]
     fn update_translation_after_step(&mut self, faulting: bool) {
         let effective_mode = self
-            .interpreter
+            .stepper
             .machine_state()
             .effective_translation_alg(&AccessType::Instruction);
         let satp_val = self
-            .interpreter
+            .stepper
             .machine_state()
             .hart
             .csregisters
@@ -118,7 +118,7 @@ where
         symbols: &HashMap<u64, &str>,
     ) -> Vec<Instruction> {
         let get_u16_at = |addr: Address| -> Option<(Address, u16)> {
-            self.interpreter
+            self.stepper
                 .machine_state()
                 .bus
                 .read(addr)
