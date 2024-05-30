@@ -41,6 +41,28 @@ pub struct Instruction {
     jump: Option<(u64, Option<String>)>,
 }
 
+impl Instruction {
+    fn new(address: u64, text: String, symbols: &HashMap<u64, &str>) -> Self {
+        let jump = match text
+            .split(' ')
+            .next()
+            .expect("Unexpected instruction format")
+        {
+            "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
+                text.split(',').last().map(|jump_address| {
+                    let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
+                    (addr, symbols.get(&addr).map(|s| s.to_string()))
+                })
+            }
+            _ => None,
+        };
+        Self {
+            address,
+            text,
+            jump,
+        }
+    }
+}
 enum EffectiveTranslationState {
     Off,
     On,
@@ -127,29 +149,6 @@ pub struct DebuggerApp<'a> {
     interpreter: &'a mut TestStepper<'a>,
     program: ProgramView<'a>,
     state: DebuggerState,
-}
-
-impl Instruction {
-    fn new(address: u64, text: String, symbols: &HashMap<u64, &str>) -> Self {
-        let jump = match text
-            .split(' ')
-            .next()
-            .expect("Unexpected instruction format")
-        {
-            "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
-                text.split(',').last().map(|jump_address| {
-                    let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
-                    (addr, symbols.get(&addr).map(|s| s.to_string()))
-                })
-            }
-            _ => None,
-        };
-        Self {
-            address,
-            text,
-            jump,
-        }
-    }
 }
 
 impl<'a> DebuggerApp<'a> {
