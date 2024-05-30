@@ -6,7 +6,10 @@ use crate::commands::bench::{BenchStats, NamedStats};
 use comfy_table::Cell;
 use itertools::Itertools;
 use numfmt::{Formatter, Numeric};
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    time::Duration,
+};
 
 /// Produce a string by formatting the number with the given `separator` and `precision`
 pub fn thousand_format<N: Numeric>(content: N, num_decimals: u8) -> String {
@@ -28,7 +31,7 @@ pub fn prepend_cell(first_cell: Cell, mut rest_of_cells: Vec<Cell>) -> Vec<Cell>
     rest_of_cells
 }
 
-/// Type holding (Name of benchmark, Option<Named Single instruction stats>)
+/// Type holding `(Name of benchmark, Option<Named Single instruction stats>)`
 pub type NamedBenchInstrStats<'a, 'b> = (&'a str, Option<&'b NamedStats>);
 
 /// Return an array r[i][j] = the stats for the i-th instruction and j-th benchmark & benchmark_name
@@ -67,4 +70,11 @@ pub fn tableify_bench_stats<'a, 'b>(
                 .collect()
         })
         .collect_vec()
+}
+
+pub fn format_opt_duration(d: &Option<Duration>) -> String {
+    match d {
+        None => "---".to_string(),
+        Some(d) => format!("{d:#?}"),
+    }
 }

@@ -11,14 +11,14 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Serializable data for instruction-level statistics
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NamedStats {
     pub name: String,
     pub count: usize,
     pub total: Duration,
     pub average: Duration,
-    pub median: Duration,
-    pub stddev: Duration,
+    pub median: Option<Duration>,
+    pub stddev: Option<Duration>,
 }
 
 impl NamedStats {
@@ -40,9 +40,22 @@ impl NamedStats {
             count,
             total,
             average,
-            median,
-            stddev,
+            median: Some(median),
+            stddev: Some(stddev),
         })
+    }
+
+    /// Used to combine statistics from two related statistics measuring the same metric.
+    /// Median and Stddev can not be trivially calculated by just knowing what is in [`NamedStats`]
+    pub fn aggregate(&mut self, other: &NamedStats, name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            average: (self.total + other.total).div_f64((self.count + other.count) as f64),
+            count: self.count + other.count,
+            total: self.total + other.total,
+            median: None,
+            stddev: None,
+        }
     }
 }
 
@@ -128,6 +141,42 @@ impl BenchStats {
             run_result: "Multiple iterations results".to_string(),
         })
     }
+
+    /// If multiple binaries have been executed, this function
+    /// combines the stats for the same instruction coming from different binaries.
+    pub fn normalize_instr_data(&mut self) {
+        self.instr_stats = self
+            .instr_stats
+            .iter()
+            .flatten()
+            .into_group_map_by(|el| &el.name)
+            .into_values()
+            .map(|val_list| {
+                val_list
+                    .iter()
+                    .map(|&e| e.clone())
+                    .reduce(|mut acc, el| acc.aggregate(&el, &el.name))
+            })
+            .collect::<Option<Vec<_>>>();
+    }
+
+    /// Function used to combine [`BenchStats`] in case multiple binaries are executed.
+    pub fn combine(mut self, other: BenchStats) -> Self {
+        Self {
+            bench_duration_stats: self
+                .bench_duration_stats
+                .aggregate(&other.bench_duration_stats, "mixed runs"),
+            instr_stats: match self.instr_stats {
+                None => other.instr_stats,
+                Some(mut stats) => Some({
+                    stats.append(&mut other.instr_stats.unwrap_or_default());
+                    stats
+                }),
+            },
+            run_result: "Mixed runs".to_string(),
+            total_steps: self.total_steps + other.total_steps,
+        }
+    }
 }
 
 impl BenchStats {
@@ -135,8 +184,8 @@ impl BenchStats {
         // The time taken for instructions to run, either the whole bench duration,
         // or the added instruction times to account for overhead
         match &self.instr_stats {
-            None => self.bench_duration_stats.total,
-            Some(counts) => counts.iter().map(|i| i.total).sum::<Duration>(),
+            Some(counts) if !counts.is_empty() => counts.iter().map(|i| i.total).sum::<Duration>(),
+            _ => self.bench_duration_stats.total,
         }
     }
 }

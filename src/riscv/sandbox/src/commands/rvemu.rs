@@ -17,9 +17,10 @@ mod rvemu_syscall;
 
 pub fn rvemu(opts: RvemuOptions) -> Result<(), Box<dyn Error>> {
     let mut emu = Emulator::new();
+    let path = opts.input;
 
     // Load the ELF binary into the emulator.
-    let contents = std::fs::read(&opts.common.input)?;
+    let contents = std::fs::read(path)?;
 
     rvemu_boot::setup_boot(&mut emu, &contents, opts.initrd)?;
 
