@@ -8,6 +8,7 @@ use self::utils::{
 use crate::{
     cli::{SortInstr, SortRuns, TableSortArgs},
     commands::bench::{BenchStats, NamedStats},
+    table::utils::format_opt_duration,
 };
 use comfy_table::{
     modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Attribute, Cell, CellAlignment, Color,
@@ -48,7 +49,7 @@ fn section_summary(table: &mut Table, data: &[(&BenchStats, &String)]) {
     }
 }
 
-fn content_stats_line_opt(name: &str, stats: &Option<&NamedStats>) -> Vec<Cell> {
+fn content_stats_line_opt(name: &str, stats: Option<&NamedStats>) -> Vec<Cell> {
     match stats {
         Some(s) => content_stats_line(name, s),
         None => vec![
@@ -67,8 +68,8 @@ fn content_stats_line(name: &str, stats: &NamedStats) -> Vec<Cell> {
         Cell::new(thousand_format(stats.count, 0)).set_alignment(CellAlignment::Right),
         Cell::new(format!("{:#?}", stats.total)).set_alignment(CellAlignment::Right),
         Cell::new(format!("{:#?}", stats.average)).set_alignment(CellAlignment::Right),
-        Cell::new(format!("{:#?}", stats.median)).set_alignment(CellAlignment::Right),
-        Cell::new(format!("{:#?}", stats.stddev)).set_alignment(CellAlignment::Right),
+        Cell::new(format_opt_duration(&stats.stddev)).set_alignment(CellAlignment::Right),
+        Cell::new(format_opt_duration(&stats.median)).set_alignment(CellAlignment::Right),
     ]
 }
 
@@ -111,7 +112,7 @@ fn section_instruction_stats(table: &mut Table, data: &[&[&NamedBenchInstrStats]
 
         // content
         for instr_stat in instr_data.iter() {
-            table.add_row(content_stats_line_opt(instr_stat.0, &instr_stat.1));
+            table.add_row(content_stats_line_opt(instr_stat.0, instr_stat.1));
         }
     }
 }

@@ -17,7 +17,7 @@ use octez_riscv::{
     parser::{instruction::Instr, parse},
     Interpreter, InterpreterResult,
 };
-use std::error::Error;
+use std::{error::Error, path::Path};
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
@@ -110,8 +110,8 @@ fn bench_simple(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchD
     BenchData::from_simple(data, res)
 }
 
-fn bench_iteration(opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
-    let contents = std::fs::read(&opts.common.input)?;
+fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
+    let contents = std::fs::read(path)?;
     let mut backend = Interpreter::<'_, Posix>::create_backend();
     let mut interpreter = Interpreter::new(
         &mut backend,
@@ -124,22 +124,32 @@ fn bench_iteration(opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> 
         BenchMode::Simple => bench_simple(&mut interpreter, opts),
         BenchMode::Fine => bench_fine(&mut interpreter, opts),
     };
-
     Ok(data)
 }
 
 pub fn run(opts: BenchRunOptions) -> Result<(), Box<dyn Error>> {
+    let mut stats = opts
+        .inputs
+        .iter()
+        .filter_map(|path| run_binary(path, &opts).ok())
+        .reduce(|acc, e| e.combine(acc))
+        .ok_or("Could not combine benchmark results".to_string())?;
+    stats.normalize_instr_data();
+    save_to_file(&stats, &opts)?;
+    show_results(&stats, &opts);
+    Ok(())
+}
+
+fn run_binary(path: &Path, opts: &BenchRunOptions) -> Result<BenchStats, Box<dyn Error>> {
     let stats = match opts.repeat {
-        0 | 1 => BenchStats::from_data(bench_iteration(&opts)?)?,
+        0 | 1 => BenchStats::from_data(bench_iteration(path, opts)?)?,
         iterations => {
             let mut data_list = vec![];
             for _ in 0..iterations {
-                data_list.push(bench_iteration(&opts)?)
+                data_list.push(bench_iteration(path, opts)?)
             }
             BenchStats::from_data_list(data_list)?
         }
     };
-    save_to_file(&stats, &opts)?;
-    show_results(&stats, &opts);
-    Ok(())
+    Ok(stats)
 }

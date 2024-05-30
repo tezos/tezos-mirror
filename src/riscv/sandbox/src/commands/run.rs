@@ -8,7 +8,8 @@ use octez_riscv::{exec_env::posix::Posix, Interpreter, InterpreterResult};
 use std::error::Error;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
-    let contents = std::fs::read(&opts.common.input)?;
+    let path = opts.input;
+    let contents = std::fs::read(path)?;
     let mut backend = Interpreter::<'_, Posix>::create_backend();
     let mut interpreter = Interpreter::new(
         &mut backend,

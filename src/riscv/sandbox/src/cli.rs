@@ -35,18 +35,30 @@ pub struct Cli {
 pub struct RunOptions {
     #[command(flatten)]
     pub common: CommonOptions,
+
+    /// Path to the input ELF executable
+    #[arg(long, short)]
+    pub input: Box<Path>,
 }
 
 #[derive(Debug, Clone, Parser)]
 pub struct DebugOptions {
     #[command(flatten)]
     pub common: CommonOptions,
+
+    /// Path to the input ELF executable
+    #[arg(long, short)]
+    pub input: Box<Path>,
 }
 
 #[derive(Debug, Clone, Parser)]
 pub struct RvemuOptions {
     #[command(flatten)]
     pub common: CommonOptions,
+
+    /// Path to the input ELF executable
+    #[arg(long, short)]
+    pub input: Box<Path>,
 
     /// Path to the initrd
     #[arg(long)]
@@ -101,6 +113,10 @@ pub struct BenchRunOptions {
 
     #[command(flatten)]
     pub common: CommonOptions,
+
+    /// Paths to the input ELF executable
+    #[arg(long, short, num_args=1..)]
+    pub inputs: Vec<Box<Path>>,
 
     #[command(flatten)]
     pub sort_args: TableSortArgs,
@@ -182,10 +198,6 @@ pub struct TableSortArgs {
 
 #[derive(Debug, Clone, Parser)]
 pub struct CommonOptions {
-    /// Path to the input ELF executable
-    #[arg(short, long)]
-    pub input: String,
-
     #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
     pub posix_exit_mode: ExitMode,
 
