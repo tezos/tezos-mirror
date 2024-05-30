@@ -1,4 +1,3 @@
-
 # Debian packaging
 
 The `octez` directory contains the Debian package specification for Octez.
@@ -46,3 +45,25 @@ same environment used in the CI. The script
 builds the Debian packages. The pre-requisite to this script is to run `make
 build-deps` and ensure all runtime dependencies as well as the build
 dependencies needed to build the Debian packages are correctly installed.
+
+# Apt Repository Management
+
+The file [package-signing-key.asc] contains the public key associated to
+the gpg signing key stored in the CI. The CI / Release Manager will
+sign the repository using this key, while the user can download
+the public key to verify that the signature is indeed valid.
+
+This user must download the key and make it known to apt.
+
+Ex.
+
+    curl "<apt-repository>/octez.asc" \
+    | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+
+
+### gutils
+
+We use the gutils suite to upload the apt repository to the
+google cloud storage. The key used to install those packages
+is committed in the repository and can be refreshed from this url
+`https://packages.cloud.google.com/apt/doc/apt-key.gpg`
