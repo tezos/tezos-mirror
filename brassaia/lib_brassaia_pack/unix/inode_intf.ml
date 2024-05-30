@@ -29,7 +29,7 @@ module type Persistent = sig
     file_manager:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
-    lru:Lru.t ->
+    lru:Lru.t option ->
     read t
 
   include Brassaia_pack.Checkable with type 'a t := 'a t and type hash := hash

@@ -33,7 +33,7 @@ module type S = sig
     file_manager:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
-    lru:Lru.t ->
+    lru:Lru.t option ->
     read t
 
   val cast : read t -> read_write t

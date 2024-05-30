@@ -137,6 +137,11 @@ struct
   let index t hash = Lwt.return (index_direct t hash)
 
   let init ~config ~file_manager ~dict ~dispatcher ~lru =
+    let lru =
+      match lru with
+      | Some lru -> lru
+      | None -> Lru.create (Conf.init "pack_store")
+    in
     let indexing_strategy = Conf.indexing_strategy config in
     let staging = Tbl.create 127 in
     File_manager.register_suffix_consumer file_manager ~after_flush:(fun () ->

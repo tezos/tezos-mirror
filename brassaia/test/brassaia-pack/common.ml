@@ -159,7 +159,7 @@ struct
     (* open the index created by the fm. *)
     let index = File_manager.index file_manager in
     let dict = Dict.init file_manager |> Errs.raise_if_error in
-    let lru = Brassaia_pack_unix.Lru.create config in
+    let lru = Some (Brassaia_pack_unix.Lru.create config) in
     let pack = Pack.init ~config ~file_manager ~dict ~dispatcher ~lru in
     (f := fun () -> File_manager.flush file_manager |> Errs.raise_if_error);
     { name; index; pack; dict; file_manager } |> Lwt.return

@@ -193,13 +193,15 @@ module Maker (Config : Conf.S) = struct
           in
           let lru = Lru.create config in
           let contents =
-            Contents.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+            Contents.CA.init ~config ~file_manager ~dict ~dispatcher
+              ~lru:(Some lru)
           in
           let node =
-            Node.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+            Node.CA.init ~config ~file_manager ~dict ~dispatcher ~lru:(Some lru)
           in
           let commit =
-            Commit.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+            Commit.CA.init ~config ~file_manager ~dict ~dispatcher
+              ~lru:(Some lru)
           in
           let+ branch =
             let root = Conf.root config in
