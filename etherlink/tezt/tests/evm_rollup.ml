@@ -459,6 +459,7 @@ let register_test ~title ~tags ?kernel ?additional_config ?admin ?uses
     ~tags:(extra_tag :: tags)
     ~uses
     ~title:(sf "%s (%s)" title extra_tag)
+    ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
     (fun protocol ->
       let* evm_setup =
         setup_evm_kernel

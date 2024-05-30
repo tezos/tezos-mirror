@@ -232,6 +232,7 @@ val register_test :
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
+  ?additional_tags:(t -> string list) ->
   (t -> unit Lwt.t) ->
   t list ->
   unit
@@ -252,6 +253,7 @@ val register_long_test :
   ?team:string ->
   executors:Long_test.executor list ->
   timeout:Long_test.timeout ->
+  ?additional_tags:(t -> string list) ->
   (t -> unit Lwt.t) ->
   t list ->
   unit
@@ -270,6 +272,7 @@ val register_regression_test :
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
+  ?additional_tags:(t -> string list) ->
   (t -> unit Lwt.t) ->
   t list ->
   unit

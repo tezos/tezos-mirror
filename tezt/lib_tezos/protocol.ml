@@ -325,14 +325,19 @@ let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
-let add_to_test_parameters protocol title tags uses =
+let add_to_test_parameters ?(additional_tags = fun _ -> []) protocol title tags
+    uses =
   let uses = match uses with None -> [] | Some uses -> uses protocol in
-  (name protocol ^ ": " ^ title, tag protocol :: tags, uses)
+  ( name protocol ^ ": " ^ title,
+    (tag protocol :: tags) @ additional_tags protocol,
+    uses )
 
 let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?supports body protocols =
+    ?uses_admin_client ?supports ?additional_tags body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  let title, tags, uses =
+    add_to_test_parameters ?additional_tags protocol title tags uses
+  in
   Test.register
     ~__FILE__
     ~title
@@ -344,9 +349,12 @@ let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     (fun () -> body protocol)
 
 let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?supports ?team ~executors ~timeout body protocols =
+    ?uses_admin_client ?supports ?team ~executors ~timeout ?additional_tags body
+    protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  let title, tags, uses =
+    add_to_test_parameters ?additional_tags protocol title tags uses
+  in
   Long_test.register
     ~__FILE__
     ~title
@@ -361,9 +369,11 @@ let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     (fun () -> body protocol)
 
 let register_regression_test ~__FILE__ ~title ~tags ?uses ?uses_node
-    ?uses_client ?uses_admin_client ?supports body protocols =
+    ?uses_client ?uses_admin_client ?supports ?additional_tags body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  let title, tags, uses =
+    add_to_test_parameters ?additional_tags protocol title tags uses
+  in
   Regression.register
     ~__FILE__
     ~title

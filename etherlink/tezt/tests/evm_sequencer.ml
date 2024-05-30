@@ -402,7 +402,11 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
     in
     body sequencer_setup protocol
   in
-  Protocol.register_test ~__FILE__ ~uses body
+  Protocol.register_test
+    ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
+    ~__FILE__
+    ~uses
+    body
 
 let register_both ?devmode ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
