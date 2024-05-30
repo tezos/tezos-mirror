@@ -1515,6 +1515,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1964,6 +1988,7 @@ dependencies = [
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-entrypoint",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-macros",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
@@ -2027,6 +2052,15 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
+]
+
+[[package]]
+name = "tezos-smart-rollup-macros"
+version = "0.2.2"
+dependencies = [
+ "proc-macro-error",
+ "quote",
+ "syn 2.0.65",
 ]
 
 [[package]]
