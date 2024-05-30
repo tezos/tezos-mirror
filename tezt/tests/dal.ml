@@ -6686,16 +6686,24 @@ module Refutations = struct
         client
     in
     let* () = bake_for client in
+    let* published_level =
+      let* curr = Node.get_level node in
+      return (curr + 1)
+    in
 
     (* Publish two slots and indices 0 and 1, respectively *)
-    let publish source index =
-      Helpers.make_slot
-        ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
-        (Format.sprintf "Hello slot %d" index)
-      |> Helpers.publish_and_store_slot client honest_dal_node source ~index
+    let publish_and_get_shards_filename source index =
+      let* _commitment =
+        Helpers.make_slot
+          ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
+          (Format.sprintf "Hello slot %d" index)
+        |> Helpers.publish_and_store_slot client honest_dal_node source ~index
+      in
+      (* TODO: We should refactor this to use the function defined in bin_dal_node/store. *)
+      return @@ Format.asprintf "%d_%d" published_level index
     in
-    let* commitment0 = publish Constant.bootstrap1 0 in
-    let* commitment1 = publish Constant.bootstrap2 1 in
+    let* shards_file0 = publish_and_get_shards_filename Constant.bootstrap1 0 in
+    let* shards_file1 = publish_and_get_shards_filename Constant.bootstrap2 1 in
 
     (* Bake sufficiently many blocks to be able to attest. *)
     let* () = bake_for ~count:parameters.attestation_lag client in
@@ -6731,9 +6739,9 @@ module Refutations = struct
             from
             n
     in
-    mv_shards commitment0 "tmp" ;
-    mv_shards commitment1 commitment0 ;
-    mv_shards "tmp" commitment1 ;
+    mv_shards shards_file0 "tmp" ;
+    mv_shards shards_file1 shards_file0 ;
+    mv_shards "tmp" shards_file1 ;
 
     let* () = Dal_node.run ~wait_ready:true faulty_dal_node in
 
