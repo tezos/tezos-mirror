@@ -102,21 +102,27 @@ module Shards = struct
 
   let write_all shards_store slot_id shards =
     let open Lwt_result_syntax in
-    let shards =
-      Seq.map (fun {Cryptobox.index; share} -> (slot_id, index, share)) shards
-    in
     let* () =
-      KVS.write_values shards_store file_layout shards
+      Seq.ES.iter
+        (fun {Cryptobox.index; share} ->
+          let* exists =
+            KVS.value_exists shards_store file_layout slot_id index
+          in
+          if exists then return_unit
+          else
+            let* () =
+              KVS.write_value shards_store file_layout slot_id index share
+            in
+            let () = Dal_metrics.shard_stored () in
+            let*! () =
+              Event.(
+                emit
+                  stored_slot_shard
+                  (slot_id.slot_level, slot_id.slot_index, index))
+            in
+            return_unit)
+        shards
       |> Errors.other_lwt_result
-    in
-    let*! () =
-      List.of_seq shards
-      |> Lwt_list.iter_s (fun (_slot_id, index, _share) ->
-             Dal_metrics.shard_stored () ;
-             Event.(
-               emit
-                 stored_slot_shard
-                 (slot_id.slot_level, slot_id.slot_index, index)))
     in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
 
