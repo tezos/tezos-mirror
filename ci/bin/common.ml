@@ -169,6 +169,30 @@ end
 
 (** {2 Helpers} *)
 
+(** The default [before_script:] section.
+
+    In general, the result of this script should be used as the
+    default value for [~before_merging] for all jobs. Each boolean flag
+    of this function enables a specific functionality before the job's
+    [script:] runs. In detail:
+
+    - [take_ownership]: all files in the working directory of the
+      job are [chown]'d by the job's user. This requires that either
+      sudo is installed in the job's image or that the job's user has
+      sufficient privileges. (default: [false])
+    - [source_version]: the script [scripts/version.sh] is sourced. (default: [false])
+    - [eval_opam]: runs [eval $(opam env)], activating any opam switch
+      if present in the image. (default: [false])
+    - [init_python_venv]: runs [.venv/bin/activate], activating any
+      python vinv if present in the image. (default: [false])
+    - [install_js_deps]: runs, and sources,
+      [./scripts/install_build_deps.js.sh] installing JavaScript
+      dependencies and [node], [nvm] and [npm] available in the
+      environment. (default: [false])
+
+   The unnamed argument of the function is appended to the end of the
+   [before_script:] section, after any of the additions caused by the
+   optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
     before_script =
