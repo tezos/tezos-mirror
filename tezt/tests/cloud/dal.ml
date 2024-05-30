@@ -27,8 +27,8 @@ module Disconnected = struct
   (* This function only does something when a relevant level is reached. In
      that case, the next baker to disconnect is added with the current level in
      the state and [f] is applied that baker *)
-  let disconnect level f =
-    if level mod disconnect_frequency <> 0 then Lwt.return_unit
+  let disconnect frequency level f =
+    if level mod frequency <> 0 then Lwt.return_unit
     else
       match IMap.find_opt !next_to_disconnect !state with
       | Some _ -> Lwt.return_unit
@@ -40,10 +40,10 @@ module Disconnected = struct
 
   (* Applies [f] on the bakers DAL nodes that have been disconnected for long
      enough *)
-  let reconnect level f =
+  let reconnect reconnection_delay level f =
     let bakers_to_reconnect, bakers_to_keep_disconnected =
       IMap.partition
-        (fun _ disco_level -> level >= disco_level + time_disconnected)
+        (fun _ disco_level -> level >= disco_level + reconnection_delay)
         !state
     in
     state := bakers_to_keep_disconnected ;
@@ -120,7 +120,12 @@ module Cli = struct
         try
           string |> String.split_on_char ',' |> List.map int_of_string
           |> Option.some
-        with _ -> None
+        with _ ->
+          raise
+            (Invalid_argument
+               (Printf.sprintf
+                  "Cli.observer_slot_indices: could not parse %s"
+                  string))
       in
       let show l = l |> List.map string_of_int |> String.concat "," in
       Clap.typ ~name:"observer-slot-indices" ~dummy:[] ~parse ~show
@@ -157,6 +162,30 @@ module Cli = struct
       Protocol.Alpha
 
   let etherlink = Clap.flag ~section ~set_long:"etherlink" false
+
+  let disconnect =
+    let disconnect_typ =
+      let parse string =
+        try
+          match String.split_on_char ',' string with
+          | [disconnection; reconnection] ->
+              Some (int_of_string disconnection, int_of_string reconnection)
+          | _ -> None
+        with _ -> None
+      in
+      let show (d, r) = Format.sprintf "%d,%d" d r in
+      Clap.typ ~name:"disconnect" ~dummy:(10, 10) ~parse ~show
+    in
+    Clap.optional
+      ~section
+      ~long:"disconnect"
+      ~placeholder:"<disconnect_frequency>,<levels_disconnected>"
+      ~description:
+        "If this argument is provided, bakers will disconnect in turn each \
+         <disconnect_frequency> levels, and each will reconnect after a delay \
+         of <levels_disconnected> levels."
+      disconnect_typ
+      ()
 end
 
 type configuration = {
@@ -167,6 +196,9 @@ type configuration = {
   protocol : Protocol.t;
   producer_machine_type : string option;
   etherlink : bool;
+  (* The first argument is the deconnection frequency, the second is the
+     reconnection delay *)
+  disconnect : (int * int) option;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -967,7 +999,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     (Dal_node.name dal_node1) ;
   conn_ev_in_node1
 
-let on_new_level ?(disconnect = false) t level =
+let on_new_level t level =
   let node = t.bootstrap.node in
   let client = t.bootstrap.client in
   let* () =
@@ -983,21 +1015,22 @@ let on_new_level ?(disconnect = false) t level =
   pp_metrics t metrics ;
   push_metrics t metrics ;
   Hashtbl.replace t.metrics level metrics ;
-  if not disconnect then Lwt.return_unit
-  else
-    let nb_bakers = List.length t.bakers in
-    let* () =
-      Disconnected.disconnect level (fun b ->
-          let baker_to_disconnect =
+  match t.configuration.disconnect with
+  | None -> Lwt.return_unit
+  | Some (disconnect_frequency, time_disconnected) ->
+      let nb_bakers = List.length t.bakers in
+      let* () =
+        Disconnected.disconnect disconnect_frequency level (fun b ->
+            let baker_to_disconnect =
+              (List.nth t.bakers (b mod nb_bakers)).dal_node
+            in
+            Dal_node.terminate baker_to_disconnect)
+      in
+      Disconnected.reconnect time_disconnected level (fun b ->
+          let baker_to_reconnect =
             (List.nth t.bakers (b mod nb_bakers)).dal_node
           in
-          Dal_node.terminate baker_to_disconnect)
-    in
-    Disconnected.reconnect level (fun b ->
-        let baker_to_reconnect =
-          (List.nth t.bakers (b mod nb_bakers)).dal_node
-        in
-        connect_nodes_via_p2p t.bootstrap.dal_node baker_to_reconnect)
+          connect_nodes_via_p2p t.bootstrap.dal_node baker_to_reconnect)
 
 let produce_slot t level i =
   let producer = List.nth t.producers i in
@@ -1033,7 +1066,7 @@ let producers_not_ready t =
   List.for_all producer_ready t.producers
 
 let rec loop t level =
-  let p = on_new_level ~disconnect:true t level in
+  let p = on_new_level t level in
   let _p2 =
     if producers_not_ready t then Lwt.return_unit
     else
@@ -1053,6 +1086,7 @@ let configuration =
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
   let etherlink = Cli.etherlink in
+  let disconnect = Cli.disconnect in
   {
     stake;
     stake_machine_type;
@@ -1061,6 +1095,7 @@ let configuration =
     protocol;
     producer_machine_type;
     etherlink;
+    disconnect;
   }
 
 let benchmark () =
