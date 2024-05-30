@@ -177,15 +177,15 @@ module Make
           ("operations", Data_encoding.list Operation.encoding)
           ~pp1:(pp_operations_list ~numbered:true)
 
-      let dropped_operations =
-        declare_1
-          ~name:"dropped_operations"
-          ~msg:
-            "Dropping operations: the following operations are dropped \
-             {operations}"
+      let dropped_operation =
+        declare_2
+          ~name:"dropped_operation"
+          ~msg:"Dropping operation {operation} with error {error}"
           ~level:Info
-          ("operations", Data_encoding.list Operation.encoding)
-          ~pp1:(pp_operations_list ~numbered:false)
+          ("operation", Operation.encoding)
+          ("error", Data_encoding.option Error_monad.trace_encoding)
+          ~pp1:Operation.pp
+          ~pp2:(fun ppf -> Option.iter (Error_monad.pp_print_trace ppf))
 
       let simulating_operations =
         declare_2

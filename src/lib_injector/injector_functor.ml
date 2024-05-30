@@ -810,11 +810,13 @@ module Make (Parameters : PARAMETERS) = struct
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
             let*! () =
-              Event.(emit1 ~signers:[signer] dropped_operations)
-                state
-                (List.map
-                   (fun o -> o.Inj_operation.operation)
-                   operations_to_drop)
+              List.iter_s
+                (fun Inj_operation.{operation; errors; _} ->
+                  Event.(emit2 ~signers:[signer] dropped_operation)
+                    state
+                    operation
+                    errors.last_error)
+                operations_to_drop
             in
             let* () =
               List.iter_es
