@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -16,5 +16,12 @@ let build_rpc_directory node_version config _store =
       ~dal_config:config.blockchain_network.dal_config
       static_dir
   in
-  Tezos_rpc.Directory.register0 static_dir Node_services.S.config (fun () () ->
-      Lwt.return_ok config)
+  let static_dir =
+    Tezos_rpc.Directory.register0
+      static_dir
+      Node_services.S.config
+      (fun () () -> Lwt.return_ok config)
+  in
+  Tezos_rpc.Directory.merge
+    static_dir
+    (Tezos_shell.Health_directory.build_rpc_directory ())
