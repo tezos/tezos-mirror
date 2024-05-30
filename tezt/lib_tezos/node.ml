@@ -601,8 +601,9 @@ let handle_event node {name; value; timestamp = _} =
   | "head_increment.v0" | "branch_switch.v0" -> (
       match JSON.(value |-> "level" |> as_int_opt) with
       | None ->
-          (* There are several kinds of events and maybe
-             this one is not the one with the level: ignore it. *)
+          (* Names [head_increment] and [branch_switch] correspond to
+             multiple different events. Some of those events carry a
+             [level], some do not. *)
           ()
       | Some level -> update_level node level)
   | "read_identity.v0" -> update_identity node (JSON.as_string value)
