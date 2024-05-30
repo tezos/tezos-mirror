@@ -11,15 +11,15 @@ use octez_riscv::{
         AccessType,
     },
     parser::{instruction::Instr, parse},
-    stepper::{
-        test::{TestStepper, TestStepperResult},
-        Stepper,
-    },
+    stepper::Stepper,
 };
 use std::{collections::HashMap, ops::Range};
 
-impl<'a> DebuggerApp<'a, TestStepper<'a>> {
-    pub(super) fn update_after_step(&mut self, result: TestStepperResult) {
+impl<'a, S> DebuggerApp<'a, S>
+where
+    S: Stepper,
+{
+    pub(super) fn update_after_step(&mut self, result: S::StepResult) {
         let (pc, faulting) = self.update_pc_after_step();
         self.update_translation_after_step(faulting);
         self.update_instr_list(pc);
@@ -34,7 +34,7 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
             });
 
         self.program.state.select(Some(self.program.next_instr));
-        self.state.interpreter = result;
+        self.state.result = result;
     }
 
     /// Even if pc is not updated, the selected instruction can change,

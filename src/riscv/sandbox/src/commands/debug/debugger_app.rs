@@ -134,8 +134,8 @@ impl TranslationState {
     }
 }
 
-struct DebuggerState {
-    pub interpreter: TestStepperResult,
+struct DebuggerState<R> {
+    pub result: R,
     pub prev_pc: Address,
     pub translation: TranslationState,
 }
@@ -148,11 +148,11 @@ struct ProgramView<'a> {
     symbols: HashMap<u64, &'a str>,
 }
 
-pub struct DebuggerApp<'a, S> {
+pub struct DebuggerApp<'a, S: Stepper> {
     title: &'a str,
     interpreter: &'a mut S,
     program: ProgramView<'a>,
-    state: DebuggerState,
+    state: DebuggerState<S::StepResult>,
 }
 
 impl<'a> DebuggerApp<'a, TestStepper<'a>> {
@@ -185,7 +185,7 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
                 symbols,
             ),
             state: DebuggerState {
-                interpreter: TestStepperResult::Running(0),
+                result: TestStepperResult::default(),
                 prev_pc: 0,
                 translation: TranslationState {
                     mode: SATPModeState::Bare,

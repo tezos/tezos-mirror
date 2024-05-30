@@ -19,7 +19,7 @@ fn format_status(result: &TestStepperResult) -> String {
     match result {
         Exit { code: 0, .. } => "Ok (exit code = 0)".to_string(),
         Exit { code, .. } => format!("Failed with exit code = {}", code),
-        Running(_) => "Timeout".to_string(),
+        Running { .. } => "Timeout".to_string(),
         Exception { cause, .. } => format!("{}", exception_to_error(cause)),
     }
 }

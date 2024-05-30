@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::Stepper;
+use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     exec_env::{
         posix::{Posix, PosixState},
@@ -24,7 +24,7 @@ use std::{collections::BTreeMap, ops::RangeBounds};
 #[derive(Clone, Debug)]
 pub enum TestStepperResult {
     /// Execution has not finished. Returns the number of steps executed.
-    Running(usize),
+    Running { steps: usize },
     /// Program exited. Returns exit code and number of steps executed.
     Exit { code: usize, steps: usize },
     /// Execution finished because an unhandled environment exception has been thrown.
@@ -34,6 +34,34 @@ pub enum TestStepperResult {
         steps: usize,
         message: Option<String>,
     },
+}
+
+impl Default for TestStepperResult {
+    fn default() -> Self {
+        Self::Running { steps: 0 }
+    }
+}
+
+impl StepResult for TestStepperResult {
+    fn to_stepper_status(&self) -> StepperStatus {
+        match self {
+            Running { steps } => StepperStatus::Running { steps: *steps },
+            Exit { code, steps } => StepperStatus::Exited {
+                steps: *steps,
+                success: *code == 0,
+                status: format!("code {code}"),
+            },
+            Exception {
+                cause,
+                steps,
+                message,
+            } => StepperStatus::Errored {
+                steps: *steps,
+                cause: format!("{cause:?}"),
+                message: message.as_deref().unwrap_or("<no message>").to_owned(),
+            },
+        }
+    }
 }
 
 use TestStepperResult::*;
@@ -129,7 +157,9 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
                         steps: result.steps,
                     }
                 } else {
-                    Running(result.steps)
+                    Running {
+                        steps: result.steps,
+                    }
                 }
             }
         }
