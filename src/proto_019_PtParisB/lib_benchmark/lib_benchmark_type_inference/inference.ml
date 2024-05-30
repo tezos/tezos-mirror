@@ -400,8 +400,8 @@ and unify_base (x : Type.Base.t) (y : Type.Base.t) : unit M.t =
   let open M in
   let unify_single_var v x =
     (if List.mem v (Type.Base.vars x) then
-     raise (Ill_typed_script Cyclic_base_type)
-    else return ())
+       raise (Ill_typed_script Cyclic_base_type)
+     else return ())
     >>= fun () ->
     M.uf_lift (UF.find v) >>= fun root ->
     get_repr_exn root >>= fun repr ->

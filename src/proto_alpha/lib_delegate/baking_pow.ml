@@ -109,8 +109,8 @@ let mine ~proof_of_work_threshold shell builder =
         else (
           Bytes.blit_string (Z.to_bits z) 0 block_header offset z_len ;
           (if Hacl_star.AutoConfig2.(has_feature VEC256) then
-           Hacl_star.Hacl.Blake2b_256.Noalloc.hash
-          else Hacl_star.Hacl.Blake2b_32.Noalloc.hash)
+             Hacl_star.Hacl.Blake2b_256.Noalloc.hash
+           else Hacl_star.Hacl.Blake2b_32.Noalloc.hash)
             ~key:Bytes.empty
             ~msg:block_header
             ~digest:block_hash_bytes ;

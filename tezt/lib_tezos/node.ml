@@ -867,7 +867,7 @@ let runlike_command_arguments node command arguments =
   :: "--metrics-addr"
   :: (metrics_addr ^ string_of_int node.persistent_state.metrics_port)
   :: (if node.persistent_state.rpc_external then "--external-rpc-addr"
-     else "--rpc-addr")
+      else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
   :: "--max-active-rpc-connections"
   :: string_of_int node.persistent_state.max_active_rpc_connections

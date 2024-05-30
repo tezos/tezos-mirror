@@ -754,15 +754,15 @@ module Test = struct
              let* retrieved_precomputation =
                Lwt_main.run
                  (let open Error_monad.Lwt_result_syntax in
-                 let* () =
-                   Cryptobox.save_precompute_shards_proofs
-                     precomputation
-                     ~filename
-                 in
-                 Cryptobox.load_precompute_shards_proofs
-                   ~hash:(Some hash)
-                   ~filename
-                   ())
+                  let* () =
+                    Cryptobox.save_precompute_shards_proofs
+                      precomputation
+                      ~filename
+                  in
+                  Cryptobox.load_precompute_shards_proofs
+                    ~hash:(Some hash)
+                    ~filename
+                    ())
              in
              Sys.remove filename ;
              return
@@ -798,15 +798,15 @@ module Test = struct
              let* _ =
                Lwt_main.run
                  (let open Error_monad.Lwt_result_syntax in
-                 let* () =
-                   Cryptobox.save_precompute_shards_proofs
-                     precomputation
-                     ~filename:!filename
-                 in
-                 Cryptobox.load_precompute_shards_proofs
-                   ~hash:(Some dummy_hash)
-                   ~filename:!filename
-                   ())
+                  let* () =
+                    Cryptobox.save_precompute_shards_proofs
+                      precomputation
+                      ~filename:!filename
+                  in
+                  Cryptobox.load_precompute_shards_proofs
+                    ~hash:(Some dummy_hash)
+                    ~filename:!filename
+                    ())
              in
              return filename
          | _ ->

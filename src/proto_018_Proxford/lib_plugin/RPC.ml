@@ -3858,7 +3858,7 @@ module Attestation_rights = struct
          (req "first_slot" Slot.encoding)
          (req
             (if use_legacy_attestation_name then "endorsing_power"
-            else "attestation_power")
+             else "attestation_power")
             uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 

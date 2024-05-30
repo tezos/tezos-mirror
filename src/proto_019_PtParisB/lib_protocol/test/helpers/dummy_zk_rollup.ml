@@ -380,7 +380,7 @@ end = struct
   let lazy_srs =
     lazy
       (let open Octez_bls12_381_polynomial in
-      (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1))
+       (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =
     Hex.to_bytes_exn (`Hex "0002298c03ed7d454a101eb7022bc95f7e5f41ac78")

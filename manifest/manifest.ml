@@ -267,26 +267,26 @@ module Dune = struct
           | [] -> E
           | _ -> [V (S "libraries" :: libraries)]);
           (if inline_tests then
-           let modes : mode list =
-             match (modes, js_of_ocaml) with
-             | None, None ->
-                 (* Make the default dune behavior explicit *)
-                 [Native]
-             | None, Some _ -> [Native; JS]
-             | Some modes, _ ->
-                 (* always preserve mode if specified *)
-                 modes
-           in
-           [
-             S "inline_tests";
-             [S "flags"; S "-verbose"];
-             S "modes"
-             :: of_list (List.map (fun mode -> S (string_of_mode mode)) modes);
-             (match inline_tests_deps with
-             | [] -> E
-             | deps -> S "deps" :: of_list deps);
-           ]
-          else E);
+             let modes : mode list =
+               match (modes, js_of_ocaml) with
+               | None, None ->
+                   (* Make the default dune behavior explicit *)
+                   [Native]
+               | None, Some _ -> [Native; JS]
+               | Some modes, _ ->
+                   (* always preserve mode if specified *)
+                   modes
+             in
+             [
+               S "inline_tests";
+               [S "flags"; S "-verbose"];
+               S "modes"
+               :: of_list (List.map (fun mode -> S (string_of_mode mode)) modes);
+               (match inline_tests_deps with
+               | [] -> E
+               | deps -> S "deps" :: of_list deps);
+             ]
+           else E);
           (match ppx_kind with
           | None -> E
           | Some Ppx_rewriter -> [S "kind"; S "ppx_rewriter"]

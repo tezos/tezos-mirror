@@ -111,8 +111,8 @@ let register =
     typecheck_script
       ?res:
         (if Protocol.(number protocol >= number Oxford) then
-         Some (rex "unexpected annotation")
-        else None)
+           Some (rex "unexpected annotation")
+         else None)
       ~legacy:true
       ~script:"parameter %r unit; storage unit; code { FAILWITH }"
       client

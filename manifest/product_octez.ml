@@ -5444,18 +5444,18 @@ end = struct
             "test_delegation";
             "test_double_baking";
             (if N.(number >= 018) then "test_double_attestation"
-            else "test_double_endorsement");
+             else "test_double_endorsement");
             (if N.(number >= 018) then "test_double_preattestation"
-            else "test_double_preendorsement");
+             else "test_double_preendorsement");
             (if N.(number >= 018) then "test_attestation"
-            else "test_endorsement");
+             else "test_endorsement");
             "test_frozen_deposits";
             "test_helpers_rpcs";
             "test_participation";
             (if N.(number >= 018) then "test_preattestation_functor"
-            else "test_preendorsement_functor");
+             else "test_preendorsement_functor");
             (if N.(number >= 018) then "test_preattestation"
-            else "test_preendorsement");
+             else "test_preendorsement");
             "test_seed";
           ]
           ~path:(path // "lib_protocol/test/integration/consensus")
@@ -5998,11 +5998,11 @@ module Protocol = Protocol
                       S "run";
                       S "%{bin:octez-protocol-compiler}";
                       (if
-                       String_set.mem
-                         tezos_protocol.Tezos_protocol.hash
-                         final_protocol_versions
-                      then E
-                      else S "-no-hash-check");
+                         String_set.mem
+                           tezos_protocol.Tezos_protocol.hash
+                           final_protocol_versions
+                       then E
+                       else S "-no-hash-check");
                       (match disable_warnings with
                       | [] -> E
                       | l ->
@@ -6588,8 +6588,8 @@ let hash = Protocol.hash
         ~path:(path // "lib_delegate")
         ~synopsis:
           (if N.(number <= 011) then
-           "Base library for `tezos-baker/endorser/accuser`"
-          else "Base library for `tezos-baker/accuser`")
+             "Base library for `tezos-baker/endorser/accuser`"
+           else "Base library for `tezos-baker/accuser`")
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -6622,8 +6622,8 @@ let hash = Protocol.hash
         ~linkall:true
         ~all_modules_except:
           (if N.(number <= 011) then
-           ["Delegate_commands"; "Delegate_commands_registration"]
-          else ["Baking_commands"; "Baking_commands_registration"])
+             ["Delegate_commands"; "Delegate_commands_registration"]
+           else ["Baking_commands"; "Baking_commands_registration"])
     in
     let tenderbrute =
       only_if (active && N.(number >= 013)) @@ fun () ->
@@ -6743,8 +6743,7 @@ let hash = Protocol.hash
         ~linkall:true
         ~modules:
           [
-            (if N.(number <= 011) then "Delegate_commands"
-            else "Baking_commands");
+            (if N.(number <= 011) then "Delegate_commands" else "Baking_commands");
           ]
     in
     let baking_commands_registration =
@@ -6770,7 +6769,7 @@ let hash = Protocol.hash
         ~modules:
           [
             (if N.(number <= 011) then "Delegate_commands_registration"
-            else "Baking_commands_registration");
+             else "Baking_commands_registration");
           ]
     in
     let daemon daemon =
@@ -6842,12 +6841,12 @@ let hash = Protocol.hash
       tezt
         (* test [test_dac_pages_encoding] was removed after 016 *)
         (if N.(number == 016) then
-         [
-           "test_dal_slot_frame_encoding";
-           "test_dac_pages_encoding";
-           "test_helpers";
-         ]
-        else ["test_dal_slot_frame_encoding"; "test_helpers"])
+           [
+             "test_dal_slot_frame_encoding";
+             "test_dac_pages_encoding";
+             "test_helpers";
+           ]
+         else ["test_dal_slot_frame_encoding"; "test_helpers"])
         ~path:(path // "lib_dal/test")
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~with_macos_security_framework:true
@@ -7451,23 +7450,23 @@ let get_contracts_lib =
         match (Protocol.status proto, Protocol.client proto) with
         | Active, Some client ->
             (if not @@ Sys.file_exists get_contracts_ml then
-             let contents =
-               file_content @@ get_contracts_module Protocol.alpha
-             in
-             let contents =
-               Str.global_replace
-                 (Str.regexp_string "open Tezos_protocol_alpha")
-                 ("open Tezos_protocol_" ^ Protocol.name_underscore proto)
-                 contents
-             in
-             let contents =
-               Str.global_replace
-                 (Str.regexp_string "open Tezos_client_alpha")
-                 ("open Tezos_client_" ^ Protocol.name_underscore proto)
-                 contents
-             in
-             write get_contracts_ml (fun fmt ->
-                 Format.pp_print_string fmt contents)) ;
+               let contents =
+                 file_content @@ get_contracts_module Protocol.alpha
+               in
+               let contents =
+                 Str.global_replace
+                   (Str.regexp_string "open Tezos_protocol_alpha")
+                   ("open Tezos_protocol_" ^ Protocol.name_underscore proto)
+                   contents
+               in
+               let contents =
+                 Str.global_replace
+                   (Str.regexp_string "open Tezos_client_alpha")
+                   ("open Tezos_client_" ^ Protocol.name_underscore proto)
+                   contents
+               in
+               write get_contracts_ml (fun fmt ->
+                   Format.pp_print_string fmt contents)) ;
             Some [Protocol.main proto; client]
         | _ ->
             remove_if_exists get_contracts_ml ;
@@ -7539,17 +7538,17 @@ let yes_wallet_lib =
         match Protocol.status proto with
         | Active ->
             (if not @@ Sys.file_exists get_delegates_ml then
-             let contents =
-               file_content @@ get_delegates_module Protocol.alpha
-             in
-             let contents =
-               Str.global_replace
-                 (Str.regexp_string "open Tezos_protocol_alpha")
-                 ("open Tezos_protocol_" ^ Protocol.name_underscore proto)
-                 contents
-             in
-             write get_delegates_ml (fun fmt ->
-                 Format.pp_print_string fmt contents)) ;
+               let contents =
+                 file_content @@ get_delegates_module Protocol.alpha
+               in
+               let contents =
+                 Str.global_replace
+                   (Str.regexp_string "open Tezos_protocol_alpha")
+                   ("open Tezos_protocol_" ^ Protocol.name_underscore proto)
+                   contents
+               in
+               write get_delegates_ml (fun fmt ->
+                   Format.pp_print_string fmt contents)) ;
             Some (Protocol.main proto)
         | _ ->
             remove_if_exists get_delegates_ml ;
@@ -7646,22 +7645,23 @@ let simulation_scenario_lib =
         match (Protocol.status proto, Protocol.client proto) with
         | Active, Some _client ->
             (if not @@ Sys.file_exists tool_path then
-             let contents = file_content @@ alpha_tool in
-             let contents =
-               List.fold_left
-                 (fun contents (re, replace) ->
-                   Str.global_replace re replace contents)
-                 contents
-                 [
-                   ( Str.regexp_string "open Tezos_client_alpha",
-                     "open Tezos_client_" ^ Protocol.name_underscore proto );
-                   ( Str.regexp_string "open Tezos_baking_alpha",
-                     "open Tezos_baking_" ^ Protocol.name_underscore proto );
-                   ( Str.regexp_string "open Tezos_protocol_alpha",
-                     "open Tezos_protocol_" ^ Protocol.name_underscore proto );
-                 ]
-             in
-             write tool_path (fun fmt -> Format.pp_print_string fmt contents)) ;
+               let contents = file_content @@ alpha_tool in
+               let contents =
+                 List.fold_left
+                   (fun contents (re, replace) ->
+                     Str.global_replace re replace contents)
+                   contents
+                   [
+                     ( Str.regexp_string "open Tezos_client_alpha",
+                       "open Tezos_client_" ^ Protocol.name_underscore proto );
+                     ( Str.regexp_string "open Tezos_baking_alpha",
+                       "open Tezos_baking_" ^ Protocol.name_underscore proto );
+                     ( Str.regexp_string "open Tezos_protocol_alpha",
+                       "open Tezos_protocol_" ^ Protocol.name_underscore proto
+                     );
+                   ]
+               in
+               write tool_path (fun fmt -> Format.pp_print_string fmt contents)) ;
             let proto_deps =
               Protocol.
                 [

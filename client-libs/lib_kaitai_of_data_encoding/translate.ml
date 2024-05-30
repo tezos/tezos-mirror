@@ -540,7 +540,7 @@ let rec seq_field_of_data_encoding0 :
                      refs = [];
                      summary =
                        (if String.equal original_name name then None
-                       else Some original_name);
+                        else Some original_name);
                    }
                in
                (i, EnumValueSpec.{name; doc}))

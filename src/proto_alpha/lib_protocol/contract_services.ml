@@ -619,35 +619,36 @@ let register () =
               let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
               Lwt.return
                 (let open Result_syntax in
-                let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _
-                    =
-                  parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-                in
-                let unreachable_entrypoint, map =
-                  Script_ir_translator.list_entrypoints_uncarbonated
-                    arg_type
-                    entrypoints
-                in
-                let* entrypoint_types, _ctxt =
-                  Entrypoint.Map.fold_e
-                    (fun entry
-                         (Script_typed_ir.Ex_ty ty, original_type_expr)
-                         (acc, ctxt) ->
-                      let* ty_expr, ctxt =
-                        if normalize_types then
-                          let* ty_node, ctxt =
-                            Script_ir_unparser.unparse_ty ~loc:() ctxt ty
-                          in
-                          return (Micheline.strip_locations ty_node, ctxt)
-                        else
-                          return
-                            (Micheline.strip_locations original_type_expr, ctxt)
-                      in
-                      return ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
-                    map
-                    ([], ctxt)
-                in
-                return_some (unreachable_entrypoint, entrypoint_types)))) ;
+                 let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _
+                     =
+                   parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+                 in
+                 let unreachable_entrypoint, map =
+                   Script_ir_translator.list_entrypoints_uncarbonated
+                     arg_type
+                     entrypoints
+                 in
+                 let* entrypoint_types, _ctxt =
+                   Entrypoint.Map.fold_e
+                     (fun entry
+                          (Script_typed_ir.Ex_ty ty, original_type_expr)
+                          (acc, ctxt) ->
+                       let* ty_expr, ctxt =
+                         if normalize_types then
+                           let* ty_node, ctxt =
+                             Script_ir_unparser.unparse_ty ~loc:() ctxt ty
+                           in
+                           return (Micheline.strip_locations ty_node, ctxt)
+                         else
+                           return
+                             (Micheline.strip_locations original_type_expr, ctxt)
+                       in
+                       return
+                         ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+                     map
+                     ([], ctxt)
+                 in
+                 return_some (unreachable_entrypoint, entrypoint_types)))) ;
   opt_register1
     ~chunked:true
     S.contract_big_map_get_opt

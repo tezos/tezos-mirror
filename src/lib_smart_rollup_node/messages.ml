@@ -21,8 +21,8 @@ let add_all_messages (node_ctxt : _ Node_context.t) ~messages ~pred_hash =
   @@ Plugin.Pvm.start_of_level_serialized
      ::
      (if is_first_block then
-      Option.to_list Plugin.Pvm.protocol_migration_serialized
-     else [])
+        Option.to_list Plugin.Pvm.protocol_migration_serialized
+      else [])
   @ Plugin.Pvm.info_per_level_serialized
       ~predecessor:pred_header.hash
       ~predecessor_timestamp:pred_header.header.timestamp

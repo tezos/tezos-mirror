@@ -250,8 +250,8 @@ let start ~rpc_address ~rpc_port ~allow_v1_api node_ctxt =
               (Tezos_rpc.Directory.merge
                  (register_v0_dynamic_rpc (module Dac_plugin))
                  (if allow_v1_api then
-                  register_v1_dynamic_rpc (module Dac_plugin)
-                 else Tezos_rpc.Directory.empty)
+                    register_v1_dynamic_rpc (module Dac_plugin)
+                  else Tezos_rpc.Directory.empty)
               |> register_health_endpoints)
         | Starting ->
             Lwt.return (Tezos_rpc.Directory.empty |> register_health_endpoints))

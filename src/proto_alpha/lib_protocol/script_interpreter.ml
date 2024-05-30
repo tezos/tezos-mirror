@@ -1720,8 +1720,8 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
     | None -> step (outdated_ctxt, sc) gas descr.kinstr KNil accu stack
     | Some logger ->
         (if log_now then
-         let loc = kinstr_location descr.kinstr in
-         logger.log_interp descr.kinstr ctxt loc descr.kbef (accu, stack)) ;
+           let loc = kinstr_location descr.kinstr in
+           logger.log_interp descr.kinstr ctxt loc descr.kbef (accu, stack)) ;
         let log =
           ILog
             ( kinstr_location descr.kinstr,

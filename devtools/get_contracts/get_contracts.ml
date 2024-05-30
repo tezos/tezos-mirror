@@ -507,9 +507,9 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       else return Contract_size.zero
     in
     (if Config.collect_storage then
-     let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
-     let storages = ExprMap.map (fun {storage; _} -> storage) ctr.storages in
-     File_helpers.print_expr_dir ~dirname ~ext:".storage" storages) ;
+       let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
+       let storages = ExprMap.map (fun {storage; _} -> storage) ctr.storages in
+       File_helpers.print_expr_dir ~dirname ~ext:".storage" storages) ;
     return @@ Contract_size.add contract_size total_size
 
   let write_gas_file ~output_dir contract_map =

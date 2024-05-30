@@ -200,21 +200,21 @@ module Real = struct
     let rec answerer =
       lazy
         (if config.private_mode then P2p_protocol.create_private ()
-        else
-          let connect =
-            P2p_connect_handler.connect (Lazy.force connect_handler)
-          in
-          let proto_conf =
-            {
-              P2p_protocol.swap_linger = limits.P2p_limits.swap_linger;
-              pool;
-              log;
-              connect;
-              latest_accepted_swap = Ptime.epoch;
-              latest_successful_swap = Ptime.epoch;
-            }
-          in
-          P2p_protocol.create_default proto_conf)
+         else
+           let connect =
+             P2p_connect_handler.connect (Lazy.force connect_handler)
+           in
+           let proto_conf =
+             {
+               P2p_protocol.swap_linger = limits.P2p_limits.swap_linger;
+               pool;
+               log;
+               connect;
+               latest_accepted_swap = Ptime.epoch;
+               latest_successful_swap = Ptime.epoch;
+             }
+           in
+           P2p_protocol.create_default proto_conf)
     and connect_handler =
       lazy
         (create_connect_handler

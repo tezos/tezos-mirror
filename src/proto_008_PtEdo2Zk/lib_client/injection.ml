@@ -283,10 +283,10 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
         | _ -> Tezos_crypto.Signature.V0.Generic_operation
       in
       (if verbose_signing then
-       cctxt#message
-         "Pre-signature information (verbose signing):@.%t%!"
-         (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
-      else Lwt.return_unit)
+         cctxt#message
+           "Pre-signature information (verbose signing):@.%t%!"
+           (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
+       else Lwt.return_unit)
       >>= fun () ->
       Client_keys_v0.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
       return_some signature)
@@ -584,39 +584,39 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
    fun first -> function
     | Manager_operation c, (Manager_operation_result _ as result) ->
         (if user_gas_limit_needs_patching c.gas_limit then
-         Lwt.return (estimated_gas_single result) >>=? fun gas ->
-         if Gas.Arith.(gas = zero) then
-           cctxt#message "Estimated gas: none" >>= fun () ->
-           return Gas.Arith.zero
-         else
-           cctxt#message
-             "Estimated gas: %a units (will add 100 for safety)"
-             Gas.Arith.pp
-             gas
-           >>= fun () ->
-           let gas_plus_100 =
-             Gas.Arith.(add (ceil gas) (integral_of_int 100))
-           in
-           let patched_gas =
-             Gas.Arith.min gas_plus_100 hard_gas_limit_per_operation
-           in
-           return patched_gas
-        else return c.gas_limit)
+           Lwt.return (estimated_gas_single result) >>=? fun gas ->
+           if Gas.Arith.(gas = zero) then
+             cctxt#message "Estimated gas: none" >>= fun () ->
+             return Gas.Arith.zero
+           else
+             cctxt#message
+               "Estimated gas: %a units (will add 100 for safety)"
+               Gas.Arith.pp
+               gas
+             >>= fun () ->
+             let gas_plus_100 =
+               Gas.Arith.(add (ceil gas) (integral_of_int 100))
+             in
+             let patched_gas =
+               Gas.Arith.min gas_plus_100 hard_gas_limit_per_operation
+             in
+             return patched_gas
+         else return c.gas_limit)
         >>=? fun gas_limit ->
         (if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
-         Lwt.return
-           (estimated_storage_single (Z.of_int origination_size) result)
-         >>=? fun storage ->
-         if Z.equal storage Z.zero then
-           cctxt#message "Estimated storage: no bytes added" >>= fun () ->
-           return Z.zero
-         else
-           cctxt#message
-             "Estimated storage: %s bytes added (will add 20 for safety)"
-             (Z.to_string storage)
-           >>= fun () ->
-           return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
-        else return c.storage_limit)
+           Lwt.return
+             (estimated_storage_single (Z.of_int origination_size) result)
+           >>=? fun storage ->
+           if Z.equal storage Z.zero then
+             cctxt#message "Estimated storage: no bytes added" >>= fun () ->
+             return Z.zero
+           else
+             cctxt#message
+               "Estimated storage: %s bytes added (will add 20 for safety)"
+               (Z.to_string storage)
+             >>= fun () ->
+             return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
+         else return c.storage_limit)
         >>=? fun storage_limit ->
         let cm = Manager_operation {c with gas_limit; storage_limit} in
         if compute_fee && c.fee = Tez.zero then return (patch_fee first cm)
@@ -691,16 +691,16 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     contents
   >>=? fun contents ->
   (if simulation then simulate cctxt ~chain ~block ?branch contents
-  else
-    preapply
-      cctxt
-      ~chain
-      ~block
-      ~fee_parameter
-      ?verbose_signing
-      ?branch
-      ?src_sk
-      contents)
+   else
+     preapply
+       cctxt
+       ~chain
+       ~block
+       ~fee_parameter
+       ?verbose_signing
+       ?branch
+       ?src_sk
+       contents)
   >>=? fun (_oph, op, result) ->
   (match detect_script_failure result with
   | Ok () -> return_unit

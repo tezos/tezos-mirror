@@ -675,7 +675,7 @@ let test_deposits_unfrozen_after_deactivation () =
           ~loc:__LOC__
           frozen_deposits
           (if is_deactivated then frozen_deposits_when_deactivated
-          else initial_frozen_deposits)
+           else initial_frozen_deposits)
       in
       loop b (pred n)
   in

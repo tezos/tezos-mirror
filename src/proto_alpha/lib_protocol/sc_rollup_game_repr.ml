@@ -727,11 +727,11 @@ let check_proof_stop_state ~pvm ~stop_state input_given
     (let b = Option.equal State_hash.equal stop_state stop_proof in
      if validate then b else not b)
     (if validate then
-     Proof_stop_state_hash_failed_to_validate
-       {stop_state_hash = stop_state; stop_proof}
-    else
-      Proof_stop_state_hash_failed_to_refute
-        {stop_state_hash = stop_state; stop_proof})
+       Proof_stop_state_hash_failed_to_validate
+         {stop_state_hash = stop_state; stop_proof}
+     else
+       Proof_stop_state_hash_failed_to_refute
+         {stop_state_hash = stop_state; stop_proof})
 
 (** Check the proof validates the stop state. *)
 let check_proof_validate_stop_state ~stop_state input input_request proof =

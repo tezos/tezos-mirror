@@ -668,8 +668,8 @@ let test_freeze_more_with_low_balance =
     | [d1; d2] ->
         return
           (if Signature.Public_key_hash.equal account d1.delegate then d1
-          else if Signature.Public_key_hash.equal account d2.delegate then d2
-          else assert false)
+           else if Signature.Public_key_hash.equal account d2.delegate then d2
+           else assert false)
             .slots
     | _ -> assert false
     (* there are exactly two attesters for this test. *)

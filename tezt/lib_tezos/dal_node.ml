@@ -115,22 +115,22 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     | None -> []
     | Some addr -> [Some "--public-addr"; Some addr])
   @ (if peers = [] then [None]
-    else [Some "--peers"; Some (String.concat "," peers)])
+     else [Some "--peers"; Some (String.concat "," peers)])
   @ (if attester_profiles = [] then [None]
-    else
-      [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
+     else
+       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
   @ (if observer_profiles = [] then [None]
-    else
-      [
-        Some "--observer-profiles";
-        Some (String.concat "," (List.map string_of_int observer_profiles));
-      ])
+     else
+       [
+         Some "--observer-profiles";
+         Some (String.concat "," (List.map string_of_int observer_profiles));
+       ])
   @ (if producer_profiles = [] then [None]
-    else
-      [
-        Some "--producer-profiles";
-        Some (String.concat "," (List.map string_of_int producer_profiles));
-      ])
+     else
+       [
+         Some "--producer-profiles";
+         Some (String.concat "," (List.map string_of_int producer_profiles));
+       ])
   @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
   @
   match history_mode with

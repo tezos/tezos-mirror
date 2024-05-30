@@ -537,13 +537,13 @@ let p2p =
              bool
              default_p2p.enable_testchain)
           (let open Tezos_p2p_services.Point_reconnection_config in
-          dft
-            "greylisting_config"
-            ~description:
-              "The reconnection policy regulates the frequency with which the \
-               node tries to reconnect to an old known peer."
-            encoding
-            default)
+           dft
+             "greylisting_config"
+             ~description:
+               "The reconnection policy regulates the frequency with which the \
+                node tries to reconnect to an old known peer."
+             encoding
+             default)
           (dft
              "disable_peer_discovery"
              ~description:
@@ -912,7 +912,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
       maintenance_idle_time =
         (if disable_p2p_maintenance then None
-        else cfg.p2p.limits.maintenance_idle_time);
+         else cfg.p2p.limits.maintenance_idle_time);
       swap_linger =
         (if disable_p2p_swap then None else cfg.p2p.limits.swap_linger);
     }

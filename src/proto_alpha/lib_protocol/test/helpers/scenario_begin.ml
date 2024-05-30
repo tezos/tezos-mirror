@@ -110,10 +110,10 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
   --> set S.cost_per_byte Tez.zero
   --> set S.consensus_threshold 0
   --> (if deactivate_dynamic then
-       set
-         S.Adaptive_issuance.Adaptive_rewards_params.max_bonus
-         (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
-      else Empty)
+         set
+           S.Adaptive_issuance.Adaptive_rewards_params.max_bonus
+           (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
+       else Empty)
   --> set S.Adaptive_issuance.ns_enable false
 
 (** Initialize the test, given some initial parameters *)

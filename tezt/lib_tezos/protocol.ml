@@ -254,7 +254,7 @@ let write_parameter_file :
             [
               `String
                 (if is_revealed then account.public_key
-                else account.public_key_hash);
+                 else account.public_key_hash);
               `String
                 (string_of_int
                    (Option.value ~default:4000000000000 default_balance));

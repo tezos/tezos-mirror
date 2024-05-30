@@ -566,7 +566,7 @@ module V2_0_0 = struct
         Compare.Z.min
           (Z.of_int default_number_of_sections)
           (if is_stop_chunk_aligned then max_number_of_sections
-          else Z.succ max_number_of_sections)
+           else Z.succ max_number_of_sections)
       in
       let given = Z.of_int number_of_sections in
       error_unless

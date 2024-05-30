@@ -175,7 +175,7 @@ let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" V.True
 let ocaml_protoc_compiler =
   external_lib "ocaml-protoc-plugin" V.(at_least "4.5.0")
 
-let ocamlformat = opam_only "ocamlformat" V.(exactly "0.24.1")
+let ocamlformat = opam_only "ocamlformat" V.(exactly "0.25.1")
 
 let ocamlgraph = external_lib "ocamlgraph" V.True
 
@@ -381,7 +381,7 @@ let () =
       external_lib "merlin" V.(at_least "4.14");
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7085
          remove constraint on odoc version when odoc bug is solved *)
-      external_lib "odoc" V.(at_least "2.2.0" && less_than "2.3.0");
+      external_lib "odoc" V.(at_least "2.4.2");
       external_lib "ocp-indent" V.True;
       external_lib "ocaml-lsp-server" V.(at_least "1.17.0");
       external_lib "merge-fmt" V.True;

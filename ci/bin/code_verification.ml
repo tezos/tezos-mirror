@@ -66,8 +66,8 @@ let opam_rules ~only_marge_bot ?batch_index () =
     job_rule
       ~if_:
         (if only_marge_bot then
-         If.(Rules.merge_request && Rules.started_by_marge_bot)
-        else Rules.merge_request)
+           If.(Rules.merge_request && Rules.started_by_marge_bot)
+         else Rules.merge_request)
       ~changes:(Changeset.encode changeset_opam_jobs)
       ~when_
       ();
@@ -330,8 +330,8 @@ let jobs pipeline_type =
     | Before_merging -> (
         (* MR labels can be used to force tests to run. *)
         (if margebot_disable then
-         [job_rule ~if_:Rules.started_by_marge_bot ~when_:Never ()]
-        else [])
+           [job_rule ~if_:Rules.started_by_marge_bot ~when_:Never ()]
+         else [])
         @ (match label with
           | Some label ->
               [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]

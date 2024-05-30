@@ -391,21 +391,21 @@ let () =
     List.concat
       [
         (if List.mem "bandwidth" parameters.Cmdline.analysis then
-         [estimate_bandwidth]
-        else []);
+           [estimate_bandwidth]
+         else []);
         (if List.mem "consumer" parameters.Cmdline.analysis then
-         [consumer_receives_enough_shards]
-        else []);
+           [consumer_receives_enough_shards]
+         else []);
         (if List.mem "shards" parameters.Cmdline.analysis then
-         [
-           attester_receives_enough_shards (Roles.largest_attester_index cfg);
-           attester_receives_enough_shards (Roles.median_attester_index cfg);
-           attester_receives_enough_shards (Roles.smallest_attester_index cfg);
-         ]
-        else []);
+           [
+             attester_receives_enough_shards (Roles.largest_attester_index cfg);
+             attester_receives_enough_shards (Roles.median_attester_index cfg);
+             attester_receives_enough_shards (Roles.smallest_attester_index cfg);
+           ]
+         else []);
         (if List.mem "confirmation" parameters.Cmdline.analysis then
-         [slot_confirmed]
-        else []);
+           [slot_confirmed]
+         else []);
       ]
   in
 

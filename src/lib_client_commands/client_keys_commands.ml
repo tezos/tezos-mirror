@@ -702,26 +702,26 @@ let commands network : Client_context.full Tezos_clic.command list =
         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name);
   ]
   @ (if network <> Some `Mainnet then []
-    else
-      [
-        command
-          ~group
-          ~desc:"Add a fundraiser secret key to the wallet."
-          (args1 (Secret_key.force_switch ()))
-          (prefix "import"
-          @@ prefixes ["fundraiser"; "secret"; "key"]
-          @@ Secret_key.fresh_alias_param @@ stop)
-          (fun force name (cctxt : Client_context.full) ->
-            let* name = Secret_key.of_fresh cctxt force name in
-            let* sk = input_fundraiser_params cctxt in
-            let* sk_uri =
-              Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
-            in
-            let* pk_uri = Client_keys.neuterize sk_uri in
-            let* () = fail_if_already_registered cctxt force pk_uri name in
-            let* pkh, _public_key = Client_keys.public_key_hash pk_uri in
-            register_key cctxt ~force (pkh, pk_uri, sk_uri) name);
-      ])
+     else
+       [
+         command
+           ~group
+           ~desc:"Add a fundraiser secret key to the wallet."
+           (args1 (Secret_key.force_switch ()))
+           (prefix "import"
+           @@ prefixes ["fundraiser"; "secret"; "key"]
+           @@ Secret_key.fresh_alias_param @@ stop)
+           (fun force name (cctxt : Client_context.full) ->
+             let* name = Secret_key.of_fresh cctxt force name in
+             let* sk = input_fundraiser_params cctxt in
+             let* sk_uri =
+               Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
+             in
+             let* pk_uri = Client_keys.neuterize sk_uri in
+             let* () = fail_if_already_registered cctxt force pk_uri name in
+             let* pkh, _public_key = Client_keys.public_key_hash pk_uri in
+             register_key cctxt ~force (pkh, pk_uri, sk_uri) name);
+       ])
   @ [
       command
         ~group

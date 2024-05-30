@@ -204,8 +204,8 @@ and infer_cmd_one_shot local_model_name workload_data solver
             let s = perform_report () in
             Lwt_main.run
               (let open Lwt_syntax in
-              let* _nwritten = Lwt_utils_unix.create_file output_file s in
-              Lwt.return_unit) ;
+               let* _nwritten = Lwt_utils_unix.create_file output_file s in
+               Lwt.return_unit) ;
             Format.eprintf "Produced report on %s@." output_file
       in
       process_output measure local_model_name problem solution infer_opts
@@ -492,8 +492,8 @@ and infer_for_measurements ?local_model_name measurements
       let s = Report.to_latex report in
       Lwt_main.run
         (let open Lwt_syntax in
-        let* _nwritten = Lwt_utils_unix.create_file output_file s in
-        Lwt.return_unit) ;
+         let* _nwritten = Lwt_utils_unix.create_file output_file s in
+         Lwt.return_unit) ;
       Format.eprintf "Produced report on %s@." output_file
   | _ -> assert false) ;
   solution

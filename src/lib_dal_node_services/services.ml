@@ -262,13 +262,13 @@ module P2P = struct
       ~description:"Connect to a new peer."
       ~query:
         (let open Tezos_rpc.Query in
-        query (fun timeout ->
-            object
-              method timeout = timeout
-            end)
-        |+ opt_field "timeout" Tezos_base.Time.System.Span.rpc_arg (fun t ->
-               t#timeout)
-        |> seal)
+         query (fun timeout ->
+             object
+               method timeout = timeout
+             end)
+         |+ opt_field "timeout" Tezos_base.Time.System.Span.rpc_arg (fun t ->
+                t#timeout)
+         |> seal)
       ~input:P2p_point.Id.encoding
       ~output:Data_encoding.unit
       (open_root / "connect")

@@ -169,8 +169,8 @@ module S = struct
       ~input:bytes
       ~output:Operation_hash.encoding
       (if private_ then
-       Tezos_rpc.Path.(root / "private" / "injection" / "operation")
-      else Tezos_rpc.Path.(path / "operation"))
+         Tezos_rpc.Path.(root / "private" / "injection" / "operation")
+       else Tezos_rpc.Path.(path / "operation"))
 
   let private_operations =
     Tezos_rpc.Service.post_service

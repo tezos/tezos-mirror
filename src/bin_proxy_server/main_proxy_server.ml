@@ -261,19 +261,19 @@ let main (config_file : string option) (log_requests : bool)
   in
   Lwt_main.run
     (let open Lwt_syntax in
-    let* r =
-      Lwt_exit.wrap_and_error
-      @@ main_promise config_file config_args log_requests
-    in
-    match r with
-    | Ok (Ok _) ->
-        let+ _ = Lwt_exit.exit_and_wait 0 in
-        `Ok ()
-    | Ok (Error err) ->
-        let+ _ = Lwt_exit.exit_and_wait 2 in
-        `Error (false, Format.asprintf "%a" pp_print_trace err)
-    | Error exit_status ->
-        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
+     let* r =
+       Lwt_exit.wrap_and_error
+       @@ main_promise config_file config_args log_requests
+     in
+     match r with
+     | Ok (Ok _) ->
+         let+ _ = Lwt_exit.exit_and_wait 0 in
+         `Ok ()
+     | Ok (Error err) ->
+         let+ _ = Lwt_exit.exit_and_wait 2 in
+         `Error (false, Format.asprintf "%a" pp_print_trace err)
+     | Error exit_status ->
+         Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
 
 let term : unit Term.t =
   Term.(

@@ -831,8 +831,8 @@ let save_protocol_info node_ctxt (block : Layer1.header)
           {
             level =
               (if Protocol_hash.(pred_current_protocol = pred_next_protocol)
-              then First_known predecessor.level
-              else Activation_level predecessor.level);
+               then First_known predecessor.level
+               else Activation_level predecessor.level);
             proto_level = predecessor.header.proto_level;
             protocol = pred_next_protocol;
           }
