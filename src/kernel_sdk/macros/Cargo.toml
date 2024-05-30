@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-macros"
+version = "0.2.2"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Procedural macros for Tezos Smart Rollup kernels."
+keywords = ["tezos", "smart", "rollup"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro-error = "1.0.4"
+quote = "1.0.36"
+
+[dependencies.syn]
+version = "2.0.65"
+features = ["full"]

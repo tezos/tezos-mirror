@@ -48,6 +48,10 @@ path = "../entrypoint"
 version = "0.2.2"
 default-features = false
 
+[dependencies.tezos-smart-rollup-macros]
+path = "../macros"
+version = "0.2.2"
+
 [dependencies.tezos-smart-rollup-mock]
 path = "../mock"
 version = "0.2.2"
