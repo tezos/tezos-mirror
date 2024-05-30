@@ -148,7 +148,7 @@ pub fn octez_riscv_install_boot_sector(
 #[ocaml::func]
 #[ocaml::sig("state -> bytes")]
 pub fn octez_riscv_state_hash(state: Pointer<State>) -> [u8; 32] {
-    state.as_ref().0.hash().try_into().unwrap()
+    state.as_ref().0.hash()
 }
 
 #[ocaml::func]
