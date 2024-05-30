@@ -444,8 +444,68 @@ let reconstruct_level_context rollup_ctxt ~predecessor
   assert (Smart_rollup_context_hash.(context_hash = block.header.context)) ;
   return (block, ctxt)
 
+let with_modify_data_dir cctxt ~data_dir
+    ?(skip_condition = fun _ _ ~head:_ -> Lwt_result.return false) f =
+  let open Lwt_result_syntax in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  let context_dir = Configuration.default_context_dir data_dir in
+  let* () = check_store_version store_dir in
+  let* store =
+    Store.load
+      Read_write
+      ~index_buffer_size:1000
+      ~l2_blocks_cache_size:100
+      store_dir
+  in
+  let* head = get_head store in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
+  in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let*? metadata =
+    match metadata with
+    | None -> error_with "No rollup node metadata in %S." data_dir
+    | Some m -> Ok m
+  in
+  let (module C) = Plugin.Pvm.context metadata.kind in
+  let* context =
+    Context.load (module C) ~cache_size:100 Read_write context_dir
+  in
+  let* skip = skip_condition store context ~head in
+  unless skip @@ fun () ->
+  let* current_protocol =
+    Node_context.protocol_of_level_with_store store head.header.level
+  in
+  let*? (module Plugin) =
+    Protocol_plugins.proto_plugin_for_protocol current_protocol.protocol
+  in
+  let* constants =
+    Plugin.Layer1_helpers.retrieve_constants
+      cctxt
+      ~block:(`Level head.header.level)
+  in
+  let current_protocol =
+    {
+      Node_context.hash = current_protocol.protocol;
+      proto_level = current_protocol.proto_level;
+      constants;
+    }
+  in
+  let* node_ctxt =
+    Node_context_loader.For_snapshots.create_node_context
+      cctxt
+      current_protocol
+      store
+      context
+      ~data_dir
+  in
+  let* () = f node_ctxt ~head in
+  let*! () = Context.close context in
+  let* () = Store.close store in
+  return_unit
+
 let reconstruct_context_from_first_available_level
-    (node_ctxt : _ Node_context.t) (head : Sc_rollup_block.t) =
+    (node_ctxt : _ Node_context.t) ~(head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
   let* {first_available_level = first_level; _} =
     Node_context.get_gc_levels node_ctxt
@@ -476,65 +536,14 @@ let reconstruct_context_from_first_available_level
   reconstruct_chain_from first_block first_ctxt
 
 let maybe_reconstruct_context cctxt ~data_dir =
-  let open Lwt_result_syntax in
-  let store_dir = Configuration.default_storage_dir data_dir in
-  let context_dir = Configuration.default_context_dir data_dir in
-  let* () = check_store_version store_dir in
-  let* store =
-    Store.load
-      Read_write
-      ~index_buffer_size:1000
-      ~l2_blocks_cache_size:100
-      store_dir
-  in
-  let* head = get_head store in
-  let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
-  in
-  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
-  let*? metadata =
-    match metadata with
-    | None -> error_with "No rollup node metadata in %S." data_dir
-    | Some m -> Ok m
-  in
-  let (module C) = Plugin.Pvm.context metadata.kind in
-  let* context =
-    Context.load (module C) ~cache_size:100 Read_write context_dir
-  in
-  let*! head_ctxt = Context.checkout context head.header.context in
-  match head_ctxt with
-  | Some _ -> return_unit
-  | None ->
-      let* current_protocol =
-        Node_context.protocol_of_level_with_store store head.header.level
-      in
-      let*? (module Plugin) =
-        Protocol_plugins.proto_plugin_for_protocol current_protocol.protocol
-      in
-      let* constants =
-        Plugin.Layer1_helpers.retrieve_constants
-          cctxt
-          ~block:(`Level head.header.level)
-      in
-      let current_protocol =
-        {
-          Node_context.hash = current_protocol.protocol;
-          proto_level = current_protocol.proto_level;
-          constants;
-        }
-      in
-      let* node_ctxt =
-        Node_context_loader.For_snapshots.create_node_context
-          cctxt
-          current_protocol
-          store
-          context
-          ~data_dir
-      in
-      let* () = reconstruct_context_from_first_available_level node_ctxt head in
-      let*! () = Context.close context in
-      let* () = Store.close store in
-      return_unit
+  with_modify_data_dir
+    cctxt
+    ~data_dir
+    ~skip_condition:(fun _store context ~head ->
+      let open Lwt_result_syntax in
+      let*! head_ctxt = Context.checkout context head.header.context in
+      return (Option.is_some head_ctxt))
+    reconstruct_context_from_first_available_level
 
 let post_checks ~action ~message snapshot_metadata ~dest =
   let open Lwt_result_syntax in
@@ -607,7 +616,7 @@ let post_export_checks ~snapshot_file =
   let reader =
     if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
   in
-  let* snapshot_metadata =
+  let* snapshot_metadata, () =
     extract reader stdlib_writer (fun _ -> return_unit) ~snapshot_file ~dest
   in
   post_checks
@@ -804,7 +813,7 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
         (* The rollup node data dir was never initialized, i.e. the rollup node
            wasn't run yet. *)
         return_unit
-    | Some {rollup_address; _}, Some history_mode ->
+    | Some {rollup_address; _}, Some history_mode -> (
         let* () =
           error_unless Address.(rollup_address = snapshot_metadata.address)
           @@ error_of_fmt
@@ -819,11 +828,14 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
           | Configuration.Archive -> "an archive"
           | Configuration.Full -> "a full"
         in
-        error_unless (history_mode = snapshot_metadata.history_mode)
-        @@ error_of_fmt
-             "Cannot import %s snapshot into %s rollup node."
-             (a_history_str snapshot_metadata.history_mode)
-             (a_history_str history_mode)
+        match (history_mode, snapshot_metadata.history_mode) with
+        | Full, Archive -> Ok ()
+        | _, _ ->
+            error_unless (history_mode = snapshot_metadata.history_mode)
+            @@ error_of_fmt
+                 "Cannot import %s snapshot into %s rollup node."
+                 (a_history_str snapshot_metadata.history_mode)
+                 (a_history_str history_mode))
   in
   let*? () =
     let open Result_syntax in
@@ -843,7 +855,7 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
     unless no_checks @@ fun () ->
     check_last_commitment_published cctxt snapshot_metadata
   in
-  return_unit
+  return (metadata, history_mode)
 
 let check_data_dir_unpopulated data_dir () =
   let open Lwt_result_syntax in
@@ -858,6 +870,38 @@ let check_data_dir_unpopulated data_dir () =
       data_dir
   else return_unit
 
+let maybe_gc_after_import cctxt ~data_dir snapshot_metadata
+    (original_history_mode : Configuration.history_mode option) =
+  let open Lwt_result_syntax in
+  match (original_history_mode, snapshot_metadata.history_mode) with
+  | None, _ -> return_unit
+  | Some Archive, Full ->
+      (* Impossible because filtered out by pre_import_checks. *)
+      assert false
+  | Some Archive, Archive | Some Full, Full -> return_unit
+  | Some Full, Archive ->
+      with_modify_data_dir cctxt ~data_dir @@ fun node_ctxt ~head ->
+      let* () =
+        Node_context.Node_store.check_and_set_history_mode
+          Read_write
+          node_ctxt.store
+          (Some Full)
+      in
+      Format.eprintf
+        "Running garbage collection to convert rollup node data to full \
+         mode... %!" ;
+      let start = Time.System.now () in
+      let* () =
+        Node_context.gc
+          ~force:true
+          ~wait_finished:true
+          node_ctxt
+          ~level:head.header.level
+      in
+      let elapsed = Ptime.diff (Time.System.now ()) start in
+      Format.eprintf "Done (%a)@." Ptime.Span.pp elapsed ;
+      return_unit
+
 let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let* () = unless force (check_data_dir_unpopulated data_dir) in
@@ -870,7 +914,7 @@ let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
   let reader =
     if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
   in
-  let* snapshot_metadata =
+  let* snapshot_metadata, (_original_metadata, original_history_mode) =
     extract
       reader
       stdlib_writer
@@ -879,6 +923,13 @@ let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
       ~dest:data_dir
   in
   let* () = maybe_reconstruct_context cctxt ~data_dir in
+  let* () =
+    maybe_gc_after_import
+      cctxt
+      ~data_dir
+      snapshot_metadata
+      original_history_mode
+  in
   unless no_checks @@ fun () ->
   post_checks
     ~action:(`Import cctxt)

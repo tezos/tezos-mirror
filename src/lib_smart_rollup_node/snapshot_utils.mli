@@ -58,10 +58,10 @@ val create :
 val extract :
   reader ->
   writer ->
-  (snapshot_metadata -> unit tzresult Lwt.t) ->
+  (snapshot_metadata -> 'a tzresult Lwt.t) ->
   snapshot_file:string ->
   dest:string ->
-  snapshot_metadata tzresult Lwt.t
+  (snapshot_metadata * 'a) tzresult Lwt.t
 
 (** [compress ~snapshot_file] compresses the snapshot archive [snapshot_file] of
     the form ["path/to/snapshot.uncompressed"] to a new file

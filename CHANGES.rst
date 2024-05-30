@@ -98,6 +98,8 @@ Smart Rollup node
 
 - Default history mode is now "full". (MR :gl:`!13178`)
 
+- Allow to import archive snapshots in "full" rollup node. (MR :gl:`!13186`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
