@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -25,7 +25,7 @@ pub mod host {
     //!
     //! [core_unsafe]: crate::core_unsafe
 
-    pub use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+    pub use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
     #[doc(inline)]
     pub use tezos_smart_rollup_host::Error as HostError;
 }
@@ -77,7 +77,11 @@ pub mod types {
         smart_rollup::SmartRollupAddress,
         timestamp::Timestamp,
     };
-    pub use tezos_smart_rollup_host::{input::Message, metadata::RollupMetadata};
+    pub use tezos_smart_rollup_host::input::Message;
+    pub use tezos_smart_rollup_host::metadata::RollupMetadata;
+
+    #[cfg(feature = "proto-alpha")]
+    pub use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 }
 
 #[doc(inline)]
