@@ -20,6 +20,7 @@
   upstream EVM node endpoint is stalled. (!13265)
 - Support for the `charset` specifier for `Content-Type: application/json`. (!13256)
 - `txpool_content` support. (!12873, !13292)
+- Support the RPC `eth_getBlockReceipts`. (!13370)
 
 ### Experimental
 

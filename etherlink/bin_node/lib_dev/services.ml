@@ -86,6 +86,14 @@ let get_block_by_number ~full_transaction_object block_param
   in
   Rollup_node_rpc.nth_block ~full_transaction_object n
 
+let get_block_receipts block_param
+    (module Rollup_node_rpc : Services_backend_sig.S) =
+  let open Lwt_result_syntax in
+  let* (Ethereum_types.Qty n) =
+    Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
+  in
+  Rollup_node_rpc.block_receipts n
+
 let get_transaction_from_index block index
     (module Rollup_node_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
@@ -205,6 +213,12 @@ let dispatch_request (config : Configuration.t)
             Backend_rpc.block_by_hash ~full_transaction_object block_hash
           in
           rpc_ok block
+        in
+        build_with_input ~f module_ parameters
+    | Method (Get_block_receipts.Method, module_) ->
+        let f block_param =
+          let* receipts = get_block_receipts block_param (module Backend_rpc) in
+          rpc_ok receipts
         in
         build_with_input ~f module_ parameters
     | Method (Get_code.Method, module_) ->

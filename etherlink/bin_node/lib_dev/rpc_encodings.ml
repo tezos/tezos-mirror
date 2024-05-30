@@ -308,6 +308,22 @@ module Get_block_by_hash = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Get_block_receipts = struct
+  open Ethereum_types
+
+  type input = Block_parameter.t
+
+  type output = Ethereum_types.transaction_receipt list
+
+  let input_encoding = Data_encoding.tup1 Block_parameter.encoding
+
+  let output_encoding = Data_encoding.list transaction_receipt_encoding
+
+  let method_ = "eth_getBlockReceipts"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Get_code = struct
   open Ethereum_types
 
@@ -740,6 +756,7 @@ let supported_methods : (module METHOD) list =
     (module Block_number);
     (module Get_block_by_number);
     (module Get_block_by_hash);
+    (module Get_block_receipts);
     (module Get_code);
     (module Gas_price);
     (module Get_transaction_count);
@@ -785,7 +802,6 @@ let unsupported_methods : string list =
     "eth_getProof";
     "eth_createAccessList";
     "eth_feeHistory";
-    "eth_getBlockReceipts";
     "eth_getFilterChanges";
     "eth_getFilterLogs";
     "eth_newBlockFilter";

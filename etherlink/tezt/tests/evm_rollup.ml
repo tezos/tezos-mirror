@@ -760,6 +760,46 @@ let test_rpc_getBlockByHash =
   assert (block = block') ;
   unit
 
+let test_rpc_getBlockReceipts =
+  register_both
+    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~tags:["evm"; "rpc"; "get_block_receipts"]
+    ~title:"RPC method eth_getBlockReceipts"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
+  let txs =
+    read_tx_from_file ()
+    |> List.filteri (fun i _ -> i < 5)
+    |> List.map (fun (tx, _hash) -> tx)
+  in
+  let* _requests, receipt, _hashes =
+    send_n_transactions ~sc_rollup_node ~client ~evm_node txs
+  in
+  let* receipts =
+    Evm_node.(
+      call_evm_rpc
+        evm_node
+        {
+          method_ = "eth_getBlockReceipts";
+          parameters = `A [`String (Format.sprintf "%#lx" receipt.blockNumber)];
+        })
+  in
+  let txs =
+    List.map
+      (fun receipt ->
+        JSON.
+          ( receipt |-> "transactionHash" |> as_string,
+            receipt |-> "transactionIndex" |> as_int ))
+      JSON.(receipts |-> "result" |> as_list)
+  in
+  let expected_txs =
+    read_tx_from_file ()
+    |> List.filteri (fun i _ -> i < 5)
+    |> List.mapi (fun i (_tx, hash) -> (hash, i))
+  in
+  assert (List.equal ( = ) txs expected_txs) ;
+  unit
+
 let test_l2_block_size_non_zero =
   register_both
     ~tags:["evm"; "block"; "size"]
@@ -5662,6 +5702,7 @@ let register_evm_node ~protocols =
   test_rpc_net_version protocols ;
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getBlockByHash protocols ;
+  test_rpc_getBlockReceipts protocols ;
   test_rpc_getTransactionCount protocols ;
   test_rpc_getTransactionCountBatch protocols ;
   test_rpc_batch protocols ;
