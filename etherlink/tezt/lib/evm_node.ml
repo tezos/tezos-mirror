@@ -34,14 +34,12 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
       time_between_blocks : time_between_blocks option;
-      devmode : bool;
     }
   | Threshold_encryption_observer of {
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
       bundler_node_endpoint : string;
-      devmode : bool;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -55,7 +53,6 @@ type mode =
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
-      devmode : bool;
       wallet_dir : string option;
       tx_pool_timeout_limit : int option;
       tx_pool_addr_limit : int option;
@@ -73,14 +70,13 @@ type mode =
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
-      devmode : bool;
       wallet_dir : string option;
       tx_pool_timeout_limit : int option;
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
       sequencer_sidecar_endpoint : string;
     }
-  | Proxy of {devmode : bool}
+  | Proxy
 
 module Per_level_map = Map.Make (Int)
 
@@ -115,7 +111,7 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Threshold_encryption_sequencer _ -> true
-  | Observer _ | Threshold_encryption_observer _ | Proxy _ -> false
+  | Observer _ | Threshold_encryption_observer _ | Proxy -> false
 
 let initial_kernel t =
   match t.persistent_state.mode with
@@ -124,7 +120,7 @@ let initial_kernel t =
   | Observer {initial_kernel; _}
   | Threshold_encryption_observer {initial_kernel; _} ->
       initial_kernel
-  | Proxy _ ->
+  | Proxy ->
       Test.fail
         "Wrong argument: [initial_kernel] does not support the proxy node"
 
@@ -133,7 +129,7 @@ let can_apply_blueprint t =
   | Sequencer _ | Threshold_encryption_sequencer _ | Observer _
   | Threshold_encryption_observer _ ->
       true
-  | Proxy _ -> false
+  | Proxy -> false
 
 let connection_arguments ?rpc_addr ?rpc_port () =
   let open Cli_arg in
@@ -421,14 +417,14 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_pool_add_transaction.v0"
   @@ JSON.as_string_opt
 
-let create ?name ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
-    ?rpc_port endpoint =
+let create ?name ?runner ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port endpoint
+    =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ()
   in
   let new_name () =
     match mode with
-    | Proxy _ -> "proxy_" ^ fresh_name ()
+    | Proxy -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Threshold_encryption_sequencer _ -> "te_sequencer" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
@@ -473,7 +469,7 @@ let run_args evm_node =
   let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy _ -> ["run"; "proxy"]
+    | Proxy -> ["run"; "proxy"]
     | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
         ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
         @ Cli_arg.optional_arg
@@ -597,9 +593,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
   in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy {devmode} ->
-        ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
-        @ Cli_arg.optional_switch "devmode" devmode
+    | Proxy -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
     | Sequencer
         {
           initial_kernel = _;
@@ -613,7 +607,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           max_blueprints_catchup;
           catchup_cooldown;
           max_number_of_chunks;
-          devmode;
           wallet_dir;
           tx_pool_timeout_limit;
           tx_pool_addr_limit;
@@ -651,7 +644,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "max-number-of-chunks"
             string_of_int
             max_number_of_chunks
-        @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
         @ Cli_arg.optional_arg
             "tx-pool-timeout-limit"
@@ -678,7 +670,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           max_blueprints_catchup;
           catchup_cooldown;
           max_number_of_chunks;
-          devmode;
           wallet_dir;
           tx_pool_timeout_limit;
           tx_pool_addr_limit;
@@ -719,7 +710,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "max-number-of-chunks"
             string_of_int
             max_number_of_chunks
-        @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
         @ Cli_arg.optional_arg
             "tx-pool-timeout-limit"
@@ -738,7 +728,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           preimages_dir;
           initial_kernel = _;
           rollup_node_endpoint;
-          devmode;
           time_between_blocks;
         } ->
         [
@@ -753,14 +742,12 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "time-between-blocks"
             time_between_blocks_fmt
             time_between_blocks
-        @ Cli_arg.optional_switch "devmode" devmode
     | Threshold_encryption_observer
         {
           preimages_dir;
           initial_kernel = _;
           rollup_node_endpoint;
           bundler_node_endpoint;
-          devmode;
         } ->
         [
           "--evm-node-endpoint";
@@ -772,7 +759,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
-        @ Cli_arg.optional_switch "devmode" devmode
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -791,7 +777,7 @@ let endpoint ?(private_ = false) (evm_node : t) =
       | Threshold_encryption_sequencer {private_rpc_port = None; _} ->
           Test.fail
             "Threshold encryption sequencer doesn't have a private RPC server"
-      | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
+      | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
       | Threshold_encryption_observer _ ->
           Test.fail
@@ -839,15 +825,13 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
   let* () = run evm_node in
   return evm_node
 
-let init_from_rollup_node_data_dir ?(devmode = false) ?reconstruct evm_node
-    rollup_node =
+let init_from_rollup_node_data_dir ?reconstruct evm_node rollup_node =
   let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
   let process =
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
       @ data_dir evm_node
-      @ Cli_arg.optional_switch "devmode" devmode
       @ Cli_arg.optional_arg "reconstruct" Fun.id reconstruct)
   in
   Process.check process
@@ -926,8 +910,8 @@ let reset evm_node ~l2_level =
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   Process.check process
 
-let sequencer_upgrade_payload ?(devmode = true) ?client ~public_key
-    ~pool_address ~activation_timestamp () =
+let sequencer_upgrade_payload ?client ~public_key ~pool_address
+    ~activation_timestamp () =
   let args =
     [
       "make";
@@ -953,13 +937,12 @@ let sequencer_upgrade_payload ?(devmode = true) ?client ~public_key
         "wallet-dir"
         Fun.id
         (Option.map Client.base_dir client)
-    @ Cli_arg.optional_switch "devmode" devmode
   in
   let* payload = Process.check_and_read_stdout process in
   return (String.trim payload)
 
-let chunk_data ?(devmode = true) ~rollup_address ?sequencer_key ?timestamp
-    ?parent_hash ?number ?client data =
+let chunk_data ~rollup_address ?sequencer_key ?timestamp ?parent_hash ?number
+    ?client data =
   let args = "chunk" :: "data" :: data in
   let sequencer =
     match sequencer_key with
@@ -970,11 +953,9 @@ let chunk_data ?(devmode = true) ~rollup_address ?sequencer_key ?timestamp
   let timestamp = Cli_arg.optional_arg "timestamp" Fun.id timestamp in
   let parent_hash = Cli_arg.optional_arg "parent-hash" Fun.id parent_hash in
   let number = Cli_arg.optional_arg "number" string_of_int number in
-  let devmode = Cli_arg.optional_switch "devmode" devmode in
   let process =
     Process.spawn (Uses.path Constant.octez_evm_node)
     @@ args @ rollup_address @ sequencer @ timestamp @ parent_hash @ number
-    @ devmode
     @ Cli_arg.optional_arg
         "wallet-dir"
         Fun.id

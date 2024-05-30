@@ -142,10 +142,9 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
   return
     {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_governance}
 
-let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks
+let setup_sequencer ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -235,7 +234,6 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              max_blueprints_catchup;
              catchup_cooldown;
              max_number_of_chunks;
-             devmode;
              wallet_dir = Some (Client.base_dir client);
              tx_pool_timeout_limit = None;
              tx_pool_addr_limit = None;
@@ -257,7 +255,6 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              max_blueprints_catchup;
              catchup_cooldown;
              max_number_of_chunks;
-             devmode;
              wallet_dir = Some (Client.base_dir client);
              tx_pool_timeout_limit = None;
              tx_pool_addr_limit = None;
@@ -283,7 +280,6 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
              bundler_node_endpoint = Dsn_node.endpoint bundler;
-             devmode;
            })
     else
       return
@@ -292,7 +288,6 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              initial_kernel = output;
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             devmode;
              time_between_blocks;
            })
   in
@@ -305,7 +300,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
   let* proxy =
     Evm_node.init
       ~patch_config
-      ~mode:(Proxy {devmode})
+      ~mode:Proxy
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   return
@@ -372,14 +367,13 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-let register_test ?devmode ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
-    ?history_mode body =
+let register_test ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?bootstrap_accounts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?(threshold_encryption = false) ?(uses = uses)
+    ?(additional_uses = []) ?history_mode body =
   let additional_uses =
     if threshold_encryption then
       Constant.octez_dsn_node :: kernel :: additional_uses
@@ -388,7 +382,6 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
-        ?devmode
         ?genesis_timestamp
         ?time_between_blocks
         ?max_blueprints_lag
@@ -419,16 +412,15 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
     ~uses:(fun protocol -> uses protocol @ additional_uses)
     body
 
-let register_both ?devmode ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode
     ?additional_uses ~title ~tags body protocols =
   let register ~kernel ~threshold_encryption =
     register_test
-      ?devmode
       ?genesis_timestamp
       ?time_between_blocks
       ?max_blueprints_lag
@@ -1225,10 +1217,7 @@ let test_delayed_deposit_from_init_rollup_node =
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      new_sequencer
-      sc_rollup_node
+    Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
   let* () = Evm_node.run new_sequencer in
 
@@ -1286,7 +1275,6 @@ let test_init_from_rollup_node_data_dir =
 
   let* () =
     Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
       ~reconstruct:boot_sector
       evm_node'
       sc_rollup_node
@@ -1370,12 +1358,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
         unit)
   in
 
-  let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      evm_node'
-      sc_rollup_node
-  in
+  let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
 
   let* () = Evm_node.run evm_node' in
 
@@ -1505,7 +1488,6 @@ let test_get_balance_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             devmode = true;
              time_between_blocks = Some Nothing;
            })
       ~data_dir:(Temp.dir name)
@@ -1516,7 +1498,6 @@ let test_get_balance_block_param =
   in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
       observer_partial_history
       sc_rollup_node
   in
@@ -1580,7 +1561,6 @@ let test_get_block_by_number_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             devmode = true;
              time_between_blocks = Some Nothing;
            })
       ~data_dir:(Temp.dir name)
@@ -1591,7 +1571,6 @@ let test_get_block_by_number_block_param =
   in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
       observer_partial_history
       sc_rollup_node
   in
@@ -2229,9 +2208,7 @@ let test_force_kernel_upgrade_too_early =
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -2293,9 +2270,7 @@ let test_force_kernel_upgrade =
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -2507,115 +2482,6 @@ let test_no_automatic_block_production =
     ~error_msg:"No transaction hash expected" ;
   unit
 
-let test_migration_from_ghostnet =
-  (* Creates a sequencer using prod version and ghostnet kernel. *)
-  register_test
-    ~threshold_encryption:false
-    ~time_between_blocks:Nothing
-    ~kernel:Constant.WASM.ghostnet_evm_kernel
-    ~devmode:false
-    ~max_blueprints_lag:0
-    ~tags:["evm"; "sequencer"; "upgrade"; "migration"; "ghostnet"]
-    ~title:"Sequencer can upgrade from ghostnet"
-    ~additional_uses:[Constant.WASM.evm_kernel]
-  @@ fun {
-           sequencer;
-           client;
-           sc_rollup_node;
-           sc_rollup_address;
-           l1_contracts;
-           proxy;
-           _;
-         }
-             _protocol ->
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  (* Check kernelVersion. *)
-  let* _kernel_version =
-    check_kernel_version
-      ~evm_node:sequencer
-      ~equal:true
-      Constant.WASM.ghostnet_evm_commit
-  in
-  let* _kernel_version =
-    check_kernel_version
-      ~evm_node:proxy
-      ~equal:true
-      Constant.WASM.ghostnet_evm_commit
-  in
-
-  (* Produces a few blocks. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
-        unit)
-  in
-  let* () =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
-  (* Check the consistency. *)
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
-  (* Sends upgrade to current version. *)
-  let* () =
-    upgrade
-      ~sc_rollup_node
-      ~sc_rollup_address
-      ~admin:Constant.bootstrap2.public_key_hash
-      ~admin_contract:l1_contracts.admin
-      ~client
-      ~upgrade_to:Constant.WASM.evm_kernel
-      ~activation_timestamp:"0"
-  in
-  (* Bakes 2 blocks for the event follower to see the upgrade. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
-  (* Produce a block to trigger the upgrade. *)
-  let*@ _ = Rpc.produce_block sequencer in
-  let* _ =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
-  (* Check that the prod sequencer has updated. *)
-  let* new_kernel_version =
-    check_kernel_version
-      ~evm_node:sequencer
-      ~equal:false
-      Constant.WASM.ghostnet_evm_commit
-  in
-  (* Runs sequencer and proxy with --devmode. *)
-  let* () = Evm_node.terminate proxy in
-  let* () = Evm_node.terminate sequencer in
-  (* Manually put `--devmode` to use the same command line. *)
-  let* () = Evm_node.run ~extra_arguments:["--devmode"] proxy in
-  let* () = Evm_node.run ~extra_arguments:["--devmode"] sequencer in
-  (* Check that new sequencer and proxy are on a new version. *)
-  let* _kernel_version =
-    check_kernel_version ~evm_node:sequencer ~equal:true new_kernel_version
-  in
-  let* _kernel_version =
-    check_kernel_version ~evm_node:proxy ~equal:true new_kernel_version
-  in
-  (* Check the consistency. *)
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
-  (* Produces a few blocks. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
-        unit)
-  in
-  let* () =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
-  (* Final consistency check. *)
-  check_head_consistency ~left:sequencer ~right:proxy ()
-
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_sequencer_upgrade =
@@ -2731,10 +2597,7 @@ let test_sequencer_upgrade =
   let* _ = Evm_node.wait_for_shutdown_event sequencer
   and* () =
     let* () =
-      Evm_node.init_from_rollup_node_data_dir
-        ~devmode:true
-        new_sequencer
-        sc_rollup_node
+      Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
     in
     let* () = Evm_node.run new_sequencer in
     let* () =
@@ -2820,10 +2683,7 @@ let test_sequencer_diverge =
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer_bis in
   let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      sequencer_bis
-      sc_rollup_node
+    Evm_node.init_from_rollup_node_data_dir sequencer_bis sc_rollup_node
   in
   let diverged_and_shutdown sequencer observer =
     let* _ = Evm_node.wait_for_diverged sequencer
@@ -3321,10 +3181,7 @@ let test_preimages_endpoint =
         unit)
   in
   let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      new_sequencer
-      sc_rollup_node
+    Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
   (* Sends an upgrade with new preimages. *)
   let* () =
@@ -3927,7 +3784,6 @@ let () =
   test_delayed_transfer_timeout_fails_l1_levels protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
-  test_migration_from_ghostnet protocols ;
   test_sequencer_upgrade protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;

@@ -42,14 +42,12 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
       time_between_blocks : time_between_blocks option;
-      devmode : bool;
     }
   | Threshold_encryption_observer of {
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
       bundler_node_endpoint : string;
-      devmode : bool;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -67,7 +65,6 @@ type mode =
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
-      devmode : bool;  (** --devmode flag. *)
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
       tx_pool_timeout_limit : int option;
           (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
@@ -94,7 +91,6 @@ type mode =
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
-      devmode : bool;  (** --devmode flag. *)
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
       tx_pool_timeout_limit : int option;
           (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
@@ -108,7 +104,7 @@ type mode =
           (** --sequencer-sidecar-endpoint: Uri of the sidecar endpoints to which
               proposals are forwarded, and from where preblocks are fetched. *)
     }
-  | Proxy of {devmode : bool  (** --devmode flag. *)}
+  | Proxy
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
@@ -311,13 +307,12 @@ val fetch_contract_code : t -> string -> string Lwt.t
 val upgrade_payload :
   root_hash:string -> activation_timestamp:string -> string Lwt.t
 
-(** [sequencer_upgrade_payload ?devmode ?client ~public_key  ~pool_address
+(** [sequencer_upgrade_payload ?client ~public_key  ~pool_address
     ~activation_timestamp ()] gives the sequencer upgrade payload to
     put in a upgrade message, it will upgrade the sequencer to
     [public_key] at the first l1 block after [activation_timestamp]
-    (in RFC3399 format).  [devmode] is true by default. *)
+    (in RFC3399 format). *)
 val sequencer_upgrade_payload :
-  ?devmode:bool ->
   ?client:Client.t ->
   public_key:string ->
   pool_address:string ->
@@ -325,11 +320,11 @@ val sequencer_upgrade_payload :
   unit ->
   string Lwt.t
 
-(** [init_from_rollup_node_data_dir ?devmode ?reconstruct evm_node rollup_node]
+(** [init_from_rollup_node_data_dir ?reconstruct evm_node rollup_node]
     initialises the data dir of the evm node by importing the evm
     state from a rollup node data dir. [devmode] is false by default. *)
 val init_from_rollup_node_data_dir :
-  ?devmode:bool -> ?reconstruct:string -> t -> Sc_rollup_node.t -> unit Lwt.t
+  ?reconstruct:string -> t -> Sc_rollup_node.t -> unit Lwt.t
 
 (** [transform_dump ~dump_json ~dump_rlp] transforms a JSON list of
     instructions stored in [dump_json] to an RLP list, which is
@@ -340,12 +335,11 @@ val transform_dump : dump_json:string -> dump_rlp:string -> unit Lwt.t
     l2_level. *)
 val reset : t -> l2_level:int -> unit Lwt.t
 
-(** [chunk data ?devmode ~rollup_address ?sequencer_key ?timestamp ?parent_hash
+(** [chunk data ~rollup_address ?sequencer_key ?timestamp ?parent_hash
     ?number ?client data] generates the valid inputs for the rollup at
     [rollup_address] from the given [data]. If [sequencer_key] is given, the
     data produced is for the sequencer mode. *)
 val chunk_data :
-  ?devmode:bool ->
   rollup_address:string ->
   ?sequencer_key:string ->
   ?timestamp:string ->

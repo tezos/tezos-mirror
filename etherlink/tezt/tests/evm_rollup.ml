@@ -275,9 +275,8 @@ type setup_mode =
   | Setup_sequencer of {
       time_between_blocks : Evm_node.time_between_blocks option;
       sequencer : Account.key;
-      devmode : bool;
     }
-  | Setup_proxy of {devmode : bool}
+  | Setup_proxy
 
 let setup_evm_kernel ?devmode ?additional_config
     ?(setup_kernel_root_hash = true)
@@ -291,7 +290,7 @@ let setup_evm_kernel ?devmode ?additional_config
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ?max_number_of_chunks ?(setup_mode = Setup_proxy {devmode = true})
+    ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -331,7 +330,7 @@ let setup_evm_kernel ?devmode ?additional_config
     in
     let sequencer =
       match setup_mode with
-      | Setup_proxy _ -> None
+      | Setup_proxy -> None
       | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
     let output_config = Temp.file "config.yaml" in
@@ -399,8 +398,8 @@ let setup_evm_kernel ?devmode ?additional_config
   in
   let* mode =
     match setup_mode with
-    | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
-    | Setup_sequencer {time_between_blocks; sequencer; devmode} ->
+    | Setup_proxy -> return Evm_node.Proxy
+    | Setup_sequencer {time_between_blocks; sequencer} ->
         let private_rpc_port = Some (Port.fresh ()) in
         return
           (Evm_node.Sequencer
@@ -416,7 +415,6 @@ let setup_evm_kernel ?devmode ?additional_config
                max_blueprints_catchup = None;
                catchup_cooldown = None;
                max_number_of_chunks;
-               devmode;
                wallet_dir = Some (Client.base_dir client);
                tx_pool_timeout_limit;
                tx_pool_addr_limit;
@@ -448,7 +446,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?rollup_operator_key ?maximum_allowed_ticks ~setup_mode f protocols =
   let extra_tag =
     match setup_mode with
-    | Setup_proxy _ -> "proxy"
+    | Setup_proxy -> "proxy"
     | Setup_sequencer _ -> "sequencer"
   in
   List.iter
@@ -508,7 +506,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?admin
     ?maximum_allowed_ticks
     f
     protocols
-    ~setup_mode:(Setup_proxy {devmode = true})
+    ~setup_mode:Setup_proxy
 
 let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
@@ -535,8 +533,7 @@ let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
   in
   register
     ~setup_mode:
-      (Setup_sequencer
-         {time_between_blocks; sequencer = Constant.bootstrap1; devmode = true})
+      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
 
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
@@ -561,11 +558,10 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
       f
       protocols
   in
-  register ~setup_mode:(Setup_proxy {devmode = true}) ;
+  register ~setup_mode:Setup_proxy ;
   register
     ~setup_mode:
-      (Setup_sequencer
-         {time_between_blocks; sequencer = Constant.bootstrap1; devmode = true})
+      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
 
 let deploy ~contract ~sender full_evm_setup =
   let {client; sc_rollup_node; evm_node; _} = full_evm_setup in
@@ -2899,9 +2895,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
   in
   (* Load the EVM rollup's storage and sanity check results. *)
   let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {devmode = false})
-      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
@@ -2923,9 +2917,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
       ~client:evm_setup.client
   in
   let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let evm_setup = {evm_setup with evm_node} in
   (* Check the values after the upgrade with [sanity_check] results. *)
@@ -4636,7 +4628,6 @@ let test_migrate_proxy_to_sequencer_future =
           max_blueprints_catchup = None;
           catchup_cooldown = None;
           max_number_of_chunks = None;
-          devmode = true;
           wallet_dir = Some (Client.base_dir client);
           tx_pool_timeout_limit = None;
           tx_pool_addr_limit = None;
@@ -4653,10 +4644,7 @@ let test_migrate_proxy_to_sequencer_future =
   in
   (* Run the sequencer from the rollup node state. *)
   let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      sequencer_node
-      sc_rollup_node
+    Evm_node.init_from_rollup_node_data_dir sequencer_node sc_rollup_node
   in
   let* () = Evm_node.run sequencer_node in
   (* Same head after initialisation. *)
@@ -4803,7 +4791,6 @@ let test_migrate_proxy_to_sequencer_past =
           max_blueprints_catchup = None;
           catchup_cooldown = None;
           max_number_of_chunks = None;
-          devmode = true;
           wallet_dir = Some (Client.base_dir client);
           tx_pool_timeout_limit = None;
           tx_pool_addr_limit = None;
@@ -4815,10 +4802,7 @@ let test_migrate_proxy_to_sequencer_past =
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_node in
   (* Run the sequencer from the rollup node state. *)
   let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      sequencer_node
-      sc_rollup_node
+    Evm_node.init_from_rollup_node_data_dir sequencer_node sc_rollup_node
   in
   let* () = Evm_node.run sequencer_node in
   (* Same head after initialisation. *)
@@ -5356,11 +5340,7 @@ let test_tx_pool_timeout =
   let admin = Some Constant.bootstrap3 in
   let setup_mode =
     Setup_sequencer
-      {
-        time_between_blocks = Some Nothing;
-        sequencer = sequencer_admin;
-        devmode = true;
-      }
+      {time_between_blocks = Some Nothing; sequencer = sequencer_admin}
   in
   let ttl = 15 in
   let* {evm_node = sequencer_node; _} =
@@ -5456,11 +5436,7 @@ let test_tx_pool_address_boundaries =
   let admin = Some Constant.bootstrap3 in
   let setup_mode =
     Setup_sequencer
-      {
-        time_between_blocks = Some Nothing;
-        sequencer = sequencer_admin;
-        devmode = true;
-      }
+      {time_between_blocks = Some Nothing; sequencer = sequencer_admin}
   in
   let* {evm_node = sequencer_node; _} =
     setup_evm_kernel
@@ -5579,11 +5555,7 @@ let test_tx_pool_transaction_size_exceeded =
   let admin = Some Constant.bootstrap3 in
   let setup_mode =
     Setup_sequencer
-      {
-        time_between_blocks = Some Nothing;
-        sequencer = sequencer_admin;
-        devmode = true;
-      }
+      {time_between_blocks = Some Nothing; sequencer = sequencer_admin}
   in
   let* {evm_node = sequencer_node; _} =
     setup_evm_kernel
