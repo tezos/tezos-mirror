@@ -60,7 +60,7 @@ let install_finalizer server =
   let* () = Events.shutdown_node ~exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = Events.shutdown_rpc_server ~private_:false in
-  Helpers.unwrap_error_monad @@ fun () ->
+  Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
   Evm_context.shutdown ()

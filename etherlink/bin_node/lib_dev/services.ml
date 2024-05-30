@@ -479,7 +479,7 @@ let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
     | Method (Produce_block.Method, module_) ->
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
-          let timestamp = Option.value timestamp ~default:(Helpers.now ()) in
+          let timestamp = Option.value timestamp ~default:(Misc.now ()) in
           let* nb_transactions =
             Sequencer_rpc.produce_block ~force:true ~timestamp
           in

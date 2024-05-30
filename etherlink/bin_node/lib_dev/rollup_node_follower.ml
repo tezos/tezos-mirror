@@ -199,7 +199,7 @@ let start ~keep_alive ~proxy ~rollup_node_endpoint () =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
-  Helpers.unwrap_error_monad @@ fun () ->
+  Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* oldest_rollup_node_known_l1_level =
     Rollup_services.oldest_known_l1_level ~keep_alive rollup_node_endpoint

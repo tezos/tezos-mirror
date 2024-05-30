@@ -64,7 +64,7 @@ let install_finalizer_seq server private_server =
         Events.shutdown_rpc_server ~private_:true)
       private_server
   in
-  Helpers.unwrap_error_monad @@ fun () ->
+  Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
   let* () = Evm_events_follower.shutdown () in
@@ -181,7 +181,7 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
         let*! () = task in
         return_unit
     | Time_between_blocks time_between_blocks ->
-        let now = Helpers.now () in
+        let now = Misc.now () in
         (* We force if the last produced block is older than [time_between_blocks]. *)
         let force =
           let diff = Time.Protocol.(diff now last_produced_block) in
@@ -193,10 +193,9 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
         if nb_transactions > 0 || force then loop now
         else loop last_produced_block
   in
-  let now = Helpers.now () in
-  loop now
+  loop Misc.(now ())
 
-let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
+let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
