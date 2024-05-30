@@ -134,51 +134,6 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
             }
         }
     }
-
-    /// This function only exists to make the funneling of [steps_done]
-    /// tail-recursive.
-    fn run_accum<F>(
-        &mut self,
-        steps_done: usize,
-        step_bounds: &impl RangeBounds<usize>,
-        mut should_continue: F,
-    ) -> TestStepperResult
-    where
-        F: FnMut(&MachineState<ML, SliceManager<'a>>) -> bool,
-    {
-        let mut result = self.machine_state.step_range_handle(
-            step_bounds,
-            &mut should_continue,
-            |machine_state, exc| match self.exec_env_state.handle_call(
-                machine_state,
-                &mut Default::default(),
-                exc,
-            ) {
-                EcallOutcome::Fatal { message } => Err((exc, message)),
-                EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
-            },
-        );
-        result.steps = result.steps.saturating_add(steps_done);
-        self.handle_step_result(result)
-    }
-
-    /// Run at most `max` steps.
-    pub fn run(&mut self, max: usize) -> TestStepperResult {
-        self.run_accum(0, &..=max, |_| true)
-    }
-
-    /// Run as many steps such that they statisfy the given range bound.
-    /// The `should_predicate` lets you control when to stop within that range.
-    pub fn run_range_while<F>(
-        &mut self,
-        steps: impl RangeBounds<usize>,
-        should_continue: F,
-    ) -> TestStepperResult
-    where
-        F: FnMut(&MachineState<ML, SliceManager<'a>>) -> bool,
-    {
-        self.run_accum(0, &steps, should_continue)
-    }
 }
 
 impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
@@ -189,5 +144,27 @@ impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
     #[inline(always)]
     fn machine_state(&self) -> &MachineState<Self::MainMemoryLayout, Self::Manager> {
         &self.machine_state
+    }
+
+    type StepResult = TestStepperResult;
+
+    fn step_range_while<B, F>(&mut self, steps: B, mut should_continue: F) -> Self::StepResult
+    where
+        B: RangeBounds<usize>,
+        F: FnMut(&MachineState<Self::MainMemoryLayout, Self::Manager>) -> bool,
+    {
+        let result = self.machine_state.step_range_handle(
+            &steps,
+            &mut should_continue,
+            |machine_state, exc| match self.exec_env_state.handle_call(
+                machine_state,
+                &mut Default::default(),
+                exc,
+            ) {
+                EcallOutcome::Fatal { message } => Err((exc, message)),
+                EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
+            },
+        );
+        self.handle_step_result(result)
     }
 }

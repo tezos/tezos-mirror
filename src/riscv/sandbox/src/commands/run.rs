@@ -6,7 +6,10 @@
 use crate::{cli::RunOptions, format_status, posix_exit_mode};
 use octez_riscv::{
     machine_state::bus::main_memory::M1G,
-    stepper::test::{TestStepper, TestStepperResult},
+    stepper::{
+        test::{TestStepper, TestStepperResult},
+        Stepper,
+    },
 };
 use std::error::Error;
 
@@ -21,7 +24,7 @@ pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
         posix_exit_mode(&opts.common.posix_exit_mode),
     )?;
 
-    match interpreter.run(opts.common.max_steps) {
+    match interpreter.step_max(opts.common.max_steps) {
         TestStepperResult::Exit { code: 0, .. } => Ok(()),
         result => Err(format_status(&result).into()),
     }

@@ -15,7 +15,10 @@ use octez_riscv::{
         mode::Mode,
         AccessType,
     },
-    stepper::test::{TestStepper, TestStepperResult},
+    stepper::{
+        test::{TestStepper, TestStepperResult},
+        Stepper,
+    },
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -234,13 +237,13 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     }
 
     fn step(&mut self, max_steps: usize) {
-        let result = self.interpreter.run(max_steps);
+        let result = self.interpreter.step_max(max_steps);
         self.update_after_step(result);
     }
 
     fn step_until_breakpoint(&mut self) {
         // perform at least a step to progress if already on a breakpoint
-        let result = self.interpreter.run_range_while(1..=MAX_STEPS, |m| {
+        let result = self.interpreter.step_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)
@@ -252,7 +255,7 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
 
     fn step_until_next_symbol(&mut self) {
         // perform at least a step to progress if already on a breakpoint/symbol
-        let result = self.interpreter.run_range_while(1..=MAX_STEPS, |m| {
+        let result = self.interpreter.step_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)
