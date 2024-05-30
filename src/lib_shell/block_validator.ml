@@ -215,6 +215,21 @@ let errors_contains_context_error errors =
   in
   List.exists is_context_error errors
 
+let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
+    block_hash bv_operations =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit applying_block) block_hash in
+  protect ~canceler:(Worker.canceler worker) (fun () ->
+      protect ?canceler (fun () ->
+          with_retry_to_load_protocol bv ~peer (fun () ->
+              Block_validator_process.apply_block
+                ~should_precheck:false
+                bv.validation_process
+                chain_store
+                ~predecessor
+                block_header
+                bv_operations)))
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -290,17 +305,16 @@ let on_validation_request w
                            before being fully applied. *)
                         Distributed_db.Advertise.prechecked_head chain_db header ;
                       let* result =
-                        protect ~canceler:(Worker.canceler w) (fun () ->
-                            protect ?canceler (fun () ->
-                                let*! () = Events.(emit applying_block) hash in
-                                with_retry_to_load_protocol (fun () ->
-                                    Block_validator_process.apply_block
-                                      ~should_precheck:false
-                                      bv.validation_process
-                                      chain_store
-                                      ~predecessor:pred
-                                      header
-                                      bv_operations)))
+                        apply_block
+                          w
+                          ?canceler
+                          bv
+                          peer
+                          chain_store
+                          ~predecessor:pred
+                          header
+                          hash
+                          bv_operations
                       in
                       Shell_metrics.Block_validator
                       .set_operation_per_pass_collector
