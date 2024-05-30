@@ -125,6 +125,24 @@ type call_result = (execution_result, hash) result
 
 type validation_result = (transaction_object, address) Either.t
 
+let validation_result_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"Transaction object"
+        Json_only
+        transaction_object_encoding
+        (function Either.Left obj -> Some obj | _ -> None)
+        (fun obj -> Left obj);
+      case
+        ~title:"Address"
+        Json_only
+        address_encoding
+        (function Either.Right addr -> Some addr | _ -> None)
+        (fun addr -> Right addr);
+    ]
+
 type 'a simulation_result = ('a, string) result
 
 module Encodings = struct

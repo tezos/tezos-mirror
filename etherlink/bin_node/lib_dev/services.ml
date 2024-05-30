@@ -335,11 +335,20 @@ let dispatch_request (config : Configuration.t)
                None
         else
           let f tx_raw =
-            let* tx_hash = Tx_pool.add (Ethereum_types.hex_to_bytes tx_raw) in
-            match tx_hash with
-            | Ok tx_hash -> rpc_ok tx_hash
-            | Error reason ->
-                rpc_error (Rpc_errors.transaction_rejected reason None)
+            let txn = Ethereum_types.hex_to_bytes tx_raw in
+            let* is_valid = Backend_rpc.is_tx_valid txn in
+            match is_valid with
+            | Error err ->
+                let*! () =
+                  Tx_pool_events.invalid_transaction ~transaction:txn
+                in
+                rpc_error (Rpc_errors.transaction_rejected err None)
+            | Ok is_valid -> (
+                let* tx_hash = Tx_pool.add is_valid txn in
+                match tx_hash with
+                | Ok tx_hash -> rpc_ok tx_hash
+                | Error reason ->
+                    rpc_error (Rpc_errors.transaction_rejected reason None))
           in
           build_with_input ~f module_ parameters
     | Method (Eth_call.Method, module_) ->

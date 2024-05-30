@@ -226,7 +226,7 @@ type size_info = {number_of_addresses : int; number_of_transactions : int}
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        string
+        Simulation.validation_result * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions : int -> (string list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
@@ -246,13 +246,16 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Add_transaction"
-          (obj2
+          (obj3
              (req "request" (constant "add_transaction"))
+             (req "simpulation_result" Simulation.validation_result_encoding)
              (req "transaction" string))
           (function
-            | View (Add_transaction transaction) -> Some ((), transaction)
+            | View (Add_transaction (transaction, txn)) ->
+                Some ((), transaction, txn)
             | _ -> None)
-          (fun ((), transaction) -> View (Add_transaction transaction));
+          (fun ((), transaction, txn) ->
+            View (Add_transaction (transaction, txn)));
         case
           (Tag 1)
           ~title:"Pop_transactions"
@@ -293,7 +296,7 @@ module Request = struct
 
   let pp ppf (View r) =
     match r with
-    | Add_transaction tx_raw ->
+    | Add_transaction (_, tx_raw) ->
         Format.fprintf
           ppf
           "Add tx [%s] to tx-pool"
@@ -398,22 +401,15 @@ let insert_valid_transaction state tx_raw address transaction_object =
       state.pool <- pool ;
       return (Ok hash)
 
-let on_normal_transaction state tx_raw =
-  let open Lwt_result_syntax in
-  let open Types in
-  let module Rollup_node = (val state.rollup_node) in
-  let* is_valid = Rollup_node.is_tx_valid tx_raw in
-  match is_valid with
-  | Error err ->
-      let*! () =
-        Tx_pool_events.invalid_transaction
-          ~transaction:(Hex.of_string tx_raw |> Hex.show)
-      in
-      return (Error err)
-  | Ok (Either.Left transaction_object) ->
-      let address = transaction_object.from in
-      insert_valid_transaction state tx_raw address (Some transaction_object)
-  | Ok (Right address) -> insert_valid_transaction state tx_raw address None
+let on_normal_transaction state validation_result tx_raw =
+  match validation_result with
+  | Either.Left transaction_object ->
+      insert_valid_transaction
+        state
+        tx_raw
+        (transaction_object : Ethereum_types.transaction_object).from
+        (Some transaction_object)
+  | Right address -> insert_valid_transaction state tx_raw address None
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
@@ -613,9 +609,9 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state w in
     match request with
-    | Request.Add_transaction transaction ->
+    | Request.Add_transaction (is_valid, txn) ->
         protect @@ fun () ->
-        let* res = on_normal_transaction state transaction in
+        let* res = on_normal_transaction state is_valid txn in
         let* () = observer_self_inject_request w in
         return res
     | Request.Pop_transactions maximum_cumulative_size ->
@@ -715,10 +711,12 @@ let shutdown () =
   let*! () = Worker.shutdown w in
   return_unit
 
-let add raw_tx =
+let add is_valid raw_tx =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w (Request.Add_transaction raw_tx)
+  Worker.Queue.push_request_and_wait
+    w
+    (Request.Add_transaction (is_valid, raw_tx))
   |> handle_request_error
 
 let nonce pkey =
