@@ -37,6 +37,8 @@
 
    Invocation:   dune exec tezt/tests/main.exe -- --file dal.ml
    Subject: Integration tests related to the data-availability layer
+   Remarks: For tagging tests with memory tags (like memory_3k), the script
+            tezt_cgmemtime_all.sh from !9593 was used.
 *)
 
 let team = Tag.tezos2
@@ -333,7 +335,7 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?regression ?(tags = [team; Tag.memory_3k])
+let scenario_with_layer1_node ?regression ?(tags = [team])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
     ?(dal_enable = true) ?event_sections_levels ?node_arguments
@@ -3174,7 +3176,7 @@ let register_end_to_end_tests ~protocols =
       let slot_index = 5 in
       let producer_profiles = [slot_index] in
       let tags =
-        ["e2e"; network; Tag.ci_disabled]
+        ["e2e"; network; Tag.ci_disabled; Tag.memory_4k]
         @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
         @ tags
       in
@@ -4674,7 +4676,7 @@ module History_rpcs = struct
       dal_node
 
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; "memory_3k"] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
     let description = "test commitments history with migration" in
     let slot_index = 3 in
     let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
@@ -6794,6 +6796,7 @@ let register ~protocols =
      mainnet value. It could be extended to higher values if
      desired. *)
   scenario_with_layer1_node
+    ~tags:[Tag.memory_4k]
     ~regression:true
     ~number_of_slots:32
     ~additional_bootstrap_accounts:(32 - Array.length Account.Bootstrap.keys)
@@ -6919,14 +6922,14 @@ let register ~protocols =
     test_baker_registers_profiles
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; "memory_3k"]
+    ~tags:["bootstrap"; Tag.memory_3k]
     ~bootstrap_profile:true
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
     protocols ;
 
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; "trusted"; "connection"; "memory_3k"]
+    ~tags:["bootstrap"; "trusted"; "connection"; Tag.memory_3k]
     ~bootstrap_profile:true
     "trusted peers reconnection"
     test_peers_reconnection
@@ -6937,7 +6940,7 @@ let register ~protocols =
     test_producer_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["attestation"; "p2p"]
+    ~tags:["attestation"; "p2p"; Tag.memory_3k]
     ~attestation_threshold:100
     ~bootstrap_profile:true
     "attestation through p2p"
@@ -6950,7 +6953,7 @@ let register ~protocols =
     History_rpcs.test_commitments_history_rpcs
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "memory_3k"]
+    ~tags:["amplification"; Tag.memory_4k]
     ~bootstrap_profile:true
     ~redundancy_factor:2
       (* With a redundancy factor of 4 or more, not much luck is
@@ -6964,13 +6967,13 @@ let register ~protocols =
     Amplification.test_amplification
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "simple"; "memory_3k"]
+    ~tags:["amplification"; "simple"; Tag.memory_4k]
     ~bootstrap_profile:true
     "observer triggers amplification (without lost shards)"
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "simple"; "memory_3k"]
+    ~tags:["gc"; "simple"; Tag.memory_3k]
     ~producer_profiles:[0]
     ~history_mode:(Dal_node.Custom 15)
     ~number_of_slots:1
@@ -6978,7 +6981,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"; "memory_3k"]
+    ~tags:["gc"; "multi"; Tag.memory_4k]
     ~bootstrap_profile:true
     ~number_of_slots:1
     "garbage collection of shards for all profiles"
