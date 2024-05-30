@@ -122,11 +122,11 @@ docker:
   script:
     - >
       for EXE in archiver server ; do
-        docker build -t ${CI_REGISTRY_IMAGE}/$${EXE}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} -f Dockerfile.$${EXE} . ;
+        docker build -t ${CI_REGISTRY_IMAGE}/$EXE-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} -f Dockerfie.$$EXE . ;
       done
     - >
       for EXE in archiver server ; do
-        docker push ${CI_REGISTRY_IMAGE}/$${EXE}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} ;
+        docker push ${CI_REGISTRY_IMAGE}/$EXE-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} ;
       done
 
 # Create multiarch manifest
@@ -148,6 +148,6 @@ manifest:
   script:
     - >
       for EXE in archiver server ; do
-        docker manifest create ${CI_REGISTRY_IMAGE}/$${EXE}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$${EXE}-$${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`;
-        docker manifest push ${CI_REGISTRY_IMAGE}/$${EXE}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
+        docker manifest create ${CI_REGISTRY_IMAGE}/$EXE:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$EXE-$${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`;
+        docker manifest push ${CI_REGISTRY_IMAGE}/$EXE:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
       done
