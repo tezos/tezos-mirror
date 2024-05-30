@@ -8198,6 +8198,7 @@ let _octez_tps_evaluation =
         tezt_tezos |> open_;
         tezt_performance_regression |> open_;
         uri;
+        octez_test_helpers |> open_;
       ]
     ~static:false
     ~dune:
