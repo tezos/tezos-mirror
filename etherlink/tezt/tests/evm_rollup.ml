@@ -442,59 +442,64 @@ let setup_evm_kernel ?devmode ?additional_config
       kernel_root_hash = root_hash;
     }
 
-let register_test ~title ~tags ?kernel ?additional_config ?admin ?uses
-    ?commitment_period ?challenge_window ?bootstrap_accounts ?whitelist
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ?rollup_operator_key
-    ?maximum_allowed_ticks ~setup_mode f =
+let register_test ~title ~tags ?(kernel = Kernel.All) ?additional_config ?admin
+    ?(additional_uses = []) ?commitment_period ?challenge_window
+    ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
+    ?rollup_operator_key ?maximum_allowed_ticks ~setup_mode f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
     | Setup_sequencer _ -> "sequencer"
   in
-  let uses =
-    Option.value
-      ~default:(fun _protocol ->
+  List.iter
+    (fun (kernel_tag, kernel) ->
+      let uses _protocol =
         [
+          kernel;
           Constant.octez_smart_rollup_node;
           Constant.octez_evm_node;
           Constant.smart_rollup_installer;
-          Constant.WASM.evm_kernel;
-        ])
-      uses
-  in
-  Protocol.register_test
-    ~__FILE__
-    ~tags:(extra_tag :: tags)
-    ~uses
-    ~title:(sf "%s (%s)" title extra_tag)
-    ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
-    (fun protocol ->
-      let* evm_setup =
-        setup_evm_kernel
-          ?kernel_installee:kernel
-          ?additional_config
-          ?whitelist
-          ?commitment_period
-          ?challenge_window
-          ?bootstrap_accounts
-          ?da_fee_per_byte
-          ?minimum_base_fee_per_gas
-          ?rollup_operator_key
-          ?maximum_allowed_ticks
-          ~admin
-          ~setup_mode
-          protocol
+        ]
+        @ additional_uses
       in
-      f ~protocol ~evm_setup)
+      Protocol.register_test
+        ~__FILE__
+        ~tags:(kernel_tag :: extra_tag :: tags)
+        ~uses
+        ~title:(sf "%s (%s, %s)" title extra_tag kernel_tag)
+        ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
+        (fun protocol ->
+          let* evm_setup =
+            setup_evm_kernel
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+               Remove once the upgrade is done *)
+              ~devmode:(kernel = Constant.WASM.evm_kernel)
+              ~kernel_installee:kernel
+              ?additional_config
+              ?whitelist
+              ?commitment_period
+              ?challenge_window
+              ?bootstrap_accounts
+              ?da_fee_per_byte
+              ?minimum_base_fee_per_gas
+              ?rollup_operator_key
+              ?maximum_allowed_ticks
+              ~admin
+              ~setup_mode
+              protocol
+          in
+          f ~protocol ~evm_setup)
+        protocols)
+    (Kernel.to_uses_and_tags kernel)
 
-let register_proxy ~title ~tags ?kernel ?uses ?admin ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?minimum_base_fee_per_gas
-    ?maximum_allowed_ticks f protocols =
+let register_proxy ~title ~tags ?kernel ?additional_uses ?admin
+    ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?minimum_base_fee_per_gas ?maximum_allowed_ticks f protocols =
   register_test
     ~title
     ~tags
     ?kernel
-    ?uses
+    ?additional_uses
     ?admin
     ?commitment_period
     ?challenge_window
@@ -505,16 +510,16 @@ let register_proxy ~title ~tags ?kernel ?uses ?admin ?commitment_period
     protocols
     ~setup_mode:(Setup_proxy {devmode = true})
 
-let register_sequencer ~title ~tags ?kernel ?uses ?additional_config ?admin
-    ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
+let register_sequencer ~title ~tags ?kernel ?additional_uses ?additional_config
+    ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks f protocols =
   let register =
     register_test
       ~title
       ~tags
       ?kernel
-      ?uses
+      ?additional_uses
       ?additional_config
       ?admin
       ?commitment_period
@@ -533,16 +538,16 @@ let register_sequencer ~title ~tags ?kernel ?uses ?additional_config ?admin
       (Setup_sequencer
          {time_between_blocks; sequencer = Constant.bootstrap1; devmode = true})
 
-let register_both ~title ~tags ?kernel ?uses ?additional_config ?admin
-    ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
+let register_both ~title ~tags ?kernel ?additional_uses ?additional_config
+    ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks f protocols =
   let register =
     register_test
       ~title
       ~tags
       ?kernel
-      ?uses
+      ?additional_uses
       ?additional_config
       ?admin
       ?commitment_period
@@ -811,6 +816,9 @@ let test_rpc_getBlockReceipts =
 
 let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "get_block_by_hash"]
     ~title:"getBlockBy returns base fee per gas and mix hash"
     ~minimum_base_fee_per_gas:(Wei.to_wei_z @@ Z.of_int 100)
@@ -1513,6 +1521,7 @@ let test_chunked_transaction =
 
 let test_rpc_txpool_content =
   register_sequencer
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "txpool_content"]
     ~title:"Check RPC txpool_content is available"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -2272,13 +2281,6 @@ let test_deposit_and_withdraw =
     ~tags:["evm"; "deposit"; "withdraw"]
     ~title:"Deposit and withdraw tez"
     ~admin
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-      ])
     ~commitment_period
     ~challenge_window
   @@ fun ~protocol:_
@@ -2358,6 +2360,9 @@ let test_deposit_and_withdraw =
 let test_withdraw_amount =
   let admin = Constant.bootstrap5 in
   register_proxy
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "withdraw"; "wei"; "mutez"]
     ~title:"Minimum amout to withdraw"
     ~admin
@@ -5711,14 +5716,7 @@ let test_validation_with_legacy_encoding =
   register_both
     ~title:"Transaction pool can read the legacy encodings of the validation"
     ~tags:["evm"; "txpool"; "validation"; "legacy"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_evm_node;
-        Constant.octez_smart_rollup_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.ghostnet_evm_kernel;
-      ])
-    ~kernel:Constant.WASM.ghostnet_evm_kernel
+    ~kernel:Kernel.Mainnet
   @@ fun ~protocol:_ ~evm_setup ->
   let* tx_hash =
     send
@@ -5737,6 +5735,9 @@ let test_validation_with_legacy_encoding =
 
 let test_rpc_feeHistory =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "fee_history"]
     ~title:"RPC methods eth_feeHistory"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5784,6 +5785,9 @@ let test_rpc_feeHistory =
 
 let test_rpc_feeHistory_past =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "fee_history"; "past"]
     ~title:"RPC methods eth_feeHistory in the past"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5813,6 +5817,9 @@ let test_rpc_feeHistory_past =
 
 let test_rpc_feeHistory_future =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "fee_history"; "future"]
     ~title:"RPC methods eth_feeHistory in the future"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5831,6 +5838,9 @@ let test_rpc_feeHistory_future =
 
 let test_rpc_feeHistory_long =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "fee_history"; "block_count"]
     ~title:"RPC methods eth_feeHistory with high blockCount"
   @@ fun ~protocol:_ ~evm_setup ->

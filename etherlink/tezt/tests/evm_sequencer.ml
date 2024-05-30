@@ -43,7 +43,6 @@ let uses _protocol =
     Constant.octez_smart_rollup_node;
     Constant.octez_evm_node;
     Constant.smart_rollup_installer;
-    Constant.WASM.evm_kernel;
   ]
 
 open Helpers
@@ -82,6 +81,7 @@ type sequencer_setup = {
   proxy : Evm_node.t;
   l1_contracts : l1_contracts;
   boot_sector : string;
+  kernel : Uses.t;
 }
 
 let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
@@ -173,6 +173,9 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+       Replace by ~devmode after the upgrade *)
+      ~devmode:(kernel = Constant.WASM.evm_kernel)
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
@@ -315,6 +318,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       sc_rollup_address;
       sc_rollup_node;
       boot_sector = output;
+      kernel;
     }
 
 let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
@@ -371,12 +375,14 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(threshold_encryption = false) ?(uses = uses) ?history_mode body =
-  let uses =
-    if threshold_encryption then fun p -> Constant.octez_dsn_node :: uses p
-    else uses
+    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
+    ?history_mode body =
+  let additional_uses =
+    if threshold_encryption then
+      Constant.octez_dsn_node :: kernel :: additional_uses
+    else kernel :: additional_uses
   in
   let body protocol =
     let* sequencer_setup =
@@ -394,7 +400,7 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
         ?bootstrap_accounts
         ?sequencer
         ?sequencer_pool_address
-        ?kernel
+        ~kernel
         ?da_fee
         ?minimum_base_fee_per_gas
         ?preimages_dir
@@ -409,17 +415,17 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
   Protocol.register_test
     ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
     ~__FILE__
-    ~uses
+    ~uses:(fun protocol -> uses protocol @ additional_uses)
     body
 
 let register_both ?devmode ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode ?uses
-    ~title ~tags body protocols =
-  let register ~threshold_encryption =
+    ?(kernel = Kernel.All) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode
+    ?additional_uses ~title ~tags body protocols =
+  let register ~kernel ~threshold_encryption =
     register_test
       ?devmode
       ?genesis_timestamp
@@ -434,23 +440,36 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
       ?bootstrap_accounts
       ?sequencer
       ?sequencer_pool_address
-      ?kernel
+      ~kernel
       ?da_fee
       ?minimum_base_fee_per_gas
       ?preimages_dir
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
-      ?uses
+      ?additional_uses
       ~threshold_encryption
       ?history_mode
       body
       protocols
   in
-  register ~threshold_encryption:false ~title:(sf "%s (sequencer)" title) ~tags ;
-  register
-    ~threshold_encryption:true
-    ~title:(sf "%s (te_sequencer)" title)
-    ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags)
+  List.iter
+    (fun (kernel_tag, kernel) ->
+      let tags = kernel_tag :: tags in
+      register
+        ~kernel
+        ~threshold_encryption:false
+        ~title:(sf "%s (sequencer, %s)" title kernel_tag)
+        ~tags)
+    (Kernel.to_uses_and_tags kernel) ;
+  List.iter
+    (fun (kernel_tag, kernel) ->
+      let tags = kernel_tag :: tags in
+      register
+        ~kernel
+        ~threshold_encryption:true
+        ~title:(sf "%s (te_sequencer, %s)" title kernel_tag)
+        ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags))
+    (Kernel.to_uses_and_tags Latest)
 
 module Protocol = struct
   include Protocol
@@ -1214,6 +1233,9 @@ let test_delayed_deposit_from_init_rollup_node =
 (** test to initialise a sequencer data dir based on a rollup node data dir *)
 let test_init_from_rollup_node_data_dir =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
@@ -1832,6 +1854,7 @@ let test_self_upgrade_kernel =
            sequencer;
            proxy;
            observer;
+           kernel;
            _;
          }
              _protocol ->
@@ -1843,7 +1866,7 @@ let test_self_upgrade_kernel =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.evm_kernel
+      ~upgrade_to:kernel
       ~activation_timestamp
   in
 
@@ -1900,10 +1923,12 @@ let test_upgrade_kernel_auto_sync =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_both
+    ~kernel:Kernel.Mainnet
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
     ~title:"Rollup-node kernel upgrade is applied to the sequencer state."
+    ~additional_uses:[Constant.WASM.evm_kernel]
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -1984,6 +2009,7 @@ let test_delayed_transfer_timeout =
            proxy;
            observer = _;
            boot_sector = _;
+           kernel = _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2044,6 +2070,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
            proxy;
            observer = _;
            boot_sector = _;
+           kernel = _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2109,7 +2136,8 @@ let test_force_kernel_upgrade_too_early =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
     ~title:"Force kernel upgrade fail too early"
-    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+    ~additional_uses:
+      [Constant.WASM.ghostnet_evm_kernel; Constant.WASM.evm_kernel]
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -2117,6 +2145,7 @@ let test_force_kernel_upgrade_too_early =
            client;
            sequencer;
            proxy;
+           kernel;
            _;
          }
              _protocol ->
@@ -2145,7 +2174,10 @@ let test_force_kernel_upgrade_too_early =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~upgrade_to:
+        (if kernel = Constant.WASM.ghostnet_evm_kernel then
+           Constant.WASM.evm_kernel
+         else Constant.WASM.ghostnet_evm_kernel)
       ~activation_timestamp
   in
 
@@ -2171,7 +2203,8 @@ let test_force_kernel_upgrade =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
     ~title:"Force kernel upgrade"
-    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+    ~additional_uses:
+      [Constant.WASM.ghostnet_evm_kernel; Constant.WASM.evm_kernel]
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -2179,6 +2212,7 @@ let test_force_kernel_upgrade =
            client;
            sequencer;
            proxy;
+           kernel;
            _;
          }
              _protocol ->
@@ -2207,7 +2241,10 @@ let test_force_kernel_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~upgrade_to:
+        (if kernel = Constant.WASM.ghostnet_evm_kernel then
+           Constant.WASM.evm_kernel
+         else Constant.WASM.ghostnet_evm_kernel)
       ~activation_timestamp
   in
 
@@ -2298,6 +2335,7 @@ let test_delayed_inbox_flushing =
            proxy;
            observer = _;
            boot_sector = _;
+           kernel = _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2407,7 +2445,7 @@ let test_migration_from_ghostnet =
     ~max_blueprints_lag:0
     ~tags:["evm"; "sequencer"; "upgrade"; "migration"; "ghostnet"]
     ~title:"Sequencer can upgrade from ghostnet"
-    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+    ~additional_uses:[Constant.WASM.evm_kernel]
   @@ fun {
            sequencer;
            client;
@@ -3175,7 +3213,8 @@ let test_preimages_endpoint =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
     ~title:"Sequencer use remote server to get preimages"
-    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+    ~kernel:Kernel.Latest
+    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -3261,7 +3300,6 @@ let test_store_smart_rollup_address =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "store"]
     ~title:"Sequencer checks the smart rollup address"
-    ~uses
   @@ fun {sequencer; client; node; _} _protocol ->
   (* Starting the sequencer stores the smart rollup address in the store. *)
   (* Kill the sequencer. *)
@@ -3342,15 +3380,8 @@ let test_txpool_content_empty_with_legacy_encoding =
     ~tags:["evm"; "txpool_content"; "legacy"]
     ~time_between_blocks:Nothing
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_evm_node;
-        Constant.octez_smart_rollup_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.ghostnet_evm_kernel;
-        Constant.WASM.evm_kernel;
-      ])
-    ~kernel:Constant.WASM.ghostnet_evm_kernel
+    ~additional_uses:[Constant.WASM.evm_kernel]
+    ~kernel:Kernel.Mainnet
     ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
@@ -3461,6 +3492,9 @@ let test_txpool_content_empty_with_legacy_encoding =
 
 let test_trace_transaction =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -3524,6 +3558,9 @@ let test_trace_transaction =
 
 let test_trace_transaction_on_invalid_transaction =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -3609,6 +3646,9 @@ let check_trace expect_null expected_returned_value receipt trace =
 
 let test_trace_transaction_call =
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
@@ -3719,6 +3759,9 @@ let test_miner =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
   in
   register_both
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+     Replace by [Any] after the next upgrade *)
+    ~kernel:Latest
     ~tags:["evm"; "miner"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
