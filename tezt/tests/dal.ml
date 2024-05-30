@@ -6720,8 +6720,16 @@ module Refutations = struct
        shards store of the faulty node by interchanging the content/shards of
        [commitment0] and [commitment1]. *)
     let mv_shards from into =
-      sf "mv %s/%s %s/%s" shards_store from shards_store into
-      |> Sys.command |> ignore
+      sf "mv %s/%s %s/%s" shards_store from shards_store into |> Sys.command
+      |> function
+      | 0 ->
+          Log.info "Copied %s/%s into %s/%s" shards_store from shards_store into
+      | n ->
+          Test.fail
+            "Failed to copy file %s/%s. Got a ret code %d@."
+            shards_store
+            from
+            n
     in
     mv_shards commitment0 "tmp" ;
     mv_shards commitment1 commitment0 ;
