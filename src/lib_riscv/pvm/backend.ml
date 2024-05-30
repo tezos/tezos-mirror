@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -30,4 +31,23 @@ let get_tick state = Lwt.return (Z.of_int64 (Api.octez_riscv_get_tick state))
 
 let get_status state = Lwt.return (Api.octez_riscv_get_status state)
 
+let get_message_counter state =
+  Lwt.return (Api.octez_riscv_get_message_counter state)
+
 let string_of_status status = Api.octez_riscv_string_of_status status
+
+let install_boot_sector state boot_sector =
+  Lwt.return
+    (Api.octez_riscv_install_boot_sector state (Bytes.of_string boot_sector))
+
+let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
+
+let state_hash state = Api.octez_riscv_state_hash state
+
+let set_input state level message_counter payload =
+  Lwt.return
+    (Api.octez_riscv_set_input
+       state
+       level
+       message_counter
+       (Bytes.of_string payload))

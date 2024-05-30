@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -31,4 +32,14 @@ val get_tick : state -> Z.t Lwt.t
 
 val get_status : state -> status Lwt.t
 
+val get_message_counter : state -> int64 Lwt.t
+
 val string_of_status : status -> string
+
+val install_boot_sector : state -> string -> state Lwt.t
+
+val get_current_level : state -> int32 option Lwt.t
+
+val state_hash : state -> bytes
+
+val set_input : state -> int32 -> int64 -> string -> state Lwt.t

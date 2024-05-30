@@ -20,9 +20,11 @@ end
 module Id = struct
   type t = Api.id
 
-  let unsafe_of_raw_string hash = Api.octez_riscv_id_unsafe_of_raw_string hash
+  let unsafe_of_raw_string hash =
+    Api.octez_riscv_id_unsafe_of_raw_bytes (Bytes.of_string hash)
 
-  let to_raw_string id = Api.octez_riscv_storage_id_to_raw_string id
+  let to_raw_string id =
+    String.of_bytes (Api.octez_riscv_storage_id_to_raw_bytes id)
 
   let equal id1 id2 = Api.octez_riscv_storage_id_equal id1 id2
 end
