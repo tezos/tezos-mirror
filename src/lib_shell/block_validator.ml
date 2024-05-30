@@ -141,28 +141,6 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
       tzfail (invalid_block hash error)
   | None | Some _ -> return_unit
 
-let validate_block bvp chain_db chain_store ~predecessor block_header block_hash
-    operations bv_operations =
-  let open Lwt_result_syntax in
-  let*! () = Events.(emit validating_block) block_hash in
-  let* () =
-    Block_validator_process.validate_block
-      bvp
-      chain_store
-      ~predecessor
-      block_header
-      block_hash
-      bv_operations
-  in
-  let*! () = Events.(emit validated_block) block_hash in
-  (* Add the block and operations to the cache of the ddb to make them
-     available to our peers *)
-  Distributed_db.inject_validated_block
-    chain_db
-    block_hash
-    block_header
-    operations
-
 let check_operations_merkle_root hash header operations =
   let open Result_syntax in
   let fail_unless b e = if b then return_unit else tzfail e in
@@ -201,6 +179,28 @@ let with_retry_to_load_protocol (bv : Types.state) ~peer f =
       in
       f ()
   | _ -> Lwt.return r
+
+let validate_block bvp chain_db chain_store ~predecessor block_header block_hash
+    operations bv_operations =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit validating_block) block_hash in
+  let* () =
+    Block_validator_process.validate_block
+      bvp
+      chain_store
+      ~predecessor
+      block_header
+      block_hash
+      bv_operations
+  in
+  let*! () = Events.(emit validated_block) block_hash in
+  (* Add the block and operations to the cache of the ddb to make them
+     available to our peers *)
+  Distributed_db.inject_validated_block
+    chain_db
+    block_hash
+    block_header
+    operations
 
 let on_validation_request w
     {
