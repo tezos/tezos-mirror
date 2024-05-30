@@ -17,7 +17,7 @@ use octez_riscv::{
         },
         registers,
     },
-    stepper::test::TestStepperResult,
+    stepper::test::{TestStepper, TestStepperResult},
 };
 use ratatui::{
     prelude::*,
@@ -131,7 +131,7 @@ impl Instruction {
     }
 }
 
-impl<'a> DebuggerApp<'a> {
+impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     fn render_program_pane(&mut self, area: Rect, buf: &mut Buffer) {
         let title = Title::from(format!(" {} ", self.title).bold());
         let block = Block::default()
@@ -505,7 +505,7 @@ impl<'a> DebuggerApp<'a> {
     }
 }
 
-impl Widget for &mut DebuggerApp<'_> {
+impl<'a> Widget for &mut DebuggerApp<'a, TestStepper<'a>> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Split main layout from bottom instructions bar
         use Constraint::{Fill, Length, Percentage};

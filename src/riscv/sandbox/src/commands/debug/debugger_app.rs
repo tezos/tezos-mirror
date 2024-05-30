@@ -144,14 +144,14 @@ struct ProgramView<'a> {
     symbols: HashMap<u64, &'a str>,
 }
 
-pub struct DebuggerApp<'a> {
+pub struct DebuggerApp<'a, S> {
     title: &'a str,
-    interpreter: &'a mut TestStepper<'a>,
+    interpreter: &'a mut S,
     program: ProgramView<'a>,
     state: DebuggerState,
 }
 
-impl<'a> DebuggerApp<'a> {
+impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
         let mut backend = TestStepper::<'_>::create_backend();
         let (mut interpreter, prog) =

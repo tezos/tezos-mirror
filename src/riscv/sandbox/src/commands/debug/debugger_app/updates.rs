@@ -7,11 +7,11 @@ use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use octez_riscv::{
     machine_state::{bus::Address, csregisters::CSRegister, AccessType},
     parser::{instruction::Instr, parse},
-    stepper::test::TestStepperResult,
+    stepper::test::{TestStepper, TestStepperResult},
 };
 use std::{collections::HashMap, ops::Range};
 
-impl<'a> DebuggerApp<'a> {
+impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     pub(super) fn update_after_step(&mut self, result: TestStepperResult) {
         let (pc, faulting) = self.update_pc_after_step();
         self.update_translation_after_step(faulting);
