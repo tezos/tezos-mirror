@@ -2,44 +2,24 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::Stepper;
 use crate::{
-    bits::Bits64,
     exec_env::{
         posix::{Posix, PosixState},
         EcallOutcome, ExecutionEnvironment, ExecutionEnvironmentState,
     },
     kernel_loader,
-    machine_state::{
-        bus::{
-            main_memory::{MainMemoryLayout, M1G},
-            Address, Addressable, OutOfBounds,
-        },
-        csregisters::{satp::TranslationAlgorithm, CSRegister},
-        registers::{FRegister, FValue},
-        AccessType,
-    },
-    machine_state::{
-        mode, registers::XRegister, MachineError, MachineState, MachineStateLayout, StepManyResult,
-    },
+    machine_state::bus::main_memory::{MainMemoryLayout, M1G},
+    machine_state::{mode, MachineError, MachineState, MachineStateLayout, StepManyResult},
     program::Program,
     state_backend::{
         memory_backend::{InMemoryBackend, SliceManager},
-        Backend, Elem, Layout,
+        Backend, Layout,
     },
-    traps::{EnvironException, Exception},
+    traps::EnvironException,
 };
 use derive_more::{Error, From};
 use std::{collections::BTreeMap, ops::RangeBounds};
-
-type TestStepperLayout<ML = M1G> = (
-    <Posix as ExecutionEnvironment>::Layout,
-    MachineStateLayout<ML>,
-);
-
-pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
-    machine_state: MachineState<ML, SliceManager<'a>>,
-    exec_env_state: PosixState<SliceManager<'a>>,
-}
 
 #[derive(Clone, Debug)]
 pub enum TestStepperResult {
@@ -64,6 +44,16 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
+type TestStepperLayout<ML = M1G> = (
+    <Posix as ExecutionEnvironment>::Layout,
+    MachineStateLayout<ML>,
+);
+
+pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
+    machine_state: MachineState<ML, SliceManager<'a>>,
+    exec_env_state: PosixState<SliceManager<'a>>,
+}
+
 impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     /// In order to create an [Interpreter], a memory backend must first be generated.
     /// Currently, the size of the main memory to be allocated is fixed at 1GB.
@@ -80,42 +70,6 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
             exec_env_state,
             machine_state,
         }
-    }
-
-    pub fn effective_translation_alg(
-        &self,
-        access_type: &AccessType,
-    ) -> Option<TranslationAlgorithm> {
-        self.machine_state.effective_translation_alg(access_type)
-    }
-
-    /// Obtain the translated address of pc.
-    pub fn translate_instruction_address(&self, pc: Address) -> Result<Address, Exception> {
-        self.machine_state.translate(pc, AccessType::Instruction)
-    }
-
-    pub fn read_bus<E: Elem>(&self, address: Address) -> Result<E, OutOfBounds> {
-        self.machine_state.bus.read(address)
-    }
-
-    pub fn read_xregister(&self, reg: XRegister) -> u64 {
-        self.machine_state.hart.xregisters.read(reg)
-    }
-
-    pub fn read_fregister(&self, reg: FRegister) -> FValue {
-        self.machine_state.hart.fregisters.read(reg)
-    }
-
-    pub fn read_csregister<V: Bits64>(&self, reg: CSRegister) -> V {
-        self.machine_state.hart.csregisters.read::<V>(reg)
-    }
-
-    pub fn read_pc(&self) -> u64 {
-        self.machine_state.hart.pc.read()
-    }
-
-    pub fn read_mode(&self) -> mode::Mode {
-        self.machine_state.hart.mode.read_default()
     }
 
     /// Initialise an interpreter with a given [program], starting execution in [mode].
@@ -224,5 +178,16 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
         F: FnMut(&MachineState<ML, SliceManager<'a>>) -> bool,
     {
         self.run_accum(0, &steps, should_continue)
+    }
+}
+
+impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
+    type MainMemoryLayout = ML;
+
+    type Manager = SliceManager<'a>;
+
+    #[inline(always)]
+    fn machine_state(&self) -> &MachineState<Self::MainMemoryLayout, Self::Manager> {
+        &self.machine_state
     }
 }

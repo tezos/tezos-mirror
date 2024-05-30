@@ -17,7 +17,10 @@ use octez_riscv::{
         },
         registers,
     },
-    stepper::test::{TestStepper, TestStepperResult},
+    stepper::{
+        test::{TestStepper, TestStepperResult},
+        Stepper,
+    },
 };
 use ratatui::{
     prelude::*,
@@ -30,8 +33,16 @@ macro_rules! xregister_line {
     ($self: ident, $reg: ident) => {
         Line::from(vec![
             format!("   {0} ({0:?}): ", $reg).into(),
-            format!("{} ", $self.interpreter.read_xregister($reg)).fg(super::YELLOW),
-            format!("0x{:x}", $self.interpreter.read_xregister($reg)).fg(super::ORANGE),
+            format!(
+                "{} ",
+                $self.interpreter.machine_state().hart.xregisters.read($reg)
+            )
+            .fg(super::YELLOW),
+            format!(
+                "0x{:x}",
+                $self.interpreter.machine_state().hart.xregisters.read($reg)
+            )
+            .fg(super::ORANGE),
         ])
     };
 }
@@ -40,8 +51,16 @@ macro_rules! fregister_line {
     ($self: ident, $reg: ident) => {
         Line::from(vec![
             format!("   {0} ({0:?}): ", $reg).into(),
-            format!("{} ", u64::from($self.interpreter.read_fregister($reg))).fg(super::YELLOW),
-            format!("0x{:x}", u64::from($self.interpreter.read_fregister($reg))).fg(super::ORANGE),
+            format!(
+                "{} ",
+                u64::from($self.interpreter.machine_state().hart.fregisters.read($reg))
+            )
+            .fg(super::YELLOW),
+            format!(
+                "0x{:x}",
+                u64::from($self.interpreter.machine_state().hart.fregisters.read($reg))
+            )
+            .fg(super::ORANGE),
         ])
     };
 }
@@ -222,7 +241,12 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
         use csregisters::*;
         use CSRegister as CSR;
 
-        let mstatus: MStatus = self.interpreter.read_csregister(CSR::mstatus);
+        let mstatus: MStatus = self
+            .interpreter
+            .machine_state()
+            .hart
+            .csregisters
+            .read(CSR::mstatus);
         let mbe = mstatus.mbe();
         let sbe = mstatus.sbe();
         let tvm = mstatus.tvm();
@@ -360,8 +384,18 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
 
         use csregisters::*;
 
-        let frm: CSRRepr = self.interpreter.read_csregister(CSRegister::frm);
-        let fflags: CSRRepr = self.interpreter.read_csregister(CSRegister::fflags);
+        let frm: CSRRepr = self
+            .interpreter
+            .machine_state()
+            .hart
+            .csregisters
+            .read(CSRegister::frm);
+        let fflags: CSRRepr = self
+            .interpreter
+            .machine_state()
+            .hart
+            .csregisters
+            .read(CSRegister::fflags);
 
         fn rounding_mode(rm: u64) -> &'static str {
             match rm {
@@ -389,7 +423,10 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
                 format!(
                     "0x{:02x}",
                     self.interpreter
-                        .read_csregister::<CSRRepr>(CSRegister::fcsr)
+                        .machine_state()
+                        .hart
+                        .csregisters
+                        .read::<CSRRepr>(CSRegister::fcsr)
                 )
                 .fg(ORANGE),
             ]),
@@ -425,7 +462,7 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
             .border_set(border::THICK);
         let pc_line = Line::from(vec![
             "   PC: ".into(),
-            format!("{:x}", self.interpreter.read_pc()).fg(ORANGE),
+            format!("{:x}", self.interpreter.machine_state().hart.pc.read()).fg(ORANGE),
         ]);
         let TranslationState {
             mode,
@@ -443,7 +480,11 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
         ]);
         let mode_line = Line::from(vec![
             "   Mode: ".into(),
-            format!("{:?}", self.interpreter.read_mode()).fg(BLUE),
+            format!(
+                "{:?}",
+                self.interpreter.machine_state().hart.mode.read_default()
+            )
+            .fg(BLUE),
         ]);
         let status_text = match &self.state.interpreter {
             TestStepperResult::Running(steps) => vec![

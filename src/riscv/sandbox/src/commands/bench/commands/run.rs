@@ -12,9 +12,15 @@ use crate::{
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
-    machine_state::bus::Address,
+    machine_state::{
+        bus::{Address, Addressable},
+        AccessType,
+    },
     parser::{instruction::Instr, parse},
-    stepper::test::{TestStepper, TestStepperResult},
+    stepper::{
+        test::{TestStepper, TestStepperResult},
+        Stepper,
+    },
 };
 use std::{
     collections::HashSet,
@@ -25,14 +31,15 @@ use std::{
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
-fn get_current_instr(interpreter: &TestStepper) -> Result<Instr, InstrGetError> {
+fn get_current_instr<S: Stepper>(stepper: &S) -> Result<Instr, InstrGetError> {
+    let machine_state = stepper.machine_state();
     let get_half_instr = |raw_pc: Address| -> Result<u16, InstrGetError> {
-        let pc = interpreter
-            .translate_instruction_address(raw_pc)
+        let pc = machine_state
+            .translate(raw_pc, AccessType::Instruction)
             .or(Err(InstrGetError::Translation))?;
-        interpreter.read_bus(pc).or(Err(InstrGetError::Parse))
+        machine_state.bus.read(pc).or(Err(InstrGetError::Parse))
     };
-    let pc = interpreter.read_pc();
+    let pc = machine_state.hart.pc.read();
     let first = get_half_instr(pc)?;
     let second = || get_half_instr(pc + 2);
     parse(first, second)

@@ -63,6 +63,7 @@ impl Instruction {
         }
     }
 }
+
 enum EffectiveTranslationState {
     Off,
     On,

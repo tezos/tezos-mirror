@@ -6,10 +6,14 @@
 use goldenfile::Mint;
 use octez_riscv::{
     machine_state::{
+        bus::main_memory::M1G,
         mode::Mode,
         registers::{gp, XRegister, XValue},
     },
-    stepper::test::{TestStepper, TestStepperResult::*},
+    stepper::{
+        test::{TestStepper, TestStepperResult::*},
+        Stepper,
+    },
 };
 use std::{fs, io::Write};
 
@@ -17,11 +21,11 @@ const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const GOLDEN_DIR: &str = "tests/expected";
 const MAX_STEPS: usize = 1_000_000;
 
-fn check_register_values(interpreter: &TestStepper, check_xregs: &[(XRegister, XValue)]) {
+fn check_register_values<S: Stepper>(stepper: &S, check_xregs: &[(XRegister, XValue)]) {
     let failure = check_xregs
         .iter()
         .filter_map(|(xreg, xval)| {
-            let res = interpreter.read_xregister(*xreg);
+            let res = stepper.machine_state().hart.xregisters.read(*xreg);
             (res != *xval).then(|| format!("\n- check {xreg} == {xval} | got {res}"))
         })
         .collect::<String>();
@@ -38,7 +42,7 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
     let mut golden = mint.new_goldenfile(format!("{path}.out")).unwrap();
 
     let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
-    let mut backend = TestStepper::<'_>::create_backend();
+    let mut backend = TestStepper::<'_, M1G>::create_backend();
     let mut interpreter =
         TestStepper::new(&mut backend, &contents, None, exit_mode).expect("Boot failed");
 
