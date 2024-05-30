@@ -44,22 +44,15 @@ val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 val may_add :
   Rpc_context.t -> t -> first_level:int32 -> proto_level:int -> t tzresult Lwt.t
 
-(** [initial_plugins rpc_ctxt ~current_level ~attestation_lag] returns the
-    plugins for levels between [current_level - 2 - attestation_lag] and
-    [current_level], where [current_level] is the level at which the DAL node
-    started. Note that if a migration has happened in this interval, there will
-    be two plugins. Note also that the node does not need the plugin for levels
-    smaller than [current_level - 2 - attestation_lag] ([current_level - 2] is
-    the level of the first processed block).
+(** [initial_plugins rpc_ctxt ~first_level ~last_level] returns the plugins for
+    levels between [first_level] and [last_last]. Note that if migrations have
+    happened in this interval, there will be several plugins.
 
     It returns an error if the [Chain_services.Blocks.protocols] RPC fails, or
-    if the plugin is not registered, in which case it returns
+    if some plugin is not registered, in which case it returns
     [No_plugin_for_proto]. *)
 val initial_plugins :
-  Rpc_context.t ->
-  current_level:int32 ->
-  attestation_lag:int ->
-  t tzresult Lwt.t
+  Rpc_context.t -> first_level:int32 -> last_level:int32 -> t tzresult Lwt.t
 
 (** [resolve_plugin_for_level rpc_ctxt ~level] returns the plugin for the given
     [level].

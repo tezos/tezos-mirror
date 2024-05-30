@@ -67,12 +67,8 @@ let resolve_plugin_for_level cctxt ~level =
   let proto_hash = protocols.next_protocol in
   resolve_plugin_by_hash proto_hash
 
-let initial_plugins cctxt ~current_level ~attestation_lag =
+let initial_plugins cctxt ~first_level ~last_level =
   let open Lwt_result_syntax in
-  let last_level = current_level in
-  let first_level =
-    Int32.max 1l (Int32.sub current_level (Int32.of_int (attestation_lag + 2)))
-  in
   let block = `Level first_level in
   let* protocols =
     Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()

@@ -125,12 +125,12 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
           ctxt.profile_ctxt
           ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
       in
-      let attestation_lag = proto_parameters.attestation_lag in
       let* proto_plugins =
-        Proto_plugins.initial_plugins
-          cctxt
-          ~current_level:level
-          ~attestation_lag
+        let relevant_period = proto_parameters.Dal_plugin.attestation_lag in
+        let first_level =
+          Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
+        in
+        Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
       in
       ctxt.status <-
         Ready
