@@ -33,6 +33,9 @@ ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXE
 #Define octez only executables by excluding the EVM-node.
 OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node,${ALL_EXECUTABLES})
 
+#Define octez layer1 only executables by excluding the EVM-node.
+OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out octez-evm-node octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dac-client octez-dac-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
+
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
 # build the TPS evaluation tool, Octogram and the Tezt test suite in the
@@ -98,6 +101,10 @@ release:
 .PHONY: octez
 octez:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_EXECUTABLES)"
+
+.PHONY: octez-layer1
+octez-layer1:
+	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_LAYER1_EXECUTABLES)"
 
 .PHONY: experimental-release
 experimental-release:
