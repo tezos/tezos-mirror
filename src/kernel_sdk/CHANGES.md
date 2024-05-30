@@ -12,6 +12,7 @@
 - Add michelson `nat`.
 - Removes deprecated `proto-nairobi` feature flag.
 - Stabilise `OutboxMessage::WhitelistUpdate`.
+- Add `entrypoint` procedural macro to mark the kernel entrypoint function.
 
 ### Installer client/kernel
 

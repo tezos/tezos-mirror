@@ -2,10 +2,11 @@ mod sbi_crypto;
 
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup::{
-    inbox::InboxMessage, kernel_entry, michelson::MichelsonUnit, prelude::*,
-    storage::path::OwnedPath, types::SmartRollupAddress,
+    inbox::InboxMessage, michelson::MichelsonUnit, prelude::*, storage::path::OwnedPath,
+    types::SmartRollupAddress,
 };
 
+#[tezos_smart_rollup::entrypoint]
 pub fn entry(host: &mut impl Runtime) {
     let msg = "Hello World\n";
     debug_msg!(host, "{}", msg);
@@ -59,5 +60,3 @@ pub fn entry(host: &mut impl Runtime) {
     // Drain the inbox, making the sandbox stop.
     while host.read_input().map(|msg| msg.is_some()).unwrap_or(true) {}
 }
-
-kernel_entry!(entry);

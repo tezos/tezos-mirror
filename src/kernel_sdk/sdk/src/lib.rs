@@ -14,6 +14,7 @@ extern crate alloc;
 extern crate hermit;
 
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
+pub use tezos_smart_rollup_macros::entrypoint;
 
 pub mod host {
     //! A low level, but safe, wrapper over the Smart Rollup host functions.
