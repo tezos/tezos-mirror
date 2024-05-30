@@ -126,7 +126,17 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
           ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
       in
       let* proto_plugins =
-        let relevant_period = proto_parameters.Dal_plugin.attestation_lag in
+        (* We resolve the plugins for all levels starting with [first_level]. It
+           is currently not necessary to go as far in the past, because only the
+           protocol parameters for these past levels are needed, and these do
+           not change for now (and are not retrieved for these past
+           levels). However, if/when they do change, it will be necessary to
+           retrieve them, using the right plugins. *)
+        let relevant_period =
+          Profile_manager.get_attested_data_default_store_period
+            ctxt.profile_ctxt
+            proto_parameters
+        in
         let first_level =
           Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
         in
