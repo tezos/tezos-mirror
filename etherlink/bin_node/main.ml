@@ -521,10 +521,7 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
-  let* () =
-    if config.devmode then Evm_node_lib_dev.Proxy.main config
-    else Evm_node_lib_prod.Proxy.main config
-  in
+  let* () = Evm_node_lib_dev.Proxy.main config in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in
   return_unit
@@ -668,22 +665,14 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
-  if configuration.devmode then
-    Evm_node_lib_dev.Sequencer.main
-      ~data_dir
-      ?genesis_timestamp
-      ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~configuration
-      ?kernel
-      ()
-  else
-    Evm_node_lib_prod.Sequencer.main
-      ~data_dir
-      ?genesis_timestamp
-      ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~configuration
-      ?kernel
-      ()
+
+  Evm_node_lib_dev.Sequencer.main
+    ~data_dir
+    ?genesis_timestamp
+    ~cctxt:(wallet_ctxt :> Client_context.wallet)
+    ~configuration
+    ?kernel
+    ()
 
 let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
@@ -918,9 +907,7 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  if config.devmode then
-    Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
-  else Evm_node_lib_prod.Observer.main ?kernel_path:kernel ~data_dir ~config ()
+  Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
 
 let observer_command =
   let open Tezos_clic in
@@ -997,41 +984,6 @@ let observer_command =
     ?log_filter_max_nb_blocks
     ?kernel
     ()
-
-let make_prod_messages ~kind ~smart_rollup_address data =
-  let open Lwt_result_syntax in
-  let open Evm_node_lib_dev in
-  let open Evm_node_lib_dev_encoding in
-  let transactions =
-    List.map
-      (fun s -> Ethereum_types.hex_of_string s |> Ethereum_types.hex_to_bytes)
-      data
-  in
-  let* messages =
-    match kind with
-    | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
-        let* blueprint =
-          Sequencer_blueprint.create
-            ~cctxt
-            ~sequencer_key:sk_uri
-            ~timestamp
-            ~smart_rollup_address
-            ~number:(Ethereum_types.quantity_of_z number)
-            ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
-            ~transactions
-            ~delayed_transactions:[]
-        in
-        return @@ List.map (fun (`External s) -> s) blueprint
-    | `Transaction ->
-        let*? chunks =
-          List.map_e
-            (fun tx ->
-              Transaction_format.make_encoded_messages ~smart_rollup_address tx)
-            transactions
-        in
-        return (chunks |> List.map snd |> List.flatten)
-  in
-  return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
 let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
@@ -1110,7 +1062,7 @@ let chunker_command =
             is prefixed with `file:`, the content is read from the given \
             filename and can contain a list of data separated by a whitespace."
          (Tezos_clic.parameter (fun _ -> from_data_or_file)))
-    (fun ( devmode,
+    (fun ( _devmode,
            rollup_address,
            as_blueprint,
            blueprint_timestamp,
@@ -1142,10 +1094,7 @@ let chunker_command =
       in
       let data = List.flatten data in
       let print_chunks smart_rollup_address data =
-        let* messages =
-          if devmode then make_dev_messages ~kind ~smart_rollup_address data
-          else make_prod_messages ~kind ~smart_rollup_address data
-        in
+        let* messages = make_dev_messages ~kind ~smart_rollup_address data in
         Format.printf "Chunked transactions :\n%!" ;
         List.iter (Format.printf "%s\n%!") messages ;
         return_unit
@@ -1173,14 +1122,10 @@ let make_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ stop)
-    (fun devmode root_hash timestamp () ->
+    (fun _devmode root_hash timestamp () ->
       let payload =
-        if devmode then
-          Evm_node_lib_dev_encoding.Ethereum_types.Upgrade.(
-            to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
-        else
-          Evm_node_lib_prod_encoding.Ethereum_types.Upgrade.(
-            to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
+        Evm_node_lib_dev_encoding.Ethereum_types.Upgrade.(
+          to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
@@ -1204,7 +1149,7 @@ let make_sequencer_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun (wallet_dir, devmode)
+    (fun (wallet_dir, _devmode)
          pool_address
          activation_timestamp
          sequencer_str
@@ -1219,16 +1164,11 @@ let make_sequencer_upgrade_command =
           sequencer_sk_opt
       in
       let* payload =
-        if devmode then
-          let open Evm_node_lib_dev_encoding.Ethereum_types in
-          let sequencer_upgrade : Sequencer_upgrade.t =
-            {sequencer; pool_address; timestamp = activation_timestamp}
-          in
-          return @@ Sequencer_upgrade.to_bytes sequencer_upgrade
-        else
-          tzfail
-            (error_of_fmt
-               "devmode must be set for producing the sequencer upgrade")
+        let open Evm_node_lib_dev_encoding.Ethereum_types in
+        let sequencer_upgrade : Sequencer_upgrade.t =
+          {sequencer; pool_address; timestamp = activation_timestamp}
+        in
+        return @@ Sequencer_upgrade.to_bytes sequencer_upgrade
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
@@ -1248,23 +1188,17 @@ let init_from_rollup_node_command =
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
     (fun ( data_dir,
-           devmode,
+           _devmode,
            omit_delayed_tx_events,
            reconstruct_from_boot_sector )
          rollup_node_data_dir
          () ->
-      if devmode then
-        Evm_node_lib_dev.Evm_context.init_from_rollup_node
-          ~omit_delayed_tx_events
-          ~data_dir
-          ~rollup_node_data_dir
-          ?reconstruct_from_boot_sector
-          ()
-      else
-        Evm_node_lib_prod.Evm_context.init_from_rollup_node
-          ~omit_delayed_tx_events
-          ~data_dir
-          ~rollup_node_data_dir)
+      Evm_node_lib_dev.Evm_context.init_from_rollup_node
+        ~omit_delayed_tx_events
+        ~data_dir
+        ~rollup_node_data_dir
+        ?reconstruct_from_boot_sector
+        ())
 
 let dump_to_rlp_command =
   let open Tezos_clic in
@@ -1277,7 +1211,7 @@ let dump_to_rlp_command =
     @@ prefixes ["to"; "rlp"]
     @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
     @@ stop)
-    (fun (devmode, keep_everything) dump_json dump_rlp () ->
+    (fun (_devmode, keep_everything) dump_json dump_rlp () ->
       let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
       let config =
         Data_encoding.Json.destruct
@@ -1298,26 +1232,8 @@ let dump_to_rlp_command =
               :: acc
             else acc
         in
-        if devmode then
-          let open Evm_node_lib_dev_encoding.Rlp in
-          List.fold_left aux [] config |> fun l -> encode (List l)
-        else
-          let aux =
-            let open Evm_node_lib_prod_encoding.Rlp in
-            if keep_everything then
-              fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
-              :: acc
-            else
-              fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-              if String.starts_with ~prefix:"/evm" to_ then
-                List
-                  [Value (String.to_bytes to_); Value (String.to_bytes value)]
-                :: acc
-              else acc
-          in
-          let open Evm_node_lib_prod_encoding.Rlp in
-          List.fold_left aux [] config |> fun l -> encode (List l)
+        let open Evm_node_lib_dev_encoding.Rlp in
+        List.fold_left aux [] config |> fun l -> encode (List l)
       in
 
       let write_bytes_to_file filename bytes =
@@ -1572,7 +1488,7 @@ let make_kernel_config_command =
          ~desc:"file path where the config will be written to"
          Params.string
     @@ stop)
-    (fun ( devmode,
+    (fun ( _devmode,
            kernel_root_hash,
            chain_id,
            sequencer,
@@ -1594,52 +1510,28 @@ let make_kernel_config_command =
            bootstrap_accounts )
          output
          () ->
-      if devmode then
-        Evm_node_lib_dev.Kernel_config.make
-          ?kernel_root_hash
-          ?chain_id
-          ?sequencer
-          ?delayed_bridge
-          ?ticketer
-          ?admin
-          ?sequencer_governance
-          ?kernel_governance
-          ?kernel_security_governance
-          ?minimum_base_fee_per_gas
-          ?da_fee_per_byte
-          ?delayed_inbox_timeout
-          ?delayed_inbox_min_levels
-          ?sequencer_pool_address
-          ?maximum_allowed_ticks
-          ?maximum_gas_per_transaction
-          ?remove_whitelist
-          ~boostrap_balance
-          ?bootstrap_accounts
-          ~output
-          ()
-      else
-        Evm_node_lib_prod.Kernel_config.make
-          ?kernel_root_hash
-          ?chain_id
-          ?sequencer
-          ?delayed_bridge
-          ?ticketer
-          ?admin
-          ?sequencer_governance
-          ?kernel_governance
-          ?kernel_security_governance
-          ?minimum_base_fee_per_gas
-          ?da_fee_per_byte
-          ?delayed_inbox_timeout
-          ?delayed_inbox_min_levels
-          ?sequencer_pool_address
-          ?maximum_allowed_ticks
-          ?maximum_gas_per_transaction
-          ?remove_whitelist
-          ~boostrap_balance
-          ?bootstrap_accounts
-          ~output
-          ())
+      Evm_node_lib_dev.Kernel_config.make
+        ?kernel_root_hash
+        ?chain_id
+        ?sequencer
+        ?delayed_bridge
+        ?ticketer
+        ?admin
+        ?sequencer_governance
+        ?kernel_governance
+        ?kernel_security_governance
+        ?minimum_base_fee_per_gas
+        ?da_fee_per_byte
+        ?delayed_inbox_timeout
+        ?delayed_inbox_min_levels
+        ?sequencer_pool_address
+        ?maximum_allowed_ticks
+        ?maximum_gas_per_transaction
+        ?remove_whitelist
+        ~boostrap_balance
+        ?bootstrap_accounts
+        ~output
+        ())
 
 let proxy_simple_command =
   let open Tezos_clic in

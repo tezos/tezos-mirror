@@ -58,16 +58,6 @@ let evm_node_config =
         octez_stdlib_unix |> open_;
       ]
 
-let evm_node_lib_prod_encoding =
-  octez_evm_node_lib
-    "evm_node_lib_prod_encoding"
-    ~path:"etherlink/bin_node/lib_prod/encodings"
-    ~synopsis:
-      "EVM encodings for the EVM node and plugin for the WASM Debugger [prod \
-       version]"
-    ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
-
 let _evm_node_sequencer_protobuf =
   let protobuf_rules =
     Dune.[protobuf_rule "narwhal"; protobuf_rule "exporter"]
@@ -111,43 +101,6 @@ let evm_node_migrations =
             ];
           ];
         ]
-
-let evm_node_lib_prod =
-  octez_evm_node_lib
-    "evm_node_lib_prod"
-    ~path:"etherlink/bin_node/lib_prod"
-    ~synopsis:
-      "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
-       rollup [prod version]"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_rpc_http |> open_;
-        octez_rpc_http_server;
-        octez_workers |> open_;
-        octez_rpc_http_client_unix;
-        octez_version_value;
-        octez_stdlib_unix |> open_;
-        evm_node_lib_prod_encoding |> open_;
-        lwt_watcher;
-        lwt_exit;
-        caqti;
-        caqti_lwt;
-        caqti_lwt_unix;
-        caqti_sqlite;
-        octez_client_base |> open_;
-        evm_node_config |> open_;
-        octez_context_sigs;
-        octez_context_disk;
-        octez_context_encoding;
-        octez_scoru_wasm;
-        octez_scoru_wasm_helpers |> open_;
-        octez_scoru_wasm_debugger_lib |> open_;
-        octez_layer2_store |> open_;
-        octez_smart_rollup_lib |> open_;
-        evm_node_migrations;
-        prometheus_app;
-      ]
 
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
@@ -211,7 +164,6 @@ let _octez_evm_node_tests =
         octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotezt;
-        evm_node_lib_prod;
         evm_node_lib_dev;
       ]
 
@@ -257,7 +209,6 @@ let _evm_node =
         octez_version_value;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
-        evm_node_lib_prod;
         evm_node_lib_dev;
         evm_node_config |> open_;
       ]
