@@ -5762,6 +5762,126 @@ module Garbage_collection = struct
 
     Log.info "End of test" ;
     unit
+
+  let read_dir dir =
+    let* dir = Lwt_unix.opendir dir in
+    let rec read_files acc =
+      Lwt.catch
+        (fun () ->
+          let* entry = Lwt_unix.readdir dir in
+          match entry with
+          | "." | ".." | ".lock" -> read_files acc
+          | file -> read_files (file :: acc))
+        (function
+          | End_of_file ->
+              let* () = Lwt_unix.closedir dir in
+              return acc
+          | exn -> Lwt.reraise exn)
+    in
+    read_files []
+
+  (* This function checks that in the skip list store of the given [dal_node]
+     there are the list of files in the 'hashes' sub-directory coincides with
+     [expected_levels] (up to ordering) and as many files in the 'cells'
+     sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
+  let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
+    let store_dir =
+      sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node)
+    in
+    let* hashes = read_dir (store_dir ^ "hashes") in
+    Check.(
+      List.sort String.compare hashes = List.sort String.compare expected_levels)
+      ~__LOC__
+      Check.(list string)
+      ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
+    let* cells = read_dir (store_dir ^ "cells") in
+    Check.(List.length cells = number_of_slots * List.length expected_levels)
+      ~__LOC__
+      Check.int
+      ~error_msg:"Expected %R cells, got %L" ;
+    unit
+
+  let test_gc_skip_list_cells ~protocols =
+    Protocol.register_test
+      ~__FILE__
+      ~tags:[Tag.tezos2; "dal"; "gc"; "skip_list"]
+      ~uses:(fun _protocol -> [Constant.octez_dal_node])
+      ~title:"garbage collection of skip list cells"
+      ~supports:(Protocol.From_protocol 19)
+      (fun protocol ->
+        (* We choose some arbitrary, small values *)
+        let a = 1 in
+        let b = 2 in
+        let c = 2 in
+        (* The period in blocks for which cells are kept. *)
+        let non_gc_period = 2 * (a + b + c) in
+        Log.info "The \"non-GC period\" is %d" non_gc_period ;
+        let parameters =
+          make_int_parameter
+            ["smart_rollup_commitment_period_in_blocks"]
+            (Some a)
+          @ make_int_parameter
+              ["smart_rollup_challenge_window_in_blocks"]
+              (Some b)
+          @ make_int_parameter
+              [
+                "smart_rollup_reveal_activation_level";
+                "dal_attested_slots_validity_lag";
+              ]
+              (Some c)
+        in
+        let* node, client, dal_parameters =
+          setup_node ~parameters ~protocol ()
+        in
+        let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
+        let lag = dal_parameters.attestation_lag in
+        let dal_node = Dal_node.create ~node () in
+        let* () = Dal_node.init_config ~observer_profiles:[1] dal_node in
+        let* () = Dal_node.run dal_node ~wait_ready:true in
+        Log.info
+          "The first level with stored cells is 1 + lag = %d. We bake till \
+           that level is final, that is until level %d."
+          (lag + 1)
+          (lag + 3) ;
+        let wait_for_dal_node =
+          wait_for_layer1_final_block dal_node (lag + 1)
+        in
+        let* current_level = Client.level client in
+        assert (current_level = 1) ;
+        let* () = bake_for client ~count:(lag + 2) in
+        let* () = wait_for_dal_node in
+        Log.info
+          "Check that the skip list store contains the right files for level \
+           lag + 1." ;
+        let* () =
+          check_skip_list_store
+            dal_node
+            ~number_of_slots
+            ~expected_levels:[string_of_int (lag + 1)]
+        in
+        (* We just want to observe the GC taking effect, so we need to bake at
+           least [non_gc_period] blocks. *)
+        Log.info "We bake %d more blocks" non_gc_period ;
+        let last_final_level = lag + 1 + non_gc_period in
+        let wait_for_dal_node =
+          wait_for_layer1_final_block dal_node last_final_level
+        in
+        let* () = bake_for client ~count:non_gc_period in
+        let* () = wait_for_dal_node in
+        Log.info
+          "Check that the skip list store contains cells for [non_gc_period] \
+           levels." ;
+        (* Example: say head level = 21. The node GCs the cells at level 19 - 10
+           = 9, and it injects at level 19. So we have cells for level 10 to
+           19, that is, 10 levels. *)
+        let expected_levels =
+          (* The first level with stored cells is [last_final_level -
+             non_gc_period + 1 = lag + 2]. *)
+          let offset = lag + 2 in
+          List.init non_gc_period (fun i -> string_of_int (offset + i))
+        in
+        check_skip_list_store dal_node ~number_of_slots ~expected_levels)
+      protocols
 end
 
 module Tx_kernel_e2e = struct
@@ -6864,6 +6984,7 @@ let register ~protocols =
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
     protocols ;
+  Garbage_collection.test_gc_skip_list_cells ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing"
