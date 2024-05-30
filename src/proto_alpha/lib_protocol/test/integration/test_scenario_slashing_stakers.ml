@@ -141,6 +141,13 @@ let test_simple_slash =
        --> exec_unit (check_pending_slashings ~loc:__LOC__)
        --> next_cycle
        --> assert_failure
+             ~expected_error:(fun (_, state) errs ->
+               let str =
+                 if State_ai_flags.Delayed_slashing.enabled state then
+                   Str.regexp_string "ns_enable = true: slash not applied yet"
+                 else Str.regexp ".*\n.*is not equal to.*"
+               in
+               Error_helpers.expect_failwith ~loc:__LOC__ ~str errs)
              (exec_unit (fun (_block, state) ->
                   if State_ai_flags.Delayed_slashing.enabled state then
                     failwith "ns_enable = true: slash not applied yet"
@@ -150,37 +157,11 @@ let test_simple_slash =
        --> next_cycle
       |+ Tag "denounce too late" --> next_cycle --> next_cycle
          --> assert_failure
-               ~expected_error:(fun (_block, state) ->
-                 let ds = state.State.double_signings in
-                 let ds = match ds with [a] -> a | _ -> assert false in
-                 let level =
-                   Protocol.Alpha_context.Raw_level.Internal_for_tests.from_repr
-                     ds.misbehaviour.level
-                 in
-                 let last_cycle =
-                   Cycle.add
-                     (Block.current_cycle_of_level
-                        ~blocks_per_cycle:state.State.constants.blocks_per_cycle
-                        ~current_level:
-                          (Protocol.Raw_level_repr.to_int32
-                             ds.misbehaviour.level))
-                     (Protocol.Constants_repr.max_slashing_period - 1)
-                 in
-                 let (kind : Protocol.Alpha_context.Misbehaviour.kind) =
-                   (* This conversion would not be needed if
-                      Misbehaviour_repr.kind were moved to a
-                      separate file that doesn't have under/over
-                      Alpha_context versions. *)
-                   match ds.misbehaviour.kind with
-                   | Double_baking -> Double_baking
-                   | Double_attesting -> Double_attesting
-                   | Double_preattesting -> Double_preattesting
-                 in
-                 [
-                   Environment.Ecoproto_error
-                     (Protocol.Validate_errors.Anonymous.Outdated_denunciation
-                        {kind; level; last_cycle});
-                 ])
+               ~expected_error:(fun (_block, state) errs ->
+                 Error_helpers.expect_outdated_denunciation_state
+                   ~loc:__LOC__
+                   ~state
+                   errs)
                (make_denunciations ())
          --> check_snapshot_balances "before slash")
 

@@ -17,13 +17,26 @@ open Scenario
 
 let test_expected_error =
   assert_failure
-    ~expected_error:(fun _ -> [Exn (Failure "")])
+    ~expected_error:(fun _ errs ->
+      Error_helpers.expect_failwith
+        ~loc:__LOC__
+        ~str:(Str.regexp_string "")
+        errs)
     (exec (fun _ -> failwith ""))
   --> assert_failure
-        ~expected_error:(fun _ -> [Unexpected_error])
+        ~expected_error:(fun _ errs ->
+          Error_helpers.expect_failwith
+            ~str:(Str.regexp ".*expected a specific error.*")
+            ~loc:__LOC__
+            errs)
         (assert_failure
-           ~expected_error:(fun _ ->
-             [Inconsistent_number_of_bootstrap_accounts])
+           ~expected_error:(fun _ errs ->
+             Error_helpers.check_error_constructor_name
+               ~loc:__LOC__
+               ~expected:
+                 Protocol.Apply
+                 .Staking_to_delegate_that_refuses_external_staking
+               errs)
            (exec (fun _ -> failwith "")))
 
 let tests =

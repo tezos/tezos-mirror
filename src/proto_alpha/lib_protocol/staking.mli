@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error +=
+  | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+  | Manual_staking_forbidden
+
 (** [stake ctxt ~sender ~for_next_cycle_use_only_after_slashing ~delegate amount]
     add [amount] as [sender]'s stake to [delegate].
 
