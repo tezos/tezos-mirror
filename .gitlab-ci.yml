@@ -74,7 +74,7 @@ variables:
   OPAMRETRIES: "5"
   FF_USE_FASTZIP: "true"
   RUNTEZTALIAS: "false"
-  CARGO_HOME: $CI_PROJECT_DIR/cargo
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
 
 dummy_job:
   stage: .pre

@@ -19,7 +19,13 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-let cargo_home = Gitlab_ci.Predefined_vars.(show ci_project_dir) // "cargo"
+let cargo_home =
+  (* Note:
+     - We want [CARGO_HOME] to be in a sub-folder of
+       {!ci_project_dir} to enable GitLab CI caching.
+     - We want [CARGO_HOME] to be hidden from dune
+       (thus the dot-prefix). *)
+  Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
 
 (* Define [stages:]
 
