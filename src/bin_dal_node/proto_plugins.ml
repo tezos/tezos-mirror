@@ -67,13 +67,83 @@ let resolve_plugin_for_level cctxt ~level =
   let proto_hash = protocols.next_protocol in
   resolve_plugin_by_hash proto_hash
 
+(* This function performs a (kind of) binary search to search for all values
+   that satisfy the given condition [cond] on values. There is bijection between
+   values and levels (which are here just positive int32 integers). The
+   functions [to_level] and [from_level] retrieve the associates levels/values
+   from given values/levels (respectively). The function [no_satisfying_value l1
+   l2] returns true iff no value satisfying [cond] is present in the interval
+   [l1, l2] (both inclusive). The search is performed between (the levels
+   associated to) the values [first] and [last] (both inclusive). *)
+let binary_search (cond : 'a -> bool) (no_satisfying_value : 'a -> 'a -> bool)
+    (to_level : 'a -> int32) (from_level : int32 -> 'a tzresult Lwt.t)
+    ~(first : 'a) ~(last : 'a) =
+  let open Lwt_result_syntax in
+  let rec search ~first ~last acc =
+    let first_level = to_level first in
+    let last_level = to_level last in
+    if first_level >= last_level then
+      (* search ended *)
+      if cond last then return (last :: acc) else return acc
+    else if Int32.succ first_level = last_level then
+      (* search ended as well *)
+      let acc = if cond last then last :: acc else acc in
+      return @@ if cond first then first :: acc else acc
+    else
+      let mid_level =
+        Int32.(add first_level (div (sub last_level first_level) 2l))
+      in
+      let* mid = from_level mid_level in
+      let* acc =
+        if no_satisfying_value first mid then return acc
+        else search ~first ~last:mid acc
+      in
+      if no_satisfying_value mid last then return acc
+      else search ~first:mid ~last acc
+  in
+  search ~first ~last []
+
+let migration protocols =
+  not
+  @@ Protocol_hash.equal
+       protocols.Chain_services.Blocks.current_protocol
+       protocols.Chain_services.Blocks.next_protocol
+
+type level_with_protos = {
+  level : int32;
+  protocols : Chain_services.Blocks.protocols;
+}
+
+(* This function performs a binary search between [first_level] and [last_level]
+   to search for migration levels. [first_protocols] and [last_protocols]
+   represent the 'protocols' metadata field of the blocks at these levels. *)
+let find_migration_levels cctxt ~first_level ~first_protocols ~last_level
+    ~last_protocols =
+  let first = {level = first_level; protocols = first_protocols} in
+  let last = {level = last_level; protocols = last_protocols} in
+  let to_level {level; _} = level in
+  let from_level level =
+    let open Lwt_result_syntax in
+    let* protocols =
+      Chain_services.Blocks.protocols cctxt ~block:(`Level level) ()
+    in
+    return {level; protocols}
+  in
+  let cond {protocols; _} = migration protocols in
+  let no_satisfying_value first last =
+    let first_proto = first.protocols.Chain_services.Blocks.next_protocol in
+    let last_proto = last.protocols.Chain_services.Blocks.next_protocol in
+    Protocol_hash.equal first_proto last_proto
+  in
+  binary_search cond no_satisfying_value to_level from_level ~first ~last
+
 let initial_plugins cctxt ~first_level ~last_level =
   let open Lwt_result_syntax in
   let block = `Level first_level in
-  let* protocols =
+  let* first_protocols =
     Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
   in
-  let first_proto = protocols.next_protocol in
+  let first_proto = first_protocols.next_protocol in
   let* plugin = resolve_plugin_by_hash first_proto in
   let* header = Shell_services.Blocks.Header.shell_header cctxt ~block () in
   let proto_level = header.proto_level in
@@ -83,35 +153,41 @@ let initial_plugins cctxt ~first_level ~last_level =
   let* last_protocols =
     Chain_services.Blocks.protocols cctxt ~block:(`Level last_level) ()
   in
-  let last_proto = last_protocols.Chain_services.Blocks.next_protocol in
-  if Protocol_hash.equal first_proto last_proto then
-    (* There's no migration in between, we're done. *)
+  if
+    Protocol_hash.equal
+      first_protocols.next_protocol
+      last_protocols.next_protocol
+  then (* There's no migration in between, we're done. *)
     return proto_plugins
   else
-    (* There was a migration in between; we search the migration level and then
-       we add the plugin *)
-    let rec find_migration_level level protocols =
-      if
-        Protocol_hash.equal
-          first_proto
-          protocols.Chain_services.Blocks.current_protocol
-      then return level
-      else
-        let block = `Level (Int32.pred level) in
-        let* protocols = Chain_services.Blocks.protocols cctxt ~block () in
-        find_migration_level (Int32.pred level) protocols
+    let first_level = Int32.succ first_level in
+    let* first_protocols =
+      Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
     in
-    let* migration_level = find_migration_level last_level last_protocols in
-    let* plugin = resolve_plugin_by_hash last_proto in
-    let* header =
-      Shell_services.Blocks.Header.shell_header
+    (* There was at least one migration in between; we search the migration
+       levels and then we add the corresponding plugins. We perform a binary
+       search from [last_level] to [first_level]. *)
+    let* migration_levels =
+      find_migration_levels
         cctxt
-        ~block:(`Level migration_level)
-        ()
+        ~first_level
+        ~first_protocols
+        ~last_level
+        ~last_protocols
     in
-    let proto_level = header.proto_level in
-    Plugins.add proto_plugins ~first_level:migration_level ~proto_level plugin
-    |> return
+    List.fold_left_es
+      (fun plugins {level; protocols} ->
+        let* plugin = resolve_plugin_by_hash protocols.next_protocol in
+        let* header =
+          Shell_services.Blocks.Header.shell_header
+            cctxt
+            ~block:(`Level level)
+            ()
+        in
+        let proto_level = header.proto_level in
+        Plugins.add plugins ~first_level:level ~proto_level plugin |> return)
+      proto_plugins
+      migration_levels
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
