@@ -14,7 +14,6 @@ use crate::{
         ExecutionEnvironment, ExecutionEnvironmentState,
     },
     machine_state::{self, bus::main_memory, StepManyResult},
-    range_utils::range_bounds_saturating_sub,
     state_backend,
     traps::EnvironException,
 };
@@ -87,7 +86,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(config, exc) {
                 return Err(EvalError {
                     cause: exc,
-                    message,
+                    error: message,
                 });
             }
         }
@@ -115,69 +114,27 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
         &mut self,
         config: &mut EE::Config<'_>,
         step_bounds: &impl RangeBounds<usize>,
-        mut should_continue: F,
+        should_continue: F,
     ) -> EvalManyResult
     where
         F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
     {
-        let mut bounds = range_bounds_saturating_sub(step_bounds, 0);
-
-        // initial state
-        let mut total_steps: usize = 0;
-
-        // Evaluation loop.
-        // Runs the evaluation function until either:
-        // reached the max steps,
-        // or has stopped at an exception, handled or otherwise
-        let error = loop {
-            let StepManyResult {
-                mut steps,
-                exception,
-            } = self.machine_state.step_range(&bounds, &mut should_continue);
-
-            total_steps = total_steps.saturating_add(steps);
-
-            if let Some(exc) = exception {
-                // Raising the exception is not a completed step. Trying to handle it is.
-                // We don't have to check against `max_steps` because running the
-                // instruction that triggered the exception meant that `max_steps > 0`.
-                total_steps = total_steps.saturating_add(1);
-                steps = steps.saturating_add(1);
-
-                match self.handle_exception(config, exc) {
-                    // EE encountered an error.
-                    exec_env::EcallOutcome::Fatal { message } => {
-                        break Some(EvalError {
-                            cause: exc,
-                            message,
-                        });
-                    }
-
-                    // EE hints we may continue evaluation.
-                    exec_env::EcallOutcome::Handled {
-                        continue_eval: true,
-                    } => {
-                        // update min max by shifting the bounds
-                        bounds = range_bounds_saturating_sub(&bounds, steps);
-                        // loop
-                        continue;
-                    }
-
-                    // EE suggests to stop evaluation.
-                    exec_env::EcallOutcome::Handled {
-                        continue_eval: false,
-                    } => {
-                        break None;
-                    }
-                }
-            } else {
-                break None;
-            }
-        };
-        EvalManyResult {
-            steps: total_steps,
-            error,
-        }
+        self.machine_state
+            .step_range_handle(
+                step_bounds,
+                should_continue,
+                |machine_state, exc| match self.exec_env_state.handle_call(
+                    machine_state,
+                    config,
+                    exc,
+                ) {
+                    exec_env::EcallOutcome::Fatal { message } => Err(EvalError {
+                        cause: exc,
+                        error: message,
+                    }),
+                    exec_env::EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
+                },
+            )
     }
 }
 
@@ -199,14 +156,11 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<PvmSbi, M
 #[derive(Debug)]
 pub struct EvalError {
     pub cause: EnvironException,
-    pub message: String,
+    pub error: String,
 }
 
 /// Result of [`Pvm::eval_range`]
-pub struct EvalManyResult {
-    pub steps: usize,
-    pub error: Option<EvalError>,
-}
+pub type EvalManyResult = StepManyResult<EvalError>;
 
 #[cfg(test)]
 mod tests {
