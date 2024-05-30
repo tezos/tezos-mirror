@@ -5,6 +5,7 @@ stages:
 - build
 - prepare_release
 - publish_release_gitlab
+- publish_release
 
 oc.build:static-x86_64-linux-binaries:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -259,3 +260,21 @@ apt_repo_ubuntu_jammy:
   variables:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+docker:promote_to_latest:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: publish_release
+  tags:
+  - gcp
+  needs:
+  - docker:merge_manifests
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_promote_to_latest.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"

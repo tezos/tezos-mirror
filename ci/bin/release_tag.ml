@@ -159,6 +159,12 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~name:"opam:release"
       ["./scripts/ci/opam-release.sh"]
   in
+  let job_promote_to_latest_test =
+    Common.job_docker_promote_to_latest
+      ~ci_docker_hub:false
+      ~dependencies:(Dependent [Job job_docker_merge])
+      ()
+  in
   [
     job_static_x86_64_release;
     job_static_arm64_release;
@@ -179,6 +185,12 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         job_apt_repo_debian_bookworm;
         job_apt_repo_ubuntu_focal;
         job_apt_repo_ubuntu_jammy;
+        (* This job normally runs in the {!Octez_latest_release} pipeline
+           that is triggered manually after a release is made. However, to
+           make release testing easier, we include it here directly. Thus,
+           release testers are not required to trigger two separate pipelines
+           (indeed, the second `latest_release_test` pipeline is rarely tested). *)
+        job_promote_to_latest_test;
       ]
   | _ -> []
 
