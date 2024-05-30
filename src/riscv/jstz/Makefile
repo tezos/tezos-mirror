@@ -35,9 +35,9 @@ run:
 
 .PHONY: check
 check:
-	@cargo check --workspace --locked
+	@cargo check --all-features --workspace --locked
 	@cargo fmt --check
-	@cargo clippy -- --deny warnings
+	@cargo clippy --all-features -- --deny warnings
 
 .PHONY: inbox-bench
 inbox-bench:

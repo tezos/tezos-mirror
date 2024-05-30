@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 tezos-smart-rollup.workspace = true
 jstz_kernel.workspace = true
+[features]
+default = []
+static-inbox = []
