@@ -39,6 +39,7 @@ let call_handler2 ctxt handler =
 type error +=
   | Cryptobox_error of string * string
   | Post_slot_too_large of {expected : int; got : int}
+  | No_prover_profile
 
 let () =
   register_error_kind
@@ -70,7 +71,16 @@ let () =
     Data_encoding.(obj2 (req "expected" int31) (req "got" int31))
     (function
       | Post_slot_too_large {expected; got} -> Some (expected, got) | _ -> None)
-    (fun (expected, got) -> Post_slot_too_large {expected; got})
+    (fun (expected, got) -> Post_slot_too_large {expected; got}) ;
+  register_error_kind
+    `Permanent
+    ~id:"no_prover_profile"
+    ~title:"No prover profile"
+    ~description:
+      "The DAL node does not have a prover profile to accept slots injection."
+    Data_encoding.unit
+    (function No_prover_profile -> Some () | _ -> None)
+    (fun () -> No_prover_profile)
 
 module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
@@ -139,33 +149,44 @@ module Slots_handlers = struct
       (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
       ->
         let open Lwt_result_syntax in
-        let slot_size = proto_parameters.cryptobox_parameters.slot_size in
-        let slot_length = String.length slot in
-        let*? slot =
-          if slot_length > slot_size then
-            Error
-              (Errors.other
-                 [Post_slot_too_large {expected = slot_size; got = slot_length}])
-          else if slot_length = slot_size then Ok (Bytes.of_string slot)
-          else
-            let padding = String.make (slot_size - slot_length) query#padding in
-            Ok (Bytes.of_string (slot ^ padding))
-        in
-        let*? polynomial = Slot_manager.polynomial_from_slot cryptobox slot in
-        let*? commitment = Slot_manager.commit cryptobox polynomial in
-        let*? commitment_proof =
-          commitment_proof_from_polynomial cryptobox polynomial
-        in
-        let* () =
-          Slot_manager.add_commitment_shards
-            ~shards_proofs_precomputation
-            store
-            cryptobox
-            commitment
-            slot
-            polynomial
-        in
-        return (commitment, commitment_proof))
+        if
+          not
+            (Profile_manager.is_prover_profile
+               (Node_context.get_profile_ctxt ctxt))
+        then fail (Errors.other [No_prover_profile])
+        else
+          let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+          let slot_length = String.length slot in
+          let*? slot =
+            if slot_length > slot_size then
+              Error
+                (Errors.other
+                   [
+                     Post_slot_too_large
+                       {expected = slot_size; got = slot_length};
+                   ])
+            else if slot_length = slot_size then Ok (Bytes.of_string slot)
+            else
+              let padding =
+                String.make (slot_size - slot_length) query#padding
+              in
+              Ok (Bytes.of_string (slot ^ padding))
+          in
+          let*? polynomial = Slot_manager.polynomial_from_slot cryptobox slot in
+          let*? commitment = Slot_manager.commit cryptobox polynomial in
+          let*? commitment_proof =
+            commitment_proof_from_polynomial cryptobox polynomial
+          in
+          let* () =
+            Slot_manager.add_commitment_shards
+              ~shards_proofs_precomputation
+              store
+              cryptobox
+              commitment
+              slot
+              polynomial
+          in
+          return (commitment, commitment_proof))
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
