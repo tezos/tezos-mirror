@@ -1517,7 +1517,7 @@ let bootstrap_account_arg =
   let doc = Format.sprintf "add a bootstrap account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..."
   @@ Tezos_clic.parameter (fun _ address ->
-         Lwt.return_ok @@ Evm_node_lib_dev.Helpers.normalize_addr address)
+         Lwt.return_ok @@ Evm_node_lib_dev.Misc.normalize_addr address)
 
 let make_kernel_config_command =
   let open Tezos_clic in

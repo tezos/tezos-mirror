@@ -497,7 +497,7 @@ module State = struct
 
     let time_processed = ref Ptime.Span.zero in
     let* try_apply =
-      Helpers.with_timing
+      Misc.with_timing
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
           Evm_state.apply_blueprint

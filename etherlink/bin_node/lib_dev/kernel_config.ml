@@ -65,7 +65,7 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
     @ make_instr ~convert:le_int_bytes delayed_inbox_min_levels
     @ make_instr
         ~convert:(fun addr ->
-          let addr = Helpers.normalize_addr addr in
+          let addr = Misc.normalize_addr addr in
           Hex.to_bytes_exn (`Hex addr) |> String.of_bytes)
         sequencer_pool_address
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks

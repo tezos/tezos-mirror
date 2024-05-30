@@ -95,7 +95,7 @@ module Pool = struct
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
     let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
-    let inclusion_timestamp = Helpers.now () in
+    let inclusion_timestamp = Misc.now () in
     (* Add the transaction to the user's transaction map *)
     let transactions =
       let transaction =
@@ -469,7 +469,7 @@ let pop_transactions state ~maximum_cumulative_size =
     (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
     let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
-    let current_timestamp = Helpers.now () in
+    let current_timestamp = Misc.now () in
     let pool =
       addr_with_nonces
       |> List.fold_left
@@ -556,7 +556,7 @@ let pop_and_inject_transactions state =
           Rollup_node.inject_raw_transactions
           (* The timestamp is ignored in observer and proxy mode, it's just for
              compatibility with sequencer mode. *)
-            ~timestamp:(Helpers.now ())
+            ~timestamp:(Misc.now ())
             ~smart_rollup_address:state.smart_rollup_address
             ~transactions:txs
         in

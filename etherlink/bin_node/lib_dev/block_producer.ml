@@ -161,12 +161,12 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     let n = List.length transactions + List.length delayed_transactions in
     if force || n > 0 then
       let*! head_info = Evm_context.head_info () in
-      Helpers.with_timing
+      Misc.with_timing
         (Blueprint_events.blueprint_production head_info.next_blueprint_number)
       @@ fun () ->
       let*? hashes = get_hashes ~transactions ~delayed_transactions in
       let* blueprint =
-        Helpers.with_timing
+        Misc.with_timing
           (Blueprint_events.blueprint_proposal head_info.next_blueprint_number)
         @@ fun () ->
         Sequencer_blueprint.create
