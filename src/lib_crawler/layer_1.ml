@@ -537,6 +537,15 @@ module Internal_for_tests = struct
     }
 end
 
+let timeout_promise service timeout =
+  let open Lwt_syntax in
+  let* () = Lwt_unix.sleep timeout in
+  let path = Tezos_rpc.(Service.Internal.to_service service).path in
+  let path =
+    Tezos_rpc.Service.Internal.from_path path |> Tezos_rpc.Path.to_string
+  in
+  Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
+
 let client_context_with_timeout (obj : #Client_context.full) timeout :
     Client_context.full =
   let open Lwt_syntax in
@@ -551,16 +560,33 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
           'i ->
           'o tzresult Lwt.t =
       fun service params query body ->
-        let timeout_promise =
-          let* () = Lwt_unix.sleep timeout in
-          let path = Tezos_rpc.(Service.Internal.to_service service).path in
-          let path =
-            Tezos_rpc.Service.Internal.from_path path
-            |> Tezos_rpc.Path.to_string
-          in
-          Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
-        in
-        Lwt.pick [obj#call_service service params query body; timeout_promise]
+        Lwt.pick
+          [
+            obj#call_service service params query body;
+            timeout_promise service timeout;
+          ]
+
+    method! call_streamed_service
+        : 'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
+          (unit -> unit) tzresult Lwt.t =
+      fun service ~on_chunk ~on_close params query body ->
+        Lwt.pick
+          [
+            obj#call_streamed_service
+              service
+              ~on_chunk
+              ~on_close
+              params
+              query
+              body;
+            timeout_promise service timeout;
+          ]
 
     method! generic_media_type_call meth ?body uri =
       let timeout_promise =
