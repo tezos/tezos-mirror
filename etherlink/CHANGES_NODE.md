@@ -4,6 +4,9 @@
 
 ### Features
 
+- Deprecate the `--devmode` CLI flag. The EVM node aims to be compatible with
+  three versions of the kernel: the latest one, the one deployed on Ghostnet
+  and the one deployed on Mainnet. (!13522)
 - Support daily log files for the observer mode (!13101).
 - The RPC `eth_getBalance`, `eth_getCode`, `eth_getTransactionCount` and
   `eth_getStorageAt` support the default block parameter

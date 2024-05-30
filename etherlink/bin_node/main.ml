@@ -186,8 +186,7 @@ let cors_allowed_origins_arg =
     ~doc:"List of accepted cors origins."
     Params.string_list
 
-let devmode_arg =
-  Tezos_clic.switch ~long:"devmode" ~doc:"The EVM node in development mode." ()
+let devmode_arg = Tezos_clic.switch ~long:"devmode" ~doc:"DEPRECATED" ()
 
 let profile_arg =
   Tezos_clic.switch
@@ -478,7 +477,7 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
       ]
   else Ok ()
 
-let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
+let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~verbose ~read_only () =
@@ -486,7 +485,6 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
   let* config =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ~keep_alive
       ?rpc_addr
       ?rpc_port
@@ -545,7 +543,7 @@ let proxy_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -570,7 +568,6 @@ let proxy_command =
       in
       start_proxy
         ~data_dir
-        ~devmode
         ~keep_alive
         ?rpc_addr
         ?rpc_port
@@ -599,14 +596,14 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
-let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
-    ?rpc_port ?cors_origins ?cors_headers ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-    ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
-    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?genesis_timestamp ?kernel () =
+let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
+    ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+    ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
+    ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
+    ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
+    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp ?kernel ()
+    =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -617,7 +614,6 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
   let* configuration =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ?rpc_addr
       ?rpc_port
       ?cors_origins
@@ -675,7 +671,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
     ()
 
 let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
-    ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
+    ~data_dir ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ~keep_alive ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
@@ -693,7 +689,6 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
   let* configuration =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ?rpc_addr
       ?rpc_port
       ?cors_origins
@@ -742,15 +737,13 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "te_sequencer" in
-  if configuration.devmode then
-    Evm_node_lib_dev.Threshold_encryption_sequencer.main
-      ~data_dir
-      ?genesis_timestamp
-      ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~configuration
-      ?kernel
-      ()
-  else failwith "Threshold encryption is not enabled in prod mode."
+  Evm_node_lib_dev.Threshold_encryption_sequencer.main
+    ~data_dir
+    ?genesis_timestamp
+    ~cctxt:(wallet_ctxt :> Client_context.wallet)
+    ~configuration
+    ?kernel
+    ()
 
 let sequencer_command =
   let open Tezos_clic in
@@ -787,7 +780,7 @@ let sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -827,7 +820,6 @@ let sequencer_command =
         ?password_filename
         ~wallet_dir
         ~data_dir
-        ~devmode
         ?rpc_addr
         ?rpc_port
         ?cors_origins
@@ -855,17 +847,16 @@ let sequencer_command =
         ?kernel
         ())
 
-let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
-    ?cors_origins ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
-    ?preimages_endpoint ?evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
-    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?kernel () =
+let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
+    ?cors_headers ~verbose ?preimages ?rollup_node_endpoint ?preimages_endpoint
+    ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
+    ?kernel () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ~keep_alive
       ?rpc_addr
       ?rpc_port
@@ -935,7 +926,7 @@ let observer_command =
   @@ fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -964,7 +955,6 @@ let observer_command =
   in
   start_observer
     ~data_dir
-    ~devmode
     ~keep_alive
     ?rpc_addr
     ?rpc_port
@@ -1358,7 +1348,7 @@ mode.|}
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1398,7 +1388,6 @@ mode.|}
           ~data_dir
           ?rpc_addr
           ?rpc_port
-          ~devmode
           ?cors_origins
           ?cors_headers
           ?log_filter_max_nb_blocks
@@ -1542,7 +1531,7 @@ let proxy_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1558,7 +1547,6 @@ let proxy_simple_command =
          () ->
       start_proxy
         ~data_dir
-        ~devmode
         ~keep_alive
         ?rpc_addr
         ?rpc_port
@@ -1601,7 +1589,7 @@ let sequencer_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1632,7 +1620,6 @@ let sequencer_simple_command =
         ?password_filename
         ~wallet_dir
         ~data_dir
-        ~devmode
         ?rpc_addr
         ?rpc_port
         ?cors_origins
@@ -1689,7 +1676,7 @@ let threshold_encryption_sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1721,7 +1708,6 @@ let threshold_encryption_sequencer_command =
         ?password_filename
         ~wallet_dir
         ~data_dir
-        ~devmode
         ?rpc_addr
         ?rpc_port
         ?cors_origins
@@ -1767,7 +1753,7 @@ let observer_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1787,7 +1773,6 @@ let observer_simple_command =
          () ->
       start_observer
         ~data_dir
-        ~devmode
         ~keep_alive
         ?rpc_addr
         ?rpc_port

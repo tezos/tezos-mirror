@@ -199,7 +199,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
-  Metrics.Info.init ~devmode:configuration.devmode ~mode:"sequencer" ;
+  Metrics.Info.init ~mode:"sequencer" ;
   let {rollup_node_endpoint; keep_alive; _} = configuration in
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address

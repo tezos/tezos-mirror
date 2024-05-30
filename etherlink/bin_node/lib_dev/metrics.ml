@@ -67,7 +67,7 @@ module Chain = struct
 end
 
 module Info = struct
-  let init ~devmode ~mode =
+  let init ~mode =
     let commit_hash =
       Tezos_version_value.Current_git_info.abbreviated_commit_hash
     in
@@ -78,13 +78,10 @@ module Info = struct
         ~help:"Information"
         ~namespace
         ~subsystem
-        ~label_names:["commit_hash"; "commit_date"; "devmode"; "mode"]
+        ~label_names:["commit_hash"; "commit_date"; "mode"]
         "info"
     in
-    ignore
-      (Gauge.labels
-         metric
-         [commit_hash; commit_date; string_of_bool devmode; mode])
+    ignore (Gauge.labels metric [commit_hash; commit_date; mode])
 end
 
 module Block = struct
