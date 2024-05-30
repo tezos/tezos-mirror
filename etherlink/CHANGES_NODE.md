@@ -28,6 +28,17 @@
   (rollup node version must support it). The field allows to reduce
   the cost of operating a rollup batcher node. (!13189)
 - Support enabling or disabling the `eth_sendRawTransaction` method. (!13162 !13288)
+- New threshold encryption sequencer mode of operation. (!12791)
+  A new flag `--sequencer-sidecar-endpoint` has been added to the configuration
+  command to specify the sequencer sidecar that will be used by the threshold
+  encryption sequencer.
+  You can run the threshold encryption sequencer with the command:
+  - `run threshold encryption sequencer`
+- Observer can run using a DSN node bundler as sidecar. (!12841)
+  A new optional flag `--bundler-node-endpoint` can be used either
+  when configuring the node, or when running the observer, to forward
+  transactions to the DSN node bundler sidecar. The bundler is used
+  for threshold encryption.
 
 ### Bug fixes
 
@@ -37,6 +48,9 @@
 ### Breaking changes
 
 ### Internal
+
+- Threshold encryption Sequencer connects to sequencer sidecar. (!3140)
+- Decouple proposal submission and preblocks monitoring for threshold encryption sequencer. (!13181)
 
 ## Version for b9f6c9138719220db83086f0548e49c5c4c8421f
 
