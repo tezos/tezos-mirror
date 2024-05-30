@@ -139,7 +139,9 @@ module type S = sig
       transaction [hash], and traces this transaction with the specified
       [tracer]. *)
   val trace_transaction :
-    Ethereum_types.hash -> Tracer_types.config -> unit tzresult Lwt.t
+    Ethereum_types.hash ->
+    Tracer_types.config ->
+    Tracer_types.output tzresult Lwt.t
 end
 
 module type Backend = sig

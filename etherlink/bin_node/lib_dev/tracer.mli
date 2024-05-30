@@ -12,4 +12,4 @@ val trace_transaction :
   block_number:Ethereum_types.quantity ->
   transaction_hash:Ethereum_types.hash ->
   config:Tracer_types.config ->
-  unit tzresult Lwt.t
+  Tracer_types.output tzresult Lwt.t

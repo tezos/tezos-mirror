@@ -114,3 +114,44 @@ let input_rlp_encoder hash config =
   let stack = bool_encoding config.tracer_config.disable_stack in
   let storage = bool_encoding config.tracer_config.disable_storage in
   List [hash; return_data; memory; stack; storage] |> encode |> Bytes.to_string
+
+(* This is a temporary type, it should be filled in a follow up patch. Int and
+   not unit, so that the encoding doesn't fail with: "Cannot insert potentially
+   zero-sized element in a list." Making it a list ensures it is encoded as an
+   (empty) array and compatible with the specification until the correct
+   type. *)
+type opcode_log = int
+
+type output = {
+  gas : int64;
+  failed : bool;
+  return_value : Ethereum_types.hash;
+  struct_logs : opcode_log list;
+}
+
+let output_encoding =
+  let open Data_encoding in
+  conv
+    (fun {gas; failed; return_value; struct_logs} ->
+      (gas, failed, return_value, struct_logs))
+    (fun (gas, failed, return_value, struct_logs) ->
+      {gas; failed; return_value; struct_logs})
+    (obj4
+       (req "gas" int64)
+       (req "failed" bool)
+       (req "returnValue" Ethereum_types.hash_encoding)
+       (req "structLogs" (list int31)))
+
+let output_binary_decoder ~gas ~failed ~return_value =
+  let gas =
+    Ethereum_types.decode_number gas |> fun (Ethereum_types.Qty z) ->
+    Z.to_int64 z
+  in
+  let failed =
+    if Bytes.length failed = 0 then false else Bytes.get failed 0 = '\x01'
+  in
+  let return_value =
+    let (`Hex hex_value) = Hex.of_bytes return_value in
+    Ethereum_types.hash_of_string hex_value
+  in
+  {gas; failed; return_value; struct_logs = []}

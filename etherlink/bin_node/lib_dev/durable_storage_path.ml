@@ -117,5 +117,13 @@ module Evm_events = struct
 end
 
 module Trace_transaction = struct
-  let input = EVM.make "/trace/input"
+  let root = EVM.make "/trace"
+
+  let input = root ^ "/input"
+
+  let output_gas = root ^ "/gas"
+
+  let output_failed = root ^ "/failed"
+
+  let output_return_value = root ^ "/return_value"
 end

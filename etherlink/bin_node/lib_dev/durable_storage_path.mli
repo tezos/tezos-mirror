@@ -95,4 +95,13 @@ end
 module Trace_transaction : sig
   (** Path where is stored the input of the tracer. *)
   val input : path
+
+  (** Path where is stored the gas consumed by the call. *)
+  val output_gas : path
+
+  (** Path where the result of the traced transaction is stored. *)
+  val output_failed : path
+
+  (** Path where is stored the value returned by the transaction's execution. *)
+  val output_return_value : path
 end
