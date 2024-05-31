@@ -84,25 +84,18 @@ module Slots : sig
   val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
 end
 
+module Slot_id_cache : sig
+  type t
+
+  val add : number_of_slots:int -> t -> Dal_plugin.slot_header -> unit
+
+  val find_opt : t -> Types.slot_id -> commitment option
+end
+
 module Statuses : sig
   (** A store keeping the attestation status of slot ids. *)
 
   type t
-
-  (** [add_slot_headers ~number_of_slots ~block_level slot_headers
-      store] adds all the given slot headers at the given block level,
-      updating the bidirectional mapping between commitments and slot
-      identifiers. For each slot header, the associated operation
-      application result indicates if the slot header should be
-      considered as accepted (the publication operation has succeeded)
-      or not. In the accepted case, the associated status is
-      [`Waiting_attestation], otherwise it is [`Not_selected]. *)
-  val add_slot_headers :
-    number_of_slots:int ->
-    block_level:int32 ->
-    (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
-    t ->
-    unit tzresult Lwt.t
 
   (** [update_selected_slot_headers_statuses ~block_level
       ~attestation_lag ~number_of_slots attested store] updates the
@@ -146,6 +139,8 @@ type t = private {
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
+  finalized_commitments : Slot_id_cache.t;
+      (** Cache of commitments indexed by level and then by slot id. The maximum number of levels is given by {!Constants.slot_id_cache_size}. No more than [number_of_slots] commitments can be stored per level. *)
 }
 
 (** [cache_entry store commitment entry] adds or replace an entry to
@@ -159,3 +154,20 @@ val cache_entry :
   unit
 
 val init : Configuration_file.t -> t tzresult Lwt.t
+
+(** [add_slot_headers ~number_of_slots ~block_level slot_headers store]
+    processes the [slot_headers] published at [block_level]. Concretely, for
+    each slot header successfully applied in the L1 block,
+
+    - It is added to disk store {!slot_header_statuses} with a
+    [`Waiting_attestation] status (indexed by slot_id);
+
+    - It is added to the 2D memory cache {!finalized_commitments}, indexed by
+    publication level and slots indices.
+*)
+val add_slot_headers :
+  number_of_slots:int ->
+  block_level:int32 ->
+  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+  t ->
+  unit tzresult Lwt.t

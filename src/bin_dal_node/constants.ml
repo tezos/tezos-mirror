@@ -60,6 +60,10 @@ let cache_size =
   let number_of_slots = 5 in
   number_of_levels_to_keep * number_of_slots
 
+(* This cache is being used for the validation of message ids, in particular messages in
+   the future, it does not have to be big. We take 100 which sounds reasonable. *)
+let slot_id_cache_size = 100
+
 let shards_verification_sampling_frequency = 100
 
 let amplification_random_delay_min = 1.

@@ -205,6 +205,40 @@ module Slots = struct
     KVS.remove_file t file_layout (slot_id, slot_size)
 end
 
+module Slot_id_cache = struct
+  module Levels =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = Types.level
+
+        let equal = Int32.equal
+
+        let hash = Hashtbl.hash
+      end)
+
+  type t = Cryptobox.Commitment.t option array Levels.t
+
+  let create ~capacity = Levels.create capacity
+
+  let add ~number_of_slots t slot_header =
+    let Dal_plugin.{slot_index; commitment; published_level} = slot_header in
+    match Levels.find_opt t published_level with
+    | None ->
+        let table = Array.make number_of_slots None in
+        Array.set table slot_index (Some commitment) ;
+        Levels.replace t published_level table
+    | Some table -> Array.set table slot_index (Some commitment)
+
+  let find_opt =
+    let get_opt a i =
+      let len = Array.length a in
+      if i < 0 || i >= len then None else Array.get a i
+    in
+    fun t Types.Slot_id.{slot_level; slot_index} ->
+      Levels.find_opt t slot_level
+      |> Option.filter_map (Fun.flip get_opt slot_index)
+end
+
 module Statuses = struct
   type t = (int32, int, Types.header_status) KVS.t
 
@@ -256,41 +290,6 @@ module Statuses = struct
     | Error err ->
         let data_kind = Types.Store.Header_status in
         fail @@ Errors.decoding_failed data_kind err
-
-  let add_slot_headers ~number_of_slots ~block_level slot_headers t =
-    let module SI = Set.Make (Int) in
-    let open Lwt_result_syntax in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
-       Handle reorgs. *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
-             https://gitlab.com/tezos/tezos/-/issues/4528
-       Handle statuses evolution. *)
-    let* waiting =
-      List.fold_left_es
-        (fun waiting (slot_header, status) ->
-          let Dal_plugin.{slot_index; commitment = _; published_level} =
-            slot_header
-          in
-          (* This invariant should hold. *)
-          assert (Int32.equal published_level block_level) ;
-          let index =
-            Types.Slot_id.{slot_level = published_level; slot_index}
-          in
-          match status with
-          | Dal_plugin.Succeeded ->
-              let* () =
-                add_status t `Waiting_attestation index |> Errors.to_tzresult
-              in
-              return (SI.add slot_index waiting)
-          | Dal_plugin.Failed -> return waiting)
-        SI.empty
-        slot_headers
-    in
-    List.iter
-      (fun i ->
-        Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
-      (0 -- (number_of_slots - 1)) ;
-    return_unit
 
   let update_slot_headers_attestation ~published_level ~number_of_slots t
       attested =
@@ -350,6 +349,7 @@ type t = {
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
+  finalized_commitments : Slot_id_cache.t;
 }
 
 let cache_entry node_store commitment slot shares shard_proofs =
@@ -373,4 +373,46 @@ let init config =
       slots;
       slot_header_statuses;
       cache = Commitment_indexed_cache.create Constants.cache_size;
+      finalized_commitments =
+        Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
     }
+
+let add_slot_headers ~number_of_slots ~block_level slot_headers t =
+  let module SI = Set.Make (Int) in
+  let open Lwt_result_syntax in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
+           https://gitlab.com/tezos/tezos/-/issues/4528
+     Handle statuses evolution. *)
+  let slot_header_statuses = t.slot_header_statuses in
+  let* waiting =
+    List.fold_left_es
+      (fun waiting (slot_header, status) ->
+        let Dal_plugin.{slot_index; commitment = _; published_level} =
+          slot_header
+        in
+        (* This invariant should hold. *)
+        assert (Int32.equal published_level block_level) ;
+        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
+        match status with
+        | Dal_plugin.Succeeded ->
+            let* () =
+              Statuses.add_status
+                slot_header_statuses
+                `Waiting_attestation
+                index
+              |> Errors.to_tzresult
+            in
+            Slot_id_cache.add
+              ~number_of_slots
+              t.finalized_commitments
+              slot_header ;
+            return (SI.add slot_index waiting)
+        | Dal_plugin.Failed -> return waiting)
+      SI.empty
+      slot_headers
+  in
+  List.iter
+    (fun i ->
+      Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
+    (0 -- (number_of_slots - 1)) ;
+  return_unit
