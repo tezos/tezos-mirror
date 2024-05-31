@@ -29,7 +29,7 @@ variables:
     - RUNNER: "amd64"
       ARCH: "amd64"
       OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
-    - RUNNER: "gcp_arm64"
+    - RUNNER: "gcp_dev_arm64"
       ARCH: "arm64"
       OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
 
