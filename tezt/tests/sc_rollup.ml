@@ -1230,7 +1230,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   in
   let* () =
     Process.check_error
-      ~msg:(rex "Last commitment of snapshot is not published on L1.")
+      ~msg:(rex "Commitment of snapshot is not published on L1.")
       unpublished
   in
   unit
@@ -6141,14 +6141,14 @@ let register_protocol_independent () =
   test_snapshots
     ~kind
     ~challenge_window:5
-    ~commitment_period:2
+    ~commitment_period:4
     ~history_mode:Full
     ~compact:false
     protocols ;
   test_snapshots
     ~kind
     ~challenge_window:5
-    ~commitment_period:2
+    ~commitment_period:4
     ~history_mode:Full
     ~compact:true
     protocols ;
