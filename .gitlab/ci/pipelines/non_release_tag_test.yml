@@ -112,6 +112,7 @@ oc.build:dpkg:amd64:
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64
+    CARGO_HOME: /root/.cargo
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -155,6 +156,7 @@ oc.build:rpm:amd64:
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64
+    CARGO_HOME: /root/.cargo
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day

@@ -1221,6 +1221,9 @@ let jobs pipeline_type =
           ~dependencies:dependencies_needs_start
           ~rules:install_octez_rules
           ~stage:Stages.test
+            (* This job uses a CARGO_HOME different from
+               {!Common.cargo_home}. *)
+          ~variables:[("CARGO_HOME", "/home/opam/.cargo")]
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
       in
       [

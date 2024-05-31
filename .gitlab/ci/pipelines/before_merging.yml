@@ -7521,6 +7521,8 @@ oc.compile_release_sources_bullseye:
   dependencies: []
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  variables:
+    CARGO_HOME: /home/opam/.cargo
 
 oc.compile_sources_bullseye:
   image: ocaml/opam:debian-11
@@ -7540,6 +7542,8 @@ oc.compile_sources_bullseye:
   script:
   - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  variables:
+    CARGO_HOME: /home/opam/.cargo
 
 oc.compile_sources_mantic:
   image: ocaml/opam:ubuntu-23.10
@@ -7559,6 +7563,8 @@ oc.compile_sources_mantic:
   script:
   - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  variables:
+    CARGO_HOME: /home/opam/.cargo
 
 tezt:
   image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
@@ -8406,6 +8412,7 @@ oc.build:dpkg:amd64:
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64
+    CARGO_HOME: /root/.cargo
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -8452,6 +8459,7 @@ oc.build:rpm:amd64:
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64
+    CARGO_HOME: /root/.cargo
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day

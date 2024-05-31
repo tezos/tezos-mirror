@@ -782,6 +782,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
         ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
         ("BLST_PORTABLE", "yes");
         ("ARCH", arch_string);
+        ("CARGO_HOME", "/root/.cargo");
       ]
     ~artifacts
     ~parallel
