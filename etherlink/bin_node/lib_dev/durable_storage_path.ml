@@ -126,4 +126,10 @@ module Trace_transaction = struct
   let output_failed = root ^ "/failed"
 
   let output_return_value = root ^ "/return_value"
+
+  let opcodes_root = root ^ "/struct_logs"
+
+  let logs_length = opcodes_root ^ "/length"
+
+  let opcode i = opcodes_root ^ "/" ^ string_of_int i
 end

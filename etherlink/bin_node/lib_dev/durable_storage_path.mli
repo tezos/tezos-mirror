@@ -104,4 +104,8 @@ module Trace_transaction : sig
 
   (** Path where is stored the value returned by the transaction's execution. *)
   val output_return_value : path
+
+  val logs_length : path
+
+  val opcode : int -> path
 end

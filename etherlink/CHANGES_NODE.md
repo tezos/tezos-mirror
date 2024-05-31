@@ -30,6 +30,8 @@
 - The observer mode has the `devmode` flag, similar to the sequencer mode. (!13163)
 - Adds a `--read-only` flag to the proxy mode, if the flag is set, the transaction
   pool is not supported. (!13162)
+- Support `debug_traceTransaction` with its default logger `structLogs`.
+  (!13268, !13321, !13350, !13378)
 
 ### Experimental
 
