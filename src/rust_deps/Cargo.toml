@@ -17,3 +17,7 @@ path = "librustzcash"
 [dependencies.octez-riscv]
 path = "../riscv/lib"
 features = ["ocaml-api"]
+
+[dependencies]
+armerge = "2.0.0"
+regex = "1.10.4"
