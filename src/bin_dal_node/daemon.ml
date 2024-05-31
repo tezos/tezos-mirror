@@ -187,7 +187,7 @@ module Handler = struct
           `Unknown
         else `Invalid
 
-  let _gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
+  let gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
     let attestation_level =
       Int32.(
         pred
@@ -216,16 +216,16 @@ module Handler = struct
         then `Valid
         else `Invalid
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
-
-     We should check:
-
-     - That the included shard index is indeed assigned to the included pkh;
-
-     - That the bounds on the slot/shard indexes are respected.
-  *)
   let gossipsub_message_id_validation ctxt proto_parameters message_id =
-    gossipsub_message_id_commitment_validation ctxt proto_parameters message_id
+    match
+      gossipsub_message_id_commitment_validation
+        ctxt
+        proto_parameters
+        message_id
+    with
+    | `Valid ->
+        gossipsub_message_id_topic_validation ctxt proto_parameters message_id
+    | other -> other
 
   (* [gossipsub_app_messages_validation ctxt cryptobox head_level
      attestation_lag ?message ~message_id ()] checks for the validity of the
