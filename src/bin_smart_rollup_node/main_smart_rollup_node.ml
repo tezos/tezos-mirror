@@ -42,62 +42,65 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args25
-       force_switch
-       data_dir_arg
-       rpc_addr_arg
-       rpc_port_arg
-       acl_override_arg
-       metrics_addr_arg
-       enable_performance_metrics_arg
-       loser_mode_arg
-       reconnection_delay_arg
-       dal_node_endpoint_arg
-       dac_observer_endpoint_arg
-       dac_timeout_arg
-       pre_images_endpoint_arg
-       injector_retention_period_arg
-       injector_attempts_arg
-       injection_ttl_arg
-       index_buffer_size_arg
-       index_buffer_size_arg
-       log_kernel_debug_arg
-       boot_sector_file_arg
-       no_degraded_arg
-       gc_frequency_arg
-       history_mode_arg
-       cors_allowed_origins_arg
-       cors_allowed_headers_arg)
+    (merge_options
+       (args25
+          force_switch
+          data_dir_arg
+          rpc_addr_arg
+          rpc_port_arg
+          acl_override_arg
+          metrics_addr_arg
+          enable_performance_metrics_arg
+          loser_mode_arg
+          reconnection_delay_arg
+          dal_node_endpoint_arg
+          dac_observer_endpoint_arg
+          dac_timeout_arg
+          pre_images_endpoint_arg
+          injector_retention_period_arg
+          injector_attempts_arg
+          injection_ttl_arg
+          index_buffer_size_arg
+          index_buffer_size_arg
+          log_kernel_debug_arg
+          boot_sector_file_arg
+          no_degraded_arg
+          gc_frequency_arg
+          history_mode_arg
+          cors_allowed_origins_arg
+          cors_allowed_headers_arg)
+       (args1 bail_on_disagree_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
     @@ seq_of_param @@ operator_param)
-    (fun ( force,
-           data_dir,
-           rpc_addr,
-           rpc_port,
-           acl_override,
-           metrics_addr,
-           enable_performance_metrics,
-           loser_mode,
-           reconnection_delay,
-           dal_node_endpoint,
-           dac_observer_endpoint,
-           dac_timeout,
-           pre_images_endpoint,
-           injector_retention_period,
-           injector_attempts,
-           injection_ttl,
-           index_buffer_size,
-           irmin_cache_size,
-           log_kernel_debug,
-           boot_sector_file,
-           no_degraded,
-           gc_frequency,
-           history_mode,
-           allowed_origins,
-           allowed_headers )
+    (fun ( ( force,
+             data_dir,
+             rpc_addr,
+             rpc_port,
+             acl_override,
+             metrics_addr,
+             enable_performance_metrics,
+             loser_mode,
+             reconnection_delay,
+             dal_node_endpoint,
+             dac_observer_endpoint,
+             dac_timeout,
+             pre_images_endpoint,
+             injector_retention_period,
+             injector_attempts,
+             injection_ttl,
+             index_buffer_size,
+             irmin_cache_size,
+             log_kernel_debug,
+             boot_sector_file,
+             no_degraded,
+             gc_frequency,
+             history_mode,
+             allowed_origins,
+             allowed_headers ),
+           bail_on_disagree )
          mode
          sc_rollup_address
          operators
@@ -131,6 +134,7 @@ let config_init_command =
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches:false
+          ~bail_on_disagree
       in
       let* () = Configuration.save ~force ~data_dir config in
       let*! () =
@@ -157,7 +161,7 @@ let legacy_run_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg)
-       (args20
+       (args21
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -177,7 +181,8 @@ let legacy_run_command =
           history_mode_arg
           cors_allowed_origins_arg
           cors_allowed_headers_arg
-          apply_unsafe_patches_switch))
+          apply_unsafe_patches_switch
+          bail_on_disagree_switch))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
              mode,
@@ -206,7 +211,8 @@ let legacy_run_command =
              history_mode,
              allowed_origins,
              allowed_headers,
-             apply_unsafe_patches ) )
+             apply_unsafe_patches,
+             bail_on_disagree ) )
          cctxt ->
       let* configuration =
         Configuration.Cli.create_or_read_config
@@ -238,6 +244,7 @@ let legacy_run_command =
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches
+          ~bail_on_disagree
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -270,7 +277,7 @@ let run_command =
           dac_observer_endpoint_arg
           dac_timeout_arg
           pre_images_endpoint_arg)
-       (args14
+       (args15
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -284,7 +291,8 @@ let run_command =
           history_mode_arg
           cors_allowed_origins_arg
           cors_allowed_headers_arg
-          apply_unsafe_patches_switch))
+          apply_unsafe_patches_switch
+          bail_on_disagree_switch))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -314,7 +322,8 @@ let run_command =
              history_mode,
              allowed_origins,
              allowed_headers,
-             apply_unsafe_patches ) )
+             apply_unsafe_patches,
+             bail_on_disagree ) )
          mode
          sc_rollup_address
          operators
@@ -349,6 +358,7 @@ let run_command =
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches
+          ~bail_on_disagree
       in
       Rollup_node_daemon.run
         ~data_dir

@@ -535,3 +535,11 @@ let apply_unsafe_patches_switch : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:
       "Apply unsafe PVM patches in the configuration or hardcoded by the node."
     ()
+
+let bail_on_disagree_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"bail-on-disagree"
+    ~doc:
+      "Make an observer rollup node bail when it sees a commitment it disagree \
+       with on L1."
+    ()
