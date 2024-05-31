@@ -9,15 +9,14 @@ use octez_riscv::{
         mode::Mode,
         registers::{gp, XRegister, XValue},
     },
-    Interpreter,
-    InterpreterResult::*,
+    stepper::test::{TestStepper, TestStepperResult::*},
 };
 use std::fs;
 
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const MAX_STEPS: usize = 1_000_000;
 
-fn check_register_values(interpreter: &Interpreter, check_xregs: &[(XRegister, XValue)]) {
+fn check_register_values(interpreter: &TestStepper, check_xregs: &[(XRegister, XValue)]) {
     let failure = check_xregs
         .iter()
         .filter_map(|(xreg, xval)| {
@@ -32,9 +31,9 @@ fn check_register_values(interpreter: &Interpreter, check_xregs: &[(XRegister, X
 }
 
 fn interpret_test_with_check(contents: &[u8], exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
-    let mut backend = Interpreter::<'_, Posix>::create_backend();
+    let mut backend = TestStepper::<'_, Posix>::create_backend();
     let mut interpreter =
-        Interpreter::new(&mut backend, contents, None, exit_mode).expect("Boot failed");
+        TestStepper::new(&mut backend, contents, None, exit_mode).expect("Boot failed");
     match interpreter.run(MAX_STEPS) {
         Exit { code: 0, .. } => check_register_values(&interpreter, check_xregs),
         Exit { code, steps } => {

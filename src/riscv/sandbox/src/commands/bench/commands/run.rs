@@ -15,13 +15,13 @@ use octez_riscv::{
     exec_env::posix::Posix,
     machine_state::bus::Address,
     parser::{instruction::Instr, parse},
-    Interpreter, InterpreterResult,
+    stepper::test::{TestStepper, TestStepperResult},
 };
 use std::{error::Error, path::Path};
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
-fn get_current_instr(interpreter: &Interpreter) -> Result<Instr, InstrGetError> {
+fn get_current_instr(interpreter: &TestStepper) -> Result<Instr, InstrGetError> {
     let get_half_instr = |raw_pc: Address| -> Result<u16, InstrGetError> {
         let pc = interpreter
             .translate_instruction_address(raw_pc)
@@ -37,10 +37,10 @@ fn get_current_instr(interpreter: &Interpreter) -> Result<Instr, InstrGetError> 
 /// Composes "in time" two [`InterpreterResult`] one after another,
 /// to obtain the equivalent final [`InterpreterResult`]
 fn compose(
-    current_state: InterpreterResult,
-    following_result: InterpreterResult,
-) -> InterpreterResult {
-    use InterpreterResult::*;
+    current_state: TestStepperResult,
+    following_result: TestStepperResult,
+) -> TestStepperResult {
+    use TestStepperResult::*;
     match current_state {
         Exit { .. } => current_state,
         Exception { .. } => current_state,
@@ -63,8 +63,8 @@ fn compose(
     }
 }
 
-fn bench_fine(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchData {
-    let mut run_res = InterpreterResult::Running(0);
+fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
+    let mut run_res = TestStepperResult::Running(0);
     let mut bench_data = FineBenchData::new();
     let bench_start = quanta::Instant::now();
 
@@ -82,9 +82,9 @@ fn bench_fine(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchDat
 
         run_res = compose(run_res, step_res);
         match run_res {
-            InterpreterResult::Exit { .. } => break,
-            InterpreterResult::Exception { .. } => break,
-            InterpreterResult::Running(_) => (),
+            TestStepperResult::Exit { .. } => break,
+            TestStepperResult::Exception { .. } => break,
+            TestStepperResult::Running(_) => (),
         }
     }
     let bench_duration = bench_start.elapsed();
@@ -94,12 +94,12 @@ fn bench_fine(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchDat
 
 /// A single run of the given `interpreter`.
 /// Provides basic benchmark data and interpreter result.
-fn bench_simple(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchData {
+fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
     let start = quanta::Instant::now();
     let res = interpreter.run(opts.common.max_steps);
     let duration = start.elapsed();
 
-    use InterpreterResult::*;
+    use TestStepperResult::*;
     let steps = match res {
         Exit { steps, .. } => steps,
         Running(steps) => steps,
@@ -112,8 +112,8 @@ fn bench_simple(interpreter: &mut Interpreter, opts: &BenchRunOptions) -> BenchD
 
 fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
     let contents = std::fs::read(path)?;
-    let mut backend = Interpreter::<'_, Posix>::create_backend();
-    let mut interpreter = Interpreter::new(
+    let mut backend = TestStepper::<'_, Posix>::create_backend();
+    let mut interpreter = TestStepper::new(
         &mut backend,
         &contents,
         None,

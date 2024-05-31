@@ -17,7 +17,7 @@ use octez_riscv::{
         },
         registers,
     },
-    InterpreterResult,
+    stepper::test::TestStepperResult,
 };
 use ratatui::{
     prelude::*,
@@ -446,14 +446,14 @@ impl<'a> DebuggerApp<'a> {
             format!("{:?}", self.interpreter.read_mode()).fg(BLUE),
         ]);
         let status_text = match &self.state.interpreter {
-            InterpreterResult::Running(steps) => vec![
+            TestStepperResult::Running(steps) => vec![
                 Line::from(vec!["   Running".bold().fg(GREEN)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
                 virt_line,
                 mode_line,
             ],
-            InterpreterResult::Exit { code, steps } => {
+            TestStepperResult::Exit { code, steps } => {
                 let color = if *code == 0 { YELLOW } else { RED };
                 vec![
                     Line::from(vec![format!("   Exit with code {}", code).bold().fg(color)]),
@@ -462,7 +462,7 @@ impl<'a> DebuggerApp<'a> {
                     virt_line,
                 ]
             }
-            InterpreterResult::Exception {
+            TestStepperResult::Exception {
                 cause,
                 message,
                 steps,
