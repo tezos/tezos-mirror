@@ -590,26 +590,7 @@ opam:prepare:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 1 minute
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    when: delayed
+  - when: delayed
     start_in: 1 minute
   dependencies:
   - oc.docker:ci:amd64
@@ -630,28 +611,7 @@ opam:all_6:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 6 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 6 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 6 minutes
   needs:
   - oc.docker:ci:amd64
@@ -715,26 +675,7 @@ opam:exec_6:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 6 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 6 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    when: delayed
+  - when: delayed
     start_in: 6 minutes
   needs:
   - oc.docker:ci:amd64
@@ -787,28 +728,7 @@ opam:all_2:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 2 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 2 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 2 minutes
   needs:
   - oc.docker:ci:amd64
@@ -874,28 +794,7 @@ opam:all_1:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 1 minute
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 1 minute
   needs:
   - oc.docker:ci:amd64
@@ -949,28 +848,7 @@ opam:all_3:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 3 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 3 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 3 minutes
   needs:
   - oc.docker:ci:amd64
@@ -1036,26 +914,7 @@ opam:exec_4:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 4 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 4 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    when: delayed
+  - when: delayed
     start_in: 4 minutes
   needs:
   - oc.docker:ci:amd64
@@ -1107,28 +966,7 @@ opam:all_4:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 4 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 4 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 4 minutes
   needs:
   - oc.docker:ci:amd64
@@ -1193,26 +1031,7 @@ opam:exec_1:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 1 minute
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    when: delayed
+  - when: delayed
     start_in: 1 minute
   needs:
   - oc.docker:ci:amd64
@@ -1275,28 +1094,7 @@ opam:all_5:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 5 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 5 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 5 minutes
   needs:
   - oc.docker:ci:amd64
@@ -1362,28 +1160,7 @@ opam:all_7:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 7 minutes
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 7 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
-    when: delayed
+  - when: delayed
     start_in: 7 minutes
   needs:
   - oc.docker:ci:amd64
