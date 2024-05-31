@@ -161,15 +161,8 @@ module Handler = struct
   let is_bootstrap_node ctxt =
     Node_context.get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
-
-     We should check:
-
-     - That the included shard index is indeed assigned to the included pkh;
-
-     - That the bounds on the slot/shard indexes are respected.
-  *)
-  let gossipsub_message_id_validation ctxt proto_parameters message_id =
+  let gossipsub_message_id_commitment_validation ctxt proto_parameters
+      message_id =
     let store = Node_context.get_store ctxt in
     let slot_index = message_id.Types.Message_id.slot_index in
     match
@@ -193,6 +186,17 @@ module Handler = struct
           (* We know the message is not [Outdated], because this has already been checked in {!gossipsub_app_messages_validation}. *)
           `Unknown
         else `Invalid
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
+
+     We should check:
+
+     - That the included shard index is indeed assigned to the included pkh;
+
+     - That the bounds on the slot/shard indexes are respected.
+  *)
+  let gossipsub_message_id_validation ctxt proto_parameters message_id =
+    gossipsub_message_id_commitment_validation ctxt proto_parameters message_id
 
   (* [gossipsub_app_messages_validation ctxt cryptobox head_level
      attestation_lag ?message ~message_id ()] checks for the validity of the
