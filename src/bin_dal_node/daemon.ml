@@ -187,6 +187,35 @@ module Handler = struct
           `Unknown
         else `Invalid
 
+  let _gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
+    let attestation_level =
+      Int32.(
+        pred
+        @@ add
+             message_id.Types.Message_id.level
+             (of_int proto_parameters.Dal_plugin.attestation_lag))
+    in
+    let shard_indices_opt =
+      Node_context.get_fetched_assigned_shard_indices
+        ctxt
+        ~pkh:message_id.Types.Message_id.pkh
+        ~level:attestation_level
+    in
+    match shard_indices_opt with
+    | None ->
+        (* If DAL committees of [attestation_level] are fetched each time the
+           corresponding published/finalized_level is processed, this should not
+           happen. *)
+        `Unknown
+    | Some shard_indices ->
+        if
+          List.mem
+            ~equal:( = )
+            message_id.Types.Message_id.shard_index
+            shard_indices
+        then `Valid
+        else `Invalid
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
 
      We should check:
