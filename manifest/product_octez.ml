@@ -8096,6 +8096,20 @@ let _octez_injector_server =
       (* run the protocol registration code *)
       @ Protocol.(all_optionally [octez_injector]))
 
+let _RPC_toy =
+  public_exe
+    "RPC-toy"
+    ~internal_name:"RPC_toy"
+    ~path:"contrib/RPC_toy"
+    ~synopsis:"RPC toy"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~linkall:true
+    ~deps:
+      [
+        octez_stdlib_unix; octez_base |> open_ ~m:"TzPervasives"; cohttp_lwt_unix;
+      ]
+
 (* We use Dune's select statement and keep uTop optional *)
 (* Keeping uTop optional lets `make build` succeed, *)
 (* which uses tezos/opam-repository to resolve dependencies, *)
