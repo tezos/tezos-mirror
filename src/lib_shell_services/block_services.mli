@@ -101,9 +101,6 @@ module type PROTO = sig
 
   type block_header_metadata
 
-  val block_header_metadata_encoding_with_legacy_attestation_name :
-    block_header_metadata Data_encoding.t
-
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 
   type operation_data
@@ -117,18 +114,9 @@ module type PROTO = sig
 
   val operation_data_encoding : operation_data Data_encoding.t
 
-  val operation_data_encoding_with_legacy_attestation_name :
-    operation_data Data_encoding.t
-
   val operation_receipt_encoding : operation_receipt Data_encoding.t
 
-  val operation_receipt_encoding_with_legacy_attestation_name :
-    operation_receipt Data_encoding.t
-
   val operation_data_and_receipt_encoding :
-    (operation_data * operation_receipt) Data_encoding.t
-
-  val operation_data_and_receipt_encoding_with_legacy_attestation_name :
     (operation_data * operation_receipt) Data_encoding.t
 end
 
@@ -745,8 +733,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     end
 
     module Mempool : sig
-      val encoding : Mempool.t Data_encoding.t
-
       (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
         ('a, 'b) Tezos_rpc.Path.t ->
