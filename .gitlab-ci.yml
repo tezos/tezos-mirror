@@ -114,7 +114,6 @@ docker:
     - .needs-build
     - .docker-rules
   tags:
-    - devops
     - ${RUNNER}
   before_script:
     - !reference [.needs-build, before_script]
