@@ -85,6 +85,7 @@ type t = {
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
+  bail_on_disagree : bool;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -455,6 +456,7 @@ let encoding default_display : t Data_encoding.t =
            gc_parameters;
            history_mode;
            cors;
+           bail_on_disagree;
          } ->
       ( ( ( sc_rollup_address,
             boot_sector_file,
@@ -486,7 +488,8 @@ let encoding default_display : t Data_encoding.t =
             no_degraded,
             gc_parameters,
             history_mode,
-            cors ) ) ))
+            cors,
+            bail_on_disagree ) ) ))
     (fun ( ( ( sc_rollup_address,
                boot_sector_file,
                operators,
@@ -517,7 +520,8 @@ let encoding default_display : t Data_encoding.t =
                no_degraded,
                gc_parameters,
                history_mode,
-               cors ) ) ) ->
+               cors,
+               bail_on_disagree ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -554,6 +558,7 @@ let encoding default_display : t Data_encoding.t =
         gc_parameters;
         history_mode;
         cors;
+        bail_on_disagree;
       })
     (merge_objs
        (merge_objs
@@ -621,7 +626,7 @@ let encoding default_display : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj9
+          (obj10
              (dft "l1_rpc_timeout" Data_encoding.float default_l1_rpc_timeout)
              (dft
                 "loop_retry_delay"
@@ -633,7 +638,8 @@ let encoding default_display : t Data_encoding.t =
              (dft "no-degraded" Data_encoding.bool false)
              (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
              (opt "history-mode" history_mode_encoding)
-             (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
+             (dft "cors" cors_encoding Resto_cohttp.Cors.default)
+             (dft "bail-on-disagree" bool false))))
 
 let encoding_no_default = encoding `Show
 
@@ -747,7 +753,7 @@ module Cli = struct
       ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches =
+      ~apply_unsafe_patches ~bail_on_disagree =
     let open Result_syntax in
     let* purposed_operator, default_operator =
       get_purposed_and_default_operators operators
@@ -820,6 +826,7 @@ module Cli = struct
             allowed_origins =
               Option.value ~default:default.allowed_origins allowed_origins;
           };
+      bail_on_disagree;
     }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
@@ -829,7 +836,7 @@ module Cli = struct
       ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches =
+      ~apply_unsafe_patches ~bail_on_disagree =
     let open Result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let* () = check_custom_mode mode in
@@ -917,6 +924,7 @@ module Cli = struct
                   ~default:configuration.cors.allowed_origins
                   allowed_origins;
             };
+        bail_on_disagree = bail_on_disagree || configuration.bail_on_disagree;
       }
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
@@ -926,7 +934,7 @@ module Cli = struct
       ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches =
+      ~apply_unsafe_patches ~bail_on_disagree =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -976,6 +984,7 @@ module Cli = struct
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches
+          ~bail_on_disagree
       in
       return configuration
     else
@@ -1027,6 +1036,7 @@ module Cli = struct
           ~allowed_headers
           ~allowed_origins
           ~apply_unsafe_patches
+          ~bail_on_disagree
       in
       return config
 end

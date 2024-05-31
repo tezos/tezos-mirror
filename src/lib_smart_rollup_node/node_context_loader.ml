@@ -295,6 +295,7 @@ module For_snapshots = struct
                l1_rpc_timeout;
                loop_retry_delay = 10.;
                pre_images_endpoint = None;
+               bail_on_disagree = false;
              }
     in
     let*? l1_ctxt =
@@ -406,6 +407,7 @@ module Internal_for_tests = struct
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
+          bail_on_disagree = false;
         }
     in
     let* lockfile = lock ~data_dir in
