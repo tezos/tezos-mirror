@@ -8,6 +8,25 @@
 
 set -e
 
+TX=""
+
+while getopts "t:" OPTION; do
+  case "$OPTION" in
+  t)
+    TX="$OPTARG"
+    ;;
+  *)
+    echo "Usage: -t <num_transfers>"
+    exit 1
+    ;;
+  esac
+done
+
+if [ -z "$TX" ]; then
+  echo "Usage: -t <num_transfers>"
+  exit 1
+fi
+
 CURR=$(pwd)
 
 RISCV_DIR=$(dirname "$0")/..
@@ -20,11 +39,11 @@ make -C jstz build &> /dev/null
 
 DATA_DIR=${DATA_DIR:=$(mktemp -d)}
 
-echo "[INFO]: generating $1 transfers"
+echo "[INFO]: generating $TX transfers"
 INBOX_FILE="${DATA_DIR}/inbox.json"
-./jstz/inbox-bench generate --inbox-file "$INBOX_FILE" --transfers "$1"
+./jstz/inbox-bench generate --inbox-file "$INBOX_FILE" --transfers "$TX"
 
-echo "[INFO]: running $1 transfers"
+echo "[INFO]: running $TX transfers"
 LOG="${DATA_DIR}/log.out"
 ./riscv-sandbox rvemu \
   --input ../../tezt/tests/riscv-tests/hermit-loader \
