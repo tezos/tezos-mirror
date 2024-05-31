@@ -294,7 +294,13 @@ let enable_kernels =
 
 (* Common GitLab CI caches *)
 
-let enable_cargo_cache = append_cache {key = "cargo"; paths = [cargo_home]}
+let enable_cargo_cache job =
+  job
+  |> append_cache
+       {
+         key = ("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug));
+         paths = [cargo_home // "registry/cache"];
+       }
 
 (** {2 Changesets} *)
 
