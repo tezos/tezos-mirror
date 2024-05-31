@@ -55,7 +55,8 @@ type sequencer = {
   preimages : string;  (** Path to the preimages directory. *)
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
-  time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
+  time_between_blocks : time_between_blocks;
+      (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
   private_rpc_port : int option;  (** Port for internal RPC services *)
@@ -69,7 +70,7 @@ type threshold_encryption_sequencer =
       preimages_endpoint : Uri.t option;
           (** Endpoint where pre-images can be fetched individually when missing. *)
       time_between_blocks : time_between_blocks;
-          (** See {!time_between_blocks}. *)
+          (** See {!type-time_between_blocks}. *)
       max_number_of_chunks : int;
           (** The maximum number of chunks per blueprints. *)
       private_rpc_port : int option;  (** Port for internal RPC services *)
@@ -86,7 +87,7 @@ type observer = {
   preimages : string;
   preimages_endpoint : Uri.t option;
   time_between_blocks : time_between_blocks option;
-      (** See {!time_between_blocks}. *)
+      (** See {!type-time_between_blocks}. *)
 }
 
 type proxy = {

@@ -55,15 +55,14 @@ module Ast : sig
     | UnaryOp of {op : unaryop; operand : t}
         (** [UnaryOp] represents an unary operation. *)
     | IfExp of {condition : t; ifTrue : t; ifFalse : t}
-        (** | Dict of {keys : t list; values : t list} *)
+      (* | Dict of {keys : t list; values : t list} *)
     | Compare of {left : t; ops : cmpop; right : t}
         (** Represents [X < Y], [X > Y] and so on. *)
     | Call of {func : t; args : t list}
         (** [Call] represents a function call. *)
-    | IntNum of int
-        (** [IntNum] is originally represented by {@scala[scala.math.BigInt]}. *)
+    | IntNum of int  (** [IntNum] is originally represented by [math.BigInt]. *)
     | FloatNum of float
-        (** [FloatNum] is originally represented by {@scala[scala.math.BigDecimal]}. *)
+        (** [FloatNum] is originally represented by [math.BigDecimal]. *)
     | Str of string  (** [Str] is a string expression. *)
     | Bool of bool  (** [Bool] is a bool expression. *)
     | EnumByLabel of {
@@ -114,8 +113,8 @@ module Endianness : sig
 end
 
 (** [DocSpec] module defines primitives for attaching documentation to kaitai
-    specification files. 
-   
+    specification files.
+
     See the {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/DocSpec.scala}
     reference implementation}.*)
 module DocSpec : sig
@@ -128,7 +127,7 @@ module InstanceIdentifier : sig
   type t = string
 end
 
-(** [RepeatSpec] defines possible repetitions of Kaitai primitives. 
+(** [RepeatSpec] defines possible repetitions of Kaitai primitives.
 
     See the {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/RepeatSpec.scala}
     reference implementation}.*)
@@ -183,7 +182,7 @@ end
 
 (** [DataType] module defines AST for describing underlying data types.
 
-    For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala} see. *)
+    For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala} see}. *)
 module DataType : sig
   type data_type =
     | NumericType of numeric_type
@@ -290,7 +289,7 @@ module InstanceSpec : sig
   (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/InstanceSpec.scala} see}. *)
 
   (** [t] defines a Kaitai instance.
-  
+
       For more about it {{:https://doc.kaitai.io/user_guide.html#_instances_data_beyond_the_sequence} see}. *)
   type t = {doc : DocSpec.t; descr : descr}
 
