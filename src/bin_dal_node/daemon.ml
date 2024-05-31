@@ -165,14 +165,34 @@ module Handler = struct
 
      We should check:
 
-     - That the commitment (slot index for the given level if the commitment
-       field is dropped from message id) is waiting for attestation;
-
      - That the included shard index is indeed assigned to the included pkh;
 
      - That the bounds on the slot/shard indexes are respected.
   *)
-  let gossipsub_message_id_validation _ctxt _cryptobox _message_id = `Valid
+  let gossipsub_message_id_validation ctxt proto_parameters message_id =
+    let store = Node_context.get_store ctxt in
+    let slot_index = message_id.Types.Message_id.slot_index in
+    match
+      Store.Slot_id_cache.find_opt
+        store.finalized_commitments
+        Types.Slot_id.
+          {slot_level = message_id.Types.Message_id.level; slot_index}
+    with
+    | Some commitment ->
+        if
+          Cryptobox.Commitment.equal
+            commitment
+            message_id.Types.Message_id.commitment
+        then `Valid
+        else `Invalid
+    | None ->
+        if
+          slot_index >= 0
+          && slot_index < proto_parameters.Dal_plugin.number_of_slots
+        then
+          (* We know the message is not [Outdated], because this has already been checked in {!gossipsub_app_messages_validation}. *)
+          `Unknown
+        else `Invalid
 
   (* [gossipsub_app_messages_validation ctxt cryptobox head_level
      attestation_lag ?message ~message_id ()] checks for the validity of the
@@ -185,7 +205,7 @@ module Handler = struct
      {!gossipsub_app_message_payload_validation} is used to check its
      validity. *)
   let gossipsub_app_messages_validation ctxt cryptobox head_level
-      attestation_lag ?message ~message_id () =
+      proto_parameters ?message ~message_id () =
     if is_bootstrap_node ctxt then
       (* 1. As bootstrap nodes advertise their profiles to attester and producer
          nodes, they shouldn't receive messages or messages ids. If this
@@ -198,14 +218,16 @@ module Handler = struct
       if
         Int32.(
           sub head_level message_id.Types.Message_id.level
-          > of_int (attestation_lag + slack))
+          > of_int (proto_parameters.Dal_plugin.attestation_lag + slack))
       then
         (* 2. Nodes don't care about messages whose ids are too old.  Gossipsub
            should only be used for the dissemination of fresh data. Old data could
            be retrieved using another method. *)
         `Outdated
       else
-        match gossipsub_message_id_validation ctxt cryptobox message_id with
+        match
+          gossipsub_message_id_validation ctxt proto_parameters message_id
+        with
         | `Valid ->
             (* 3. Only check for message validity if the message_id is valid. *)
             Option.fold
@@ -550,7 +572,7 @@ module Handler = struct
                    ctxt
                    cryptobox
                    level
-                   proto_parameters.attestation_lag) ;
+                   proto_parameters) ;
               let*! () =
                 remove_old_level_slots_and_shards proto_parameters ctxt level
               in

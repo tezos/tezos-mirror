@@ -39,6 +39,10 @@ val committee_cache_size : int
     not-yet-published slots, shards, and shard proofs. *)
 val cache_size : int
 
+(** [slot_id_cache_size] is the size (in number of levels) of the cache to
+    associate commitments with slot ids at a given level. *)
+val slot_id_cache_size : int
+
 (** The frequency at which we sample the time spent in shards crypto
     verification. *)
 val shards_verification_sampling_frequency : int

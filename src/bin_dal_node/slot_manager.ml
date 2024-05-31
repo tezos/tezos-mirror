@@ -356,12 +356,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         gs_worker
 
 let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
-  Store.(
-    Statuses.add_slot_headers
-      ~number_of_slots
-      ~block_level
-      slot_headers
-      node_store.slot_header_statuses)
+  Store.(add_slot_headers ~number_of_slots ~block_level slot_headers node_store)
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
