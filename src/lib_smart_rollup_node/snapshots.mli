@@ -17,13 +17,14 @@ type compression =
           temporarily than {!On_the_fly} but does not lock the rollup node for
           very long. *)
 
-(** [export ~no_checks ~compression ~data_dir ~dest ~filename] creates a tar
-    gzipped archive with name [filename] (or a generated name) in [dest] (or the
-    current directory) containing a snapshot of the data of the rollup node with
-    data directory [data_dir]. The path of the snapshot archive is returned. If
-    [no_checks] is [true], the integrity of the snapshot is not checked at the
-    end. *)
+(** [export cctxt ~no_checks ~compression ~data_dir ~dest ~filename] creates a
+    tar gzipped archive with name [filename] (or a generated name) in [dest] (or
+    the current directory) containing a snapshot of the data of the rollup node
+    with data directory [data_dir]. The path of the snapshot archive is
+    returned. If [no_checks] is [true], the integrity of the snapshot is not
+    checked at the end. *)
 val export :
+  #Client_context.full ->
   no_checks:bool ->
   compression:compression ->
   data_dir:string ->
@@ -31,13 +32,17 @@ val export :
   filename:string option ->
   string tzresult Lwt.t
 
-(** [export_compact ~compression ~data_dir ~dest ~filename] creates a tar
-    gzipped archive with name [filename] (or a generated name) in [dest] (or the
-    current directory) containing a snapshot of the data of the rollup node with
-    data directory [data_dir]. The difference with {!export} is that the
-    snapshot contains a single commit for the context (which must be
-    reconstructed on import) but is significantly smaller. *)
+(** [export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename]
+    creates a tar gzipped archive with name [filename] (or a generated name) in
+    [dest] (or the current directory) containing a snapshot of the data of the
+    rollup node with data directory [data_dir]. The difference with {!export} is
+    that the snapshot contains a single commit for the context (which must be
+    reconstructed on import) but is significantly smaller. If [no_checks] is
+    [true], we don't check if commitments are published on L1 (integrity is not
+    checked because it requires rebuilding the context). *)
 val export_compact :
+  #Client_context.full ->
+  no_checks:bool ->
   compression:compression ->
   data_dir:string ->
   dest:string option ->

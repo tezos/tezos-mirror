@@ -49,7 +49,24 @@ let check_head (head : Sc_rollup_block.t) context =
   in
   return head
 
-let pre_export_checks_and_get_snapshot_metadata ~data_dir =
+let check_commitment_published cctxt address commitment =
+  let open Lwt_result_syntax in
+  Error.trace_lwt_result_with "Commitment of snapshot is not published on L1."
+  @@ let* {current_protocol; _} =
+       Tezos_shell_services.Shell_services.Blocks.protocols
+         cctxt
+         ~block:(`Head 0)
+         ()
+     in
+     let*? (module Plugin) =
+       Protocol_plugins.proto_plugin_for_protocol current_protocol
+     in
+     let* (_commitment : Commitment.t) =
+       Plugin.Layer1_helpers.get_commitment cctxt address commitment
+     in
+     return_unit
+
+let pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
@@ -79,8 +96,26 @@ let pre_export_checks_and_get_snapshot_metadata ~data_dir =
     | None -> error_with "No history mode information in %S." data_dir
     | Some h -> Ok h
   in
-
   let* head = check_head head context in
+  let last_commitment_hash =
+    Sc_rollup_block.most_recent_commitment head.header
+  in
+  let* () =
+    unless no_checks @@ fun () ->
+    let* last_commitment =
+      Store.Commitments.read store.commitments last_commitment_hash
+    in
+    let last_commitment, () =
+      WithExceptions.Option.get ~loc:__LOC__ last_commitment
+    in
+    (* Check if predecessor commitment exist on chain as a safety measure,
+       because the very last one may not be included in a block yet. *)
+    let pred_last_commitment = last_commitment.predecessor in
+    check_commitment_published
+      cctxt
+      metadata.rollup_address
+      pred_last_commitment
+  in
   (* Closing context and stores after checks *)
   let*! () = Context.close context in
   let* () = Store.close store in
@@ -89,7 +124,7 @@ let pre_export_checks_and_get_snapshot_metadata ~data_dir =
       history_mode;
       address = metadata.rollup_address;
       head_level = head.header.level;
-      last_commitment = Sc_rollup_block.most_recent_commitment head.header;
+      last_commitment = last_commitment_hash;
     }
 
 let first_available_level ~data_dir store =
@@ -355,27 +390,6 @@ let check_last_commitment head snapshot_metadata =
        last_snapshot_commitment
        Commitment.Hash.pp
        snapshot_metadata.last_commitment
-
-let check_last_commitment_published cctxt snapshot_metadata =
-  let open Lwt_result_syntax in
-  Error.trace_lwt_result_with
-    "Last commitment of snapshot is not published on L1."
-  @@ let* {current_protocol; _} =
-       Tezos_shell_services.Shell_services.Blocks.protocols
-         cctxt
-         ~block:(`Head 0)
-         ()
-     in
-     let*? (module Plugin) =
-       Protocol_plugins.proto_plugin_for_protocol current_protocol
-     in
-     let* (_commitment : Commitment.t) =
-       Plugin.Layer1_helpers.get_commitment
-         cctxt
-         snapshot_metadata.address
-         snapshot_metadata.last_commitment
-     in
-     return_unit
 
 let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
     (module Plugin : Protocol_plugin_sig.S) =
@@ -716,19 +730,21 @@ let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
   in
   return snapshot_file
 
-let export ~no_checks ~compression ~data_dir ~dest ~filename =
+let export cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
-  let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+  let* metadata =
+    pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir
+  in
   let* snapshot_file =
     export_dir metadata ~take_locks:true ~compression ~data_dir ~dest ~filename
   in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 
-let export_compact ~compression ~data_dir ~dest ~filename =
+let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
   let* snapshot_metadata =
-    pre_export_checks_and_get_snapshot_metadata ~data_dir
+    pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir
   in
   Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
   let tmp_context_dir = Configuration.default_context_dir tmp_dir in
@@ -865,7 +881,10 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
   in
   let* () =
     unless no_checks @@ fun () ->
-    check_last_commitment_published cctxt snapshot_metadata
+    check_commitment_published
+      cctxt
+      snapshot_metadata.address
+      snapshot_metadata.last_commitment
   in
   return (metadata, history_mode)
 
