@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_smart_rollup::kernel_entry;
+use tezos_smart_rollup::host::Runtime;
 
-kernel_entry!(jstz_kernel::entry);
+#[tezos_smart_rollup::entrypoint]
+pub fn entry(host: &mut (impl Runtime + 'static)) {
+    jstz_kernel::entry(host)
+}
