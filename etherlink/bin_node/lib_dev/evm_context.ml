@@ -825,6 +825,7 @@ module State = struct
             ~none:[error_of_fmt "cannot parse delayed inbox item "]
           @@ Ethereum_types.Delayed_transaction.of_rlp_content
                ~transaction_tag:"\x01"
+               ~fa_deposit_tag:"\x03"
                hash
                rlp_item
         in

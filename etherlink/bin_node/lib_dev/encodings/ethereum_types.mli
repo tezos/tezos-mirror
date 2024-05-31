@@ -318,7 +318,7 @@ module Address : sig
 end
 
 module Delayed_transaction : sig
-  type kind = Transaction | Deposit
+  type kind = Transaction | Deposit | Fa_deposit
 
   type t = {kind : kind; hash : hash; raw : string}
 
@@ -326,7 +326,12 @@ module Delayed_transaction : sig
 
   val pp : Format.formatter -> t -> unit
 
-  val of_rlp_content : ?transaction_tag:string -> hash -> Rlp.item -> t option
+  val of_rlp_content :
+    ?transaction_tag:string ->
+    ?fa_deposit_tag:string ->
+    hash ->
+    Rlp.item ->
+    t option
 
   val to_rlp : t -> bytes
 end
