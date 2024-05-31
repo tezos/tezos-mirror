@@ -14,7 +14,7 @@ use crate::{
         ExecutionEnvironment, ExecutionEnvironmentState,
     },
     machine_state::{self, bus::main_memory, StepManyResult},
-    range_utils::{range_bounds_saturating_sub, range_max, range_min},
+    range_utils::range_bounds_saturating_sub,
     state_backend,
     traps::EnvironException,
 };
@@ -120,9 +120,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     where
         F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
     {
-        let min = range_min(step_bounds);
-        let max = range_max(step_bounds);
-        let mut bounds = min..=max;
+        let mut bounds = range_bounds_saturating_sub(step_bounds, 0);
 
         // initial state
         let mut total_steps: usize = 0;
