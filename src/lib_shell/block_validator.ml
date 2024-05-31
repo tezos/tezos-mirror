@@ -38,6 +38,8 @@ type validation_result =
   | Application_error_after_validation of error trace
   | Validation_failed of error trace
 
+type validate_block_result = Validated | Validation_error of error trace
+
 type new_block = {
   block : Store.Block.t;
   resulting_context_hash : Context_hash.t;
@@ -141,28 +143,6 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
       tzfail (invalid_block hash error)
   | None | Some _ -> return_unit
 
-let validate_block bvp chain_db chain_store ~predecessor block_header block_hash
-    operations bv_operations =
-  let open Lwt_result_syntax in
-  let*! () = Events.(emit validating_block) block_hash in
-  let* () =
-    Block_validator_process.validate_block
-      bvp
-      chain_store
-      ~predecessor
-      block_header
-      block_hash
-      bv_operations
-  in
-  let*! () = Events.(emit validated_block) block_hash in
-  (* Add the block and operations to the cache of the ddb to make them
-     available to our peers *)
-  Distributed_db.inject_validated_block
-    chain_db
-    block_hash
-    block_header
-    operations
-
 let check_operations_merkle_root hash header operations =
   let open Result_syntax in
   let fail_unless b e = if b then return_unit else tzfail e in
@@ -201,6 +181,36 @@ let with_retry_to_load_protocol (bv : Types.state) ~peer f =
       in
       f ()
   | _ -> Lwt.return r
+
+let validate_block worker ?canceler bv peer chain_db chain_store ~predecessor
+    block_header block_hash operations bv_operations =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit validating_block) block_hash in
+  let*! r =
+    protect ~canceler:(Worker.canceler worker) (fun () ->
+        protect ?canceler (fun () ->
+            with_retry_to_load_protocol bv ~peer (fun () ->
+                let* () =
+                  Block_validator_process.validate_block
+                    bv.validation_process
+                    chain_store
+                    ~predecessor
+                    block_header
+                    block_hash
+                    bv_operations
+                in
+                let*! () = Events.(emit validated_block) block_hash in
+                (* Add the block and operations to the cache of the ddb to make them
+                   available to our peers *)
+                Distributed_db.inject_validated_block
+                  chain_db
+                  block_hash
+                  block_header
+                  operations)))
+  in
+  match r with
+  | Error errs -> Lwt.return (Validation_error errs)
+  | Ok () -> Lwt.return Validated
 
 let on_validation_request w
     {
@@ -251,22 +261,22 @@ let on_validation_request w
                     operations
                 in
                 let*! r =
-                  protect ~canceler:(Worker.canceler w) (fun () ->
-                      protect ?canceler (fun () ->
-                          with_retry_to_load_protocol bv ~peer (fun () ->
-                              validate_block
-                                bv.validation_process
-                                chain_db
-                                chain_store
-                                ~predecessor:pred
-                                header
-                                hash
-                                operations
-                                bv_operations)))
+                  validate_block
+                    w
+                    ?canceler
+                    bv
+                    peer
+                    chain_db
+                    chain_store
+                    ~predecessor:pred
+                    header
+                    hash
+                    operations
+                    bv_operations
                 in
                 match r with
-                | Error errs -> return (Validation_failed errs)
-                | Ok () -> (
+                | Validation_error errs -> return (Validation_failed errs)
+                | Validated -> (
                     if advertise_after_validation then
                       (* Headers which have been preapplied can be advertised
                          before being fully applied. *)
