@@ -1036,6 +1036,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "tezos-smart-rollup",
 ]
 
 [[package]]
@@ -1991,6 +1992,7 @@ dependencies = [
  "tezos-smart-rollup-macros",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
+ "tezos-smart-rollup-utils",
  "tezos_crypto_rs",
  "tezos_data_encoding",
 ]
@@ -2091,6 +2093,18 @@ dependencies = [
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "thiserror",
+]
+
+[[package]]
+name = "tezos-smart-rollup-utils"
+version = "0.2.2"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "tezos-smart-rollup-encoding",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
 ]
 
 [[package]]

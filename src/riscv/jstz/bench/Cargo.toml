@@ -18,6 +18,7 @@ features = ["serde"]
 [dependencies]
 jstz_crypto.workspace = true
 jstz_proto.workspace = true
+tezos-smart-rollup.workspace = true
 base64 = "0.22.0"
 http = "1.1.0"
 bincode = "1.3.3"

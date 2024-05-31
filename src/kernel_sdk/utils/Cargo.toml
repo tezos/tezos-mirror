@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-utils"
+version = "0.2.2"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "SDK for Tezos Smart Rollup kernel development."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["development-tools"]
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
+version = "0.2.2"
+default-features = false
+
+[dependencies.tezos_crypto_rs]
+version = "=0.5.2"
+default-features = false
+
+[dependencies.tezos_data_encoding]
+version = "=0.5.2"
+deafult-features = false
+
+[dependencies.hex]
+version = "0.4"
+features = ["serde"]
+
+[dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1.0.115"
+

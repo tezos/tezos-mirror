@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! `inbox.json` files are consumed as an optional input argument
+//! by both *wasm debugger* and *riscv sandbox*.
+
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
@@ -14,6 +17,8 @@ pub enum Message {
 
     /// External inbox message
     External {
+        /// Payload of the external message - will be tagged with
+        /// the 'external message byte tag' in the inbox.
         #[serde(with = "hex::serde")]
         external: Vec<u8>,
     },

@@ -12,7 +12,6 @@ use std::error::Error;
 mod cli;
 mod commands;
 mod console;
-mod inbox;
 mod table;
 
 fn format_status(result: &TestStepperResult) -> String {

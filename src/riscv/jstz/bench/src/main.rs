@@ -11,10 +11,6 @@ use std::path::Path;
 mod generate;
 mod results;
 
-#[allow(unused)]
-#[path = "../../../sandbox/src/inbox/file.rs"]
-mod inbox;
-
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Debug, Parser)]

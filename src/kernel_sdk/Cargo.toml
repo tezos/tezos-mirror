@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 [workspace]
-
+resolver = "2"
 members = [
   # Kernel Dev
   "constants",
@@ -17,6 +17,7 @@ members = [
   "panic-hook",
   "entrypoint",
   "macros",
+  "utils",
   "sdk",
   # UX
   "installer-kernel",

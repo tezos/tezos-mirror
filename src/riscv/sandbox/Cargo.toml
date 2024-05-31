@@ -28,6 +28,7 @@ serde_json.workspace = true
 strum.workspace = true
 tezos-smart-rollup-constants.workspace = true
 tezos-smart-rollup-encoding.workspace = true
+tezos-smart-rollup.workspace = true
 tezos_crypto_rs.workspace = true
 vm-fdt.workspace = true
 

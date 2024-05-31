@@ -5,10 +5,7 @@
 //! More information on SBI specification:
 //!   - https://www.scs.stanford.edu/~zyedidia/docs/riscv/riscv-sbi.pdf
 
-use crate::{
-    commands::rvemu::rvemu_boot::{A0, A1, A2, A3, A6, A7},
-    inbox::Inbox,
-};
+use crate::commands::rvemu::rvemu_boot::{A0, A1, A2, A3, A6, A7};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use octez_riscv::kernel_loader::Memory;
 use rvemu::{
@@ -17,6 +14,7 @@ use rvemu::{
     exception::Exception,
 };
 use std::{error::Error, process::exit};
+use tezos_smart_rollup::utils::inbox::Inbox;
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,

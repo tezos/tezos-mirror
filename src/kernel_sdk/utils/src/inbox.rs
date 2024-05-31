@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-mod file;
+//! Utilities for constructing inboxes & dealing with the `inbox.json` file,
+//! used as inputs for both the *wasm debugger* and *RISC-V sandbox*.
+
+pub mod file;
 
 use self::file::{InboxFile, Message};
 use std::{collections::LinkedList, error::Error, path::Path};
@@ -31,7 +34,10 @@ impl InboxBuilder {
     }
 
     /// Load inbox messages from a JSON file.
-    pub fn load_from_file(&mut self, path: impl AsRef<Path>) -> Result<&mut Self, Box<dyn Error>> {
+    pub fn load_from_file(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<&mut Self, Box<dyn Error>> {
         let inbox_messages = InboxFile::load(path.as_ref())
             .map_err(|err| {
                 format!(
@@ -106,7 +112,8 @@ impl InboxBuilder {
 
     /// Inject an external message.
     pub fn insert_external(&mut self, data: impl AsRef<[u8]>) -> &mut Self {
-        let msg: InboxMessage<michelson::MichelsonUnit> = InboxMessage::External(data.as_ref());
+        let msg: InboxMessage<michelson::MichelsonUnit> =
+            InboxMessage::External(data.as_ref());
         let mut data = Vec::new();
         msg.serialize(&mut data)
             .expect("Failed to serialise external message");
@@ -162,6 +169,12 @@ impl InboxBuilder {
     }
 }
 
+impl Default for InboxBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Inbox
 pub struct Inbox {
     current_level: u32,
@@ -171,8 +184,16 @@ pub struct Inbox {
 }
 
 impl Inbox {
-    /// Move to the new inbox message.
-    pub fn next(&mut self) -> Option<(u32, u32, Vec<u8>)> {
+    /// Count the number of nones that have been returned by the inbox so far.
+    pub fn none_count(&self) -> usize {
+        self.none_counter
+    }
+}
+
+impl Iterator for Inbox {
+    type Item = (u32, u32, Vec<u8>);
+
+    fn next(&mut self) -> Option<Self::Item> {
         let Some(level) = self.levels.front_mut() else {
             self.none_counter += 1;
             return None;
@@ -194,10 +215,5 @@ impl Inbox {
                 self.next()
             }
         }
-    }
-
-    /// Count the number of nones that have been returned by the inbox so far.
-    pub fn none_count(&self) -> usize {
-        self.none_counter
     }
 }
