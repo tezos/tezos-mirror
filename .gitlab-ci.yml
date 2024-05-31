@@ -150,6 +150,7 @@ manifest:
     - set -xv
     - >
       for BIN in archiver server ; do
-        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`;
-        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-      done
+        for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done ;
+        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done ;`;
+        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} ;
+      done ;
