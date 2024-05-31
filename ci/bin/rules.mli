@@ -22,6 +22,29 @@ val push : If.t
 (** A rule that is true if [CI_PIPELINE_SOURCE] is [scheduled]. *)
 val scheduled : If.t
 
+(** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [detached].
+
+    Merge request pipelines are {i detached} when:
+     - merge result pipelines are disabled in GitLab CI settings;
+     - merge result pipelines are enabled {i but} the MR has
+       conflicts with the target branch and cannot be rebased. *)
+val detached : If.t
+
+(** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [merged_result].
+
+    Merge request pipelines are {i merged result} pipelines when:
+     - merge result pipelines are enabled in GitLab CI settings; {b and}
+     - MR rebases cleanly on the target branch; {b and}
+     - the pipeline is not running in a merge train. *)
+val merged_result : If.t
+
+(** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [merge_train].
+
+    Merge request pipelines are {i merge train} pipelines when merge
+    trains are activated (and thus necessarily merged result
+    pipelines), and when the pipeline is triggered from a merge train. *)
+val merge_train : If.t
+
 (** A rule that is true for scheduled extended test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and

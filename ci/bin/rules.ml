@@ -8,6 +8,25 @@
 open Gitlab_ci
 open Gitlab_ci.If
 
+(** Types of merge request pipelines. *)
+type merge_request_event_type = Detached | Merged_result | Merge_train
+
+(** Convert a {!pipeline_source} to string. *)
+let merge_request_event_type_to_string = function
+  | Detached -> "detached"
+  | Merged_result -> "merged_result"
+  | Merge_train -> "merge_train"
+
+let merge_request_event_type_eq merge_request_event_type =
+  Predefined_vars.ci_merge_request_event_type
+  == str (merge_request_event_type_to_string merge_request_event_type)
+
+let detached = merge_request_event_type_eq Detached
+
+let merged_result = merge_request_event_type_eq Merged_result
+
+let merge_train = merge_request_event_type_eq Merge_train
+
 (** The source of a pipeline. *)
 type pipeline_source = Schedule | Merge_request_event | Push
 
