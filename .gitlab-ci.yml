@@ -138,8 +138,6 @@ manifest:
       - OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
   extends:
     - .docker-rules
-  tags:
-    - devops
   needs:
     - job: docker
       artifacts: false
