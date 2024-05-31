@@ -29,7 +29,7 @@ variables:
     - RUNNER: "amd64"
       ARCH: "amd64"
       OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
-    - RUNNER: "gcp_dev_arm64"
+    - RUNNER: "arm64"
       ARCH: "arm64"
       OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
 
@@ -114,6 +114,7 @@ docker:
     - .needs-build
     - .docker-rules
   tags:
+    - devops
     - ${RUNNER}
   before_script:
     - !reference [.needs-build, before_script]
