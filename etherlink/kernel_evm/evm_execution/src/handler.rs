@@ -298,7 +298,7 @@ fn trace<Host: Runtime>(
     gas: u64,
     gas_cost: u64,
     depth: usize,
-    error: Vec<u8>,
+    error: Option<Vec<u8>>,
     stack: Vec<H256>,
     memory: Vec<u8>,
     storage: Vec<StorageMapItem>,
@@ -307,10 +307,10 @@ fn trace<Host: Runtime>(
         let opcode = opcode.as_u8();
         let pc: u64 = pc.try_into().unwrap_or_default();
         let depth: u16 = depth.try_into().unwrap_or_default();
-        let stack = tracer.disable_stack.then_some(stack);
+        let stack = (!tracer.disable_stack).then_some(stack);
         let return_data = tracer.enable_return_data.then_some(return_data);
         let memory = tracer.enable_memory.then_some(memory);
-        let storage = tracer.disable_storage.then_some(storage);
+        let storage = (!tracer.disable_storage).then_some(storage);
 
         let struct_log = StructLog {
             pc,
@@ -704,12 +704,16 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
             let error = if let Err(Capture::Exit(reason)) = &step_result {
                 match &reason {
-                    ExitReason::Error(exit) => format!("{:?}", exit).as_bytes().to_vec(),
-                    ExitReason::Fatal(exit) => format!("{:?}", exit).as_bytes().to_vec(),
-                    _ => vec![],
+                    ExitReason::Error(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    ExitReason::Fatal(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    _ => None,
                 }
             } else {
-                vec![]
+                None
             };
 
             trace(

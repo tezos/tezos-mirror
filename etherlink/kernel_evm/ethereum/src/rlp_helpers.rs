@@ -296,17 +296,49 @@ pub fn decode_timestamp(decoder: &Rlp<'_>) -> Result<Timestamp, DecoderError> {
     Ok(timestamp)
 }
 
-/// Hardcoding the option RLP encoding for u64 in little endian. This is
-/// unfortunately necessary as we cannot redefine the u64 encoding.
-pub fn append_option_u64_le(v: &Option<u64>, stream: &mut rlp::RlpStream) {
+/// Hardcoding the option RLP encoding, usable for types where we cannot
+/// redefine their trait as they're defined in an external crate.
+pub fn append_option_canonical<'a, T, Enc>(
+    stream: &'a mut rlp::RlpStream,
+    v: &Option<T>,
+    append: Enc,
+) where
+    Enc: Fn(&'a mut RlpStream, &T) -> &'a mut RlpStream,
+{
     match v {
         None => {
             stream.begin_list(0);
         }
         Some(value) => {
             stream.begin_list(1);
-            append_u64_le(stream, value);
+            append(stream, value);
         }
+    }
+}
+
+/// Hardcoding the option RLP encoding for u64 in little endian. This is
+/// unfortunately necessary as we cannot redefine the u64 encoding.
+pub fn append_option_u64_le(v: &Option<u64>, stream: &mut rlp::RlpStream) {
+    append_option_canonical(stream, v, append_u64_le)
+}
+
+/// See [append_option_canonical]
+pub fn decode_option_canonical<T, Dec>(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+    dec_field: Dec,
+) -> Result<Option<T>, DecoderError>
+where
+    Dec: Fn(&Rlp<'_>, &'static str) -> Result<T, DecoderError>,
+{
+    let items = decoder.item_count()?;
+    match items {
+        1 => {
+            let mut it = decoder.iter();
+            Ok(Some(dec_field(&next(&mut it)?, field_name)?))
+        }
+        0 => Ok(None),
+        _ => Err(DecoderError::RlpIncorrectListLen),
     }
 }
 
@@ -315,15 +347,7 @@ pub fn decode_option_u64_le(
     decoder: &Rlp<'_>,
     field_name: &'static str,
 ) -> Result<Option<u64>, DecoderError> {
-    let items = decoder.item_count()?;
-    match items {
-        1 => {
-            let mut it = decoder.iter();
-            Ok(Some(decode_field_u64_le(&next(&mut it)?, field_name)?))
-        }
-        0 => Ok(None),
-        _ => Err(DecoderError::RlpIncorrectListLen),
-    }
+    decode_option_canonical(decoder, field_name, decode_field_u64_le)
 }
 
 pub fn append_public_key(stream: &mut RlpStream, public_key: &PublicKey) {

@@ -128,13 +128,14 @@ pub enum EthereumError {
 fn trace_outcome<Host: Runtime>(
     handler: EvmHandler<Host>,
     tracing: bool,
-    failure: u8,
+    is_success: bool,
     result: &Option<Vec<u8>>,
+    gas_used: u64,
 ) -> Result<(), StorageError> {
     if tracing {
-        tracer::store_trace_failed(handler.host, failure)
+        tracer::store_trace_failed(handler.host, is_success)
             .map_err(StorageError::RuntimeError)?;
-        tracer::store_trace_gas(handler.host, handler.gas_used())
+        tracer::store_trace_gas(handler.host, gas_used)
             .map_err(StorageError::RuntimeError)?;
         if let Some(return_value) = result {
             tracer::store_return_value(handler.host, return_value)
@@ -243,12 +244,18 @@ where
                     }
                 }
 
-                trace_outcome(handler, tracing, 0, &result.result)?;
+                trace_outcome(
+                    handler,
+                    tracing,
+                    result.is_success,
+                    &result.result,
+                    result.gas_used,
+                )?;
 
                 Ok(Some(result))
             }
             Err(e) => {
-                trace_outcome(handler, tracing, 1, &None)?;
+                trace_outcome(handler, tracing, false, &None, 0)?;
                 Err(e)
             }
         }

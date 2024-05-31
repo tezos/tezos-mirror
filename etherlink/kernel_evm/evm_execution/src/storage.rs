@@ -34,9 +34,9 @@ pub mod tracer {
 
     pub fn store_trace_failed<Host: Runtime>(
         host: &mut Host,
-        status: u8,
+        is_success: bool,
     ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_FAILED, &[status])
+        host.store_write_all(&TRACE_FAILED, &[u8::from(!is_success)])
     }
 
     pub fn store_return_value<Host: Runtime>(

@@ -5,7 +5,7 @@
 ### Features
 
 - The kernel has now the ability to trace a transaction (via
-  the EVM runtime). (!13185)
+  the EVM runtime). (!13185, !13502)
 
 ### Bug fixes
 
