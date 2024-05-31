@@ -18,7 +18,7 @@ executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
 docker_target="without-evm-artifacts"
-rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
+rust_toolchain_image_name="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
 rust_toolchain_image_tag="master"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
@@ -33,7 +33,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--build-deps-image-version <IMAGE_TAG> ]
   [--variants VARIANTS]
   [--docker-target <TARGET> ]
-  [--rust-toolchain-image <IMAGE_NAME> ]
+  [--rust-toolchain-image-name <IMAGE_NAME> ]
   [--rust-toolchain-image-tag <IMAGE_TAG> ]
   [--executables <EXECUTABLES> ]
   [--commit-short-sha <COMMIT_SHA> ]
@@ -64,8 +64,8 @@ DESCRIPTION
     If TARGET is 'with-evm-artifacts' then EVM artifacts are
     included. The image rust-toolchain is used to build these
     artifacts, and is pulled from
-    RUST_TOOLCHAIN_IMAGE:RUST_TOOLCHAIN_IMAGE_TAG. By default,
-    RUST_TOOLCHAIN_IMAGE:RUST_TOOLCHAIN_IMAGE_TAG points to a
+    RUST_TOOLCHAIN_IMAGE_NAME:RUST_TOOLCHAIN_IMAGE_TAG. By default,
+    RUST_TOOLCHAIN_IMAGE_NAME:RUST_TOOLCHAIN_IMAGE_TAG points to a
     rust-toolchain image built from the latest commit on master. To
     rebuild the rust-toolchain image locally, see ./images/README.md
     and ./images/create_rust_toolchain_image.sh.
@@ -93,7 +93,7 @@ OPTIONS
         --build-deps-image-version BUILD_DEPS_IMAGE_TAG
             Version of the build-deps image.
 
-        --rust-toolchain-image RUST_TOOLCHAIN_IMAGE_NAME
+        --rust-toolchain-image-name RUST_TOOLCHAIN_IMAGE_NAME
             Name of the rust-toolchain image.
 
         --rust-toolchain-image-tag RUST_TOOLCHAIN_IMAGE_TAG
@@ -129,7 +129,7 @@ CURRENT VALUES
     BUILD_DEPS_IMAGE_VERSION: $build_deps_image_version
     VARIANTS: $variants
     DOCKER_TARGET: $docker_target
-    RUST_TOOLCHAIN_IMAGE: $rust_toolchain_image
+    RUST_TOOLCHAIN_IMAGE_NAME: $rust_toolchain_image_name
     RUST_TOOLCHAIN_IMAGE_TAG: $rust_toolchain_image_tag
     EXECUTABLES: $(echo "$executables" | tr "\n" " ")
     COMMIT_SHORT_SHA: $commit_short_sha
@@ -143,7 +143,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,build-deps-image-name:,build-deps-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
+  -l help,image-name:,image-version:,build-deps-image-name:,build-deps-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -190,9 +190,9 @@ while true; do
     shift
     docker_target="$1"
     ;;
-  --rust-toolchain-image)
+  --rust-toolchain-image-name)
     shift
-    rust_toolchain_image="$1"
+    rust_toolchain_image_name="$1"
     ;;
   --rust-toolchain-image-tag)
     shift
@@ -249,7 +249,7 @@ docker build \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
   --build-arg "GIT_VERSION=${commit_tag}" \
-  --build-arg "RUST_TOOLCHAIN_IMAGE=$rust_toolchain_image" \
+  --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
   "$src_dir"
 

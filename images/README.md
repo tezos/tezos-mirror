@@ -13,14 +13,24 @@ The images, their content and indented usage, are:
 For more details on the contents and usage of each image, see below
 and in the header comment of each corresponding Dockerfile.
 
-## Image provenance
+## Input hashes
 
 Images are rebuilt on-demand in the Tezos CI whenever one of their
-inputs change.  The inputs are image-specific and correspond to a set
-of paths in the tree. Images are tagged with the input hash and the
-branch on which they were produced (see `images/image_tag.sh` for more
-details). More provenance meta-data can be found by inspecting the
-labels of an image's manifest:
+*inputs* change.  The inputs are image-specific and correspond to a
+set of paths in the tree. Images are tagged with the input hash and
+the branch on which they were produced (see `images/image_tag.sh` for
+more details).
+
+## Image build contexts
+
+Build contexts for image builds are produced from the images build
+context directory `images/IMAGE_NAME`. All files in this folder will
+be available to the Dockerfile during build.
+
+## Image provenance
+
+Provenance meta-data can be found by inspecting the labels of an
+image's manifest:
 
  - `com.tezos.build-pipeline-id`: The ID of the CI pipeline in which
    the image was produced.
@@ -93,7 +103,7 @@ will attempt to re-use the latest version of this image built on the
 `master` branch of the tezos/tezos CI. If you need to use a different
 image for the rust-toolchain image, follow the instructions in
 `./images/README.MD` and `./images/create_rust_toolchain_image.sh` to
-create one. Then specify the `--rust-toolchain-image` and
+create one. Then specify the `--rust-toolchain-image-name` and
 `--rust-toolchain-image-tag` parameters to
 `./scripts/create_docker_image.sh` accordingly.
 
