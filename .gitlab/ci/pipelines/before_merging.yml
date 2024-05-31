@@ -93,7 +93,7 @@ trigger:
   - gcp
   rules:
   - if: $GITLAB_USER_LOGIN != "nomadic-margebot" && $CI_MERGE_REQUEST_ASSIGNEES !~
-      /nomadic-margebot/
+      /nomadic-margebot/ && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     when: manual
     allow_failure: false
   - when: always
@@ -626,7 +626,8 @@ opam:bls12-381:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -831,7 +832,8 @@ opam:octez-alcotezt:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -1172,7 +1174,8 @@ opam:octez-crawler:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -1445,7 +1448,8 @@ opam:octez-distributed-internal:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -1514,7 +1518,8 @@ opam:octez-distributed-lwt-internal:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -1651,7 +1656,8 @@ opam:octez-evm-node-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 1 minute
   needs:
@@ -1720,7 +1726,8 @@ opam:octez-injector:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -1789,7 +1796,8 @@ opam:octez-internal-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -1858,7 +1866,8 @@ opam:octez-l2-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -1927,7 +1936,8 @@ opam:octez-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -2064,7 +2074,8 @@ opam:octez-node-config:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -2133,7 +2144,8 @@ opam:octez-proto-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -2202,7 +2214,8 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -2271,7 +2284,8 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -2340,7 +2354,8 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2409,7 +2424,8 @@ opam:octez-protocol-003-PsddFKi3-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2478,7 +2494,8 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2547,7 +2564,8 @@ opam:octez-protocol-005-PsBabyM1-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2616,7 +2634,8 @@ opam:octez-protocol-006-PsCARTHA-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2685,7 +2704,8 @@ opam:octez-protocol-007-PsDELPH1-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2754,7 +2774,8 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2823,7 +2844,8 @@ opam:octez-protocol-009-PsFLoren-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2892,7 +2914,8 @@ opam:octez-protocol-010-PtGRANAD-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -2961,7 +2984,8 @@ opam:octez-protocol-011-PtHangz2-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -3030,7 +3054,8 @@ opam:octez-protocol-012-Psithaca-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -3099,7 +3124,8 @@ opam:octez-protocol-013-PtJakart-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -3168,7 +3194,8 @@ opam:octez-protocol-014-PtKathma-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -3237,7 +3264,8 @@ opam:octez-protocol-015-PtLimaPt-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -3306,7 +3334,8 @@ opam:octez-protocol-016-PtMumbai-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -3375,7 +3404,8 @@ opam:octez-protocol-017-PtNairob-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -3444,7 +3474,8 @@ opam:octez-protocol-018-Proxford-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -3513,7 +3544,8 @@ opam:octez-protocol-019-PtParisB-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -3582,7 +3614,8 @@ opam:octez-protocol-alpha-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -3787,7 +3820,8 @@ opam:octez-riscv-api:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -3856,7 +3890,8 @@ opam:octez-riscv-pvm:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -3925,7 +3960,8 @@ opam:octez-rpc-process:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 3 minutes
   needs:
@@ -3994,7 +4030,8 @@ opam:octez-rust-deps:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -4063,7 +4100,8 @@ opam:octez-shell-libs:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -4268,7 +4306,8 @@ opam:octez-smart-rollup-node-Proxford:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -4337,7 +4376,8 @@ opam:octez-smart-rollup-node-PtNairob:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -4406,7 +4446,8 @@ opam:octez-smart-rollup-node-PtParisB:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -4475,7 +4516,8 @@ opam:octez-smart-rollup-node-alpha:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -4544,7 +4586,8 @@ opam:octez-smart-rollup-node-lib:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -4681,7 +4724,8 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -4750,7 +4794,8 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 7 minutes
   needs:
@@ -4887,7 +4932,8 @@ opam:tezos-benchmark:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -4956,7 +5002,8 @@ opam:tezos-client-demo-counter:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5025,7 +5072,8 @@ opam:tezos-client-genesis:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5094,7 +5142,8 @@ opam:tezos-dac-client-lib:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5163,7 +5212,8 @@ opam:tezos-dac-lib:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5232,7 +5282,8 @@ opam:tezos-dac-node-lib:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 2 minutes
   needs:
@@ -5301,7 +5352,8 @@ opam:tezos-dal-node-lib:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5370,7 +5422,8 @@ opam:tezos-dal-node-services:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -5439,7 +5492,8 @@ opam:tezos-openapi:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -5508,7 +5562,8 @@ opam:tezos-protocol-000-Ps9mPmXa:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5577,7 +5632,8 @@ opam:tezos-protocol-001-PtCJ7pwo:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5646,7 +5702,8 @@ opam:tezos-protocol-002-PsYLVpVv:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5715,7 +5772,8 @@ opam:tezos-protocol-003-PsddFKi3:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5784,7 +5842,8 @@ opam:tezos-protocol-004-Pt24m4xi:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5853,7 +5912,8 @@ opam:tezos-protocol-005-PsBABY5H:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5922,7 +5982,8 @@ opam:tezos-protocol-005-PsBabyM1:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 4 minutes
   needs:
@@ -5991,7 +6052,8 @@ opam:tezos-protocol-006-PsCARTHA:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6060,7 +6122,8 @@ opam:tezos-protocol-007-PsDELPH1:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6129,7 +6192,8 @@ opam:tezos-protocol-008-PtEdo2Zk:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6198,7 +6262,8 @@ opam:tezos-protocol-008-PtEdoTez:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6267,7 +6332,8 @@ opam:tezos-protocol-009-PsFLoren:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6336,7 +6402,8 @@ opam:tezos-protocol-010-PtGRANAD:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6405,7 +6472,8 @@ opam:tezos-protocol-011-PtHangz2:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6474,7 +6542,8 @@ opam:tezos-protocol-012-Psithaca:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6543,7 +6612,8 @@ opam:tezos-protocol-013-PtJakart:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6612,7 +6682,8 @@ opam:tezos-protocol-014-PtKathma:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6681,7 +6752,8 @@ opam:tezos-protocol-015-PtLimaPt:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6750,7 +6822,8 @@ opam:tezos-protocol-016-PtMumbai:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6819,7 +6892,8 @@ opam:tezos-protocol-017-PtNairob:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6888,7 +6962,8 @@ opam:tezos-protocol-018-Proxford:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -6957,7 +7032,8 @@ opam:tezos-protocol-019-PtParisB:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 5 minutes
   needs:
@@ -7026,7 +7102,8 @@ opam:tezos-protocol-alpha:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -7095,7 +7172,8 @@ opam:tezos-protocol-demo-counter:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -7164,7 +7242,8 @@ opam:tezos-protocol-demo-noops:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -7233,7 +7312,8 @@ opam:tezos-protocol-genesis:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -7302,7 +7382,8 @@ opam:tezos-proxy-server-config:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -7371,7 +7452,8 @@ opam:tezt-tezos:
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/)
+      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train")
     when: delayed
     start_in: 6 minutes
   needs:
@@ -9004,7 +9086,7 @@ oc.unified_coverage:
   - gcp
   rules:
   - if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
-      /nomadic-margebot/
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: never
   - changes:
     - .gitlab-ci.yml

@@ -73,7 +73,8 @@ val has_mr_label : string -> If.t
 
     This rule is true if and only if:
      - the pipeline is started by marge-bot; or
-     - the merge request is assigned to marge-bot.
+     - the merge request is assigned to marge-bot; or
+     - the pipeline is in a merge train.
 
     We require the second case since there are cases where marge-bot
     will just trigger an existing pipeline instead of creating one.
