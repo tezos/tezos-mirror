@@ -99,6 +99,12 @@ type error +=
       saved_address : Octez_smart_rollup.Address.t;
     }
 
+type error +=
+  | Disagree_with_commitment of {
+      our_commitment : Octez_smart_rollup.Commitment.t;
+      their_commitment : Octez_smart_rollup.Commitment.t;
+    }
+
 let () =
   register_error_kind
     `Permanent
@@ -559,4 +565,30 @@ let () =
           Some (rollup_address, saved_address)
       | _ -> None)
     (fun (rollup_address, saved_address) ->
-      Unexpected_rollup {rollup_address; saved_address})
+      Unexpected_rollup {rollup_address; saved_address}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.disagree_with_commitment"
+    ~title:"Rollup node disagrees with commitment"
+    ~description:
+      "The rollup node disagrees with a commitment but cannot refute it."
+    ~pp:(fun ppf (our_commitment, their_commitment) ->
+      Format.fprintf
+        ppf
+        "The rollup node has computed commitment %a, but it disagrees with the \
+         commitment %a which it cannot refute."
+        Commitment.pp
+        our_commitment
+        Commitment.pp
+        their_commitment)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "our_commitment" Commitment.encoding)
+        (req "their_commitment" Commitment.encoding))
+    (function
+      | Disagree_with_commitment {our_commitment; their_commitment} ->
+          Some (our_commitment, their_commitment)
+      | _ -> None)
+    (fun (our_commitment, their_commitment) ->
+      Disagree_with_commitment {our_commitment; their_commitment})
