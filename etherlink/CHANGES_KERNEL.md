@@ -31,6 +31,8 @@
 - The kernel can limit the block production to at most one block per tezos level
   if the file `/__at_most_one_block` exists in the storage. (!13202)
 - Stop emitting an `Info` log when running an Ethereum transaction. (!13630)
+- A FA bridge feature flag is added to the configuration. If the path has a value
+  in `/evm/feature_flags/enable_fa_bridge`, FA bridge related operations will be accepted. (!13535)
 
 ## Version b9f6c9138719220db83086f0548e49c5c4c8421f
 

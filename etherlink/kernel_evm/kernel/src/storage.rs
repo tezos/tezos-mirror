@@ -142,6 +142,10 @@ pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
+// If this path contains a value, the fa bridge is enabled in the kernel.
+const ENABLE_FA_BRIDGE: RefPath =
+    RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
+
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,
     path: &T,
@@ -1083,6 +1087,14 @@ pub fn read_tracer_input<Host: Runtime>(
         Ok(Some(FromRlpBytes::from_rlp_bytes(&bytes)?))
     } else {
         Ok(None)
+    }
+}
+
+pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
+    if let Some(ValueType::Value) = host.store_has(&ENABLE_FA_BRIDGE)? {
+        Ok(true)
+    } else {
+        Ok(false)
     }
 }
 
