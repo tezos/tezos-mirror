@@ -14,6 +14,7 @@
   `requireCanonical` field is not yet supported. (!12345)
 - The RPC `eth_call` supports the default block parameter
   (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block). (!13110)
+- The RPC `eth_call` supports `null` parameters. (!13067)
 - Support the RPC `eth_maxPriorityFeePerGas`, which always returns 0 wei. (!13161)
 - Support for specifying an expected time between blocks for the observer node
   in the configuration file, used to detect when the connection with the
@@ -21,6 +22,14 @@
 - Support for the `charset` specifier for `Content-Type: application/json`. (!13256)
 - `txpool_content` support. (!12873, !13292)
 - Support the RPC `eth_getBlockReceipts`. (!13370)
+- `blueprints_publisher_config` and `verbose` are made optional in the
+  configuration. (!13084)
+- The EVM node has metrics available at `/metrics`. It gives metrics about
+  progress of the chain, block production, node information, transaction pool
+  and rpcs. (!13128, !13132, !13135)
+- The observer mode has the `devmode` flag, similar to the sequencer mode. (!13163)
+- Adds a `--read-only` flag to the proxy mode, if the flag is set, the transaction
+  pool is not supported. (!13162)
 
 ### Experimental
 
@@ -45,6 +54,7 @@
 
 - The RPC `eth_getBlockByNumber` correctly interprets its block parameter
   argument. (!13201)
+- Fix upgrade detection. (!13207)
 
 ### Breaking changes
 
@@ -52,6 +62,7 @@
 
 - Threshold encryption Sequencer connects to sequencer sidecar. (!3140)
 - Decouple proposal submission and preblocks monitoring for threshold encryption sequencer. (!13181)
+- Add a private rpc `replay_block`. (!13196)
 
 ## Version for b9f6c9138719220db83086f0548e49c5c4c8421f
 
