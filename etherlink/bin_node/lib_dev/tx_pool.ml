@@ -189,6 +189,18 @@ module Pool = struct
     in
     let (Qty current_nonce) = current_nonce in
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
+
+  let find (t : t) tx_hash =
+    let transactions =
+      Pkey_map.to_seq t.transactions
+      |> Seq.concat_map (fun (_, t) -> Nonce_map.to_seq t |> Seq.map snd)
+    in
+    Seq.find_map
+      (fun t ->
+        match t.transaction_object with
+        | Some {hash; _} when hash = tx_hash -> t.transaction_object
+        | _ -> None)
+      transactions
 end
 
 type mode = Proxy | Sequencer | Observer
@@ -245,6 +257,9 @@ module Request = struct
     | Unlock_transactions : (unit, tztrace) t
     | Is_locked : (bool, tztrace) t
     | Size_info : (size_info, tztrace) t
+    | Find :
+        Ethereum_types.hash
+        -> (Ethereum_types.transaction_object option, tztrace) t
 
   type view = View : _ t -> view
 
@@ -303,6 +318,14 @@ module Request = struct
           (obj1 (req "request" (constant "is_locked")))
           (function View Is_locked -> Some () | _ -> None)
           (fun () -> View Is_locked);
+        case
+          (Tag 6)
+          ~title:"Find"
+          (obj2
+             (req "request" (constant "find"))
+             (req "tx_hash" Ethereum_types.hash_encoding))
+          (function View (Find tx_hash) -> Some ((), tx_hash) | _ -> None)
+          (fun ((), tx_hash) -> View (Find tx_hash));
       ]
 
   let pp ppf (View r) =
@@ -324,6 +347,12 @@ module Request = struct
     | Is_locked -> Format.fprintf ppf "Checking if the tx pool is locked"
     | Size_info ->
         Format.fprintf ppf "Requesting size information about the tx pool"
+    | Find tx_hash ->
+        Format.fprintf
+          ppf
+          "Looking for tx %a in tx pool"
+          Ethereum_types.pp_hash
+          tx_hash
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -612,6 +641,8 @@ let size_info (state : Types.state) =
   in
   {number_of_addresses; number_of_transactions}
 
+let find state tx_hash = Pool.find state.Types.pool tx_hash
+
 module Handlers = struct
   type self = worker
 
@@ -648,6 +679,7 @@ module Handlers = struct
     | Request.Unlock_transactions -> return (unlock_transactions state)
     | Request.Is_locked -> protect @@ fun () -> return (is_locked state)
     | Request.Size_info -> protect @@ fun () -> return (size_info state)
+    | Request.Find tx_hash -> protect @@ fun () -> return (find state tx_hash)
 
   type launch_error = error trace
 
@@ -837,3 +869,9 @@ let get_tx_pool_content () =
   in
   let*? pending, queued = Pool.get_pool pool addr_balance_nonce_map in
   return Ethereum_types.{pending; queued}
+
+let find tx_hash =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker (Request.Find tx_hash)
+  |> handle_request_error

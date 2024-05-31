@@ -57,7 +57,7 @@ val net_version : Evm_node.t -> (string, error) result Lwt.t
 val get_transaction_by_hash :
   transaction_hash:string ->
   Evm_node.t ->
-  (Transaction.transaction_object, error) result Lwt.t
+  (Transaction.transaction_object option, error) result Lwt.t
 
 (** [get_code ~address evm_node] calls [eth_getCode]. *)
 val get_code : address:string -> Evm_node.t -> (string, error) result Lwt.t

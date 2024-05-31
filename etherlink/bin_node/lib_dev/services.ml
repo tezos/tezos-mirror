@@ -360,7 +360,12 @@ let dispatch_request (config : Configuration.t)
         build_with_input ~f module_ parameters
     | Method (Get_transaction_by_hash.Method, module_) ->
         let f tx_hash =
-          let* transaction_object = Backend_rpc.transaction_object tx_hash in
+          let* transaction_object =
+            let* transaction_object = Tx_pool.find tx_hash in
+            match transaction_object with
+            | Some transaction_object -> return_some transaction_object
+            | None -> Backend_rpc.transaction_object tx_hash
+          in
           rpc_ok transaction_object
         in
         build_with_input ~f module_ parameters

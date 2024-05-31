@@ -74,3 +74,9 @@ type size_info = {number_of_addresses : int; number_of_transactions : int}
 val size_info : unit -> size_info tzresult Lwt.t
 
 val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
+
+(** [find tx_hash] look into the tx pool if a transaction with hash
+    [tx_hash] exists and returns it's corresponding
+    {!Ethereum_types.transaction_object}. *)
+val find :
+  Ethereum_types.hash -> Ethereum_types.transaction_object option tzresult Lwt.t

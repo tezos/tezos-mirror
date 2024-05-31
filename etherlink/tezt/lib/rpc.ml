@@ -186,7 +186,10 @@ let get_transaction_by_hash ~transaction_hash evm_node =
   return
     (decode_or_error
        (fun json ->
-         JSON.(json |-> "result" |> Transaction.transaction_object_of_json))
+         JSON.(
+           json |-> "result" |> fun json ->
+           if is_null json then None
+           else Some (Transaction.transaction_object_of_json json)))
        json)
 
 let get_code ~address evm_node =

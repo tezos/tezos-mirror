@@ -26,8 +26,8 @@
 (*****************************************************************************)
 
 type transaction_object = {
-  blockHash : string;
-  blockNumber : int32;
+  blockHash : string option;
+  blockNumber : int32 option;
   from : string;
   gas : int64;
   gasPrice : int64;
@@ -35,7 +35,7 @@ type transaction_object = {
   input : string option;
   nonce : int32;
   to_ : string option;
-  transactionIndex : int32;
+  transactionIndex : int32 option;
   value : Wei.t;
   v : int32;
   r : string;
@@ -45,8 +45,8 @@ type transaction_object = {
 let transaction_object_of_json json =
   let open JSON in
   {
-    blockHash = json |-> "blockHash" |> as_string;
-    blockNumber = json |-> "blockNumber" |> as_int32;
+    blockHash = json |-> "blockHash" |> as_string_opt;
+    blockNumber = json |-> "blockNumber" |> as_int32_opt;
     from = json |-> "from" |> as_string;
     gas = json |-> "gas" |> as_int64;
     gasPrice = json |-> "gasPrice" |> as_int64;
@@ -54,7 +54,7 @@ let transaction_object_of_json json =
     input = json |-> "input" |> as_string_opt;
     nonce = json |-> "nonce" |> as_int32;
     to_ = json |-> "to" |> as_string_opt;
-    transactionIndex = json |-> "transactionIndex" |> as_int32;
+    transactionIndex = json |-> "transactionIndex" |> as_int32_opt;
     value = json |-> "value" |> as_string |> Wei.of_string;
     v = json |-> "v" |> as_int32;
     r = json |-> "r" |> as_string;
