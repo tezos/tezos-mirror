@@ -23,7 +23,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?remove_whitelist ~output () =
+    ?remove_whitelist ~enable_fa_bridge ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -36,6 +36,10 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
               (Some (address ^ "/balance", balance)))
           bootstrap_accounts
         |> List.flatten
+  in
+  let enable_fa_bridge =
+    if enable_fa_bridge then Some ("feature_flags/enable_fa_bridge", "")
+    else None
   in
   let le_int64_bytes i =
     let b = Bytes.make 8 '\000' in
@@ -74,5 +78,6 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ bootstrap_accounts
     @ make_instr remove_whitelist
+    @ make_instr enable_fa_bridge
   in
   Installer_config.to_file instrs ~output
