@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -26,6 +26,7 @@ use tezos_smart_rollup_host::metadata::RollupMetadata;
 
 use state::HostState;
 use std::cell::RefCell;
+use std::{fmt, io};
 
 const MAXIMUM_REBOOTS_PER_INPUT: i32 = 1000;
 
@@ -47,10 +48,19 @@ const NAIROBI_ACTIVATION_TIMESTAMP: i64 = 1_687_561_630;
 pub use state::InMemoryStore;
 
 /// The runtime host when _not_ running in **wasm**.
-#[derive(Debug)]
 pub struct MockHost {
     state: RefCell<HostState>,
     info: inbox::InfoPerLevel,
+    debug_log: Box<RefCell<dyn io::Write>>,
+}
+
+impl fmt::Debug for MockHost {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MockHost")
+            .field("info", &self.info)
+            .field("state", &self.state)
+            .finish()
+    }
 }
 
 impl Default for MockHost {
@@ -123,12 +133,18 @@ impl MockHost {
         let mut host = Self {
             state: state.into(),
             info,
+            debug_log: Box::new(RefCell::new(io::stderr())),
         };
 
         // Ensure inbox setup correctly
         host.bump_level();
 
         host
+    }
+
+    /// Override debug log handler.
+    pub fn set_debug_handler(&mut self, sink: impl io::Write + 'static) {
+        self.debug_log = Box::new(RefCell::new(sink));
     }
 
     /// Append an internal message to the current inbox.
