@@ -333,6 +333,10 @@ pub mod tests {
             unimplemented!()
         }
 
+        fn read_all<E: Elem>(&self, _address: usize, _values: &mut [E]) {
+            unimplemented!()
+        }
+
         fn write<E: Elem>(&mut self, _address: usize, _value: E) {
             unimplemented!()
         }
