@@ -7,7 +7,7 @@ use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Addressable},
         registers::{a0, a1, a2, a6, a7},
-        MachineState,
+        AccessType, MachineState,
     },
     parser::instruction::Instr,
     state_backend::{AllocatedOf, EnumCell, EnumCellLayout, Manager},
@@ -19,8 +19,8 @@ use std::{
 };
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
-    SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
-    SBI_TEZOS_META_ORIGINATION_LEVEL,
+    SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
+    SBI_TEZOS_METADATA_REVEAL,
 };
 
 /// PVM status
@@ -29,6 +29,7 @@ use tezos_smart_rollup_constants::riscv::{
 pub enum PvmStatus {
     Evaluating,
     WaitingForInput,
+    WaitingForMetadata,
 }
 
 impl Default for PvmStatus {
@@ -43,10 +44,12 @@ impl TryFrom<u8> for PvmStatus {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         const EVALUATING: u8 = PvmStatus::Evaluating as u8;
         const WAITING_FOR_INPUT: u8 = PvmStatus::WaitingForInput as u8;
+        const WAITING_FOR_METADATA: u8 = PvmStatus::WaitingForMetadata as u8;
 
         match value {
             EVALUATING => Ok(Self::Evaluating),
             WAITING_FOR_INPUT => Ok(Self::WaitingForInput),
+            WAITING_FOR_METADATA => Ok(Self::WaitingForMetadata),
             _ => Err(value),
         }
     }
@@ -152,17 +155,16 @@ impl<M: Manager> PvmSbiState<M> {
 
         // The argument address is a virtual address. We need to translate it to
         // a physical address.
-        let phys_dest_addr =
-            match machine.translate(arg_buffer_addr, crate::machine_state::AccessType::Store) {
-                Ok(phys_addr) => phys_addr,
-                Err(_exc) => {
-                    // We back out on failure.
-                    machine.hart.xregisters.write(a0, 0);
-                    machine.hart.xregisters.write(a1, 0);
-                    machine.hart.xregisters.write(a2, 0);
-                    return true;
-                }
-            };
+        let phys_dest_addr = match machine.translate(arg_buffer_addr, AccessType::Store) {
+            Ok(phys_addr) => phys_addr,
+            Err(_exc) => {
+                // We back out on failure.
+                machine.hart.xregisters.write(a0, 0);
+                machine.hart.xregisters.write(a1, 0);
+                machine.hart.xregisters.write(a2, 0);
+                return true;
+            }
+        };
 
         // The SBI caller expects the payload to be returned at [phys_dest_addr]
         // with at maximum [max_buffer_size] bytes written.
@@ -181,6 +183,53 @@ impl<M: Manager> PvmSbiState<M> {
             machine.hart.xregisters.write(a0, level);
             machine.hart.xregisters.write(a1, counter);
             machine.hart.xregisters.write(a2, max_buffer_size as u64);
+        }
+
+        true
+    }
+
+    /// Provide metadata in response to a metadata request. Returns `false`
+    /// if the machine is not expecting metadata.
+    pub fn provide_metadata<ML: MainMemoryLayout>(
+        &mut self,
+        machine: &mut MachineState<ML, M>,
+        rollup_address: &[u8; 20],
+        origination_level: u64,
+    ) -> bool {
+        // This method should only do something when we're waiting for metadata.
+        match self.status() {
+            PvmStatus::WaitingForMetadata => {}
+            _ => return false,
+        }
+
+        // We're evaluating again after this.
+        self.status.write(PvmStatus::Evaluating);
+
+        // These arguments should have been set by the previous SBI call.
+        let arg_buffer_addr = machine.hart.xregisters.read(a0);
+
+        // The argument address is a virtual address. We need to translate it to
+        // a physical address.
+        let phys_dest_addr = match machine.translate(arg_buffer_addr, AccessType::Store) {
+            Ok(phys_addr) => phys_addr,
+            Err(_exc) => {
+                // TODO: https://app.asana.com/0/1206655199123740/1207434664665316/f
+                // Error handling needs to be improved.
+                machine.hart.xregisters.write(a0, 0);
+                return true;
+            }
+        };
+
+        let write_res = machine
+            .bus
+            .write_all(phys_dest_addr, rollup_address.as_slice());
+
+        if write_res.is_err() {
+            // TODO: https://app.asana.com/0/1206655199123740/1207434664665316/f
+            // Error handling needs to be improved.
+            machine.hart.xregisters.write(a0, 0);
+        } else {
+            machine.hart.xregisters.write(a0, origination_level);
         }
 
         true
@@ -205,6 +254,32 @@ impl<M: Manager> PvmSbiState<M> {
 
         EcallOutcome::Handled {
             // We can't evaluate after this. The next step is an input step.
+            continue_eval: false,
+        }
+    }
+
+    /// Handle a [SBI_TEZOS_META] call.
+    fn handle_tezos_metadata_reveal(&mut self) -> EcallOutcome
+    where
+        M: Manager,
+    {
+        // This method only makes sense when evaluating.
+        match self.status() {
+            PvmStatus::Evaluating => {}
+            status => {
+                return EcallOutcome::Fatal {
+                    message: format!(
+                        "Called SBI_TEZOS_META while in non-Evaluating status {status:?}"
+                    ),
+                }
+            }
+        }
+
+        // Prepare the EE state for a reveal metadata tick.
+        self.status.write(PvmStatus::WaitingForMetadata);
+
+        EcallOutcome::Handled {
+            // We can't evaluate after this. The next step is a revelation step.
             continue_eval: false,
         }
     }
@@ -281,8 +356,7 @@ where
 
                 match sbi_function {
                     SBI_TEZOS_INBOX_NEXT => self.handle_tezos_inbox_next(),
-                    SBI_TEZOS_META_ORIGINATION_LEVEL => todo!(),
-                    SBI_TEZOS_META_ADDRESS => todo!(),
+                    SBI_TEZOS_METADATA_REVEAL => self.handle_tezos_metadata_reveal(),
                     SBI_TEZOS_ED25519_SIGN => todo!(),
                     SBI_TEZOS_ED25519_VERIFY => todo!(),
                     SBI_TEZOS_BLAKE2B_HASH256 => todo!(),

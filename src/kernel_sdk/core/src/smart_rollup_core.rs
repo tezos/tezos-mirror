@@ -351,9 +351,9 @@ mod riscv64_hermit {
         io::{self, Write},
         slice::from_raw_parts,
     };
-    use tezos_smart_rollup_constants::riscv::{
-        SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
-        SBI_TEZOS_META_ORIGINATION_LEVEL,
+    use tezos_smart_rollup_constants::{
+        core::{METADATA_LENGTH, ORIGINATION_LEVEL_LENGTH, ROLLUP_ADDRESS_LENGTH},
+        riscv::{SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL},
     };
 
     /// Information about the next inbox level
@@ -389,37 +389,20 @@ mod riscv64_hermit {
         MessageInfo { level, id, length }
     }
 
-    /// Retrieve this rollup's origination level.
+    /// Retrieve this rollup's metadata.
     #[inline(always)]
-    unsafe fn sbi_tezos_meta_origination_level() -> u64 {
+    unsafe fn sbi_tezos_metadata_reveal(buffer: *mut u8) -> u64 {
         let level: u64;
 
         core::arch::asm!(
             "ecall",
             in("a7") SBI_FIRMWARE_TEZOS,
-            in("a6") SBI_TEZOS_META_ORIGINATION_LEVEL,
+            in("a6") SBI_TEZOS_METADATA_REVEAL,
+            in("a0") buffer,
             lateout("a0") level
         );
 
         level
-    }
-
-    /// Retrieve the address of this rollup and return it via `buffer`. Returns
-    /// the number of bytes written to `buffer`.
-    #[inline(always)]
-    unsafe fn sbi_tezos_meta_address(buffer: *mut u8, max_len: u64) -> u64 {
-        let result: u64;
-
-        core::arch::asm!(
-            "ecall",
-            in("a0") buffer,
-            in("a1") max_len,
-            in("a7") SBI_FIRMWARE_TEZOS,
-            in("a6") SBI_TEZOS_META_ADDRESS,
-            lateout("a0") result
-        );
-
-        result
     }
 
     pub unsafe fn read_input(
@@ -529,17 +512,32 @@ mod riscv64_hermit {
     }
 
     pub unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
-        // Fill in the address part of the buffer.
-        let offset = sbi_tezos_meta_address(buffer, max_bytes as u64) as usize;
+        let mut sbi_buffer = [0u8; METADATA_LENGTH];
+        let origin_level =
+            sbi_tezos_metadata_reveal(sbi_buffer[..ROLLUP_ADDRESS_LENGTH].as_mut_ptr());
 
-        // Fill the remaining part of the buffer with the origination level.
-        let orig_level = (sbi_tezos_meta_origination_level() as u32).to_le_bytes();
-        assert!(max_bytes - offset >= orig_level.len());
-        buffer
-            .add(offset)
-            .copy_from(orig_level.as_ptr(), orig_level.len());
+        match ORIGINATION_LEVEL_LENGTH {
+            4 => {
+                sbi_buffer[ROLLUP_ADDRESS_LENGTH
+                    ..(ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH)]
+                    .copy_from_slice(&(origin_level as i32).to_be_bytes());
+            }
 
-        (offset + orig_level.len()) as i32
+            8 => {
+                sbi_buffer[ROLLUP_ADDRESS_LENGTH
+                    ..(ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH)]
+                    .copy_from_slice(&(origin_level as i64).to_be_bytes());
+            }
+
+            _ => {
+                panic!("Unknown origination level type length {ORIGINATION_LEVEL_LENGTH}")
+            }
+        }
+
+        let written = max_bytes.min(sbi_buffer.len());
+        buffer.copy_from(sbi_buffer.as_mut_ptr(), written);
+
+        written as i32
     }
 }
 
