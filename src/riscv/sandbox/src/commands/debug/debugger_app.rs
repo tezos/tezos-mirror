@@ -8,17 +8,20 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use octez_riscv::{
     bits::Bits64,
+    exec_env::pvm::PvmSbiConfig,
     kernel_loader,
     machine_state::{
-        bus::{main_memory::M1G, Address},
+        bus::{main_memory::MainMemoryLayout, Address},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         mode::Mode,
         AccessType,
     },
-    stepper::{test::TestStepper, Stepper},
+    program::Program,
+    stepper::{pvm::PvmStepper, test::TestStepper, Stepper},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use tezos_smart_rollup::utils::inbox::Inbox;
 
 mod render;
 mod updates;
@@ -152,15 +155,42 @@ pub struct DebuggerApp<'a, S: Stepper> {
     state: DebuggerState<S::StepResult>,
 }
 
-impl<'a> DebuggerApp<'a, TestStepper<'a>> {
-    pub fn launch(fname: &str, program: &[u8], exit_mode: Mode) -> Result<()> {
-        let mut backend = TestStepper::<'_, M1G>::create_backend();
+impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<'a, ML>> {
+    pub fn launch(
+        fname: &str,
+        program: &[u8],
+        initrd: Option<&[u8]>,
+        exit_mode: Mode,
+    ) -> Result<()> {
+        let mut backend = TestStepper::<'_, ML>::create_backend();
         let (mut interpreter, prog) =
-            TestStepper::new_with_parsed_program(&mut backend, program, None, exit_mode)?;
+            TestStepper::new_with_parsed_program(&mut backend, program, initrd, exit_mode)?;
         let symbols = kernel_loader::get_elf_symbols(program)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
+        tui::restore()?;
+        Ok(())
+    }
+}
+
+impl<'backend, 'hooks, ML: MainMemoryLayout>
+    DebuggerApp<'backend, PvmStepper<'backend, 'hooks, ML>>
+{
+    /// Launch the Debugger app for a PVM.
+    pub fn launch(fname: &str, program: &[u8], initrd: Option<&[u8]>, inbox: Inbox) -> Result<()> {
+        let config = PvmSbiConfig::new(|_| {});
+
+        let mut backend = PvmStepper::<'backend, 'hooks, ML>::create_backend();
+        let mut stepper = PvmStepper::new(&mut backend, program, initrd, inbox, config)?;
+
+        let symbols = kernel_loader::get_elf_symbols(program)?;
+        let program = Program::<ML>::from_elf(program)?.parsed();
+
+        errors::install_hooks()?;
+        let terminal = tui::init()?;
+        DebuggerApp::new(&mut stepper, fname, &program, symbols).run_debugger(terminal)?;
+
         tui::restore()?;
         Ok(())
     }
