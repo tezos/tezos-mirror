@@ -60,7 +60,7 @@ impl From<PvmStatus> for u8 {
 
 /// PVM configuration
 pub struct PvmSbiConfig<'a> {
-    putchar_hook: Box<dyn FnMut(u8) + 'a>,
+    pub putchar_hook: Box<dyn FnMut(u8) + 'a>,
 }
 
 impl<'a> PvmSbiConfig<'a> {
@@ -103,6 +103,29 @@ impl<M: Manager> PvmSbiState<M> {
     /// Get the current PVM status.
     pub fn status(&self) -> PvmStatus {
         self.status.read_default()
+    }
+
+    /// Respond to a request for input with no input. Returns `false` in case the
+    /// machine wasn't expecting any input, otherwise returns `true`.
+    pub fn provide_no_input<ML: MainMemoryLayout>(
+        &mut self,
+        machine: &mut MachineState<ML, M>,
+    ) -> bool {
+        // This method should only do something when we're waiting for input.
+        match self.status() {
+            PvmStatus::WaitingForInput => {}
+            _ => return false,
+        }
+
+        // We're evaluating again after this.
+        self.status.write(PvmStatus::Evaluating);
+
+        // Zeros in all these registers is equivalent to 'None'.
+        machine.hart.xregisters.write(a0, 0);
+        machine.hart.xregisters.write(a1, 0);
+        machine.hart.xregisters.write(a2, 0);
+
+        true
     }
 
     /// Provide input information to the machine. Returns `false` in case the

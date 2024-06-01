@@ -1312,6 +1312,7 @@ dependencies = [
  "strum 0.26.2",
  "tempfile",
  "tezos-smart-rollup-constants",
+ "tezos-smart-rollup-utils",
  "tezos_crypto_rs",
  "thiserror",
  "twiddle",

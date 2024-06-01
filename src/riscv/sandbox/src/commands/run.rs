@@ -3,29 +3,58 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{cli::RunOptions, format_status, posix_exit_mode};
+use crate::{cli::RunOptions, posix_exit_mode};
 use octez_riscv::{
+    exec_env::pvm::PvmSbiConfig,
     machine_state::bus::main_memory::M1G,
-    stepper::{
-        test::{TestStepper, TestStepperResult},
-        Stepper,
-    },
+    stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
-use std::error::Error;
+use std::{error::Error, fs};
+use tezos_smart_rollup::utils::inbox::InboxBuilder;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
-    let path = opts.input;
-    let contents = std::fs::read(path)?;
+    let program = fs::read(&opts.input)?;
+    let initrd = opts.initrd.as_ref().map(fs::read).transpose()?;
+
+    if opts.common.pvm {
+        run_pvm(program.as_slice(), initrd.as_deref(), &opts)
+    } else {
+        run_test(program.as_slice(), initrd.as_deref(), &opts)
+    }
+}
+
+fn run_test(
+    program: &[u8],
+    initrd: Option<&[u8]>,
+    opts: &RunOptions,
+) -> Result<(), Box<dyn Error>> {
     let mut backend = TestStepper::<'_, M1G>::create_backend();
-    let mut interpreter = TestStepper::new(
+    let stepper = TestStepper::new(
         &mut backend,
-        &contents,
-        None,
+        program,
+        initrd,
         posix_exit_mode(&opts.common.posix_exit_mode),
     )?;
 
-    match interpreter.step_max(opts.common.max_steps) {
-        TestStepperResult::Exit { code: 0, .. } => Ok(()),
-        result => Err(format_status(&result).into()),
+    run_stepper(stepper, opts.common.max_steps)
+}
+
+fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(), Box<dyn Error>> {
+    let mut inbox = InboxBuilder::new();
+    if let Some(inbox_file) = &opts.common.inbox.file {
+        inbox.load_from_file(inbox_file)?;
+    }
+
+    let config = PvmSbiConfig::default();
+    let mut backend = PvmStepper::<'_, '_, M1G>::create_backend();
+    let stepper = PvmStepper::new(&mut backend, program, initrd, inbox.build(), config)?;
+
+    run_stepper(stepper, opts.common.max_steps)
+}
+
+fn run_stepper(mut stepper: impl Stepper, max_steps: usize) -> Result<(), Box<dyn Error>> {
+    match stepper.step_max(max_steps).to_stepper_status() {
+        StepperStatus::Exited { success: true, .. } => Ok(()),
+        result => Err(format!("{result:?}").into()),
     }
 }

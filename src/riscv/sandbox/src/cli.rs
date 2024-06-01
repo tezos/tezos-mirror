@@ -39,6 +39,10 @@ pub struct RunOptions {
     /// Path to the input ELF executable
     #[arg(long, short)]
     pub input: Box<Path>,
+
+    /// Path to the initrd
+    #[arg(long)]
+    pub initrd: Option<Box<Path>>,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -209,6 +213,10 @@ pub struct CommonOptions {
 
     #[arg(long, default_value_t = false)]
     pub timings: bool,
+
+    /// Run as PVM.
+    #[arg(long)]
+    pub pvm: bool,
 }
 
 #[derive(Debug, Clone, Parser)]

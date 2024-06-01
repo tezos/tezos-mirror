@@ -8,9 +8,11 @@ use crate::{
 };
 use std::ops::RangeBounds;
 
+pub mod pvm;
 pub mod test;
 
 /// Status of a stepper
+#[derive(Clone, Debug)]
 pub enum StepperStatus {
     /// Stepper is still running.
     Running { steps: usize },
@@ -30,10 +32,23 @@ pub enum StepperStatus {
     },
 }
 
+impl Default for StepperStatus {
+    fn default() -> Self {
+        Self::Running { steps: 0 }
+    }
+}
+
 /// Result after performing a number of steps
 pub trait StepResult: Default {
     /// Retrieve the status of the stepper
     fn to_stepper_status(&self) -> StepperStatus;
+}
+
+impl StepResult for StepperStatus {
+    #[inline(always)]
+    fn to_stepper_status(&self) -> StepperStatus {
+        self.clone()
+    }
 }
 
 /// Interface for a debuggable stepper

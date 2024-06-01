@@ -581,7 +581,7 @@ mod tests {
             state.xregisters.write(rs1, d);
             assert!(state.run_fmv_d_x(rs1, rs1_f).is_ok());
 
-            assert_eq!(d, state.fregisters.read(rs1_f).into(), "Expected bits to be moved to fregister");
+            assert_eq!(d, u64::from(state.fregisters.read(rs1_f)), "Expected bits to be moved to fregister");
 
             assert!(state.run_fmv_x_d(rs1_f, rs2).is_ok());
 
