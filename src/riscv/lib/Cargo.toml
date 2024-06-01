@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bincode.workspace = true
 derive_more.workspace = true
+ed25519-dalek.workspace = true
 enum-tag.workspace = true
 goblin.workspace = true
 hex.workspace = true
