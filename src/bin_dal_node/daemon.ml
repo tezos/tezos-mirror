@@ -616,6 +616,25 @@ module Handler = struct
           | None -> Lwt.fail_with "L1 crawler lib shut down"
           | Some (_finalized_hash, finalized_shell_header) ->
               let level = finalized_shell_header.level in
+              (* At each potential published_level [level], we prefetch the
+                 committee for its corresponding attestation_level (that is:
+                 level + attestation_lag - 1). This is in particular used by GS
+                 messages ids validation that cannot depend on Lwt. *)
+              let* () =
+                if not proto_parameters.feature_enable then return_unit
+                else
+                  let attestation_level =
+                    Int32.(
+                      pred
+                      @@ add
+                           level
+                           (of_int proto_parameters.Dal_plugin.attestation_lag))
+                  in
+                  let* _committee =
+                    Node_context.fetch_committee ctxt ~level:attestation_level
+                  in
+                  return_unit
+              in
               let* () =
                 Node_context.may_add_plugin
                   ctxt
