@@ -9,11 +9,12 @@ use crate::rlp_helpers::{
     append_option_explicit, append_timestamp, append_u256_le, append_u64_le,
     decode_field, decode_field_h256, decode_field_u256_le, decode_field_u64_le,
     decode_option_explicit, decode_timestamp, decode_transaction_hash_list, next,
+    VersionedEncoding,
 };
 use crate::transaction::TransactionHash;
 use ethbloom::Bloom;
 use primitive_types::{H160, H256, U256};
-use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use rlp::{DecoderError, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
@@ -137,20 +138,11 @@ pub struct L2Block {
     pub gas_used: U256,
     pub timestamp: Timestamp,
     pub transactions: Vec<TransactionHash>,
+    pub base_fee_per_gas: U256,
+    pub mix_hash: H256,
 }
 
 impl L2Block {
-    const DUMMY_HASH: &str = "00000000000000000000000000000000";
-    const BLOCK_HASH_SIZE: usize = 32;
-
-    fn dummy_block_hash() -> H256 {
-        H256([0; L2Block::BLOCK_HASH_SIZE])
-    }
-
-    pub fn dummy_hash() -> OwnedHash {
-        L2Block::DUMMY_HASH.into()
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         number: U256,
@@ -163,6 +155,7 @@ impl L2Block {
         receipts_root: OwnedHash,
         gas_used: U256,
         gas_limit: u64,
+        base_fee_per_gas: U256,
     ) -> Self {
         let hash = Self::hash(
             parent_hash,
@@ -191,6 +184,8 @@ impl L2Block {
             gas_limit,
             extra_data: None,
             miner: None,
+            base_fee_per_gas,
+            mix_hash: H256::zero(),
         }
     }
 
@@ -242,51 +237,19 @@ impl L2Block {
         let bytes: Vec<u8> = rlp::encode_list::<String, String>(&header).into();
         H256(Keccak256::digest(bytes).into())
     }
-}
 
-impl Default for L2Block {
-    fn default() -> Self {
-        Self {
-            number: U256::default(),
-            hash: H256::default(),
-            parent_hash: L2Block::dummy_block_hash(),
-            logs_bloom: Bloom::default(),
-            transactions_root: L2Block::dummy_hash(),
-            state_root: L2Block::dummy_hash(),
-            receipts_root: L2Block::dummy_hash(),
-            miner: None,
-            extra_data: None,
-            gas_limit: 1 << 50,
-            gas_used: U256::zero(),
-            timestamp: Timestamp::from(0),
-            transactions: Vec::new(),
+    pub fn from_bytes(bytes: &[u8]) -> Result<L2Block, DecoderError> {
+        let first = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
+        if first == 0x01 {
+            let decoder = Rlp::new(&bytes[1..]);
+            Self::rlp_decode_v1(&decoder)
+        } else {
+            let decoder = Rlp::new(bytes);
+            Self::rlp_decode_v0(&decoder)
         }
     }
-}
 
-impl Encodable for L2Block {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(13);
-        append_u256_le(s, &self.number);
-        s.append(&self.hash);
-        s.append(&self.parent_hash);
-        s.append(&self.logs_bloom);
-        s.append(&self.transactions_root);
-        s.append(&self.state_root);
-        s.append(&self.receipts_root);
-        append_option_explicit(s, &self.miner, RlpStream::append);
-        append_option_explicit(s, &self.extra_data, RlpStream::append);
-        append_u64_le(s, &self.gas_limit);
-        let transactions_bytes: Vec<Vec<u8>> =
-            self.transactions.iter().map(|x| x.to_vec()).collect();
-        s.append_list::<Vec<u8>, _>(&transactions_bytes);
-        append_u256_le(s, &self.gas_used);
-        append_timestamp(s, self.timestamp);
-    }
-}
-
-impl Decodable for L2Block {
-    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+    fn rlp_decode_v0(decoder: &Rlp) -> Result<L2Block, DecoderError> {
         if decoder.is_list() {
             if Ok(13) == decoder.item_count() {
                 let mut it = decoder.iter();
@@ -323,6 +286,8 @@ impl Decodable for L2Block {
                     gas_used,
                     timestamp,
                     transactions,
+                    base_fee_per_gas: U256::from(1000000000),
+                    mix_hash: H256::zero(),
                 })
             } else {
                 Err(DecoderError::RlpIncorrectListLen)
@@ -331,24 +296,116 @@ impl Decodable for L2Block {
             Err(DecoderError::RlpExpectedToBeList)
         }
     }
+
+    fn rlp_decode_v1(decoder: &Rlp) -> Result<L2Block, DecoderError> {
+        if decoder.is_list() {
+            if Ok(15) == decoder.item_count() {
+                let mut it = decoder.iter();
+                let number: U256 = decode_field_u256_le(&next(&mut it)?, "number")?;
+                let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
+                let parent_hash: H256 =
+                    decode_field_h256(&next(&mut it)?, "parent_hash")?;
+                let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
+                let transactions_root: OwnedHash =
+                    decode_field(&next(&mut it)?, "transactions_root")?;
+                let state_root: OwnedHash = decode_field(&next(&mut it)?, "state_root")?;
+                let receipts_root: OwnedHash =
+                    decode_field(&next(&mut it)?, "receipts_root")?;
+                let miner: Option<OwnedHash> =
+                    decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
+                let extra_data: Option<OwnedHash> =
+                    decode_option_explicit(&next(&mut it)?, "extra_data", decode_field)?;
+                let gas_limit = decode_field_u64_le(&next(&mut it)?, "gas_limit")?;
+                let transactions: Vec<TransactionHash> =
+                    decode_transaction_hash_list(&next(&mut it)?, "transactions")?;
+                let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
+                let timestamp = decode_timestamp(&next(&mut it)?)?;
+                let base_fee_per_gas: U256 =
+                    decode_field_u256_le(&next(&mut it)?, "base_fee_per_gas")?;
+                let mix_hash: H256 = decode_field_h256(&next(&mut it)?, "mix_hash")?;
+                Ok(L2Block {
+                    number,
+                    hash,
+                    parent_hash,
+                    logs_bloom,
+                    transactions_root,
+                    state_root,
+                    receipts_root,
+                    miner,
+                    extra_data,
+                    gas_limit,
+                    gas_used,
+                    timestamp,
+                    transactions,
+                    base_fee_per_gas,
+                    mix_hash,
+                })
+            } else {
+                Err(DecoderError::RlpIncorrectListLen)
+            }
+        } else {
+            Err(DecoderError::RlpExpectedToBeList)
+        }
+    }
+
+    fn rlp_encode(self: &L2Block, s: &mut RlpStream) {
+        s.begin_list(15);
+        append_u256_le(s, &self.number);
+        s.append(&self.hash);
+        s.append(&self.parent_hash);
+        s.append(&self.logs_bloom);
+        s.append(&self.transactions_root);
+        s.append(&self.state_root);
+        s.append(&self.receipts_root);
+        append_option_explicit(s, &self.miner, RlpStream::append);
+        append_option_explicit(s, &self.extra_data, RlpStream::append);
+        append_u64_le(s, &self.gas_limit);
+        let transactions_bytes: Vec<Vec<u8>> =
+            self.transactions.iter().map(|x| x.to_vec()).collect();
+        s.append_list::<Vec<u8>, _>(&transactions_bytes);
+        append_u256_le(s, &self.gas_used);
+        append_timestamp(s, self.timestamp);
+        append_u256_le(s, &self.base_fee_per_gas);
+        s.append(&self.mix_hash);
+    }
+}
+
+impl VersionedEncoding for L2Block {
+    const VERSION: u8 = 1;
+
+    fn unversionned_encode(&self) -> bytes::BytesMut {
+        let mut s = RlpStream::new();
+        self.rlp_encode(&mut s);
+        s.out()
+    }
+
+    fn unversionned_decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        Self::rlp_decode_v1(decoder)
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::L2Block;
-    use crate::rlp_helpers::FromRlpBytes;
+    use crate::eth_gen::OwnedHash;
+    use crate::rlp_helpers::VersionedEncoding;
     use crate::transaction::TRANSACTION_HASH_SIZE;
+    use crate::Bloom;
     use primitive_types::{H256, U256};
-    use rlp::Encodable;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
     fn block_encoding_roundtrip(v: L2Block) {
-        let bytes = v.rlp_bytes();
-        let v2 = L2Block::from_rlp_bytes(&bytes).expect("L2Block should be decodable");
+        let bytes = v.to_bytes();
+        let v2 = L2Block::from_bytes(&bytes).expect("L2Block should be decodable");
         assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
     }
 
+    const DUMMY_HASH: &str = "00000000000000000000000000000000";
+
+    pub fn dummy_hash() -> OwnedHash {
+        DUMMY_HASH.into()
+    }
     fn dummy_block(tx_length: usize) -> L2Block {
         L2Block {
             number: U256::from(42),
@@ -356,7 +413,16 @@ mod tests {
             parent_hash: H256::from([2u8; 32]),
             timestamp: Timestamp::from(10i64),
             transactions: vec![[0u8; TRANSACTION_HASH_SIZE]; tx_length],
-            ..Default::default()
+            logs_bloom: Bloom::default(),
+            transactions_root: dummy_hash(),
+            state_root: dummy_hash(),
+            receipts_root: dummy_hash(),
+            miner: None,
+            extra_data: None,
+            gas_limit: 1 << 50,
+            gas_used: U256::zero(),
+            base_fee_per_gas: U256::zero(),
+            mix_hash: H256::default(),
         }
     }
 

@@ -8,6 +8,7 @@
 use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
+use crate::gas_price::base_fee_per_gas;
 use crate::inbox::Transaction;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
@@ -279,7 +280,7 @@ impl BlockInProgress {
     ) -> Result<Vec<u8>, anyhow::Error> {
         match host.store_get_hash(path) {
             Ok(hash) => Ok(hash),
-            _ => Ok(L2Block::dummy_hash()),
+            _ => Ok("00000000000000000000000000000000".into()),
         }
     }
 
@@ -293,6 +294,7 @@ impl BlockInProgress {
             Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_RECEIPTS))?;
         let transactions_root =
             Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_OBJECTS))?;
+        let base_fee_per_gas = base_fee_per_gas(host, self.timestamp);
         let new_block = L2Block::new(
             self.number,
             self.valid_txs,
@@ -304,6 +306,7 @@ impl BlockInProgress {
             receipts_root,
             self.cumulative_gas,
             block_constants.gas_limit,
+            base_fee_per_gas,
         );
         storage::store_current_block(host, &new_block)
             .context("Failed to store the current block")?;

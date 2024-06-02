@@ -151,6 +151,10 @@ type block = {
   timestamp : quantity;
   transactions : block_transactions;
   uncles : hash list;
+  (* baseFeePerGas and mixHash are set optionnal because old blocks didn't have
+     them*)
+  baseFeePerGas : quantity option;
+  mixHash : block_hash option;
 }
 
 val block_encoding : block Data_encoding.t

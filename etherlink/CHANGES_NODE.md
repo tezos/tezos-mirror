@@ -32,6 +32,8 @@
   pool is not supported. (!13162)
 - Support `debug_traceTransaction` with its default logger `structLogs`.
   (!13268, !13321, !13350, !13378)
+- Return `baseFeePerGas` and `mixHash` field for `eth_getBlockBy*` RPCs. The
+  former only when appropriate, the later with a default value. (!13159)
 
 ### Experimental
 
