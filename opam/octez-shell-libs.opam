@@ -33,7 +33,7 @@ depends: [
   "uri" { >= "3.1.0" }
   "ocplib-endian"
   "fmt" { >= "0.8.7" }
-  "resto-cohttp-self-serving-client" { >= "1.2" }
+  "resto-cohttp-self-serving-client" { = "1.2" }
   "tezos-benchmark" { = version }
   "qcheck-alcotest" { with-test & >= "0.20" }
   "qcheck-core" {with-test}
