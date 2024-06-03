@@ -659,12 +659,13 @@ module Make (C : AUTOMATON_CONFIG) :
       let state = {state with fanout = Topic.Map.remove topic state.fanout} in
       (state, ())
 
-    let put_message_in_cache message_id message topic state =
+    let put_message_in_cache ~peer message_id message topic state =
       let state =
         {
           state with
           message_cache =
             Message_cache.add_message
+              ~peer
               message_id
               message
               topic
@@ -1133,19 +1134,25 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       let*? () =
         let*! message_cache in
-        match Message_cache.get_first_seen_time message_id message_cache with
+        match
+          Message_cache.get_first_seen_time_and_senders message_id message_cache
+        with
         | None -> unit
-        | Some validated ->
+        | Some (validated, peers) ->
             let* () =
-              update_score sender (fun stats ->
-                  Score.duplicate_message_delivered stats topic validated)
+              if Peer.Set.mem sender peers then fun x -> (x, ())
+              else
+                update_score sender (fun stats ->
+                    Score.duplicate_message_delivered stats topic validated)
             in
             fail Already_received
       in
       let*? () = check_message_id_valid sender topic message_id in
       let*? () = check_message_valid sender topic message message_id in
       let peers = Peer.Set.remove sender peers_in_mesh in
-      let* () = put_message_in_cache message_id message topic in
+      let* () =
+        put_message_in_cache ~peer:(Some sender) message_id message topic
+      in
       let* () =
         update_score sender (fun stats ->
             Score.first_message_delivered stats topic)
@@ -1168,7 +1175,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_not_seen message_id =
       let open Monad.Syntax in
       let*! message_cache in
-      match Message_cache.get_first_seen_time message_id message_cache with
+      match
+        Message_cache.get_first_seen_time_and_senders message_id message_cache
+      with
       | None -> unit
       | Some _validated -> fail Already_published
 
@@ -1198,7 +1207,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic message_id message : [`Publish_message] output Monad.t =
       let open Monad.Syntax in
       let*? () = check_not_seen message_id in
-      let* () = put_message_in_cache message_id message topic in
+      let* () = put_message_in_cache ~peer:None message_id message topic in
       let*! mesh_opt = find_mesh topic in
       let* peers =
         match mesh_opt with

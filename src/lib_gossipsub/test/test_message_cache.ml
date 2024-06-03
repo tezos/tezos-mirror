@@ -50,10 +50,10 @@ let new_messages n = Array.init n (fun _ -> new_message ()) |> Array.to_list
 
 (** [add_messages topic messages message_cache] adds [messages] to [message_cache]
     under [topic]. *)
-let add_messages topic messages message_cache =
+let add_messages ?(peer = None) topic messages message_cache =
   List.fold_left
     (fun m (message_id, message) ->
-      Message_cache.add_message message_id message topic m)
+      Message_cache.add_message ~peer message_id message topic m)
     message_cache
     messages
 
@@ -131,7 +131,7 @@ let test_message_cache () =
     List.map (fun (message_id, _) -> message_id) messages
   in
   (* Add 10 messages. *)
-  let m = add_messages topic message_batches.(0) m in
+  let m = add_messages ~peer:None topic message_batches.(0) m in
   (* Should gossip 10 messages (10 total). *)
   check_gossip_ids
     ~__LOC__
