@@ -75,6 +75,7 @@ variables:
   FF_USE_FASTZIP: "true"
   RUNTEZTALIAS: "false"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  CARGO_NET_OFFLINE: "true"
 
 dummy_job:
   stage: .pre
