@@ -45,6 +45,9 @@ module Request : sig
   val eth_maxPriorityFeePerGas : Evm_node.request
 
   val txpool_content : Evm_node.request
+
+  val eth_feeHistory :
+    block_count:string -> newest_block:string -> Evm_node.request
 end
 
 (** [net_version evm_node] calls [net_version]. *)
@@ -170,3 +173,13 @@ val trace_transaction :
   ?tracer_config:(string * JSON.u) list ->
   Evm_node.t ->
   (JSON.t, error) result Lwt.t
+
+type fee_history = {
+  oldest_block : int64;
+  base_fee_per_gas : int64 list;
+  gas_used_ratio : float list;
+}
+
+(** [fee_history block_count newest_block evm_node] calls [eth_feeHistory]. *)
+val fee_history :
+  string -> string -> Evm_node.t -> (fee_history, error) result Lwt.t

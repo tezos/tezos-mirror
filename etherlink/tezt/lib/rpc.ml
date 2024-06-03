@@ -155,6 +155,19 @@ module Request = struct
       | config -> `A [`String transaction_hash; `O config]
     in
     {method_ = "debug_traceTransaction"; parameters}
+
+  let eth_feeHistory ~block_count ~newest_block =
+    {
+      method_ = "eth_feeHistory";
+      parameters =
+        `A
+          [
+            `String block_count;
+            `String newest_block;
+            (* rewards query, not relevant to etherlink *)
+            `A [`Float 0.; `Float 1.; `Float 2.; `Float 3.];
+          ];
+    }
 end
 
 let net_version evm_node =
@@ -384,3 +397,33 @@ let trace_transaction ~transaction_hash ?tracer ?tracer_config evm_node =
   in
   return
   @@ decode_or_error (fun response -> Evm_node.extract_result response) response
+
+type fee_history = {
+  oldest_block : int64;
+  base_fee_per_gas : int64 list;
+  gas_used_ratio : float list;
+}
+
+let fee_history block_count newest_block evm_node =
+  let* response =
+    Evm_node.(
+      call_evm_rpc evm_node (Request.eth_feeHistory ~block_count ~newest_block))
+  in
+
+  let decode_fee_history_result response =
+    let oldest_block =
+      JSON.(response |-> "result" |-> "oldestBlock" |> as_int64)
+    in
+    let base_fee_per_gas =
+      JSON.(
+        response |-> "result" |-> "baseFeePerGas" |> as_list
+        |> List.map as_int64)
+    in
+    let gas_used_ratio =
+      JSON.(
+        response |-> "result" |-> "gasUsedRatio" |> as_list |> List.map as_float)
+    in
+    {oldest_block; base_fee_per_gas; gas_used_ratio}
+  in
+
+  return @@ decode_or_error decode_fee_history_result response

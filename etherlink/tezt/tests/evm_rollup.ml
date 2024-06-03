@@ -5675,6 +5675,123 @@ let test_validation_with_legacy_encoding =
         "The transaction should have been included, meaning the validation \
          failed."
 
+let test_rpc_feeHistory =
+  register_both
+    ~tags:["evm"; "rpc"; "fee_history"]
+    ~title:"RPC methods eth_feeHistory"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let {evm_node; sc_rollup_node; client; _} = evm_setup in
+  let* _ =
+    repeat 2 (fun _ -> next_evm_level ~evm_node ~sc_rollup_node ~client)
+  in
+  let* _ =
+    send
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~receiver:Eth_account.bootstrap_accounts.(1)
+      ~value:Wei.one
+      evm_setup
+  in
+  let* _ =
+    repeat 2 (fun _ -> next_evm_level ~evm_node ~sc_rollup_node ~client)
+  in
+  let*@ history = Rpc.fee_history "0x03" "latest" evm_setup.evm_node in
+  let*@ latest_block =
+    Rpc.get_block_by_number ~block:"latest" evm_setup.evm_node
+  in
+  Check.(
+    Int64.(history.oldest_block = sub (of_int32 latest_block.number) 2L) int64)
+    ~error_msg:"Expected block %R, but got %L" ;
+  Check.((List.length history.base_fee_per_gas = 3) int)
+    ~error_msg:"Expected list of size %R, but got %L" ;
+  Check.((List.length history.gas_used_ratio = 3) int)
+    ~error_msg:"Expected list of size %R, but got %L" ;
+  List.iter
+    (fun fee ->
+      Check.((fee = latest_block.baseFeePerGas) int64)
+        ~error_msg:"Expected fee %L to be %R")
+    history.base_fee_per_gas ;
+
+  (* 21000 / (2 ^ 50) = 1.86517e-11 *)
+  Check.((List.hd history.gas_used_ratio = 1.86517e-11) float)
+    ~error_msg:"Expected gas used ratio to be %R, but got %L" ;
+
+  List.iter
+    (fun ratio ->
+      Check.((ratio <= 1.) float)
+        ~error_msg:"Expected gas used ratio to be less than 1, but got %L")
+    history.gas_used_ratio ;
+  unit
+
+let test_rpc_feeHistory_past =
+  register_both
+    ~tags:["evm"; "rpc"; "fee_history"; "past"]
+    ~title:"RPC methods eth_feeHistory in the past"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let {evm_node; sc_rollup_node; client; _} = evm_setup in
+  let* _ =
+    repeat 6 (fun () -> next_evm_level ~evm_node ~sc_rollup_node ~client)
+  in
+  let*@ latest_block =
+    Rpc.get_block_by_number ~block:"latest" evm_setup.evm_node
+  in
+  let old_block = Int64.of_int32 @@ Int32.sub latest_block.number 2l in
+  let block_count = 3L in
+  let*@ history =
+    Rpc.fee_history
+      (Int64.to_string block_count)
+      (Int64.to_string old_block)
+      evm_setup.evm_node
+  in
+  Check.(Int64.(history.oldest_block = sub old_block @@ pred block_count) int64)
+    ~error_msg:"Expected block %R, but got %L" ;
+  Check.((List.length history.base_fee_per_gas = Int64.to_int block_count) int)
+    ~error_msg:"Expected list of size %R, but got %L" ;
+  Check.((List.length history.gas_used_ratio = Int64.to_int block_count) int)
+    ~error_msg:"Expected list of size %R, but got %L" ;
+  unit
+
+let test_rpc_feeHistory_future =
+  register_both
+    ~tags:["evm"; "rpc"; "fee_history"; "future"]
+    ~title:"RPC methods eth_feeHistory in the future"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let {evm_node; sc_rollup_node; client; _} = evm_setup in
+  let* _ =
+    repeat 3 (fun () -> next_evm_level ~evm_node ~sc_rollup_node ~client)
+  in
+  let*@? error = Rpc.fee_history "0x02" "0xFFFFFFFF" evm_setup.evm_node in
+  Check.(
+    ((error.message
+    = "Evm_node_lib_dev.Durable_storage.Make(Reader).Invalid_block_index(4294967295)"
+     )
+       string)
+      ~error_msg:"The transaction should fail with message %R, got &L") ;
+  unit
+
+let test_rpc_feeHistory_long =
+  register_both
+    ~tags:["evm"; "rpc"; "fee_history"; "block_count"]
+    ~title:"RPC methods eth_feeHistory with high blockCount"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let {evm_node; sc_rollup_node; client; _} = evm_setup in
+  let* _ =
+    repeat 3 (fun () -> next_evm_level ~evm_node ~sc_rollup_node ~client)
+  in
+  let*@ history = Rpc.fee_history "0xffffffffff" "latest" evm_setup.evm_node in
+  let*@ latest_block =
+    Rpc.get_block_by_number ~block:"latest" evm_setup.evm_node
+  in
+  Check.((history.oldest_block = 1L) int64)
+    ~error_msg:"Expected block %R, but got %L" ;
+  Check.(
+    (List.length history.base_fee_per_gas = Int32.to_int latest_block.number)
+      int)
+    ~error_msg:"Expected list of size %R, but got %L" ;
+  Check.(
+    (List.length history.gas_used_ratio = Int32.to_int latest_block.number) int)
+    ~error_msg:"Expected list of size %R, but got %L" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5780,7 +5897,11 @@ let register_evm_node ~protocols =
   test_proxy_read_only protocols ;
   test_unsupported_rpc protocols ;
   test_validation_with_legacy_encoding protocols ;
-  test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash protocols
+  test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash protocols ;
+  test_rpc_feeHistory protocols ;
+  test_rpc_feeHistory_past protocols ;
+  test_rpc_feeHistory_future protocols ;
+  test_rpc_feeHistory_long protocols
 
 let protocols = Protocol.all
 
