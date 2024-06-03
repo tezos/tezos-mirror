@@ -38,15 +38,19 @@ impl InboxBuilder {
         &mut self,
         path: impl AsRef<Path>,
     ) -> Result<&mut Self, Box<dyn Error>> {
-        let inbox_messages = InboxFile::load(path.as_ref())
-            .map_err(|err| {
-                format!(
-                    "Failed to read inbox from {}: {err}",
-                    path.as_ref().display()
-                )
-            })?
-            .0;
-        for (idx, level) in inbox_messages.into_iter().enumerate() {
+        let inbox_messages = InboxFile::load(path.as_ref()).map_err(|err| {
+            format!(
+                "Failed to read inbox from {}: {err}",
+                path.as_ref().display()
+            )
+        })?;
+        self.add_inbox_messages(inbox_messages);
+        Ok(self)
+    }
+
+    /// Load inbox messages from a pre-loaded [`InboxFile`].
+    pub fn add_inbox_messages(&mut self, inbox_messages: InboxFile) -> &mut Self {
+        for (idx, level) in inbox_messages.0.into_iter().enumerate() {
             if idx > 0 {
                 self.next_level();
             }
@@ -58,7 +62,7 @@ impl InboxBuilder {
                 };
             }
         }
-        Ok(self)
+        self
     }
 
     /// Inject the `start of level` and `info per level` messages to indicate
