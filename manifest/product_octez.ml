@@ -606,12 +606,14 @@ let octez_rust_deps =
                   S "progn";
                   of_atom_list
                     ["run"; "rm"; "-f"; "wasmer-3.3.0/lib/c-api/wasmer.h"];
-                  of_atom_list ["run"; "cargo"; "build"; "--release"];
+                  of_atom_list
+                    ["run"; "cargo"; "build"; "--release"; "--locked"];
                   [
                     S "setenv";
                     S "OBJCOPY";
                     S "objcopy";
-                    of_atom_list ["run"; "cargo"; "run"; "--release"];
+                    of_atom_list
+                      ["run"; "cargo"; "run"; "--release"; "--locked"];
                   ];
                   of_atom_list ["run"; "strip"; "-x"; "liboctez_rust_deps.a"];
                   of_atom_list
