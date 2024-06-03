@@ -32,13 +32,16 @@ type validation_result =
   | Already_committed
   | Already_known_invalid of error trace
   | Validated_and_applied
-  | Application_error of error trace
   | Preapplied of (Block_header.shell_header * error Preapply_result.t list)
   | Preapplication_error of error trace
   | Application_error_after_validation of error trace
   | Validation_failed of error trace
 
 type validate_block_result = Validated | Validation_error of error trace
+
+type apply_block_result =
+  | Applied of Block_validation.result
+  | Application_error of error trace
 
 type new_block = {
   block : Store.Block.t;
@@ -212,6 +215,26 @@ let validate_block worker ?canceler bv peer chain_db chain_store ~predecessor
   | Error errs -> Lwt.return (Validation_error errs)
   | Ok () -> Lwt.return Validated
 
+let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
+    block_hash bv_operations =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit applying_block) block_hash in
+  let*! r =
+    protect ~canceler:(Worker.canceler worker) (fun () ->
+        protect ?canceler (fun () ->
+            with_retry_to_load_protocol bv ~peer (fun () ->
+                Block_validator_process.apply_block
+                  ~should_validate:false
+                  bv.validation_process
+                  chain_store
+                  ~predecessor
+                  block_header
+                  bv_operations)))
+  in
+  match r with
+  | Error errs -> Lwt.return (Application_error errs)
+  | Ok application_result -> Lwt.return (Applied application_result)
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -281,43 +304,46 @@ let on_validation_request w
                       (* Headers which have been preapplied can be advertised
                          before being fully applied. *)
                       Distributed_db.Advertise.validated_head chain_db header ;
-                    let* result =
-                      protect ~canceler:(Worker.canceler w) (fun () ->
-                          protect ?canceler (fun () ->
-                              let*! () = Events.(emit applying_block) hash in
-                              with_retry_to_load_protocol bv ~peer (fun () ->
-                                  Block_validator_process.apply_block
-                                    ~should_validate:false
-                                    bv.validation_process
-                                    chain_store
-                                    ~predecessor:pred
-                                    header
-                                    bv_operations)))
-                    in
-                    Shell_metrics.Block_validator
-                    .set_operation_per_pass_collector
-                      (fun () ->
-                        List.map
-                          (fun v -> Int.to_float (List.length v))
-                          operations) ;
-                    let* o =
-                      Distributed_db.commit_block
-                        chain_db
-                        hash
+                    let*! r =
+                      apply_block
+                        w
+                        ?canceler
+                        bv
+                        peer
+                        chain_store
+                        ~predecessor:pred
                         header
-                        operations
-                        result
+                        hash
+                        bv_operations
                     in
-                    match o with
-                    | Some block ->
-                        notify_new_block
-                          {
-                            block;
-                            resulting_context_hash =
-                              result.validation_store.resulting_context_hash;
-                          } ;
-                        return Validated_and_applied
-                    | None -> return Already_committed)))
+                    match r with
+                    | Application_error errs -> fail errs
+                    | Applied application_result -> (
+                        Shell_metrics.Block_validator
+                        .set_operation_per_pass_collector
+                          (fun () ->
+                            List.map
+                              (fun v -> Int.to_float (List.length v))
+                              operations) ;
+                        let* o =
+                          Distributed_db.commit_block
+                            chain_db
+                            hash
+                            header
+                            operations
+                            application_result
+                        in
+                        match o with
+                        | Some block ->
+                            notify_new_block
+                              {
+                                block;
+                                resulting_context_hash =
+                                  application_result.validation_store
+                                    .resulting_context_hash;
+                              } ;
+                            return Validated_and_applied
+                        | None -> return Already_committed))))
       in
       match r with
       | Ok r -> return r
@@ -333,13 +359,12 @@ let on_validation_request w
                   Distributed_db.commit_invalid_block chain_db hash header errs)
             else return_unit
           in
-          if advertise_after_validation then (
+          if advertise_after_validation then
             Block_hash_ring.replace
               bv.inapplicable_blocks_after_validation
               hash
               errs ;
-            return (Application_error_after_validation errs))
-          else return (Application_error errs))
+          return (Application_error_after_validation errs))
 
 let on_preapplication_request w
     {
@@ -463,20 +488,6 @@ let on_completion :
       | Validation v ->
           Events.(emit validation_and_application_success) (v.block, st)
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
-  | Request.Request_validation _, Application_error errs -> (
-      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
-      Prometheus.Counter.inc_one metrics.validation_errors_count ;
-      match Request.view request with
-      | Validation v -> (
-          match errs with
-          | [Canceled] ->
-              (* Ignore requests cancellation *)
-              Lwt.return_unit
-          | errs ->
-              let* () = Events.(emit validation_failure) (v.block, st, errs) in
-              let* () = check_and_quit_on_irmin_errors errs in
-              return_unit)
-      | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_preapplication _, Preapplied _ -> (
       Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
       match Request.view request with
@@ -495,13 +506,18 @@ let on_completion :
       Prometheus.Counter.inc_one
         metrics.application_errors_after_validation_count ;
       match Request.view request with
-      | Validation v ->
-          let* () =
-            Events.(emit application_failure_after_validation)
-              (v.block, st, errs)
-          in
-          let* () = check_and_quit_on_irmin_errors errs in
-          return_unit
+      | Validation v -> (
+          match errs with
+          | [Canceled] ->
+              (* Ignore requests cancellation *)
+              Lwt.return_unit
+          | errs ->
+              let* () =
+                Events.(emit application_failure_after_validation)
+                  (v.block, st, errs)
+              in
+              let* () = check_and_quit_on_irmin_errors errs in
+              return_unit)
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Validation_failed errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
@@ -520,8 +536,7 @@ let on_completion :
   | Request.Request_validation _, (Preapplied _ | Preapplication_error _)
   | ( Request.Request_preapplication _,
       ( Already_committed | Already_known_invalid _ | Validated_and_applied
-      | Application_error _ | Application_error_after_validation _
-      | Validation_failed _ ) ) ->
+      | Application_error_after_validation _ | Validation_failed _ ) ) ->
       (* assert false *) Lwt.return_unit
 
 let on_close w =
@@ -601,7 +616,6 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
       | Ok (Application_error_after_validation errs) ->
           return (Inapplicable_after_validation errs)
       | Ok (Validation_failed errs)
-      | Ok (Application_error errs)
       | Ok (Already_known_invalid errs)
       | Error (Request_error errs) ->
           return (Invalid errs)
@@ -637,8 +651,7 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
   | Error (Any exn) -> Lwt.return_error [Exn exn]
   | Ok
       ( Already_committed | Already_known_invalid _ | Validated_and_applied
-      | Application_error _ | Application_error_after_validation _
-      | Validation_failed _ ) ->
+      | Application_error_after_validation _ | Validation_failed _ ) ->
       (* validation cases *)
       assert false
 
