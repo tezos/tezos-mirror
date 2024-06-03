@@ -1134,7 +1134,9 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       let*? () =
         let*! message_cache in
-        match Message_cache.get_first_seen_time message_id message_cache with
+        match
+          Message_cache.get_first_seen_time_and_senders message_id message_cache
+        with
         | None -> unit
         | Some (validated, peers) ->
             let* () =
@@ -1173,7 +1175,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_not_seen message_id =
       let open Monad.Syntax in
       let*! message_cache in
-      match Message_cache.get_first_seen_time message_id message_cache with
+      match
+        Message_cache.get_first_seen_time_and_senders message_id message_cache
+      with
       | None -> unit
       | Some _validated -> fail Already_published
 

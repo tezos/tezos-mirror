@@ -444,16 +444,16 @@ module type MESSAGE_CACHE = sig
 
   module Time : TIME
 
-  (** A sliding window cache that stores published messages and their first seen
-    time. The module also keeps track of the number of accesses to a message by
-    a peer, thus indirectly tracking the number of IWant requests a peer makes
-    for the same message between two heartbeats.
+  (** A sliding window cache that stores published messages, their first seen
+      time, and their senders. The module also keeps track of the number of
+      accesses to a message by a peer, thus indirectly tracking the number of
+      IWant requests a peer makes for the same message between two heartbeats.
 
-    The module assumes that no two different messages have the same message
-    id. However, the cache stores duplicates; for instance, if [add_message id
-    msg topic] is called exactly twice, then [msg] will appear twice in
-    [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
-    shifts have been executed in the meanwhile). *)
+      The module assumes that no two different messages have the same message
+      id. However, the cache stores duplicates; for instance, if [add_message
+      peer id msg topic] is called exactly twice, then [msg] will appear twice
+      in [get_message_ids_to_gossip]'s result (assuming not more than
+      [gossip_slots] shifts have been executed in the meanwhile). *)
   type t
 
   (** [create ~history_slots ~gossip_slots ~seen_message_slots] creates two
@@ -483,7 +483,9 @@ module type MESSAGE_CACHE = sig
 
   (** Add message to the most recent cache slot. If the message already exists
       in the cache, the message is not overridden, instead a duplicate message
-      id is stored (the message itself is only stored once). *)
+      id is stored (the message itself is only stored once). The [peer] argument
+      represents the message sender. It is [None] in case the message is
+      produced and not received (thus it has no sender). *)
   val add_message :
     peer:Peer.t option -> Message_id.t -> Message.t -> Topic.t -> t -> t
 
@@ -499,10 +501,12 @@ module type MESSAGE_CACHE = sig
       messages in the output. *)
   val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
 
-  (** [get_first_seen_time message_id t] returns the time the message with [message_id]
-      was first seen. Returns [None] if the message was not seen during the period
-      covered by the sliding window. *)
-  val get_first_seen_time : Message_id.t -> t -> (Time.t * Peer.Set.t) option
+  (** [get_first_seen_time_and_senders message_id t] returns the time the
+      message with [message_id] was first seen and the senders of that message
+      during the tracked sliding window. Returns [None] if the message was not
+      seen during the period covered by the sliding window. *)
+  val get_first_seen_time_and_senders :
+    Message_id.t -> t -> (Time.t * Peer.Set.t) option
 
   (** [seen_message message_id t] returns [true] if the message was seen during the
       period covered by the sliding window and returns [false] if otherwise. *)
