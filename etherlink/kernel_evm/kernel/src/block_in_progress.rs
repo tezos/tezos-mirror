@@ -231,8 +231,15 @@ impl BlockInProgress {
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
         // account for gas
-        let Some(gas_used) = receipt_info.execution_outcome.as_ref().map(|eo| eo.gas_used) else {
-            anyhow::bail!("No execution outcome on valid transaction 0x{}", hex::encode(transaction.tx_hash));
+        let Some(gas_used) = receipt_info
+            .execution_outcome
+            .as_ref()
+            .map(|eo| eo.gas_used)
+        else {
+            anyhow::bail!(
+                "No execution outcome on valid transaction 0x{}",
+                hex::encode(transaction.tx_hash)
+            );
         };
         self.add_gas(gas_used.into())?;
 
@@ -305,7 +312,7 @@ impl BlockInProgress {
             state_root,
             receipts_root,
             self.cumulative_gas,
-            block_constants.gas_limit,
+            block_constants,
             base_fee_per_gas,
         );
         storage::store_current_block(host, &new_block)

@@ -209,3 +209,12 @@ let counter =
     abi = kernel_inputs_path ^ "/counter.abi";
     bin = kernel_inputs_path ^ "/counter.bin";
   }
+
+(** The info for the "coinbase.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/coinbase.sol] *)
+let coinbase =
+  {
+    label = "coinbase";
+    abi = kernel_inputs_path ^ "/coinbase.abi";
+    bin = kernel_inputs_path ^ "/coinbase.bin";
+  }

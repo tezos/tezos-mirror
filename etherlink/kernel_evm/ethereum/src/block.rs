@@ -98,10 +98,11 @@ impl BlockConstants {
         chain_id: U256,
         block_fees: BlockFees,
         gas_limit: u64,
+        coinbase: H160,
     ) -> Self {
         Self {
             number: U256::zero(),
-            coinbase: H160::zero(),
+            coinbase,
             timestamp,
             gas_limit,
             block_fees,
@@ -132,7 +133,7 @@ pub struct L2Block {
     pub transactions_root: OwnedHash,
     pub state_root: OwnedHash,
     pub receipts_root: OwnedHash,
-    pub miner: Option<OwnedHash>,
+    pub miner: Option<H160>,
     pub extra_data: Option<OwnedHash>,
     pub gas_limit: u64,
     pub gas_used: U256,
@@ -154,7 +155,7 @@ impl L2Block {
         state_root: OwnedHash,
         receipts_root: OwnedHash,
         gas_used: U256,
-        gas_limit: u64,
+        block_constants: &BlockConstants,
         base_fee_per_gas: U256,
     ) -> Self {
         let hash = Self::hash(
@@ -163,9 +164,9 @@ impl L2Block {
             &transactions_root,
             &receipts_root,
             &logs_bloom,
-            &None,
+            &Some(block_constants.coinbase),
             number,
-            gas_limit,
+            block_constants.gas_limit,
             gas_used,
             timestamp,
             &None,
@@ -181,9 +182,9 @@ impl L2Block {
             state_root,
             receipts_root,
             gas_used,
-            gas_limit,
+            gas_limit: block_constants.gas_limit,
             extra_data: None,
-            miner: None,
+            miner: Some(block_constants.coinbase),
             base_fee_per_gas,
             mix_hash: H256::zero(),
         }
@@ -194,11 +195,12 @@ impl L2Block {
         chain_id: U256,
         block_fees: BlockFees,
         gas_limit: u64,
+        coinbase: H160,
     ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         BlockConstants {
             number: self.number,
-            coinbase: H160::zero(),
+            coinbase,
             timestamp,
             gas_limit,
             block_fees,
@@ -214,7 +216,7 @@ impl L2Block {
         transactions_root: &OwnedHash,
         receipts_root: &OwnedHash,
         logs_bloom: &Bloom,
-        miner: &Option<OwnedHash>,
+        miner: &Option<H160>,
         number: U256,
         gas_limit: u64,
         gas_used: U256,
@@ -263,7 +265,7 @@ impl L2Block {
                 let state_root: OwnedHash = decode_field(&next(&mut it)?, "state_root")?;
                 let receipts_root: OwnedHash =
                     decode_field(&next(&mut it)?, "receipts_root")?;
-                let miner: Option<OwnedHash> =
+                let miner: Option<H160> =
                     decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
                 let extra_data: Option<OwnedHash> =
                     decode_option_explicit(&next(&mut it)?, "extra_data", decode_field)?;
@@ -311,7 +313,7 @@ impl L2Block {
                 let state_root: OwnedHash = decode_field(&next(&mut it)?, "state_root")?;
                 let receipts_root: OwnedHash =
                     decode_field(&next(&mut it)?, "receipts_root")?;
-                let miner: Option<OwnedHash> =
+                let miner: Option<H160> =
                     decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
                 let extra_data: Option<OwnedHash> =
                     decode_option_explicit(&next(&mut it)?, "extra_data", decode_field)?;

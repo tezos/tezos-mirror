@@ -293,6 +293,7 @@ fn compute_bip<Host: KernelRuntime>(
                 current_constants.chain_id,
                 current_constants.block_fees,
                 GAS_LIMIT,
+                current_constants.coinbase,
             );
 
             *first_block_of_reboot = false;
@@ -361,10 +362,14 @@ pub fn produce<Host: Runtime>(
 ) -> Result<ComputationResult, anyhow::Error> {
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
+    // If there's a pool address, the coinbase in block constants and miner
+    // in blocks is set to the pool address.
+    let coinbase = sequencer_pool_address.unwrap_or_default();
+
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
             Ok(block) => (
-                block.constants(chain_id, block_fees, GAS_LIMIT),
+                block.constants(chain_id, block_fees, GAS_LIMIT, coinbase),
                 block.number + 1,
                 block.hash,
             ),
@@ -372,7 +377,7 @@ pub fn produce<Host: Runtime>(
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
                 (
-                    BlockConstants::first_block(timestamp, chain_id, block_fees, GAS_LIMIT),
+                    BlockConstants::first_block(timestamp, chain_id, block_fees, GAS_LIMIT, coinbase),
                     U256::zero(),
                     H256::from_slice(&hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()),
                 )
@@ -1315,6 +1320,7 @@ mod tests {
             chain_id.unwrap(),
             block_fees.unwrap(),
             crate::block::GAS_LIMIT,
+            H160::zero(),
         )
     }
 
