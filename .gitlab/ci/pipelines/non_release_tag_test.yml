@@ -12,6 +12,10 @@ oc.build:static-x86_64-linux-binaries:
   tags:
   - gcp
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -20,6 +24,7 @@ oc.build:static-x86_64-linux-binaries:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 90 days
     paths:
@@ -31,6 +36,10 @@ oc.build:static-arm64-linux-binaries:
   tags:
   - gcp_arm64
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -39,6 +48,7 @@ oc.build:static-arm64-linux-binaries:
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 90 days
     paths:

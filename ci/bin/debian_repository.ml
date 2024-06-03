@@ -74,6 +74,7 @@ let jobs =
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       ["./scripts/ci/build-debian-packages.sh"]
+    |> enable_cargo_cache
   in
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages

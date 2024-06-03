@@ -153,7 +153,7 @@ let jobs =
     (* Stage: test_coverage *)
     job_unified_coverage_default;
     (* Stage: doc *)
-    job_publish_documentation;
+    job_publish_documentation |> enable_cargo_cache;
     (* Stage: prepare_release *)
     job_docker_merge_manifests;
     (* Stage: manual *)
