@@ -9,7 +9,7 @@ stages:
 - prepare_release
 - manual
 
-oc.docker:rust-toolchain:
+oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
   tags:
@@ -135,7 +135,7 @@ oc.docker:amd64:
   rules:
   - when: always
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -264,7 +264,7 @@ publish_kernel_sdk:
   - when: manual
     allow_failure: true
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
     key: kernels
     paths:

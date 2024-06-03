@@ -30,7 +30,7 @@ oc.docker:client-libs-dependencies:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
 
-oc.docker:rust-toolchain:
+oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
   tags:
@@ -351,7 +351,7 @@ oc.build_kernels:
     - tzt_reference_test_suite/**/*
     when: on_success
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
   - key: kernels
     paths:
@@ -6999,7 +6999,7 @@ test_kernels:
     - src/kernel_*/**/*
     when: on_success
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
     key: kernels
     paths:
@@ -7027,7 +7027,7 @@ test_etherlink_kernel:
     - src/kernel_sdk/**/*
     when: on_success
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
     key: kernels
     paths:
@@ -7054,7 +7054,7 @@ test_etherlink_firehose:
     - images/**/*
     when: on_success
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
     key: kernels
     paths:
@@ -7080,7 +7080,7 @@ test_riscv_kernels:
     - src/riscv/**/*
     when: on_success
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
     key: kernels
     paths:
@@ -7109,7 +7109,7 @@ test_evm_compatibility:
     - images/**/*
     when: on_success
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   cache:
     key: kernels
     paths:
@@ -8340,9 +8340,9 @@ oc.docker:amd64:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   dependencies:
-  - oc.docker:rust-toolchain
+  - oc.docker:rust-toolchain:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
