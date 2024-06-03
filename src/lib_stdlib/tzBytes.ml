@@ -34,3 +34,34 @@ external lognot : bytes -> bytes = "bytes_lognot"
 external shift_left : bytes -> int -> bytes = "bytes_shift_left"
 
 external shift_right : bytes -> int -> bytes = "bytes_shift_right"
+
+let chunk_bytes_strict error_on_partial_chunk n b =
+  let l = Bytes.length b in
+  if l mod n <> 0 then Error error_on_partial_chunk
+  else
+    let rec split seq offset =
+      if offset = l then List.rev seq
+      else
+        let s = Bytes.sub b offset n in
+        split (s :: seq) (offset + n)
+    in
+    Ok (split [] 0)
+
+let chunk_bytes_loose n b =
+  let l = Bytes.length b in
+  let rec split seq offset =
+    if offset = l then List.rev seq
+    else if offset + n > l then List.rev (Bytes.sub b offset (l - offset) :: seq)
+    else
+      let s = Bytes.sub b offset n in
+      split (s :: seq) (offset + n)
+  in
+  split [] 0
+
+let chunk_bytes ?error_on_partial_chunk n b =
+  if n <= 0 then raise @@ Invalid_argument "chunk_bytes"
+  else
+    match error_on_partial_chunk with
+    | Some error_on_partial_chunk ->
+        chunk_bytes_strict error_on_partial_chunk n b
+    | None -> Ok (chunk_bytes_loose n b)

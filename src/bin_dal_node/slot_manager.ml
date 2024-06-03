@@ -389,12 +389,10 @@ let get_slot_pages ~reconstruct_if_missing cryptobox store node_context slot_id
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
-     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
   let*? pages =
-    String.chunk_bytes
+    Bytes.chunk_bytes
       dal_parameters.page_size
       slot
       ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
   in
-  return @@ List.map String.to_bytes pages
+  return pages
