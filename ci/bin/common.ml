@@ -294,6 +294,19 @@ let enable_kernels =
 
 (* Common GitLab CI caches *)
 
+(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
+
+    This function should only be applied to jobs that have a GitLab CI
+    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
+    function calls this function, so there is no need to apply both).
+    Exceptions can be made for jobs that must have CARGO_HOME set to
+    something different than {!cargo_home}. *)
+let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
+
+(** Adds a GitLab CI cache for the CARGO_HOME folder.
+
+    More precisely, we only cache the non-SCM dependencies in the
+    sub-directory [registry/cache]. *)
 let enable_cargo_cache job =
   job
   |> append_cache
@@ -301,6 +314,8 @@ let enable_cargo_cache job =
          key = ("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug));
          paths = [cargo_home // "registry/cache"];
        }
+  (* Allow Cargo to access the network *)
+  |> enable_networked_cargo
 
 (** {2 Changesets} *)
 
