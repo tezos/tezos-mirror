@@ -195,6 +195,18 @@ val fetch_assigned_shard_indices :
   pkh:Tezos_crypto.Signature.Public_key_hash.t ->
   int list tzresult Lwt.t
 
+(** [get_fetched_assigned_shard_indices] is a pure variant of
+    {!fetch_assigned_shard_indices} that doesn't fetch the committee from L1 if
+    not found locally. The function returns [None] if no committee is found
+    locally for the given level, or [Some shard_indexes] otherwise, where the
+    list of shards is empty if the given [pkh] is not in the committee for the
+    givel [level]. *)
+val get_fetched_assigned_shard_indices :
+  t ->
+  level:int32 ->
+  pkh:Signature.public_key_hash ->
+  Committee_cache.shard_indexes option
+
 (** [fetch_committee ctxt ~level] fetches from L1 the shard indices assigned
     to all attesters at [level].  It internally caches the DAL committee with
     [level] as the key with FIFO strategy. *)

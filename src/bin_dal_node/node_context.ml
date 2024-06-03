@@ -273,6 +273,13 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
   | None -> []
   | Some indexes -> indexes
 
+let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
+  Option.map
+    (fun committee ->
+      Tezos_crypto.Signature.Public_key_hash.Map.find_opt pkh committee
+      |> Option.value ~default:[])
+    (Committee_cache.find ctxt.committee_cache ~level)
+
 let version {config; _} =
   let network_name = config.Configuration_file.network_name in
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)

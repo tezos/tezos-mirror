@@ -161,15 +161,8 @@ module Handler = struct
   let is_bootstrap_node ctxt =
     Node_context.get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
-
-     We should check:
-
-     - That the included shard index is indeed assigned to the included pkh;
-
-     - That the bounds on the slot/shard indexes are respected.
-  *)
-  let gossipsub_message_id_validation ctxt proto_parameters message_id =
+  let gossipsub_message_id_commitment_validation ctxt proto_parameters
+      message_id =
     let store = Node_context.get_store ctxt in
     let slot_index = message_id.Types.Message_id.slot_index in
     match
@@ -193,6 +186,46 @@ module Handler = struct
           (* We know the message is not [Outdated], because this has already been checked in {!gossipsub_app_messages_validation}. *)
           `Unknown
         else `Invalid
+
+  let gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
+    let attestation_level =
+      Int32.(
+        pred
+        @@ add
+             message_id.Types.Message_id.level
+             (of_int proto_parameters.Dal_plugin.attestation_lag))
+    in
+    let shard_indices_opt =
+      Node_context.get_fetched_assigned_shard_indices
+        ctxt
+        ~pkh:message_id.Types.Message_id.pkh
+        ~level:attestation_level
+    in
+    match shard_indices_opt with
+    | None ->
+        (* If DAL committees of [attestation_level] are fetched each time the
+           corresponding published/finalized_level is processed, this should not
+           happen. *)
+        `Unknown
+    | Some shard_indices ->
+        if
+          List.mem
+            ~equal:( = )
+            message_id.Types.Message_id.shard_index
+            shard_indices
+        then `Valid
+        else `Invalid
+
+  let gossipsub_message_id_validation ctxt proto_parameters message_id =
+    match
+      gossipsub_message_id_commitment_validation
+        ctxt
+        proto_parameters
+        message_id
+    with
+    | `Valid ->
+        gossipsub_message_id_topic_validation ctxt proto_parameters message_id
+    | other -> other
 
   (* [gossipsub_app_messages_validation ctxt cryptobox head_level
      attestation_lag ?message ~message_id ()] checks for the validity of the
@@ -583,6 +616,25 @@ module Handler = struct
           | None -> Lwt.fail_with "L1 crawler lib shut down"
           | Some (_finalized_hash, finalized_shell_header) ->
               let level = finalized_shell_header.level in
+              (* At each potential published_level [level], we prefetch the
+                 committee for its corresponding attestation_level (that is:
+                 level + attestation_lag - 1). This is in particular used by GS
+                 messages ids validation that cannot depend on Lwt. *)
+              let* () =
+                if not proto_parameters.feature_enable then return_unit
+                else
+                  let attestation_level =
+                    Int32.(
+                      pred
+                      @@ add
+                           level
+                           (of_int proto_parameters.Dal_plugin.attestation_lag))
+                  in
+                  let* _committee =
+                    Node_context.fetch_committee ctxt ~level:attestation_level
+                  in
+                  return_unit
+              in
               let* () =
                 Node_context.may_add_plugin
                   ctxt
