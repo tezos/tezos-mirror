@@ -706,6 +706,15 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~ci_docker_hub
     ["./scripts/ci/docker_merge_manifests.sh"]
 
+let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
+  job_docker_authenticated
+    ~__POS__
+    ?dependencies
+    ~stage:Stages.publish_release
+    ~name:"docker:promote_to_latest"
+    ~ci_docker_hub
+    ["./scripts/ci/docker_promote_to_latest.sh"]
+
 type bin_package_target = Dpkg | Rpm
 
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
