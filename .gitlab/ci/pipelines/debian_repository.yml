@@ -66,16 +66,12 @@ oc.build-debian:
   tags:
   - $TAGS
   dependencies: []
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
+  - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh
   variables:
     DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
-    CARGO_NET_OFFLINE: "false"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -94,16 +90,12 @@ oc.build-ubuntu:
   tags:
   - $TAGS
   dependencies: []
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
+  - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh
   variables:
     DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
-    CARGO_NET_OFFLINE: "false"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
