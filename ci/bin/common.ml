@@ -837,6 +837,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "mkdir -p packages/$DISTRO/$RELEASE";
       "mv octez-*.* packages/$DISTRO/$RELEASE/";
     ]
+  |> enable_networked_cargo
 
 let job_build_dpkg_amd64 : unit -> tezos_job =
   job_build_bin_package
@@ -887,6 +888,7 @@ let job_build_homebrew ?rules ~__POS__ ~name ?(stage = Stages.build)
        pkg-config zlib1g-dev";
       "brew install -v scripts/packaging/Formula/octez.rb";
     ]
+  |> enable_networked_cargo
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =

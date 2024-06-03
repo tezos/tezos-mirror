@@ -124,6 +124,7 @@ oc.build:dpkg:amd64:
     BLST_PORTABLE: "yes"
     ARCH: amd64
     CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -168,6 +169,7 @@ oc.build:rpm:amd64:
     BLST_PORTABLE: "yes"
     ARCH: amd64
     CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day

@@ -1228,9 +1228,11 @@ let jobs pipeline_type =
           ~rules:install_octez_rules
           ~stage:Stages.test
             (* This job uses a CARGO_HOME different from
-               {!Common.cargo_home}. *)
+               {!Common.cargo_home}. That CARGO_HOME used is outside the
+               CI_PROJECT_DIR, and is thus uncachable. *)
           ~variables:[("CARGO_HOME", "/home/opam/.cargo")]
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
+        |> enable_networked_cargo
       in
       [
         (* Test installing binary / binary RC distributions in all distributions *)

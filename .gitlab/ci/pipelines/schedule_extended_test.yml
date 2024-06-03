@@ -375,6 +375,7 @@ oc.build:dpkg:amd64:
     BLST_PORTABLE: "yes"
     ARCH: amd64
     CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -419,6 +420,7 @@ oc.build:rpm:amd64:
     BLST_PORTABLE: "yes"
     ARCH: amd64
     CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -7308,6 +7310,7 @@ oc.compile_release_sources_bullseye:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
     CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_bullseye:
   image: ocaml/opam:debian-11
@@ -7322,6 +7325,7 @@ oc.compile_sources_bullseye:
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
   variables:
     CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_mantic:
   image: ocaml/opam:ubuntu-23.10
@@ -7336,6 +7340,7 @@ oc.compile_sources_mantic:
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
   variables:
     CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
 
 tezt:
   image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
