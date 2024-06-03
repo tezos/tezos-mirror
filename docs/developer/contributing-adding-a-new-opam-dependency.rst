@@ -61,12 +61,12 @@ addition to the Tezos opam repository.
 
 **Add dependencies to build files:** both opam files and dune files must
 be updated.
-Add the dependency to the relevant declarations in :src:`manifest/main.ml`. And
+Add the dependency to the relevant declarations in ``manifest/``. And
 then use ``make -C manifest`` to update the opam and dune files accordingly.
 
 For example, if you are modifying the Shell using the new
 dependency, you must add an entry in the ``~deps`` list of the
-``let octez_shell =`` entry of the :src:`manifest/main.ml` and then run
+``let octez_shell =`` entry of the :src:`manifest/product_octez.ml` and then run
 ``make -C manifest``. You should see the changes propagated onto
 :src:`opam/octez-libs.opam` and :src:`src/lib_shell/dune`,
 as well as :src:`opam/virtual/octez-deps.opam`.
@@ -200,7 +200,7 @@ As a developer:
 
 - You have an Octez MR from ``<your-organisation>/tezos:<your-branch>``
   onto ``tezos/tezos:master`` introducing a dependency to ``foo``.
-- You amend the :src:`manifest/main.ml` file to declare the dependency.
+- You amend the ``manifest/`` files to declare the dependency.
 - You propagate the changes to ``opam`` and ``dune`` files by running ``make -C manifest``.
 - You update the ``full_opam_repository_tag`` to the commit hash of
   a recent version of the public default opam repository.
