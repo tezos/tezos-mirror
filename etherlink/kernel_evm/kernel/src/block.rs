@@ -32,7 +32,7 @@ use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
-use tezos_smart_rollup_host::path::Path;
+use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
@@ -352,6 +352,8 @@ fn promote_block<Host: Runtime>(
     Ok(())
 }
 
+const AT_MOST_ONE_BLOCK: RefPath = RefPath::assert_from(b"/__at_most_one_block");
+
 pub fn produce<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
@@ -389,6 +391,8 @@ pub fn produce<Host: Runtime>(
     let mut tick_counter = TickCounter::new(0u64);
     let mut first_block_of_reboot = true;
 
+    let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
+
     #[cfg(not(test))]
     let mut internal_storage = crate::internal_storage::InternalStorage();
     #[cfg(test)]
@@ -422,12 +426,17 @@ pub fn produce<Host: Runtime>(
                 &config.limits,
                 &trace_input,
             ) {
-                Ok(ComputationResult::Finished) => promote_block(
-                    &mut safe_host,
-                    &outbox_queue,
-                    true,
-                    processed_blueprint,
-                )?,
+                Ok(ComputationResult::Finished) => {
+                    promote_block(
+                        &mut safe_host,
+                        &outbox_queue,
+                        true,
+                        processed_blueprint,
+                    )?;
+                    if at_most_one_block {
+                        return Ok(ComputationResult::Finished);
+                    }
+                }
                 Ok(ComputationResult::RebootNeeded) => {
                     // The computation still needs to reboot, we do nothing.
                     return Ok(ComputationResult::RebootNeeded);
@@ -497,7 +506,10 @@ pub fn produce<Host: Runtime>(
             &trace_input,
         ) {
             Ok(ComputationResult::Finished) => {
-                promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?
+                promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?;
+                if at_most_one_block {
+                    return Ok(ComputationResult::Finished);
+                }
             }
             Ok(ComputationResult::RebootNeeded) => {
                 // The computation will resume at next reboot, we leave the

@@ -828,14 +828,16 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
   let* () = run evm_node in
   return evm_node
 
-let init_from_rollup_node_data_dir ?(devmode = false) evm_node rollup_node =
+let init_from_rollup_node_data_dir ?(devmode = false) ?reconstruct evm_node
+    rollup_node =
   let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
   let process =
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
       @ data_dir evm_node
-      @ Cli_arg.optional_switch "devmode" devmode)
+      @ Cli_arg.optional_switch "devmode" devmode
+      @ Cli_arg.optional_arg "reconstruct" Fun.id reconstruct)
   in
   Process.check process
 

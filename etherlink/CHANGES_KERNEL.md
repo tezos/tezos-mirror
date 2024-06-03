@@ -24,6 +24,8 @@
 - Gas price is removed from internal structure block in progress. (!13220)
 - Refactor block creation to properly add the gas limit. (!13278)
 - Gas limit is no longer optional for blocks. (!13279)
+- The kernel can limit the block production to at most one block per tezos level
+  if the file `/__at_most_one_block` exists in the storage. (!13202)
 
 ## Version b9f6c9138719220db83086f0548e49c5c4c8421f
 
