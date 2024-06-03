@@ -165,3 +165,6 @@ terraform.rc
 # /src/dune is present in slim mode, absent otherwise.
 # Slim mode is a choice and, as such, must not be committed.
 /src/dune
+
+# /script-inputs/custom_dune_flags contains a local choice and must not be committed.
+/script-inputs/custom_dune_flags

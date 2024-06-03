@@ -5,7 +5,22 @@
 (env
  (_
   (binaries
-   (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+   (%{workspace_root}/src/tooling/node_wrapper.exe as node))
+  (flags
+   (:standard
+    (:include custom-flags.sexp)))))
+
+; File custom-flags.sexp needs to exist, otherwise the above :include fails.
+; But we do not want to commit it to the repository, since its goal is to be different
+; for everyone. So we generate it.
+
+(rule
+ (target custom-flags.sexp)
+ (deps (universe))
+ (action
+  (with-stdout-to
+   %{target}
+   (run scripts/custom-flags.sh sexp))))
 
 ; This file is included in the link_flags stanza of binaries for which
 ; we want a static build.
