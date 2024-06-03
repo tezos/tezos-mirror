@@ -1,5 +1,3 @@
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-
 Connecting to a Network
 =======================
 

@@ -15,17 +15,15 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = oxford paris
+NAMED_PROTOS  = paris
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 paris_long    = PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ
-oxford_long   = ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 paris_short   = PtParisB
-oxford_short  = Proxford
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -121,8 +119,7 @@ redirectcheck:
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) oxford
-	$(CHECKXREFS) -l paris
+	$(CHECKXREFS) paris
 	$(CHECKXREFS) -l alpha
 
 installcheck:
@@ -189,7 +186,7 @@ docexes-gen: api/errors.rst p2p rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/oxford" || true
+	@ln -s active "$(BUILDDIR)/paris" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -249,4 +246,4 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt oxford/octez-*.html paris/octez-*.html alpha/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html alpha/octez-*.html
