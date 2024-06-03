@@ -68,3 +68,13 @@ val initial_l1_crawler_reconnection_delay : float
 
 (** Controls the size of the blocks cache in the L1 crawler. *)
 val crawler_l1_blocks_cache_size : int
+
+(** Number of blocks processing retries in the L1 crawler in case a disconnection
+   error is encountered while retrieving data from L1 outside the
+   {!Layer1.iter_heads} callback. *)
+val crawler_retries_on_disconnection : int
+
+(** Sleep delay before retrying processing a block in the L1 crawler in case a
+   disconnection error is encountered while retrieving data from L1 outside the
+   {!Layer1.iter_heads} callback. *)
+val crawler_re_processing_delay : float

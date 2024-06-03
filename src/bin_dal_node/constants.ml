@@ -79,3 +79,13 @@ let initial_l1_crawler_reconnection_delay = 5.
 (* Controls the size of the blocks cache in the L1 crawler. It is used in
    {!Crawler.start}. *)
 let crawler_l1_blocks_cache_size = 64
+
+(* Number of times that block processing is retried in the L1 crawler in case a disconnection
+   error is encountered while retrieving data from L1 outside the
+   {!Layer1.iter_heads} callback. *)
+let crawler_retries_on_disconnection = 5
+
+(* Sleep delay before retrying processing a block in the L1 crawler in case a
+   disconnection error is encountered while retrieving data from L1 outside the
+   {!Layer1.iter_heads} callback. *)
+let crawler_re_processing_delay = 5.
