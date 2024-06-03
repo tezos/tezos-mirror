@@ -104,7 +104,7 @@ let test_forward =
   let* node, client =
     Client.init_with_protocol
       ~rpc_external:true
-      ~event_sections_levels:[("rpc-process", `Debug)]
+      ~event_sections_levels:[("rpc.process", `Debug)]
       ~protocol
       `Client
       ()

@@ -25,7 +25,7 @@
 
 include Internal_event.Simple
 
-let section = ["rpc-process"]
+let section = ["rpc"; "process"]
 
 let starting_rpc_server =
   declare_4
@@ -53,3 +53,48 @@ let locally_handled_rpc =
     ~msg:"locally handled: {uri}"
     ~level:Debug
     ("uri", Data_encoding.string)
+
+let daemon_error =
+  declare_1
+    ~section
+    ~name:"octez_rpc_server_daemon_error"
+    ~msg:"Daemon thrown an error: {error}"
+    ~level:Notice
+    ~pp1:Error_monad.pp_print_trace
+    ("error", Error_monad.trace_encoding)
+
+let new_head =
+  declare_1
+    ~section
+    ~name:"new_head"
+    ~msg:"New head received at level ({level})"
+    ~level:Notice
+    ("level", Data_encoding.int32)
+
+let start_synchronization =
+  declare_2
+    ~section
+    ~name:"start_synchronization"
+    ~msg:"Starting store synchronization for block {level} ({hash})"
+    ~level:Notice
+    ("level", Data_encoding.int32)
+    ~pp2:Block_hash.pp_short
+    ("hash", Block_hash.encoding)
+
+let shutting_head_daemon =
+  declare_0
+    ~section
+    ~name:"shutting_head_daemon"
+    ~msg:"shutting down head daemon"
+    ~level:Info
+    ()
+
+let synchronized =
+  declare_2
+    ~section
+    ~name:"synchronized"
+    ~msg:"Store synchronized on head {hash} ({level})"
+    ~level:Notice
+    ~pp1:Block_hash.pp_short
+    ("hash", Block_hash.encoding)
+    ("level", Data_encoding.int32)
