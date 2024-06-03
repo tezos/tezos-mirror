@@ -33,6 +33,7 @@ This document describes Adaptive Issuance and Staking, two new features (referre
 
   For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
 
+.. _adaptive_issuance:
 .. _adaptive_issuance_paris:
 
 Adaptive Issuance
@@ -72,6 +73,7 @@ increase, incentivizing participants to stake funds to re-approach the
 target. Conversely, incentives decrease as the ratio increases beyond
 the target.
 
+.. _adaptive_issuance_rate:
 .. _adaptive_issuance_rate_paris:
 
 Adaptive issuance rate
@@ -83,6 +85,7 @@ adaptive issuance rate is the sum of a :ref:`static rate <static_rate_paris>`
 and a :ref:`dynamic rate <dynamic_rate_paris>`. The final result is clipped to
 ensure nominal emissions remain within the minimal and the maximum ratios.
 
+.. _minimum_and_maximum_ratios:
 .. _minimum_and_maximum_ratios_paris:
 
 Minimum and maximum ratios
@@ -169,6 +172,7 @@ Where:
   below this bound for the initial period.
 - ``issuance_ratio_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
+.. _staked_ratio:
 .. _staked_ratio_paris:
 
 Staked ratio
@@ -187,6 +191,7 @@ Where:
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
+.. _static_rate:
 .. _static_rate_paris:
 
 Static rate
@@ -214,6 +219,7 @@ Where the function ``clip`` is defined as follows.
 
 The choice of a scaling factor ensures that the curve takes reasonable values for plausible staking ratios. Moreover, assuming Adaptive Issuance is activated with a dynamic ratio of 0, and at current staked funds ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
 
+.. _dynamic_rate:
 .. _dynamic_rate_paris:
 
 Dynamic rate
@@ -256,6 +262,7 @@ Where:
 
 In a nutshell, ``dyn(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[ratio_target - ratio_radius; ratio_target + ratio_radius]``, while ensuring that the adaptive issuance rate is kept within the minimum and maximum bounds.
 
+.. _issuance_rate:
 .. _issuance_rate_paris:
 
 Issuance rate
@@ -275,6 +282,7 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycl
     return clip(total_rate, ratio_min, ratio_max)
 
 
+.. _adaptive_rewards:
 .. _adaptive_rewards_paris:
 
 Adaptive rewards
@@ -288,6 +296,7 @@ each block of the cycle and distributed between the various rewards,
 in proportion to their relative :ref:`weights
 <rewards_weights_paris>`.
 
+.. _rewards_weights:
 .. _rewards_weights_paris:
 
 Reward weights
@@ -404,6 +413,7 @@ endpoint <https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-e
 all participation rewards, for the provided block and the next
 ``consensus_rights_delay`` cycles.
 
+.. _new_staking:
 .. _new_staking_paris:
 
 New Staking mechanism
@@ -478,6 +488,7 @@ delegated funds remains unchanged. In the current implementation, only
 *implicit accounts* can become stakers. In other words, smart contracts
 cannot stake funds (they can of course still delegate them).
 
+.. _staking_policy_configuration:
 .. _staking_policy_configuration_paris:
 
 Staking policy configuration
@@ -521,6 +532,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
+.. _staked_funds_management:
 .. _staked_funds_management_paris:
 
 Staked funds management
@@ -594,6 +606,7 @@ balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
 unfinalizable unstake request for token staked with the old delegate.
 
+.. _feature_activation:
 .. _feature_activation_paris:
 
 Activation of Adaptive Issuance and Staking

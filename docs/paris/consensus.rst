@@ -50,6 +50,7 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
+.. _tb_validator:
 .. _tb_validator_paris:
 
 Tenderbake is executed for each new block level by a "committee" whose members
@@ -79,12 +80,14 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
 .. _candidate_block_paris:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
+.. _quorum:
 .. _quorum_paris:
 
 Unlike Emmy*, Tenderbake has `two types of
@@ -105,6 +108,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_paris:
 
 Transaction and block finality
@@ -138,6 +142,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake:
 .. _active_stake_paris:
 
 Validator selection: staked balance and active stake
@@ -368,6 +373,7 @@ included during that cycle has been ``1,987,456`` slots. Given that this number 
 bigger than the minimum required (``2,150,400 * 2 / 3``), it receives an attesting
 reward of ``2,150,400 * 0.000761 = 1636.4544`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_paris:
 
 Slashing
@@ -396,7 +402,7 @@ The evidence for double signing at a given level can be collected by any
 for a period of ``MAX_SLASHING_PERIOD``.
 
 As soon as a delegate is denounced for any double signing, it is
-immediately :ref:`forbidden<new_forbidden_period>` from both baking
+immediately :ref:`forbidden<new_forbidden_period_paris>` from both baking
 and attesting for at least 2 cycles.
 
 The actual slashing and denunciation rewarding happen at the end of
@@ -410,6 +416,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _cs_constants:
 .. _cs_constants_paris:
 
 Consensus related protocol parameters
@@ -448,6 +455,7 @@ Consensus related protocol parameters
 
 These are a subset of the :ref:`protocol constants <protocol_constants_paris>`.
 
+.. _shell_proto_revisit:
 .. _shell_proto_revisit_paris:
 
 Shell-protocol interaction revisited
@@ -469,6 +477,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_paris>`.
 
+.. _fitness:
 .. _fitness_paris:
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
