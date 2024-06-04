@@ -37,7 +37,6 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
           bootstrap_accounts
         |> List.flatten
   in
-  let le_int_bytes i = Z.of_string i |> Z.to_bits in
   let le_int64_bytes i =
     let b = Bytes.make 8 '\000' in
     Bytes.set_int64_le b 0 (Int64.of_string i) ;
@@ -61,8 +60,8 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
         ~path_prefix:"/evm/world_state/fees/"
         ~convert:parse_z_to_padded_32_le_int_bytes
         da_fee_per_byte
-    @ make_instr ~convert:le_int_bytes delayed_inbox_timeout
-    @ make_instr ~convert:le_int_bytes delayed_inbox_min_levels
+    @ make_instr ~convert:le_int64_bytes delayed_inbox_timeout
+    @ make_instr ~convert:le_int64_bytes delayed_inbox_min_levels
     @ make_instr
         ~convert:(fun addr ->
           let addr = Misc.normalize_addr addr in
