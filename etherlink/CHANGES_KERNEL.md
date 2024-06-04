@@ -13,6 +13,9 @@
 
 ### Bug fixes
 
+- The withdrawal precompiled contract needs to be called with at least `10^12`
+  Wei to make sure it can be transformed to a mutez.
+
 ### Breaking changes
 
 - Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
