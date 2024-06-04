@@ -795,7 +795,7 @@ let dummy_script =
       storage = lazy_expr (strip_locations (Prim ((), D_Unit, [], [])));
     }
 
-let dummy_script_cost = Test_tez.of_mutez_exn 9_500L
+let dummy_script_cost = Tez_helpers.of_mutez 9_500L
 
 let transfer_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     ~(source : Contract.t) ~contents ~ty ~ticketer ~amount ~destination

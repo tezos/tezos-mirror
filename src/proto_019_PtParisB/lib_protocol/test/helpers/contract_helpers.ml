@@ -28,9 +28,11 @@ open Alpha_context
 
 (** Initializes 2 addresses to do only operations plus one that will be
     used to bake. *)
-let init () =
+let init ?hard_gas_limit_per_block () =
   let open Lwt_result_syntax in
-  let+ b, (src0, src1, src2) = Context.init3 ~consensus_threshold:0 () in
+  let+ b, (src0, src1, src2) =
+    Context.init3 ?hard_gas_limit_per_block ~consensus_threshold:0 ()
+  in
   let baker =
     match src0 with Implicit v -> v | Originated _ -> assert false
   in
@@ -53,7 +55,7 @@ let originate_contract_hash file storage src b baker =
   let open Lwt_result_syntax in
   let script = load_script ~storage file in
   let* operation, dst =
-    Op.contract_origination_hash (B b) src ~fee:(Test_tez.of_int 10) ~script
+    Op.contract_origination_hash (B b) src ~fee:(Tez_helpers.of_int 10) ~script
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) b
@@ -136,7 +138,7 @@ let originate_contract_from_string_hash ~script ~storage ~source_contract ~baker
     Op.contract_origination_hash
       (B block)
       source_contract
-      ~fee:(Test_tez.of_int 10)
+      ~fee:(Tez_helpers.of_int 10)
       ~script
   in
   let* incr =
