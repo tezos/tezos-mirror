@@ -37,7 +37,7 @@ let resto =
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["resto"]
-    ~deps:[uri]
+    ~deps:[uri; logs_fmt; fmt_tty]
     ~conflicts
 
 let resto_directory =
@@ -86,7 +86,6 @@ let resto_cohttp_server =
         resto_cohttp |> open_;
         cohttp_lwt_unix;
         conduit_lwt_unix;
-        lwt;
       ]
     ~conflicts
 
