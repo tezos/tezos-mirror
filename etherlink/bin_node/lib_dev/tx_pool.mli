@@ -28,8 +28,15 @@ val start : parameters -> unit tzresult Lwt.t
     to be processed. *)
 val shutdown : unit -> unit tzresult Lwt.t
 
-(** [add raw_tx] adds a raw eth transaction to the tx-pool. *)
-val add : string -> (Ethereum_types.hash, string) result tzresult Lwt.t
+(** [add validation_result raw_tx] adds a eth transaction identified by its
+    [validation_result] and its raw contents to the tx-pool.
+
+    The consistency between [validation_result] and [raw_tx] is assumed by
+    [add]. It is the responsibility of the caller to enforce it. *)
+val add :
+  Simulation.validation_result ->
+  string ->
+  (Ethereum_types.hash, string) result tzresult Lwt.t
 
 (** [nonce address] returns the nonce of the user
     Returns the first gap in the tx-pool, or the nonce stored on the rollup
