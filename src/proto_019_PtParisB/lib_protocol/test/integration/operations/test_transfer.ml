@@ -33,7 +33,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 open Transfers
 
 (*********************************************************************)

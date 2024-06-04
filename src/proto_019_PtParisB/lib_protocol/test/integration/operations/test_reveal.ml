@@ -35,7 +35,8 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
+open Error_helpers
 
 let ten_tez = of_int 10
 
@@ -573,14 +574,7 @@ let test_reveal_incorrect_position_in_batch () =
       (I inc)
       [op_transfer; op_reveal]
   in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          Validate_errors.Manager.Incorrect_reveal_position;
-      ] ->
-        return_unit
-    | _ -> assert false
-  in
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
   let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the operation has failed *)
   let* revelead =
@@ -617,14 +611,7 @@ let test_duplicate_valid_reveals () =
       (I inc)
       [op_rev1; op_rev2]
   in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          Validate_errors.Manager.Incorrect_reveal_position;
-      ] ->
-        return_unit
-    | _ -> assert false
-  in
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
   let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the operation has failed *)
   let* revelead =
@@ -666,14 +653,7 @@ let test_valid_reveal_after_gas_exhausted_one () =
       (I inc)
       [bad_reveal; good_reveal]
   in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          Validate_errors.Manager.Incorrect_reveal_position;
-      ] ->
-        return_unit
-    | _ -> assert false
-  in
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
   let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
   let+ revealed =
@@ -717,14 +697,7 @@ let test_valid_reveal_after_insolvent_one () =
       (I inc)
       [bad_reveal; good_reveal; transfer]
   in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          Validate_errors.Manager.Incorrect_reveal_position;
-      ] ->
-        return_unit
-    | _ -> assert false
-  in
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
   let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
   let+ revealed =
@@ -764,14 +737,7 @@ let test_valid_reveal_after_emptying_balance () =
       (I inc)
       [bad_reveal; good_reveal]
   in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          Validate_errors.Manager.Incorrect_reveal_position;
-      ] ->
-        return_unit
-    | _ -> assert false
-  in
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
   let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
   let+ revealed =
