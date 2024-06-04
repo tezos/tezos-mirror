@@ -9,6 +9,7 @@ use crate::{
         registers::{a0, a1, a2, a6, a7},
         MachineState,
     },
+    parser::instruction::Instr,
     state_backend::{AllocatedOf, EnumCell, EnumCellLayout, Manager},
     traps::EnvironException,
 };
@@ -234,12 +235,17 @@ where
         config: &mut PvmSbiConfig,
         env_exception: EnvironException,
     ) -> EcallOutcome {
-        // All calls from machine mode are fatal (according to rvemu sbi)
         if let EnvironException::EnvCallFromMMode = env_exception {
-            return EcallOutcome::Handled {
-                continue_eval: false,
+            return EcallOutcome::Fatal {
+                message: "ECALLs from M-mode are not supported".to_owned(),
             };
         }
+
+        // No matter the outcome, we need to bump the
+        // program counter because ECALL's don't update it
+        // to the following instructions.
+        let pc = machine.hart.pc.read() + Instr::Ecall.width();
+        machine.hart.pc.write(pc);
 
         // SBI extension is contained in a7.
         let sbi_extension = machine.hart.xregisters.read(a7);
