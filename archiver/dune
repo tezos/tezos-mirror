@@ -100,7 +100,12 @@
    PtParisB_machine.ml
    from
    (octez-protocol-019-PtParisB-libs.client -> PtParisB_machine.real.ml)
-   (-> PtParisB_machine.no.ml)))
+   (-> PtParisB_machine.no.ml))
+  (select
+   ProtoALp_machine.ml
+   from
+   (octez-protocol-alpha-libs.client -> ProtoALp_machine.no.ml)
+   (-> ProtoALp_machine.no.ml)))
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base -open Tezos_client_base_unix
@@ -257,3 +262,11 @@
 (rule
  (action
   (write-file PtParisB_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file ProtoALp_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file ProtoALp_machine.no.ml "module M = struct end")))
