@@ -277,6 +277,16 @@ developed in the future.
     Docker container, you have to give extended privileges to this container,
     by passing option ``--privileged`` to the ``docker run`` command.
 
+.. warning::
+
+   Mixing LLVM and GNU binutils toolchains can cause issues when building Octez. If you encounter
+   an error like this, it may be that you have tools from both LLVM and GNU in scope.
+
+   ::
+
+     Error: ExternalToolError { reason: "Failed to create archive index with `ranlib`", tool: "ranlib", args: ["liboctez_rust_deps.a"], stdout: "", stderr: "LLVM ERROR: Invalid encoding\n" }
+
+   In this case, refer to :ref:`Mixing LLVM and GNU binutils <mixing_llvm_gnu_binutils>`.
 
 Install OPAM
 ~~~~~~~~~~~~
