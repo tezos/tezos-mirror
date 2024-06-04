@@ -57,11 +57,12 @@ pub fn withdrawal_precompile<Host: Runtime>(
         return Ok(revert_withdrawal())
     };
 
-    if U256::is_zero(&transfer.value) {
+    let minimal_amount = U256::from(10).pow(U256::from(12));
+    if transfer.value < minimal_amount {
         log!(
             handler.borrow_host(),
             Info,
-            "Withdrawal precompiled contract: transfer of 0"
+            "Withdrawal precompiled contract: transfer less than 1mutez"
         );
         return Ok(revert_withdrawal());
     }
@@ -146,7 +147,7 @@ mod tests {
 
         let source = H160::from_low_u64_be(118u64);
         let target = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
-        let value = U256::from(100);
+        let value = U256::from(10).pow(U256::from(13));
 
         let transfer = Some(Transfer {
             source,
@@ -173,7 +174,7 @@ mod tests {
             result: Some(expected_output),
             withdrawals: vec![Withdrawal {
                 target: expected_target,
-                amount: 100.into(),
+                amount: value,
             }],
             estimated_ticks_used: 880_000,
         };
@@ -201,7 +202,7 @@ mod tests {
 
         let source = H160::from_low_u64_be(118u64);
         let target = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
-        let value = U256::from(100);
+        let value = U256::from(10).pow(U256::from(13));
 
         let transfer = Some(Transfer {
             source,
@@ -229,7 +230,7 @@ mod tests {
             result: Some(expected_output),
             withdrawals: vec![Withdrawal {
                 target: expected_target,
-                amount: 100.into(),
+                amount: value,
             }],
             // TODO (#6426): estimate the ticks consumption of precompiled contracts
             estimated_ticks_used: 880_000,
