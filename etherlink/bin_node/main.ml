@@ -1559,8 +1559,8 @@ let make_kernel_config_command =
           ~placeholder:"30000...")
        (config_key_flag ~name:"remove_whitelist")
        (Tezos_clic.default_arg
-          ~long:"boostrap-balance"
-          ~doc:"boolance of boostrap account"
+          ~long:"bootstrap-balance"
+          ~doc:"balance of the bootstrap accounts"
           ~default:"9999000000000000000000"
           ~placeholder:"9999000000000000000000"
        @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
