@@ -35,6 +35,7 @@ rand.workspace = true
 proptest.workspace = true
 lazy_static.workspace = true
 tempfile.workspace = true
+goldenfile.workspace = true
 
 [features]
 default = []

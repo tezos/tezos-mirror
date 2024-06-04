@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use goldenfile::Mint;
 use octez_riscv::{
     exec_env::posix::Posix,
     machine_state::{
@@ -11,9 +12,10 @@ use octez_riscv::{
     },
     stepper::test::{TestStepper, TestStepperResult::*},
 };
-use std::fs;
+use std::{fs, io::Write};
 
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
+const GOLDEN_DIR: &str = "tests/expected";
 const MAX_STEPS: usize = 1_000_000;
 
 fn check_register_values(interpreter: &TestStepper, check_xregs: &[(XRegister, XValue)]) {
@@ -30,11 +32,21 @@ fn check_register_values(interpreter: &TestStepper, check_xregs: &[(XRegister, X
     };
 }
 
-fn interpret_test_with_check(contents: &[u8], exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
+fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
+    // Create a Mint instance: when it goes out of scope (at the end of interpret_test_with_check),
+    // all golden files will be compared to the checked-in versions.
+    let mut mint = Mint::new(GOLDEN_DIR);
+    let mut golden = mint.new_goldenfile(format!("{path}.out")).unwrap();
+
+    let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
     let mut backend = TestStepper::<'_, Posix>::create_backend();
     let mut interpreter =
-        TestStepper::new(&mut backend, contents, None, exit_mode).expect("Boot failed");
-    match interpreter.run(MAX_STEPS) {
+        TestStepper::new(&mut backend, &contents, None, exit_mode).expect("Boot failed");
+
+    let res = interpreter.run(MAX_STEPS);
+    // Record the result to compare to the expected result
+    writeln!(golden, "{res:?}").unwrap();
+    match res {
         Exit { code: 0, .. } => check_register_values(&interpreter, check_xregs),
         Exit { code, steps } => {
             panic!("Failed at test case: {} - Steps done: {}", code >> 1, steps)
@@ -81,8 +93,7 @@ macro_rules! test_case {
         #[test]
         $(#[$m])*
         fn $name() {
-            let contents = fs::read(format!("{}/{}", TESTS_DIR, $path)).expect("Failed to read binary");
-            interpret_test_with_check(&contents, $mode, $xchecks)
+            interpret_test_with_check($path, $mode, $xchecks)
         }
     };
 }
