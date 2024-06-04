@@ -398,15 +398,15 @@ let get_predecessor node_ctxt head =
   let+ res = get_predecessor node_ctxt (block_level_of_head head) in
   head_of_block_level res
 
-let get_predecessor_header_opt node_ctxt head =
+let get_predecessor_header node_ctxt (head : Layer1.header) =
   let open Lwt_result_syntax in
-  let* res = get_predecessor_opt node_ctxt (Layer1.head_of_header head) in
-  Option.map_es (header_of_head node_ctxt) res
-
-let get_predecessor_header node_ctxt head =
-  let open Lwt_result_syntax in
-  let* res = get_predecessor node_ctxt (Layer1.head_of_header head) in
-  header_of_head node_ctxt res
+  let*? () =
+    error_when (head.level <= 0l) (Layer_1.Cannot_find_predecessor head.hash)
+  in
+  let pred =
+    Layer1.{hash = head.header.predecessor; level = Int32.pred head.level}
+  in
+  header_of_head node_ctxt pred
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4128
    Unit test the function tick_search. *)

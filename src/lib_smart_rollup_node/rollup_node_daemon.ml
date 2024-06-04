@@ -198,29 +198,17 @@ let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
     | Some l2_head ->
         (* Already processed *)
         return (`Already_processed l2_head)
-    | None -> (
+    | None ->
         (* New head *)
         let*! () = Daemon_event.head_processing head.hash head.level in
-        let* predecessor =
-          Node_context.get_predecessor_header_opt node_ctxt head
+        let* predecessor = Node_context.get_predecessor_header node_ctxt head in
+        let* () =
+          update_l2_chain state ~catching_up:true ~recurse_pred:true predecessor
         in
-        match predecessor with
-        | None ->
-            (* Predecessor not available on the L1, which means the block does not
-               exist in the chain. *)
-            return `Nothing
-        | Some predecessor ->
-            let* () =
-              update_l2_chain
-                state
-                ~catching_up:true
-                ~recurse_pred:true
-                predecessor
-            in
-            let* l2_head =
-              process_unseen_head state ~catching_up ~predecessor head
-            in
-            return (`New l2_head))
+        let* l2_head =
+          process_unseen_head state ~catching_up ~predecessor head
+        in
+        return (`New l2_head)
 
 and update_l2_chain ({node_ctxt; _} as state) ~catching_up
     ?(recurse_pred = false) (head : Layer1.header) =
