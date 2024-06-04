@@ -3,4 +3,6 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
 Description: The Octez Baker daemons
-Depends: bash, @DPKG@-node (>=@VERSION@), @DPKG@-client (>=@VERSION@), @DEPENDS@
+Depends: bash, @DPKG@-node (>=@VERSION@),
+ @DPKG@-client (>=@VERSION@), @DEPENDS@,
+ systemd

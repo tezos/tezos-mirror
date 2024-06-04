@@ -12,4 +12,4 @@ getent passwd ${user} >/dev/null 2>&1 || adduser --home $homedir \
 						--ingroup ${group} ${user}
 
 # Reload to get new init scripts
-/usr/bin/systemctl daemon-reload
+systemctl daemon-reload || exit 0
