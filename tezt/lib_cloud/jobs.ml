@@ -10,12 +10,7 @@ module C = Cli
 open Tezt
 module Cli = C
 
-let docker_push ~tags =
-  Test.register
-    ~__FILE__
-    ~title:"Push the dockerfile to the registry"
-    ~tags:("docker" :: "push" :: tags)
-  @@ fun () ->
+let docker_push () =
   let tezt_cloud = Lazy.force Env.tezt_cloud in
   Log.info "TEZT_CLOUD_BASENAME variable found with value: %s" tezt_cloud ;
   let ssh_public_key = Lazy.force Env.ssh_public_key in
@@ -24,7 +19,7 @@ let docker_push ~tags =
     let ssh_public_key_file = Lazy.force Env.ssh_public_key in
     if not (Sys.file_exists ssh_public_key_file) then
       Test.fail
-        "Could not find SSH key named %s. See READNE for more information why \
+        "Could not find SSH key named %s. See README for more information why \
          this ssh key is necessary."
         ssh_public_key
     else Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_file]
@@ -41,7 +36,7 @@ let docker_push ~tags =
   Log.info "Checking the existence of the zcash parameters..." ;
   if not (Sys.file_exists Path.zcash_params) then
     Test.fail
-      "Could not find the zcash parameters in %s. See READEM for more \
+      "Could not find the zcash parameters in %s. See README for more \
        information why such files are necessary."
       Path.zcash_params ;
   Log.info "Initializing terraform docker state..." ;
@@ -67,16 +62,25 @@ let docker_push ~tags =
   let*! () = Docker.push docker_registry in
   unit
 
-let deploy_docker_registry ~tags =
+let register_docker_push ~tags =
   Test.register
     ~__FILE__
-    ~title:"Deploy docker registry"
-    ~tags:("docker" :: "registry" :: "deploy" :: tags)
-  @@ fun () ->
+    ~title:"Push the dockerfile to the registry"
+    ~tags:("docker" :: "push" :: tags)
+    docker_push
+
+let deploy_docker_registry () =
   let tezt_cloud = Lazy.force Env.tezt_cloud in
   Log.info "Tezt_Cloud found with value: %s" tezt_cloud ;
   let* () = Terraform.Docker_registry.init () in
   Terraform.Docker_registry.deploy ()
+
+let register_deploy_docker_registry ~tags =
+  Test.register
+    ~__FILE__
+    ~title:"Deploy docker registry"
+    ~tags:("docker" :: "registry" :: "deploy" :: tags)
+    deploy_docker_registry
 
 let deploy_terraform_state_bucket ~tags =
   Test.register
@@ -212,8 +216,8 @@ let list_vms ~tags =
   Lwt.return_unit
 
 let register ~tags =
-  docker_push ~tags ;
-  deploy_docker_registry ~tags ;
+  register_docker_push ~tags ;
+  register_deploy_docker_registry ~tags ;
   deploy_terraform_state_bucket ~tags ;
   destroy_vms ~tags ;
   prometheus_import ~tags ;

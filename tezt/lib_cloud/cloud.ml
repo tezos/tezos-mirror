@@ -86,8 +86,14 @@ let rec wait_ssh_server_running runner =
       let* () = Lwt_unix.sleep 2. in
       wait_ssh_server_running runner
 
-let register ?vms ~__FILE__ ~title ~tags ?seed f =
+let register ?(docker_push = false) ?vms ~__FILE__ ~title ~tags ?seed f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
+  let* () =
+    if docker_push then
+      let* () = Jobs.deploy_docker_registry () in
+      Jobs.docker_push ()
+    else Lwt.return_unit
+  in
   let vms =
     (* The Cli arguments by-pass the argument given here. This enable the user
        to always have decide precisely the number of vms to be run. *)
