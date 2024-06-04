@@ -5626,7 +5626,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
-              alcotezt |> if_ N.(number <= 019);
+              alcotezt |> if_ N.(number <= 018);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
               main |> open_;
@@ -5645,15 +5645,14 @@ end = struct
             ("test_constants", true);
             ("test_frozen_bonds", true);
             ("test_adaptive_issuance_launch", N.(number >= 018));
-            ( "test_adaptive_issuance_roundtrip",
-              N.(number == 018 || number == 019) );
-            ("test_scenario_base", N.(number >= 020));
-            ("test_scenario_stake", N.(number >= 020));
-            ("test_scenario_rewards", N.(number >= 020));
-            ("test_scenario_autostaking", N.(number >= 020));
-            ("test_scenario_slashing", N.(number >= 020));
-            ("test_scenario_slashing_stakers", N.(number >= 020));
-            ("test_scenario_deactivation", N.(number >= 020));
+            ("test_adaptive_issuance_roundtrip", N.(number == 018));
+            ("test_scenario_base", N.(number >= 019));
+            ("test_scenario_stake", N.(number >= 019));
+            ("test_scenario_rewards", N.(number >= 019));
+            ("test_scenario_autostaking", N.(number >= 019));
+            ("test_scenario_slashing", N.(number >= 019));
+            ("test_scenario_slashing_stakers", N.(number >= 019));
+            ("test_scenario_deactivation", N.(number >= 019));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
@@ -5669,7 +5668,7 @@ end = struct
           ~deps:
             [
               (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
-              alcotezt |> if_ N.(number <= 019);
+              alcotezt |> if_ N.(number <= 018);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
               client |> if_some |> open_;
@@ -5774,8 +5773,8 @@ end = struct
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number >= 018));
             ("test_percentage", N.(number >= 019));
-            ("test_full_staking_balance_repr", N.(number >= 020));
-            ("test_slashing_percentage", N.(number >= 020));
+            ("test_full_staking_balance_repr", N.(number >= 019));
+            ("test_slashing_percentage", N.(number >= 019));
           ]
           |> conditional_list
         in
@@ -6432,10 +6431,8 @@ let hash = Protocol.hash
         ~deps:
           [
             tezt_core_lib |> if_ N.(number >= 019) |> open_ |> open_ ~m:"Base";
-            alcotezt |> if_ N.(number == 019);
-            tezt_tezos |> if_ N.(number >= 020);
+            tezt_tezos |> if_ N.(number >= 019);
             tezt_lib |> if_ N.(number >= 019);
-            octez_base_test_helpers |> if_ N.(number == 019) |> open_;
             qcheck_alcotest;
             octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"

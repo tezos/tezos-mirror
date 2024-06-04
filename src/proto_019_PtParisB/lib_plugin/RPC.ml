@@ -4439,6 +4439,9 @@ module Staking = struct
 
   let stakers ctxt block pkh =
     RPC_context.make_call1 S.stakers ctxt block pkh () ()
+
+  let is_forbidden ctxt block pkh =
+    RPC_context.make_call1 S.is_forbidden ctxt block pkh () ()
 end
 
 module S = struct
