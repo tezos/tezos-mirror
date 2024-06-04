@@ -19,7 +19,10 @@ cp -a _opam/share/zcash-params scripts/packaging/octez/
 
 # Build the debian packages
 rm -f scripts/packaging/*.deb
-cd scripts/packaging/octez/ &&
-  DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -b --no-sign -sa
+cd scripts/packaging/octez/
+DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -tc -b --no-sign -sa
+cd -
 
 echo "All packages are available in ./scripts/packaging"
+
+lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose
