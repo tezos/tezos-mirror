@@ -34,6 +34,9 @@
 open Protocol
 open Storage_functors
 
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["storage"]
+
 let assert_length ~loc ctxt key expected =
   let open Lwt_result_syntax in
   let*! length = Raw_context.length ctxt key in
@@ -218,23 +221,14 @@ let test_clear_carbonated_data_set () =
   let* () = Assert.equal_bool ~loc:__LOC__ is_empty0 true in
   Assert.equal_bool ~loc:__LOC__ is_empty1 false
 
-let tests =
-  [
-    Tztest.tztest
-      "fold_keys_unaccounted smoke test"
-      `Quick
-      test_fold_keys_unaccounted;
-    Tztest.tztest "length test" `Quick test_length;
-    Tztest.tztest
-      "test empty carbonated data set"
-      `Quick
-      test_is_empty_carbonated_data_set;
-    Tztest.tztest
-      "test clear carbonated data set"
-      `Quick
-      test_clear_carbonated_data_set;
-  ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("storage tests", tests)]
-  |> Lwt_main.run
+  register_test
+    ~title:"fold_keys_unaccounted smoke test"
+    test_fold_keys_unaccounted ;
+  register_test ~title:"length test" test_length ;
+  register_test
+    ~title:"test empty carbonated data set"
+    test_is_empty_carbonated_data_set ;
+  register_test
+    ~title:"test clear carbonated data set"
+    test_clear_carbonated_data_set

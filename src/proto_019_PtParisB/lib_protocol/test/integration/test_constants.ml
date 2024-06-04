@@ -32,9 +32,13 @@
     Subject:    the consistency of parametric constants
  *)
 
-open Test_tez
+open Tez_helpers
 
-let test_sc_rollup_constants_consistency () =
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["constants"]
+
+let () =
+  register_test ~title:"sc_rollup constants consistency" @@ fun () ->
   let open Protocol.Alpha_context in
   let to_string c =
     Data_encoding.Json.(
@@ -63,13 +67,15 @@ let test_sc_rollup_constants_consistency () =
     sc_rollup
     sc_rollup'
 
-let test_constants_consistency () =
+let () =
+  register_test ~title:"constants consistency" @@ fun () ->
   let open Default_parameters in
   List.iter_es
     Block.check_constants_consistency
     [constants_mainnet; constants_sandbox; constants_test]
 
-let test_max_operations_ttl () =
+let () =
+  register_test ~title:"max_operations_ttl" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let open Protocol in
   (* We check the rationale that the value for [max_operations_time_to_live] is the following:
@@ -94,7 +100,9 @@ let test_max_operations_ttl () =
 
     Otherwise committers would be forced to commit at an artificially slow rate, affecting
     the throughput of the rollup. *)
-let test_sc_rollup_challenge_window_lt_max_lookahead () =
+let () =
+  register_test ~title:"sc rollup challenge window less than max lookahead"
+  @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   let max_lookahead = constants.sc_rollup.max_lookahead_in_blocks in
   let challenge_window =
@@ -111,7 +119,9 @@ let test_sc_rollup_challenge_window_lt_max_lookahead () =
    Otherwise storage could be overallocated - since backtracking is not allowed, a staker
    can allocated at most [d] nodes (where [d] is the tree depth) - the maximum storage cost
    of these commitments must be at most the size of the staker's deposit. *)
-let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
+let () =
+  register_test ~title:"sc rollup max commitment storage cost less than deposit"
+  @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   let open Protocol in
   let cost_per_byte_mutez =
@@ -150,7 +160,8 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
    correctly scaled with respect to each other - see
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
-let test_sc_rollup_max_commitment_storage_size () =
+let () =
+  register_test ~title:"sc rollup commitment storage size correct" @@ fun () ->
   let open Lwt_result_syntax in
   let open Protocol in
   let* number_of_ticks =
@@ -208,7 +219,11 @@ let test_sc_rollup_max_commitment_storage_size () =
 
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
-let liquidity_baking_subsidy_param () =
+let () =
+  register_test
+    ~title:
+      "liquidity_baking_subsidy parameter is 1/16th of total baking rewards"
+  @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let constants = Default_parameters.constants_mainnet in
   let get_reward =
@@ -242,34 +257,3 @@ let liquidity_baking_subsidy_param () =
   let*? diff = liquidity_baking_subsidy -? expected_subsidy in
   let max_diff = 1000 (* mutez *) in
   Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff
-
-let tests =
-  [
-    Tztest.tztest
-      "sc_rollup constants consistency"
-      `Quick
-      test_sc_rollup_constants_consistency;
-    Tztest.tztest "constants consistency" `Quick test_constants_consistency;
-    Tztest.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
-    Tztest.tztest
-      "sc rollup challenge window less than max lookahead"
-      `Quick
-      test_sc_rollup_challenge_window_lt_max_lookahead;
-    Tztest.tztest
-      "sc rollup max commitment storage cost less than deposit"
-      `Quick
-      test_sc_rollup_max_commitment_storage_cost_lt_deposit;
-    Tztest.tztest
-      "sc rollup commitment storage size correct"
-      `Quick
-      test_sc_rollup_max_commitment_storage_size;
-    Tztest.tztest
-      "test liquidity_baking_subsidy parameter is 1/16th of total baking \
-       rewards"
-      `Quick
-      liquidity_baking_subsidy_param;
-  ]
-
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("test constants", tests)]
-  |> Lwt_main.run
