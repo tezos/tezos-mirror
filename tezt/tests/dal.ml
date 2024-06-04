@@ -335,13 +335,18 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?regression ?(tags = [team])
+let scenario_with_layer1_node ?regression ?(tags = [])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
     ?(dal_enable = true) ?event_sections_levels ?node_arguments
     ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
     ?delay_increment_per_round variant scenario =
   let description = "Testing DAL L1 integration" in
+  let tags = if List.mem team tags then tags else team :: tags in
+  let tags =
+    if List.mem Tag.memory_3k tags || List.mem Tag.memory_4k tags then tags
+    else Tag.memory_3k :: tags
+  in
   test
     ?regression
     ~__FILE__
@@ -367,17 +372,17 @@ let scenario_with_layer1_node ?regression ?(tags = [team])
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
+let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
     ?bootstrap_profile ?producer_profiles ?history_mode variant scenario =
   let description = "Testing DAL node" in
+  let tags = if List.mem team tags then tags else team :: tags in
   let tags =
-    match producer_profiles with
-    | None | Some [] -> tags
-    | _ -> Tag.memory_3k :: tags
+    if List.mem Tag.memory_3k tags || List.mem Tag.memory_4k tags then tags
+    else Tag.memory_3k :: tags
   in
   test
     ?regression
@@ -408,17 +413,17 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
-    ?redundancy_factor ?attestation_lag ?(tags = [team]) ?(uses = fun _ -> [])
+    ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
     ?smart_rollup_timeout_period_in_blocks ?(regression = true) variant scenario
     =
   let description = "Testing DAL rollup and node with L1" in
+  let tags = if List.mem team tags then tags else team :: tags in
   let tags =
-    match producer_profiles with
-    | None | Some [] -> tags
-    | _ -> Tag.memory_3k :: tags
+    if List.mem Tag.memory_3k tags || List.mem Tag.memory_4k tags then tags
+    else Tag.memory_3k :: tags
   in
   test
     ~regression
@@ -5806,7 +5811,7 @@ module Garbage_collection = struct
   let test_gc_skip_list_cells ~protocols =
     Protocol.register_test
       ~__FILE__
-      ~tags:[Tag.tezos2; "dal"; "gc"; "skip_list"]
+      ~tags:[Tag.tezos2; Tag.memory_3k; "dal"; "gc"; "skip_list"]
       ~uses:(fun _protocol -> [Constant.octez_dal_node])
       ~title:"garbage collection of skip list cells"
       ~supports:(Protocol.From_protocol 19)
@@ -6223,7 +6228,7 @@ let dal_crypto_benchmark () =
     ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
-    ~tags:["dal"; "benchmark"; "crypto"; Tag.slow]
+    ~tags:["dal"; "benchmark"; "crypto"; Tag.slow; team]
   @@ fun () ->
   let open Dal.Cryptobox in
   let driver = Tezos_base_unix.Simple_profiler.auto_write_to_txt_file in
@@ -6433,7 +6438,7 @@ let scenario_tutorial_dal_baker =
   test
     ~regression:true
     ~__FILE__
-    ~tags:["tutorial"; "dal"; "baker"]
+    ~tags:[team; Tag.memory_3k; "tutorial"; "dal"; "baker"]
     ~uses:(fun protocol -> [Protocol.baker protocol; Constant.octez_dal_node])
     (Printf.sprintf "%s" description)
     (fun protocol ->
