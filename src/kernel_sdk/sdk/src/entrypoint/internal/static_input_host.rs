@@ -3,17 +3,27 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_smart_rollup::core_unsafe::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup::host::{Runtime, RuntimeError, ValueType};
-use tezos_smart_rollup::storage::path::Path;
-use tezos_smart_rollup::types::{Message, RollupDalParameters, RollupMetadata};
-use tezos_smart_rollup::utils::inbox::{file::InboxFile, Inbox, InboxBuilder};
+//! This module enables creating a [`Runtime`] which can use an inbox file
+//! (read at compile time) as source for creating an [`Inbox`] for the runtime.
+//!
+//! To create the new [`Runtime`], an existing [`Runtime`] will need to be provided along
+//! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
+use crate::core_unsafe::PREIMAGE_HASH_SIZE;
+use crate::host::{Runtime, RuntimeError, ValueType};
+use crate::storage::path::Path;
+#[cfg(feature = "proto-alpha")]
+use crate::types::RollupDalParameters;
+use crate::types::{Message, RollupMetadata};
+use crate::utils::inbox::{file::InboxFile, Inbox, InboxBuilder};
+
+/// Wrapper struct for creating a [`Runtime`] with a static inbox.
 pub struct StaticInbox {
     inbox: Inbox,
 }
 
 impl StaticInbox {
+    /// Create a new [`StaticInbox`] where `inbox` is the content of an [`InboxFile`].
     pub fn new_from_json(inbox: &str) -> Self {
         let messages: InboxFile = serde_json::from_str(inbox).unwrap();
         let mut builder = InboxBuilder::new();
@@ -23,6 +33,7 @@ impl StaticInbox {
         Self { inbox }
     }
 
+    /// Create the static input [`Runtime`] associated with the current inbox file.
     pub fn wrap_runtime<'runtime, R: Runtime>(
         &'runtime mut self,
         host: &'runtime mut R,
@@ -34,6 +45,7 @@ impl StaticInbox {
     }
 }
 
+/// A smart rollup [`Runtime`] layer which uses a static inbox on top of another [`Runtime`].
 struct StaticInputHost<'runtime, R: Runtime> {
     host: &'runtime mut R,
     inbox: &'runtime mut Inbox,
@@ -100,7 +112,11 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
     }
 
     #[inline(always)]
-    fn store_write_all<T: Path>(&mut self, path: &T, src: &[u8]) -> Result<(), RuntimeError> {
+    fn store_write_all<T: Path>(
+        &mut self,
+        path: &T,
+        src: &[u8],
+    ) -> Result<(), RuntimeError> {
         self.host.store_write_all(path, src)
     }
 
@@ -186,6 +202,7 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
         self.host.runtime_version()
     }
 
+    #[cfg(feature = "proto-alpha")]
     #[inline(always)]
     fn reveal_dal_page(
         &self,
@@ -198,6 +215,7 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
             .reveal_dal_page(published_level, slot_index, page_index, destination)
     }
 
+    #[cfg(feature = "proto-alpha")]
     #[inline(always)]
     fn reveal_dal_parameters(&self) -> RollupDalParameters {
         self.host.reveal_dal_parameters()
