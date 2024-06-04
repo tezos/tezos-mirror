@@ -530,9 +530,12 @@ opam:bls12-381:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -553,6 +556,7 @@ opam:bls12-381:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -592,9 +596,12 @@ opam:octez-accuser-Proxford:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -615,6 +622,7 @@ opam:octez-accuser-Proxford:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -654,9 +662,12 @@ opam:octez-accuser-PtParisB:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -677,6 +688,7 @@ opam:octez-accuser-PtParisB:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -716,9 +728,12 @@ opam:octez-alcotezt:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -739,6 +754,7 @@ opam:octez-alcotezt:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -778,9 +794,12 @@ opam:octez-baker-Proxford:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -801,6 +820,7 @@ opam:octez-baker-Proxford:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -840,9 +860,12 @@ opam:octez-baker-PtParisB:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -863,6 +886,7 @@ opam:octez-baker-PtParisB:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -902,9 +926,12 @@ opam:octez-client:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -925,6 +952,7 @@ opam:octez-client:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -964,9 +992,12 @@ opam:octez-codec:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -987,6 +1018,7 @@ opam:octez-codec:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1026,9 +1058,12 @@ opam:octez-crawler:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1049,6 +1084,7 @@ opam:octez-crawler:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1088,9 +1124,12 @@ opam:octez-dac-client:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1111,6 +1150,7 @@ opam:octez-dac-client:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1150,9 +1190,12 @@ opam:octez-dac-node:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1173,6 +1216,7 @@ opam:octez-dac-node:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1212,9 +1256,12 @@ opam:octez-dal-node:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1235,6 +1282,7 @@ opam:octez-dal-node:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1274,9 +1322,12 @@ opam:octez-distributed-internal:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1297,6 +1348,7 @@ opam:octez-distributed-internal:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1336,9 +1388,12 @@ opam:octez-distributed-lwt-internal:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1359,6 +1414,7 @@ opam:octez-distributed-lwt-internal:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1398,9 +1454,12 @@ opam:octez-evm-node:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1421,6 +1480,7 @@ opam:octez-evm-node:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1460,9 +1520,12 @@ opam:octez-evm-node-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1483,6 +1546,7 @@ opam:octez-evm-node-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1522,9 +1586,12 @@ opam:octez-injector:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1545,6 +1612,7 @@ opam:octez-injector:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1584,9 +1652,12 @@ opam:octez-internal-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1607,6 +1678,7 @@ opam:octez-internal-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1646,9 +1718,12 @@ opam:octez-l2-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1669,6 +1744,7 @@ opam:octez-l2-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1708,9 +1784,12 @@ opam:octez-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1731,6 +1810,7 @@ opam:octez-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1770,9 +1850,12 @@ opam:octez-node:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1793,6 +1876,7 @@ opam:octez-node:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1832,9 +1916,12 @@ opam:octez-node-config:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1855,6 +1942,7 @@ opam:octez-node-config:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1894,9 +1982,12 @@ opam:octez-proto-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1917,6 +2008,7 @@ opam:octez-proto-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -1956,9 +2048,12 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1979,6 +2074,7 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2018,9 +2114,12 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2041,6 +2140,7 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2080,9 +2180,12 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2103,6 +2206,7 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2142,9 +2246,12 @@ opam:octez-protocol-003-PsddFKi3-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2165,6 +2272,7 @@ opam:octez-protocol-003-PsddFKi3-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2204,9 +2312,12 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2227,6 +2338,7 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2266,9 +2378,12 @@ opam:octez-protocol-005-PsBabyM1-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2289,6 +2404,7 @@ opam:octez-protocol-005-PsBabyM1-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2328,9 +2444,12 @@ opam:octez-protocol-006-PsCARTHA-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2351,6 +2470,7 @@ opam:octez-protocol-006-PsCARTHA-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2390,9 +2510,12 @@ opam:octez-protocol-007-PsDELPH1-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2413,6 +2536,7 @@ opam:octez-protocol-007-PsDELPH1-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2452,9 +2576,12 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2475,6 +2602,7 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2514,9 +2642,12 @@ opam:octez-protocol-009-PsFLoren-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2537,6 +2668,7 @@ opam:octez-protocol-009-PsFLoren-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2576,9 +2708,12 @@ opam:octez-protocol-010-PtGRANAD-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2599,6 +2734,7 @@ opam:octez-protocol-010-PtGRANAD-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2638,9 +2774,12 @@ opam:octez-protocol-011-PtHangz2-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2661,6 +2800,7 @@ opam:octez-protocol-011-PtHangz2-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2700,9 +2840,12 @@ opam:octez-protocol-012-Psithaca-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2723,6 +2866,7 @@ opam:octez-protocol-012-Psithaca-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2762,9 +2906,12 @@ opam:octez-protocol-013-PtJakart-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2785,6 +2932,7 @@ opam:octez-protocol-013-PtJakart-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2824,9 +2972,12 @@ opam:octez-protocol-014-PtKathma-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2847,6 +2998,7 @@ opam:octez-protocol-014-PtKathma-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2886,9 +3038,12 @@ opam:octez-protocol-015-PtLimaPt-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2909,6 +3064,7 @@ opam:octez-protocol-015-PtLimaPt-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -2948,9 +3104,12 @@ opam:octez-protocol-016-PtMumbai-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -2971,6 +3130,7 @@ opam:octez-protocol-016-PtMumbai-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3010,9 +3170,12 @@ opam:octez-protocol-017-PtNairob-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3033,6 +3196,7 @@ opam:octez-protocol-017-PtNairob-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3072,9 +3236,12 @@ opam:octez-protocol-018-Proxford-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3095,6 +3262,7 @@ opam:octez-protocol-018-Proxford-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3134,9 +3302,12 @@ opam:octez-protocol-019-PtParisB-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3157,6 +3328,7 @@ opam:octez-protocol-019-PtParisB-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3196,9 +3368,12 @@ opam:octez-protocol-alpha-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3219,6 +3394,7 @@ opam:octez-protocol-alpha-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3258,9 +3434,12 @@ opam:octez-protocol-compiler:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3281,6 +3460,7 @@ opam:octez-protocol-compiler:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3320,9 +3500,12 @@ opam:octez-proxy-server:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3343,6 +3526,7 @@ opam:octez-proxy-server:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3382,9 +3566,12 @@ opam:octez-riscv-api:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3405,6 +3592,7 @@ opam:octez-riscv-api:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3444,9 +3632,12 @@ opam:octez-riscv-pvm:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3467,6 +3658,7 @@ opam:octez-riscv-pvm:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3506,9 +3698,12 @@ opam:octez-rpc-process:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3529,6 +3724,7 @@ opam:octez-rpc-process:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3568,9 +3764,12 @@ opam:octez-rust-deps:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3591,6 +3790,7 @@ opam:octez-rust-deps:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3630,9 +3830,12 @@ opam:octez-shell-libs:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3653,6 +3856,7 @@ opam:octez-shell-libs:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3692,9 +3896,12 @@ opam:octez-signer:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3715,6 +3922,7 @@ opam:octez-signer:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3754,9 +3962,12 @@ opam:octez-smart-rollup-node:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3777,6 +3988,7 @@ opam:octez-smart-rollup-node:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3816,9 +4028,12 @@ opam:octez-smart-rollup-node-Proxford:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3839,6 +4054,7 @@ opam:octez-smart-rollup-node-Proxford:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3878,9 +4094,12 @@ opam:octez-smart-rollup-node-PtNairob:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3901,6 +4120,7 @@ opam:octez-smart-rollup-node-PtNairob:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -3940,9 +4160,12 @@ opam:octez-smart-rollup-node-PtParisB:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -3963,6 +4186,7 @@ opam:octez-smart-rollup-node-PtParisB:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4002,9 +4226,12 @@ opam:octez-smart-rollup-node-alpha:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4025,6 +4252,7 @@ opam:octez-smart-rollup-node-alpha:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4064,9 +4292,12 @@ opam:octez-smart-rollup-node-lib:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4087,6 +4318,7 @@ opam:octez-smart-rollup-node-lib:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4126,9 +4358,12 @@ opam:octez-smart-rollup-wasm-debugger:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4149,6 +4384,7 @@ opam:octez-smart-rollup-wasm-debugger:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4188,9 +4424,12 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4211,6 +4450,7 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4250,9 +4490,12 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4273,6 +4516,7 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4312,9 +4556,12 @@ opam:octez-version:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4335,6 +4582,7 @@ opam:octez-version:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4374,9 +4622,12 @@ opam:tezos-benchmark:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4397,6 +4648,7 @@ opam:tezos-benchmark:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4436,9 +4688,12 @@ opam:tezos-client-demo-counter:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4459,6 +4714,7 @@ opam:tezos-client-demo-counter:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4498,9 +4754,12 @@ opam:tezos-client-genesis:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4521,6 +4780,7 @@ opam:tezos-client-genesis:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4560,9 +4820,12 @@ opam:tezos-dac-client-lib:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4583,6 +4846,7 @@ opam:tezos-dac-client-lib:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4622,9 +4886,12 @@ opam:tezos-dac-lib:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4645,6 +4912,7 @@ opam:tezos-dac-lib:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4684,9 +4952,12 @@ opam:tezos-dac-node-lib:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4707,6 +4978,7 @@ opam:tezos-dac-node-lib:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4746,9 +5018,12 @@ opam:tezos-dal-node-lib:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4769,6 +5044,7 @@ opam:tezos-dal-node-lib:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4808,9 +5084,12 @@ opam:tezos-dal-node-services:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4831,6 +5110,7 @@ opam:tezos-dal-node-services:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4870,9 +5150,12 @@ opam:tezos-openapi:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4893,6 +5176,7 @@ opam:tezos-openapi:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4932,9 +5216,12 @@ opam:tezos-protocol-000-Ps9mPmXa:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -4955,6 +5242,7 @@ opam:tezos-protocol-000-Ps9mPmXa:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4994,9 +5282,12 @@ opam:tezos-protocol-001-PtCJ7pwo:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5017,6 +5308,7 @@ opam:tezos-protocol-001-PtCJ7pwo:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5056,9 +5348,12 @@ opam:tezos-protocol-002-PsYLVpVv:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5079,6 +5374,7 @@ opam:tezos-protocol-002-PsYLVpVv:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5118,9 +5414,12 @@ opam:tezos-protocol-003-PsddFKi3:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5141,6 +5440,7 @@ opam:tezos-protocol-003-PsddFKi3:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5180,9 +5480,12 @@ opam:tezos-protocol-004-Pt24m4xi:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5203,6 +5506,7 @@ opam:tezos-protocol-004-Pt24m4xi:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5242,9 +5546,12 @@ opam:tezos-protocol-005-PsBABY5H:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5265,6 +5572,7 @@ opam:tezos-protocol-005-PsBABY5H:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5304,9 +5612,12 @@ opam:tezos-protocol-005-PsBabyM1:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5327,6 +5638,7 @@ opam:tezos-protocol-005-PsBabyM1:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5366,9 +5678,12 @@ opam:tezos-protocol-006-PsCARTHA:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5389,6 +5704,7 @@ opam:tezos-protocol-006-PsCARTHA:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5428,9 +5744,12 @@ opam:tezos-protocol-007-PsDELPH1:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5451,6 +5770,7 @@ opam:tezos-protocol-007-PsDELPH1:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5490,9 +5810,12 @@ opam:tezos-protocol-008-PtEdo2Zk:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5513,6 +5836,7 @@ opam:tezos-protocol-008-PtEdo2Zk:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5552,9 +5876,12 @@ opam:tezos-protocol-008-PtEdoTez:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5575,6 +5902,7 @@ opam:tezos-protocol-008-PtEdoTez:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5614,9 +5942,12 @@ opam:tezos-protocol-009-PsFLoren:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5637,6 +5968,7 @@ opam:tezos-protocol-009-PsFLoren:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5676,9 +6008,12 @@ opam:tezos-protocol-010-PtGRANAD:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5699,6 +6034,7 @@ opam:tezos-protocol-010-PtGRANAD:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5738,9 +6074,12 @@ opam:tezos-protocol-011-PtHangz2:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5761,6 +6100,7 @@ opam:tezos-protocol-011-PtHangz2:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5800,9 +6140,12 @@ opam:tezos-protocol-012-Psithaca:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5823,6 +6166,7 @@ opam:tezos-protocol-012-Psithaca:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5862,9 +6206,12 @@ opam:tezos-protocol-013-PtJakart:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5885,6 +6232,7 @@ opam:tezos-protocol-013-PtJakart:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5924,9 +6272,12 @@ opam:tezos-protocol-014-PtKathma:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -5947,6 +6298,7 @@ opam:tezos-protocol-014-PtKathma:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -5986,9 +6338,12 @@ opam:tezos-protocol-015-PtLimaPt:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6009,6 +6364,7 @@ opam:tezos-protocol-015-PtLimaPt:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6048,9 +6404,12 @@ opam:tezos-protocol-016-PtMumbai:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6071,6 +6430,7 @@ opam:tezos-protocol-016-PtMumbai:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6110,9 +6470,12 @@ opam:tezos-protocol-017-PtNairob:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6133,6 +6496,7 @@ opam:tezos-protocol-017-PtNairob:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6172,9 +6536,12 @@ opam:tezos-protocol-018-Proxford:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6195,6 +6562,7 @@ opam:tezos-protocol-018-Proxford:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6234,9 +6602,12 @@ opam:tezos-protocol-019-PtParisB:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6257,6 +6628,7 @@ opam:tezos-protocol-019-PtParisB:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6296,9 +6668,12 @@ opam:tezos-protocol-alpha:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6319,6 +6694,7 @@ opam:tezos-protocol-alpha:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6358,9 +6734,12 @@ opam:tezos-protocol-demo-counter:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6381,6 +6760,7 @@ opam:tezos-protocol-demo-counter:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6420,9 +6800,12 @@ opam:tezos-protocol-demo-noops:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6443,6 +6826,7 @@ opam:tezos-protocol-demo-noops:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6482,9 +6866,12 @@ opam:tezos-protocol-genesis:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6505,6 +6892,7 @@ opam:tezos-protocol-genesis:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6544,9 +6932,12 @@ opam:tezos-proxy-server-config:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6567,6 +6958,7 @@ opam:tezos-proxy-server-config:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -6606,9 +6998,12 @@ opam:tezt-tezos:
   dependencies:
   - opam:prepare
   cache:
-    key: opam-sccache
+  - key: opam-sccache
     paths:
     - _build/_sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -6629,6 +7024,7 @@ opam:tezt-tezos:
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_LOG: debug
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
