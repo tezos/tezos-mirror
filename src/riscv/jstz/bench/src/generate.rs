@@ -10,11 +10,19 @@ use jstz_proto::operation::{Content, DeployFunction, Operation, RunFunction, Sig
 use serde::{Serialize, Serializer};
 use std::error::Error;
 use std::path::Path;
+use tezos_data_encoding::enc::BinWriter;
+use tezos_smart_rollup::inbox::ExternalMessageFrame;
+use tezos_smart_rollup::types::SmartRollupAddress;
 use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
 
 const FA2: &str = include_str!("../../fa2.js");
 
 const DEFAULT_GAS_LIMIT: u32 = 100_000;
+
+const DEFAULT_ROLLUP_ADDRESS: &str = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57";
+
+// tag + 20 byte address
+const EXTERNAL_FRAME_SIZE: usize = 21;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -237,9 +245,17 @@ impl Account {
         let signed_op = SignedOperation::new(self.pk.clone(), self.sk.sign(hash)?, op);
 
         let bytes = bincode::serialize(&signed_op)?;
+        let mut external = Vec::with_capacity(bytes.len() + EXTERNAL_FRAME_SIZE);
+
+        let frame = ExternalMessageFrame::Targetted {
+            contents: bytes,
+            address: SmartRollupAddress::from_b58check(DEFAULT_ROLLUP_ADDRESS)?,
+        };
+
+        frame.bin_write(&mut external)?;
 
         self.nonce = self.nonce.next();
-        let message = Message::External { external: bytes };
+        let message = Message::External { external };
 
         Ok(message)
     }

@@ -26,7 +26,7 @@ impl StaticInbox {
     pub fn wrap_runtime<'runtime, R: Runtime>(
         &'runtime mut self,
         host: &'runtime mut R,
-    ) -> StaticInputHost<'runtime, R> {
+    ) -> impl Runtime + 'runtime {
         StaticInputHost {
             host,
             inbox: &mut self.inbox,
@@ -34,7 +34,7 @@ impl StaticInbox {
     }
 }
 
-pub struct StaticInputHost<'runtime, R: Runtime> {
+struct StaticInputHost<'runtime, R: Runtime> {
     host: &'runtime mut R,
     inbox: &'runtime mut Inbox,
 }
