@@ -265,6 +265,11 @@ module Produce_block :
 module Produce_proposal :
   METHOD with type input = Time.Protocol.t and type output = unit
 
+module Inject_transaction :
+  METHOD
+    with type input = Ethereum_types.transaction_object * string
+     and type output = unit
+
 module Durable_state_value :
   METHOD
     with type input = Durable_storage_path.path
