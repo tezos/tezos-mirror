@@ -36,7 +36,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 (** Check that [Delegate.staking_balance] is the same as [Delegate.full_balance]
    (this is not true in general, but in these tests it is because they only deal
