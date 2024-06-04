@@ -33,7 +33,6 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
 
 module Raw_context_tests = struct
   open Sapling_helpers.Common
@@ -740,8 +739,8 @@ module Interpreter_tests = struct
     let* balance_after_shield = Context.Contract.balance (B b4) src1 in
     let diff_due_to_shield =
       Int64.sub
-        (Test_tez.to_mutez balance_after_shield)
-        (Test_tez.to_mutez balance_before_shield)
+        (Tez_helpers.to_mutez balance_after_shield)
+        (Tez_helpers.to_mutez balance_before_shield)
     in
     (* The balance after shield is obtained from the balance before shield by
        the shield specific update. *)
@@ -791,7 +790,7 @@ module Interpreter_tests = struct
     in
     (* Here we fail by doing the same transaction again*)
     let* incr = Incremental.begin_construction b in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let dst = Alpha_context.Contract.Originated dst in
     let* operation =
       Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
@@ -827,7 +826,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     let* incr = Incremental.begin_construction b in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let* operation =
       Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
     in
@@ -996,8 +995,8 @@ module Interpreter_tests = struct
         ~offset_nullifier:0L
         ()
     in
-    let fee = Test_tez.of_int 10 in
-    let*? amount_tez = Tez.one_mutez *? Int64.of_int 15 in
+    let fee = Tez_helpers.of_int 10 in
+    let*? amount_tez = Tez_helpers.(one_mutez *? Int64.of_int 15) in
     let* operation1 =
       Op.transaction
         ~gas_limit:High
@@ -1113,7 +1112,7 @@ module Interpreter_tests = struct
     let* operation =
       Op.transaction
         ~gas_limit:Max
-        ~fee:(Test_tez.of_int 10)
+        ~fee:(Tez_helpers.of_int 10)
         (B b)
         src
         dst
@@ -1159,7 +1158,7 @@ module Interpreter_tests = struct
     let parameters_2 =
       Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let cdst = Contract.Originated dst in
     let* operation =
       Op.transaction
@@ -1252,7 +1251,7 @@ module Interpreter_tests = struct
     let parameters =
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
-    let fee = Test_tez.of_int 10 in
+    let fee = Tez_helpers.of_int 10 in
     let dst = Contract.Originated dst in
     let* operation =
       Op.transaction ~gas_limit:Max ~fee (B b) src dst Tez.zero ~parameters
