@@ -212,7 +212,7 @@ _`Failing Noop`
     fails at :ref:`application time<operation_validity_alpha>`, and
     should never appear in :ref:`applied
     blocks<full_application_alpha>`. This operation allows end-users to
-    :ref:`sign arbitrary messages<failing_noop>` which have no
+    :ref:`sign arbitrary messages<failing_noop_alpha>` which have no
     computational semantics.
 
 .. _def_fee_alpha:

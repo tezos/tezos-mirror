@@ -88,7 +88,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'oxford',
+    'paris',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 

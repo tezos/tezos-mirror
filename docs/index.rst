@@ -183,8 +183,7 @@ Platform developers are also provided reference materials for internal APIs of O
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Oxford Protocol Reference <active/index>
-   Paris Protocol Reference <paris/index>
+   Paris Protocol Reference <active/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -211,7 +210,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    protocols/naming
-   protocols/018_oxford
    protocols/019_paris
    protocols/alpha
    protocols/history

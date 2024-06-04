@@ -96,7 +96,7 @@ following quantities are kept the same:
    :header-rows: 1
 
    * - Parameter (unit)
-     - Old (oxford) value
+     - Old (Paris) value
      - New value
    * - ``minimal_block_delay`` (seconds)
      - ``10``

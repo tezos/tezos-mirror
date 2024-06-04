@@ -23,15 +23,17 @@ incurs moderate penalties, while a high fraction of misconduct is
 deemed to be critical and faces more serious repercussions.
 
 This document presents the definition of an :ref:`adaptive slashing
-function<adaptive_slashing_fn>` implementing this idea, as well as a
-:ref:`new forbidden period<new_forbidden_period>`.
+function<adaptive_slashing_fn_paris>` implementing this idea, as well as a
+:ref:`new forbidden period<new_forbidden_period_paris>`.
 
 .. _adaptive_slashing_fn:
+.. _adaptive_slashing_fn_paris:
 
 Adaptive Slashing Function
 ==========================
 
 .. _adaptive_slashing_informal:
+.. _adaptive_slashing_informal_paris:
 
 Informal presentation
 ---------------------
@@ -86,6 +88,7 @@ ensures that the baker can't decrease their at-stake funds after being
 denunciated and before facing penalties.
 
 .. _formal_adaptive_slashing:
+.. _formal_adaptive_slashing_paris:
 
 A formal definition of slashing function for double-attestations
 ----------------------------------------------------------------
@@ -125,6 +128,7 @@ where :math:`(b, B) \in C` means that:
   :math:`B`.
 
 .. _new_forbidden_period:
+.. _new_forbidden_period_paris:
 
 A new definition for the forbidden period
 =========================================
