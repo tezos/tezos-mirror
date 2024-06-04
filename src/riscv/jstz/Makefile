@@ -7,6 +7,8 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
+INBOX_FILE ?= $(shell mktemp)
+
 .PHONY: all
 all: build test check inbox-bench
 
@@ -25,21 +27,25 @@ build: build-kernel inbox-bench
 build-kernel:
 	@cargo build -p jstz --release
 
+.PHONY: build-kernel-static
+build-kernel-static:
+	@INBOX_FILE=$(INBOX_FILE) cargo build -p jstz --release --features static-inbox
+
 .PHONY: test
 test:
 	@cargo test --no-default-features $(NATIVE_OPT)
+	@../scripts/jstz-bench.sh -t 1
+	@../scripts/jstz-bench.sh -t 1 -s
 
 .PHONY: run
 run:
 	@cargo run --no-default-features
 
-export INBOX_FILE = $(shell mktemp)
-
 .PHONY: check
 check:
-	@cargo check --all-features --workspace --locked
+	@INBOX_FILE=$(INBOX_FILE) cargo check --all-features --workspace --locked
 	@cargo fmt --check
-	@cargo clippy --all-features -- --deny warnings
+	@INBOX_FILE=$(INBOX_FILE) cargo clippy --all-features -- --deny warnings
 
 .PHONY: inbox-bench
 inbox-bench:
