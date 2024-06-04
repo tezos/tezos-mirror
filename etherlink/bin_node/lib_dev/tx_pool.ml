@@ -90,11 +90,22 @@ module Pool = struct
       (Ethereum_types.AddressMap.empty, Ethereum_types.AddressMap.empty)
 
   (** Add a transaction to the pool. *)
-  let add {transactions; global_index} pkey raw_tx transaction_object =
+  let add {transactions; global_index} pkey raw_tx
+      (transaction_object : Ethereum_types.transaction_object option) =
     let open Result_syntax in
-    let* nonce = Ethereum_types.transaction_nonce raw_tx in
-    let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
-    let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
+    let* nonce, gas_price, gas_limit =
+      match transaction_object with
+      | None ->
+          let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
+          let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
+          let* nonce = Ethereum_types.transaction_nonce raw_tx in
+          return (nonce, gas_price, gas_limit)
+      | Some transaction_object ->
+          let (Qty nonce) = transaction_object.nonce in
+          let (Qty gas_price) = transaction_object.gasPrice in
+          let (Qty gas_limit) = transaction_object.gas in
+          return (nonce, gas_price, gas_limit)
+    in
     let inclusion_timestamp = Misc.now () in
     (* Add the transaction to the user's transaction map *)
     let transactions =
@@ -358,7 +369,8 @@ let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
             "Limit of transaction for a user was reached. Transaction is \
              rejected." )
 
-let insert_valid_transaction state tx_raw address transaction_object =
+let insert_valid_transaction state tx_raw address
+    (transaction_object : Ethereum_types.transaction_object option) =
   let open Lwt_result_syntax in
   let open Types in
   let {
@@ -371,7 +383,14 @@ let insert_valid_transaction state tx_raw address transaction_object =
   } =
     state
   in
-  let*? tx_data = Ethereum_types.transaction_data tx_raw in
+  let*? tx_data =
+    match transaction_object with
+    | None -> Ethereum_types.transaction_data tx_raw
+    | Some transaction_object ->
+        Result.return
+          (transaction_object.input |> Ethereum_types.hash_to_bytes
+         |> Bytes.of_string)
+  in
   if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
     let*! () = Tx_pool_events.tx_data_size_limit_reached () in
     return @@ Error "Transaction data exceeded the allowed size."
