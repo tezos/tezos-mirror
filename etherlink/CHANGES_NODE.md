@@ -67,6 +67,8 @@
 - Threshold encryption Sequencer connects to sequencer sidecar. (!3140)
 - Decouple proposal submission and preblocks monitoring for threshold encryption sequencer. (!13181)
 - Add a private rpc `replay_block`. (!13196)
+- Open a read-only connection to the SQLite store in the context of the
+  `replay` command. (!13456)
 
 ## Version for b9f6c9138719220db83086f0548e49c5c4c8421f
 

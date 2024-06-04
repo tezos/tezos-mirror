@@ -310,6 +310,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
       ~fail_on_missing_blueprint:false
       ~sqlite_journal_mode:
         (`Force config.experimental_features.sqlite_journal_mode)
+      ~store_perm:`Read_write
       ()
   in
 
