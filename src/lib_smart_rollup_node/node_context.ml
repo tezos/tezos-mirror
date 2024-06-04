@@ -115,7 +115,7 @@ type 'a t = {
   private_info : ('a, private_info option) Reference.t;
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
-  mutable current_protocol : current_protocol;
+  current_protocol : current_protocol Reference.rw;
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
   sync : sync_info;
 }
@@ -209,7 +209,7 @@ let checkout_context node_ctxt block_hash =
 
 let dal_supported node_ctxt =
   node_ctxt.dal_cctxt <> None
-  && node_ctxt.current_protocol.constants.dal.feature_enable
+  && (Reference.get node_ctxt.current_protocol).constants.dal.feature_enable
 
 let readonly (node_ctxt : _ t) =
   {

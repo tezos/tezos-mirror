@@ -77,11 +77,11 @@ let sub_level level decrement =
 let sc_rollup_commitment_period node_ctxt =
   (* Publishing commitments is done w.r.t. the period in the protocol in which
      the commitment is published, and not the one for the inbox level. *)
-  node_ctxt.Node_context.current_protocol.constants.sc_rollup
+  (Reference.get node_ctxt.Node_context.current_protocol).constants.sc_rollup
     .commitment_period_in_blocks
 
 let sc_rollup_challenge_window node_ctxt =
-  node_ctxt.Node_context.current_protocol.constants.sc_rollup
+  (Reference.get node_ctxt.Node_context.current_protocol).constants.sc_rollup
     .challenge_window_in_blocks
 
 let next_commitment_level node_ctxt last_commitment_level =

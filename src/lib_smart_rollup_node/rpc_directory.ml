@@ -560,7 +560,8 @@ let build_protocol_directories node_ctxt =
     (Protocol_plugins.registered_protocols ())
 
 let get_proto_dir ?protocol (node_ctxt : _ Node_context.t) =
-  let proto = Option.value protocol ~default:node_ctxt.current_protocol.hash in
+  let current_protocol = Reference.get node_ctxt.current_protocol in
+  let proto = Option.value protocol ~default:current_protocol.hash in
   match Protocol_hash.Table.find protocol_directories proto with
   | None -> error_with "Unknown protocol %a" Protocol_hash.pp proto
   | Some (block_dir, full_dir) -> Ok (block_dir, full_dir, proto)
