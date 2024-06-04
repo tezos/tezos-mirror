@@ -1003,6 +1003,7 @@ let benchmark () =
           Cloud.default_vm_configuration)
   in
   Cloud.register
+  (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms
     ~__FILE__
     ~title:"DAL node benchmark"
