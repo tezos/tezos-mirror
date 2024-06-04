@@ -135,6 +135,10 @@ oc.build_arm64-released:
   - when: manual
     allow_failure: true
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -144,6 +148,7 @@ oc.build_arm64-released:
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -166,6 +171,10 @@ oc.build_arm64-exp-dev-extra:
   - when: manual
     allow_failure: true
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -177,6 +186,7 @@ oc.build_arm64-exp-dev-extra:
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -208,6 +218,10 @@ oc.build:static-x86_64-linux-binaries:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -216,6 +230,7 @@ oc.build:static-x86_64-linux-binaries:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -240,6 +255,10 @@ oc.build_x86_64-released:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -249,6 +268,7 @@ oc.build_x86_64-released:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -281,6 +301,10 @@ oc.build_x86_64-exp-dev-extra:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -292,6 +316,7 @@ oc.build_x86_64-exp-dev-extra:
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
+    CARGO_NET_OFFLINE: "false"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -322,12 +347,18 @@ ocaml-check:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
   - dune build @check
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -353,12 +384,12 @@ oc.build_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-  - key: kernels
-    paths:
-    - cargo/
   - key: kernels-sccache
     paths:
     - _sccache
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
@@ -366,8 +397,8 @@ oc.build_kernels:
   - make -C src/riscv/tests/ build
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     RUSTC_WRAPPER: sccache
   artifacts:
@@ -6636,6 +6667,10 @@ kaitai_checks:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -6643,6 +6678,8 @@ kaitai_checks:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
     and commit the resulting diff.' ; false)
+  variables:
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 hour
     paths:
@@ -6691,6 +6728,10 @@ oc.check_lift_limits_patch:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -6699,6 +6740,8 @@ oc.check_lift_limits_patch:
     "src/proto_alpha/lib_protocol/main.ml" ]'
   - git apply src/bin_tps_evaluation/lift_limits.patch
   - dune build @src/proto_alpha/lib_protocol/check
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.misc_checks:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
@@ -6849,11 +6892,17 @@ oc.integration:compiler-rejections:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
   - dune build @runtest_rejections
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.script:test-gen-genesis:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -6902,12 +6951,18 @@ oc.script:snapshot_alpha_and_link:
   - job: oc.build_x86_64-exp-dev-extra
     optional: true
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.script:test_octez_release_versions:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -7001,16 +7056,16 @@ test_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
 
 test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7029,16 +7084,16 @@ test_etherlink_kernel:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
   - make -f etherlink.mk check
   - make -f etherlink.mk test
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
 
 test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7056,15 +7111,15 @@ test_etherlink_firehose:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
   - make -C etherlink/firehose check
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
 
 test_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7082,17 +7137,17 @@ test_riscv_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
   - make -C src/riscv check
   - make -C src/riscv test
   - make -C src/riscv audit
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
 
 test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7111,9 +7166,9 @@ test_evm_compatibility:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: kernels
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
-    - cargo/
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
   - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
@@ -7121,8 +7176,8 @@ test_evm_compatibility:
     -c
   variables:
     CC: clang
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
 
 oc.unit:non-proto-x86_64:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
@@ -7145,6 +7200,10 @@ oc.unit:non-proto-x86_64:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -7154,6 +7213,7 @@ oc.unit:non-proto-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
+    CARGO_NET_OFFLINE: "false"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -7188,6 +7248,10 @@ oc.unit:other-x86_64:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -7197,6 +7261,7 @@ oc.unit:other-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-other-unit
+    CARGO_NET_OFFLINE: "false"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -7231,6 +7296,10 @@ oc.unit:proto-x86_64:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -7240,6 +7309,7 @@ oc.unit:proto-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-proto-unit
+    CARGO_NET_OFFLINE: "false"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -7274,6 +7344,10 @@ oc.unit:non-proto-arm64:
   - oc.build_arm64-released
   - oc.build_arm64-exp-dev-extra
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -7283,6 +7357,7 @@ oc.unit:non-proto-arm64:
     ARCH: arm64
     MAKE_TARGETS: test-nonproto-unit test-webassembly
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -7375,11 +7450,17 @@ oc.unit:protocol_compiles:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
   - dune build @runtest_compile_protocol
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.install_bin_fedora_37:
   image: fedora:37
@@ -7527,6 +7608,9 @@ oc.compile_release_sources_bullseye:
   dependencies: []
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  variables:
+    CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_bullseye:
   image: ocaml/opam:debian-11
@@ -7546,6 +7630,9 @@ oc.compile_sources_bullseye:
   script:
   - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  variables:
+    CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_mantic:
   image: ocaml/opam:ubuntu-23.10
@@ -7565,6 +7652,9 @@ oc.compile_sources_mantic:
   script:
   - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  variables:
+    CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
 
 tezt:
   image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
@@ -8168,10 +8258,16 @@ documentation:odoc:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   script:
   - make -C docs odoc-lite
+  variables:
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 hour
     paths:
@@ -8203,10 +8299,16 @@ documentation:manuals:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   script:
   - ./scripts/ci/documentation:manuals.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -8239,10 +8341,16 @@ documentation:docgen:
   needs:
   - trigger
   dependencies: []
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
   before_script:
   - eval $(opam env)
   script:
   - make -C docs -j docexes-gen
+  variables:
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
     paths:
@@ -8412,6 +8520,8 @@ oc.build:dpkg:amd64:
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64
+    CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -8458,6 +8568,8 @@ oc.build:rpm:amd64:
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64
+    CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -8493,6 +8605,8 @@ oc.build:homebrew:
   - apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev libprotobuf-dev
     libsqlite3-dev protobuf-compiler libhidapi-dev pkg-config zlib1g-dev
   - brew install -v scripts/packaging/Formula/octez.rb
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 trigger:debian_repository:
   stage: manual

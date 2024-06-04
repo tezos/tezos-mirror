@@ -73,7 +73,23 @@ let jobs =
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-      ["./scripts/ci/build-debian-packages.sh"]
+      [
+        (* This is an hack to enable Cargo networking for jobs in child pipelines.
+
+           There is an weird gotcha with how variables are passed to
+           child pipelines. Global variables of the parent pipeline
+           are passed to the child pipeline. Inside the child
+           pipeline, variables received from the parent pipeline take
+           precedence over job-level variables. It's bit strange. So
+           to override the default [CARGO_NET_OFFLINE=true], we cannot
+           just set it in the job-level variables of this job.
+
+           See
+           {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+           for more info. *)
+        "export CARGO_NET_OFFLINE=false";
+        "./scripts/ci/build-debian-packages.sh";
+      ]
   in
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages

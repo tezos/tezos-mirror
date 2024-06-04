@@ -19,6 +19,14 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+let cargo_home =
+  (* Note:
+     - We want [CARGO_HOME] to be in a sub-folder of
+       {!ci_project_dir} to enable GitLab CI caching.
+     - We want [CARGO_HOME] to be hidden from dune
+       (thus the dot-prefix). *)
+  Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
+
 (* Define [stages:]
 
    The "manual" stage exists to fix a UI problem that occurs when mixing
@@ -169,6 +177,30 @@ end
 
 (** {2 Helpers} *)
 
+(** The default [before_script:] section.
+
+    In general, the result of this script should be used as the
+    default value for [~before_merging] for all jobs. Each boolean flag
+    of this function enables a specific functionality before the job's
+    [script:] runs. In detail:
+
+    - [take_ownership]: all files in the working directory of the
+      job are [chown]'d by the job's user. This requires that either
+      sudo is installed in the job's image or that the job's user has
+      sufficient privileges. (default: [false])
+    - [source_version]: the script [scripts/version.sh] is sourced. (default: [false])
+    - [eval_opam]: runs [eval $(opam env)], activating any opam switch
+      if present in the image. (default: [false])
+    - [init_python_venv]: runs [.venv/bin/activate], activating any
+      python vinv if present in the image. (default: [false])
+    - [install_js_deps]: runs, and sources,
+      [./scripts/install_build_deps.js.sh] installing JavaScript
+      dependencies and [node], [nvm] and [npm] available in the
+      environment. (default: [false])
+
+   The unnamed argument of the function is appended to the end of the
+   [before_script:] section, after any of the additions caused by the
+   optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
     before_script =
@@ -256,11 +288,34 @@ let enable_sccache ?error_log ?idle_timeout ?log
 (** Add common variables used by jobs compiling kernels *)
 let enable_kernels =
   Tezos_ci.append_variables
-    [
-      ("CC", "clang");
-      ("CARGO_HOME", "$CI_PROJECT_DIR/cargo");
-      ("NATIVE_TARGET", "x86_64-unknown-linux-musl");
-    ]
+    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+
+(** {2 Caches} *)
+
+(* Common GitLab CI caches *)
+
+(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
+
+    This function should only be applied to jobs that have a GitLab CI
+    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
+    function calls this function, so there is no need to apply both).
+    Exceptions can be made for jobs that must have CARGO_HOME set to
+    something different than {!cargo_home}. *)
+let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
+
+(** Adds a GitLab CI cache for the CARGO_HOME folder.
+
+    More precisely, we only cache the non-SCM dependencies in the
+    sub-directory [registry/cache]. *)
+let enable_cargo_cache job =
+  job
+  |> append_cache
+       {
+         key = ("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug));
+         paths = [cargo_home // "registry/cache"];
+       }
+  (* Allow Cargo to access the network *)
+  |> enable_networked_cargo
 
 (** {2 Changesets} *)
 
@@ -619,6 +674,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
+  |> enable_cargo_cache
 
 (** Type of Docker build jobs.
 
@@ -760,6 +816,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
         ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
         ("BLST_PORTABLE", "yes");
         ("ARCH", arch_string);
+        ("CARGO_HOME", "/root/.cargo");
       ]
     ~artifacts
     ~parallel
@@ -780,6 +837,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "mkdir -p packages/$DISTRO/$RELEASE";
       "mv octez-*.* packages/$DISTRO/$RELEASE/";
     ]
+  |> enable_networked_cargo
 
 let job_build_dpkg_amd64 : unit -> tezos_job =
   job_build_bin_package
@@ -830,6 +888,7 @@ let job_build_homebrew ?rules ~__POS__ ~name ?(stage = Stages.build)
        pkg-config zlib1g-dev";
       "brew install -v scripts/packaging/Formula/octez.rb";
     ]
+  |> enable_networked_cargo
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =
@@ -901,6 +960,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
+    |> enable_cargo_cache
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
