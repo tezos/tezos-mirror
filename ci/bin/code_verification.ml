@@ -125,6 +125,7 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
     ~idle_timeout:"0"
     ~log:"debug"
     ~dir:"$CI_PROJECT_DIR/_build/_sccache"
+  |> enable_cargo_cache
 
 let ci_opam_package_tests = "script-inputs/ci-opam-package-tests"
 
