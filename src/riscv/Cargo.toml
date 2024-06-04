@@ -34,6 +34,7 @@ tezos-smart-rollup.path = "../kernel_sdk/sdk"
 thiserror = "1.0.57"
 twiddle = "1.1.0"
 vm-fdt = "0.3.0"
+goldenfile = "1.7.1"
 
 [workspace.dependencies.tezos_crypto_rs]
 version = "0.5.2"
