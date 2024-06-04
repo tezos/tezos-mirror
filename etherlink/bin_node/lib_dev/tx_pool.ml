@@ -7,8 +7,8 @@
 (*****************************************************************************)
 
 module Pool = struct
-  module Pkey_map = Map.Make (Ethereum_types.Address)
-  module Nonce_map = Tezos_base.Sized.MakeSizedMap (Map.Make (Z))
+  module Pkey_map = Ethereum_types.AddressMap
+  module Nonce_map = Tezos_base.Sized.MakeSizedMap (Ethereum_types.NonceMap)
 
   (** Transaction stored in the pool. *)
   type transaction = {
@@ -64,7 +64,7 @@ module Pool = struct
               )
     in
     let add_if_non_empty address nonce_map acc_address_map =
-      if Ethereum_types.NonceMap.cardinal nonce_map == 0 then acc_address_map
+      if Ethereum_types.NonceMap.is_empty nonce_map then acc_address_map
       else Ethereum_types.AddressMap.add address nonce_map acc_address_map
     in
     Pkey_map.fold_e
