@@ -58,13 +58,12 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* head_proto = Node_context.protocol_of_level state.node_ctxt head.level in
   let new_protocol = head_proto.protocol in
-  when_ Protocol_hash.(new_protocol <> state.node_ctxt.current_protocol.hash)
-  @@ fun () ->
+  let current_protocol = Reference.get state.node_ctxt.current_protocol in
+  when_ Protocol_hash.(new_protocol <> current_protocol.hash) @@ fun () ->
   let*! () =
     Daemon_event.migration
       ~catching_up
-      ( state.node_ctxt.current_protocol.hash,
-        state.node_ctxt.current_protocol.proto_level )
+      (current_protocol.hash, current_protocol.proto_level)
       (new_protocol, head_proto.proto_level)
   in
   let*? new_plugin = Protocol_plugins.proto_plugin_for_protocol new_protocol in
@@ -86,7 +85,7 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
     }
   in
   state.plugin <- new_plugin ;
-  state.node_ctxt.current_protocol <- new_protocol ;
+  Reference.set state.node_ctxt.current_protocol new_protocol ;
   return_unit
 
 let maybe_split_context node_ctxt commitment_hash head_level =
@@ -102,7 +101,7 @@ let maybe_split_context node_ctxt commitment_hash head_level =
     Option.value
       node_ctxt.config.gc_parameters.context_splitting_period
       ~default:
-        node_ctxt.current_protocol.constants.sc_rollup
+        (Reference.get node_ctxt.current_protocol).constants.sc_rollup
           .challenge_window_in_blocks
   in
   if Int32.(to_int @@ sub head_level last) >= splitting_period then (
@@ -560,6 +559,7 @@ let rec process_daemon ({node_ctxt; _} as state) =
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
+  let current_protocol = Reference.get node_ctxt.current_protocol in
   Metrics.Info.init_rollup_node_info
     ~id:configuration.sc_rollup_address
     ~mode:configuration.mode
@@ -574,10 +574,9 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       {
         cctxt = (node_ctxt.cctxt :> Client_context.full);
         fee_parameters = configuration.fee_parameters;
-        minimal_block_delay =
-          node_ctxt.current_protocol.constants.minimal_block_delay;
+        minimal_block_delay = current_protocol.constants.minimal_block_delay;
         delay_increment_per_round =
-          node_ctxt.current_protocol.constants.delay_increment_per_round;
+          current_protocol.constants.delay_increment_per_round;
       }
       ~data_dir:node_ctxt.data_dir
       ~signers

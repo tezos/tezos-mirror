@@ -118,8 +118,9 @@ let constants_cache =
 let get_constants_of_protocol ?level (node_ctxt : _ Node_context.t)
     protocol_hash =
   let open Lwt_result_syntax in
-  if Protocol_hash.(protocol_hash = node_ctxt.current_protocol.hash) then
-    return node_ctxt.current_protocol.constants
+  let current_protocol = Reference.get node_ctxt.current_protocol in
+  if Protocol_hash.(protocol_hash = current_protocol.hash) then
+    return current_protocol.constants
   else
     let retrieve protocol_hash =
       let*? plugin = proto_plugin_for_protocol protocol_hash in

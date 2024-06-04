@@ -197,7 +197,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       context;
       kernel_debug_logger;
       finaliser = kernel_debug_finaliser;
-      current_protocol;
+      current_protocol = Reference.new_ current_protocol;
       global_block_watcher;
       sync;
     }
@@ -340,7 +340,7 @@ module For_snapshots = struct
         context;
         kernel_debug_logger = (fun _ -> Lwt.return_unit);
         finaliser = Lwt.return;
-        current_protocol;
+        current_protocol = Reference.new_ current_protocol;
         global_block_watcher;
         sync;
       }
@@ -454,7 +454,7 @@ module Internal_for_tests = struct
         unsafe_patches;
         injector_retention_period = 0;
         block_finality_time = 2;
-        current_protocol;
+        current_protocol = Reference.new_ current_protocol;
         lockfile;
         store;
         context;
