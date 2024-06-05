@@ -18,8 +18,12 @@ octez_source_content="$script_inputs_dir/octez-source-content"
 
 # Git tags for octez releases are on the form `octez-vX.Y`, `octez-vX.Y-rcZ` or `octez-vX.Y-betaZ`.
 
+# Full octez release tag
+# octez-vX.Y, octez-vX.Y-rcZ or octez-vX.Y-betaZ
+gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-v([0-9]+)\.([0-9]+)$' || :)
+
 # Strips the leading 'octez-v'
-# X.Y, X.Y-rcZ or  X.Y-betaZ
+# X.Y, X.Y-rcZ or X.Y-betaZ
 gitlab_release_no_v=$(echo "${CI_COMMIT_TAG}" | sed -e 's/^octez-v//g')
 
 # Replace '.' with '-'
