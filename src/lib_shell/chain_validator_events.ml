@@ -98,7 +98,7 @@ let could_not_switch_testchain =
   declare_1
     ~section
     ~name:"could_not_switch_testchain"
-    ~msg:"error while switching testchina: {trace}"
+    ~msg:"error while switching testchain: {trace}"
     ~level:Error
     ~pp1:pp_print_top_error_of_trace
     ("trace", Error_monad.trace_encoding)
