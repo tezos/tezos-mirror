@@ -48,6 +48,8 @@ type block_store = {
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
   mutable merging_thread : (int32 * unit tzresult Lwt.t) option;
+  lockfile : Lwt_unix.file_descr;
+  stored_data_lockfile : Lwt_unix.file_descr;
 }
 
 type t = block_store
@@ -1190,7 +1192,7 @@ let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
               Block_repr.max_operations_ttl new_head_metadata
           | Some metadata -> Block_repr.max_operations_ttl metadata)))
 
-let instanciate_temporary_floating_store block_store =
+let instantiate_temporary_floating_store block_store =
   let open Lwt_result_syntax in
   protect
     ~on_error:(fun err ->
@@ -1222,6 +1224,21 @@ let instanciate_temporary_floating_store block_store =
          in
          block_store.rw_floating_block_store <- new_rw_store ;
          return (ro_store, rw_store, new_rw_store)))
+
+let create_lockfile path chain_dir =
+  let open Lwt_syntax in
+  protect (fun () ->
+      let* fd =
+        Lwt_unix.openfile
+          (path chain_dir |> Naming.file_path)
+          [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+          0o777
+      in
+      return_ok fd)
+
+let lock lockfile = Lwt_unix.lockf lockfile Unix.F_LOCK 0
+
+let unlock lockfile = Lwt_unix.lockf lockfile Unix.F_ULOCK 0
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
@@ -1291,9 +1308,13 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 in
                 (* Clean-up the files that are below the offset *)
                 let*! () =
-                  Cemented_block_store.trigger_gc
-                    block_store.cemented_store
-                    history_mode
+                  let*! () = lock block_store.lockfile in
+                  Lwt.finalize
+                    (fun () ->
+                      Cemented_block_store.trigger_gc
+                        block_store.cemented_store
+                        history_mode)
+                    (fun () -> unlock block_store.lockfile)
                 in
                 return_unit
               else (* Don't cement any cycles! *)
@@ -1321,9 +1342,13 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 in
                 (* Clean-up the files that are below the offset *)
                 let*! () =
-                  Cemented_block_store.trigger_gc
-                    block_store.cemented_store
-                    history_mode
+                  let*! () = lock block_store.lockfile in
+                  Lwt.finalize
+                    (fun () ->
+                      Cemented_block_store.trigger_gc
+                        block_store.cemented_store
+                        history_mode)
+                    (fun () -> unlock block_store.lockfile)
                 in
                 return_unit
               else
@@ -1388,7 +1413,13 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
              {status = Format.asprintf "%a" Block_store_status.pp store_status})
       in
       (* Mark the store's status as Merging *)
-      let* () = Block_store_status.set_merge_status block_store.status_data in
+      let* () =
+        Lwt.finalize
+          (fun () ->
+            let*! () = lock block_store.stored_data_lockfile in
+            Block_store_status.set_merge_status block_store.status_data)
+          (fun () -> unlock block_store.stored_data_lockfile)
+      in
       let new_head_lpbl =
         Block_repr.last_preserved_block_level new_head_metadata
       in
@@ -1406,7 +1437,13 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
         Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
             (* Move the rw in the ro stores and create a new tmp *)
             let* old_ro_store, old_rw_store, _new_rw_store =
-              instanciate_temporary_floating_store block_store
+              Lwt.finalize
+                (fun () ->
+                  (* Lock the block store to avoid RO instances to open the
+                     state while the file descriptors are being updated. *)
+                  let*! () = lock block_store.lockfile in
+                  instantiate_temporary_floating_store block_store)
+                (fun () -> unlock block_store.lockfile)
             in
             (* Important: do not clean-up the temporary stores on
                failures as they will delete the recently arrived
@@ -1443,17 +1480,34 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                           Lwt_idle_waiter.force_idle
                             block_store.merge_scheduler
                             (fun () ->
-                              (* Critical section: update on-disk values *)
-                              let* () =
-                                move_all_floating_stores
-                                  block_store
-                                  ~new_ro_store
-                              in
-                              let* () = write_caboose block_store new_caboose in
-                              let* () =
-                                write_savepoint block_store new_savepoint
-                              in
-                              return_unit)
+                              Lwt.finalize
+                                (fun () ->
+                                  (* Lock the block store to avoid RO
+                                     instances to open the state while
+                                     the file descriptors are being
+                                     updated. *)
+                                  let*! () = lock block_store.lockfile in
+                                  (* Critical section: update on-disk values *)
+                                  let* () =
+                                    move_all_floating_stores
+                                      block_store
+                                      ~new_ro_store
+                                  in
+                                  let*! () =
+                                    lock block_store.stored_data_lockfile
+                                  in
+                                  let* () =
+                                    write_caboose block_store new_caboose
+                                  in
+                                  let* () =
+                                    write_savepoint block_store new_savepoint
+                                  in
+                                  return_unit)
+                                (fun () ->
+                                  let*! () =
+                                    unlock block_store.stored_data_lockfile
+                                  in
+                                  unlock block_store.lockfile))
                         in
                         (* We can now trigger the context GC: if the
                            GC is performed, this call will block until
@@ -1469,11 +1523,18 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                            section, in case it needs to access the block
                            store. *)
                         let* () = finalizer new_head_lpbl in
-                        (* The merge operation succeeded, the store is now idle. *)
+                        (* The merge operation succeeded, the store is
+                           now idle. *)
                         block_store.merging_thread <- None ;
                         let* () =
-                          Block_store_status.set_idle_status
-                            block_store.status_data
+                          Lwt.finalize
+                            (fun () ->
+                              let*! () =
+                                lock block_store.stored_data_lockfile
+                              in
+                              Block_store_status.set_idle_status
+                                block_store.status_data)
+                            (fun () -> unlock block_store.stored_data_lockfile)
                         in
                         return_unit))
                   (fun () ->
@@ -1594,69 +1655,201 @@ let may_recover_merge block_store =
 
 let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   let open Lwt_result_syntax in
-  let* cemented_store = Cemented_block_store.init chain_dir ~readonly in
-  let*! ro_floating_block_store =
-    Floating_block_store.init chain_dir ~readonly RO
-  in
-  let ro_floating_block_stores = [ro_floating_block_store] in
-  let*! rw_floating_block_store =
-    Floating_block_store.init chain_dir ~readonly RW
-  in
-  let genesis_descr = Block_repr.descriptor genesis_block in
-  let* savepoint =
-    Stored_data.init
-      (Naming.savepoint_file chain_dir)
-      ~initial_data:genesis_descr
-  in
-  let*! _, savepoint_level = Stored_data.get savepoint in
-  Prometheus.Gauge.set
-    Store_metrics.metrics.savepoint_level
-    (Int32.to_float savepoint_level) ;
-  let* caboose =
-    Stored_data.init (Naming.caboose_file chain_dir) ~initial_data:genesis_descr
-  in
-  let*! _, caboose_level = Stored_data.get caboose in
-  Prometheus.Gauge.set
-    Store_metrics.metrics.caboose_level
-    (Int32.to_float caboose_level) ;
-  let* status_data =
-    Stored_data.init
-      (Naming.block_store_status_file chain_dir)
-      ~initial_data:Block_store_status.create_idle_status
-  in
-  let block_cache =
-    Block_lru_cache.create
-      (Option.value block_cache_limit ~default:default_block_cache_limit)
-  in
-  let merge_scheduler = Lwt_idle_waiter.create () in
-  let merge_mutex = Lwt_mutex.create () in
-  let block_store =
-    {
-      chain_dir;
-      genesis_block;
-      readonly;
-      cemented_store;
-      ro_floating_block_stores;
-      rw_floating_block_store;
-      caboose;
-      savepoint;
-      status_data;
-      block_cache;
-      gc_callback = None;
-      split_callback = None;
-      merge_mutex;
-      merge_scheduler;
-      merging_thread = None;
-    }
-  in
-  let* () =
-    if not readonly then may_recover_merge block_store else return_unit
-  in
-  let*! status = Stored_data.get status_data in
-  let* () =
-    fail_unless (Block_store_status.is_idle status) Cannot_load_degraded_store
+  let* lockfile = create_lockfile Naming.block_store_lockfile chain_dir in
+  let* block_store =
+    Lwt.finalize
+      (fun () ->
+        let*! () = lock lockfile in
+        let* cemented_store = Cemented_block_store.init chain_dir ~readonly in
+        let*! ro_floating_block_store =
+          Floating_block_store.init chain_dir ~readonly RO
+        in
+        let ro_floating_block_stores = [ro_floating_block_store] in
+        let*! rw_floating_block_store =
+          Floating_block_store.init chain_dir ~readonly RW
+        in
+        let genesis_descr = Block_repr.descriptor genesis_block in
+        let* savepoint =
+          Stored_data.init
+            (Naming.savepoint_file chain_dir)
+            ~initial_data:genesis_descr
+        in
+        let*! _, savepoint_level = Stored_data.get savepoint in
+        Prometheus.Gauge.set
+          Store_metrics.metrics.savepoint_level
+          (Int32.to_float savepoint_level) ;
+        let* caboose =
+          Stored_data.init
+            (Naming.caboose_file chain_dir)
+            ~initial_data:genesis_descr
+        in
+        let*! _, caboose_level = Stored_data.get caboose in
+        Prometheus.Gauge.set
+          Store_metrics.metrics.caboose_level
+          (Int32.to_float caboose_level) ;
+        let* status_data =
+          Stored_data.init
+            (Naming.block_store_status_file chain_dir)
+            ~initial_data:Block_store_status.create_idle_status
+        in
+        let block_cache =
+          Block_lru_cache.create
+            (Option.value block_cache_limit ~default:default_block_cache_limit)
+        in
+        let merge_scheduler = Lwt_idle_waiter.create () in
+        let merge_mutex = Lwt_mutex.create () in
+        let* stored_data_lockfile =
+          create_lockfile Naming.stored_data_lockfile chain_dir
+        in
+        let block_store =
+          {
+            chain_dir;
+            genesis_block;
+            readonly;
+            cemented_store;
+            ro_floating_block_stores;
+            rw_floating_block_store;
+            caboose;
+            savepoint;
+            status_data;
+            block_cache;
+            gc_callback = None;
+            split_callback = None;
+            merge_mutex;
+            merge_scheduler;
+            merging_thread = None;
+            lockfile;
+            stored_data_lockfile;
+          }
+        in
+        let* () =
+          if not readonly then may_recover_merge block_store else return_unit
+        in
+        let*! status = Stored_data.get status_data in
+        let* () =
+          fail_when
+            (Block_store_status.is_merging status && not readonly)
+            Cannot_load_degraded_store
+        in
+        return block_store)
+      (fun () -> unlock lockfile)
   in
   return block_store
+
+let lock_block_store {lockfile; _} = lock lockfile
+
+let unlock_block_store {lockfile; _} = unlock lockfile
+
+let sync ~last_status block_store =
+  let open Lwt_result_syntax in
+  Lwt.finalize
+    (fun () ->
+      let*! () = lock block_store.lockfile in
+      let chain_dir = block_store.chain_dir in
+      let readonly = true in
+      let* stored_status =
+        Stored_data.load (Naming.block_store_status_file chain_dir)
+      in
+      let*! current_status = Stored_data.get stored_status in
+      let fbs =
+        block_store.rw_floating_block_store
+        :: block_store.ro_floating_block_stores
+      in
+      (* Prepare resources cleaners for former resources. *)
+      let cleanups () = List.iter_s Floating_block_store.close fbs in
+      let no_cleanup () = Lwt.return_unit in
+      let is_last_status_merging = Block_store_status.is_merging last_status in
+      let is_current_status_merging =
+        Block_store_status.is_merging current_status
+      in
+      let last_status_id = Block_store_status.get_status_value last_status in
+      let current_status_id =
+        Block_store_status.get_status_value current_status
+      in
+      let* new_block_store, cleanups =
+        match (is_last_status_merging, is_current_status_merging) with
+        | (false, false | true, true) when last_status_id = current_status_id ->
+            (* The status has not changed (Idle to Idle or Merging to
+               Merging where status ids are equal)since the last sync:
+               we only reload the floating stores. *)
+            let () = List.iter Floating_block_store.may_sync fbs in
+            return (block_store, no_cleanup)
+        | false, false | true, false ->
+            (* A complete merge occurred (Idle to Idle where status
+               ids are different) since the last sync or a merge (that
+               was ongoing during the last sync) finished.
+               We need to:
+               - open the new floating stores and update some store
+               values,
+               - synchronize the new cemented store indexes and block
+                 files. *)
+            let*! ro_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RO
+            in
+            let ro_floating_block_stores = [ro_floating_block_store] in
+            let*! rw_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RW
+            in
+            let () =
+              Cemented_block_store.may_synchronize_indexes
+                block_store.cemented_store
+            in
+            let* () =
+              Cemented_block_store.reload_cemented_blocks_files
+                block_store.cemented_store
+            in
+            let* savepoint =
+              Stored_data.load (Naming.savepoint_file chain_dir)
+            in
+            let* caboose = Stored_data.load (Naming.caboose_file chain_dir) in
+            let status_data = block_store.status_data in
+            return
+              ( {
+                  block_store with
+                  ro_floating_block_stores;
+                  rw_floating_block_store;
+                  savepoint;
+                  caboose;
+                  status_data;
+                },
+                cleanups )
+        | false, true | true, true ->
+            (* A merge has started (Idle to Merging) since the last
+               sync or a merge that was ongoing during the last sync
+               finished and a new one is now ongoing (Merging to
+               Merging where status ids are different): we need to
+               open the temporary floating stores and update some
+               store values. *)
+            let*! ro_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RO
+            in
+            let*! rw_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RW
+            in
+            let ro_floating_block_stores =
+              [ro_floating_block_store; rw_floating_block_store]
+            in
+            let*! rw_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RW_TMP
+            in
+            let* savepoint =
+              Stored_data.load (Naming.savepoint_file chain_dir)
+            in
+            let* caboose = Stored_data.load (Naming.caboose_file chain_dir) in
+            let status_data = block_store.status_data in
+            return
+              ( {
+                  block_store with
+                  ro_floating_block_stores;
+                  rw_floating_block_store;
+                  savepoint;
+                  caboose;
+                  status_data;
+                },
+                cleanups )
+      in
+      return (new_block_store, current_status, cleanups))
+    (fun () -> unlock block_store.lockfile)
 
 let create ?block_cache_limit chain_dir ~genesis_block =
   let open Lwt_result_syntax in

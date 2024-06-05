@@ -29,6 +29,7 @@ type t = {
   rpc_comm_socket_path : string;
   internal_events : Tezos_base.Internal_event_config.t;
   node_version : Tezos_version.Octez_node_version.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 (** Encoding for parameters type {!t} *)

@@ -141,6 +141,10 @@ type t
 
     Default value for [max_active_rpc_connections] is [500].
 
+    [local_rpc_server] specify whether or not the RPC server must be
+    run locally, if true (default), or on a external process. It is
+    not allowed yet to run both server kinds at the same time.
+
     The argument list is a list of configuration options that the node
     should run with. It is passed to the first run of [octez-node config init].
     It is also passed to all runs of [octez-node run] that occur before
@@ -608,7 +612,7 @@ val init :
     port of [node]. *)
 val send_raw_data : t -> data:string -> unit Lwt.t
 
-(** [upgrade_storage node] upprades the given [node] storage. *)
+(** [upgrade_storage node] upgrades the given [node] storage. *)
 val upgrade_storage : t -> unit Lwt.t
 
 (** Run [octez-node --version] and return the node's version. *)

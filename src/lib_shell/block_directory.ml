@@ -853,19 +853,34 @@ let build_raw_rpc_directory_without_validator
        proto_services) ;
   !dir
 
-let get_protocol hash =
+let get_protocol ?(allow_retry = false) chain_store hash =
+  let open Lwt_syntax in
   match Registered_protocol.get hash with
-  | None -> raise Not_found
-  | Some protocol -> protocol
+  | None when allow_retry -> (
+      let store = Store.Chain.global_store chain_store in
+      let* proto = Store.Protocol.read store hash in
+      match proto with
+      | Some proto -> (
+          (* After the injection of a protocol, the rpc_process is not
+             aware of that newly registered protocol. We need to try,
+             at least once, to compile and register that new
+             protocol. *)
+          let* (_ : bool) = Updater.compile hash proto in
+          match Registered_protocol.get hash with
+          | Some protocol -> return protocol
+          | None -> Lwt.fail Not_found)
+      | None -> Lwt.fail Not_found)
+  | None -> Lwt.fail Not_found
+  | Some protocol -> return protocol
 
-let load_proto chain_store block (module Next_proto : Registered_protocol.T) =
+let get_proto_hash chain_store block ~next_protocol_hash =
   let open Lwt_syntax in
   let* o = Store.Block.read_predecessor_opt chain_store block in
   match o with
   | None ->
       (* No predecessors (e.g. pruned caboose), return the
          current protocol *)
-      Lwt.return (module Next_proto : Registered_protocol.T)
+      return next_protocol_hash
   | Some pred ->
       let* _, savepoint_level = Store.Chain.savepoint chain_store in
       let* protocol_hash =
@@ -881,7 +896,7 @@ let load_proto chain_store block (module Next_proto : Registered_protocol.T) =
           Lwt.return protocol_hash
         else Store.Block.protocol_hash_exn chain_store pred
       in
-      Lwt.return (get_protocol protocol_hash)
+      return protocol_hash
 
 let get_directory_with_validator chain_store block =
   let open Lwt_syntax in
@@ -892,7 +907,7 @@ let get_directory_with_validator chain_store block =
       let* next_protocol_hash =
         Store.Block.protocol_hash_exn chain_store block
       in
-      let (module Next_proto) = get_protocol next_protocol_hash in
+      let* (module Next_proto) = get_protocol chain_store next_protocol_hash in
       if Store.Block.is_genesis chain_store (Store.Block.hash block) then
         let dir =
           build_raw_rpc_directory_without_validator
@@ -907,7 +922,8 @@ let get_directory_with_validator chain_store block =
         Lwt.return (Tezos_rpc.Directory.merge dir dir_with_validator)
       else
         let* (module Proto) =
-          load_proto chain_store block (module Next_proto)
+          let* h = get_proto_hash chain_store block ~next_protocol_hash in
+          get_protocol chain_store h
         in
         let* o = Store.Chain.get_rpc_directory chain_store block in
         match o with
@@ -944,7 +960,9 @@ let get_directory_without_validator chain_store block =
       let* next_protocol_hash =
         Store.Block.protocol_hash_exn chain_store block
       in
-      let (module Next_proto) = get_protocol next_protocol_hash in
+      let* (module Next_proto) =
+        get_protocol chain_store next_protocol_hash ~allow_retry:true
+      in
       if Store.Block.is_genesis chain_store (Store.Block.hash block) then
         let dir =
           build_raw_rpc_directory_without_validator
@@ -954,7 +972,8 @@ let get_directory_without_validator chain_store block =
         Lwt.return dir
       else
         let* (module Proto) =
-          load_proto chain_store block (module Next_proto)
+          let* h = get_proto_hash chain_store block ~next_protocol_hash in
+          get_protocol chain_store h ~allow_retry:true
         in
         let* o = Store.Chain.get_rpc_directory chain_store block in
         match o with

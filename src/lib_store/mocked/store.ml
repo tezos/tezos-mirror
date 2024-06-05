@@ -1874,6 +1874,8 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
       ?history_mode
       ~allow_testchains)
 
+let sync ?last_status:_ _store = Stdlib.failwith "sync: unimplemented"
+
 let close_store global_store =
   Lwt_watcher.shutdown_input global_store.protocol_watcher ;
   Lwt_watcher.shutdown_input global_store.global_block_watcher ;

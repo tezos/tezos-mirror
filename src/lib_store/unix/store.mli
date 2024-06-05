@@ -223,6 +223,17 @@ val init :
   Genesis.t ->
   store tzresult Lwt.t
 
+(** [sync ?last_status ~trigger_hash store] performs a store
+    synchronization to update all the data and file descriptors. This
+    is useful to keep track of a store opened in readonly mode that is
+    updated by another read/write instance.
+    [?last_status] gives a hint regarding the previous synchronization
+    to speed up the process. *)
+val sync :
+  ?last_status:Block_store_status.t ->
+  t ->
+  (t * Block_store_status.t * (unit -> unit Lwt.t)) tzresult Lwt.t
+
 (** [main_chain_store global_store] returns the main chain store. *)
 val main_chain_store : store -> chain_store
 
