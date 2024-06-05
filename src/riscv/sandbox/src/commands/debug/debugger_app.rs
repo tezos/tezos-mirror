@@ -41,6 +41,29 @@ pub struct Instruction {
     jump: Option<(u64, Option<String>)>,
 }
 
+impl Instruction {
+    fn new(address: u64, text: String, symbols: &HashMap<u64, &str>) -> Self {
+        let jump = match text
+            .split(' ')
+            .next()
+            .expect("Unexpected instruction format")
+        {
+            "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
+                text.split(',').last().map(|jump_address| {
+                    let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
+                    (addr, symbols.get(&addr).map(|s| s.to_string()))
+                })
+            }
+            _ => None,
+        };
+        Self {
+            address,
+            text,
+            jump,
+        }
+    }
+}
+
 enum EffectiveTranslationState {
     Off,
     On,
@@ -122,37 +145,14 @@ struct ProgramView<'a> {
     symbols: HashMap<u64, &'a str>,
 }
 
-pub struct DebuggerApp<'a> {
+pub struct DebuggerApp<'a, S> {
     title: &'a str,
-    interpreter: &'a mut TestStepper<'a>,
+    interpreter: &'a mut S,
     program: ProgramView<'a>,
     state: DebuggerState,
 }
 
-impl Instruction {
-    fn new(address: u64, text: String, symbols: &HashMap<u64, &str>) -> Self {
-        let jump = match text
-            .split(' ')
-            .next()
-            .expect("Unexpected instruction format")
-        {
-            "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
-                text.split(',').last().map(|jump_address| {
-                    let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
-                    (addr, symbols.get(&addr).map(|s| s.to_string()))
-                })
-            }
-            _ => None,
-        };
-        Self {
-            address,
-            text,
-            jump,
-        }
-    }
-}
-
-impl<'a> DebuggerApp<'a> {
+impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
         let mut backend = TestStepper::<'_>::create_backend();
         let (mut interpreter, prog) =

@@ -5,13 +5,20 @@
 
 use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use octez_riscv::{
-    machine_state::{bus::Address, csregisters::CSRegister, AccessType},
+    machine_state::{
+        bus::{Address, Addressable},
+        csregisters::CSRegister,
+        AccessType,
+    },
     parser::{instruction::Instr, parse},
-    stepper::test::TestStepperResult,
+    stepper::{
+        test::{TestStepper, TestStepperResult},
+        Stepper,
+    },
 };
 use std::{collections::HashMap, ops::Range};
 
-impl<'a> DebuggerApp<'a> {
+impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     pub(super) fn update_after_step(&mut self, result: TestStepperResult) {
         let (pc, faulting) = self.update_pc_after_step();
         self.update_translation_after_step(faulting);
@@ -42,8 +49,12 @@ impl<'a> DebuggerApp<'a> {
 
     /// Returns the physical program counter, and if the translation algorithm is faulting
     fn update_pc_after_step(&mut self) -> (Address, bool) {
-        let raw_pc = self.interpreter.read_pc();
-        let res @ (pc, _faulting) = match self.interpreter.translate_instruction_address(raw_pc) {
+        let raw_pc = self.interpreter.machine_state().hart.pc.read();
+        let res @ (pc, _faulting) = match self
+            .interpreter
+            .machine_state()
+            .translate(raw_pc, AccessType::Instruction)
+        {
             Err(_e) => (self.state.prev_pc, true),
             Ok(pc) => (pc, false),
         };
@@ -57,8 +68,14 @@ impl<'a> DebuggerApp<'a> {
     fn update_translation_after_step(&mut self, faulting: bool) {
         let effective_mode = self
             .interpreter
+            .machine_state()
             .effective_translation_alg(&AccessType::Instruction);
-        let satp_val = self.interpreter.read_csregister(CSRegister::satp);
+        let satp_val = self
+            .interpreter
+            .machine_state()
+            .hart
+            .csregisters
+            .read(CSRegister::satp);
         self.state
             .translation
             .update(faulting, effective_mode, satp_val)
@@ -102,7 +119,9 @@ impl<'a> DebuggerApp<'a> {
     ) -> Vec<Instruction> {
         let get_u16_at = |addr: Address| -> Option<(Address, u16)> {
             self.interpreter
-                .read_bus(addr)
+                .machine_state()
+                .bus
+                .read(addr)
                 .ok()
                 .map(|bytes| (addr, bytes))
         };
