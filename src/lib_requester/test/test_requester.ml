@@ -158,20 +158,28 @@ let test_read_known_read_opt () =
     (r = Error [Test_Requester.Missing_data "baz"; Exn Not_found])
       value_tzresult_typ
       ~__LOC__
-      ~error_msg:"missing data") ;
+      ~error_msg:"missing data, obtained %L, expected %R") ;
   let* ro = Test_Requester.read_opt requester "baz" in
-  Check.((ro = None) (option value_typ) ~__LOC__ ~error_msg:"should be none") ;
+  Check.(
+    (ro = None)
+      (option value_typ)
+      ~__LOC__
+      ~error_msg:"oblained %L, should be none") ;
   let* _ = Test_Requester.inject requester "baz" 1 in
   let* b = Test_Requester.known requester "baz" in
   if not b then Test.fail "baz is now known" ;
   let* r = Test_Requester.read requester "baz" in
-  Check.((r = Ok 1) value_tzresult_typ ~__LOC__ ~error_msg:"baz can be read") ;
+  Check.(
+    (r = Ok 1)
+      value_tzresult_typ
+      ~__LOC__
+      ~error_msg:"baz can be read, but result is %L") ;
   let* ro = Test_Requester.read_opt requester "baz" in
   Check.(
     (ro = Some 1)
       (option value_typ)
       ~__LOC__
-      ~error_msg:"read_opt baz is (Some 1)") ;
+      ~error_msg:"read_opt baz should be (Some 1) but is %L") ;
   unit
 
 (** Creates a requester. At first, no key "boo" is known to the
@@ -211,7 +219,7 @@ let test_full_requester_fetch_timeout () =
       (res = Error [Test_Requester.Timeout v])
         value_tzresult_typ
         ~__LOC__
-        ~error_msg:"should timeout") ;
+        ~error_msg:"should timeout, but returned %L") ;
     unit
   in
   let* () = do_timeout (Ptime.Span.of_int_s 0) "foo" in
@@ -242,7 +250,7 @@ let test_full_fetch_issues_request () =
     (!Test_request.registered_requests = [])
       (list (tuple3 unit Tzcheck.p2p_peer_id (list key_typ)))
       ~__LOC__
-      ~error_msg:"should have no requests") ;
+      ~error_msg:"should have no requests, but has %L") ;
   let f1 =
     Test_Requester.fetch
       ~timeout:
@@ -259,14 +267,14 @@ let test_full_fetch_issues_request () =
     (List.length !Test_request.registered_requests = 5)
       int
       ~__LOC__
-      ~error_msg:"expects 5 requests") ;
+      ~error_msg:"expects 5 requests, but has %L requests") ;
   Check.(
     (WithExceptions.Option.get ~loc:__LOC__
      @@ List.hd !Test_request.registered_requests
     = ((), P2p_peer.Id.zero, ["baz"]))
       (tuple3 unit Tzcheck.p2p_peer_id (list key_typ))
       ~__LOC__
-      ~error_msg:"should have sent a request") ;
+      ~error_msg:"should have sent a request, but returned %L") ;
   Lwt.cancel f1 ;
   unit
 
@@ -303,7 +311,7 @@ let test_full_fetch_request_unrequested_peers_first () =
     (!Test_request.registered_requests = [])
       (list (tuple3 unit Tzcheck.p2p_peer_id (list key_typ)))
       ~__LOC__
-      ~error_msg:"should have no requests") ;
+      ~error_msg:"should have no request, but has %L") ;
   Test_request.active_peers := P2p_peer.Set.add unused_peer requestable_peers ;
   (* Fetch one time for each peer that should be requested for this data. *)
   let fetch_promises =
@@ -387,7 +395,7 @@ let test_full_fetch_request_unrequested_peers_first () =
       ~__LOC__
       ~error_msg:
         "all requestable_peers should be requested once before rerequesting a \
-         peer") ;
+         peer, but it is not the case in returned values %L") ;
   (* Clean up. *)
   Test_request.reinitialize () ;
   unit
@@ -434,7 +442,7 @@ let test_clear_or_cancel_cancels () =
     (res = Error [Test_Requester.Canceled "foo"])
       value_tzresult_typ
       ~__LOC__
-      ~error_msg:"fetch returns cancellation") ;
+      ~error_msg:"fetch should return cancellation, but returned %L") ;
   unit
 
 (** Creates a requester. Key "foo" is unknown yet. It is fetched two times,
@@ -472,7 +480,7 @@ let test_clear_or_cancel_decrements () =
     (res = Error [Test_Requester.Canceled "foo"])
       value_tzresult_typ
       ~__LOC__
-      ~error_msg:"fetch returns cancellation") ;
+      ~error_msg:"fetch should return cancellation, but returned %L") ;
   unit
 
 (** Test pending *)
@@ -558,7 +566,7 @@ let test_full_requester_test_simple_watch () =
     (stream_list = [("foo", 1); ("bar", 2)])
       (list (tuple2 string int))
       ~__LOC__
-      ~error_msg:"obtained stream") ;
+      ~error_msg:"obtained stream %L, expected %R") ;
   Lwt_watcher.shutdown stopper ;
   unit
 
@@ -598,14 +606,14 @@ let test_full_requester_test_double_watcher () =
     (stream_list1 = [("foo", 1)])
       (list (tuple2 string int))
       ~__LOC__
-      ~error_msg:"obtained stream1") ;
+      ~error_msg:"obtained stream1 %L, expected %R") ;
   (* check second stream *)
   let* stream_list2 = Lwt_stream.nget 1 stream2 in
   Check.(
     (stream_list2 = [("foo", 1)])
       (list (tuple2 string int))
       ~__LOC__
-      ~error_msg:"obtained stream2") ;
+      ~error_msg:"obtained stream2 %L, expected %R") ;
   (* shutdown first stream *)
   Lwt_watcher.shutdown stopper1 ;
   (* Fetch a values *)
@@ -622,7 +630,7 @@ let test_full_requester_test_double_watcher () =
     (stream_list2 = [("bar", 2)])
       (list (tuple2 string int))
       ~__LOC__
-      ~error_msg:"obtained second value in stream2 ") ;
+      ~error_msg:"obtained second value in stream2 is %L, expected was %R") ;
   Lwt_watcher.shutdown stopper2 ;
   unit
 
@@ -790,19 +798,21 @@ let test_full_requester_test_pending_requests () =
       ]
   in
   (* Fetch value  *)
-  check_pending_count "0 pending requests" 0 ;
+  check_pending_count "should have %R pending requests, has %L" 0 ;
   let* () =
     with_request "foo" (fun () ->
-        check_pending_count "1 pending requests" 1 ;
+        check_pending_count "should have %R pending requests, has %L" 1 ;
         with_unmet_request "bar" (fun () ->
-            check_pending_count "2 pending requests" 2 ;
+            check_pending_count "should have %R pending requests, has %L" 2 ;
             with_unmet_request "bar" (fun () ->
-                check_pending_count "still 2 pending requests" 2 ;
+                check_pending_count
+                  "should still have %R pending requests, has %L"
+                  2 ;
                 Test_Requester.clear_or_cancel req "foo" ;
                 (* The first "foo" fetch should be resolved *)
                 Lwt_unix.sleep 0.1)))
   in
-  check_pending_count "back to 1 pending requests" 1 ;
+  check_pending_count "should be back to %R pending requests, has %L" 1 ;
   unit
 
 (** Test memory_table_length *)
@@ -815,31 +825,31 @@ let test_full_requester_test_memory_table_length () =
     (Test_Requester.memory_table_length req = 0)
       int
       ~__LOC__
-      ~error_msg:"0 cached values") ;
+      ~error_msg:"should have %R cached values, has %L") ;
   let* _ = Test_Requester.inject req "foo" 1 in
   Check.(
     (Test_Requester.memory_table_length req = 1)
       int
       ~__LOC__
-      ~error_msg:"1 cached values") ;
+      ~error_msg:"should have %R cached values, has %L") ;
   let* _ = Test_Requester.inject req "bar" 2 in
   Check.(
     (Test_Requester.memory_table_length req = 2)
       int
       ~__LOC__
-      ~error_msg:"2 cached values") ;
+      ~error_msg:"should have %R cached values, has %L") ;
   let* _ = Test_Requester.inject req "bar" 2 in
   Check.(
     (Test_Requester.memory_table_length req = 2)
       int
       ~__LOC__
-      ~error_msg:"still 2 cached values") ;
+      ~error_msg:"should still have %R cached values, has %L") ;
   let* _ = Test_Requester.inject req "baz" 3 in
   Check.(
     (Test_Requester.memory_table_length req = 3)
       int
       ~__LOC__
-      ~error_msg:"now 3 cached values") ;
+      ~error_msg:"should now have %R cached values, has %L") ;
   unit
 
 (** Test shutdown *)
