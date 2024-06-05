@@ -13,11 +13,17 @@ Octez Node
 
 The REST API served by the Octez node on the RPC port is described by the union of several OpenAPI specifications:
 
-- ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs
+- ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs in the last (candidate) release
+- ``rpc-openapi-dev.json``, containing the protocol-independent (or "shell") RPCs in the current development version (branch ``master``)
 - For each protocol in use:
 
   + ``$PROTOCOL-openapi.json`` (served under the prefix: ``/chains/<chain-id>/blocks/<block-id>``)
   + ``$PROTOCOL-mempool-openapi.json`` (served under the prefix: ``/chains/<chain-id>/mempool``)
+
+- For the Alpha protocol, under development (branch ``master``):
+
+  + ``alpha-openapi-dev.json`` (served under the prefix: ``/chains/<chain-id>/blocks/<block-id>``)
+  + ``alpha-mempool-openapi-dev.json`` (served under the prefix: ``/chains/<chain-id>/mempool``)
 
 For instance, for an RPC listed as ``GET /filter`` in ``$PROTOCOL-mempool-openapi.json``, its real endpoint is ``GET /chains/<chain-id>/mempool/filter``.
 
@@ -52,6 +58,7 @@ The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - `rpc-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi-dev.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -67,6 +74,19 @@ The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Paris protocol can be found at:
 
 - `paris-mempool-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi.json>`_
+
+Alpha RPCs
+----------
+
+The OpenAPI specifications for RPCs which are specific to the Alpha
+protocol can be found at:
+
+- `alpha-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/alpha-openapi-dev.json>`_
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Alpha protocol can be found at:
+
+- `alpha-mempool-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/alpha-mempool-openapi-dev.json>`_
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -87,6 +107,14 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 - `paris-smart-rollup-node-openapi.json (version 20.2)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi.json>`_
 
+Alpha RPCs
+----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Alpha
+protocol can be found at:
+
+- `alpha-smart-rollup-node-openapi-dev.json (version master)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/alpha-smart-rollup-node-openapi-dev.json>`_
 
 DAL Node
 ~~~~~~~~
@@ -95,6 +123,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - `dal-node-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi.json>`_
+- `dal-node-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi-rc-dev.json>`_
 
 .. _openapi_generate:
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# This script launches a sandbox node, activates Granada, gets the RPC descriptions
+# This script launches a sandbox node, activates protocol $protocol_name, gets the RPC descriptions
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
@@ -61,7 +61,7 @@ $tezos_node run --data-dir $data_dir --connections 0 &
 node_pid="$!"
 
 # Wait for the node to be ready (sorry for the hackish way...)
-sleep 1
+sleep 3
 
 # Activate the protocol.
 mkdir $client_dir

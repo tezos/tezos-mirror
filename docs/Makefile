@@ -167,6 +167,10 @@ rpc: user/default-acl.json shell/rpc.rst \
 # To be triggered manually when needed
 rpc-protocols: $(NAMED_PROTOS:%=%/rpc.rst)
 
+.PHONY: openapi
+openapi:
+	cd ..; ./src/bin_openapi/generate.sh
+
 p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
 	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
 
@@ -248,3 +252,4 @@ clean:
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst beta/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html alpha/octez-*.html beta/octez-*.html
+	@-rm -Rf ../openapi-tmp
