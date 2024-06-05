@@ -16,7 +16,7 @@
 //! use tezos_smart_rollup::prelude::*;
 //!
 //! #[entrypoint::main]
-//! #[entrypoint::runtime(static_inbox = "path/inbox.json")]
+//! #[entrypoint::runtime(static_inbox = "../data/inbox.json")]
 //! pub fn f(host: &mut impl Runtime) {
 //!     // user kernel code
 //! }
