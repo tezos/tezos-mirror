@@ -5,7 +5,7 @@
 
 use crate::{cli::RunOptions, format_status, posix_exit_mode};
 use octez_riscv::{
-    exec_env::posix::Posix,
+    machine_state::bus::main_memory::M1G,
     stepper::test::{TestStepper, TestStepperResult},
 };
 use std::error::Error;
@@ -13,7 +13,7 @@ use std::error::Error;
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let path = opts.input;
     let contents = std::fs::read(path)?;
-    let mut backend = TestStepper::<'_, Posix>::create_backend();
+    let mut backend = TestStepper::<'_, M1G>::create_backend();
     let mut interpreter = TestStepper::new(
         &mut backend,
         &contents,

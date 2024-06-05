@@ -8,7 +8,6 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use octez_riscv::{
     bits::Bits64,
-    exec_env::posix::Posix,
     kernel_loader,
     machine_state::{
         bus::Address,
@@ -155,7 +154,7 @@ impl Instruction {
 
 impl<'a> DebuggerApp<'a> {
     pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
-        let mut backend = TestStepper::<'_, Posix>::create_backend();
+        let mut backend = TestStepper::<'_>::create_backend();
         let (mut interpreter, prog) =
             TestStepper::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
         let symbols = kernel_loader::get_elf_symbols(contents)?;

@@ -10,7 +10,7 @@ pub mod dummy_pvm;
 use crate::{
     exec_env::{
         self,
-        pvm::{PvmSbi, PvmStatus},
+        pvm::{PvmSbi, PvmSbiConfig, PvmSbiState, PvmStatus},
         ExecutionEnvironment, ExecutionEnvironmentState,
     },
     machine_state::{self, bus::main_memory, StepManyResult},
@@ -20,40 +20,34 @@ use crate::{
 use std::ops::RangeBounds;
 
 /// PVM state layout
-pub type PvmLayout<EE, ML> = (
+pub type PvmLayout<ML> = (
     state_backend::Atom<u64>,
     machine_state::MachineStateLayout<ML>,
-    <EE as ExecutionEnvironment>::Layout,
+    <PvmSbi as ExecutionEnvironment>::Layout,
 );
 
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;
 
 /// Proof-generating virtual machine
-pub struct Pvm<
-    EE: ExecutionEnvironment,
-    ML: main_memory::MainMemoryLayout,
-    M: state_backend::Manager,
-> {
+pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> {
     version: state_backend::Cell<u64, M>,
     pub(crate) machine_state: machine_state::MachineState<ML, M>,
 
     /// Execution environment state
-    pub exec_env_state: EE::State<M>,
+    pub exec_env_state: PvmSbiState<M>,
 }
 
-impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backend::Manager>
-    Pvm<EE, ML, M>
-{
+impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// Bind the PVM to the given allocated region.
-    pub fn bind(space: state_backend::AllocatedOf<PvmLayout<EE, ML>, M>) -> Self {
+    pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML>, M>) -> Self {
         // Ensure we're binding a version we can deal with
         assert_eq!(space.0.read(), INITIAL_VERSION);
 
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
-            exec_env_state: EE::State::<M>::bind(space.2),
+            exec_env_state: PvmSbiState::<M>::bind(space.2),
         }
     }
 
@@ -67,7 +61,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     /// Handle an exception using the defined Execution Environment.
     pub fn handle_exception(
         &mut self,
-        config: &mut EE::Config<'_>,
+        config: &mut PvmSbiConfig<'_>,
         exception: EnvironException,
     ) -> exec_env::EcallOutcome {
         match exception {
@@ -81,7 +75,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, config: &mut EE::Config<'_>) -> Result<(), EvalError> {
+    pub fn eval_one(&mut self, config: &mut PvmSbiConfig<'_>) -> Result<(), EvalError> {
         if let Err(exc) = self.machine_state.step() {
             if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(config, exc) {
                 return Err(EvalError {
@@ -112,7 +106,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
     // Trampoline style function for [eval_range]
     pub fn eval_range<F>(
         &mut self,
-        config: &mut EE::Config<'_>,
+        config: &mut PvmSbiConfig<'_>,
         step_bounds: &impl RangeBounds<usize>,
         should_continue: F,
     ) -> EvalManyResult
@@ -136,9 +130,7 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
                 },
             )
     }
-}
 
-impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<PvmSbi, ML, M> {
     /// Provide input. Returns `false` if the machine state is not expecting
     /// input.
     pub fn provide_input(&mut self, level: u64, counter: u64, payload: &[u8]) -> bool {
@@ -182,12 +174,12 @@ mod tests {
     #[test]
     fn test_read_input() {
         type ML = M1M;
-        type L = PvmLayout<PvmSbi, ML>;
+        type L = PvmLayout<ML>;
 
         // Setup PVM
         let (mut backend, placed) = InMemoryBackend::<L>::new();
         let space = backend.allocate(placed);
-        let mut pvm = Pvm::<PvmSbi, ML, _>::bind(space);
+        let mut pvm = Pvm::<ML, _>::bind(space);
         pvm.reset();
 
         let buffer_addr = start_of_main_memory::<ML>();
@@ -264,7 +256,7 @@ mod tests {
     #[test]
     fn test_write_debug() {
         type ML = M1M;
-        type L = PvmLayout<PvmSbi, ML>;
+        type L = PvmLayout<ML>;
 
         let mut buffer = Vec::new();
         let mut pvm_config = PvmSbiConfig::new(|c| buffer.push(c));
@@ -272,7 +264,7 @@ mod tests {
         // Setup PVM
         let (mut backend, placed) = InMemoryBackend::<L>::new();
         let space = backend.allocate(placed);
-        let mut pvm = Pvm::<PvmSbi, ML, _>::bind(space);
+        let mut pvm = Pvm::<ML, _>::bind(space);
         pvm.reset();
 
         // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
