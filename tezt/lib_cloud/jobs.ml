@@ -96,7 +96,7 @@ let destroy_vms ~tags =
   Test.register
     ~__FILE__
     ~title:"Destroy terraform VMs"
-    ~tags:("terraform" :: "destroy" :: tags)
+    ~tags:("terraform" :: "destroy" :: "vms" :: tags)
   @@ fun () ->
   let tezt_cloud = Lazy.force Env.tezt_cloud in
   Log.info "Tezt_Cloud found with value: %s" tezt_cloud ;
