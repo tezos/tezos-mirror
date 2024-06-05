@@ -111,7 +111,8 @@ let add_transaction ~transaction =
   Internal_event.Simple.emit Event.add_transaction transaction
 
 let invalid_transaction ~transaction =
-  Internal_event.Simple.emit Event.invalid_transaction transaction
+  let Ethereum_types.(Hex tx_str) = transaction in
+  Internal_event.Simple.emit Event.invalid_transaction tx_str
 
 let users_threshold_reached =
   Internal_event.Simple.emit Event.users_threshold_reached

@@ -340,7 +340,7 @@ let dispatch_request (config : Configuration.t)
             match is_valid with
             | Error err ->
                 let*! () =
-                  Tx_pool_events.invalid_transaction ~transaction:txn
+                  Tx_pool_events.invalid_transaction ~transaction:tx_raw
                 in
                 rpc_error (Rpc_errors.transaction_rejected err None)
             | Ok is_valid -> (
