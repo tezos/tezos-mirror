@@ -725,11 +725,15 @@ module Make_s
                    pv.shell.live_blocks)
             then
               failwith
-                "Operation %a is branched on a block %a which is too old"
+                "Operation %a is branched on either:\n\
+                \ - a block %a which is too old (%d blocks in the past)\n\
+                \ - a predecessor block from an alternative branch which is \
+                 now unknown"
                 Operation_hash.pp
                 oph
                 Block_hash.pp
                 op.Operation.shell.branch
+                (Block_hash.Set.cardinal pv.shell.live_blocks)
             else
               let notifier = mk_notifier pv.operation_stream in
               let*! validation_state, validated_operation, to_handle =
