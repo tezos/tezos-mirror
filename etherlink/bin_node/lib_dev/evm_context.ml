@@ -263,15 +263,16 @@ let execution_config, execution_config_waker = Lwt.task ()
 
 module State = struct
   let with_store_transaction ctxt k =
-    Evm_store.with_transaction ctxt.store (fun txn_store ->
-        k {ctxt with store = txn_store})
+    Evm_store.use ctxt.store @@ fun conn ->
+    Evm_store.with_transaction conn @@ fun conn -> k conn
 
   let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
   let load ~data_dir ~sqlite_journal_mode ~store_perm:perm index =
     let open Lwt_result_syntax in
     let* store = Evm_store.init ~data_dir ~sqlite_journal_mode ~perm () in
-    let* latest = Evm_store.Context_hashes.find_latest store in
+    Evm_store.use store @@ fun conn ->
+    let* latest = Evm_store.Context_hashes.find_latest conn in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
         let*! context = Irmin_context.checkout_exn index checkpoint in
@@ -298,22 +299,22 @@ module State = struct
     let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
 
-  let commit_next_head (ctxt : t) evm_state =
+  let commit_next_head (ctxt : t) conn evm_state =
     commit
-      ctxt.store
+      conn
       ctxt.session.context
       evm_state
       ctxt.session.next_blueprint_number
 
-  let replace_current_commit (ctxt : t) evm_state =
+  let replace_current_commit (ctxt : t) conn evm_state =
     let (Qty next) = ctxt.session.next_blueprint_number in
-    commit ctxt.store ctxt.session.context evm_state (Qty Z.(pred next))
+    commit conn ctxt.session.context evm_state (Qty Z.(pred next))
 
   let on_modified_head ctxt evm_state context =
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context
 
-  let apply_evm_event_unsafe on_success ctxt evm_state event =
+  let apply_evm_event_unsafe on_success ctxt conn evm_state event =
     let open Lwt_result_syntax in
     let open Ethereum_types in
     let*! () = Evm_events_follower_events.new_event event in
@@ -334,7 +335,7 @@ module State = struct
         in
         let* () =
           Evm_store.Kernel_upgrades.store
-            ctxt.store
+            conn
             ctxt.session.next_blueprint_number
             upgrade
         in
@@ -404,7 +405,7 @@ module State = struct
         in
         let* () =
           Evm_store.Delayed_transactions.store
-            ctxt.store
+            conn
             ctxt.session.next_blueprint_number
             delayed_transaction
         in
@@ -417,12 +418,12 @@ module State = struct
   let apply_evm_events ?finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
     let* context, evm_state, on_success =
-      with_store_transaction ctxt @@ fun ctxt ->
+      with_store_transaction ctxt @@ fun conn ->
       let* on_success, ctxt, evm_state =
         List.fold_left_es
           (fun (on_success, ctxt, evm_state) event ->
             let* evm_state, on_success =
-              apply_evm_event_unsafe on_success ctxt evm_state event
+              apply_evm_event_unsafe on_success ctxt conn evm_state event
             in
             return (on_success, ctxt, evm_state))
           (ignore, ctxt, ctxt.session.evm_state)
@@ -432,10 +433,10 @@ module State = struct
         Option.map_es
           (fun l1_level ->
             let l2_level = current_blueprint_number ctxt in
-            Evm_store.L1_latest_known_level.store ctxt.store l2_level l1_level)
+            Evm_store.L1_latest_known_level.store conn l2_level l1_level)
           finalized_level
       in
-      let* ctxt = replace_current_commit ctxt evm_state in
+      let* ctxt = replace_current_commit ctxt conn evm_state in
       return (ctxt, evm_state, on_success)
     in
     on_modified_head ctxt evm_state context ;
@@ -508,9 +509,10 @@ module State = struct
       This is because [apply_blueprint_store_unsafe] is expected to be called
       within a SQL transaction to make sure the node’s store is not left in an
       inconsistent state in case of error. *)
-  let apply_blueprint_store_unsafe ctxt timestamp payload delayed_transactions =
+  let apply_blueprint_store_unsafe ctxt conn timestamp payload
+      delayed_transactions =
     let open Lwt_result_syntax in
-    Evm_store.assert_in_transaction ctxt.store ;
+    Evm_store.assert_in_transaction conn ;
     let*! data_dir, config = execution_config in
     let (Qty next) = ctxt.session.next_blueprint_number in
 
@@ -540,7 +542,7 @@ module State = struct
           ~transactions:number_of_transactions ;
         let* () =
           Evm_store.Blueprints.store
-            ctxt.store
+            conn
             {number = Qty blueprint_number; timestamp; payload}
         in
 
@@ -552,7 +554,7 @@ module State = struct
         let* () =
           when_ applied_upgrade @@ fun () ->
           Evm_store.Kernel_upgrades.record_apply
-            ctxt.store
+            conn
             ctxt.session.next_blueprint_number
         in
 
@@ -560,7 +562,7 @@ module State = struct
           List.map_es
             (fun hash ->
               let* delayed_transaction =
-                Evm_store.Delayed_transactions.at_hash ctxt.store hash
+                Evm_store.Delayed_transactions.at_hash conn hash
               in
               match delayed_transaction with
               | None ->
@@ -571,7 +573,7 @@ module State = struct
               | Some delayed_transaction -> return delayed_transaction)
             delayed_transactions
         in
-        let* context = commit_next_head ctxt evm_state in
+        let* context = commit_next_head ctxt conn evm_state in
         return
           ( evm_state,
             context,
@@ -605,8 +607,13 @@ module State = struct
            current_block_hash,
            applied_upgrade,
            delayed_transactions ) =
-      with_store_transaction ctxt @@ fun ctxt ->
-      apply_blueprint_store_unsafe ctxt timestamp payload delayed_transactions
+      with_store_transaction ctxt @@ fun conn ->
+      apply_blueprint_store_unsafe
+        ctxt
+        conn
+        timestamp
+        payload
+        delayed_transactions
     in
     let*! () =
       on_new_head
@@ -677,16 +684,15 @@ module State = struct
         =
       load ~data_dir ~sqlite_journal_mode ~store_perm index
     in
-    let* pending_upgrade =
-      Evm_store.Kernel_upgrades.find_latest_pending store
-    in
+    Evm_store.use store @@ fun conn ->
+    let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
     let smart_rollup_address =
       Option.map
         Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
         smart_rollup_address
     in
     let* smart_rollup_address =
-      let* found_smart_rollup_address = Evm_store.Metadata.find store in
+      let* found_smart_rollup_address = Evm_store.Metadata.find conn in
       match (found_smart_rollup_address, smart_rollup_address) with
       | Some found_smart_rollup_address, Some smart_rollup_address ->
           let* () =
@@ -702,7 +708,7 @@ module State = struct
           in
           return smart_rollup_address
       | None, Some smart_rollup_address ->
-          let* () = Evm_store.Metadata.store store smart_rollup_address in
+          let* () = Evm_store.Metadata.store conn smart_rollup_address in
           return smart_rollup_address
       | Some found_smart_rollup_address, None ->
           return found_smart_rollup_address
@@ -721,7 +727,7 @@ module State = struct
           else
             let* evm_state = Evm_state.init ~kernel in
             let (Qty next) = next_blueprint_number in
-            let* context = commit store context evm_state (Qty Z.(pred next)) in
+            let* context = commit conn context evm_state (Qty Z.(pred next)) in
             return (evm_state, context)
       | None ->
           if init_status = Loaded then
@@ -770,14 +776,16 @@ module State = struct
         ~perm:`Read_write
         ()
     in
-    Evm_store.with_transaction store @@ fun store ->
+    Evm_store.use store @@ fun conn ->
+    Evm_store.with_transaction conn @@ fun store ->
     Evm_store.reset store ~l2_level
 
   let last_produced_blueprint (ctxt : t) =
     let open Lwt_result_syntax in
     let (Qty next) = ctxt.session.next_blueprint_number in
     let current = Ethereum_types.Qty Z.(pred next) in
-    let* blueprint = Evm_store.Blueprints.find ctxt.store current in
+    Evm_store.use ctxt.store @@ fun conn ->
+    let* blueprint = Evm_store.Blueprints.find conn current in
     match blueprint with
     | Some blueprint -> return blueprint
     | None -> failwith "Could not fetch the last produced blueprint"
@@ -833,12 +841,13 @@ module State = struct
 
   let blueprint_with_events ctxt level =
     let open Lwt_result_syntax in
-    let* blueprint = Evm_store.Blueprints.find ctxt.store level in
+    Evm_store.use ctxt.store @@ fun conn ->
+    let* blueprint = Evm_store.Blueprints.find conn level in
     match blueprint with
     | None -> return None
     | Some blueprint ->
         let* delayed_transactions =
-          Evm_store.Delayed_transactions.at_level ctxt.store level
+          Evm_store.Delayed_transactions.at_level conn level
         in
         return_some Blueprint_types.{delayed_transactions; blueprint}
 
@@ -879,7 +888,8 @@ module State = struct
     if number > current_block_number then (
       (* The kernel produced a new block, we commit the intermediate state. *)
       let* context =
-        commit ctxt.store ctxt.session.context evm_state (Qty number)
+        Evm_store.use ctxt.store @@ fun conn ->
+        commit conn ctxt.session.context evm_state (Qty number)
       in
       ctxt.session.context <- context ;
       reconstruct_commit_blocks
@@ -936,7 +946,8 @@ module State = struct
             (* The execution with messages produced a block. We commit to this block,
                and loop in case of other blocks. *)
             let* context =
-              commit ctxt.store ctxt.session.context evm_state (Qty number)
+              Evm_store.use ctxt.store @@ fun conn ->
+              commit conn ctxt.session.context evm_state (Qty number)
             in
             ctxt.session.context <- context ;
             reconstruct_commit_blocks
@@ -1036,15 +1047,18 @@ module Handlers = struct
         State.blueprint_with_events ctxt level
     | Blueprints_range {from; to_} ->
         let ctxt = Worker.state self in
-        Evm_store.Blueprints.find_range ctxt.store ~from ~to_
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Blueprints.find_range conn ~from ~to_
     | Last_known_L1_level ->
         let ctxt = Worker.state self in
-        let* level = Evm_store.L1_latest_known_level.find ctxt.store in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* level = Evm_store.L1_latest_known_level.find conn in
         return @@ Option.map snd level
     | New_last_known_L1_level l1_level ->
         let ctxt = Worker.state self in
+        Evm_store.use ctxt.store @@ fun conn ->
         let l2_level = State.current_blueprint_number ctxt in
-        Evm_store.L1_latest_known_level.store ctxt.store l2_level l1_level
+        Evm_store.L1_latest_known_level.store conn l2_level l1_level
     | Delayed_inbox_hashes ->
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
@@ -1064,7 +1078,8 @@ module Handlers = struct
                   (* To respect EIP-1898 we can return error code -32001. *)
                   failwith "Block was not found")
         in
-        let* checkpoint = Evm_store.Context_hashes.find ctxt.store number in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* checkpoint = Evm_store.Context_hashes.find conn number in
         match checkpoint with
         | Some checkpoint ->
             let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
@@ -1073,7 +1088,8 @@ module Handlers = struct
         | None -> return_none)
     | Earliest_state -> (
         let ctxt = Worker.state self in
-        let* checkpoint = Evm_store.Context_hashes.find_earliest ctxt.store in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* checkpoint = Evm_store.Context_hashes.find_earliest conn in
         match checkpoint with
         | Some (_level, checkpoint) ->
             let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
@@ -1082,7 +1098,8 @@ module Handlers = struct
         | None -> return_none)
     | Earliest_number -> (
         let ctxt = Worker.state self in
-        let* checkpoint = Evm_store.Context_hashes.find_earliest ctxt.store in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* checkpoint = Evm_store.Context_hashes.find_earliest conn in
         match checkpoint with
         | Some (level, _checkpoint) -> return_some level
         | None -> return_none)
@@ -1295,9 +1312,10 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   let* store =
     Evm_store.init ~data_dir ~sqlite_journal_mode:`Identity ~perm:`Read_write ()
   in
+  Evm_store.use store @@ fun conn ->
   let* () =
     Evm_store.Context_hashes.store
-      store
+      conn
       (Qty current_blueprint_number)
       checkpoint
   in
