@@ -29,4 +29,5 @@ let ssh_public_key =
 let dockerfile =
   Lazy.from_fun (fun () ->
       let tezt_cloud = Lazy.force tezt_cloud in
-      Path.docker // Format.asprintf "%s.Dockerfile" tezt_cloud)
+      let basename = Option.value ~default:tezt_cloud Cli.dockerfile in
+      Path.docker // Format.asprintf "%s.Dockerfile" basename)
