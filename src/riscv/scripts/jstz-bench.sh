@@ -9,6 +9,7 @@
 set -e
 
 USAGE="Usage: -t <num_transfers> [ -s: static inbox ]"
+DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
 TX=""
 STATIC_INBOX=""
@@ -66,6 +67,7 @@ LOG="${DATA_DIR}/log.out"
   --input ../../tezt/tests/riscv-tests/hermit-loader \
   --initrd jstz/target/riscv64gc-unknown-hermit/release/jstz \
   --inbox-file "$RUN_INBOX" \
+  --address "$DEFAULT_ROLLUP_ADDRESS" \
   --timings > "$LOG" 2> /dev/null
 
 echo "[INFO]: collecting results"

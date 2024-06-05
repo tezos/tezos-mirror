@@ -43,15 +43,15 @@ features = [
 
 [workspace.dependencies.jstz_kernel]
 git = "https://github.com/trilitech/jstz.git"
-rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
+rev = "d9f8d3f887c0d01794b5968479168c87288bd817"
 
 [workspace.dependencies.jstz_crypto]
 git = "https://github.com/trilitech/jstz.git"
-rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
+rev = "d9f8d3f887c0d01794b5968479168c87288bd817"
 
 [workspace.dependencies.jstz_proto]
 git = "https://github.com/trilitech/jstz.git"
-rev = "d12faf23299b706f507e46a7aa517588fa93ec18"
+rev = "d9f8d3f887c0d01794b5968479168c87288bd817"
 
 [workspace.dependencies.serde]
 version = "1.0.197"
@@ -66,5 +66,9 @@ version = "4.4.6"
 features = ["derive"]
 
 [workspace.dependencies.tezos_crypto_rs]
+version = "0.5.2"
+default-features = false
+
+[workspace.dependencies.tezos_data_encoding]
 version = "0.5.2"
 default-features = false

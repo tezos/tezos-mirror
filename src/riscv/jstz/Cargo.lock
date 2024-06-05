@@ -1037,6 +1037,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tezos-smart-rollup",
+ "tezos_data_encoding",
 ]
 
 [[package]]
@@ -1094,7 +1095,7 @@ dependencies = [
 [[package]]
 name = "jstz_api"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d12faf23299b706f507e46a7aa517588fa93ec18#d12faf23299b706f507e46a7aa517588fa93ec18"
+source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
 dependencies = [
  "base64 0.21.7",
  "boa_engine",
@@ -1118,7 +1119,7 @@ dependencies = [
 [[package]]
 name = "jstz_core"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d12faf23299b706f507e46a7aa517588fa93ec18#d12faf23299b706f507e46a7aa517588fa93ec18"
+source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1136,7 +1137,7 @@ dependencies = [
 [[package]]
 name = "jstz_crypto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d12faf23299b706f507e46a7aa517588fa93ec18#d12faf23299b706f507e46a7aa517588fa93ec18"
+source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
 dependencies = [
  "anyhow",
  "boa_gc",
@@ -1150,7 +1151,7 @@ dependencies = [
 [[package]]
 name = "jstz_kernel"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d12faf23299b706f507e46a7aa517588fa93ec18#d12faf23299b706f507e46a7aa517588fa93ec18"
+source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1169,7 +1170,7 @@ dependencies = [
 [[package]]
 name = "jstz_proto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d12faf23299b706f507e46a7aa517588fa93ec18#d12faf23299b706f507e46a7aa517588fa93ec18"
+source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
 dependencies = [
  "boa_engine",
  "boa_gc",
