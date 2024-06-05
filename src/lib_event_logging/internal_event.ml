@@ -189,6 +189,8 @@ let register_section section =
   registered_sections :=
     String.Set.add (Section.name section) !registered_sections
 
+type alternative_color = Magenta | Cyan | Green | Blue
+
 module type EVENT_DEFINITION = sig
   type t
 
@@ -203,6 +205,8 @@ module type EVENT_DEFINITION = sig
   val encoding : t Data_encoding.t
 
   val level : level
+
+  val alternative_color : alternative_color option
 end
 
 module type EVENT = sig
@@ -773,7 +777,7 @@ module Simple = struct
       ~name
       (Data_encoding.With_version.first_version encoding)
 
-  let declare_0 ?section ~name ~msg ?(level = Info) () =
+  let declare_0 ?alternative_color ?section ~name ~msg ?(level = Info) () =
     let section = make_section section in
     let parsed_msg = parse_msg [] msg in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
@@ -791,12 +795,14 @@ module Simple = struct
       let encoding = with_version ~name Data_encoding.unit
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun () -> Event.emit ?section ())}
 
-  let declare_1 (type a) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) =
+  let declare_1 (type a) ?alternative_color ?section ~name ~msg ?(level = Info)
+      ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a = struct
@@ -819,12 +825,14 @@ module Simple = struct
       let encoding = with_version ~name f1_enc
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameter -> Event.emit ?section parameter)}
 
-  let declare_2 (type a b) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_2 (type a b) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name; f2_name] msg in
@@ -855,12 +863,14 @@ module Simple = struct
              (Data_encoding.req f2_name f2_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
-  let declare_3 (type a b c) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_3 (type a b c) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) =
     let section = make_section section in
@@ -894,12 +904,14 @@ module Simple = struct
              (Data_encoding.req f3_name f3_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
-  let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_4 (type a b c d) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) =
@@ -937,12 +949,14 @@ module Simple = struct
              (Data_encoding.req f4_name f4_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
-  let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_5 (type a b c d e) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -985,12 +999,14 @@ module Simple = struct
              (Data_encoding.req f5_name f5_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
-  let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_6 (type a b c d e f) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1036,12 +1052,14 @@ module Simple = struct
              (Data_encoding.req f6_name f6_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
-  let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_7 (type a b c d e f g) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1092,12 +1110,14 @@ module Simple = struct
              (Data_encoding.req f7_name f7_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
-  let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_8 (type a b c d e f g h) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1151,6 +1171,8 @@ module Simple = struct
              (Data_encoding.req f8_name f8_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
     {name; emit = (fun parameters -> Event.emit ?section parameters)}
@@ -1171,6 +1193,8 @@ module Lwt_worker_logger = struct
     let doc = "Worker started event"
 
     let level = Debug
+
+    let alternative_color = None
   end)
 
   module Ended_event = Make (struct
@@ -1187,6 +1211,8 @@ module Lwt_worker_logger = struct
     let doc = "Worker ended event"
 
     let level = Debug
+
+    let alternative_color = None
   end)
 
   module Failed_event = Make (struct
@@ -1204,6 +1230,8 @@ module Lwt_worker_logger = struct
     let doc = "Worker failed event"
 
     let level = Error
+
+    let alternative_color = None
   end)
 
   let on_event name event =
