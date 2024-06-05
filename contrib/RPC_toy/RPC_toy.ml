@@ -40,6 +40,7 @@ let start_server () =
       ~mode:(`TCP (`Port port))
       (Server.make
          ~conn_closed:(fun _ -> Format.printf "Cohttp connection closed\n%!")
+         ~sleep_fn:(fun () -> Lwt_unix.sleep 1.0)
          ~callback
          ())
   in
