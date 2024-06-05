@@ -33,6 +33,7 @@ type mode =
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
+      time_between_blocks : time_between_blocks option;
       devmode : bool;
     }
   | Threshold_encryption_observer of {
@@ -590,6 +591,10 @@ end
 
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
+  let time_between_blocks_fmt = function
+    | Nothing -> "none"
+    | Time_between_blocks f -> Format.sprintf "%.3f" f
+  in
   let mode_args =
     match evm_node.persistent_state.mode with
     | Proxy {devmode} ->
@@ -640,9 +645,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             catchup_cooldown
         @ Cli_arg.optional_arg
             "time-between-blocks"
-            (function
-              | Nothing -> "none"
-              | Time_between_blocks f -> Format.sprintf "%.3f" f)
+            time_between_blocks_fmt
             time_between_blocks
         @ Cli_arg.optional_arg
             "max-number-of-chunks"
@@ -710,9 +713,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             catchup_cooldown
         @ Cli_arg.optional_arg
             "time-between-blocks"
-            (function
-              | Nothing -> "none"
-              | Time_between_blocks f -> Format.sprintf "%.3f" f)
+            time_between_blocks_fmt
             time_between_blocks
         @ Cli_arg.optional_arg
             "max-number-of-chunks"
@@ -733,7 +734,13 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             string_of_int
             tx_pool_tx_per_addr_limit
     | Observer
-        {preimages_dir; initial_kernel = _; rollup_node_endpoint; devmode} ->
+        {
+          preimages_dir;
+          initial_kernel = _;
+          rollup_node_endpoint;
+          devmode;
+          time_between_blocks;
+        } ->
         [
           "--evm-node-endpoint";
           evm_node.persistent_state.endpoint;
@@ -742,6 +749,10 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
+        @ Cli_arg.optional_arg
+            "time-between-blocks"
+            time_between_blocks_fmt
+            time_between_blocks
         @ Cli_arg.optional_switch "devmode" devmode
     | Threshold_encryption_observer
         {

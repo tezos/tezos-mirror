@@ -721,6 +721,7 @@ module Cli = struct
             ~data_dir
             ?preimages
             ?preimages_endpoint
+            ?time_between_blocks
             ~evm_node_endpoint
             ?threshold_encryption_bundler_endpoint
             ())
@@ -945,7 +946,10 @@ module Cli = struct
                 (match threshold_encryption_bundler_endpoint with
                 | None -> observer_config.threshold_encryption_bundler_endpoint
                 | endpoint -> endpoint);
-              time_between_blocks;
+              time_between_blocks =
+                Option.either
+                  time_between_blocks
+                  observer_config.time_between_blocks;
             }
       | None ->
           Option.map
