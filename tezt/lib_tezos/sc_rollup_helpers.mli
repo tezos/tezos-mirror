@@ -118,6 +118,7 @@ val setup_l1 :
   ?whitelist_enable:bool ->
   ?rpc_external:bool ->
   ?riscv_pvm_enable:bool ->
+  ?minimal_block_delay:int ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
