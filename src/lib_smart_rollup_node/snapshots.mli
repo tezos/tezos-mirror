@@ -65,3 +65,19 @@ val import :
 val info :
   snapshot_file:string ->
   Snapshot_utils.snapshot_metadata * [`Compressed | `Uncompressed]
+
+(** [with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches ?skip_condition
+    f] applies [f] in a read-write context that is created from [data-dir] (and
+    a potential existing configuration). The node context given to [f] does not
+    follow the L1 chain and [f] is only supposed to modify the data of the
+    rollup node. It is used internally by this module to reconstruct contexts
+    from a snapshot but can also be use by the {!Repair} module to apply fixes
+    off-line. *)
+val with_modify_data_dir :
+  #Client_context.full ->
+  data_dir:string ->
+  apply_unsafe_patches:bool ->
+  ?skip_condition:
+    (Store.rw -> Context.rw -> head:Sc_rollup_block.t -> bool tzresult Lwt.t) ->
+  (Node_context.rw -> head:Sc_rollup_block.t -> unit tzresult Lwt.t) ->
+  unit tzresult Lwt.t
