@@ -12,6 +12,7 @@
 # but use only the files located in the right ${ARCH}-${OCTEZ_BRANCH} directory.
 
 stages:
+  - check
   - prepare
   - build
   - deploy
@@ -53,7 +54,7 @@ workflow:
       OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
 
 fmt:
-  stage: build
+  stage: check
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   script:
     - opam-2.1 install ocamlformat.0.24.1
