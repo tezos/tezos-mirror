@@ -118,7 +118,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - `dal-node-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi.json>`_
-- `dal-node-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi-rc-dev.json>`_
+- `dal-node-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi-dev.json>`_
 
 .. _openapi_generate:
 
