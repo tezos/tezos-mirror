@@ -6,8 +6,6 @@
  (public_name octez-rust-deps)
  (instrumentation (backend bisect_ppx))
  (js_of_ocaml)
- (library_flags
-  (:standard (:include %{workspace_root}/macos-link-flags.sexp)))
  (foreign_archives octez_rust_deps))
 
 (dirs :standard .cargo (not target))
@@ -28,9 +26,8 @@
   (no-infer
    (progn
     (run rm -f wasmer-3.3.0/lib/c-api/wasmer.h)
-    (run cargo build --release)
-    (setenv OBJCOPY objcopy (run cargo run --release))
-    (run strip -x liboctez_rust_deps.a)
+    (run cargo build --release -p octez-rust-deps)
+    (copy target/release/liboctez_rust_deps.a liboctez_rust_deps.a)
     (bash
      "test -r target/release/liboctez_rust_deps.so && cp -f target/release/liboctez_rust_deps.so dlloctez_rust_deps.so || true")
     (bash
