@@ -70,3 +70,12 @@ let get_ip_address_from_name ~zone name =
       ]
   in
   Lwt.return (String.trim output)
+
+let list_vms ~prefix =
+  let filter = Format.asprintf "status=RUNNING AND name:%s" prefix in
+  let* output =
+    Process.run_and_read_stdout
+      "gcloud"
+      ["compute"; "instances"; "list"; "--filter"; filter]
+  in
+  Lwt.return (String.trim output)

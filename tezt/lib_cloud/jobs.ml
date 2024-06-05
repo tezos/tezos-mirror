@@ -203,6 +203,14 @@ let clean_up_vms ~tags =
          in
          unit)
 
+let list_vms ~tags =
+  Test.register ~__FILE__ ~title:"List VMs" ~tags:("list" :: "vms" :: tags)
+  @@ fun () ->
+  let tezt_cloud = Lazy.force Env.tezt_cloud in
+  Log.info "TEZT_CLOUD environment variable found with value: %s" tezt_cloud ;
+  let* _ = Gcloud.list_vms ~prefix:tezt_cloud in
+  Lwt.return_unit
+
 let simple ~tags =
   Cloud.register
     ~vms:[{machine_type = Cli.machine_type}; {machine_type = Cli.machine_type}]
@@ -240,4 +248,5 @@ let register ~tags =
   destroy_vms ~tags ;
   prometheus_import ~tags ;
   clean_up_vms ~tags ;
+  list_vms ~tags ;
   simple ~tags
