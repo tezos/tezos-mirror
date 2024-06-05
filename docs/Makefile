@@ -125,12 +125,10 @@ xrefscheck:
 installcheck:
 	scripts/test_install_scripts.sh install-bin-focal
 	scripts/test_install_scripts.sh install-bin-jammy
-	scripts/test_install_scripts.sh install-bin-fedora37
-	scripts/test_install_scripts.sh install-bin-fedora38
-	scripts/test_install_scripts.sh install-bin-rc-focal
 	scripts/test_install_scripts.sh install-bin-rc-jammy
-	scripts/test_install_scripts.sh install-bin-rc-fedora37
-	scripts/test_install_scripts.sh install-bin-rc-fedora38
+	scripts/test_install_scripts.sh install-bin-rc-focal
+	scripts/test_install_scripts.sh install-bin-bookworm
+	scripts/test_install_scripts.sh install-bin-rc-bookworm
 	scripts/test_install_scripts.sh install-opam-scratch
 	scripts/test_install_scripts.sh install-opam-jammy
 	scripts/test_install_scripts.sh compile-release-sources-bullseye
