@@ -6,22 +6,11 @@
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
 
-  llvmPackages = pkgs.llvmPackages_16;
-
   kernelPackageSet =
     [
       # Packages required to build & develop kernels
       pkgs.rustup
       pkgs.wabt
-
-      # Bring Clang into scope in case the stdenv doesn't come with it already.
-      llvmPackages.clang
-
-      # This brings in things like llvm-ar which are needed for Rust WebAssembly
-      # compilation on Mac.
-      # It isn't used by default. Configure the AR environment variable to
-      # make rustc use it.
-      llvmPackages.bintools
 
       # Cross-compilation for RISC-V
       sources.riscv64Pkgs.clangStdenv.cc
@@ -98,11 +87,6 @@
         '';
       })
     else pkgs.clang;
-
-  libtoolAliasDarwin = pkgs.runCommand "libtool-alias" {} ''
-    mkdir -p $out/bin
-    ln -s ${llvmPackages.bintools-unwrapped}/bin/llvm-libtool-darwin $out/bin/libtool
-  '';
 in
   pkgs.mkShell {
     name = "tezos-shell";
@@ -134,7 +118,6 @@ in
         if pkgs.stdenv.isDarwin
         then [
           fswatch
-          libtoolAliasDarwin
         ]
         else [
           inotify-tools

@@ -62,6 +62,15 @@
       )
       frameworks
     );
+
+  llvmPackages = pkgs.llvmPackages_16;
+
+  libtoolAliasDarwin =
+    # On Darwin we need a little help to bring `libtool` into scope.
+    pkgs.runCommand "libtool-alias" {} ''
+      mkdir -p $out/bin
+      ln -s ${llvmPackages.bintools-unwrapped}/bin/llvm-libtool-darwin $out/bin/libtool
+    '';
 in
   pkgs.stdenv.mkDerivation {
     name = "tezos";
@@ -86,7 +95,22 @@ in
 
     hardeningDisable = ["stackprotector"];
 
-    buildInputs = packages ++ (with pkgs; [makeWrapper cacert]);
+    buildInputs =
+      packages
+      ++ (with pkgs; [
+        makeWrapper
+        cacert
+
+        # Bring Clang into scope in case the stdenv doesn't come with it already.
+        llvmPackages.clang
+
+        # This brings in things like llvm-ar which are needed for Rust WebAssembly
+        # compilation on Mac. It isn't used by default. Configure the AR environment variable to
+        # make rustc use it.
+        # This package also brings objcopy, libtoool and ranlib which are used.
+        llvmPackages.bintools
+      ])
+      ++ pkgs.lib.optional pkgs.stdenv.isDarwin libtoolAliasDarwin;
 
     # Disable OPAM usage in Makefile.
     TEZOS_WITHOUT_OPAM = true;
