@@ -86,6 +86,12 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   in
   state.plugin <- new_plugin ;
   Reference.set state.node_ctxt.current_protocol new_protocol ;
+  let*! () =
+    Daemon_event.switched_protocol
+      new_protocol.hash
+      new_protocol.proto_level
+      new_protocol.constants
+  in
   return_unit
 
 let maybe_split_context node_ctxt commitment_hash head_level =
