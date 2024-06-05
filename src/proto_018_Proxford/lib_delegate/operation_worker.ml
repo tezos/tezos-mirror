@@ -119,6 +119,14 @@ module Events = struct
       ~msg:"starting new monitoring"
       ()
 
+  let resetting_monitoring =
+    declare_0
+      ~section
+      ~name:"resetting_monitoring"
+      ~level:Debug
+      ~msg:"resetting monitoring after a mempool flush"
+      ()
+
   let end_of_stream =
     declare_0
       ~section
@@ -280,19 +288,21 @@ let is_valid_consensus_content (candidate : candidate) consensus_content =
 let cancel_monitoring state = state.proposal_watched <- None
 
 let reset_monitoring state =
+  let open Lwt_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
+  let* () = Events.(emit resetting_monitoring ()) in
   match state.proposal_watched with
-  | None -> Lwt.return_unit
+  | None -> return_unit
   | Some (Pqc_watch pqc_watched) ->
       pqc_watched.current_voting_power <- 0 ;
       pqc_watched.preattestations_count <- 0 ;
       pqc_watched.preattestations_received <- Preattestation_set.empty ;
-      Lwt.return_unit
+      return_unit
   | Some (Qc_watch qc_watched) ->
       qc_watched.current_voting_power <- 0 ;
       qc_watched.attestations_count <- 0 ;
       qc_watched.attestations_received <- Attestation_set.empty ;
-      Lwt.return_unit
+      return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
   let open Lwt_syntax in
