@@ -541,6 +541,7 @@ let sc_rollup_commands () =
     snapshot_info;
     openapi_command;
   ]
+  @ Repair.commands
 
 let select_commands _ctxt _ = Lwt_result_syntax.return (sc_rollup_commands ())
 
