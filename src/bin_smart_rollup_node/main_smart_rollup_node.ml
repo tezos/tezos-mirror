@@ -463,12 +463,22 @@ let import_snapshot =
   command
     ~group
     ~desc:"Import a snapshot file in a rollup node."
-    (args3 data_dir_arg Cli.no_checks_arg Cli.import_force_switch)
+    (args4
+       data_dir_arg
+       Cli.no_checks_arg
+       Cli.import_force_switch
+       Cli.apply_unsafe_patches_switch)
     (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_param @@ stop)
-    (fun (data_dir, no_checks, force) snapshot_file cctxt ->
+    (fun (data_dir, no_checks, force, apply_unsafe_patches) snapshot_file cctxt ->
       let open Lwt_result_syntax in
       let* () =
-        Snapshots.import cctxt ~no_checks ~force ~data_dir ~snapshot_file
+        Snapshots.import
+          ~apply_unsafe_patches
+          cctxt
+          ~no_checks
+          ~force
+          ~data_dir
+          ~snapshot_file
       in
       let*! () = cctxt#message "Snapshot successfully imported@." in
       return_unit)

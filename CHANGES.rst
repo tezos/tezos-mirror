@@ -44,6 +44,11 @@ Node
   error to mitigate the error crashing by replaying the application/validation
   before raising an uncaught failure (MR :gl:`!13398` and :gl:`!13437`)
 
+- Importing a snapshot uses the configuration if it exists. It's
+  useful when an archive snapshot contains some
+  ``unsafe_pvm_patches``. The same ``unsafe_pvm_patches`` must be set
+  in the export and import or the import will fail. (MR :gl:`!13397`)
+
 Client
 ------
 

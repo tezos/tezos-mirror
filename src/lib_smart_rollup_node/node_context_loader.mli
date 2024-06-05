@@ -63,6 +63,7 @@ module For_snapshots : sig
     ([< `Read | `Write > `Read] as 'a) Store.t ->
     'a Context.t ->
     data_dir:string ->
+    apply_unsafe_patches:bool ->
     'a t tzresult Lwt.t
 end
 
