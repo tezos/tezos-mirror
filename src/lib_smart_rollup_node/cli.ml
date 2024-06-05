@@ -513,6 +513,13 @@ let protocol_hash_arg =
        between different versions of the node."
     protocol_hash_parameter
 
+let protocol_hash_param next =
+  Tezos_clic.param
+    ~name:"protocol"
+    ~desc:"Protocol hash"
+    protocol_hash_parameter
+    next
+
 let apply_unsafe_patches_switch : (bool, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
     ~long:"apply-unsafe-patches"
