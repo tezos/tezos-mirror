@@ -30,6 +30,8 @@
    Invocation:   dune exec tezt/long_tests/main.exe -- --file sc_rollup.ml
 *)
 
+let team = Team.etherlink
+
 open Base
 
 let hooks = Tezos_regression.hooks
@@ -85,7 +87,7 @@ let make_parameter name = function
 
 let regression_test ~executors ~__FILE__ ?(tags = []) ?uses title f =
   let tags = "sc_rollup" :: tags in
-  Protocol.register_long_test ~executors ~__FILE__ ~title ~tags ?uses f
+  Protocol.register_long_test ~executors ~__FILE__ ~title ~team ~tags ?uses f
 
 let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let parameters =

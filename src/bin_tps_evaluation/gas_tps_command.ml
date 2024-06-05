@@ -78,6 +78,7 @@ let register () =
   Long_test.register
     ~__FILE__
     ~title:Dashboard.Test.gas_tps
+    ~team:Tag.layer1
     ~tags:[Dashboard.Test.gas_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]

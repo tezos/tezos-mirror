@@ -219,6 +219,7 @@ let register () =
   Long_test.register
     ~__FILE__
     ~title:Dashboard.Test.estimate_average_block
+    ~team:Tag.layer1
     ~tags:[Dashboard.Test.estimate_average_block]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]

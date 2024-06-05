@@ -34,6 +34,8 @@
 
    Add more fine-grained measurements (e.g. time to verify shard) *)
 
+let team = Team.tezos2
+
 module Dal = Dal_common
 
 module Dal_RPC = struct
@@ -181,6 +183,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
   Long_test.register
     ~__FILE__
     ~title:measurement
+    ~team
     ~tags:["dal"]
     ~uses:[Constant.octez_dal_node]
     ~executors

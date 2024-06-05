@@ -30,6 +30,8 @@
    Subject: check regressions in the duration it takes for the main tezt test suite to load.
 *)
 
+let team = Team.infrastructure
+
 let tezt_load_time = "tezt load time"
 
 let grafana_panels : Grafana.panel list =
@@ -51,7 +53,7 @@ let test_tezt_tests_suite_load_time ~executors () =
     ~uses_node:false
     ~uses_admin_client:false
     ~uses_client:false
-    ~team:Team.infrastructure
+    ~team
     ~executors
   @@ fun () ->
   let* () = Process.run "dune" ["build"; "tezt/tests/main.exe"] in

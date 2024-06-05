@@ -30,6 +30,8 @@
    Subject: check regressions in the duration it takes to emit log events.
 *)
 
+let team = Team.infrastructure
+
 open Internal_event
 
 let grafana_panels titles : Grafana.panel list =
@@ -72,7 +74,7 @@ let test_simple_event_logging_time ~executors title simple_event =
     ~uses_node:true
     ~uses_admin_client:true
     ~uses_client:true
-    ~team:Team.infrastructure
+    ~team
     ~executors
   @@ fun () ->
   (* Even with [nb_repeat = 10_000_000], the measurements are not very precise:
