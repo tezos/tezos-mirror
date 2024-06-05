@@ -132,7 +132,12 @@ let get_constants_of_protocol ?level (node_ctxt : _ Node_context.t)
               Node_context.protocol_activation_level node_ctxt protocol_hash
             in
             l
-        | Some l -> return l
+        | Some l ->
+            (* If the head is the last block of the protocol, i.e. a migration
+               block, we need to use its predecessor to fetch constants from the
+               correct context. For the other cases, the context of the
+               predecessor is always the same protocol. *)
+            return (Int32.pred l)
       in
       Plugin.Layer1_helpers.retrieve_constants
         ~block:(`Level level)
