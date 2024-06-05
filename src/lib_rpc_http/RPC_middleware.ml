@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -28,6 +10,32 @@ type forwarder_events = {
   on_forwarding : Cohttp.Request.t -> unit Lwt.t;
   on_locally_handled : Cohttp.Request.t -> unit Lwt.t;
 }
+
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["rpc_middleware"]
+
+  let forwarding_accepted_conn =
+    declare_3
+      ~section
+      ~name:"forwarding_accepted_conn"
+      ~msg:"[pid:{pid}] ({con}) got accepted conn, forwarding to {uri}"
+      ~level:Debug
+      ("pid", Data_encoding.int32)
+      ("con", Data_encoding.string)
+      ("uri", Data_encoding.string)
+
+  let rpc_metrics_callback =
+    declare_3
+      ~section
+      ~name:"rpc_metrics_callback"
+      ~msg:"[pid:{pid}] ({con}) rpc metrics callback for {path}"
+      ~level:Debug
+      ("pid", Data_encoding.int32)
+      ("con", Data_encoding.string)
+      ("path", Data_encoding.string)
+end
 
 let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
     conn req body =
@@ -87,6 +95,12 @@ let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
       Header.remove h "connection" |> fun h ->
       Header.add h "accept-encoding" "identity"
     in
+    let* () =
+      Events.(emit forwarding_accepted_conn)
+        ( Int32.of_int (Unix.getpid ()),
+          Cohttp.Connection.to_string (snd conn),
+          Uri.to_string uri )
+    in
     let* resp, body =
       Cohttp_lwt_unix.Client.call
         ?ctx
@@ -145,6 +159,12 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
   let uri = Cohttp.Request.uri req in
   let path = Uri.path uri in
   let decoded = Resto.Utils.decode_split_path path in
+  let*! () =
+    Events.(emit rpc_metrics_callback)
+      ( Int32.of_int (Unix.getpid ()),
+        Cohttp.Connection.to_string (snd conn),
+        path )
+  in
   let*! description =
     let* resto_meth =
       match cohttp_meth with

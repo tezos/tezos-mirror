@@ -1,25 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -72,13 +55,25 @@ let launch_rpc_server dir {address; port; tls_cert_and_key; forwarding_endpoint}
     Tezos_rpc_http_server.RPC_middleware.proxy_server_query_forwarder
       forwarding_endpoint
   in
-  let callback =
-    Tezos_rpc_http_server.RPC_server.resto_callback server |> middleware
+  let callback conn req body =
+    let*! () =
+      Events.(emit accepted_conn_proxy_server)
+        (Int32.of_int (Unix.getpid ()), Cohttp.Connection.to_string (snd conn))
+    in
+    let callback_fn = Tezos_rpc_http_server.RPC_server.resto_callback server in
+    middleware callback_fn conn req body
   in
   Lwt.catch
     (fun () ->
       let*! () =
-        Tezos_rpc_http_server.RPC_server.launch ~host server ~callback mode
+        Tezos_rpc_http_server.RPC_server.launch
+          ~host
+          server
+          ~callback
+          ~conn_closed:(fun (_, con) ->
+            Events.(emit__dont_wait__use_with_care conn_closed_proxy_server)
+              (Int32.of_int (Unix.getpid ()), Cohttp.Connection.to_string con))
+          mode
       in
       Lwt.return_ok server)
     (function
