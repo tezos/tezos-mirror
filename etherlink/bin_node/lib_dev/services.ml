@@ -171,6 +171,25 @@ let get_fee_history block_count block_parameter config
         let oldest_reachable = Z.(sub (Qty.to_z nb_latest) (of_int delta)) in
         Z.(gt (Qty.to_z nb) oldest_reachable)
   in
+  let* newest_block =
+    get_block_by_number
+      ~full_transaction_object:false
+      block_parameter
+      (module Backend_rpc)
+  in
+  let* base_fee_per_gas_next_block =
+    if newest_block.number = nb_latest then Backend_rpc.base_fee_per_gas ()
+    else
+      let next_block_number = Qty.next newest_block.number in
+      let* next_block =
+        get_block_by_number
+          ~full_transaction_object:false
+          (Block_parameter.Number next_block_number)
+          (module Backend_rpc)
+      in
+      return (Option.value next_block.baseFeePerGas ~default:Qty.zero)
+  in
+
   let rec get_fee_history_aux block_count block_parameter history_acc =
     if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
     then return history_acc
@@ -192,11 +211,7 @@ let get_fee_history block_count block_parameter config
         Option.value block.baseFeePerGas ~default:Qty.zero
       in
       let base_fee_per_gas =
-        match history_acc.base_fee_per_gas with
-        (* TODO : the list should start with the fee for the next block.
-           until then we double the first value to keep a list of correct length *)
-        | [] -> [block_base_fee_per_gas; block_base_fee_per_gas]
-        | l -> block_base_fee_per_gas :: l
+        block_base_fee_per_gas :: history_acc.base_fee_per_gas
       in
       let oldest_block = block.number in
       let history_acc = {oldest_block; base_fee_per_gas; gas_used_ratio} in
@@ -213,9 +228,7 @@ let get_fee_history block_count block_parameter config
       (* default value if no block (which is a terrible
          corner case) *)
       oldest_block = Qty.zero;
-      (* TODO: should include baseFeePerGas of next block of newest block in
-         range *)
-      base_fee_per_gas = [];
+      base_fee_per_gas = [base_fee_per_gas_next_block];
       gas_used_ratio = [];
     }
   in

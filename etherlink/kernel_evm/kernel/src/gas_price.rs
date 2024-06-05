@@ -5,7 +5,7 @@
 //! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
 
 use crate::block_in_progress::BlockInProgress;
-use crate::storage::read_minimum_base_fee_per_gas;
+use crate::storage::{read_minimum_base_fee_per_gas, store_base_fee_per_gas};
 
 use primitive_types::U256;
 use softfloat::F64;
@@ -32,7 +32,11 @@ pub fn register_block(
         anyhow::bail!("update_gas_price on non-empty block");
     }
 
-    update_tick_backlog(host, bip.estimated_ticks_in_block, bip.timestamp)
+    update_tick_backlog(host, bip.estimated_ticks_in_block, bip.timestamp)?;
+    let base_fee_per_gas = base_fee_per_gas(host, bip.timestamp);
+    store_base_fee_per_gas(host, base_fee_per_gas)?;
+
+    Ok(())
 }
 
 /// Update the kernel-wide base fee per gas with a new value.

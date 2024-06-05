@@ -57,6 +57,8 @@ type quantity = Qty of Z.t [@@unboxed]
 module Qty : sig
   val pred : quantity -> quantity
 
+  val next : quantity -> quantity
+
   val to_z : quantity -> Z.t
 
   val zero : quantity

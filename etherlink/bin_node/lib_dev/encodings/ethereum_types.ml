@@ -71,6 +71,8 @@ type quantity = Qty of Z.t [@@ocaml.unboxed]
 module Qty = struct
   let pred (Qty z) = Qty (Z.pred z)
 
+  let next (Qty z) = Qty (Z.add z Z.one)
+
   let to_z (Qty z) = z
 
   let zero = Qty Z.zero
