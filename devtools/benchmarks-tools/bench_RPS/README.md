@@ -53,3 +53,18 @@ for kind in health header baking attestation; do
 done
 
 ```
+
+# Results
+
+Previous values of this benchmark can be found in `results.json`. This
+result comes from manual runs and is aimed to be updated manually. The
+benchmarks were executed on the Octez recommanded hardware, which is a
+GCP `n2-standard-4` virtual machine.
+The json file is made of the following fields:
+- kind: the RPC server that is tested (local or external)
+- rpc: the RPC that is tested
+- concurrency: the number of concurrent RPC requests allowed
+- rps: the Request Per Second benchmark value
+
+We should consider having this automatized to get track of performance
+regression, see https://gitlab.com/tezos/tezos/-/issues/7286
