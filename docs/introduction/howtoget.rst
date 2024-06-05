@@ -31,6 +31,11 @@ There are several options for getting the binaries, depending on how you plan to
 
 These different options are described in the following sections.
 
+Some Octez binaries also require some parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is currently described in section :ref:`compiling_with_make`, but those instructions may be used for other installation types:
+
+- :ref:`setup_zcash_params`
+- :ref:`setup_dal_crypto_params`
+
 Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current development version (see :doc:`../releases/releases` for more information).
 
 When choosing between the installation options, you may take into account the
@@ -528,6 +533,19 @@ and ``sapling-output.params``. Here is where you should expect to find those fil
    If Zcash is located elsewhere on your system (typically, on MacOS X), you may try creating a symbolic link such as: ``ln -s ~/Library/Application\ Support/ZcashParams ~/.zcash-params``.
 
 Note that the script ``fetch-params.sh`` downloads a third file containing parameters for Sprout (currently called ``sprout-groth16.params``), which is not loaded by Sapling and can be deleted to save a significant amount of space (this file is *much* bigger than the two other files).
+
+.. _setup_dal_crypto_params:
+
+Install DAL trusted setup
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Users running :doc:`DAL<../shell/dal>` as :ref:`slot producers<dal_profiles>`
+need to have a set of cryptographic parameters (known as an SRS) installed in
+order to run their :doc:`DAL node<../shell/dal_node>`. The parameters can be
+retrieved via the following script::
+
+  scripts/install_dal_trusted_setup.sh
+
 
 Get the sources
 ~~~~~~~~~~~~~~~
