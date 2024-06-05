@@ -41,7 +41,7 @@ module Events = struct
       ~section
       ~name:(prefix "heartbeat")
       ~msg:"Process Heartbeat"
-      ~level:Info
+      ~level:Debug
       ()
 
   let check_unknown_messages =
@@ -49,7 +49,7 @@ module Events = struct
       ~section
       ~name:(prefix "check_unknown_messages")
       ~msg:"Process unknown messages"
-      ~level:Info
+      ~level:Debug
       ()
 
   let publish_message =

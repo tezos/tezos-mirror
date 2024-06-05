@@ -222,7 +222,7 @@ let removed_slot_shards =
     ~section
     ~name:"removed_slot_shards"
     ~msg:"removed shards for level {published_level} and index {slot_index}"
-    ~level:Info
+    ~level:Debug
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
 
@@ -231,7 +231,7 @@ let removed_slot =
     ~section
     ~name:"removed_slot"
     ~msg:"removed slot for level {published_level} and index {slot_index}"
-    ~level:Info
+    ~level:Debug
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
 
