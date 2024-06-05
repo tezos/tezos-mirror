@@ -40,7 +40,7 @@ pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_ve
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
 
-const TICKETER: RefPath = RefPath::assert_from(b"/evm/ticketer");
+pub const TICKETER: RefPath = RefPath::assert_from(b"/evm/world_state/ticketer");
 pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/sequencer_governance");

@@ -2865,7 +2865,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
 let test_kernel_migration =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "migration"; "upgrade"]
+    ~tags:["evm"; "migration"; "upgrade"; "foo"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -2889,9 +2889,41 @@ let test_kernel_migration =
     in
     let*@ block_result = latest_block evm_setup.evm_node in
     let* config_result = config_setup evm_setup in
+    let* ticketer =
+      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/ticketer"
+           ()
+    in
+    let ticketer = Option.value ~default:"none ticketer" ticketer in
+    Log.info "Ticketer before: %s" ticketer ;
     return {transfer_result; block_result; config_result}
   in
   let scenario_after ~evm_setup ~sanity_check =
+    let* ticketer =
+      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/ticketer"
+           ()
+    in
+    let ticketer = Option.value ~default:"none ticketer" ticketer in
+    Log.info "Ticketer after prev path: %s" ticketer ;
+
+    let* ticketer =
+      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/world_state/ticketer"
+           ()
+    in
+    let ticketer = Option.value ~default:"none ticketer" ticketer in
+    Log.info "Ticketer after new path: %s" ticketer ;
+
     let* () =
       ensure_transfer_result_integrity
         ~sender
