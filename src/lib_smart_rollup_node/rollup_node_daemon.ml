@@ -68,14 +68,13 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   in
   let*? new_plugin = Protocol_plugins.proto_plugin_for_protocol new_protocol in
   let* constants =
-    (* If the head is the last block of the protocol, i.e. a migration block, we
-       need to use its predecessor to fetch constants from the correct
-       context. For the other cases, the context of the predecessor is always
-       the same protocol. *)
     let constants_level =
-      Int32.max (Int32.pred head.level) state.node_ctxt.genesis_info.level
+      Int32.max head.level state.node_ctxt.genesis_info.level
     in
-    Protocol_plugins.get_constants_of_level state.node_ctxt constants_level
+    Protocol_plugins.get_constants_of_protocol
+      state.node_ctxt
+      ~level:constants_level
+      new_protocol
   in
   let new_protocol =
     {

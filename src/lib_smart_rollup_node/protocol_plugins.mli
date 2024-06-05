@@ -87,3 +87,11 @@ val get_constants_of_block_hash :
   _ Node_context.t ->
   Block_hash.t ->
   Rollup_constants.protocol_constants tzresult Lwt.t
+
+(** Retrieve constants for a given protocol (values are cached). [level], if
+    provided, must be a level of the protocol. *)
+val get_constants_of_protocol :
+  ?level:int32 ->
+  _ Node_context.t ->
+  Protocol_hash.t ->
+  Rollup_constants.protocol_constants tzresult Lwt.t
