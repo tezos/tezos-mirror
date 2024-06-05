@@ -29,7 +29,7 @@ use crate::{
     },
     parser::{instruction::Instr, parse},
     program::Program,
-    range_utils::{range_max, range_min},
+    range_utils::{range_bounds_saturating_sub, range_max, range_min},
     state_backend as backend,
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
@@ -57,9 +57,9 @@ enum ProgramCounterUpdate {
 
 /// Result type when running multiple steps at a time with [`MachineState::step_many`]
 #[derive(Debug)]
-pub struct StepManyResult {
+pub struct StepManyResult<E> {
     pub steps: usize,
-    pub exception: Option<EnvironException>,
+    pub error: Option<E>,
 }
 
 /// Runs an R-type instruction over [`XRegisters`]
@@ -649,6 +649,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     ///
     /// The [`Err`] case represents an [`Exception`] to be handled by
     /// the execution environment, narrowed down by the type [`EnvironException`].
+    #[inline]
     pub fn step(&mut self) -> Result<(), EnvironException> {
         // Try to take an interrupt if available, and then
         // obtain the pc for the next instruction to be executed
@@ -686,7 +687,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         &mut self,
         steps: &impl RangeBounds<usize>,
         mut should_continue: F,
-    ) -> StepManyResult
+    ) -> StepManyResult<EnvironException>
     where
         F: FnMut(&Self) -> bool,
     {
@@ -706,7 +707,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
                 Err(e) => {
                     return StepManyResult {
                         steps: steps_done,
-                        exception: Some(e),
+                        error: Some(e),
                     }
                 }
             };
@@ -715,8 +716,51 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
         StepManyResult {
             steps: steps_done,
-            exception: None,
+            error: None,
         }
+    }
+
+    /// Similar to [step_range] but lets the user handle environment exceptions
+    /// inside the inner step loop.
+    #[inline]
+    pub fn step_range_handle<E>(
+        &mut self,
+        step_bounds: &impl RangeBounds<usize>,
+        mut should_continue: impl FnMut(&Self) -> bool,
+        mut handle: impl FnMut(&mut Self, EnvironException) -> Result<bool, E>,
+    ) -> StepManyResult<E> {
+        let mut steps = 0usize;
+        let mut step_bounds = range_bounds_saturating_sub(step_bounds, 0);
+
+        let error = loop {
+            let result = self.step_range(&step_bounds, &mut should_continue);
+
+            steps = steps.saturating_add(result.steps);
+            step_bounds = range_bounds_saturating_sub(&step_bounds, result.steps);
+
+            match result.error {
+                Some(cause) => {
+                    // Raising the exception is not a completed step. Trying to handle it is.
+                    // We don't have to check against `max_steps` because running the
+                    // instruction that triggered the exception meant that `max_steps > 0`.
+                    steps = steps.saturating_add(1);
+                    step_bounds = range_bounds_saturating_sub(&step_bounds, 1);
+
+                    match handle(self, cause) {
+                        Ok(may_continue) => {
+                            if !may_continue {
+                                break None;
+                            }
+                        }
+
+                        Err(error) => break Some(error),
+                    }
+                }
+                None => break None,
+            }
+        };
+
+        StepManyResult { steps, error }
     }
 
     /// Install a program and set the program counter to its start.

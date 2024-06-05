@@ -151,10 +151,10 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, Posix, ML> {
     fn handle_step_result(&mut self, result: EvalManyResult) -> TestStepperResult {
         match result.error {
             // An error was encountered in the evaluation function.
-            Some(EvalError { cause, message }) => TestStepperResult::Exception {
+            Some(EvalError { cause, error }) => TestStepperResult::Exception {
                 cause,
                 steps: result.steps,
-                message: Some(message),
+                message: Some(error),
             },
 
             // Evaluation function returned without error.
