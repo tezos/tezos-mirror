@@ -125,12 +125,17 @@ Their OpenAPI specification can be found at:
 How to Generate
 ~~~~~~~~~~~~~~~
 
-To generate the above files, run the ``src/bin_openapi/generate.sh`` script
+To generate the ``*-dev.json`` and ``alpha-*.json`` files above from the current sources in your Octez repository, run the ``src/bin_openapi/generate.sh`` script
 from the root of the Octez repository.
-It will start a sandbox node, activate the protocol,
+Note that the generation script requires the Octez executables to be built, so you have to first run ``make`` from the repository root.
+
+You may instead run this script via ``make -C docs openapi``, which will run the generation script and check if the files above are up-to-date with respect to their versions under Git (modulo the ``version`` fields inside).
+If there are any other differences, you may want to create an MR to update these JSON files under ``docs/api/``.
+
+The generation script will start a sandbox node, activate the protocol,
 get the RPC specifications from this node and convert them to OpenAPI specifications.
 
-To generate the OpenAPI specification for the RPCs provided by a specific protocol,
+To generate the OpenAPI specification for the RPCs provided by a specific protocol instead of Alpha,
 update the following variables in :src:`src/bin_openapi/generate.sh`:
 
 ```sh
