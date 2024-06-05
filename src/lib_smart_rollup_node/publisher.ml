@@ -175,6 +175,7 @@ let genesis_commitment (module Plugin : Protocol_plugin_sig.S)
          {
            expected = node_ctxt.genesis_info.commitment_hash;
            actual = commitment_hash;
+           actual_state_hash = compressed_state;
          })
   in
   commitment
