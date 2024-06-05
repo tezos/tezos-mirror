@@ -13,6 +13,38 @@ Generic issues
 
 N/A
 
+.. _mixing_llvm_gnu_binutils:
+
+Mixing LLVM and GNU binutils
+----------------------------
+
+Mixing LLVM and GNU binutils toolchains can cause issues when building Octez. If you encounter
+errors like the following, it may be that you have tools from both LLVM and GNU in scope.
+
+::
+
+  Error: ExternalToolError { reason: "Failed to create archive index with `ranlib`", tool: "ranlib", args: ["liboctez_rust_deps.a"], stdout: "", stderr: "LLVM ERROR: Invalid encoding\n" }
+
+::
+
+  LLVM ERROR: Invalid encoding
+
+::
+
+  bfd plugin: LLVM gold plugin has failed to create LTO module: Opaque pointers are only supported in -opaque-pointers mode (Producer: 'LLVM17.0.4-rust-1.74.0-stable' Reader: 'LLVM 14.0.0')
+
+You can check ``objcopy``, for example, like this.
+
+::
+
+  objcopy --version
+
+If the output of this command indicates an LLVM version of ``objcopy`` and you have encountered
+the above error message, then you are mixing toolchains. In this case, you ought to remove, for
+example, the LLVM toolchain (e.g. through your system's package manager) or ensure that GNU's
+tools and libraries, like ``objcopy``, have higher precedence in your ``$PATH`` environment
+variable.
+
 Compiling the sources
 ---------------------
 
