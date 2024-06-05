@@ -125,7 +125,7 @@ release:
     - apk add zip curl
   script:
     - zip ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip archiver/main.exe server/main.exe
-    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:=latest}/${ARCHIVE}"
+    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:-latest}/${ARCHIVE}"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG != null
@@ -157,11 +157,11 @@ docker:
     - set -xv
     - >
       for BIN in archiver server ; do
-        docker build -t ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} -f Dockerfile.$BIN . ;
+        docker build -t ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} -f Dockerfile.$BIN . ;
       done
     - >
       for BIN in archiver server ; do
-        docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} ;
+        docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} ;
       done
 
 # Create multiarch manifest
@@ -177,12 +177,12 @@ manifest:
     - job: docker
       artifacts: false
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - *docker_login
   script:
     - set -xv
     - >
       for BIN in archiver server ; do
-        for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done ;
-        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done ;`;
-        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} ;
+        for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}" ; done ;
+        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}" ; done ;`;
+        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} ;
       done ;
