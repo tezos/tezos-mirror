@@ -209,11 +209,6 @@ let create_commitment_if_necessary plugin (node_ctxt : _ Node_context.t)
           ~inbox_level:current_level
           ctxt
       in
-      let*! () =
-        Commitment_event.new_commitment
-          (Octez_smart_rollup.Commitment.hash commitment)
-          commitment.inbox_level
-      in
       return_some commitment
     else return_none
 
@@ -232,6 +227,11 @@ let process_head plugin (node_ctxt : _ Node_context.t) ~predecessor
   match commitment with
   | None -> return_none
   | Some commitment ->
+      let*! () =
+        Commitment_event.new_commitment
+          (Octez_smart_rollup.Commitment.hash commitment)
+          commitment.inbox_level
+      in
       let* commitment_hash =
         Node_context.save_commitment node_ctxt commitment
       in
