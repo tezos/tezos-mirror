@@ -1,0 +1,20 @@
+ARG BASE=ocaml/opam:ubuntu-22.04-ocaml-4.14
+
+FROM $BASE
+
+ARG OCTEZ_BRANCH
+
+ARG OPAM_INSTALL_ARGS
+
+RUN sudo apt-get update
+
+RUN git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
+
+RUN opam-2.1 install --deps-only tezos/opam/virtual/octez-deps.opam $OPAM_INSTALL_ARGS
+
+RUN opam-2.1 install caqti caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass $OPAM_INSTALL_ARGS
+
+RUN rm -rf ./tezos/
+
+# Same as ocaml/opam:ubuntu-22.04-ocaml-4.14
+CMD ["/bin/sh" "-c" "bash"]

@@ -12,6 +12,7 @@
 # but use only the files located in the right ${ARCH}-${OCTEZ_BRANCH} directory.
 
 stages:
+  - prepare
   - build
   - deploy
   - docker
@@ -19,10 +20,28 @@ stages:
 .supported_ARCH: &supported_ARCH ["amd64", "arm64"] 
 .supported_OCTEZ_BRANCH: &supported_OCTEZ_BRANCH ["octez-v20.0", "master"]
 
-# Repeating these as variables that can be used for for loops in scripts
+# Repeating supported_ARCH and supported_OCTEZ_BRANCH as variables
+# that can be used for for loops in scripts
 variables:
   supported_ARCH: "amd64 arm64"
   supported_OCTEZ_BRANCH: "octez-v20.0 master"
+  BUILD_CONTAINER_NAME: ${CI_REGISTRY_IMAGE}/dependencies-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF}
+  # Build blst used by ocaml-bls12-381 without ADX to support old CPU
+  # architectures.
+  # See https://gitlab.com/tezos/tezos/-/issues/1788
+  BLST_PORTABLE: "yes"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      variables:
+        TEZTALE_REF: "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+    - if: $CI_COMMIT_TAG
+      variables:
+        TEZTALE_REF: "$CI_COMMIT_TAG"
+    - if: $CI_COMMIT_REF_SLUG
+      variables:
+        TEZTALE_REF: "$CI_COMMIT_REF_SLUG"
 
 .default_matrix: &default_matrix
   matrix:
@@ -40,24 +59,39 @@ fmt:
     - opam-2.1 install ocamlformat.0.24.1
     - dune build @fmt
 
-build:
-  stage: build
-  image: ocaml/opam:ubuntu-22.04-ocaml-4.14
+.docker_login: &docker_login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
+
+# Build or update the docker image that will be used for the build job
+prepare:
+  stage: prepare
+  image: docker:stable
   parallel: *default_matrix
   tags:
     - ${RUNNER}
-  variables:
-    # Build blst used by ocaml-bls12-381 without ADX to support old CPU
-    # architectures.
-    # See https://gitlab.com/tezos/tezos/-/issues/1788
-    BLST_PORTABLE: "yes"
+  services:
+    - docker:dind
   before_script:
-    - sudo apt update
-    - eval $(opam env)
+    - *docker_login
   script:
+    - set -xv
+    - export DOCKER_CLI_EXPERIMENTAL=enabled
+    - docker manifest inspect "${BUILD_CONTAINER_NAME}" && export DOCKER_ARGS="--build-arg BASE=${BUILD_CONTAINER_NAME}" && export OPAM_INSTALL_ARGS=--criteria="-changed,-removed" || export DOCKER_ARGS="" && export OPAM_INSTALL_ARGS=
+    - echo DOCKER_ARGS="${DOCKER_ARGS}" OCTEZ_BRANCH="${OCTEZ_BRANCH}" OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}"
+    - docker build -t "${BUILD_CONTAINER_NAME}" ${DOCKER_ARGS} --build-arg OCTEZ_BRANCH="${OCTEZ_BRANCH}" --build-arg OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}" -f Dockerfile.dependencies .
+    - docker push "${BUILD_CONTAINER_NAME}"
+
+build:
+  stage: build
+  parallel: *default_matrix
+  image: ${BUILD_CONTAINER_NAME}
+  tags:
+    - ${RUNNER}
+  needs:
+    - job: prepare
+      artifacts: false
+  before_script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
-    - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
-    - opam-2.1 install -y caqti caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
+  script:
     - dune build archiver/main.exe server/main.exe
     - mkdir -p ./${ARCH}-${OCTEZ_BRANCH}/{archiver,server}
     - cp --parents {archiver,server}/main.exe ./${ARCH}-${OCTEZ_BRANCH}/
@@ -118,7 +152,7 @@ docker:
     - ${RUNNER}
   before_script:
     - !reference [.needs-build, before_script]
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - *docker_login
   script:
     - set -xv
     - >
