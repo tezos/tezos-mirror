@@ -43,7 +43,7 @@
 //! ```
 //! where A(...) signifies that A modifies the entrypoint/kernel code given as input.
 
-pub use tezos_smart_rollup_macros::main;
+pub use tezos_smart_rollup_macros::{main, runtime};
 
 #[doc(hidden)]
 pub mod internal;
