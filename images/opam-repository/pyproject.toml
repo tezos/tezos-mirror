@@ -1,0 +1,47 @@
+# If you modify this file, generate the lock file using `poetry lock` and copy
+# the resulting poetry.lock file with this one in https://gitlab.com/tezos/opam-repository
+[tool.poetry]
+name = "tezos"
+version = "0.1.0"
+description = "Python documentation & scripts for Tezos"
+
+readme = "README.md"
+
+authors = [
+  "Tezos community <tezos@tezos.com>"
+]
+repository = "https://gitlab.com/tezos/tezos"
+homepage = "https://gitlab.com/tezos/tezos"
+
+keywords = ["tezos"]
+
+
+[tool.poetry.dependencies]
+python = "~3.11"
+
+# developer tools
+mypy = "0.942"
+mypy-extensions = "0.4.3"
+pycodestyle = "2.7.0"
+pylint = "3.0.2"
+black = "22.3.0"
+
+# pytest is used by scripts/ci/coverage.py and scripts/b58_prefix
+pytest = "6.2.5"
+
+# docs/ dependencies
+sphinx = "4.2.0"
+sphinx-rtd-theme = "0.5.2"
+types-pygments = "2.14.0.1"
+types-docutils = "0.19.1.2"
+
+# scripts/b58_prefix dependencies
+base58 = "2.1.0"
+fire = "0.4.0"
+
+# scripts/ci/coverage.py dependencies
+python-gitlab = "2.10.1"
+
+[tool.black]
+line-length = 80
+skip-string-normalization = true
