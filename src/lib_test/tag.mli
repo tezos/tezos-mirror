@@ -33,9 +33,9 @@
 
 (** ["flaky"]: the test is flaky.
 
-    This disables the test in the CI just like {!ci_disabled}.
-    Contrary to {!ci_disabled} however, this also gives the reason why the test
-    is disabled: the test is flaky.
+    This disables the test in [before_merging] pipelines of the CI
+    just like {!ci_disabled}. Contrary to {!ci_disabled} however, this
+    also gives the reason why the test is disabled: the test is flaky.
 
     Tip: you can list tests that are declared as flaky with [tezt --list flaky].
     You can check if they are still flaky with something like

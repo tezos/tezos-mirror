@@ -897,7 +897,9 @@ let trusted_ring () =
   Test.register
     ~__FILE__
     ~title:"p2p - set a trusted ring"
-    ~tags:[team; "p2p"; "connection"; "trusted"; "ring"]
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7276
+         This test is flaky because it times out sometimes. *)
+    ~tags:[team; "p2p"; "connection"; "trusted"; "ring"; Tag.flaky]
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->

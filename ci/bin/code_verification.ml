@@ -1415,6 +1415,12 @@ let jobs pipeline_type =
           ()
       in
       let tezt_flaky : tezos_job =
+        (* Runs tests tagged "flaky" [Tag.flaky].
+
+           These tests only run on scheduled pipelines. They run with
+           higher retries (both GitLab CI job retries, and tezt
+           retries). They also run with [~parallel:1] to increase
+           stability. *)
         job_tezt
           ~__POS__
           ~name:"tezt-flaky"
@@ -1428,8 +1434,9 @@ let jobs pipeline_type =
           ~tezt_parallel:1
           ~dependencies
           ~rules:
-            (* This job can only be manually started when it's
-               artifact dependencies exists, which they do when
+            (* This job can only be manually started on
+               [before_merging] pipelines when it's artifact
+               dependencies exists, which they do when
                [changeset_octez] is changed. *)
             (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
           ()
