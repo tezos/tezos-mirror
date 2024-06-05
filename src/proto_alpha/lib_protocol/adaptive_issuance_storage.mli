@@ -125,6 +125,7 @@ module Internal_for_tests : sig
     Q.t
 
   val compute_max :
+    issuance_ratio_min:Q.t ->
     reward_params:Constants_parametric_repr.adaptive_rewards_params ->
     launch_cycle:Cycle_repr.t option ->
     new_cycle:Cycle_repr.t ->
