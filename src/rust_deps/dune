@@ -28,8 +28,8 @@
   (no-infer
    (progn
     (run rm -f wasmer-3.3.0/lib/c-api/wasmer.h)
-    (run cargo build --release --locked)
-    (setenv OBJCOPY objcopy (run cargo run --release --locked))
+    (run cargo build --release)
+    (setenv OBJCOPY objcopy (run cargo run --release))
     (run strip -x liboctez_rust_deps.a)
     (bash
      "test -r target/release/liboctez_rust_deps.so && cp -f target/release/liboctez_rust_deps.so dlloctez_rust_deps.so || true")
