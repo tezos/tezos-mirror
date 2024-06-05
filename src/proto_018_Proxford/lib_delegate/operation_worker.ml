@@ -55,7 +55,7 @@ module Events = struct
     declare_2
       ~section
       ~name:"pqc_reached"
-      ~level:Debug
+      ~level:Info
       ~msg:
         "prequorum reached (voting power: {voting_power}, {preattestations} \
          preattestations)"
@@ -85,7 +85,7 @@ module Events = struct
     declare_2
       ~section
       ~name:"qc_reached"
-      ~level:Debug
+      ~level:Info
       ~msg:
         "quorum reached (voting power: {voting_power}, {attestations} \
          attestations)"
