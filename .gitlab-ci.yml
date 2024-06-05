@@ -50,12 +50,13 @@ workflow:
       ARCH: "arm64"
       OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
 
-fmt:
+check:
   stage: check
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   script:
     - opam-2.1 install ocamlformat.0.24.1
-    - dune build @fmt
+    - git am < ProtoALpha.git.patch # Check that ProtoALpha patch can be applied
+    - dune build @fmt # Check that code is properly formatted with ocamlformat
 
 .docker_login: &docker_login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
