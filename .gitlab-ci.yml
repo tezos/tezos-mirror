@@ -31,6 +31,9 @@ variables:
   # architectures.
   # See https://gitlab.com/tezos/tezos/-/issues/1788
   BLST_PORTABLE: "yes"
+  # Without this option git will fail when trying to `git am < ProtoALpha.git.patch`
+  # See https://gitlab.com/gitlab-org/gitlab-runner/-/issues/37238
+  FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR: "true"
 
 workflow:
   rules:
