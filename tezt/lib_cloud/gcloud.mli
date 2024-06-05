@@ -29,3 +29,5 @@ val compute_ssh :
 (** [get_ip_address_from_name ~zone name] allows to get the external IP
     address of a VM from its name [name]. *)
 val get_ip_address_from_name : zone:string -> string -> string Lwt.t
+
+val list_vms : prefix:string -> string Lwt.t
