@@ -613,47 +613,47 @@ let pop_transactions state ~maximum_cumulative_size =
 
 let clear_popped_transactions state = state.Types.popped_txs <- []
 
+(** [pop_and_inject_transactions state] pop transactions from the pool
+    and forward them to the next node. In proxy mode the transaction
+    are forwarded to a rollup node, in observer mode to the next evm
+    node. The sequencer is not supposed to use this function, using it
+    would make transaction disappear from the tx pool. *)
 let pop_and_inject_transactions state =
   let open Lwt_result_syntax in
   let open Types in
-  match state.mode with
-  | Sequencer ->
-      failwith
-        "Internal error: the sequencer is not supposed to use this function"
-  | Observer | Proxy ->
-      (* We over approximate the number of transactions to pop in proxy and
-         observer mode to the maximum size an L1 block can hold. If the proxy
-         sends more, they won't be applied at the next level. For the observer,
-         it prevents spamming the sequencer. *)
-      let maximum_cumulative_size =
-        Sequencer_blueprint.maximum_usable_space_in_blueprint
-          Sequencer_blueprint.maximum_chunks_per_l1_level
-      in
-      let* txs = pop_transactions state ~maximum_cumulative_size in
-      if not (List.is_empty txs) then
-        let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
-        let txs = List.map fst txs in
-        let*! hashes =
-          Rollup_node.inject_raw_transactions
-          (* The timestamp is ignored in observer and proxy mode, it's just for
-             compatibility with sequencer mode. *)
-            ~timestamp:(Misc.now ())
-            ~smart_rollup_address:state.smart_rollup_address
-            ~transactions:txs
+  (* We over approximate the number of transactions to pop in proxy and
+     observer mode to the maximum size an L1 block can hold. If the proxy
+     sends more, they won't be applied at the next level. For the observer,
+     it prevents spamming the sequencer. *)
+  let maximum_cumulative_size =
+    Sequencer_blueprint.maximum_usable_space_in_blueprint
+      Sequencer_blueprint.maximum_chunks_per_l1_level
+  in
+  let* txs = pop_transactions state ~maximum_cumulative_size in
+  if not (List.is_empty txs) then
+    let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
+    let txs = List.map fst txs in
+    let*! hashes =
+      Rollup_node.inject_raw_transactions
+      (* The timestamp is ignored in observer and proxy mode, it's just for
+         compatibility with sequencer mode. *)
+        ~timestamp:(Misc.now ())
+        ~smart_rollup_address:state.smart_rollup_address
+        ~transactions:txs
+    in
+    let () = clear_popped_transactions state in
+    match hashes with
+    | Error trace ->
+        let*! () = Tx_pool_events.transaction_injection_failed trace in
+        return_unit
+    | Ok hashes ->
+        let*! () =
+          List.iter_s
+            (fun hash -> Tx_pool_events.transaction_injected ~hash)
+            hashes
         in
-        let () = clear_popped_transactions state in
-        match hashes with
-        | Error trace ->
-            let*! () = Tx_pool_events.transaction_injection_failed trace in
-            return_unit
-        | Ok hashes ->
-            let*! () =
-              List.iter_s
-                (fun hash -> Tx_pool_events.transaction_injected ~hash)
-                hashes
-            in
-            return_unit
-      else return_unit
+        return_unit
+  else return_unit
 
 let lock_transactions state = state.Types.locked <- true
 
@@ -848,16 +848,32 @@ let pop_transactions ~maximum_cumulative_size =
 let pop_and_inject_transactions () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Pop_and_inject_transactions
-  |> handle_request_error
+  let state = Worker.state worker in
+  match state.mode with
+  | Sequencer ->
+      (* the sequencer injects blueprint in a rollup node, not
+         transaction. *)
+      return_unit
+  | Proxy | Observer ->
+      Worker.Queue.push_request_and_wait
+        worker
+        Request.Pop_and_inject_transactions
+      |> handle_request_error
 
 let pop_and_inject_transactions_lazy () =
   let open Lwt_result_syntax in
   bind_worker @@ fun w ->
-  let*! (_pushed : bool) =
-    Worker.Queue.push_request w Request.Pop_and_inject_transactions
-  in
-  return_unit
+  let state = Worker.state w in
+  match state.mode with
+  | Sequencer ->
+      (* the sequencer injects blueprint in a rollup node, not
+         transaction. *)
+      return_unit
+  | Proxy | Observer ->
+      let*! (_pushed : bool) =
+        Worker.Queue.push_request w Request.Pop_and_inject_transactions
+      in
+      return_unit
 
 let lock_transactions () =
   let open Lwt_result_syntax in
