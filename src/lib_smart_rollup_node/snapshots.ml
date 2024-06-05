@@ -455,7 +455,7 @@ let reconstruct_level_context rollup_ctxt ~predecessor
   return (block, ctxt)
 
 let reconstruct_context_from_first_available_level
-    (node_ctxt : _ Node_context.t) (head : Sc_rollup_block.t) =
+    (node_ctxt : _ Node_context.t) ~(head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
   let* {first_available_level = first_level; _} =
     Node_context.get_gc_levels node_ctxt
@@ -485,7 +485,8 @@ let reconstruct_context_from_first_available_level
   in
   reconstruct_chain_from first_block first_ctxt
 
-let maybe_reconstruct_context cctxt ~data_dir =
+let with_modify_data_dir cctxt ~data_dir
+    ?(skip_condition = fun _ _ ~head:_ -> Lwt_result.return false) f =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
@@ -511,44 +512,52 @@ let maybe_reconstruct_context cctxt ~data_dir =
   let* context =
     Context.load (module C) ~cache_size:100 Read_write context_dir
   in
-  let*! head_ctxt =
-    Context.checkout
-      context
-      (Smart_rollup_context_hash.to_context_hash head.header.context)
+  let* skip = skip_condition store context ~head in
+  unless skip @@ fun () ->
+  let* current_protocol =
+    Node_context.protocol_of_level_with_store store head.header.level
   in
-  match head_ctxt with
-  | Some _ -> return_unit
-  | None ->
-      let* current_protocol =
-        Node_context.protocol_of_level_with_store store head.header.level
-      in
-      let*? (module Plugin) =
-        Protocol_plugins.proto_plugin_for_protocol current_protocol.protocol
-      in
-      let* constants =
-        Plugin.Layer1_helpers.retrieve_constants
-          cctxt
-          ~block:(`Level head.header.level)
-      in
-      let current_protocol =
-        {
-          Node_context.hash = current_protocol.protocol;
-          proto_level = current_protocol.proto_level;
-          constants;
-        }
-      in
-      let* node_ctxt =
-        Node_context_loader.For_snapshots.create_node_context
-          cctxt
-          current_protocol
-          store
+  let*? (module Plugin) =
+    Protocol_plugins.proto_plugin_for_protocol current_protocol.protocol
+  in
+  let* constants =
+    Plugin.Layer1_helpers.retrieve_constants
+      cctxt
+      ~block:(`Level head.header.level)
+  in
+  let current_protocol =
+    {
+      Node_context.hash = current_protocol.protocol;
+      proto_level = current_protocol.proto_level;
+      constants;
+    }
+  in
+  let* node_ctxt =
+    Node_context_loader.For_snapshots.create_node_context
+      cctxt
+      current_protocol
+      store
+      context
+      ~data_dir
+  in
+  let* () = f node_ctxt ~head in
+  let*! () = Context.close context in
+  let* () = Store.close store in
+  return_unit
+
+let maybe_reconstruct_context cctxt ~data_dir =
+  with_modify_data_dir
+    cctxt
+    ~data_dir
+    ~skip_condition:(fun _store context ~head ->
+      let open Lwt_result_syntax in
+      let*! head_ctxt =
+        Context.checkout
           context
-          ~data_dir
+          (Smart_rollup_context_hash.to_context_hash head.header.context)
       in
-      let* () = reconstruct_context_from_first_available_level node_ctxt head in
-      let*! () = Context.close context in
-      let* () = Store.close store in
-      return_unit
+      return (Option.is_some head_ctxt))
+    reconstruct_context_from_first_available_level
 
 let post_checks ~action ~message snapshot_metadata ~dest =
   let open Lwt_result_syntax in
