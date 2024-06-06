@@ -33,16 +33,29 @@ let riscv_sandbox =
    the RISC-V test suite using the same tag to avoid warnings. *)
 let _ = Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/"
 
-let _ =
-  Uses.make ~tag:"riscv_sandbox" ~path:"./tezt/tests/riscv-tests/generated/"
+type vm_kind = Pvm | Test
 
-let run_kernel ?(posix = false) ~input ?initrd () =
+let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd () =
   let process =
     Process.spawn
       ~hooks:Tezt_tezos.Tezos_regression.hooks
       (Uses.path riscv_sandbox)
-      (["rvemu"; "--input"; input]
-      @ Option.fold ~none:[] ~some:(fun initrd -> ["--initrd"; initrd]) initrd
-      @ if posix then ["--posix"] else [])
+      (["run"; "--input"; Uses.path input]
+      @ Option.fold
+          ~none:[]
+          ~some:(fun initrd -> ["--initrd"; Uses.path initrd])
+          initrd
+      @ ["--max-steps"; Int64.to_string max_steps]
+      @ (match inbox with
+        | None -> []
+        | Some inbox -> ["--inbox-file"; Uses.path inbox])
+      @
+      match kind with
+      | Test -> ["--posix-exit-mode"; "machine"]
+      | Pvm -> ["--pvm"])
   in
   Process.check process
+
+let run_pvm = run ~kind:Pvm
+
+let run_test = run ~kind:Test
