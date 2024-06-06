@@ -4011,14 +4011,7 @@ let injecting_old_operation_fails =
     Client.RPC.spawn client
     @@ RPC.post_injection_operation (Data (`String (op_str_hex ^ signature)))
   in
-  let injection_error_rex =
-    rex
-      ~opts:[`Dotall]
-      "Fatal error:\n\
-      \  Command failed: Operation .* is branched on a block .* which is too \
-       old"
-  in
-  Process.check_error ~msg:injection_error_rex process
+  Process.check_error ~msg:Operation_core.injection_error_unknown_branch process
 
 let test_request_operations_peer =
   let step1_msg = "Step 1: Connect and initialise two nodes " in
