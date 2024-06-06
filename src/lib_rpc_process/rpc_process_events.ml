@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -68,7 +68,7 @@ let new_head =
     ~section
     ~name:"new_head"
     ~msg:"New head received at level ({level})"
-    ~level:Notice
+    ~level:Info
     ("level", Data_encoding.int32)
 
 let new_applied_block =
@@ -76,7 +76,7 @@ let new_applied_block =
     ~section
     ~name:"new_applied_block"
     ~msg:"New applied block received ({level})"
-    ~level:Notice
+    ~level:Info
     ("level", Data_encoding.int32)
 
 let start_synchronization =
@@ -84,7 +84,7 @@ let start_synchronization =
     ~section
     ~name:"start_synchronization"
     ~msg:"Starting store synchronization for block {level} ({hash})"
-    ~level:Notice
+    ~level:Info
     ("level", Data_encoding.int32)
     ~pp2:Block_hash.pp_short
     ("hash", Block_hash.encoding)
@@ -97,20 +97,12 @@ let shutting_head_daemon =
     ~level:Info
     ()
 
-let store_synchronized =
-  declare_0
-    ~section
-    ~name:"store_synchronized"
-    ~msg:"Store synchronized"
-    ~level:Notice
-    ()
-
 let store_synchronized_on_head =
   declare_2
     ~section
     ~name:"store_synchronized_on_head"
     ~msg:"Store synchronized on head {hash} ({level})"
-    ~level:Notice
+    ~level:Info
     ~pp1:Block_hash.pp_short
     ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
