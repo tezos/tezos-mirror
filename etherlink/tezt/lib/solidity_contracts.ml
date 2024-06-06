@@ -178,14 +178,13 @@ let revert () =
     ~contract:"Revert"
     ~evm_version:"london"
 
-(** The info for the "create2.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/create2.sol] *)
-let create2 =
-  {
-    label = "create2";
-    abi = kernel_inputs_path ^ "/create2.abi";
-    bin = kernel_inputs_path ^ "/create2.bin";
-  }
+(** The info for the "create2.sol" contract. *)
+let create2 () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/create2.sol")
+    ~label:"create2"
+    ~contract:"Create2"
+    ~evm_version:"london"
 
 (** The info for the "oog_call.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/oog_call.sol] *)

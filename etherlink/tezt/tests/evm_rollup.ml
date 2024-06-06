@@ -4470,14 +4470,17 @@ let test_l2_create_collision =
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* create2_address, _tx = deploy ~contract:create2 ~sender evm_setup in
+  let* create2_resolved = create2 () in
+  let* create2_address, _tx =
+    deploy ~contract:create2_resolved ~sender evm_setup
+  in
 
   let call_create2 (sender : Eth_account.t) ~expect_failure =
     Eth_cli.contract_send
       ~expect_failure
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:create2.label
+      ~abi_label:create2_resolved.label
       ~address:create2_address
       ~method_call:(Printf.sprintf "create2()")
   in
