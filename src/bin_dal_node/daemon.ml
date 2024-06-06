@@ -492,12 +492,8 @@ module Handler = struct
         in
         let* () =
           (* If a slot header was posted to the L1 and we have the corresponding
-                 data, post it to gossipsub.
-
-             FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
-             Should we restrict published slot data to the slots for which
-             we have the producer role?
-          *)
+             data, post it to gossipsub.  Note that this is done independently
+             of the profile. *)
           List.iter_es
             (fun (slot_header, status) ->
               match status with
