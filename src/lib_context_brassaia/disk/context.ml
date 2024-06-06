@@ -223,6 +223,17 @@ module Events = struct
       ~name:"gc_launch_failure"
       ~msg:"context garbage collection launch failed: {error}"
       ("error", Data_encoding.string)
+
+  let warning_experimental =
+    declare_0
+      ~section
+      ~level:Warning
+      ~name:"brassaia_warning_experimental"
+      ~msg:
+        "creating a context with Brassaia.\n\
+        \ Brassaia is still experimental and should only be used in testing \
+         environments"
+      ()
 end
 
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
@@ -805,6 +816,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       let* () =
         Events.(emit init_context (readonly, index_log_size, lru_size))
       in
+      let* () = Events.(emit warning_experimental ()) in
       Store.Repo.init
         (Brassaia_pack.config
            ~readonly
