@@ -214,6 +214,9 @@ Smart Rollup node
 - Support for unsafely increasing the WASM PVM's tick limit of a rollup.
   (MRs :gl:`!12907`, :gl:`!12957`, :gl:`!12983`, :gl:`!13357`)
 
+- Fix a bug in how commitments are computed after a protocol migration
+  where the the commitment period changes. (MR :gl:`!13588`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
