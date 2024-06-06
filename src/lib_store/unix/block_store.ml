@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1909,18 +1909,24 @@ let close block_store =
 
 let v_3_1_upgrade chain_dir =
   let open Lwt_result_syntax in
-  (* Load using the legacy block_store_status encoding *)
-  let*! () = Store_events.(emit load_block_store_status ()) in
-  let* legacy_status_data =
-    Stored_data.init
-      (Naming.legacy_block_store_status_file chain_dir)
-      ~initial_data:Block_store_status.Legacy.create_idle_status
+  let legacy_block_store_status_file =
+    Naming.legacy_block_store_status_file chain_dir
   in
-  (* Convert to the new encoding *)
-  let* status = Block_store_status.of_legacy legacy_status_data in
-  (* Overwrite the status file *)
-  let* () =
-    Stored_data.write_file (Naming.block_store_status_file chain_dir) status
-  in
-  let*! () = Store_events.(emit fixed_block_store_status ()) in
-  return_unit
+  let*! exists = Lwt_unix.file_exists legacy_block_store_status_file.path in
+  if exists then
+    (* Load using the legacy block_store_status encoding *)
+    let*! () = Store_events.(emit load_block_store_status ()) in
+    let* legacy_status_data =
+      Stored_data.init
+        legacy_block_store_status_file
+        ~initial_data:Block_store_status.Legacy.create_idle_status
+    in
+    (* Convert to the new encoding *)
+    let* status = Block_store_status.of_legacy legacy_status_data in
+    (* Overwrite the status file *)
+    let* () =
+      Stored_data.write_file (Naming.block_store_status_file chain_dir) status
+    in
+    let*! () = Store_events.(emit fixed_block_store_status ()) in
+    return_unit
+  else (* The store is not containing any data to upgrade yet.*) return_unit
