@@ -623,6 +623,8 @@ module Handler = struct
                   return_unit
               in
               let* () =
+                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
+                   We should use the head level instead. *)
                 Node_context.may_add_plugin
                   ctxt
                   cctxt
