@@ -410,7 +410,13 @@ let insert_valid_transaction state tx_raw address
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
       in
-
+      (* This is a temporary fix until the hash computation is fixed on the
+         kernel side. *)
+      let transaction_object =
+        Option.map
+          (fun (tx : Ethereum_types.transaction_object) -> {tx with hash})
+          transaction_object
+      in
       let*? pool = Pool.add pool address tx_raw transaction_object in
 
       let*! () =
