@@ -43,6 +43,8 @@ shift
 # E.g. 'jammy focal', 'bookworm'
 RELEASES=$*
 
+# If it's a protected branch the value of $bucket will
+# be set accordingly but the CI.
 BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
 oldPWD=$PWD
@@ -53,6 +55,9 @@ if [ -n "${CI_COMMIT_TAG:-}" ]; then
   # shellcheck source=./scripts/ci/octez-release.sh
   . ./scripts/ci/octez-release.sh
 fi
+
+#This logic must be kept in sync with the installation tests scripts in
+# docs/introduction/install-bin-deb.sh
 
 # if it's a release tag, then it can be a RC release or a final release
 if [ -n "${gitlab_release_no_v:-}" ]; then
@@ -70,14 +75,17 @@ else
   GPG_KEY_ID="CFC482F3CD08D36D"
   GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
   GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
-  if [ ! "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
+  if [ "$CI_COMMIT_REF_PROTECTED" = "false" ]; then
     if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
       echo "Cannot create a repository for a branch named 'RC'"
       exit 1
     else
+      # Branch is not protected, this is for testing ordinary MRs
       TARGETDIR="public/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
     fi
   else
+    # For protected branches that are not release, we allow
+    # a repository only for master.
     if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
       TARGETDIR="public/master/$DISTRIBUTION"
     else
@@ -128,6 +136,7 @@ for architecture in $ARCHITECTURES; do # amd64, arm64 ...
       gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
         -u "$GPG_KEY_ID" --clearsign \
         -o "dists/${release}/InRelease" "dists/${release}/Release"
+    cd -
   done
   # back to base
   cd "$oldPWD"
