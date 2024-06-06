@@ -981,10 +981,10 @@ let wait_termination (evm_node : t) =
       let* _status = Process.wait process in
       unit
 
-let make_kernel_installer_config ?(remove_whitelist = false) ?kernel_root_hash
-    ?chain_id ?bootstrap_balance ?bootstrap_accounts ?sequencer ?delayed_bridge
-    ?ticketer ?administrator ?sequencer_governance ?kernel_governance
-    ?kernel_security_governance ?minimum_base_fee_per_gas
+let make_kernel_installer_config ?(devmode = true) ?(remove_whitelist = false)
+    ?kernel_root_hash ?chain_id ?bootstrap_balance ?bootstrap_accounts
+    ?sequencer ?delayed_bridge ?ticketer ?administrator ?sequencer_governance
+    ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ~output () =
@@ -1029,6 +1029,7 @@ let make_kernel_installer_config ?(remove_whitelist = false) ?kernel_root_hash
         Int64.to_string
         maximum_gas_per_transaction
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
+    @ Cli_arg.optional_switch "devmode" devmode
     @
     match bootstrap_accounts with
     | None -> []

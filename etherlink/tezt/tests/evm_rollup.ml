@@ -279,7 +279,8 @@ type setup_mode =
     }
   | Setup_proxy of {devmode : bool}
 
-let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
+let setup_evm_kernel ?devmode ?additional_config
+    ?(setup_kernel_root_hash = true)
     ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
@@ -337,6 +338,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let*! () =
       Evm_node.make_kernel_installer_config
         ~remove_whitelist:Option.(is_some whitelist)
+        ?devmode
         ?kernel_root_hash
         ~bootstrap_accounts
         ?da_fee_per_byte
@@ -2359,8 +2361,8 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
-    ?(activation_timestamp = "0") ?evm_setup ?rollup_address
+let gen_test_kernel_upgrade ?devmode ?setup_kernel_root_hash ?admin_contract
+    ?timestamp ?(activation_timestamp = "0") ?evm_setup ?rollup_address
     ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
@@ -2376,6 +2378,7 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     | Some evm_setup -> return evm_setup
     | None ->
         setup_evm_kernel
+          ?devmode
           ?setup_kernel_root_hash
           ?timestamp
           ?with_administrator
@@ -2821,6 +2824,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
+      ~devmode:false
       ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
@@ -2865,7 +2869,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
 let test_kernel_migration =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "migration"; "upgrade"; "foo"]
+    ~tags:["evm"; "migration"; "upgrade"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -2879,6 +2883,12 @@ let test_kernel_migration =
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
+  let expected_ticketer evm_setup =
+    match evm_setup.l1_contracts with
+    | Some {exchanger; _} -> exchanger
+    | None -> Test.fail "The test needs a ticketer"
+  in
+
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
@@ -2889,6 +2899,7 @@ let test_kernel_migration =
     in
     let*@ block_result = latest_block evm_setup.evm_node in
     let* config_result = config_setup evm_setup in
+    let expected_ticketer = expected_ticketer evm_setup in
     let* ticketer =
       Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
@@ -2897,12 +2908,16 @@ let test_kernel_migration =
            ~key:"/evm/ticketer"
            ()
     in
-    let ticketer = Option.value ~default:"none ticketer" ticketer in
-    Log.info "Ticketer before: %s" ticketer ;
+    let ticketer =
+      Option.map (fun ticketer -> Hex.to_string (`Hex ticketer)) ticketer
+    in
+    Check.((Some expected_ticketer = ticketer) (option string))
+      ~error_msg:"Ticketer not found at /evm/ticketer" ;
     return {transfer_result; block_result; config_result}
   in
   let scenario_after ~evm_setup ~sanity_check =
-    let* ticketer =
+    let expected_ticketer = expected_ticketer evm_setup in
+    let* evm_ticketer =
       Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
@@ -2910,10 +2925,13 @@ let test_kernel_migration =
            ~key:"/evm/ticketer"
            ()
     in
-    let ticketer = Option.value ~default:"none ticketer" ticketer in
-    Log.info "Ticketer after prev path: %s" ticketer ;
+    let evm_ticketer =
+      Option.map (fun ticketer -> Hex.to_string (`Hex ticketer)) evm_ticketer
+    in
+    Check.((None = evm_ticketer) (option string))
+      ~error_msg:"/evm/ticketer should be none after migration" ;
 
-    let* ticketer =
+    let* evm_world_state_ticketer =
       Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
@@ -2921,8 +2939,13 @@ let test_kernel_migration =
            ~key:"/evm/world_state/ticketer"
            ()
     in
-    let ticketer = Option.value ~default:"none ticketer" ticketer in
-    Log.info "Ticketer after new path: %s" ticketer ;
+    let evm_world_state_ticketer =
+      Option.map
+        (fun ticketer -> Hex.to_string (`Hex ticketer))
+        evm_world_state_ticketer
+    in
+    Check.((Some expected_ticketer = evm_world_state_ticketer) (option string))
+      ~error_msg:"Ticketer not found at /evm/world_state/ticketer" ;
 
     let* () =
       ensure_transfer_result_integrity
