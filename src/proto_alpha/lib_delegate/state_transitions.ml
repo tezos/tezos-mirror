@@ -73,6 +73,12 @@ let is_acceptable_proposal_for_current_level state
          is a predecessor therefore the proposal is valid *)
       return Valid_proposal
 
+(* This function retrieves the branch of the predecessor's predecessor (block
+   finalized) instead of the predecessor. This is done to avoid having consensus
+   operation branched on block that are not part of the canonical chain
+   anymore. *)
+let get_branch_from_proposal proposal = proposal.predecessor.shell.predecessor
+
 let make_consensus_vote_batch state proposal kind =
   let level =
     Raw_level.of_int32 state.level_state.current_level |> function
@@ -89,7 +95,9 @@ let make_consensus_vote_batch state proposal kind =
       (Delegate_slots.own_delegates state.level_state.delegate_slots)
   in
   (* The branch is the latest finalized block. *)
-  let batch_branch = state.level_state.latest_proposal.predecessor.hash in
+  let batch_branch =
+    get_branch_from_proposal state.level_state.latest_proposal
+  in
   Baking_state.make_unsigned_consensus_vote_batch
     kind
     batch_content
@@ -740,7 +748,9 @@ let inject_early_arrived_attestations state =
   | first_signed_attestation :: _ as unbatched_signed_attestations -> (
       let new_round_state = {state.round_state with early_attestations = []} in
       let new_state = {state with round_state = new_round_state} in
-      let batch_branch = state.level_state.latest_proposal.predecessor.hash in
+      let batch_branch =
+        get_branch_from_proposal state.level_state.latest_proposal
+      in
       let batch_content =
         let vote_consensus_content =
           first_signed_attestation.unsigned_consensus_vote
