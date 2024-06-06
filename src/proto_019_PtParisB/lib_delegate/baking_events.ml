@@ -777,6 +777,7 @@ module Actions = struct
 
   let block_injected =
     declare_4
+      ~alternative_color:Internal_event.Blue
       ~section
       ~name:"block_injected"
       ~level:Notice
@@ -944,6 +945,7 @@ module Nonces = struct
 
   let revealing_nonce =
     declare_3
+      ~alternative_color:Internal_event.Cyan
       ~section
       ~name:"revealing_nonce"
       ~level:Notice
