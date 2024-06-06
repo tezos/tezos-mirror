@@ -189,7 +189,7 @@ where
         }
     }
 
-    log!(host, Info, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
+    log!(host, Debug, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
 
     let tracing = tracer.is_some();
 
