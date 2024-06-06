@@ -132,6 +132,9 @@ val byte_size :
    injection fails. If the injection succeeds, the hash of the
    operation is returned.
 
+   @param dont_wait If [true], the operation is injected without waiting
+   on some node event. Making [request] ignore. Default is [false].
+
    @param request If [`Inject], we do not wait the [prevalidator] to
    classify the operation. This can create some flakyness in the test
    but is needed to test corner cases. If [`Notify], the function
@@ -170,6 +173,16 @@ val spawn_inject :
   t ->
   Client.t ->
   JSON.t Runnable.process Lwt.t
+
+(** Run [spawn_inject] then capture one group on stderr with [rex]. *)
+val inject_and_capture1_stderr :
+  rex:rex ->
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  string Lwt.t
 
 (** Run [spawn_inject] then capture two groups on stderr with [rex]. *)
 val inject_and_capture2_stderr :
@@ -719,3 +732,10 @@ val already_denounced : rex
 
     Captures [kind], [last_cycle], [level]. *)
 val outdated_denunciation : rex
+
+(** Matches the message
+    [Operation %a is branched on either:]
+    from [src/lib_shell/prevalidator.ml].
+
+    Captures [hash]. *)
+val injection_error_unknown_branch : rex

@@ -169,6 +169,18 @@ let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
       let* () = Process.check_error ~msg process in
       hash t client
 
+let inject_and_capture1_stderr ~rex ?force ?protocol ?signature t client =
+  let* runnable = spawn_inject ?force ?protocol ?signature t client in
+  let*? process = runnable in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
+  match stderr =~* rex with
+  | None ->
+      Test.fail
+        "Injection was expected to fail with:\n%s\nbut instead failed with:\n%s"
+        (show_rex rex)
+        stderr
+  | Some groups -> return groups
+
 let inject_and_capture2_stderr ~rex ?force ?protocol ?signature t client =
   let* runnable = spawn_inject ?force ?protocol ?signature t client in
   let*? process = runnable in
@@ -892,3 +904,6 @@ let already_denounced =
 let outdated_denunciation =
   rex
     {|A double-([\w]+) denunciation is outdated \(last acceptable cycle: ([\d]+), given level: ([\d]+)\).|}
+
+let injection_error_unknown_branch =
+  rex {|Operation ([\w\d]+) is branched on either:|}

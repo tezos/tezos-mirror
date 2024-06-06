@@ -123,11 +123,9 @@ let operation_liveness_reorg =
       client1
   in
   Log.info "Injecting op targeting a non-liveblock (expected to fail)" ;
-  let* _, _ =
-    Operation.inject_and_capture2_stderr
-      ~rex:
-        (rex
-           {|Operation ([\w\d]+) is branched on a block ([\w\d]+) which is too old|})
+  let* _ =
+    Operation.inject_and_capture1_stderr
+      ~rex:Operation_core.injection_error_unknown_branch
       non_live_op
       client1
   in
@@ -218,11 +216,9 @@ let operation_liveness_reorg =
   in
 
   Log.info "Injecting op targeting a non-liveblock" ;
-  let* _, _ =
-    Operation.inject_and_capture2_stderr
-      ~rex:
-        (rex
-           {|Operation ([\w\d]+) is branched on a block ([\w\d]+) which is too old|})
+  let* _ =
+    Operation.inject_and_capture1_stderr
+      ~rex:Operation_core.injection_error_unknown_branch
       non_live_op
       client1
   in
@@ -278,11 +274,9 @@ let operation_liveness =
       client1
   in
   Log.info "Injecting op targeting a non-liveblock (expected to fail)" ;
-  let* _, _ =
-    Operation.inject_and_capture2_stderr
-      ~rex:
-        (rex
-           {|Operation ([\w\d]+) is branched on a block ([\w\d]+) which is too old|})
+  let* _ =
+    Operation.inject_and_capture1_stderr
+      ~rex:Operation_core.injection_error_unknown_branch
       non_live_op
       client1
   in
