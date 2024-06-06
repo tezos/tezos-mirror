@@ -7,9 +7,13 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
-    read_chain_id, read_storage_version, store_storage_version, STORAGE_VERSION,
+    read_chain_id, read_storage_version, store_sequencer_pool_address,
+    store_storage_version, STORAGE_VERSION,
 };
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+
+use primitive_types::H160;
+use std::str::FromStr;
 
 pub enum MigrationStatus {
     None,
@@ -56,6 +60,10 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+        if is_etherlink_ghostnet(host)? {
+            let address = H160::from_str("CF02B9Ca488f8F6F4E28e37AA1bDD16b3F1b2aD8")?;
+            store_sequencer_pool_address(host, address)?;
+        };
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);

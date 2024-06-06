@@ -9,6 +9,7 @@
 - Incorporate the gas limit in the block hash. (!13280)
 - The block's miner and coinbase address are set to sequencer pool
   address if it exists. (!13414)
+- Update Sequencer Pool address on Ghostnet. (!13614)
 
 ### Bug fixes
 
