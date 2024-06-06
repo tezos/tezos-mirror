@@ -298,97 +298,96 @@ let on_validation_request w
          removing it would prevent checking locally
          injected/reconstructed blocks which might be problematic. *)
       let*? () = check_operations_merkle_root hash header operations in
-      let*! r =
-        match
-          Block_hash_ring.find_opt bv.inapplicable_blocks_after_validation hash
-        with
-        | Some errs ->
-            (* If the block is inapplicable but has been previously
-               successfuly validated, we directly return with the cached
-               errors. This way, multiple propagation won't happen. *)
-            return (Application_error_after_validation errs)
-        | None -> (
-            let*! o = Store.Block.read_invalid_block_opt chain_store hash in
-            match o with
-            | Some {errors; _} -> return (Already_known_invalid errors)
-            | None -> (
-                let* pred =
-                  Store.Block.read_block chain_store header.shell.predecessor
-                in
-                let*! mempool = Store.Chain.mempool chain_store in
-                let bv_operations =
-                  List.map
-                    (List.map
-                       (Block_validation.mk_operation
-                          ~known_valid_operation_set:mempool.known_valid))
-                    operations
-                in
-                let*! r =
-                  validate_block
+      match
+        Block_hash_ring.find_opt bv.inapplicable_blocks_after_validation hash
+      with
+      | Some errs ->
+          (* If the block is inapplicable but has been previously
+             successfuly validated, we directly return with the cached
+             errors. This way, multiple propagation won't happen. *)
+          return (Application_error_after_validation errs)
+      | None -> (
+          let*! o = Store.Block.read_invalid_block_opt chain_store hash in
+          match o with
+          | Some {errors; _} -> return (Already_known_invalid errors)
+          | None -> (
+              let* pred =
+                Store.Block.read_block chain_store header.shell.predecessor
+              in
+              let*! mempool = Store.Chain.mempool chain_store in
+              let bv_operations =
+                List.map
+                  (List.map
+                     (Block_validation.mk_operation
+                        ~known_valid_operation_set:mempool.known_valid))
+                  operations
+              in
+              let*! r =
+                validate_block
+                  w
+                  ?canceler
+                  bv
+                  peer
+                  chain_db
+                  chain_store
+                  ~predecessor:pred
+                  header
+                  hash
+                  operations
+                  bv_operations
+              in
+              match r with
+              | Validation_error errs ->
+                  may_commit_invalid_block
                     w
-                    ?canceler
-                    bv
-                    peer
                     chain_db
-                    chain_store
-                    ~predecessor:pred
-                    header
                     hash
-                    operations
-                    bv_operations
-                in
-                match r with
-                | Validation_error errs ->
-                    may_commit_invalid_block
+                    header
+                    advertise_after_validation
+                    errs
+              | Validated -> (
+                  if advertise_after_validation then
+                    (* Headers which have been preapplied can be advertised
+                       before being fully applied. *)
+                    Distributed_db.Advertise.validated_head chain_db header ;
+                  let*! r =
+                    apply_block
                       w
-                      chain_db
-                      hash
+                      ?canceler
+                      bv
+                      peer
+                      chain_store
+                      ~predecessor:pred
                       header
-                      advertise_after_validation
-                      errs
-                | Validated -> (
-                    if advertise_after_validation then
-                      (* Headers which have been preapplied can be advertised
-                         before being fully applied. *)
-                      Distributed_db.Advertise.validated_head chain_db header ;
-                    let*! r =
-                      apply_block
-                        w
-                        ?canceler
-                        bv
-                        peer
-                        chain_store
-                        ~predecessor:pred
-                        header
-                        hash
-                        bv_operations
-                    in
-                    match r with
-                    | Application_error errs -> fail errs
-                    | Applied application_result ->
-                        Shell_metrics.Block_validator
-                        .set_operation_per_pass_collector
-                          (fun () ->
-                            List.map
-                              (fun v -> Int.to_float (List.length v))
-                              operations) ;
-                        commit_and_notify_block
-                          notify_new_block
-                          chain_db
+                      hash
+                      bv_operations
+                  in
+                  match r with
+                  | Application_error errs ->
+                      (* If an error occurs at application, the block_hash is
+                         registered in [inapplicable_blocks_after_validation]
+                         to avoid validating and advertising it again in the
+                         future *)
+                      if advertise_after_validation then
+                        Block_hash_ring.replace
+                          bv.inapplicable_blocks_after_validation
                           hash
-                          header
-                          operations
-                          application_result)))
-      in
-      match r with
-      | Ok r -> return r
-      | Error errs ->
-          if advertise_after_validation then
-            Block_hash_ring.replace
-              bv.inapplicable_blocks_after_validation
-              hash
-              errs ;
-          return (Application_error_after_validation errs))
+                          errs ;
+                      return (Application_error_after_validation errs)
+                  | Applied application_result ->
+                      Shell_metrics.Block_validator
+                      .set_operation_per_pass_collector
+                        (fun () ->
+                          List.map
+                            (fun v -> Int.to_float (List.length v))
+                            operations) ;
+                      commit_and_notify_block
+                        notify_new_block
+                        chain_db
+                        hash
+                        header
+                        operations
+                        application_result))))
 
 let on_preapplication_request w
     {
