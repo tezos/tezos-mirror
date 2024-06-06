@@ -263,13 +263,15 @@ let commit_and_notify_block notify_new_block chain_db hash header operations
    in the error trace. *)
 let may_commit_invalid_block worker chain_db hash header errs =
   let open Lwt_result_syntax in
-  let* () =
-    if List.exists (function Invalid_block _ -> true | _ -> false) errs then
+  if List.exists (function Invalid_block _ -> true | _ -> false) errs then
+    let*! r =
       protect ~canceler:(Worker.canceler worker) (fun () ->
           Distributed_db.commit_invalid_block chain_db hash header errs)
-    else return_unit
-  in
-  return (Validation_failed errs)
+    in
+    match r with
+    | Ok () -> return (Validation_failed errs)
+    | Error errs -> return (Commit_block_failed errs)
+  else return (Validation_failed errs)
 
 let on_validation_request w
     {
