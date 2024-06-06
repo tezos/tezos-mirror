@@ -127,14 +127,13 @@ let mapping_storage () =
     ~contract:"MappingStorage"
     ~evm_version:"london"
 
-(** The info for the "storage.sol" contract, compiled for Shanghai.
-    See [etherlink/tezt/tests/evm_kernel_inputs/shanghai_storage.*] *)
-let shanghai_storage =
-  {
-    label = "shanghai";
-    abi = kernel_inputs_path ^ "/shanghai_storage.abi";
-    bin = kernel_inputs_path ^ "/shanghai_storage.bin";
-  }
+(** The info for the "storage.sol" contract, compiled for Shanghai. *)
+let shanghai_storage () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/storage.sol")
+    ~label:"shanghai_storage"
+    ~contract:"SimpleStorage"
+    ~evm_version:"shanghai"
 
 (** The info for the Callee contract.
     See [src\kernel_evm\solidity_examples\caller_callee.sol] *)
