@@ -4,7 +4,7 @@
 
 use lazy_static::lazy_static;
 use octez_riscv::parser::{instruction::Instr, parse_block};
-use std::process::Command;
+use std::{fs::DirEntry, process::Command};
 
 fn compute_offset(src: &str, dest: &str) -> i64 {
     i64::from_str_radix(dest, 16).unwrap() - i64::from_str_radix(src, 16).unwrap()
@@ -157,14 +157,27 @@ fn check_instructions(fname: &str, instructions: Vec<(String, Instr, String)>) {
     }
 }
 
+fn should_skip_rv_test(file: &DirEntry) -> bool {
+    let name = file.file_name();
+    let name_str = name.to_str().unwrap();
+
+    // Conditions to exclude the test
+    let not_rv = !name_str.starts_with("rv");
+    let dir = file.path().is_dir();
+    // Skip zfh tests: extension not implemented
+    let zfh = name_str.starts_with("rv64uzfh");
+    not_rv || dir || zfh
+}
+
 #[test]
 fn parser_riscv_test_suite() {
     let tests_dir = "../../../tezt/tests/riscv-tests/generated/";
 
     for f in std::fs::read_dir(tests_dir).unwrap() {
         let file = f.unwrap();
-        if file.path().is_dir() || file.file_name().to_string_lossy().starts_with("rv64uzfh") {
-            // Don't run tests for the unimplemented Zfh extension
+
+        if should_skip_rv_test(&file) {
+            // Skip directories, zfh tests, extraneous files
             continue;
         }
         let path = file.path();
