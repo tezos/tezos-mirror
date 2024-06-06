@@ -1457,7 +1457,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args21
+    (args22
        mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
@@ -1488,7 +1488,8 @@ let make_kernel_config_command =
        (switch
           ~doc:"Enable the FA bridge in the kernel"
           ~long:"enable-fa-bridge"
-          ()))
+          ())
+       (config_key_flag ~name:"enable_dal"))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -1515,7 +1516,8 @@ let make_kernel_config_command =
            remove_whitelist,
            boostrap_balance,
            bootstrap_accounts,
-           enable_fa_bridge )
+           enable_fa_bridge,
+           enable_dal )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
@@ -1540,6 +1542,7 @@ let make_kernel_config_command =
         ~boostrap_balance
         ?bootstrap_accounts
         ~enable_fa_bridge
+        ?enable_dal
         ~output
         ())
 
