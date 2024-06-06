@@ -823,7 +823,7 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
 
 let endpoint = rpc_endpoint ?local:None
 
-let patch_config_with_experimental_feature ?(wal_sqlite_journal_mode = false)
+let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false) =
   let conditional_json_put ~name cond value_json json =
     if cond then
@@ -834,13 +834,8 @@ let patch_config_with_experimental_feature ?(wal_sqlite_journal_mode = false)
         json
     else json
   in
-  JSON.update "experimental_features" @@ fun json ->
-  conditional_json_put
-    wal_sqlite_journal_mode
-    ~name:"sqlite_journal_mode"
-    (`String "wal")
-    json
-  |> conditional_json_put
+  JSON.update "experimental_features"
+  @@ conditional_json_put
        drop_duplicate_when_injection
        ~name:"drop_duplicate_on_injection"
        (`Bool true)

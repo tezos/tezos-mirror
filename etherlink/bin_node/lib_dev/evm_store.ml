@@ -14,6 +14,8 @@ type pool =
     [Caqti_error.connect | `K_error of tztrace] )
   Caqti_lwt_unix.Pool.t
 
+type sqlite_journal_mode = Wal | Other
+
 module Db = struct
   let caqti (p : ('a, Caqti_error.t) result Lwt.t) : 'a tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -170,11 +172,8 @@ module Q = struct
 
   let journal_mode =
     custom
-      ~encode:(function Configuration.Wal -> Ok "wal" | Delete -> Ok "delete")
-      ~decode:(function
-        | "wal" -> Ok Wal
-        | "delete" -> Ok Delete
-        | _ -> Error "unsupported journal mode")
+      ~encode:(function Wal -> Ok "wal" | Other -> Ok "delete")
+      ~decode:(function "wal" -> Ok Wal | _ -> Ok Other)
       string
 
   let table_exists =
@@ -225,10 +224,7 @@ module Q = struct
     (* It does not appear possible to write a request {|PRAGMA journal_mode=?|}
        accepted by caqti, sadly. *)
 
-    let set = function
-      | Configuration.Wal ->
-          (unit ->! journal_mode) @@ {|PRAGMA journal_mode=wal|}
-      | Delete -> (unit ->! journal_mode) @@ {|PRAGMA journal_mode=delete|}
+    let set_wal = (unit ->! journal_mode) @@ {|PRAGMA journal_mode=wal|}
   end
 
   module Blueprints = struct
@@ -371,13 +367,12 @@ let with_transaction conn k =
       failwith "Internal error: attempting to perform a nested transaction"
 
 module Journal_mode = struct
-  let set_journal_mode store mode =
+  let set_wal_journal_mode store =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
     let* current_mode = Db.find conn Q.Journal_mode.get () in
-    when_ (current_mode <> mode) @@ fun () ->
-    let* _wal = Db.find conn (Q.Journal_mode.set mode) () in
-    let*! () = Evm_store_events.journal_mode_updated mode in
+    when_ (current_mode <> Wal) @@ fun () ->
+    let* _wal = Db.find conn Q.Journal_mode.set_wal () in
     return_unit
 end
 
@@ -421,7 +416,7 @@ end
 let use (Pool {db_pool}) k =
   Db.use_pool db_pool @@ fun conn -> k (Raw_connection conn)
 
-let init ~data_dir ~sqlite_journal_mode ~perm () =
+let init ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // "store.sqlite" in
   let*! exists = Lwt_unix.file_exists path in
@@ -434,12 +429,7 @@ let init ~data_dir ~sqlite_journal_mode ~perm () =
   let* db_pool = Db.caqti' @@ Caqti_lwt_unix.connect_pool uri in
   let store = Pool {db_pool} in
   use store @@ fun conn ->
-  let* () =
-    match sqlite_journal_mode with
-    | `Force sqlite_journal_mode ->
-        Journal_mode.set_journal_mode conn sqlite_journal_mode
-    | `Identity -> return_unit
-  in
+  let* () = Journal_mode.set_wal_journal_mode conn in
   let* () =
     with_transaction conn @@ fun conn ->
     let* () =

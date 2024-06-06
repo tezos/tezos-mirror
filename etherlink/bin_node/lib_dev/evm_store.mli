@@ -23,11 +23,7 @@ type conn
     If [perm] is [`Read_only], then SQL requests requiring write access will
     fail. With [`Read_write], they will succeed as expected. *)
 val init :
-  data_dir:string ->
-  sqlite_journal_mode:[`Identity | `Force of Configuration.sqlite_journal_mode] ->
-  perm:[`Read_only | `Read_write] ->
-  unit ->
-  t tzresult Lwt.t
+  data_dir:string -> perm:[`Read_only | `Read_write] -> unit -> t tzresult Lwt.t
 
 (** [use store k] executes [k] with a fresh connection to [store]. *)
 val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t

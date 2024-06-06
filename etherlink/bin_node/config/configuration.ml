@@ -21,10 +21,7 @@ type blueprints_publisher_config = {
   catchup_cooldown : int;
 }
 
-type sqlite_journal_mode = Delete | Wal
-
 type experimental_features = {
-  sqlite_journal_mode : sqlite_journal_mode;
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
 }
@@ -98,13 +95,10 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
     chunk_size = Option.value ~default:10 chunk_size;
   }
 
-let default_sqlite_journal_mode = Delete
-
 let default_enable_send_raw_transaction = true
 
 let default_experimental_features =
   {
-    sqlite_journal_mode = default_sqlite_journal_mode;
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
   }
@@ -463,31 +457,16 @@ let observer_encoding data_dir =
           Tezos_rpc.Encoding.uri_encoding)
        (opt "time_between_blocks" encoding_time_between_blocks))
 
-let sqlite_journal_mode_encoding =
-  let open Data_encoding in
-  string_enum [("delete", Delete); ("wal", Wal)]
-
 let experimental_features_encoding =
   let open Data_encoding in
   conv
-    (fun {
-           sqlite_journal_mode;
-           drop_duplicate_on_injection;
-           enable_send_raw_transaction;
-         } ->
-      ( sqlite_journal_mode,
-        drop_duplicate_on_injection,
-        enable_send_raw_transaction ))
-    (fun ( sqlite_journal_mode,
-           drop_duplicate_on_injection,
-           enable_send_raw_transaction ) ->
-      {
-        sqlite_journal_mode;
-        drop_duplicate_on_injection;
-        enable_send_raw_transaction;
-      })
+    (fun {drop_duplicate_on_injection; enable_send_raw_transaction} ->
+      (None, drop_duplicate_on_injection, enable_send_raw_transaction))
+    (fun (_, drop_duplicate_on_injection, enable_send_raw_transaction) ->
+      {drop_duplicate_on_injection; enable_send_raw_transaction})
     (obj3
-       (dft "sqlite_journal_mode" sqlite_journal_mode_encoding Delete)
+       (* `sqlite_journal_mode` field is kept for now for backward compatibility. *)
+       (opt "sqlite_journal_mode" Json.encoding)
        (dft "drop_duplicate_on_injection" bool false)
        (dft
           "enable_send_raw_transaction"

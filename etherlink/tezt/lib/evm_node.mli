@@ -205,10 +205,7 @@ val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
     experimental feature. Each optional argument add the correspondent
     experimental feature. *)
 val patch_config_with_experimental_feature :
-  ?wal_sqlite_journal_mode:bool ->
-  ?drop_duplicate_when_injection:bool ->
-  JSON.t ->
-  JSON.t
+  ?drop_duplicate_when_injection:bool -> JSON.t -> JSON.t
 
 (** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr
     ?rpc_port rollup_node_endpoint] creates an EVM node server with

@@ -28,7 +28,6 @@ val start :
   preimages_endpoint:Uri.t option ->
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->
-  sqlite_journal_mode:[`Identity | `Force of Configuration.sqlite_journal_mode] ->
   store_perm:[`Read_only | `Read_write] ->
   unit ->
   init_status tzresult Lwt.t

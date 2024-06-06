@@ -1374,7 +1374,6 @@ let patch_kernel_command =
           Evm_context.start
             ~data_dir
             ~preimages:Filename.Infix.(data_dir // "wasm_2_0_0")
-            ~sqlite_journal_mode:`Identity
             ~store_perm:`Read_write
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
