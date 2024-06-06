@@ -62,3 +62,11 @@ let get_slot_page_proof cctxt (slot_id : Types.slot_id) page_index =
     ((((), slot_id.slot_level), slot_id.slot_index), page_index)
     ()
     ()
+
+let post_slot cctxt slot =
+  let padding =
+    object
+      method padding = '\000'
+    end
+  in
+  call cctxt Services.post_slot () padding slot
