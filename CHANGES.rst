@@ -217,6 +217,9 @@ Smart Rollup node
 - Fix a bug in how commitments are computed after a protocol migration
   where the the commitment period changes. (MR :gl:`!13588`)
 
+- New command ``repair commitments`` which allows the rollup node to recompute
+  correct commitments for a protocol upgrade which did not. (MR :gl:`!13615`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
