@@ -152,6 +152,88 @@ let expect_input input f =
 let build_with_input method_ ~f parameters =
   build method_ ~f:(fun input -> expect_input input f) parameters
 
+let get_fee_history block_count block_parameter config
+    (module Backend_rpc : Services_backend_sig.S) =
+  (* TODO: exclude 0 blocks *)
+  let open Lwt_result_syntax in
+  let open Ethereum_types in
+  (* block count can be bounded in configuration *)
+  let block_count =
+    match Configuration.(config.fee_history.max_count) with
+    | None -> block_count
+    | Some count -> Z.(min (of_int count) block_count)
+  in
+  let* nb_latest = Backend_rpc.current_block_number () in
+  let is_reachable nb =
+    match Configuration.(config.fee_history.max_past) with
+    | None -> true
+    | Some delta ->
+        let oldest_reachable = Z.(sub (Qty.to_z nb_latest) (of_int delta)) in
+        Z.(gt (Qty.to_z nb) oldest_reachable)
+  in
+  let* newest_block =
+    get_block_by_number
+      ~full_transaction_object:false
+      block_parameter
+      (module Backend_rpc)
+  in
+  let* base_fee_per_gas_next_block =
+    if newest_block.number = nb_latest then Backend_rpc.base_fee_per_gas ()
+    else
+      let next_block_number = Qty.next newest_block.number in
+      let* next_block =
+        get_block_by_number
+          ~full_transaction_object:false
+          (Block_parameter.Number next_block_number)
+          (module Backend_rpc)
+      in
+      return (Option.value next_block.baseFeePerGas ~default:Qty.zero)
+  in
+
+  let rec get_fee_history_aux block_count block_parameter history_acc =
+    if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
+    then return history_acc
+    else
+      let* block =
+        get_block_by_number
+          ~full_transaction_object:false
+          block_parameter
+          (module Backend_rpc)
+      in
+      let gas_used_ratio =
+        Float.div
+          (Z.to_float @@ Qty.to_z block.gasUsed)
+          (Z.to_float @@ Qty.to_z block.gasLimit)
+        :: history_acc.gas_used_ratio
+      in
+      (* 0 for block pre EIP-1559 *)
+      let block_base_fee_per_gas =
+        Option.value block.baseFeePerGas ~default:Qty.zero
+      in
+      let base_fee_per_gas =
+        block_base_fee_per_gas :: history_acc.base_fee_per_gas
+      in
+      let oldest_block = block.number in
+      let history_acc = {oldest_block; base_fee_per_gas; gas_used_ratio} in
+      let next_block = Qty.pred block.number in
+      if is_reachable next_block then
+        get_fee_history_aux
+          Z.(block_count - one)
+          (Block_parameter.Number next_block)
+          history_acc
+      else return history_acc
+  in
+  let init_acc =
+    {
+      (* default value if no block (which is a terrible
+         corner case) *)
+      oldest_block = Qty.zero;
+      base_fee_per_gas = [base_fee_per_gas_next_block];
+      gas_used_ratio = [];
+    }
+  in
+  get_fee_history_aux block_count block_parameter init_acc
+
 let dispatch_request (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -241,9 +323,7 @@ let dispatch_request (config : Configuration.t)
               rpc_ok nonce
           | _ ->
               let* nonce = Backend_rpc.nonce address block_param in
-              let nonce =
-                Option.value ~default:(Ethereum_types.Qty Z.zero) nonce
-              in
+              let nonce = Option.value ~default:Qty.zero nonce in
               rpc_ok nonce
         in
         build_with_input ~f module_ parameters
@@ -267,10 +347,10 @@ let dispatch_request (config : Configuration.t)
         in
         build_with_input ~f module_ parameters
     | Method (Get_uncle_count_by_block_hash.Method, module_) ->
-        let f _block_param = rpc_ok (Qty Z.zero) in
+        let f _block_param = rpc_ok Qty.zero in
         build_with_input ~f module_ parameters
     | Method (Get_uncle_count_by_block_number.Method, module_) ->
-        let f _block_param = rpc_ok (Qty Z.zero) in
+        let f _block_param = rpc_ok Qty.zero in
         build_with_input ~f module_ parameters
     | Method (Get_transaction_receipt.Method, module_) ->
         let f tx_hash =
@@ -426,7 +506,7 @@ let dispatch_request (config : Configuration.t)
         in
         build ~f module_ parameters
     | Method (Eth_max_priority_fee_per_gas.Method, module_) ->
-        let f (_ : unit option) = rpc_ok @@ Qty Z.zero in
+        let f (_ : unit option) = rpc_ok Qty.zero in
         build ~f module_ parameters
     | Method (Trace_transaction.Method, module_) ->
         let f ((hash, config) : Tracer_types.input) =
@@ -445,6 +525,23 @@ let dispatch_request (config : Configuration.t)
           | Error e ->
               let msg = Format.asprintf "%a" pp_print_trace e in
               rpc_error (Rpc_errors.internal_error msg)
+        in
+        build_with_input ~f module_ parameters
+    | Method (Eth_fee_history.Method, module_) ->
+        let f (Qty block_count, newest_block, _reward_percentile) =
+          if block_count = Z.zero then
+            rpc_error
+              (Rpc_errors.invalid_params
+                 "Number of block should be greater than 0.")
+          else
+            let* fee_history_result =
+              get_fee_history
+                block_count
+                newest_block
+                config
+                (module Backend_rpc)
+            in
+            rpc_ok fee_history_result
         in
         build_with_input ~f module_ parameters
     | Method (_, _) ->

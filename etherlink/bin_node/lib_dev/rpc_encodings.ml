@@ -736,6 +736,26 @@ module Trace_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Eth_fee_history = struct
+  open Ethereum_types
+
+  type input = quantity * Block_parameter.t * float list
+
+  type output = Ethereum_types.fee_history
+
+  let input_encoding =
+    Data_encoding.tup3
+      quantity_encoding
+      Block_parameter.encoding
+      (Data_encoding.list Data_encoding.float)
+
+  let output_encoding = Ethereum_types.fee_history_encoding
+
+  let method_ = "eth_feeHistory"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -783,6 +803,7 @@ let supported_methods : (module METHOD) list =
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
     (module Trace_transaction);
+    (module Eth_fee_history);
   ]
 
 let unsupported_methods : string list =
@@ -801,7 +822,6 @@ let unsupported_methods : string list =
     "eth_blobBaseFee";
     "eth_getProof";
     "eth_createAccessList";
-    "eth_feeHistory";
     "eth_getFilterChanges";
     "eth_getFilterLogs";
     "eth_newBlockFilter";

@@ -62,6 +62,8 @@ type observer = {
 
 type proxy = unit
 
+type fee_history = {max_count : int option; max_past : int option}
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
@@ -82,6 +84,7 @@ type t = {
   rollup_node_endpoint : Uri.t;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
+  fee_history : fee_history;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -150,6 +153,8 @@ let default_blueprints_publisher_config =
     max_blueprints_catchup = 50;
     catchup_cooldown = 1;
   }
+
+let default_fee_history = {max_count = None; max_past = None}
 
 let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ~sequencer
@@ -489,6 +494,13 @@ let proxy_encoding = Data_encoding.unit
 
 let default_proxy = ()
 
+let fee_history_encoding =
+  let open Data_encoding in
+  conv
+    (fun {max_count; max_past} -> (max_count, max_past))
+    (fun (max_count, max_past) -> {max_count; max_past})
+    (obj2 (opt "max_count" int31) (opt "max_past" int31))
+
 let encoding data_dir : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -511,6 +523,7 @@ let encoding data_dir : t Data_encoding.t =
            rollup_node_endpoint;
            verbose;
            experimental_features;
+           fee_history;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -529,7 +542,8 @@ let encoding data_dir : t Data_encoding.t =
           Uri.to_string rollup_node_endpoint,
           verbose,
           experimental_features,
-          proxy ) ))
+          proxy,
+          fee_history ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
@@ -547,7 +561,8 @@ let encoding data_dir : t Data_encoding.t =
              rollup_node_endpoint,
              verbose,
              experimental_features,
-             proxy ) ) ->
+             proxy,
+             fee_history ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -567,6 +582,7 @@ let encoding data_dir : t Data_encoding.t =
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
         verbose;
         experimental_features;
+        fee_history;
       })
     (merge_objs
        (obj10
@@ -589,7 +605,7 @@ let encoding data_dir : t Data_encoding.t =
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj8
+       (obj9
           (dft
              "tx-pool-timeout-limit"
              ~description:
@@ -616,7 +632,8 @@ let encoding data_dir : t Data_encoding.t =
              "experimental_features"
              experimental_features_encoding
              default_experimental_features)
-          (dft "proxy" proxy_encoding default_proxy)))
+          (dft "proxy" proxy_encoding default_proxy)
+          (dft "fee_history" fee_history_encoding default_fee_history)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -743,6 +760,7 @@ module Cli = struct
       rollup_node_endpoint;
       verbose = (if verbose then Debug else Internal_event.Notice);
       experimental_features = default_experimental_features;
+      fee_history = default_fee_history;
     }
 
   let patch_configuration_from_args ~data_dir ~devmode ?rpc_addr ?rpc_port
@@ -991,6 +1009,7 @@ module Cli = struct
           rollup_node_endpoint;
       verbose = (if verbose then Debug else configuration.verbose);
       experimental_features = configuration.experimental_features;
+      fee_history = configuration.fee_history;
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins

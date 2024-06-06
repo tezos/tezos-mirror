@@ -54,6 +54,16 @@ val block_hash_of_string : string -> block_hash
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@unboxed]
 
+module Qty : sig
+  val pred : quantity -> quantity
+
+  val next : quantity -> quantity
+
+  val to_z : quantity -> Z.t
+
+  val zero : quantity
+end
+
 val quantity_encoding : quantity Data_encoding.t
 
 val pp_quantity : Format.formatter -> quantity -> unit
@@ -290,6 +300,14 @@ type filter = {
 }
 
 val filter_encoding : filter Data_encoding.t
+
+type fee_history = {
+  oldest_block : quantity;
+  base_fee_per_gas : quantity list;
+  gas_used_ratio : float list;
+}
+
+val fee_history_encoding : fee_history Data_encoding.t
 
 module Address : sig
   type t = address
