@@ -50,10 +50,6 @@ let fetch_dal_config cctxt =
 let init_cryptobox config dal_config
     (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/6906
-
-     We should load the verifier SRS by default.
-  *)
   let prover_srs =
     Profile_manager.is_prover_profile config.Configuration_file.profile
   in
