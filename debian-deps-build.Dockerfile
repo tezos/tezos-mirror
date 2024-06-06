@@ -54,5 +54,4 @@ WORKDIR /root/tezos
 RUN . /tmp/version.sh && \
     eval $(opam env) && \
     . "/root/.cargo/env" && \
-    echo "$opam_repository_tag" > opam_repository_tag && \
     make build-deps

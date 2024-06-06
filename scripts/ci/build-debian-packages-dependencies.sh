@@ -34,7 +34,6 @@ docker build \
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  --label "com.tezos.build-opam_repository_tag"="${opam_repository_tag}" \
   -f debian-deps-build.Dockerfile \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
