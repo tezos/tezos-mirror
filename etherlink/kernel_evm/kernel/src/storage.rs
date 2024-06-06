@@ -138,6 +138,10 @@ pub const WORD_SIZE: usize = 32usize;
 // at this path, the kernel is in proxy mode.
 pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
 
+// Path to the DAL feature flag. If there is nothing at this path, DAL
+// is not used.
+pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable_dal");
+
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
@@ -989,6 +993,14 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
         Ok(Some(tz1))
     } else {
         Ok(None)
+    }
+}
+
+pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
+    if let Some(ValueType::Value) = host.store_has(&ENABLE_DAL)? {
+        Ok(true)
+    } else {
+        Ok(false)
     }
 }
 
