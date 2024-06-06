@@ -194,14 +194,13 @@ let oog_call () =
     ~contract:"OOGCall"
     ~evm_version:"london"
 
-(** The info for the "ether_wallet.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/ether_wallet.sol] *)
-let ether_wallet =
-  {
-    label = "ether_wallet";
-    abi = kernel_inputs_path ^ "/ether_wallet.abi";
-    bin = kernel_inputs_path ^ "/ether_wallet.bin";
-  }
+(** The info for the "ether_wallet.sol" contract. *)
+let ether_wallet () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/ether_wallet.sol")
+    ~label:"ether_wallet"
+    ~contract:"SharedEtherWallet"
+    ~evm_version:"london"
 
 (** The info for the "block_hash_gen.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/block_hash_gen.sol] *)

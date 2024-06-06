@@ -4548,8 +4548,9 @@ let test_l2_ether_wallet =
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* ether_wallet_resolved = ether_wallet () in
   let* ether_wallet_address, _tx =
-    deploy ~contract:ether_wallet ~sender evm_setup
+    deploy ~contract:ether_wallet_resolved ~sender evm_setup
   in
   let* tx1 =
     let transaction =
@@ -4566,7 +4567,7 @@ let test_l2_ether_wallet =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:ether_wallet.label
+        ~abi_label:ether_wallet_resolved.label
         ~address:ether_wallet_address
         ~method_call:(Printf.sprintf "withdraw(%d)" n)
     in
