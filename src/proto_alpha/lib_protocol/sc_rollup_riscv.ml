@@ -41,9 +41,12 @@ let minimal_state_encoding =
 let make_empty_state () =
   {payload = ""; level = None; message_counter = Z.zero; tick = Z.zero}
 
-let state_hash state =
-  [Data_encoding.Binary.to_bytes_exn minimal_state_encoding state]
-  |> Context_hash.hash_bytes |> State_hash.context_hash_to_state_hash
+let state_hash _state =
+  (* In order to synchronise with the node implementation of the PVM at genesis,
+   * we set the state hash to be the initial state hash of the node
+   * implementation. *)
+  State_hash.of_b58check_exn
+    "srs125KWe9pR1PK3KMeiRc19gmh54Ywc3pm1PMTJntAMpguPvPr6mX"
 
 module type S = sig
   include PS.S
