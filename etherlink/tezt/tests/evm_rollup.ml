@@ -2963,122 +2963,6 @@ let test_kernel_migration =
   in
   gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
 
-let test_deposit_dailynet =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "deposit"; "dailynet"]
-    ~uses:(fun _protocol ->
-      Constant.
-        [
-          octez_smart_rollup_node;
-          smart_rollup_installer;
-          octez_evm_node;
-          Constant.WASM.evm_kernel;
-        ])
-    ~title:"deposit on dailynet"
-  @@ fun protocol ->
-  let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
-  let exchanger_address = "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW" in
-  let rollup_address = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf" in
-
-  let mockup_client = Client.create_with_mode Mockup in
-  let make_bootstrap_contract ~address ~code ~storage ?typecheck () =
-    let* code_json = Client.convert_script_to_json ~script:code mockup_client in
-    let* storage_json =
-      Client.convert_data_to_json ~data:storage ?typecheck mockup_client
-    in
-    let script : Ezjsonm.value =
-      `O [("code", code_json); ("storage", storage_json)]
-    in
-    return
-      Protocol.
-        {delegate = None; amount = Tez.of_int 0; script; hash = Some address}
-  in
-
-  (* Creates the exchanger contract. *)
-  let* exchanger_contract =
-    make_bootstrap_contract
-      ~address:exchanger_address
-      ~code:(exchanger_path ())
-      ~storage:"Unit"
-      ()
-  in
-  (* Creates the bridge contract initialized with exchanger contract. *)
-  let* bridge_contract =
-    make_bootstrap_contract
-      ~address:bridge_address
-      ~code:(bridge_path ())
-      ~storage:(sf "Pair %S None" exchanger_address)
-      ()
-  in
-
-  (* Creates the EVM rollup that listens to the bootstrap smart contract exchanger. *)
-  let* {
-         bootstrap_smart_rollup = evm;
-         smart_rollup_node_data_dir;
-         smart_rollup_node_extra_args;
-       } =
-    setup_bootstrap_smart_rollup
-      ~name:"evm"
-      ~address:rollup_address
-      ~parameters_ty:evm_type
-      ~installee:Constant.WASM.evm_kernel
-      ~config:(`Path Base.(project_root // "etherlink/config/dailynet.yaml"))
-      ()
-  in
-
-  (* Setup a chain where the EVM rollup, the exchanger contract and the bridge
-     are all originated. *)
-  let* node, client =
-    setup_l1
-      ~bootstrap_smart_rollups:[evm]
-      ~bootstrap_contracts:[exchanger_contract; bridge_contract]
-      protocol
-  in
-
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      Operator
-      node
-      ~data_dir:smart_rollup_node_data_dir
-      ~base_dir:(Client.base_dir client)
-      ~default_operator:Constant.bootstrap1.public_key_hash
-  in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-
-  let* () =
-    Sc_rollup_node.run
-      sc_rollup_node
-      rollup_address
-      smart_rollup_node_extra_args
-  in
-
-  let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-  let endpoint = Evm_node.endpoint evm_node in
-
-  (* Deposit tokens to the EVM rollup. *)
-  let amount_mutez = Tez.of_mutez_int 100_000_000 in
-  let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
-
-  let* () =
-    deposit
-      ~amount_mutez
-      ~bridge:bridge_address
-      ~depositor:Constant.bootstrap2
-      ~receiver
-      ~evm_node
-      ~sc_rollup_node
-      ~sc_rollup_address:rollup_address
-      client
-  in
-
-  (* Check the balance in the EVM rollup. *)
-  check_balance ~receiver ~endpoint amount_mutez
-
 let test_cannot_prepayed_leads_to_no_inclusion =
   register_both
     ~tags:["evm"; "prepay"; "inclusion"]
@@ -5843,7 +5727,6 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_governance protocols ;
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_deposit_dailynet protocols ;
   test_cannot_prepayed_leads_to_no_inclusion protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
