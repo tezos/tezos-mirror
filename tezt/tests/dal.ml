@@ -4773,8 +4773,13 @@ end
    migration.
 
    The [offset] says when to start the DAL node wrt to the migration level. It
-   can be negative. *)
-let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset =
+   can be negative.
+
+   If [check_rpc] is set, a call is made to [get_attestable_slots] on the
+   migration level. This will fail if the encoding of the DAL committee has
+   changed between protocols and the node does not use the right plugin. *)
+let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
+    ~check_rpc =
   Test.register
     ~__FILE__
     ~tags:
@@ -4852,9 +4857,21 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset =
       let* () = Dal_node.init_config dal_node in
       let* () = Dal_node.run dal_node ~wait_ready:true in
 
-      (* that is, till the migration level*)
+      (* that is, till the migration level *)
       let* () = bake_for ~count:(-offset) client in
       return dal_node
+  in
+  let* () =
+    if check_rpc then
+      let* _ =
+        Dal_RPC.(
+          call dal_node
+          @@ get_attestable_slots
+               ~attester:Constant.bootstrap1
+               ~attested_level:migration_level)
+      in
+      unit
+    else unit
   in
   let wait_for_dal_node =
     wait_for_layer1_final_block dal_node (migration_level + 2)
@@ -7138,6 +7155,24 @@ let register ~protocols =
   register_end_to_end_tests ~protocols ;
   dal_crypto_benchmark ()
 
+let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
+  let offsets = [-2; -1; 0; 1; 2] in
+  let tests ~migrate_from ~migrate_to ~check_rpc =
+    List.iter
+      (fun offset ->
+        test_start_dal_node_around_migration
+          ~migrate_from
+          ~migrate_to
+          ~offset
+          ~check_rpc)
+      offsets
+  in
+  (* These tests can be removed when the Oxford protocol is removed from tezt
+     tests. Here [check = false] because these tests fail when [check =
+     true]. *)
+  tests ~migrate_from:Oxford ~migrate_to:Paris ~check_rpc:false ;
+  tests ~migrate_from ~migrate_to ~check_rpc:true
+
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
   (* This test can be safely removed when Paris is activated (and the Oxford
@@ -7150,16 +7185,4 @@ let register_migration ~migrate_from ~migrate_to =
     ~migration_level:10
     ~migrate_from
     ~migrate_to ;
-  (* These tests can be safely removed when Paris is activated (and the Oxford
-     protocol is removed from tezt tests). *)
-  List.iter
-    (fun offset ->
-      test_start_dal_node_around_migration
-        ~migrate_from:Oxford
-        ~migrate_to:Paris
-        ~offset)
-    [-2; -1; 0; 1; 2] ;
-  List.iter
-    (fun offset ->
-      test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset)
-    [-2; -1; 0; 1; 2]
+  tests_start_dal_node_around_migration ~migrate_from ~migrate_to
