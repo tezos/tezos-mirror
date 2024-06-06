@@ -44,6 +44,12 @@ module Commitment : sig
   type t = Tezos_crypto_dal.Cryptobox.Verifier.commitment
 
   val encoding : t Data_encoding.t
+
+  val pp :
+    Format.formatter -> Tezos_crypto_dal.Cryptobox.Verifier.commitment -> unit
+
+  val pp_short :
+    Format.formatter -> Tezos_crypto_dal.Cryptobox.Verifier.commitment -> unit
 end
 
 module Slot_header : sig
