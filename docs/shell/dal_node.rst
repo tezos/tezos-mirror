@@ -20,6 +20,9 @@ Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe
 - Slot producers subscribe to all topics containing some specified slot indexes.
 - Bakers subscribe to all topics containing the attester identities they run for (for all possible slot indexes).
 
+.. _dal_profiles:
+
+
 Profiles
 ~~~~~~~~
 
@@ -73,6 +76,10 @@ Both commands have the same arguments, which can be seen by executing, e.g., ``o
     :end-before: COMMON OPTIONS
 
 See the :ref:`DAL node manual <dal_node_manual>` for more details.
+
+In order to run a DAL node with a slot producer profile, one first needs to
+install some cryptographic parameters, see the section on :ref:`Install DAL
+trusted setup<setup_dal_crypto_params>`.
 
 DAL configuration of the L1 node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
