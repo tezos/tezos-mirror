@@ -5449,10 +5449,11 @@ let test_reveal_storage =
 
 let call_get_hash ~address ~block_number
     {sc_rollup_node; client; endpoint; evm_node; _} =
+  let* blockhash_resolved = blockhash () in
   let call_get_hash block_number =
     Eth_cli.contract_call
       ~endpoint
-      ~abi_label:blockhash.label
+      ~abi_label:blockhash_resolved.label
       ~address
       ~method_call:(Printf.sprintf "getHash(%d)" block_number)
   in
@@ -5482,7 +5483,8 @@ let test_blockhash_opcode =
     repeat 3 (fun () -> next_evm_level ~evm_node ~client ~sc_rollup_node)
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* address, tx = deploy ~contract:blockhash ~sender evm_setup in
+  let* blockhash_resolved = blockhash () in
+  let* address, tx = deploy ~contract:blockhash_resolved ~sender evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx in
   let* expected_block_hash =
     let* block = Eth_cli.get_block ~block_id:"2" ~endpoint in

@@ -209,14 +209,13 @@ let block_hash_gen () =
     ~contract:"BlockHashGen"
     ~evm_version:"london"
 
-(** The info for the "block_hash_gen.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/blockhash.sol] *)
-let blockhash =
-  {
-    label = "blockhash";
-    abi = kernel_inputs_path ^ "/blockhash.abi";
-    bin = kernel_inputs_path ^ "/blockhash.bin";
-  }
+(** The info for the "block_hash_gen.sol" contract. *)
+let blockhash () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/blockhash.sol")
+    ~label:"blockhash"
+    ~contract:"Blockhash"
+    ~evm_version:"london"
 
 (** The info for the "timestamp.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/timestamp.sol] *)
