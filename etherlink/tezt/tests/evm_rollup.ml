@@ -1200,9 +1200,10 @@ let test_l2_deploy_erc20 =
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let player = Eth_account.bootstrap_accounts.(1) in
+  let* erc20_resolved = erc20 () in
 
   (* deploy the contract *)
-  let* address, tx = deploy ~contract:erc20 ~sender evm_setup in
+  let* address, tx = deploy ~contract:erc20_resolved ~sender evm_setup in
   Check.(
     (String.lowercase_ascii address
     = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
@@ -1233,7 +1234,7 @@ let test_l2_deploy_erc20 =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:erc20.label
+      ~abi_label:erc20_resolved.label
       ~address
       ~method_call:(Printf.sprintf "mint(%d)" n)
   in
@@ -1242,7 +1243,7 @@ let test_l2_deploy_erc20 =
       ~expect_failure
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:erc20.label
+      ~abi_label:erc20_resolved.label
       ~address
       ~method_call:(Printf.sprintf "burn(%d)" n)
   in
@@ -4163,14 +4164,17 @@ let get_logs ?from_block ?to_block ?address ?topics evm_node =
     JSON.(response |-> "result" |> as_list |> List.map Transaction.logs_of_json)
 
 let test_rpc_getLogs =
-  register_both ~tags:["evm"; "rpc"; "get_logs"] ~title:"Check getLogs RPC"
+  register_both
+    ~tags:["evm"; "rpc"; "get_logs"; "erc20"]
+    ~title:"Check getLogs RPC"
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; client; sc_rollup_node; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let player = Eth_account.bootstrap_accounts.(1) in
+  let* erc20_resolved = erc20 () in
   (* deploy the contract *)
-  let* address, _tx = deploy ~contract:erc20 ~sender evm_setup in
+  let* address, _tx = deploy ~contract:erc20_resolved ~sender evm_setup in
   let address = String.lowercase_ascii address in
   Check.(
     (address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
@@ -4181,7 +4185,7 @@ let test_rpc_getLogs =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:erc20.label
+      ~abi_label:erc20_resolved.label
       ~address
       ~method_call:(Printf.sprintf "mint(%d)" n)
   in
@@ -4190,7 +4194,7 @@ let test_rpc_getLogs =
       ~expect_failure
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:erc20.label
+      ~abi_label:erc20_resolved.label
       ~address
       ~method_call:(Printf.sprintf "burn(%d)" n)
   in
