@@ -5655,7 +5655,8 @@ let test_outbox_size_limit_resilience ~slow =
   let commitment_period = 5 and challenge_window = 5 in
   let slow_str = if slow then "slow" else "fast" in
   register_proxy
-    ~tags:(["evm"; "withdraw"; "outbox"] @ if slow then [Tag.slow] else [])
+    ~tags:
+      (["evm"; "withdraw"; "outbox"; "spam"] @ if slow then [Tag.slow] else [])
     ~title:(sf "Outbox size limit resilience (%s)" slow_str)
     ~admin
     ~commitment_period
@@ -5692,8 +5693,11 @@ let test_outbox_size_limit_resilience ~slow =
   in
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* spam_withdrawal_resolved = spam_withdrawal () in
   (* Deploy the spam contract. *)
-  let* contract, _tx = deploy ~contract:spam_withdrawal ~sender evm_setup in
+  let* contract, _tx =
+    deploy ~contract:spam_withdrawal_resolved ~sender evm_setup
+  in
 
   (* Start by giving funds to the contract. This cannot be done in one go
      because the stupid [eth-cli] doesn't include the transfer in gas
@@ -5703,7 +5707,7 @@ let test_outbox_size_limit_resilience ~slow =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:spam_withdrawal.label
+        ~abi_label:spam_withdrawal_resolved.label
         ~address:contract
         ~method_call:"giveFunds()"
         ~value:(Wei.of_eth_int 200)
@@ -5719,7 +5723,7 @@ let test_outbox_size_limit_resilience ~slow =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:spam_withdrawal.label
+        ~abi_label:spam_withdrawal_resolved.label
         ~address:contract
         ~method_call:"doWithdrawals(120)"
         ~value:(Wei.of_eth_int 200)
