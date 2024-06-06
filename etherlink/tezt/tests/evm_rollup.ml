@@ -5621,9 +5621,10 @@ let test_block_gas_limit =
     ~tags:["evm"; "gas_limit"; "block"]
     ~title:"Block gas limit returns 2^50."
   @@ fun ~protocol:_ ~evm_setup:({evm_node; endpoint; _} as evm_setup) ->
+  let* gas_limit_contract_resolved = gas_limit_contract () in
   let* contract, _tx =
     deploy
-      ~contract:gas_limit_contract
+      ~contract:gas_limit_contract_resolved
       ~sender:Eth_account.bootstrap_accounts.(0)
       evm_setup
   in
@@ -5631,7 +5632,7 @@ let test_block_gas_limit =
     let* gas_limit =
       Eth_cli.contract_call
         ~endpoint
-        ~abi_label:gas_limit_contract.label
+        ~abi_label:gas_limit_contract_resolved.label
         ~address:contract
         ~method_call:"retrieve()"
         ()

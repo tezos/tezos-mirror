@@ -257,14 +257,13 @@ let spam_withdrawal () =
     ~contract:"SpamWithdrawals"
     ~evm_version:"london"
 
-(** The info for the "gas_limit.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/gas_limit.sol] *)
-let gas_limit_contract =
-  {
-    label = "gas_limit_contract";
-    abi = kernel_inputs_path ^ "/gas_limit.abi";
-    bin = kernel_inputs_path ^ "/gas_limit.bin";
-  }
+(** The info for the "gas_limit.sol" contract. *)
+let gas_limit_contract () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gas_limit.sol")
+    ~label:"gas_limit"
+    ~contract:"Gas_limit"
+    ~evm_version:"london"
 
 (** The info for the "gas_limit.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/counter.sol] *)
