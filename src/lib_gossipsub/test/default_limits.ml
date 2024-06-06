@@ -32,8 +32,12 @@ let default_limits ?(time_in_mesh_weight = 1.0)
     ?(first_message_deliveries_cap = 2000)
     ?(first_message_deliveries_decay = 0.5)
     ?(mesh_message_deliveries_activation = Milliseconds.of_int_s 5)
+    ?(mesh_message_deliveries_threshold = 20)
+    ?(mesh_message_deliveries_cap = 100)
     ?(mesh_message_deliveries_weight = ~-.1.0)
-    ?(mesh_failure_penalty_weight = ~-.1.)
+    ?(mesh_message_deliveries_decay = 0.5)
+    ?(mesh_message_deliveries_window = Milliseconds.of_float_s 0.01)
+    ?(mesh_failure_penalty_weight = ~-.1.) ?(mesh_failure_penalty_decay = 0.5)
     ?(invalid_message_deliveries_weight = ~-.1.)
     ?(invalid_message_deliveries_decay = 0.3) ?(app_specific_weight = 10.)
     ?(behaviour_penalty_weight = ~-.10.0) ?(behaviour_penalty_decay = 0.2) () :
@@ -47,13 +51,13 @@ let default_limits ?(time_in_mesh_weight = 1.0)
       first_message_deliveries_cap;
       first_message_deliveries_decay;
       mesh_message_deliveries_weight;
-      mesh_message_deliveries_window = Milliseconds.of_float_s 0.01;
+      mesh_message_deliveries_window;
       mesh_message_deliveries_activation;
-      mesh_message_deliveries_cap = 100;
-      mesh_message_deliveries_threshold = 20;
-      mesh_message_deliveries_decay = 0.5;
+      mesh_message_deliveries_cap;
+      mesh_message_deliveries_threshold;
+      mesh_message_deliveries_decay;
       mesh_failure_penalty_weight;
-      mesh_failure_penalty_decay = 0.5;
+      mesh_failure_penalty_decay;
       invalid_message_deliveries_weight;
       invalid_message_deliveries_decay;
     }
