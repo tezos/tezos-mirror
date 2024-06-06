@@ -183,7 +183,8 @@ module Handler = struct
           slot_index >= 0
           && slot_index < proto_parameters.Dal_plugin.number_of_slots
         then
-          (* We know the message is not [Outdated], because this has already been checked in {!gossipsub_app_messages_validation}. *)
+          (* We know the message is not [Outdated], because this has already
+             been checked in {!gossipsub_app_messages_validation}. *)
           `Unknown
         else `Invalid
 
@@ -269,13 +270,7 @@ module Handler = struct
               ~some:
                 (gossipsub_app_message_payload_validation cryptobox message_id)
         | other ->
-            (* 4. In the case the message id is not Valid.
-
-               FIXME: https://gitlab.com/tezos/tezos/-/issues/6460
-
-               This probably include cases where the message is in the future, in
-               which case we might return `Unknown for the moment. But then, when is
-               the message revalidated? *)
+            (* 4. In the case the message id is not Valid. *)
             other
 
   (* Set the profile context once we have the protocol plugin. This is supposed
