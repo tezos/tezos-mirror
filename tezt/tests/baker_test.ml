@@ -188,10 +188,63 @@ let baker_remote_test =
   let* _ = Node.wait_for_level node 3 in
   unit
 
+let baker_check_consensus_branch =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker check branch in consensus operations"
+    ~tags:[team; "baker"; "grandparent"; "parent"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
+  in
+
+  let target_level = 5 in
+  Log.info "Start a baker and bake until level %d" target_level ;
+  let* baker = Baker.init ~protocol node client in
+  let* _ = Node.wait_for_level node target_level in
+  let* () = Baker.kill baker in
+
+  Log.info "Retrieve mempool" ;
+  let* mempool =
+    Client.RPC.call client
+    @@ RPC.get_chain_mempool_pending_operations ~outdated:false ()
+  in
+
+  let branch_s, branch_lvl =
+    if Protocol.number protocol >= Protocol.number Alpha then ("grandparent", 2)
+    else ("parent", 1)
+  in
+  Log.info "Check that consensus operations are branched on %s block" branch_s ;
+  let ops = JSON.(mempool |-> "validated" |> as_list) in
+  assert (not ([] = ops)) ;
+  Tezos_base__TzPervasives.List.iter_s
+    (fun op ->
+      let branch = JSON.(op |-> "branch" |> as_string) in
+      let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
+      let level = JSON.(content |-> "level" |> as_int) in
+
+      let* target_branch =
+        Client.RPC.call client
+        @@ RPC.get_chain_block_header
+             ~block:(string_of_int (level - branch_lvl))
+             ()
+      in
+      let target_branch = JSON.(target_branch |-> "hash" |> as_string) in
+
+      Tezt.Check.(
+        (target_branch = branch)
+          string
+          ~error_msg:"Consensus operation should be branch on block %L, got %R") ;
+      unit)
+    ops
+
 let register ~protocols =
   baker_simple_test protocols ;
   baker_reward_test protocols ;
   baker_stresstest protocols ;
   baker_stresstest_apply protocols ;
   baker_bls_test protocols ;
-  baker_remote_test protocols
+  baker_remote_test protocols ;
+  baker_check_consensus_branch protocols
