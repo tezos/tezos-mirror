@@ -1353,7 +1353,7 @@ let check_log_indices ~endpoint ~status ~tx indices =
 
 let test_log_index =
   register_both
-    ~tags:["evm"; "log_index"]
+    ~tags:["evm"; "log_index"; "events"]
     ~title:"Check that log index is correctly computed"
   @@ fun ~protocol:_ ~evm_setup ->
   (* setup *)
@@ -1361,8 +1361,9 @@ let test_log_index =
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let _player = Eth_account.bootstrap_accounts.(1) in
+  let* events_resolved = events () in
   (* deploy the events contract *)
-  let* _address, _tx = deploy ~contract:events ~sender evm_setup in
+  let* _address, _tx = deploy ~contract:events_resolved ~sender evm_setup in
   (* Emits two events: EventA and EventB *)
   let raw_emitBoth =
     "0xf88901843b9aca00826bf694d77420f73b4612a7a99dba8c2afd30a1886b034480a4cc79cf9d0000000000000000000000000000000000000000000000000000000000000064820a96a01350f66edc1a5bfa7dc8651d5735dbb343c491939a9e49b3f1a041b6a234df72a0028c5523a2bcc1077e090360a0e96ffaff7a2f26fd161b87107252e4bb83c47b"

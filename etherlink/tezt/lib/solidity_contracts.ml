@@ -154,14 +154,13 @@ let caller =
     bin = kernel_inputs_path ^ "/caller.bin";
   }
 
-(** The info for the "events.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/events.sol] *)
-let events =
-  {
-    label = "events";
-    abi = kernel_inputs_path ^ "/events.abi";
-    bin = kernel_inputs_path ^ "/events.bin";
-  }
+(** The info for the "events.sol" contract. *)
+let events () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/events.sol")
+    ~label:"events"
+    ~contract:"Events"
+    ~evm_version:"london"
 
 (** The info for the "nested_create.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/nested_create.sol] *)
