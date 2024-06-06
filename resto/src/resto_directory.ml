@@ -376,12 +376,12 @@ module Make (Encoding : ENCODING) = struct
    fun recurse dir ->
     let services = MethMap.map describe_service dir.services in
     (if recurse then
-     match dir.subdirs with
-     | None -> Lwt.return_none
-     | Some subdirs ->
-         describe_static_subdirectories subdirs >>= fun dirs ->
-         Lwt.return (Some dirs)
-    else Lwt.return_none)
+       match dir.subdirs with
+       | None -> Lwt.return_none
+       | Some subdirs ->
+           describe_static_subdirectories subdirs >>= fun dirs ->
+           Lwt.return (Some dirs)
+     else Lwt.return_none)
     >>= fun subdirs ->
     Lwt.return
       ({services; subdirs} : Encoding.schema Description.static_directory)
