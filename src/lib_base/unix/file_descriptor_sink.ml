@@ -81,9 +81,21 @@ module Color = struct
   let bold_len = 4
 
   module FG = struct
+    (* Error level default color *)
     let red = "\027[31m"
 
+    (* Warning level default color *)
     let yellow = "\027[33m"
+
+    (* Alternative colors *)
+
+    let green = "\027[32m"
+
+    let blue = "\027[34m"
+
+    let cyan = "\027[36m"
+
+    let magenta = "\027[35m"
   end
 end
 
@@ -619,6 +631,12 @@ end) : Internal_event.SINK with type t = t = struct
         | Some (_, None) -> (* exclude list *) false
         | Some (_, Some lvl) -> Internal_event.Level.compare M.level lvl >= 0)
 
+  let color = function
+    | Internal_event.Blue -> Some Color.FG.blue
+    | Internal_event.Cyan -> Some Color.FG.cyan
+    | Internal_event.Green -> Some Color.FG.green
+    | Internal_event.Magenta -> Some Color.FG.magenta
+
   let level_color = function
     | Internal_event.Warning -> Some Color.FG.yellow
     | Error | Fatal -> Some Color.FG.red
@@ -654,7 +672,9 @@ end) : Internal_event.SINK with type t = t = struct
               if colors then
                 let*! color_compatible = output_color_compatible output in
                 if color_compatible then
-                  Lwt.return (Enabled (level_color M.level))
+                  match M.alternative_color with
+                  | None -> Lwt.return (Enabled (level_color M.level))
+                  | Some c -> Lwt.return (Enabled (color c))
                 else Lwt.return Disabled
               else Lwt.return Disabled
             in

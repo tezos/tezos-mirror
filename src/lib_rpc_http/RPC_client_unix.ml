@@ -52,6 +52,8 @@ module Attempt_logging = Internal_event.Make (struct
       text
 
   let level = Internal_event.Error
+
+  let alternative_color = None
 end)
 
 module RetryClient :

@@ -97,6 +97,10 @@ val get_registered_sections : unit -> string Seq.t
 
 val register_section : Section.t -> unit
 
+(** Alternative colors usable in console logs. Yellow and Red are already used
+  for Warning/alerts log levels*)
+type alternative_color = Magenta | Cyan | Green | Blue
+
 (** Parameters defining an inspectable type of events. *)
 module type EVENT_DEFINITION = sig
   type t
@@ -127,6 +131,8 @@ module type EVENT_DEFINITION = sig
 
   (** Return the preferred {!type-level} for a given event instance. *)
   val level : level
+
+  val alternative_color : alternative_color option
 end
 
 (** Events created with {!Make} provide the {!EVENT} API. *)
@@ -259,6 +265,7 @@ module Simple : sig
 
   (** Declare an event with no parameters. *)
   val declare_0 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -268,6 +275,7 @@ module Simple : sig
 
   (** Declare an event with one parameter. *)
   val declare_1 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -278,6 +286,7 @@ module Simple : sig
 
   (** Declare an event with two parameters. *)
   val declare_2 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -290,6 +299,7 @@ module Simple : sig
 
   (** Declare an event with three parameters. *)
   val declare_3 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -304,6 +314,7 @@ module Simple : sig
 
   (** Declare an event with four parameters. *)
   val declare_4 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -320,6 +331,7 @@ module Simple : sig
 
   (** Declare an event with five parameters. *)
   val declare_5 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -338,6 +350,7 @@ module Simple : sig
 
   (** Declare an event with six parameters. *)
   val declare_6 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -358,6 +371,7 @@ module Simple : sig
 
   (** Declare an event with seven parameters. *)
   val declare_7 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -380,6 +394,7 @@ module Simple : sig
 
   (** Declare an event with eight parameters. *)
   val declare_8 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
