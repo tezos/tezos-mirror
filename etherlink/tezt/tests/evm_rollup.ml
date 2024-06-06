@@ -541,30 +541,42 @@ let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks f protocols =
-  let register =
-    register_test
-      ~title
-      ~tags
-      ?kernels
-      ?additional_uses
-      ?additional_config
-      ?admin
-      ?commitment_period
-      ?challenge_window
-      ?bootstrap_accounts
-      ?da_fee_per_byte
-      ?minimum_base_fee_per_gas
-      ?whitelist
-      ?rollup_operator_key
-      ?maximum_allowed_ticks
-      f
-      protocols
-  in
-  register ~setup_mode:Setup_proxy ;
-  register
-    ~setup_mode:
-      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
+    ?rollup_operator_key ?maximum_allowed_ticks f protocols : unit =
+  register_proxy
+    ~title
+    ~tags
+    ?kernels
+    ?additional_uses
+    ?additional_config
+    ?admin
+    ?commitment_period
+    ?challenge_window
+    ?bootstrap_accounts
+    ?da_fee_per_byte
+    ?minimum_base_fee_per_gas
+    ?whitelist
+    ?rollup_operator_key
+    ?maximum_allowed_ticks
+    f
+    protocols ;
+  register_sequencer
+    ~title
+    ~tags
+    ?kernels
+    ?additional_uses
+    ?additional_config
+    ?admin
+    ?commitment_period
+    ?challenge_window
+    ?bootstrap_accounts
+    ?da_fee_per_byte
+    ?minimum_base_fee_per_gas
+    ?time_between_blocks
+    ?whitelist
+    ?rollup_operator_key
+    ?maximum_allowed_ticks
+    f
+    protocols
 
 let deploy ~contract ~sender full_evm_setup =
   let {client; sc_rollup_node; evm_node; _} = full_evm_setup in
