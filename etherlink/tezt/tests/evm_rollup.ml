@@ -5207,12 +5207,15 @@ let test_call_recursive_contract_estimate_gas =
     setup_evm_kernel ~admin:None protocol
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* recursive_address, _tx = deploy ~contract:recursive ~sender evm_setup in
+  let* recursive_resolved = recursive () in
+  let* recursive_address, _tx =
+    deploy ~contract:recursive_resolved ~sender evm_setup
+  in
   let call () =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:recursive.label
+      ~abi_label:recursive_resolved.label
       ~address:recursive_address
       ~method_call:"call(40)"
       ()
@@ -5231,13 +5234,16 @@ let test_limited_stack_depth =
              ~evm_setup:
                ({endpoint; sc_rollup_node; client; evm_node; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* recursive_address, _tx = deploy ~contract:recursive ~sender evm_setup in
+  let* recursive_resolved = recursive () in
+  let* recursive_address, _tx =
+    deploy ~contract:recursive_resolved ~sender evm_setup
+  in
   (* 256 is ok. *)
   let call () =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:recursive.label
+      ~abi_label:recursive_resolved.label
       ~address:recursive_address
       ~method_call:"call(256)"
       ~gas:30_000_000
@@ -5251,7 +5257,7 @@ let test_limited_stack_depth =
       ~expect_failure:true
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:recursive.label
+      ~abi_label:recursive_resolved.label
       ~address:recursive_address
       ~method_call:"call(257)"
       ~gas:30_000_000

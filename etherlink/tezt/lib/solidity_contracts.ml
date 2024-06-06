@@ -238,14 +238,13 @@ let call_selfdestruct =
     bin = kernel_inputs_path ^ "/call_selfdestruct.bin";
   }
 
-(** The info for the "recursive.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/recursive.sol] *)
-let recursive =
-  {
-    label = "recursive";
-    abi = kernel_inputs_path ^ "/recursive.abi";
-    bin = kernel_inputs_path ^ "/recursive.bin";
-  }
+(** The info for the "recursive.sol" contract. *)
+let recursive () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/recursive.sol")
+    ~label:"recursive"
+    ~contract:"Recursive"
+    ~evm_version:"london"
 
 (** The info for the "error.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/error.sol] *)
