@@ -126,6 +126,9 @@ Smart Rollup node
 
 - Allow to import archive snapshots in "full" rollup node. (MR :gl:`!13186`)
 
+- Fix a bug in how commitments are computed after a protocol migration
+  where the the commitment period changes. (MR :gl:`!13588`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
