@@ -259,6 +259,22 @@ let commit_and_notify_block notify_new_block chain_db hash header operations
   | Ok None -> return Already_committed
   | Error errs -> return (Commit_block_failed errs)
 
+(* Commit the block as invalid in the store if an [Invalid_block] error is found
+   in the error trace. *)
+let may_commit_invalid_block worker chain_db hash header
+    advertise_after_validation errs =
+  let open Lwt_result_syntax in
+  let* () =
+    if
+      (not advertise_after_validation)
+      && List.exists (function Invalid_block _ -> true | _ -> false) errs
+    then
+      protect ~canceler:(Worker.canceler worker) (fun () ->
+          Distributed_db.commit_invalid_block chain_db hash header errs)
+    else return_unit
+  in
+  return (Validation_failed errs)
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -322,7 +338,14 @@ let on_validation_request w
                     bv_operations
                 in
                 match r with
-                | Validation_error errs -> return (Validation_failed errs)
+                | Validation_error errs ->
+                    may_commit_invalid_block
+                      w
+                      chain_db
+                      hash
+                      header
+                      advertise_after_validation
+                      errs
                 | Validated -> (
                     if advertise_after_validation then
                       (* Headers which have been preapplied can be advertised
@@ -360,17 +383,6 @@ let on_validation_request w
       match r with
       | Ok r -> return r
       | Error errs ->
-          let* () =
-            if
-              (not advertise_after_validation)
-              && List.exists
-                   (function Invalid_block _ -> true | _ -> false)
-                   errs
-            then
-              protect ~canceler:(Worker.canceler w) (fun () ->
-                  Distributed_db.commit_invalid_block chain_db hash header errs)
-            else return_unit
-          in
           if advertise_after_validation then
             Block_hash_ring.replace
               bv.inapplicable_blocks_after_validation
