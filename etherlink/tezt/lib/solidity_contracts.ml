@@ -225,14 +225,13 @@ let timestamp () =
     ~contract:"Timestamp"
     ~evm_version:"london"
 
-(** The info for the "call_selfdestruct.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/call_selfdestruct.sol] *)
-let call_selfdestruct =
-  {
-    label = "call_selfdestruct";
-    abi = kernel_inputs_path ^ "/call_selfdestruct.abi";
-    bin = kernel_inputs_path ^ "/call_selfdestruct.bin";
-  }
+(** The info for the "call_selfdestruct.sol" contract. *)
+let call_selfdestruct () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_selfdestruct.sol")
+    ~label:"call_selfdestruct"
+    ~contract:"C1"
+    ~evm_version:"london"
 
 (** The info for the "recursive.sol" contract. *)
 let recursive () =
