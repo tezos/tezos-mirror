@@ -157,7 +157,11 @@ pub fn append_vec<'a>(stream: &'a mut RlpStream, data: &Vec<u8>) -> &'a mut RlpS
 
 pub fn append_h256(s: &mut rlp::RlpStream, h256: H256) -> &mut RlpStream {
     if H256::zero() != h256 {
-        s.append(&h256)
+        let mut bytes = H256::as_bytes(&h256);
+        while let Some(leading) = bytes.strip_prefix(&[0]) {
+            bytes = leading;
+        }
+        s.append(&bytes)
     } else {
         // we could make the distinction between 0 and null
         // but we don't, null is encoded as 0
