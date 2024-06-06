@@ -261,14 +261,10 @@ let commit_and_notify_block notify_new_block chain_db hash header operations
 
 (* Commit the block as invalid in the store if an [Invalid_block] error is found
    in the error trace. *)
-let may_commit_invalid_block worker chain_db hash header
-    advertise_after_validation errs =
+let may_commit_invalid_block worker chain_db hash header errs =
   let open Lwt_result_syntax in
   let* () =
-    if
-      (not advertise_after_validation)
-      && List.exists (function Invalid_block _ -> true | _ -> false) errs
-    then
+    if List.exists (function Invalid_block _ -> true | _ -> false) errs then
       protect ~canceler:(Worker.canceler worker) (fun () ->
           Distributed_db.commit_invalid_block chain_db hash header errs)
     else return_unit
@@ -338,13 +334,7 @@ let on_validation_request w
               in
               match r with
               | Validation_error errs ->
-                  may_commit_invalid_block
-                    w
-                    chain_db
-                    hash
-                    header
-                    advertise_after_validation
-                    errs
+                  may_commit_invalid_block w chain_db hash header errs
               | Validated -> (
                   if advertise_after_validation then
                     (* Headers which have been preapplied can be advertised
@@ -368,11 +358,10 @@ let on_validation_request w
                          registered in [inapplicable_blocks_after_validation]
                          to avoid validating and advertising it again in the
                          future *)
-                      if advertise_after_validation then
-                        Block_hash_ring.replace
-                          bv.inapplicable_blocks_after_validation
-                          hash
-                          errs ;
+                      Block_hash_ring.replace
+                        bv.inapplicable_blocks_after_validation
+                        hash
+                        errs ;
                       return (Application_error_after_validation errs)
                   | Applied application_result ->
                       Shell_metrics.Block_validator
