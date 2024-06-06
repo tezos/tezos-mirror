@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -95,14 +95,6 @@ let shutting_head_daemon =
     ~name:"shutting_head_daemon"
     ~msg:"shutting down head daemon"
     ~level:Info
-    ()
-
-let store_synchronized =
-  declare_0
-    ~section
-    ~name:"store_synchronized"
-    ~msg:"Store synchronized"
-    ~level:Notice
     ()
 
 let store_synchronized_on_head =

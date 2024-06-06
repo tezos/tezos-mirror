@@ -141,7 +141,10 @@ let sync_store (dynamic_store : Store.t option ref) last_status parameters
       last_status := current_status ;
       dynamic_store := Some store ;
       let*! () = cleanups () in
-      let*! () = Rpc_process_events.(emit store_synchronized) () in
+      let*! () =
+        Rpc_process_events.(emit store_synchronized_on_head)
+          (block_hash, block_level)
+      in
       return store
   | None ->
       let* store =
@@ -158,10 +161,6 @@ let handle_new_head (dynamic_store : Store.t option ref) last_status parameters
   let*! () = Rpc_process_events.(emit new_head) block_level in
   let* (_ : Store.t) =
     sync_store dynamic_store last_status parameters (block_hash, header)
-  in
-  let*! () =
-    Rpc_process_events.(emit store_synchronized_on_head)
-      (block_hash, block_level)
   in
   (* The monitor_head wrapped stream used by clients is finally
      notified. *)
