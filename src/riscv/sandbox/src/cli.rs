@@ -53,6 +53,10 @@ pub struct DebugOptions {
     /// Path to the input ELF executable
     #[arg(long, short)]
     pub input: Box<Path>,
+
+    /// Path to the initrd
+    #[arg(long)]
+    pub initrd: Option<Box<Path>>,
 }
 
 #[derive(Debug, Clone, Parser)]
