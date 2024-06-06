@@ -201,9 +201,9 @@ let try_migrate_legacy_nonces state =
   } =
     state
   in
+  let legacy_location = Baking_files.filename legacy_location in
   let migrate () =
     let open Lwt_result_syntax in
-    let legacy_location = Baking_files.filename legacy_location in
     let* legacy_nonces =
       cctxt#load legacy_location ~default:legacy_empty legacy_encoding
     in
@@ -291,7 +291,17 @@ let try_migrate_legacy_nonces state =
           failed_migration
           []
       in
-      Events.(emit ignore_failed_nonce_migration failed_block_hashes)
+      let legacy_filename =
+        Filename.concat cctxt#get_base_dir legacy_location
+      in
+      let orphaned_location = Baking_files.filename orphaned_location in
+      let orphaned_filename =
+        Filename.concat cctxt#get_base_dir orphaned_location
+      in
+      Events.(
+        emit
+          ignore_failed_nonce_migration
+          (failed_block_hashes, legacy_filename, orphaned_filename))
   | Error _ -> return_unit
 
 (** [partition_unrevealed_nonces state nonces current_cycle current_level] partitions
