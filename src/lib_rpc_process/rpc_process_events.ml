@@ -68,7 +68,7 @@ let new_head =
     ~section
     ~name:"new_head"
     ~msg:"New head received at level ({level})"
-    ~level:Notice
+    ~level:Info
     ("level", Data_encoding.int32)
 
 let new_applied_block =
@@ -76,7 +76,7 @@ let new_applied_block =
     ~section
     ~name:"new_applied_block"
     ~msg:"New applied block received ({level})"
-    ~level:Notice
+    ~level:Info
     ("level", Data_encoding.int32)
 
 let start_synchronization =
@@ -84,7 +84,7 @@ let start_synchronization =
     ~section
     ~name:"start_synchronization"
     ~msg:"Starting store synchronization for block {level} ({hash})"
-    ~level:Notice
+    ~level:Info
     ("level", Data_encoding.int32)
     ~pp2:Block_hash.pp_short
     ("hash", Block_hash.encoding)
@@ -102,7 +102,7 @@ let store_synchronized_on_head =
     ~section
     ~name:"store_synchronized_on_head"
     ~msg:"Store synchronized on head {hash} ({level})"
-    ~level:Notice
+    ~level:Info
     ~pp1:Block_hash.pp_short
     ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
