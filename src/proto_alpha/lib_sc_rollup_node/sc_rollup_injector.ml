@@ -97,6 +97,15 @@ let injector_operation_of_manager :
         Sc_rollup_proto_types.Commitment_hash.to_octez cemented_commitment
       in
       Some (Execute_outbox_message {rollup; cemented_commitment; output_proof})
+  | Dal_publish_commitment {slot_index; commitment; commitment_proof} ->
+      Some
+        (Publish_dal_commitment
+           {
+             slot_index =
+               Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index;
+             commitment;
+             commitment_proof;
+           })
   | _ -> None
 
 module Proto_client = struct
