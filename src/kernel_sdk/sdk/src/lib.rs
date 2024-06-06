@@ -20,7 +20,6 @@ pub use tezos_smart_rollup_utils as utils;
 pub mod entrypoint;
 // Deprecated in !13662
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
-pub use tezos_smart_rollup_macros::entrypoint;
 
 pub mod host {
     //! A low level, but safe, wrapper over the Smart Rollup host functions.
@@ -65,6 +64,7 @@ pub mod prelude {
     //! # let mut host = MockHost::default();
     //! # host.run_level(kernel_run);
     //! ```
+    pub use crate::entrypoint;
     #[cfg(feature = "debug_alloc")]
     pub use tezos_smart_rollup_debug::debug_msg;
     #[cfg(not(feature = "debug_alloc"))]

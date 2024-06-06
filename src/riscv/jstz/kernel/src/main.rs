@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::host::Runtime;
 
-#[tezos_smart_rollup::entrypoint]
+#[entrypoint::main]
 pub fn entry(host: &mut impl Runtime) {
     #[cfg(not(feature = "static-inbox"))]
     jstz_kernel::entry(host);
@@ -16,7 +17,7 @@ pub fn entry(host: &mut impl Runtime) {
 mod entry {
     use std::cell::RefCell;
     use std::thread_local;
-    use tezos_smart_rollup::host::StaticInbox;
+    use tezos_smart_rollup::entrypoint::internal::StaticInbox;
     use tezos_smart_rollup::prelude::*;
 
     const INPUT: &str = include_str!(std::env!("INBOX_FILE"));

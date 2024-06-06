@@ -2,11 +2,11 @@ mod sbi_crypto;
 
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup::{
-    inbox::InboxMessage, michelson::MichelsonUnit, prelude::*, storage::path::OwnedPath,
-    types::SmartRollupAddress,
+    entrypoint, inbox::InboxMessage, michelson::MichelsonUnit, prelude::*,
+    storage::path::OwnedPath, types::SmartRollupAddress,
 };
 
-#[tezos_smart_rollup::entrypoint]
+#[entrypoint::main]
 pub fn entry(host: &mut impl Runtime) {
     let msg = "Hello World\n";
     debug_msg!(host, "{}", msg);

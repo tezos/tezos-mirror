@@ -1967,6 +1967,7 @@ version = "0.2.2"
 dependencies = [
  "hermit",
  "hex",
+ "serde_json",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
