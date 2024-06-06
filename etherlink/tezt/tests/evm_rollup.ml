@@ -5599,9 +5599,12 @@ let test_revert_is_correctly_propagated =
     ~title:"Check that the node propagates reverts reason correctly."
   @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* error_address, _tx = deploy ~contract:error ~sender evm_setup in
+  let* error_resolved = error () in
+  let* error_address, _tx = deploy ~contract:error_resolved ~sender evm_setup in
   let* data =
-    Eth_cli.encode_method ~abi_label:error.label ~method_:"testRevert(0)"
+    Eth_cli.encode_method
+      ~abi_label:error_resolved.label
+      ~method_:"testRevert(0)"
   in
   let* call = Rpc.call ~to_:error_address ~data evm_node in
   match call with

@@ -241,14 +241,13 @@ let recursive () =
     ~contract:"Recursive"
     ~evm_version:"london"
 
-(** The info for the "error.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/error.sol] *)
-let error =
-  {
-    label = "error";
-    abi = kernel_inputs_path ^ "/error.abi";
-    bin = kernel_inputs_path ^ "/error.bin";
-  }
+(** The info for the "error.sol" contract. *)
+let error () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/error.sol")
+    ~label:"error"
+    ~contract:"Error"
+    ~evm_version:"london"
 
 (** The info for the "block_hash_gen.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/spam_withdrawal.sol] *)
