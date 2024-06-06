@@ -104,7 +104,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// but a page fault is not)
 
     // Trampoline style function for [eval_range]
-    pub fn eval_range<F>(
+    pub fn eval_range_while<F>(
         &mut self,
         config: &mut PvmSbiConfig<'_>,
         step_bounds: &impl RangeBounds<usize>,
@@ -129,6 +129,13 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
                     exec_env::EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
                 },
             )
+    }
+
+    /// Respond to a request for input with no input. Returns `false` in case the
+    /// machine wasn't expecting any input, otherwise returns `true`.
+    pub fn provide_no_input(&mut self) -> bool {
+        self.exec_env_state
+            .provide_no_input(&mut self.machine_state)
     }
 
     /// Provide input. Returns `false` if the machine state is not expecting

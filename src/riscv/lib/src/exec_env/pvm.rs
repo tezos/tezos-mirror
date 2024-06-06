@@ -9,6 +9,7 @@ use crate::{
         registers::{a0, a1, a2, a6, a7},
         MachineState,
     },
+    parser::instruction::Instr,
     state_backend::{AllocatedOf, EnumCell, EnumCellLayout, Manager},
     traps::EnvironException,
 };
@@ -59,7 +60,7 @@ impl From<PvmStatus> for u8 {
 
 /// PVM configuration
 pub struct PvmSbiConfig<'a> {
-    putchar_hook: Box<dyn FnMut(u8) + 'a>,
+    pub putchar_hook: Box<dyn FnMut(u8) + 'a>,
 }
 
 impl<'a> PvmSbiConfig<'a> {
@@ -102,6 +103,29 @@ impl<M: Manager> PvmSbiState<M> {
     /// Get the current PVM status.
     pub fn status(&self) -> PvmStatus {
         self.status.read_default()
+    }
+
+    /// Respond to a request for input with no input. Returns `false` in case the
+    /// machine wasn't expecting any input, otherwise returns `true`.
+    pub fn provide_no_input<ML: MainMemoryLayout>(
+        &mut self,
+        machine: &mut MachineState<ML, M>,
+    ) -> bool {
+        // This method should only do something when we're waiting for input.
+        match self.status() {
+            PvmStatus::WaitingForInput => {}
+            _ => return false,
+        }
+
+        // We're evaluating again after this.
+        self.status.write(PvmStatus::Evaluating);
+
+        // Zeros in all these registers is equivalent to 'None'.
+        machine.hart.xregisters.write(a0, 0);
+        machine.hart.xregisters.write(a1, 0);
+        machine.hart.xregisters.write(a2, 0);
+
+        true
     }
 
     /// Provide input information to the machine. Returns `false` in case the
@@ -234,12 +258,17 @@ where
         config: &mut PvmSbiConfig,
         env_exception: EnvironException,
     ) -> EcallOutcome {
-        // All calls from machine mode are fatal (according to rvemu sbi)
         if let EnvironException::EnvCallFromMMode = env_exception {
-            return EcallOutcome::Handled {
-                continue_eval: false,
+            return EcallOutcome::Fatal {
+                message: "ECALLs from M-mode are not supported".to_owned(),
             };
         }
+
+        // No matter the outcome, we need to bump the
+        // program counter because ECALL's don't update it
+        // to the following instructions.
+        let pc = machine.hart.pc.read() + Instr::Ecall.width();
+        machine.hart.pc.write(pc);
 
         // SBI extension is contained in a7.
         let sbi_extension = machine.hart.xregisters.read(a7);

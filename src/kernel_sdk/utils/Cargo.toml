@@ -17,6 +17,7 @@ categories = ["development-tools"]
 path = "../encoding"
 version = "0.2.2"
 default-features = false
+features = ["alloc", "tezos-encoding"]
 
 [dependencies.tezos_crypto_rs]
 version = "=0.5.2"
@@ -36,4 +37,3 @@ features = ["derive"]
 
 [dependencies.serde_json]
 version = "1.0.115"
-
