@@ -1,15 +1,8 @@
-# FIXME: the release stage will download the artifacts from all of the build matrix jobs
-# If GitLab CI end up allowing variable expansion in needs:parallel:matrix we will be able to specify:
-#  needs:
-#    - job: build
-#      artifacts: true
-#      parallel:
-#        matrix:
-#          - ARCH: ${ARCH}
-#            OCTEZ_BRANCH: ${OCTEZ_BRANCH}
-# Until then, we rename artifacts so that {archiver,server}/main.exe are located under a ${ARCH}-${OCTEZ_BRANCH}
-# Jobs that need artifacts from build will have to download artifacts from ALL build jobs
-# but use only the files located in the right ${ARCH}-${OCTEZ_BRANCH} directory.
+# Teztale CI produces two builds, a regular one, and a canary build
+# - The regular build uses either the latest release branch or release candidate branch of tezos/tezos
+#   and does not include the archiver for ProtoALpha
+# - The `canary` build use the `master` branch of tezos/tezos
+#   and includes the archiver for ProtoALpha
 
 stages:
   - check
@@ -18,15 +11,14 @@ stages:
   - deploy
   - docker
 
-.supported_ARCH: &supported_ARCH ["amd64", "arm64"] 
-.supported_OCTEZ_BRANCH: &supported_OCTEZ_BRANCH ["octez-v20.0", "master"]
-
 # Repeating supported_ARCH and supported_OCTEZ_BRANCH as variables
 # that can be used for for loops in scripts
 variables:
   supported_ARCH: "amd64 arm64"
-  supported_OCTEZ_BRANCH: "octez-v20.0 master"
-  BUILD_CONTAINER_NAME: ${CI_REGISTRY_IMAGE}/dependencies-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF}
+  DEFAULT_OCTEZ_BRANCH: "octez-v20.0"
+  TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
+  CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
+  BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies-${ARCH}:${CONTAINER_TAG}"
   # Build blst used by ocaml-bls12-381 without ADX to support old CPU
   # architectures.
   # See https://gitlab.com/tezos/tezos/-/issues/1788
@@ -35,36 +27,63 @@ variables:
   # See https://gitlab.com/gitlab-org/gitlab-runner/-/issues/37238
   FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR: "true"
 
+# ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
 workflow:
   rules:
     - if: $CI_COMMIT_TAG
       variables:
-        TEZTALE_REF: "$CI_COMMIT_TAG"
+        TEZTALE_REF_BASE: "$CI_COMMIT_TAG"
     - if: $CI_COMMIT_REF_SLUG
       variables:
-        TEZTALE_REF: "$CI_COMMIT_REF_SLUG"
+        TEZTALE_REF_BASE: "$CI_COMMIT_REF_SLUG"
 
-.default_matrix: &default_matrix
-  matrix:
-    - RUNNER: "amd64"
-      ARCH: "amd64"
-      OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
-    - RUNNER: "arm64"
-      ARCH: "arm64"
-      OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
+.anchors:
+  # When the job involve the need for a specific architecture (e.g. when build binaries)
+  # add the following entry to your job definition:
+  # > tags:
+  # >   - ${RUNNER}
+  - &default_matrix
+    matrix:
+      - RUNNER: "amd64"
+        ARCH: "amd64"
+      - RUNNER: "arm64"
+        ARCH: "arm64"
+
+.stable:variables:
+  variables:
+    OCTEZ_BRANCH: "${DEFAULT_OCTEZ_BRANCH}"
+
+.canary:build:rules:
+  rules:
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+.canary:variables:
+  variables:
+    OCTEZ_BRANCH: "master"
+    TEZTALE_REF_SUFFIX: "-canary"
+
+.docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
+
+################
+# SANITY CHECK #
+################
 
 check:
   stage: check
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
-  script:
+  before_script:
     - opam-2.1 install ocamlformat.0.24.1
+  script:
     - git am < ProtoALpha.git.patch # Check that ProtoALpha patch can be applied
     - dune build @fmt # Check that code is properly formatted with ocamlformat
 
-.docker_login: &docker_login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
+#############################
+# DOCKER IMAGES PREPARATION #
+#############################
 
 # Build or update the docker image that will be used for the build job
-prepare:
+.prepare:
   stage: prepare
   image: docker:stable
   parallel: *default_matrix
@@ -73,7 +92,7 @@ prepare:
   services:
     - docker:dind
   before_script:
-    - *docker_login
+    - *docker-login
   script:
     - set -xv
     - export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -82,57 +101,107 @@ prepare:
     - docker build -t "${BUILD_CONTAINER_NAME}" ${DOCKER_ARGS} --build-arg OCTEZ_BRANCH="${OCTEZ_BRANCH}" --build-arg OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}" -f Dockerfile.dependencies .
     - docker push "${BUILD_CONTAINER_NAME}"
 
-build:
+prepare:stable:
+  extends:
+    - .stable:variables
+    - .prepare
+
+prepare:canary:
+  extends:
+    - .canary:variables
+    - .canary:build:rules
+    - .prepare
+
+#########################################
+# BUILD ARCHIVER AND SERVER EXECUTABLES #
+#########################################
+
+.build:
   stage: build
-  parallel: *default_matrix
   image: ${BUILD_CONTAINER_NAME}
+  parallel: *default_matrix
   tags:
     - ${RUNNER}
-  needs:
-    - job: prepare
-      artifacts: false
   before_script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
   script:
     - dune build archiver/main.exe server/main.exe
-    - mkdir -p ./${ARCH}-${OCTEZ_BRANCH}/{archiver,server}
-    - cp --parents {archiver,server}/main.exe ./${ARCH}-${OCTEZ_BRANCH}/
+    - mkdir -p ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/{archiver,server}
+    - cp --parents {archiver,server}/main.exe ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/
   artifacts:
-    name: binaries-${ARCH}-${OCTEZ_BRANCH}
+    name: binaries-${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}
     expire_in: 1 week
     paths:
-      - ./${ARCH}-${OCTEZ_BRANCH}/archiver/main.exe
-      - ./${ARCH}-${OCTEZ_BRANCH}/server/main.exe
+      - ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/archiver/main.exe
+      - ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/server/main.exe
 
-# Don't forget to specify ARCH and OCTEZ_BRANCH variable when extending this rule
-.needs-build:
+build:stable:
+  extends:
+    - .stable:variables
+    - .build
   needs:
-    - job: build
-      artifacts: true
-  before_script:
-    - mv ./${ARCH}-${OCTEZ_BRANCH}/archiver/main.exe ./archiver/
-    - mv ./${ARCH}-${OCTEZ_BRANCH}/server/main.exe ./server/
+    - job: prepare:stable
+      artifacts: false
 
-# To release specific package version, create a (gitlab) tag on branch main
-release:
+build:canary:
+  extends:
+    - .canary:variables
+    - .canary:build:rules
+    - .build
+  needs:
+    - job: prepare:canary
+      artifacts: false
+
+###########################################
+# RELEASE BINARIES (VIA PACKAGE REGISTRY) #
+###########################################
+
+# Don't forget to specify ${ARCH} (and optionally ${OCTEZ_BRANCH}) variable when using this rule
+# ${TEZTALE_REF} is already defined globally
+.rename-build-artifacts:
+  before_script: &rename-build-artifacts:before_script
+    - mv ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/archiver/main.exe ./archiver/
+    - mv ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/server/main.exe ./server/
+
+# When extending this, use a before_script in order to provide `archiver/main.exe` and `server/main.exe` files
+.release:
   stage: deploy
   image: alpine
-  parallel:
-    matrix:
-      - OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
-        ARCH: *supported_ARCH
-  extends: .needs-build
+  parallel: *default_matrix
   before_script:
-    - !reference [.needs-build, before_script]
-    - apk add zip curl
+    - !reference [.rename-build-artifacts, before_script]
   script:
+    - apk add zip curl
     - zip ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip archiver/main.exe server/main.exe
-    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:-latest}/${ARCHIVE}"
+    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${TEZTALE_REF}/${ARCHIVE}"
+
+# To release specific package version, create a (gitlab) tag on branch main
+release:stable:
+  extends:
+    - .stable:variables
+    - .release
+  needs:
+    - job: build:stable
+      artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG != null
 
-.docker-rules:
+release:canary:
+  extends:
+    - .canary:variables
+    - .release
+  needs:
+    - job: build:canary
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+################################################
+# RELEASE DOCKER IMAGES (VIA PACKAGE REGISTRY) #
+################################################
+
+.docker:rules:
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
@@ -142,19 +211,20 @@ release:
       when: manual
       allow_failure: true
 
-docker:
+docker:stable:
   image: docker
   stage: docker
   parallel: *default_matrix
-  extends:
-    - .needs-build
-    - .docker-rules
+  needs:
+    - job: build:stable
+      artifacts: true
   tags:
     - devops
     - ${RUNNER}
+  variables: !reference [.stable:variables, variables]
   before_script:
-    - !reference [.needs-build, before_script]
-    - *docker_login
+    - !reference [.rename-build-artifacts, before_script]
+    - *docker-login
   script:
     - set -xv
     - >
@@ -165,21 +235,18 @@ docker:
       for BIN in archiver server ; do
         docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} ;
       done
+  rules: !reference [.docker:rules, rules]
 
 # Create multiarch manifest
 manifest:
   stage: docker
   image: docker
-  parallel:
-    matrix:
-      - OCTEZ_BRANCH: *supported_OCTEZ_BRANCH
-  extends:
-    - .docker-rules
+  variables: !reference [.stable:variables, variables]
   needs:
-    - job: docker
+    - job: docker:stable
       artifacts: false
   before_script:
-    - *docker_login
+    - *docker-login
   script:
     - set -xv
     - >
@@ -188,3 +255,4 @@ manifest:
         docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}" ; done ;`;
         docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} ;
       done ;
+  rules: !reference [.docker:rules, rules]
