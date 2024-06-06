@@ -135,23 +135,21 @@ let shanghai_storage () =
     ~contract:"SimpleStorage"
     ~evm_version:"shanghai"
 
-(** The info for the Callee contract.
-    See [src\kernel_evm\solidity_examples\caller_callee.sol] *)
-let callee =
-  {
-    label = "callee";
-    abi = kernel_inputs_path ^ "/callee.abi";
-    bin = kernel_inputs_path ^ "/callee.bin";
-  }
+(** The info for the Callee contract. *)
+let callee () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/caller_callee.sol")
+    ~label:"callee"
+    ~contract:"Callee"
+    ~evm_version:"london"
 
-(** The info for the Caller contract.
-    See [src\kernel_evm\solidity_examples\caller_callee.sol] *)
-let caller =
-  {
-    label = "caller";
-    abi = kernel_inputs_path ^ "/caller.abi";
-    bin = kernel_inputs_path ^ "/caller.bin";
-  }
+(** The info for the Caller contract. *)
+let caller () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/caller_callee.sol")
+    ~label:"caller"
+    ~contract:"Caller"
+    ~evm_version:"london"
 
 (** The info for the "events.sol" contract. *)
 let events () =
