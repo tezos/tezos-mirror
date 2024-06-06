@@ -49,6 +49,13 @@ Node
   ``unsafe_pvm_patches``. The same ``unsafe_pvm_patches`` must be set
   in the export and import or the import will fail. (MR :gl:`!13397`)
 
+- When available, add some colors to some event logs: (MR :gl:`!13610`)
+   - node_is_ready is now Green
+   - synchronization status changes are now Magenta
+   - store merge start/end events are now Cyan
+   - update to protocol table is now Blue
+
+
 Client
 ------
 
