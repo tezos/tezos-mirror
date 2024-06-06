@@ -53,7 +53,7 @@ type t = {
   transactions : transactions;
   uncles : string list;
   baseFeePerGas : int64;
-  mixHash : string;
+  prevRandao : string;
 }
 
 (** Extracts a block {!t} from a JSON. *)
