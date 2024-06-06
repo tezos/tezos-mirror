@@ -1538,7 +1538,8 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args19
+    (args20
+       devmode_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
        (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -1571,7 +1572,8 @@ let make_kernel_config_command =
          ~desc:"file path where the config will be written to"
          Params.string
     @@ stop)
-    (fun ( kernel_root_hash,
+    (fun ( devmode,
+           kernel_root_hash,
            chain_id,
            sequencer,
            delayed_bridge,
@@ -1592,28 +1594,52 @@ let make_kernel_config_command =
            bootstrap_accounts )
          output
          () ->
-      Evm_node_lib_dev.Kernel_config.make
-        ?kernel_root_hash
-        ?chain_id
-        ?sequencer
-        ?delayed_bridge
-        ?ticketer
-        ?admin
-        ?sequencer_governance
-        ?kernel_governance
-        ?kernel_security_governance
-        ?minimum_base_fee_per_gas
-        ?da_fee_per_byte
-        ?delayed_inbox_timeout
-        ?delayed_inbox_min_levels
-        ?sequencer_pool_address
-        ?maximum_allowed_ticks
-        ?maximum_gas_per_transaction
-        ?remove_whitelist
-        ~boostrap_balance
-        ?bootstrap_accounts
-        ~output
-        ())
+      if devmode then
+        Evm_node_lib_dev.Kernel_config.make
+          ?kernel_root_hash
+          ?chain_id
+          ?sequencer
+          ?delayed_bridge
+          ?ticketer
+          ?admin
+          ?sequencer_governance
+          ?kernel_governance
+          ?kernel_security_governance
+          ?minimum_base_fee_per_gas
+          ?da_fee_per_byte
+          ?delayed_inbox_timeout
+          ?delayed_inbox_min_levels
+          ?sequencer_pool_address
+          ?maximum_allowed_ticks
+          ?maximum_gas_per_transaction
+          ?remove_whitelist
+          ~boostrap_balance
+          ?bootstrap_accounts
+          ~output
+          ()
+      else
+        Evm_node_lib_prod.Kernel_config.make
+          ?kernel_root_hash
+          ?chain_id
+          ?sequencer
+          ?delayed_bridge
+          ?ticketer
+          ?admin
+          ?sequencer_governance
+          ?kernel_governance
+          ?kernel_security_governance
+          ?minimum_base_fee_per_gas
+          ?da_fee_per_byte
+          ?delayed_inbox_timeout
+          ?delayed_inbox_min_levels
+          ?sequencer_pool_address
+          ?maximum_allowed_ticks
+          ?maximum_gas_per_transaction
+          ?remove_whitelist
+          ~boostrap_balance
+          ?bootstrap_accounts
+          ~output
+          ())
 
 let proxy_simple_command =
   let open Tezos_clic in

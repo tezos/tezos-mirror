@@ -359,6 +359,7 @@ val wait_termination : t -> unit Lwt.t
 (** [make_kernel_installer_config ~output ()] create the config needed for the
     evm kernel used by the installer *)
 val make_kernel_installer_config :
+  ?devmode:bool ->
   ?remove_whitelist:bool ->
   ?kernel_root_hash:string ->
   ?chain_id:int ->

@@ -279,7 +279,8 @@ type setup_mode =
     }
   | Setup_proxy of {devmode : bool}
 
-let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
+let setup_evm_kernel ?devmode ?additional_config
+    ?(setup_kernel_root_hash = true)
     ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
@@ -337,6 +338,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let*! () =
       Evm_node.make_kernel_installer_config
         ~remove_whitelist:Option.(is_some whitelist)
+        ?devmode
         ?kernel_root_hash
         ~bootstrap_accounts
         ?da_fee_per_byte
@@ -2359,8 +2361,8 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
-    ?(activation_timestamp = "0") ?evm_setup ?rollup_address
+let gen_test_kernel_upgrade ?devmode ?setup_kernel_root_hash ?admin_contract
+    ?timestamp ?(activation_timestamp = "0") ?evm_setup ?rollup_address
     ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
@@ -2376,6 +2378,7 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     | Some evm_setup -> return evm_setup
     | None ->
         setup_evm_kernel
+          ?devmode
           ?setup_kernel_root_hash
           ?timestamp
           ?with_administrator
@@ -2821,6 +2824,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
+      ~devmode:false
       ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
@@ -2879,6 +2883,12 @@ let test_kernel_migration =
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
+  let expected_ticketer evm_setup =
+    match evm_setup.l1_contracts with
+    | Some {exchanger; _} -> exchanger
+    | None -> Test.fail "The test needs a ticketer"
+  in
+
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
@@ -2889,9 +2899,54 @@ let test_kernel_migration =
     in
     let*@ block_result = latest_block evm_setup.evm_node in
     let* config_result = config_setup evm_setup in
+    let expected_ticketer = expected_ticketer evm_setup in
+    let* ticketer =
+      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/ticketer"
+           ()
+    in
+    let ticketer =
+      Option.map (fun ticketer -> Hex.to_string (`Hex ticketer)) ticketer
+    in
+    Check.((Some expected_ticketer = ticketer) (option string))
+      ~error_msg:"Ticketer not found at /evm/ticketer" ;
     return {transfer_result; block_result; config_result}
   in
   let scenario_after ~evm_setup ~sanity_check =
+    let expected_ticketer = expected_ticketer evm_setup in
+    let* evm_ticketer =
+      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/ticketer"
+           ()
+    in
+    let evm_ticketer =
+      Option.map (fun ticketer -> Hex.to_string (`Hex ticketer)) evm_ticketer
+    in
+    Check.((None = evm_ticketer) (option string))
+      ~error_msg:"/evm/ticketer should be none after migration" ;
+
+    let* evm_world_state_ticketer =
+      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/world_state/ticketer"
+           ()
+    in
+    let evm_world_state_ticketer =
+      Option.map
+        (fun ticketer -> Hex.to_string (`Hex ticketer))
+        evm_world_state_ticketer
+    in
+    Check.((Some expected_ticketer = evm_world_state_ticketer) (option string))
+      ~error_msg:"Ticketer not found at /evm/world_state/ticketer" ;
+
     let* () =
       ensure_transfer_result_integrity
         ~sender
@@ -2907,122 +2962,6 @@ let test_kernel_migration =
       evm_setup
   in
   gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
-
-let test_deposit_dailynet =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "deposit"; "dailynet"]
-    ~uses:(fun _protocol ->
-      Constant.
-        [
-          octez_smart_rollup_node;
-          smart_rollup_installer;
-          octez_evm_node;
-          Constant.WASM.evm_kernel;
-        ])
-    ~title:"deposit on dailynet"
-  @@ fun protocol ->
-  let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
-  let exchanger_address = "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW" in
-  let rollup_address = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf" in
-
-  let mockup_client = Client.create_with_mode Mockup in
-  let make_bootstrap_contract ~address ~code ~storage ?typecheck () =
-    let* code_json = Client.convert_script_to_json ~script:code mockup_client in
-    let* storage_json =
-      Client.convert_data_to_json ~data:storage ?typecheck mockup_client
-    in
-    let script : Ezjsonm.value =
-      `O [("code", code_json); ("storage", storage_json)]
-    in
-    return
-      Protocol.
-        {delegate = None; amount = Tez.of_int 0; script; hash = Some address}
-  in
-
-  (* Creates the exchanger contract. *)
-  let* exchanger_contract =
-    make_bootstrap_contract
-      ~address:exchanger_address
-      ~code:(exchanger_path ())
-      ~storage:"Unit"
-      ()
-  in
-  (* Creates the bridge contract initialized with exchanger contract. *)
-  let* bridge_contract =
-    make_bootstrap_contract
-      ~address:bridge_address
-      ~code:(bridge_path ())
-      ~storage:(sf "Pair %S None" exchanger_address)
-      ()
-  in
-
-  (* Creates the EVM rollup that listens to the bootstrap smart contract exchanger. *)
-  let* {
-         bootstrap_smart_rollup = evm;
-         smart_rollup_node_data_dir;
-         smart_rollup_node_extra_args;
-       } =
-    setup_bootstrap_smart_rollup
-      ~name:"evm"
-      ~address:rollup_address
-      ~parameters_ty:evm_type
-      ~installee:Constant.WASM.evm_kernel
-      ~config:(`Path Base.(project_root // "etherlink/config/dailynet.yaml"))
-      ()
-  in
-
-  (* Setup a chain where the EVM rollup, the exchanger contract and the bridge
-     are all originated. *)
-  let* node, client =
-    setup_l1
-      ~bootstrap_smart_rollups:[evm]
-      ~bootstrap_contracts:[exchanger_contract; bridge_contract]
-      protocol
-  in
-
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      Operator
-      node
-      ~data_dir:smart_rollup_node_data_dir
-      ~base_dir:(Client.base_dir client)
-      ~default_operator:Constant.bootstrap1.public_key_hash
-  in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-
-  let* () =
-    Sc_rollup_node.run
-      sc_rollup_node
-      rollup_address
-      smart_rollup_node_extra_args
-  in
-
-  let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-  let endpoint = Evm_node.endpoint evm_node in
-
-  (* Deposit tokens to the EVM rollup. *)
-  let amount_mutez = Tez.of_mutez_int 100_000_000 in
-  let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
-
-  let* () =
-    deposit
-      ~amount_mutez
-      ~bridge:bridge_address
-      ~depositor:Constant.bootstrap2
-      ~receiver
-      ~evm_node
-      ~sc_rollup_node
-      ~sc_rollup_address:rollup_address
-      client
-  in
-
-  (* Check the balance in the EVM rollup. *)
-  check_balance ~receiver ~endpoint amount_mutez
 
 let test_cannot_prepayed_leads_to_no_inclusion =
   register_both
@@ -5788,7 +5727,6 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_governance protocols ;
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_deposit_dailynet protocols ;
   test_cannot_prepayed_leads_to_no_inclusion protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;

@@ -47,7 +47,8 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
       ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
       kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
-    @ make_instr sequencer @ make_instr delayed_bridge @ make_instr ticketer
+    @ make_instr sequencer @ make_instr delayed_bridge
+    @ make_instr ~path_prefix:"/evm/world_state/" ticketer
     @ make_instr admin
     @ make_instr sequencer_governance
     @ make_instr kernel_governance

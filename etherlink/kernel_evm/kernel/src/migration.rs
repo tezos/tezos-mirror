@@ -8,8 +8,9 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
     read_chain_id, read_storage_version, store_sequencer_pool_address,
-    store_storage_version, STORAGE_VERSION,
+    store_storage_version, STORAGE_VERSION, TICKETER,
 };
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 use primitive_types::H160;
@@ -64,6 +65,10 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
             let address = H160::from_str("CF02B9Ca488f8F6F4E28e37AA1bDD16b3F1b2aD8")?;
             store_sequencer_pool_address(host, address)?;
         };
+        let legacy_ticketer_path = RefPath::assert_from(b"/evm/ticketer");
+        if host.store_has(&legacy_ticketer_path)?.is_some() {
+            host.store_move(&legacy_ticketer_path, &TICKETER)?;
+        }
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);
