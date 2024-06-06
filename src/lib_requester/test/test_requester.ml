@@ -55,27 +55,6 @@ let value_typ : Parameters.value Check.typ = Check.int
 
 let key_typ : Parameters.key Check.typ = Check.string
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7152
-   replace this typ by one using ['a tzresult typ]
-*)
-let value_tzresult_typ : Parameters.value Error_monad.tzresult Check.typ =
-  let open Check in
-  let pp fmt = function
-    | Ok x -> Format.fprintf fmt "@[<hov 2>Ok@ (%d)@]" x
-    | Error x ->
-        Format.fprintf fmt "@[<hov 2>Error@ (%a)@]" Error_monad.pp_print_trace x
-  in
-  let cmp =
-    Result.compare
-      ~ok:Stdlib.Int.compare
-      ~error:
-        (List.compare (fun x y ->
-             Stdlib.String.compare
-               (Error_monad.find_info_of_error x).id
-               (Error_monad.find_info_of_error y).id))
-  in
-  comparable pp cmp
-
 (** Test helpers *)
 
 (** Lwt helpers *)
@@ -156,7 +135,7 @@ let test_read_known_read_opt () =
   let* r = Test_Requester.read requester "baz" in
   Check.(
     (r = Error [Test_Requester.Missing_data "baz"; Exn Not_found])
-      value_tzresult_typ
+      (Tzcheck.tzresult value_typ)
       ~__LOC__
       ~error_msg:"missing data, obtained %L, expected %R") ;
   let* ro = Test_Requester.read_opt requester "baz" in
@@ -171,7 +150,7 @@ let test_read_known_read_opt () =
   let* r = Test_Requester.read requester "baz" in
   Check.(
     (r = Ok 1)
-      value_tzresult_typ
+      (Tzcheck.tzresult value_typ)
       ~__LOC__
       ~error_msg:"baz can be read, but result is %L") ;
   let* ro = Test_Requester.read_opt requester "baz" in
@@ -217,7 +196,7 @@ let test_full_requester_fetch_timeout () =
     let* res = Test_Requester.fetch ~timeout:t requester v precheck_pass in
     Check.(
       (res = Error [Test_Requester.Timeout v])
-        value_tzresult_typ
+        (Tzcheck.tzresult value_typ)
         ~__LOC__
         ~error_msg:"should timeout, but returned %L") ;
     unit
@@ -440,7 +419,7 @@ let test_clear_or_cancel_cancels () =
   let* res = f1 in
   Check.(
     (res = Error [Test_Requester.Canceled "foo"])
-      value_tzresult_typ
+      (Tzcheck.tzresult value_typ)
       ~__LOC__
       ~error_msg:"fetch should return cancellation, but returned %L") ;
   unit
@@ -478,7 +457,7 @@ let test_clear_or_cancel_decrements () =
   let* res = f1 in
   Check.(
     (res = Error [Test_Requester.Canceled "foo"])
-      value_tzresult_typ
+      (Tzcheck.tzresult value_typ)
       ~__LOC__
       ~error_msg:"fetch should return cancellation, but returned %L") ;
   unit
