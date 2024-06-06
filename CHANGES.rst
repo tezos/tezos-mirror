@@ -64,6 +64,10 @@ Baker
    - block_injected is now Blue
    - revealing_nonce is now Cyan
 
+- Branch used in consensus operation is now the grandparent block instead of the
+  parent block. This is done to avoid having consensus operation branched on
+  block that are not part of the canonical chain anymore.(MR :gl:`!13619`)
+
 Accuser
 -------
 
