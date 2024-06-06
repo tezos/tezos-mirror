@@ -60,8 +60,18 @@ Client
 Baker
 -----
 
+- When available, add some colors to some event logs: (MR :gl:`!13611`)
+   - block_injected is now Blue
+   - revealing_nonce is now Cyan
+
 Accuser
 -------
+
+- When available, add some colors to some event logs: (MR :gl:`!13611`)
+   - double_attestation_detected and double_preattestation_detected is now
+     Magenta
+   - double_attestation_denounced and double_preattestation_denounced is now
+     Blue
 
 Proxy Server
 ------------
