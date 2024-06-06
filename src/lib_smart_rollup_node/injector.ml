@@ -70,6 +70,7 @@ module Parameters :
     | Refute -> 1
     | Recover -> 1
     | Execute_outbox_message -> 1
+    | Publish_dal_commitment -> 1
 
   let operation_tag : Operation.t -> Tag.t = function
     | Add_messages _ -> Add_messages

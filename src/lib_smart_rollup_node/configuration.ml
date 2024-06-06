@@ -162,6 +162,7 @@ let default_fee : Operation_kind.t -> Injector_common.tez = function
          lose the 10k deposit or we can get the reward). *)
       tez 5
   | Execute_outbox_message -> tez 1
+  | Publish_dal_commitment -> tez 1
 
 let default_burn : Operation_kind.t -> Injector_common.tez = function
   | Publish ->
@@ -175,6 +176,7 @@ let default_burn : Operation_kind.t -> Injector_common.tez = function
       (* A refutation move can store data, e.g. opening a game. *)
       tez 1
   | Execute_outbox_message -> tez 1
+  | Publish_dal_commitment -> tez 1
 
 (* Copied from src/proto_alpha/lib_plugin/mempool.ml *)
 let default_fee_parameter operation_kind =
