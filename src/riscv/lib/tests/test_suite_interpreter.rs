@@ -54,7 +54,7 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
         Exit { code, steps } => {
             panic!("Failed at test case: {} - Steps done: {}", code >> 1, steps)
         }
-        Running(_) => panic!("Timeout"),
+        Running { .. } => panic!("Timeout"),
         Exception {
             cause,
             message,

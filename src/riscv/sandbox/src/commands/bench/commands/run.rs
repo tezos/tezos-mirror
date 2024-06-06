@@ -55,7 +55,7 @@ fn compose(
     match current_state {
         Exit { .. } => current_state,
         Exception { .. } => current_state,
-        Running(prev_steps) => match following_result {
+        Running { steps: prev_steps } => match following_result {
             Exit { code, steps } => Exit {
                 code,
                 steps: prev_steps + steps,
@@ -69,13 +69,15 @@ fn compose(
                 message,
                 steps: prev_steps + steps,
             },
-            Running(steps) => Running(prev_steps + steps),
+            Running { steps } => Running {
+                steps: prev_steps + steps,
+            },
         },
     }
 }
 
 fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
-    let mut run_res = TestStepperResult::Running(0);
+    let mut run_res = TestStepperResult::default();
     let mut bench_data = FineBenchData::new();
     let bench_start = quanta::Instant::now();
 
@@ -95,7 +97,7 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
         match run_res {
             TestStepperResult::Exit { .. } => break,
             TestStepperResult::Exception { .. } => break,
-            TestStepperResult::Running(_) => (),
+            TestStepperResult::Running { .. } => (),
         }
     }
     let bench_duration = bench_start.elapsed();
@@ -113,7 +115,7 @@ fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchD
     use TestStepperResult::*;
     let steps = match res {
         Exit { steps, .. } => steps,
-        Running(steps) => steps,
+        Running { steps } => steps,
         Exception { steps, .. } => steps,
     };
     let data = SimpleBenchData::new(duration, steps);

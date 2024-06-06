@@ -10,6 +10,32 @@ use std::ops::RangeBounds;
 
 pub mod test;
 
+/// Status of a stepper
+pub enum StepperStatus {
+    /// Stepper is still running.
+    Running { steps: usize },
+
+    /// Stepper exited.
+    Exited {
+        steps: usize,
+        success: bool,
+        status: String,
+    },
+
+    /// Stepper errored.
+    Errored {
+        steps: usize,
+        cause: String,
+        message: String,
+    },
+}
+
+/// Result after performing a number of steps
+pub trait StepResult: Default {
+    /// Retrieve the status of the stepper
+    fn to_stepper_status(&self) -> StepperStatus;
+}
+
 /// Interface for a debuggable stepper
 pub trait Stepper {
     /// Memory layout of the underlying machine state
@@ -22,7 +48,7 @@ pub trait Stepper {
     fn machine_state(&self) -> &MachineState<Self::MainMemoryLayout, Self::Manager>;
 
     /// Result of one or more steps
-    type StepResult;
+    type StepResult: StepResult;
 
     /// Run as many steps such that they satisfy the given range bound.
     /// The `should_continue` predicate lets you control when to stop within

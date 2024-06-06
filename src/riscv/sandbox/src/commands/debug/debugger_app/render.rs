@@ -17,10 +17,7 @@ use octez_riscv::{
         },
         registers,
     },
-    stepper::{
-        test::{TestStepper, TestStepperResult},
-        Stepper,
-    },
+    stepper::{StepResult, Stepper, StepperStatus},
 };
 use ratatui::{
     prelude::*,
@@ -150,7 +147,10 @@ impl Instruction {
     }
 }
 
-impl<'a> DebuggerApp<'a, TestStepper<'a>> {
+impl<'a, S> DebuggerApp<'a, S>
+where
+    S: Stepper,
+{
     fn render_program_pane(&mut self, area: Rect, buf: &mut Buffer) {
         let title = Title::from(format!(" {} ", self.title).bold());
         let block = Block::default()
@@ -486,36 +486,34 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
             )
             .fg(BLUE),
         ]);
-        let status_text = match &self.state.interpreter {
-            TestStepperResult::Running(steps) => vec![
+        let status_text = match self.state.result.to_stepper_status() {
+            StepperStatus::Running { steps } => vec![
                 Line::from(vec!["   Running".bold().fg(GREEN)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
                 virt_line,
                 mode_line,
             ],
-            TestStepperResult::Exit { code, steps } => {
-                let color = if *code == 0 { YELLOW } else { RED };
+            StepperStatus::Exited {
+                status,
+                success,
+                steps,
+            } => {
+                let color = if success { YELLOW } else { RED };
                 vec![
-                    Line::from(vec![format!("   Exit with code {}", code).bold().fg(color)]),
+                    Line::from(vec![format!("   Exited with: {}", status).bold().fg(color)]),
                     Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                     pc_line,
                     virt_line,
                 ]
             }
-            TestStepperResult::Exception {
+            StepperStatus::Errored {
                 cause,
                 message,
                 steps,
-                ..
             } => vec![
-                Line::from(vec![format!("   Exception: {:?}", cause).bold().fg(RED)]),
-                Line::from(vec![format!(
-                    "   Message: {}",
-                    message.as_deref().unwrap_or("<none>")
-                )
-                .bold()
-                .fg(RED)]),
+                Line::from(vec![format!("   Exception: {}", cause).bold().fg(RED)]),
+                Line::from(vec![format!("   Message: {}", message).bold().fg(RED)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
                 virt_line,
@@ -546,7 +544,10 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     }
 }
 
-impl<'a> Widget for &mut DebuggerApp<'a, TestStepper<'a>> {
+impl<'a, S> Widget for &mut DebuggerApp<'a, S>
+where
+    S: Stepper,
+{
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Split main layout from bottom instructions bar
         use Constraint::{Fill, Length, Percentage};
