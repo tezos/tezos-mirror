@@ -4656,7 +4656,10 @@ let test_regression_block_hash_gen =
   in
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* _address, _tx = deploy ~contract:block_hash_gen ~sender evm_setup in
+  let* block_hash_gen_resolved = block_hash_gen () in
+  let* _address, _tx =
+    deploy ~contract:block_hash_gen_resolved ~sender evm_setup
+  in
   unit
 
 let test_reboot_out_of_ticks =
