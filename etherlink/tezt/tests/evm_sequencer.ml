@@ -2120,11 +2120,9 @@ let test_extended_block_param =
      both for read only RPCs such as [eth_getStorageAt] and simulation
      such as [eth_call].
   *)
+  let* counter_resolved = Solidity_contracts.counter () in
   let* () =
-    Eth_cli.add_abi
-      ~label:Solidity_contracts.counter.label
-      ~abi:Solidity_contracts.counter.abi
-      ()
+    Eth_cli.add_abi ~label:counter_resolved.label ~abi:counter_resolved.abi ()
   in
   (* Deploy the contract. *)
   let* contract, _tx_hash =
@@ -2133,8 +2131,8 @@ let test_extended_block_param =
         Eth_cli.deploy
           ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
           ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:Solidity_contracts.counter.abi
-          ~bin:Solidity_contracts.counter.bin)
+          ~abi:counter_resolved.abi
+          ~bin:counter_resolved.bin)
       sequencer
   in
   (* Takes the level where it was originated, the counter value will be 0. *)
@@ -2149,7 +2147,7 @@ let test_extended_block_param =
                ~source_private_key:
                  Eth_account.bootstrap_accounts.(0).private_key
                ~endpoint:(Evm_node.endpoint sequencer)
-               ~abi_label:Solidity_contracts.counter.label
+               ~abi_label:counter_resolved.label
                ~address:contract
                ~method_call:"incrementCounter()")
             sequencer

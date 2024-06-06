@@ -265,14 +265,13 @@ let gas_limit_contract () =
     ~contract:"Gas_limit"
     ~evm_version:"london"
 
-(** The info for the "gas_limit.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/counter.sol] *)
-let counter =
-  {
-    label = "counter";
-    abi = kernel_inputs_path ^ "/counter.abi";
-    bin = kernel_inputs_path ^ "/counter.bin";
-  }
+(** The info for the "gas_limit.sol" contract. *)
+let counter () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/counter.sol")
+    ~label:"counter"
+    ~contract:"TestCounter"
+    ~evm_version:"london"
 
 (** The info for the "coinbase.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/coinbase.sol] *)
