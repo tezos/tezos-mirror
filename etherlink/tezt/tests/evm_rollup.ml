@@ -2213,26 +2213,38 @@ let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
   in
   return withdrawal_level
 
-let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
-    ~evm_node ~sc_rollup_node ~sc_rollup_address ~client ~endpoint =
-  let* withdrawal_level = Client.level client in
-
-  (* Call the withdrawal precompiled contract. *)
+let call_withdraw ?expect_failure ~sender ~endpoint ~value ~evm_node
+    ~sc_rollup_node ~client ~receiver () =
   let* () =
     Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
   in
   let call_withdraw =
     Eth_cli.contract_send
+      ?expect_failure
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint
       ~abi_label:"withdraw"
       ~address:"0xff00000000000000000000000000000000000001"
       ~method_call:(sf {|withdraw_base58("%s")|} receiver)
-      ~value:amount_wei
+      ~value
       ~gas:50_000
   in
+  wait_for_application ~evm_node ~sc_rollup_node ~client call_withdraw
+
+let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
+    ~evm_node ~sc_rollup_node ~sc_rollup_address ~client ~endpoint =
+  let* withdrawal_level = Client.level client in
+  (* Call the withdrawal precompiled contract. *)
   let* _tx =
-    wait_for_application ~evm_node ~sc_rollup_node ~client call_withdraw
+    call_withdraw
+      ~sender
+      ~endpoint
+      ~value:amount_wei
+      ~evm_node
+      ~sc_rollup_node
+      ~client
+      ~receiver
+      ()
   in
   let* _ =
     find_and_execute_withdrawal
@@ -2342,6 +2354,54 @@ let test_deposit_and_withdraw =
   Check.((balance = expected_balance) Tez.typ)
     ~error_msg:(sf "Expected %%R amount instead of %%L after withdrawal") ;
   return ()
+
+let test_withdraw_amount =
+  let admin = Constant.bootstrap5 in
+  register_proxy
+    ~tags:["evm"; "withdraw"; "wei"; "mutez"]
+    ~title:"Minimum amout to withdraw"
+    ~admin
+  @@ fun ~protocol:_ ~evm_setup:{client; sc_rollup_node; endpoint; evm_node; _}
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* Minimal amount of Wei fails with revert. *)
+  let* _err =
+    call_withdraw
+      ~expect_failure:true
+      ~sender
+      ~endpoint
+      ~evm_node
+      ~sc_rollup_node
+      ~client
+      ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+      ~value:Wei.one
+      ()
+  in
+  (* 1mutez is 10^12wei. The minimal accepted value is then 10^12 *)
+  let* _ok =
+    call_withdraw
+      ~sender
+      ~endpoint
+      ~evm_node
+      ~sc_rollup_node
+      ~client
+      ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+      ~value:(Wei.of_string "1000000000000")
+      ()
+  in
+  let* _err =
+    call_withdraw
+      ~expect_failure:true
+      ~sender
+      ~endpoint
+      ~evm_node
+      ~sc_rollup_node
+      ~client
+      ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+      ~value:(Wei.of_string "99999999999")
+      ()
+  in
+  unit
 
 let get_kernel_boot_wasm ~sc_rollup_node =
   let rpc_hooks : RPC_core.rpc_hooks =
@@ -5832,6 +5892,7 @@ let register_evm_node ~protocols =
   test_eth_call_input protocols ;
   test_preinitialized_evm_kernel protocols ;
   test_deposit_and_withdraw protocols ;
+  test_withdraw_amount protocols ;
   test_estimate_gas protocols ;
   test_estimate_gas_additionnal_field protocols ;
   test_kernel_upgrade_epoch protocols ;
