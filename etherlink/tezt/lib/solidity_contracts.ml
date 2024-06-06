@@ -109,14 +109,13 @@ let erc20 () =
     ~contract:"ERC20"
     ~evm_version:"london"
 
-(** The info for the "loop.sol" contract.
-    See [etherlink/tezt/tests/evm_kernel_inputs/loop.*] *)
-let loop =
-  {
-    label = "loop";
-    abi = kernel_inputs_path ^ "/loop.abi";
-    bin = kernel_inputs_path ^ "/loop.bin";
-  }
+(** The info for the "loop.sol" contract. *)
+let loop () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/loop.sol")
+    ~label:"loop"
+    ~contract:"Loop"
+    ~evm_version:"london"
 
 (** The info for the "mapping_storage.sol" contract. *)
 let mapping_storage () =
