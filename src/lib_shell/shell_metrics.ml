@@ -443,6 +443,7 @@ module Block_validator = struct
     already_known_invalid_blocks_count : Counter.t;
     validated_blocks_count : Counter.t;
     validation_errors_count : Counter.t;
+    commit_block_failed_count : Counter.t;
     preapplied_blocks_count : Counter.t;
     preapplication_errors_count : Counter.t;
     application_errors_after_validation_count : Counter.t;
@@ -470,6 +471,10 @@ module Block_validator = struct
     let validation_errors_count =
       let help = "Number of requests to validate an invalid block" in
       Counter.v ~help ~namespace ?subsystem "validation_errors_count"
+    in
+    let commit_block_failed_count =
+      let help = "Number of requests to failed commit block" in
+      Counter.v ~help ~namespace ?subsystem "commit_block_failed_count"
     in
     let preapplied_blocks_count =
       let help = "Number of successful application simulations of blocks" in
@@ -534,6 +539,7 @@ module Block_validator = struct
       already_known_invalid_blocks_count;
       validated_blocks_count;
       validation_errors_count;
+      commit_block_failed_count;
       preapplied_blocks_count;
       preapplication_errors_count;
       application_errors_after_validation_count;

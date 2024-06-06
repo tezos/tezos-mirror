@@ -149,6 +149,19 @@ let validation_failure =
     ("worker_status", Worker_types.request_status_encoding)
     ("errors", Tezos_rpc.Error.encoding)
 
+let commit_block_failure =
+  declare_3
+    ~section
+    ~name:"commit_block_failure"
+    ~level:Notice
+    ~msg:"commit of block {block} failed, {worker_status}: {errors}"
+    ~pp1:Block_hash.pp
+    ~pp2:Worker_types.pp_status
+    ~pp3:pp_print_top_error_of_trace
+    ("block", Block_hash.encoding)
+    ("worker_status", Worker_types.request_status_encoding)
+    ("errors", Tezos_rpc.Error.encoding)
+
 let validated_block =
   declare_1
     ~section
