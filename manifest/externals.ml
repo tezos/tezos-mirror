@@ -338,8 +338,6 @@ let js_of_ocaml =
 let js_of_ocaml_compiler =
   external_lib ~js_compatible:true "js_of_ocaml-compiler" V.True
 
-let conf_npm = opam_only "conf-npm" V.True
-
 let ppx_hash = external_lib ~js_compatible:true "ppx_hash" V.True
 
 let tezt_lib =

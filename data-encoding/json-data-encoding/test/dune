@@ -11,7 +11,7 @@
   test_seq_is_lazy)
  (modes native js)
  (libraries
-  json-data-encoding
+  octez-libs.json-data-encoding
   crowbar
   alcotest
   js_of_ocaml-compiler)
@@ -19,60 +19,60 @@
 
 (rule
  (alias runtest)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_big_streaming.exe})))
 
 (rule
  (alias runtest)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_destruct.exe})))
 
 (rule
  (alias runtest)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_generated.exe})))
 
 (rule
  (alias runtest)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_list_map.exe})))
 
 (rule
  (alias runtest)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_mu.exe})))
 
 (rule
  (alias runtest)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_seq_is_lazy.exe})))
 
 (rule
  (alias runtest_js)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test_big_streaming.bc.js})))
 
 (rule
  (alias runtest_js)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test_destruct.bc.js})))
 
 (rule
  (alias runtest_js)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test_generated.bc.js})))
 
 (rule
  (alias runtest_js)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test_list_map.bc.js})))
 
 (rule
  (alias runtest_js)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test_mu.bc.js})))
 
 (rule
  (alias runtest_js)
- (package json-data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test_seq_is_lazy.bc.js})))

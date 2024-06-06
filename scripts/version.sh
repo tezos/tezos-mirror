@@ -39,7 +39,7 @@ export full_opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
 ## distribution.
 ## The value of `opam_repository_tag` MUST be reflected in the `build_deps_image_version` variable
 ## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-74d935062182df67cfcbac67ee09e5dd07716f13}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-b114b38e93159016d4f956dc9fce83f4223a8465}"
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.

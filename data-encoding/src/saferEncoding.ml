@@ -31,10 +31,10 @@ module SSet = Set.Make (String)
 
 let sset_add name fields =
   (if SSet.mem name fields then
-   let s =
-     Printf.sprintf "Data_encoding.objects: duplicate field name (%S)" name
-   in
-   raise (Invalid_argument s)) ;
+     let s =
+       Printf.sprintf "Data_encoding.objects: duplicate field name (%S)" name
+     in
+     raise (Invalid_argument s)) ;
   SSet.add name fields
 
 (* This must traverse the constructors in the same fashion as `is_obj` *)
@@ -213,12 +213,12 @@ let check_case_list cases =
           }
         when kind_field_name_found = kind_field_name ->
           (if SSet.mem kind kinds then
-           let s =
-             Printf.sprintf
-               "Data_encoding: two identical kind fields in union: %S"
-               kind
-           in
-           raise (Invalid_argument s)) ;
+             let s =
+               Printf.sprintf
+                 "Data_encoding: two identical kind fields in union: %S"
+                 kind
+             in
+             raise (Invalid_argument s)) ;
           SSet.add kind kinds
       | _ ->
           (* although the type [case] is an alias for [Encoding.case], the type

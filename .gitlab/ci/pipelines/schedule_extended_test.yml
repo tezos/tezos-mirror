@@ -1760,10 +1760,10 @@ opam:octez-libs:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -1778,7 +1778,7 @@ opam:octez-libs:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -5126,10 +5126,10 @@ opam:tezos-openapi:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5144,7 +5144,7 @@ opam:tezos-openapi:
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
-    start_in: 7 minutes
+    start_in: 6 minutes
   needs:
   - opam:prepare
   dependencies:
@@ -7609,6 +7609,38 @@ oc.unit:protocol_compiles:
   - dune build @runtest_compile_protocol
   variables:
     CARGO_NET_OFFLINE: "false"
+
+de.unit:x86_64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
+de.unit:arm64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  needs:
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
 
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable

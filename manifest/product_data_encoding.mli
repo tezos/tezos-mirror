@@ -7,6 +7,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Although we consider data-encoding to be its own product, we do not (yet)
+   release it on its own. Instead, we treat it as a library of octez in the same
+   vein as error-monad or crypto. *)
+
+(* List of paths in which the source is stored *)
+val product_source : string list
+
 val data_encoding : Manifest.target
 
 val json_data_encoding : Manifest.target

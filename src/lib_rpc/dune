@@ -6,7 +6,7 @@
  (public_name octez-libs.rpc)
  (instrumentation (backend bisect_ppx))
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.error-monad
   resto
   resto-directory

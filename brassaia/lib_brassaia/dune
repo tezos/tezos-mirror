@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.event-logging
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.brassaia.data
   astring
   bheap

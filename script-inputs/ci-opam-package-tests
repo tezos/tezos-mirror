@@ -17,7 +17,7 @@ octez-evm-node-libs	all	1
 octez-injector	all	2
 octez-internal-libs	all	7
 octez-l2-libs	all	6
-octez-libs	all	6
+octez-libs	all	7
 octez-node	exec	1
 octez-node-config	all	4
 octez-proto-libs	all	6
@@ -68,7 +68,7 @@ tezos-dac-lib	all	4
 tezos-dac-node-lib	all	2
 tezos-dal-node-lib	all	4
 tezos-dal-node-services	all	6
-tezos-openapi	all	7
+tezos-openapi	all	6
 tezos-protocol-000-Ps9mPmXa	all	4
 tezos-protocol-001-PtCJ7pwo	all	4
 tezos-protocol-002-PsYLVpVv	all	4

@@ -7,46 +7,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* See comment in mli file about special, transient status of data-encoding.
+
+   On the implementation side, the consequence is that:
+   - We use the ["octez"] product to define targets.
+   - We don't define a custom version number.
+   - We mark a conflict with the already released data-encoding.
+*)
+
 open Manifest
 open Externals
 
-include Product (struct
-  let name = "data-encoding"
+let product_source = ["data-encoding"]
 
-  let source = ["data-encoding"]
+include Product (struct
+  let name = "octez"
+
+  let source = product_source
 end)
 
-let opam_version = "1.0.1"
-
-let profile = Some "data-encoding"
+let conflicts =
+  [
+    external_lib "json_data_encoding" V.True;
+    external_lib "json_data_encoding_bson" V.True;
+    external_lib "json_data_encoding_browser" V.True;
+    external_lib "data-encoding" V.True;
+  ]
 
 let json_data_encoding_stdlib =
   public_lib
-    "json-data-encoding.stdlib"
+    "octez-libs.json-data-encoding.stdlib"
+    ~internal_name:"json_data_encoding_stdlib"
     ~path:"data-encoding/json-data-encoding/src"
-    ~synopsis:"Type-safe encoding to and decoding from JSON"
-    ~opam_version
+    ~conflicts
     ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
-    ~opam:"json-data-encoding"
+    ~opam:"octez-libs"
     ~modules:["json_data_encoding_stdlib"; "list_override"]
     ~deps:[uri]
-    ?profile
 
 let json_data_encoding =
   public_lib
-    "json-data-encoding"
+    "octez-libs.json-data-encoding"
     ~internal_name:"json_data_encoding"
     ~path:"data-encoding/json-data-encoding/src"
-    ~synopsis:"Type-safe encoding to and decoding from JSON"
-    ~opam_version
+    ~conflicts
     ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["json_encoding"; "json_query"; "json_repr"; "json_schema"]
     ~deps:[uri; hex; json_data_encoding_stdlib |> open_]
-    ?profile
 
 let _json_data_encoding_tests =
   tests
@@ -58,44 +69,38 @@ let _json_data_encoding_tests =
       "test_mu";
       "test_seq_is_lazy";
     ]
-    ~opam:"json-data-encoding"
+    ~opam:"octez-libs"
     ~path:"data-encoding/json-data-encoding/test"
     ~js_compatible:true
     ~modes:[Native; JS]
-    ~deps:
-      [json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler; conf_npm]
-    ?profile
+    ~deps:[json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler]
 
 let json_data_encoding_bson =
   public_lib
-    "json-data-encoding-bson"
+    "octez-libs.json-data-encoding-bson"
     ~internal_name:"json_data_encoding_bson"
     ~path:"data-encoding/json-data-encoding/src"
-    ~synopsis:"Type-safe encoding to and decoding from JSON (bson support)"
-    ~opam_version
+    ~conflicts
     ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["json_repr_bson"]
     ~deps:
       [json_data_encoding; ocplib_endian; json_data_encoding_stdlib |> open_]
-    ?profile
 
 let _json_data_encoding_bson_tests =
   test
     "test_bson_relaxation"
-    ~opam:"json-data-encoding-bson"
+    ~opam:"octez-libs"
     ~path:"data-encoding/json-data-encoding/test-bson"
     ~deps:[crowbar; alcotest; json_data_encoding; json_data_encoding_bson]
-    ?profile
 
 let _json_data_encoding_browser =
   public_lib
-    "json-data-encoding-browser"
+    "octez-libs.json-data-encoding-browser"
     ~internal_name:"json_data_encoding_browser"
     ~path:"data-encoding/json-data-encoding/src"
-    ~synopsis:"Native representation of JSON documents"
-    ~opam_version
+    ~conflicts
     ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
@@ -106,15 +111,13 @@ let _json_data_encoding_browser =
         js_of_ocaml |> open_;
         json_data_encoding_stdlib |> open_;
       ]
-    ?profile
 
 let data_encoding =
   public_lib
-    "data-encoding"
+    "octez-libs.data-encoding"
     ~internal_name:"data_encoding"
     ~path:"data-encoding/src"
-    ~synopsis:"Library of JSON and binary encoding combinators"
-    ~opam_version
+    ~conflicts
     ~js_compatible:true
     ~preprocess:[pps ppx_hash]
     ~bisect_ppx:No
@@ -130,25 +133,16 @@ let data_encoding =
         ppx_hash;
       ]
     ~dune:Dune.[[S "include"; S "dune.inc"]]
-    ?profile
 
 let _data_encoding_tests =
   test
     "test"
-    ~opam:"data-encoding"
+    ~opam:"octez-libs"
     ~path:"data-encoding/test"
     ~js_compatible:true
     ~modes:[Native; JS]
     ~deps:
-      [
-        data_encoding;
-        zarith;
-        zarith_stubs_js;
-        alcotest;
-        js_of_ocaml_compiler;
-        conf_npm;
-      ]
-    ?profile
+      [data_encoding; zarith; zarith_stubs_js; alcotest; js_of_ocaml_compiler]
 
 let _data_encoding_expect_tests =
   private_lib
@@ -157,8 +151,7 @@ let _data_encoding_expect_tests =
     ~inline_tests:ppx_expect
     ~bisect_ppx:No
     ~deps:[data_encoding; zarith; zarith_stubs_js; ezjsonm; bigstringaf]
-    ~opam:"data-encoding"
-    ?profile
+    ~opam:"octez-libs"
 
 (* Some tests require [--stack-size] to be runnable with node.js.
    The version of node in our runners does not support [--stack-size]. *)
@@ -172,22 +165,9 @@ let _data_encoding_pbt_tests =
       "test_classifiers";
       "json_roundtrip_in_binary";
     ]
-    ~opam:"data-encoding"
+    ~opam:"octez-libs"
     ~path:"data-encoding/test/pbt"
     ~js_compatible:false
     ~modes:[Native]
     ~bisect_ppx:No
     ~deps:[data_encoding; zarith; zarith_stubs_js; crowbar; bigstringaf]
-    ?profile
-
-(* the other projects can depend on data-encoding, but as an "external"
-   dependency *)
-let json_data_encoding =
-  external_lib ~js_compatible:true "json-data-encoding" (V.exactly opam_version)
-
-let data_encoding =
-  external_lib
-    ~js_compatible:true
-    ~main_module:"Data_encoding"
-    "data-encoding"
-    (V.exactly opam_version)

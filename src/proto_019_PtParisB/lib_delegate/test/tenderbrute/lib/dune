@@ -5,7 +5,7 @@
  (name tenderbrute_019_PtParisB)
  (public_name octez-protocol-019-PtParisB-libs.baking.tenderbrute)
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
   tezos-protocol-019-PtParisB.protocol

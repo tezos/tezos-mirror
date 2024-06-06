@@ -30,11 +30,11 @@ depends: [
   "cohttp-lwt-unix" { >= "5.2.0" }
   "conf-libev"
   "conf-rust"
+  "crowbar" { >= "0.2" }
   "crunch" { >= "3.3.0" }
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
-  "data-encoding" { = "1.0.1" }
   "digestif"
   "dmap"
   "dune-configurator"
@@ -51,7 +51,8 @@ depends: [
   "integers_stubs_js"
   "ipaddr" { >= "5.3.0" & < "6.0.0" }
   "jingoo"
-  "json-data-encoding" { = "1.0.1" }
+  "js_of_ocaml" { >= "3.3.0" }
+  "js_of_ocaml-compiler"
   "jsonm"
   "lambda-term" { >= "3.3.1" }
   "ledgerwallet-tezos" { >= "0.4.0" }
@@ -72,6 +73,7 @@ depends: [
   "optint"
   "ppx_deriving"
   "ppx_expect"
+  "ppx_hash"
   "ppx_import"
   "ppx_repr" { >= "0.6.0" }
   "ppx_sexp_conv"
@@ -117,7 +119,11 @@ depends: [
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
+  "data-encoding"
   "hacl_x25519"
+  "json_data_encoding"
+  "json_data_encoding_browser"
+  "json_data_encoding_bson"
   "result" { < "1.5" }
 ]
 build: []

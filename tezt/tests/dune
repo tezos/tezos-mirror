@@ -12,7 +12,7 @@
   tezt-tezos
   tezt_riscv_sandbox
   tezt_tx_kernel
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix

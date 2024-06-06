@@ -12,7 +12,7 @@
   octez-shell-libs.store
   octez-shell-libs.protocol-updater
   octez-node-config
-  data-encoding
+  octez-libs.data-encoding
   re
   tezos-protocol-genesis.embedded-protocol
   tezos-protocol-018-Proxford.embedded-protocol

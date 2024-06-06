@@ -678,26 +678,28 @@ let int_like_n_or_z ~min_value ~max_value name sizer like =
          Z.of_int i)
        (fun z ->
          (if Z.compare z z_min_value < 0 then
-          let i =
-            (* here and in the next check, we want to make sure that the error
-               message is consistent across any platform. To that end, we only
-               convert [z] to [int] if it would fit on a 32 bit machine. *)
-            if Z.compare z (Z.of_int (Binary_size.min_int `Int31)) < 0 then
-              Binary_size.min_int `Int31
-            else Z.to_int z
-          in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+            let i =
+              (* here and in the next check, we want to make sure that the error
+                 message is consistent across any platform. To that end, we only
+                 convert [z] to [int] if it would fit on a 32 bit machine. *)
+              if Z.compare z (Z.of_int (Binary_size.min_int `Int31)) < 0 then
+                Binary_size.min_int `Int31
+              else Z.to_int z
+            in
+            raise
+              Binary_error_types.(
+                Read_error
+                  (Invalid_int {min = min_value; v = i; max = max_value}))) ;
          (if Z.compare z z_max_value > 0 then
-          let i =
-            if Z.compare z (Z.of_int (Binary_size.max_int `Int31)) > 0 then
-              Binary_size.max_int `Int31
-            else Z.to_int z
-          in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+            let i =
+              if Z.compare z (Z.of_int (Binary_size.max_int `Int31)) > 0 then
+                Binary_size.max_int `Int31
+              else Z.to_int z
+            in
+            raise
+              Binary_error_types.(
+                Read_error
+                  (Invalid_int {min = min_value; v = i; max = max_value}))) ;
          Z.to_int z)
        like)
 
