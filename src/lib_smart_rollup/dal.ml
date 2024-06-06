@@ -41,6 +41,12 @@ module Commitment = struct
   type t = Tezos_crypto_dal.Cryptobox.Verifier.commitment
 end
 
+module Commitment_proof = struct
+  include Tezos_crypto_dal.Cryptobox.Verifier.Commitment_proof
+
+  type t = Tezos_crypto_dal.Cryptobox.Verifier.commitment_proof
+end
+
 module Slot_header = struct
   module V1 = struct
     type id = {published_level : int32; index : Slot_index.t}
