@@ -119,14 +119,13 @@ let loop =
     bin = kernel_inputs_path ^ "/loop.bin";
   }
 
-(** The info for the "mapping_storage.sol" contract.
-    See [etherlink/tezt/tests/evm_kernel_inputs/mapping_storage*] *)
-let mapping_storage =
-  {
-    label = "mappingStorage";
-    abi = kernel_inputs_path ^ "/mapping_storage_abi.json";
-    bin = kernel_inputs_path ^ "/mapping_storage.bin";
-  }
+(** The info for the "mapping_storage.sol" contract. *)
+let mapping_storage () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/mapping_storage.sol")
+    ~label:"mapping_storage"
+    ~contract:"MappingStorage"
+    ~evm_version:"london"
 
 (** The info for the "storage.sol" contract, compiled for Shanghai.
     See [etherlink/tezt/tests/evm_kernel_inputs/shanghai_storage.*] *)
