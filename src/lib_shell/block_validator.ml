@@ -235,6 +235,28 @@ let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
   | Error errs -> Lwt.return (Application_error errs)
   | Ok application_result -> Lwt.return (Applied application_result)
 
+let commit_and_notify_block notify_new_block chain_db hash header operations
+    application_result =
+  let open Lwt_result_syntax in
+  let* r =
+    Distributed_db.commit_block
+      chain_db
+      hash
+      header
+      operations
+      application_result
+  in
+  match r with
+  | Some block ->
+      notify_new_block
+        {
+          block;
+          resulting_context_hash =
+            application_result.validation_store.resulting_context_hash;
+        } ;
+      return Validated_and_applied
+  | None -> return Already_committed
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -318,32 +340,20 @@ let on_validation_request w
                     in
                     match r with
                     | Application_error errs -> fail errs
-                    | Applied application_result -> (
+                    | Applied application_result ->
                         Shell_metrics.Block_validator
                         .set_operation_per_pass_collector
                           (fun () ->
                             List.map
                               (fun v -> Int.to_float (List.length v))
                               operations) ;
-                        let* o =
-                          Distributed_db.commit_block
-                            chain_db
-                            hash
-                            header
-                            operations
-                            application_result
-                        in
-                        match o with
-                        | Some block ->
-                            notify_new_block
-                              {
-                                block;
-                                resulting_context_hash =
-                                  application_result.validation_store
-                                    .resulting_context_hash;
-                              } ;
-                            return Validated_and_applied
-                        | None -> return Already_committed))))
+                        commit_and_notify_block
+                          notify_new_block
+                          chain_db
+                          hash
+                          header
+                          operations
+                          application_result)))
       in
       match r with
       | Ok r -> return r
