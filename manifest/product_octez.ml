@@ -564,7 +564,6 @@ let octez_rust_deps =
     ~synopsis:"Octez Rust Dependencies"
     ~js_compatible:true
     ~foreign_archives:["octez_rust_deps"]
-    ~with_macos_security_framework:true
     ~dune:
       Dune.
         [
@@ -607,15 +606,20 @@ let octez_rust_deps =
                   of_atom_list
                     ["run"; "rm"; "-f"; "wasmer-3.3.0/lib/c-api/wasmer.h"];
                   of_atom_list
-                    ["run"; "cargo"; "build"; "--release"; "--locked"];
-                  [
-                    S "setenv";
-                    S "OBJCOPY";
-                    S "objcopy";
-                    of_atom_list
-                      ["run"; "cargo"; "run"; "--release"; "--locked"];
-                  ];
-                  of_atom_list ["run"; "strip"; "-x"; "liboctez_rust_deps.a"];
+                    [
+                      "run";
+                      "cargo";
+                      "build";
+                      "--release";
+                      "-p";
+                      "octez-rust-deps";
+                    ];
+                  of_atom_list
+                    [
+                      "copy";
+                      "target/release/liboctez_rust_deps.a";
+                      "liboctez_rust_deps.a";
+                    ];
                   of_atom_list
                     [
                       "bash";

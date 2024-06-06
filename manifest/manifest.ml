@@ -2745,17 +2745,8 @@ let generate_dune (internal : Target.internal) =
     | Public_executable _ | Private_executable _ | Test_executable _ -> false
   in
   let library_flags =
-    let link_all_flags =
-      if internal.linkall && is_lib then [Dune.S "-linkall"] else []
-    in
-    let macos_link_flags =
-      if internal.with_macos_security_framework && is_lib then
-        [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
-      else []
-    in
-    match List.concat [link_all_flags; macos_link_flags] with
-    | [] -> None
-    | lib_flags -> Some Dune.(of_list (S ":standard" :: lib_flags))
+    if internal.linkall && is_lib then Some Dune.[S ":standard"; S "-linkall"]
+    else None
   in
   let link_flags =
     let linkall = internal.linkall && not is_lib in
@@ -2765,7 +2756,7 @@ let generate_dune (internal : Target.internal) =
       else []
     in
     let macos_link_flags =
-      if internal.with_macos_security_framework && not is_lib then
+      if internal.with_macos_security_framework then
         [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
       else []
     in
