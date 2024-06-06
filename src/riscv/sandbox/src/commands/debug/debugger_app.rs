@@ -10,15 +10,12 @@ use octez_riscv::{
     bits::Bits64,
     kernel_loader,
     machine_state::{
-        bus::Address,
+        bus::{main_memory::M1G, Address},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         mode::Mode,
         AccessType,
     },
-    stepper::{
-        test::{TestStepper, TestStepperResult},
-        Stepper,
-    },
+    stepper::{test::TestStepper, Stepper},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -150,33 +147,38 @@ struct ProgramView<'a> {
 
 pub struct DebuggerApp<'a, S: Stepper> {
     title: &'a str,
-    interpreter: &'a mut S,
+    stepper: &'a mut S,
     program: ProgramView<'a>,
     state: DebuggerState<S::StepResult>,
 }
 
 impl<'a> DebuggerApp<'a, TestStepper<'a>> {
-    pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
-        let mut backend = TestStepper::<'_>::create_backend();
+    pub fn launch(fname: &str, program: &[u8], exit_mode: Mode) -> Result<()> {
+        let mut backend = TestStepper::<'_, M1G>::create_backend();
         let (mut interpreter, prog) =
-            TestStepper::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
-        let symbols = kernel_loader::get_elf_symbols(contents)?;
+            TestStepper::new_with_parsed_program(&mut backend, program, None, exit_mode)?;
+        let symbols = kernel_loader::get_elf_symbols(program)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
         tui::restore()?;
         Ok(())
     }
+}
 
+impl<'a, S> DebuggerApp<'a, S>
+where
+    S: Stepper,
+{
     fn new(
-        interpreter: &'a mut TestStepper<'a>,
+        stepper: &'a mut S,
         title: &'a str,
         program: &'a BTreeMap<u64, String>,
         symbols: HashMap<u64, &'a str>,
     ) -> Self {
         Self {
             title,
-            interpreter,
+            stepper,
             program: ProgramView::with_items(
                 program
                     .iter()
@@ -185,7 +187,7 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
                 symbols,
             ),
             state: DebuggerState {
-                result: TestStepperResult::default(),
+                result: S::StepResult::default(),
                 prev_pc: 0,
                 translation: TranslationState {
                     mode: SATPModeState::Bare,
@@ -237,13 +239,13 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
     }
 
     fn step(&mut self, max_steps: usize) {
-        let result = self.interpreter.step_max(max_steps);
+        let result = self.stepper.step_max(max_steps);
         self.update_after_step(result);
     }
 
     fn step_until_breakpoint(&mut self) {
         // perform at least a step to progress if already on a breakpoint
-        let result = self.interpreter.step_range_while(1..=MAX_STEPS, |m| {
+        let result = self.stepper.step_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)
@@ -255,7 +257,7 @@ impl<'a> DebuggerApp<'a, TestStepper<'a>> {
 
     fn step_until_next_symbol(&mut self) {
         // perform at least a step to progress if already on a breakpoint/symbol
-        let result = self.interpreter.step_range_while(1..=MAX_STEPS, |m| {
+        let result = self.stepper.step_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)
