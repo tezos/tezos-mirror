@@ -23,7 +23,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?remove_whitelist ~enable_fa_bridge ~output () =
+    ?remove_whitelist ~enable_fa_bridge ?enable_dal ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -79,5 +79,6 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ bootstrap_accounts
     @ make_instr remove_whitelist
     @ make_instr enable_fa_bridge
+    @ make_instr ~path_prefix:"/evm/feature_flags/" enable_dal
   in
   Installer_config.to_file instrs ~output

@@ -30,6 +30,7 @@ val make :
   ?maximum_gas_per_transaction:string * string ->
   ?remove_whitelist:string * string ->
   enable_fa_bridge:bool ->
+  ?enable_dal:string * string ->
   output:string ->
   unit ->
   unit tzresult Lwt.t
