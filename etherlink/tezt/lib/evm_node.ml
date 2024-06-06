@@ -986,7 +986,7 @@ let make_kernel_installer_config ?(mainnet_compat = false)
     ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(enable_fa_bridge = false) ~output () =
+    ?(enable_fa_bridge = false) ?(enable_dal = false) ~output () =
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_switch "mainnet-compat" mainnet_compat
@@ -1029,6 +1029,7 @@ let make_kernel_installer_config ?(mainnet_compat = false)
         Int64.to_string
         maximum_gas_per_transaction
     @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
+    @ Cli_arg.optional_switch "enable-dal" enable_dal
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
     @
     match bootstrap_accounts with
