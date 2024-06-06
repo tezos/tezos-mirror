@@ -4763,8 +4763,9 @@ let test_l2_timestamp_opcode =
     let {evm_node; sc_rollup_node; client; _} = evm_setup in
     let endpoint = Evm_node.endpoint evm_node in
     let sender = Eth_account.bootstrap_accounts.(0) in
+    let* timestamp_resolved = timestamp () in
     let* timestamp_address, _tx =
-      deploy ~contract:timestamp ~sender evm_setup
+      deploy ~contract:timestamp_resolved ~sender evm_setup
     in
 
     let* set_timestamp_tx =
@@ -4772,7 +4773,7 @@ let test_l2_timestamp_opcode =
         Eth_cli.contract_send
           ~source_private_key:sender.private_key
           ~endpoint
-          ~abi_label:timestamp.label
+          ~abi_label:timestamp_resolved.label
           ~address:timestamp_address
           ~method_call:(Printf.sprintf "setTimestamp()")
       in
@@ -4782,7 +4783,7 @@ let test_l2_timestamp_opcode =
     let* saved_timestamp =
       Eth_cli.contract_call
         ~endpoint
-        ~abi_label:timestamp.label
+        ~abi_label:timestamp_resolved.label
         ~address:timestamp_address
         ~method_call:(Printf.sprintf "getSavedTimestamp()")
         ()
@@ -4793,7 +4794,7 @@ let test_l2_timestamp_opcode =
     let* simulated_timestamp =
       Eth_cli.contract_call
         ~endpoint
-        ~abi_label:timestamp.label
+        ~abi_label:timestamp_resolved.label
         ~address:timestamp_address
         ~method_call:(Printf.sprintf "getTimestamp()")
         ()

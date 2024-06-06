@@ -217,14 +217,13 @@ let blockhash () =
     ~contract:"Blockhash"
     ~evm_version:"london"
 
-(** The info for the "timestamp.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/timestamp.sol] *)
-let timestamp =
-  {
-    label = "timestamp";
-    abi = kernel_inputs_path ^ "/timestamp.abi";
-    bin = kernel_inputs_path ^ "/timestamp.bin";
-  }
+(** The info for the "timestamp.sol" contract. *)
+let timestamp () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/timestamp.sol")
+    ~label:"timestamp"
+    ~contract:"Timestamp"
+    ~evm_version:"london"
 
 (** The info for the "call_selfdestruct.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/call_selfdestruct.sol] *)
