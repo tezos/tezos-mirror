@@ -112,26 +112,18 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   in
   let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
   let job_build_rpm_amd64 = job_build_rpm_amd64 () in
-  let job_apt_repo_ubuntu_jammy =
+  let job_apt_repo_ubuntu =
     job_apt_repo
       ~__POS__
-      ~name:"apt_repo_ubuntu_jammy"
-      ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])
-      ~image:Images.ubuntu_jammy
-      ["./scripts/ci/create_debian_repo.sh ubuntu jammy"]
-  in
-  let job_apt_repo_ubuntu_focal =
-    job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_ubuntu_focal"
+      ~name:"apt_repo_ubuntu"
       ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])
       ~image:Images.ubuntu_focal
-      ["./scripts/ci/create_debian_repo.sh ubuntu focal"]
+      ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
   in
-  let job_apt_repo_debian_bookworm =
+  let job_apt_repo_debian =
     job_apt_repo
       ~__POS__
-      ~name:"apt_repo_debian_bookworm"
+      ~name:"apt_repo_debian"
       ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
@@ -182,9 +174,8 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   | false, Release_tag -> [job_opam_release]
   | true, Release_tag ->
       [
-        job_apt_repo_debian_bookworm;
-        job_apt_repo_ubuntu_focal;
-        job_apt_repo_ubuntu_jammy;
+        job_apt_repo_debian;
+        job_apt_repo_ubuntu;
         (* This job normally runs in the {!Octez_latest_release} pipeline
            that is triggered manually after a release is made. However, to
            make release testing easier, we include it here directly. Thus,
