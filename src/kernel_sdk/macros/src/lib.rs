@@ -56,13 +56,13 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Use argument `static_inbox = "<PATH_TO_FILE>"` to specify static inbox file.
 /// The path will be shell-expanded at compile time
 ///
+/// ### Example
 /// ```
-/// use tezos_smart_rollup::prelude::Runtime;
-/// use tezos_smart_rollup::entrypoint;
+/// use tezos_smart_rollup::prelude::*;
 ///
 /// #[entrypoint::main]
 /// #[entrypoint::runtime(static_inbox = "./path/to/inbox.json")]
-/// pub fn entry<R: Runtime>(host: &mut R) {
+/// pub fn entry(host: &mut impl Runtime) {
 ///     // do nothing
 /// }
 /// ```

@@ -6,42 +6,31 @@
 //!
 //! Macros and utilities for configuring kernel entrypoint functions.
 //!
-//! Consider `A`, `B`, `C` are entrypoint macros to be used
-//! on top of a kernel entrypoint function.
 //! Macros will be evaluated top-down in a function-like composable way.
+//! For this reason, the top-most entrypoint macro should be the [`main`] macro.
 //!
 //! ### Example
 //!
 //! Consider the following scenario:
-//! ```ignore
-//! #[A(..)]
-//! #[B(..)]
-//! #[C(..)]
-//! pub fn f() {}
 //! ```
+//! use tezos_smart_rollup::prelude::*;
 //!
-//! in the first step will get expanded to:
-//!
-//! ```ignore
-//! pub fn A_f() {
-//!     #[B(..)]
-//!     #[C(..)]
-//!     pub fn f()
-//!
-//!     // #[A(..)] specific code which calls f()
-//!     // Note, f will be altered by `B` and `C`
+//! #[entrypoint::main]
+//! #[entrypoint::runtime(static_inbox = "path/inbox.json")]
+//! pub fn f(host: &mut impl Runtime) {
+//!     // user kernel code
 //! }
 //! ```
 //!
-//! Note, `A_f()` is named only for presentation purposes.
-//! In reality the original `f()` will be used
-//!
 //! After all entrypoint macros are expanded,
 //! the logical equivalent will be of the form
+//!
 //! ```ignore
-//! A(B(C(f)))
+//! entrypoint::main(entrypoint::runtime(f))
 //! ```
-//! where A(...) signifies that A modifies the entrypoint/kernel code given as input.
+//!
+//! where `entrypoint::macro_name(...)` signifies that `macro_name`
+//! modifies the entrypoint/kernel code given as input.
 
 pub use tezos_smart_rollup_macros::{main, runtime};
 
