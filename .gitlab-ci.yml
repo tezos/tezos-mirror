@@ -3,6 +3,10 @@
 #   and does not include the archiver for ProtoALpha
 # - The `canary` build use the `master` branch of tezos/tezos
 #   and includes the archiver for ProtoALpha
+#
+# `canary` builds are not meant to be stable, so they may break at any time.
+# `canary` builds are likely not to be compilable once octez main branch changed after their initial compilation.
+# `canary` builds are therefore allowed to fail.
 
 stages:
   - check
@@ -53,19 +57,21 @@ workflow:
   variables:
     OCTEZ_BRANCH: "${STABLE_OCTEZ_BRANCH}"
 
-# canary build are not meant to be stable, so they may break at any time
-# having a gitlab CI warning
-.canary:build:rules:
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      allow_failure: true
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      allow_failure: true
-
 .canary:variables:
   variables:
     OCTEZ_BRANCH: "master"
     TEZTALE_REF_SUFFIX: "-canary"
+
+# In order to prevent the `canary` builds to be a hassle when developing Teztale,
+# we only build the `canary` version for default branch, tags, and merge requests
+.canary:build:rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      allow_failure: true
+    - if: $CI_COMMIT_TAG
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      allow_failure: true
 
 .docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
@@ -188,18 +194,23 @@ release:stable:
     - job: build:stable
       artifacts: true
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG != null
+
+.release:canary:rules:
+  rules:
+    # Only release the `canary` for what would be the next stable version
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TAG == null
+      allow_failure: true
 
 release:canary:
   extends:
     - .canary:variables
+    - .release:canary:rules
     - .release
   needs:
     - job: build:canary
       artifacts: true
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
 
 ################################################
 # RELEASE DOCKER IMAGES (VIA PACKAGE REGISTRY) #
@@ -230,23 +241,13 @@ release:canary:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: never
     - if: $CI_REGISTRY_IMAGE
       when: manual
       allow_failure: true
 
+
 .docker:canary:rules:
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      allow_failure: true
-    - if: $CI_COMMIT_TAG
-      allow_failure: true
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: never
-    - if: $CI_REGISTRY_IMAGE
-      when: manual
-      allow_failure: true
+  extends: .release:canary:rules
 
 docker:stable:
   extends:
