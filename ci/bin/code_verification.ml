@@ -1691,8 +1691,8 @@ let jobs pipeline_type =
           ~image:Images.ubuntu_jammy;
         job_install_python
           ~__POS__
-          ~name:"oc.install_python_bullseye"
-          ~image:Images.debian_bullseye;
+          ~name:"oc.install_python_bookworm"
+          ~image:Images.debian_bookworm;
       ]
     in
     let jobs_documentation : tezos_job list =

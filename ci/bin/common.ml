@@ -99,8 +99,6 @@ module Images_external = struct
 
   let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
 
-  let debian_bullseye = Image.mk_external ~image_path:"debian:bullseye"
-
   let ubuntu_focal =
     Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:20.04_stable"
 
