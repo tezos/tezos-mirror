@@ -2505,7 +2505,6 @@ oc.install_bin_ubuntu_focal:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2524,7 +2523,6 @@ oc.install_bin_ubuntu_jammy:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2543,7 +2541,6 @@ oc.install_bin_rc_ubuntu_focal:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2562,7 +2559,6 @@ oc.install_bin_rc_ubuntu_jammy:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2581,7 +2577,6 @@ oc.install_bin_debian_bookworm:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2600,7 +2595,6 @@ oc.install_bin_rc_debian_bookworm:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2636,8 +2630,7 @@ oc.compile_sources_doc_bookworm:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
-    - docs/introduction/install*.sh
+    - docs/introduction/compile-sources.sh
     when: on_success
   - when: manual
     allow_failure: true

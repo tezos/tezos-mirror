@@ -1191,12 +1191,17 @@ let jobs pipeline_type =
     in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
-      let changeset_install_jobs =
-        Changeset.make
-          ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
-      in
       let install_octez_rules =
-        make_rules ~changes:changeset_install_jobs ~manual:Yes ()
+        make_rules
+          ~changes:(Changeset.make ["docs/introduction/install*.sh"])
+          ~manual:Yes
+          ()
+      in
+      let compile_octez_rules =
+        make_rules
+          ~changes:(Changeset.make ["docs/introduction/compile-sources.sh"])
+          ~manual:Yes
+          ()
       in
       (* Test installation of the current deb binary packages. *)
       let job_install_bin ~__POS__ ~name
@@ -1245,7 +1250,7 @@ let jobs pipeline_type =
           ~name
           ~image
           ~dependencies:dependencies_needs_start
-          ~rules:install_octez_rules
+          ~rules:compile_octez_rules
           ~stage:Stages.test
             (* This job uses a CARGO_HOME different from
                {!Common.cargo_home}. That CARGO_HOME used is outside the
