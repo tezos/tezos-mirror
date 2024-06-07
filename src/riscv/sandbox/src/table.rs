@@ -68,13 +68,14 @@ fn content_stats_line(name: &str, stats: &NamedStats) -> Vec<Cell> {
         Cell::new(thousand_format(stats.count, 0)).set_alignment(CellAlignment::Right),
         Cell::new(format!("{:#?}", stats.total)).set_alignment(CellAlignment::Right),
         Cell::new(format!("{:#?}", stats.average)).set_alignment(CellAlignment::Right),
-        Cell::new(format_opt_duration(&stats.stddev)).set_alignment(CellAlignment::Right),
+        Cell::new(format!("±{}", format_opt_duration(&stats.stddev)))
+            .set_alignment(CellAlignment::Right),
         Cell::new(format_opt_duration(&stats.median)).set_alignment(CellAlignment::Right),
     ]
 }
 
 fn row_header_stats(name_cell: Cell) -> Vec<Cell> {
-    let prop_cells = vec_cell_factory_ref(&["Count", "Total", "Avg", "Median", "Stddev"], |f| {
+    let prop_cells = vec_cell_factory_ref(&["Count", "Total", "Avg", "Stddev", "Median"], |f| {
         Cell::new(f)
             .add_attribute(Attribute::Bold)
             .fg(Color::DarkCyan)
