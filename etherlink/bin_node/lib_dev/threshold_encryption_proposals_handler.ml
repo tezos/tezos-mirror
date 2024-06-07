@@ -191,7 +191,10 @@ let make_and_submit_proposal_exn ~maximum_number_of_chunks ~keep_alive
     if force || n > 0 then
       let*! head_info = Evm_context.head_info () in
       let transactions =
-        List.map Threshold_encryption_types.Transaction.of_string transactions
+        List.map
+          (fun (transaction, _hash) ->
+            Threshold_encryption_types.Transaction.of_string transaction)
+          transactions
       in
       let proposal : Threshold_encryption_types.proposal =
         Threshold_encryption_types.
