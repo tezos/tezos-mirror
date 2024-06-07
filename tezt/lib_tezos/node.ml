@@ -653,6 +653,14 @@ let check_event ?where node name promise =
       raise (Terminated_before_event {daemon = node.name; event = name; where})
   | Some x -> return x
 
+let wait_for_synchronisation ~statuses node =
+  let filter json =
+    let status = JSON.as_string json in
+    Log.info "%s: %s" (name node) status ;
+    if List.exists (fun st -> st =~ rex status) statuses then Some () else None
+  in
+  wait_for node "synchronisation_status.v0" filter
+
 let wait_for_ready node =
   match node.status with
   | Running {session_state = {ready = true; _}; _} -> unit

@@ -481,6 +481,12 @@ exception
     where : string option;
   }
 
+(** Wait for synchronisation status changes
+
+More precisely, wait until a [synchronisation_status] event occurs with a status
+change listed in [statuses]. *)
+val wait_for_synchronisation : statuses:string list -> t -> unit Lwt.t
+
 (** Wait until the node is ready.
 
     More precisely, wait until a [node_is_ready] event occurs.

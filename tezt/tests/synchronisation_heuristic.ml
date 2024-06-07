@@ -38,14 +38,6 @@ let team = Tag.layer1
 
 open Base
 
-let wait_for ~statuses node =
-  let filter json =
-    let status = JSON.as_string json in
-    Log.info "%s: %s" (Node.name node) status ;
-    if List.exists (fun st -> st =~ rex status) statuses then Some () else None
-  in
-  Node.wait_for node "synchronisation_status.v0" filter
-
 let wait_for_sync node =
   let filter json =
     let status = JSON.as_string json in
@@ -123,7 +115,8 @@ let check_node_synchronization_state =
   (* We register this event before restarting the node to avoid to register it too late. *)
   let synchronisation_events =
     List.map
-      (fun node -> wait_for ~statuses:["synced"; "stuck"] node)
+      (fun node ->
+        Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node)
       (main_node :: nodes)
   in
   let* _ =
