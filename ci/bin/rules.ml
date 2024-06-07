@@ -46,6 +46,8 @@ let assigned_to_marge_bot =
 let started_by_marge_bot =
   Predefined_vars.gitlab_user_login == str "nomadic-margebot"
 
+let is_final_pipeline = started_by_marge_bot || assigned_to_marge_bot
+
 let has_mr_label label =
   Predefined_vars.ci_merge_request_labels =~ "/(?:^|,)" ^ label ^ "(?:$|,)/"
 

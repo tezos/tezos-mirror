@@ -46,11 +46,17 @@ val has_tag_match : string -> If.t
 (** A rule that is true if the comma-separated list [CI_MERGE_REQUEST_LABELS] contains a given label. *)
 val has_mr_label : string -> If.t
 
-(** A rule that is true if [CI_MERGE_REQUEST_ASSIGNEES] contains [nomadic-margebot]. *)
-val assigned_to_marge_bot : If.t
+(** A rule that is true if this is a final pipeline before merging.
 
-(** A rule that is true if [CI_USER_LOGIN] equals [nomadic-margebot]. *)
-val started_by_marge_bot : If.t
+    This rule is true if and only if:
+     - the pipeline is started by marge-bot; or
+     - the merge request is assigned to marge-bot.
+
+    We require the second case since there are cases where marge-bot
+    will just trigger an existing pipeline instead of creating one.
+
+    Use this rule to add or exclude jobs from final pipelines. *)
+val is_final_pipeline : If.t
 
 (** A rule that is never true. *)
 val never : If.t
