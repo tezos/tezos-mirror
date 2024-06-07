@@ -106,7 +106,6 @@ check:
     - ${RUNNER}
   services:
     - docker:dind
-    - docker:git # Used by canary builds for patch application
   before_script:
     - *docker-login
   script:
@@ -128,6 +127,7 @@ prepare:canary:
     - .canary:build:rules
     - .prepare
   before_script:
+    - apk update && apk add git # docker:stable is base on alpine linux
     - *apply-proto-alpha-patch
     - !reference [.prepare, before_script]
 
