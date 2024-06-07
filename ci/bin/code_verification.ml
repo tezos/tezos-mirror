@@ -54,7 +54,7 @@ type opam_package = {
   batch_index : int;
 }
 
-let opam_rules ~only_marge_bot ?batch_index () =
+let opam_rules ~only_final_pipeline ?batch_index () =
   let when_ =
     match batch_index with
     | Some batch_index -> Delayed (Minutes batch_index)
@@ -65,7 +65,7 @@ let opam_rules ~only_marge_bot ?batch_index () =
     job_rule ~if_:(Rules.has_mr_label "ci--opam") ~when_ ();
     job_rule
       ~if_:
-        (if only_marge_bot then
+        (if only_final_pipeline then
            If.(Rules.merge_request && Rules.is_final_pipeline)
          else Rules.merge_request)
       ~changes:(Changeset.encode changeset_opam_jobs)
@@ -86,7 +86,7 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
          Therefore, a retry was added. This should be removed once the
          underlying tests have been fixed. *)
     ~retry:2
-    ~rules:(opam_rules ~only_marge_bot:(group = All) ~batch_index ())
+    ~rules:(opam_rules ~only_final_pipeline:(group = All) ~batch_index ())
     ~variables:
       [
         (* See [.gitlab-ci.yml] for details on [RUNTEZTALIAS] *)
@@ -321,10 +321,10 @@ let jobs pipeline_type =
      enable the job [On_success] in the [before_merging] pipeline. This
      is safe, but prefer specifying a [changes] clause if possible.
 
-     If [margebot_disable] is set to true (default false), this job is
-     disabled when marge-bot starts the [before_merging] pipeline. *)
+     If [final_pipeline_disable] is set to true (default false), this job is
+     disabled in final [Before_merging] pipelines. *)
   let make_rules ?label ?changes ?(manual = No) ?(dependent = false)
-      ?(margebot_disable = false) () =
+      ?(final_pipeline_disable = false) () =
     match pipeline_type with
     | Schedule_extended_test ->
         (* The scheduled pipeline always runs all jobs unconditionally
@@ -333,7 +333,7 @@ let jobs pipeline_type =
         [job_rule ~when_:(if dependent then On_success else Always) ()]
     | Before_merging -> (
         (* MR labels can be used to force tests to run. *)
-        (if margebot_disable then
+        (if final_pipeline_disable then
            [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
          else [])
         @ (match label with
@@ -710,7 +710,7 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~eval_opam:true [])
         ~artifacts:(artifacts ["_opam-repo-for-release/"])
-        ~rules:(opam_rules ~only_marge_bot:false ~batch_index:1 ())
+        ~rules:(opam_rules ~only_final_pipeline:false ~batch_index:1 ())
         [
           "git init _opam-repo-for-release";
           "./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release";
@@ -1605,7 +1605,10 @@ let jobs pipeline_type =
             ~stage:Stages.test_coverage
             ~coverage:"/Coverage: ([^%]+%)/"
             ~rules:
-              (make_rules ~margebot_disable:true ~changes:changeset_octez ())
+              (make_rules
+                 ~final_pipeline_disable:true
+                 ~changes:changeset_octez
+                 ())
             ~variables:
               [
                 (* This inhibits the Makefile's opam version check, which
