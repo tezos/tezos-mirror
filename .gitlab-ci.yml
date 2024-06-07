@@ -57,7 +57,7 @@ workflow:
 # having a gitlab CI warning
 .canary:build:rules:
   rules:
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       allow_failure: true
@@ -205,27 +205,13 @@ release:canary:
 # RELEASE DOCKER IMAGES (VIA PACKAGE REGISTRY) #
 ################################################
 
-.docker:rules:
-  rules:
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: never
-    - if: $CI_REGISTRY_IMAGE
-      when: manual
-      allow_failure: true
-
-docker:stable:
+.docker:release:
   image: docker
   stage: docker
   parallel: *default_matrix
-  needs:
-    - job: build:stable
-      artifacts: true
   tags:
     - devops
     - ${RUNNER}
-  variables: !reference [.stable:variables, variables]
   before_script:
     - !reference [.rename-build-artifacts, before_script]
     - *docker-login
@@ -239,16 +225,51 @@ docker:stable:
       for BIN in archiver server ; do
         docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF} ;
       done
-  rules: !reference [.docker:rules, rules]
+
+.docker:stable:rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_REGISTRY_IMAGE
+      when: manual
+      allow_failure: true
+
+.docker:canary:rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      allow_failure: true
+    - if: $CI_COMMIT_TAG
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_REGISTRY_IMAGE
+      when: manual
+      allow_failure: true
+
+docker:stable:
+  extends:
+    - .stable:variables
+    - .docker:stable:rules
+    - .docker:release
+  needs:
+    - job: build:stable
+      artifacts: true
+
+docker:canary:
+  extends:
+    - .canary:variables
+    - .docker:canary:rules
+    - .docker:release
+  needs:
+    - job: build:canary
+      artifacts: true
 
 # Create multiarch manifest
-manifest:
+.docker:manifest:
   stage: docker
   image: docker
-  variables: !reference [.stable:variables, variables]
-  needs:
-    - job: docker:stable
-      artifacts: false
   before_script:
     - *docker-login
   script:
@@ -259,4 +280,21 @@ manifest:
         docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${TEZTALE_REF} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${TEZTALE_REF}" ; done ;`;
         docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${TEZTALE_REF} ;
       done ;
-  rules: !reference [.docker:rules, rules]
+
+docker:manifest:stable:
+  extends:
+    - .stable:variables
+    - .docker:stable:rules
+    - .docker:manifest
+  needs:
+    - job: docker:stable
+      artifacts: false
+
+docker:manifest:canary:
+  extends:
+    - .canary:variables
+    - .docker:canary:rules
+    - .docker:manifest
+  needs:
+    - job: docker:canary
+      artifacts: false
