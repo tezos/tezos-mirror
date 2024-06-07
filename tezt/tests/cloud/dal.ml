@@ -993,38 +993,6 @@ let init ~(configuration : configuration) cloud next_agent =
       disconnection_state;
     }
 
-let wait_for_gossipsub_worker_event ~name dal_node lambda =
-  Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
-
-let check_expected expected found = if expected <> found then None else Some ()
-
-let ( let*?? ) a b = Option.bind a b
-
-let check_new_connection_event ~main_node ~other_node ~is_trusted =
-  let* id = Dal_node.read_identity other_node in
-  wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
-      let*?? () = check_expected id JSON.(event |-> "peer" |> as_string) in
-      check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
-
-(** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
-    [dal_node2] will use [dal_node1] as a bootstrap peer.
-
-    For this to work, [dal_node1] must already be running. *)
-let connect_nodes_via_p2p dal_node1 dal_node2 =
-  (* We ensure that [dal_node1] connects to [dal_node2]. *)
-  let conn_ev_in_node1 =
-    check_new_connection_event
-      ~main_node:dal_node1
-      ~other_node:dal_node2
-      ~is_trusted:false
-  in
-  let* () = Dal_node.run dal_node2 in
-  Log.info
-    "Node %s started. Waiting for connection with node %s"
-    (Dal_node.name dal_node2)
-    (Dal_node.name dal_node1) ;
-  conn_ev_in_node1
-
 let on_new_level t level =
   let node = t.bootstrap.node in
   let client = t.bootstrap.client in
@@ -1057,7 +1025,9 @@ let on_new_level t level =
             let baker_to_reconnect =
               (List.nth t.bakers (b mod nb_bakers)).dal_node
             in
-            connect_nodes_via_p2p t.bootstrap.dal_node baker_to_reconnect)
+            Dal_common.Helpers.connect_nodes_via_p2p
+              t.bootstrap.dal_node
+              baker_to_reconnect)
       in
       Lwt.return {t with disconnection_state = Some disconnection_state}
 

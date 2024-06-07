@@ -120,6 +120,28 @@ module Helpers : sig
     | `Prover_SRS_not_loaded
     | `Invalid_shard ] ->
     unit
+
+  (** Wait for a connection event between [main_node] and
+    [other_node]. The optional argument [other_peer_id] can be used to
+    ignore the connection events which are not between these two
+    nodes. When this optional argument is given, it must be the peer
+    of [other_node]; this assumption is checked by this function
+    after the reception of the connection event. *)
+  val check_new_connection_event :
+    main_node:Dal_node.t ->
+    ?other_peer_id:string ->
+    other_node:Dal_node.t ->
+    is_trusted:bool ->
+    unit ->
+    unit Lwt.t
+
+  (** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
+    [dal_node2] will use [dal_node1] as a bootstrap peer.
+    For this to work, [dal_node1] must already be running.
+    If [init_config] (false by default) is set to true, [Dal_node.init_config]
+    will be performed for [dal_node2] with [dal_node1] as peer *)
+  val connect_nodes_via_p2p :
+    ?init_config:bool -> Dal_node.t -> Dal_node.t -> unit Lwt.t
 end
 
 module RPC : sig
