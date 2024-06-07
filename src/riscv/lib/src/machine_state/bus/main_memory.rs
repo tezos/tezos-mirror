@@ -109,6 +109,17 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
         Ok(self.data.read(addr as usize))
     }
 
+    #[inline(always)]
+    fn read_all(&self, addr: super::Address, values: &mut [E]) -> Result<(), super::OutOfBounds> {
+        if addr as usize + mem::size_of_val(values) > L::BYTES {
+            return Err(super::OutOfBounds);
+        }
+
+        self.data.read_all(addr as usize, values);
+
+        Ok(())
+    }
+
     fn write(&mut self, addr: super::Address, value: E) -> Result<(), super::OutOfBounds> {
         if addr as usize + mem::size_of::<E>() > L::BYTES {
             return Err(super::OutOfBounds);

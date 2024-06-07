@@ -145,6 +145,16 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             .provide_input(&mut self.machine_state, level, counter, payload)
     }
 
+    /// Provide metadata in response to a metadata request. Returns `false`
+    /// if the machine is not expecting metadata.
+    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u64) -> bool {
+        self.exec_env_state.provide_metadata(
+            &mut self.machine_state,
+            rollup_address,
+            origination_level,
+        )
+    }
+
     /// Get the current machine status.
     pub fn status(&self) -> PvmStatus {
         self.exec_env_state.status()

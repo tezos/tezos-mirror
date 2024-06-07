@@ -21,6 +21,9 @@ pub trait Addressable<E: backend::Elem> {
     /// Read an element of type `E` from the given address.
     fn read(&self, addr: Address) -> Result<E, OutOfBounds>;
 
+    /// Read elements of type `E` from the given address.
+    fn read_all(&self, addr: Address, values: &mut [E]) -> Result<(), OutOfBounds>;
+
     /// Write an element of type `E` to the given address.
     fn write(&mut self, addr: Address, value: E) -> Result<(), OutOfBounds>;
 
@@ -115,6 +118,25 @@ where
         match addr_space {
             AddressSpace::Devices => self.devices.read(local_address),
             AddressSpace::MainMemory => self.memory.read(local_address),
+            AddressSpace::OutOfBounds => Err(OutOfBounds),
+        }
+    }
+
+    #[inline(always)]
+    fn read_all(&self, addr: Address, values: &mut [E]) -> Result<(), OutOfBounds> {
+        let end_addr = addr + mem::size_of_val(values).saturating_sub(1) as Address;
+
+        let (addr_space, local_addr) = AddressSpace::locate::<ML>(addr);
+        let (end_addr_space, _) = AddressSpace::locate::<ML>(end_addr);
+
+        if addr_space != end_addr_space {
+            // We don't allow cross-address space reads
+            return Err(OutOfBounds);
+        }
+
+        match addr_space {
+            AddressSpace::Devices => self.devices.read_all(local_addr, values),
+            AddressSpace::MainMemory => self.memory.read_all(local_addr, values),
             AddressSpace::OutOfBounds => Err(OutOfBounds),
         }
     }

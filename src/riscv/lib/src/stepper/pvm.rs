@@ -37,6 +37,8 @@ pub struct PvmStepper<'backend, 'hooks, ML: MainMemoryLayout = M1G> {
     pvm: Pvm<ML, SliceManager<'backend>>,
     config: PvmSbiConfig<'hooks>,
     inbox: Inbox,
+    rollup_address: [u8; 20],
+    origination_level: u64,
 }
 
 impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
@@ -52,6 +54,8 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
         initrd: Option<&[u8]>,
         inbox: Inbox,
         config: PvmSbiConfig<'hooks>,
+        rollup_address: [u8; 20],
+        origination_level: u64,
     ) -> Result<Self, PvmStepperError> {
         let placed = <PvmLayout<ML> as Layout>::placed().into_location();
         let space = backend.allocate(placed);
@@ -61,7 +65,13 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
         pvm.machine_state
             .setup_boot(&program, initrd, Mode::Supervisor)?;
 
-        Ok(Self { pvm, config, inbox })
+        Ok(Self {
+            pvm,
+            config,
+            inbox,
+            rollup_address,
+            origination_level,
+        })
     }
 
     /// Non-continuing variant of [`Stepper::step_range_while`]
@@ -118,6 +128,22 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
                     }
                 }
             },
+
+            PvmStatus::WaitingForMetadata => {
+                let success = self
+                    .pvm
+                    .provide_metadata(&self.rollup_address, self.origination_level);
+
+                if success {
+                    StepperStatus::Running { steps: 1 }
+                } else {
+                    StepperStatus::Errored {
+                        steps: 0,
+                        cause: "PVM was waiting for metadata".to_owned(),
+                        message: "Providing metadata did not succeed".to_owned(),
+                    }
+                }
+            }
         }
     }
 }

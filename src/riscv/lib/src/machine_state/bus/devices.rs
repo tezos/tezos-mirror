@@ -41,6 +41,10 @@ impl<E: backend::Elem, M: backend::Manager> Addressable<E> for Devices<M> {
         Err(super::OutOfBounds)
     }
 
+    fn read_all(&self, _addr: super::Address, _values: &mut [E]) -> Result<(), super::OutOfBounds> {
+        Err(super::OutOfBounds)
+    }
+
     fn write(&mut self, _addr: super::Address, _value: E) -> Result<(), super::OutOfBounds> {
         Err(super::OutOfBounds)
     }

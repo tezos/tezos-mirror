@@ -67,3 +67,12 @@ pub const VALUE_TYPE_SUBTREE: i32 = 2;
 
 /// Value with subtree ValueType discriminant, for a value carrying a subtree node in the store.
 pub const VALUE_TYPE_VALUE_WITH_SUBTREE: i32 = 3;
+
+/// Length of a rollup address in bytes.
+pub const ROLLUP_ADDRESS_LENGTH: usize = 20;
+
+/// Length of the origination level type in bytes.
+pub const ORIGINATION_LEVEL_LENGTH: usize = 4;
+
+/// Length of the combined metadata for a rollup.
+pub const METADATA_LENGTH: usize = ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH;

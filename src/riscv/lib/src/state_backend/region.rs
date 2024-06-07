@@ -237,6 +237,9 @@ pub trait DynRegion {
     /// Read an element in the region. `address` is in bytes.
     fn read<E: Elem>(&self, address: usize) -> E;
 
+    /// Read elements from the region. `address` is in bytes.
+    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]);
+
     /// Update an element in the region. `address` is in bytes.
     fn write<E: Elem>(&mut self, address: usize, value: E);
 
@@ -255,6 +258,17 @@ impl<T, const LEN: usize> DynRegion for [T; LEN] {
                 .add(address)
                 .cast::<E>()
                 .read_unaligned()
+        }
+    }
+
+    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        assert!(address + mem::size_of_val(values) <= Self::LEN);
+        unsafe {
+            self.as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .copy_to(values.as_mut_ptr(), values.len())
         }
     }
 
@@ -288,6 +302,10 @@ impl<T: DynRegion> DynRegion for &mut T {
         (self as &T).read(address)
     }
 
+    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        (self as &T).read_all(address, values)
+    }
+
     fn write<E: Elem>(&mut self, address: usize, value: E) {
         (self as &mut T).write(address, value)
     }
@@ -302,6 +320,10 @@ impl<T: DynRegion> DynRegion for &T {
 
     fn read<E: Elem>(&self, address: usize) -> E {
         (self as &T).read(address)
+    }
+
+    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        (self as &T).read_all(address, values)
     }
 
     fn write<E: Elem>(&mut self, _address: usize, _value: E) {

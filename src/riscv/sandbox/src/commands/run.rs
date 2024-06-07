@@ -11,6 +11,7 @@ use octez_riscv::{
 };
 use std::{error::Error, fs};
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
+use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let program = fs::read(&opts.input)?;
@@ -45,9 +46,19 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
         inbox.load_from_file(inbox_file)?;
     }
 
+    let rollup_address = SmartRollupAddress::from_b58check(opts.common.inbox.address.as_str())?;
+
     let config = PvmSbiConfig::default();
     let mut backend = PvmStepper::<'_, '_, M1G>::create_backend();
-    let stepper = PvmStepper::new(&mut backend, program, initrd, inbox.build(), config)?;
+    let stepper = PvmStepper::new(
+        &mut backend,
+        program,
+        initrd,
+        inbox.build(),
+        config,
+        rollup_address.into_hash().0.try_into().unwrap(),
+        opts.common.inbox.origination_level,
+    )?;
 
     run_stepper(stepper, opts.common.max_steps)
 }

@@ -17,8 +17,8 @@ use std::{error::Error, process::exit};
 use tezos_smart_rollup::utils::inbox::Inbox;
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
-    SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
-    SBI_TEZOS_META_ORIGINATION_LEVEL,
+    SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
+    SBI_TEZOS_METADATA_REVEAL,
 };
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
@@ -102,23 +102,13 @@ pub struct RollupMetadata {
     pub address: SmartRollupAddress,
 }
 
-/// Provide the rollup's origination level.
-fn sbi_tezos_meta_origination_level(emu: &mut Emulator, meta: &RollupMetadata) -> SBIResult {
-    emu.cpu.xregs.write(A0, meta.origination_level);
-    Ok(())
-}
-
-/// Provide the rollup's address.
-fn sbi_tezos_meta_address(emu: &mut Emulator, meta: &RollupMetadata) -> SBIResult {
+/// Provide the rollup's metadata.
+fn sbi_tezos_meta(emu: &mut Emulator, meta: &RollupMetadata) -> SBIResult {
     let dest_addr = read_physical_address(emu, A0)?;
-    let max_bytes = emu.cpu.xregs.read(A1);
-
     let addr_bytes = meta.address.hash().as_ref().as_slice();
-    let length = max_bytes.min(addr_bytes.len() as u64);
-    let source_data = &addr_bytes[0..length as usize];
+    emu.cpu.bus.write_bytes(dest_addr, &addr_bytes[..20])?;
 
-    emu.cpu.bus.write_bytes(dest_addr, source_data)?;
-    emu.cpu.xregs.write(A0, length);
+    emu.cpu.xregs.write(A0, meta.origination_level);
 
     Ok(())
 }
@@ -197,8 +187,7 @@ pub fn handle_sbi(
             let sbi_function = emu.cpu.xregs.read(A6);
             match sbi_function {
                 SBI_TEZOS_INBOX_NEXT => sbi_tezos_inbox_next(emu, inbox),
-                SBI_TEZOS_META_ORIGINATION_LEVEL => sbi_tezos_meta_origination_level(emu, meta),
-                SBI_TEZOS_META_ADDRESS => sbi_tezos_meta_address(emu, meta),
+                SBI_TEZOS_METADATA_REVEAL => sbi_tezos_meta(emu, meta),
                 SBI_TEZOS_ED25519_SIGN => sbi_tezos_ed25519_sign(emu),
                 SBI_TEZOS_ED25519_VERIFY => sbi_tezos_ed25519_verify(emu),
                 SBI_TEZOS_BLAKE2B_HASH256 => sbi_tezos_blake2b_hash256(emu),

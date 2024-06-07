@@ -178,11 +178,26 @@ impl<'backend, 'hooks, ML: MainMemoryLayout>
     DebuggerApp<'backend, PvmStepper<'backend, 'hooks, ML>>
 {
     /// Launch the Debugger app for a PVM.
-    pub fn launch(fname: &str, program: &[u8], initrd: Option<&[u8]>, inbox: Inbox) -> Result<()> {
+    pub fn launch(
+        fname: &str,
+        program: &[u8],
+        initrd: Option<&[u8]>,
+        inbox: Inbox,
+        rollup_address: [u8; 20],
+        origination_level: u64,
+    ) -> Result<()> {
         let config = PvmSbiConfig::new(|_| {});
 
         let mut backend = PvmStepper::<'backend, 'hooks, ML>::create_backend();
-        let mut stepper = PvmStepper::new(&mut backend, program, initrd, inbox, config)?;
+        let mut stepper = PvmStepper::new(
+            &mut backend,
+            program,
+            initrd,
+            inbox,
+            config,
+            rollup_address,
+            origination_level,
+        )?;
 
         let symbols = kernel_loader::get_elf_symbols(program)?;
         let program = Program::<ML>::from_elf(program)?.parsed();

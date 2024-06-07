@@ -10,6 +10,7 @@ use octez_riscv::{
 };
 use std::{error::Error, fs};
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
+use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
 mod debugger_app;
 mod errors;
@@ -59,12 +60,16 @@ fn debug_pvm(
         inbox.load_from_file(inbox_file)?;
     }
 
+    let rollup_address = SmartRollupAddress::from_b58check(opts.common.inbox.address.as_str())?;
+
     Ok(
         debugger_app::DebuggerApp::<'_, PvmStepper<'_, '_, M1G>>::launch(
             fname,
             program,
             initrd,
             inbox.build(),
+            rollup_address.into_hash().0.try_into().unwrap(),
+            opts.common.inbox.origination_level,
         )?,
     )
 }
