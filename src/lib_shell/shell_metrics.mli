@@ -93,6 +93,7 @@ module Block_validator : sig
     already_known_invalid_blocks_count : Prometheus.Counter.t;
     validated_blocks_count : Prometheus.Counter.t;
     validation_errors_count : Prometheus.Counter.t;
+    commit_block_failed_count : Prometheus.Counter.t;
     preapplied_blocks_count : Prometheus.Counter.t;
     preapplication_errors_count : Prometheus.Counter.t;
     application_errors_after_validation_count : Prometheus.Counter.t;

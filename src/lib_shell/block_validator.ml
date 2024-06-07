@@ -36,6 +36,7 @@ type validation_result =
   | Preapplication_error of error trace
   | Application_error_after_validation of error trace
   | Validation_failed of error trace
+  | Commit_block_failed of error trace
 
 type validate_block_result = Validated | Validation_error of error trace
 
@@ -235,6 +236,29 @@ let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
   | Error errs -> Lwt.return (Application_error errs)
   | Ok application_result -> Lwt.return (Applied application_result)
 
+let commit_and_notify_block notify_new_block chain_db hash header operations
+    application_result =
+  let open Lwt_result_syntax in
+  let*! r =
+    Distributed_db.commit_block
+      chain_db
+      hash
+      header
+      operations
+      application_result
+  in
+  match r with
+  | Ok (Some block) ->
+      notify_new_block
+        {
+          block;
+          resulting_context_hash =
+            application_result.validation_store.resulting_context_hash;
+        } ;
+      return Validated_and_applied
+  | Ok None -> return Already_committed
+  | Error errs -> return (Commit_block_failed errs)
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -318,32 +342,20 @@ let on_validation_request w
                     in
                     match r with
                     | Application_error errs -> fail errs
-                    | Applied application_result -> (
+                    | Applied application_result ->
                         Shell_metrics.Block_validator
                         .set_operation_per_pass_collector
                           (fun () ->
                             List.map
                               (fun v -> Int.to_float (List.length v))
                               operations) ;
-                        let* o =
-                          Distributed_db.commit_block
-                            chain_db
-                            hash
-                            header
-                            operations
-                            application_result
-                        in
-                        match o with
-                        | Some block ->
-                            notify_new_block
-                              {
-                                block;
-                                resulting_context_hash =
-                                  application_result.validation_store
-                                    .resulting_context_hash;
-                              } ;
-                            return Validated_and_applied
-                        | None -> return Already_committed))))
+                        commit_and_notify_block
+                          notify_new_block
+                          chain_db
+                          hash
+                          header
+                          operations
+                          application_result)))
       in
       match r with
       | Ok r -> return r
@@ -533,10 +545,27 @@ let on_completion :
               let* () = check_and_quit_on_irmin_errors errs in
               return_unit)
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
+  | Request.Request_validation _, Commit_block_failed errs -> (
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
+      Prometheus.Counter.inc_one metrics.commit_block_failed_count ;
+      match Request.view request with
+      | Validation v -> (
+          match errs with
+          | [Canceled] ->
+              (* Ignore requests cancellation *)
+              Lwt.return_unit
+          | errs ->
+              let* () =
+                Events.(emit commit_block_failure) (v.block, st, errs)
+              in
+              let* () = check_and_quit_on_irmin_errors errs in
+              return_unit)
+      | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, (Preapplied _ | Preapplication_error _)
   | ( Request.Request_preapplication _,
       ( Already_committed | Already_known_invalid _ | Validated_and_applied
-      | Application_error_after_validation _ | Validation_failed _ ) ) ->
+      | Application_error_after_validation _ | Validation_failed _
+      | Commit_block_failed _ ) ) ->
       (* assert false *) Lwt.return_unit
 
 let on_close w =
@@ -613,7 +642,8 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
       in
       match r with
       | Ok (Validated_and_applied | Already_committed) -> return Valid
-      | Ok (Application_error_after_validation errs) ->
+      | Ok (Application_error_after_validation errs)
+      | Ok (Commit_block_failed errs) ->
           return (Inapplicable_after_validation errs)
       | Ok (Validation_failed errs)
       | Ok (Already_known_invalid errs)
@@ -651,7 +681,8 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
   | Error (Any exn) -> Lwt.return_error [Exn exn]
   | Ok
       ( Already_committed | Already_known_invalid _ | Validated_and_applied
-      | Application_error_after_validation _ | Validation_failed _ ) ->
+      | Application_error_after_validation _ | Validation_failed _
+      | Commit_block_failed _ ) ->
       (* validation cases *)
       assert false
 
