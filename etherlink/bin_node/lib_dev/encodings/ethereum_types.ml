@@ -1467,10 +1467,6 @@ module Delayed_transaction = struct
            payload but have a different tag for transaction.
         *)
         | tag, Rlp.Value raw_tx when tag = transaction_tag ->
-            let hash =
-              raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
-              |> Hex.show |> hash_of_string
-            in
             Some {kind = Transaction; hash; raw = Bytes.to_string raw_tx}
         | "\x02", deposit ->
             let raw = Rlp.encode deposit |> Bytes.to_string in
