@@ -108,6 +108,18 @@ type connection_status =
   | Connected of connection_info
   | Connecting of connection_info Lwt_condition.t
 
+(** Cache structure for predecessors. *)
+module Precessor_cache = struct
+  include
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
+
+  type nonrec t = Block_hash.t t
+
+  let max_cached = 65536 (* 2MB *)
+
+  let create () = create max_cached
+end
+
 type t = {
   name : string;
   chain : Tezos_shell_services.Chain_services.chain;
@@ -116,6 +128,7 @@ type t = {
   cctxt : Tezos_rpc.Context.generic;
   mutable last_seen : (Block_hash.t * Block_header.t) option;
   mutable status : connection_status;
+  cache : Precessor_cache.t;
 }
 
 let is_running c =
@@ -149,6 +162,14 @@ let rec do_connect ~count ~previous_status
   in
   match res with
   | Ok (heads, stopper) ->
+      let heads =
+        Lwt_stream.map
+          (fun ((hash, Tezos_base.Block_header.{shell = {predecessor; _}; _}) as
+               head) ->
+            Precessor_cache.replace l1_ctxt.cache hash predecessor ;
+            head)
+          heads
+      in
       let consumer =
         Lwt_stream.iter_s
           (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head) ->
@@ -201,6 +222,7 @@ let create ~name ~chain ~reconnection_delay ?protocols cctxt =
     protocols;
     last_seen = None;
     status = Disconnected;
+    cache = Precessor_cache.create ();
   }
 
 let start ~name ~chain ~reconnection_delay ?protocols cctxt =
@@ -369,56 +391,46 @@ let predecessors_of_blocks hashes =
   let rec aux next = function [] -> [] | x :: xs -> (next, x) :: aux x xs in
   match hashes with [] -> [] | x :: xs -> aux x xs
 
-(** [get_predecessor block_hash] returns the predecessor block hash of
-    some [block_hash] through an RPC to the Tezos node. To limit the
-    number of RPCs, this information is requested for a batch of hashes
-    and cached locally. *)
-let get_predecessor =
-  let max_cached = 65536 in
-  let hard_max_read = max_cached in
-  (* 2MB *)
-  let module HM =
-    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
-  in
-  let cache = HM.create max_cached in
-  fun ~max_read
-      cctxt
-      (chain : Tezos_shell_services.Chain_services.chain)
-      ancestor ->
-    let open Lwt_result_syntax in
-    (* Don't read more than the hard limit in one RPC call. *)
-    let max_read = min max_read hard_max_read in
-    (* But read at least two because the RPC also returns the head. *)
-    let max_read = max max_read 2 in
-    match HM.find_opt cache ancestor with
-    | Some pred -> return_some pred
-    | None -> (
-        let* blocks =
-          Tezos_shell_services.Chain_services.Blocks.list
-            cctxt
-            ~chain
-            ~heads:[ancestor]
-            ~length:max_read
-            ()
-        in
-        match blocks with
-        | [ancestors] -> (
-            List.iter
-              (fun (h, p) -> HM.replace cache h p)
-              (predecessors_of_blocks ancestors) ;
-            match HM.find_opt cache ancestor with
-            | None ->
-                (* This could happen if ancestors was empty, but it shouldn't be. *)
-                return_none
-            | Some predecessor -> return_some predecessor)
-        | _ -> return_none)
+(** [get_predecessor ~max_read state block_hash] returns the predecessor block
+    hash of some [block_hash] through an RPC to the Tezos node. To limit the
+    number of RPCs, this information is requested for a batch of hashes (of size
+    [max_read]) and cached locally. *)
+let get_predecessor ~max_read state ancestor =
+  let open Lwt_result_syntax in
+  (* Don't read more than the hard limit in one RPC call. *)
+  let max_read = min max_read Precessor_cache.max_cached in
+  (* But read at least two because the RPC also returns the head. *)
+  let max_read = max max_read 2 in
+  match Precessor_cache.find_opt state.cache ancestor with
+  | Some pred -> return_some pred
+  | None -> (
+      let* blocks =
+        Tezos_shell_services.Chain_services.Blocks.list
+          state.cctxt
+          ~chain:state.chain
+          ~heads:[ancestor]
+          ~length:max_read
+          ()
+      in
+      match blocks with
+      | [ancestors] -> (
+          List.iter
+            (fun (h, p) -> Precessor_cache.replace state.cache h p)
+            (predecessors_of_blocks ancestors) ;
+          match Precessor_cache.find_opt state.cache ancestor with
+          | None ->
+              (* This could happen if ancestors was empty, but it shouldn't
+                 be. *)
+              return_none
+          | Some predecessor -> return_some predecessor)
+      | _ -> return_none)
 
 let get_predecessor_opt ?(max_read = 8) state (hash, level) =
   let open Lwt_result_syntax in
   if level = 0l then return_none
   else
     let level = Int32.pred level in
-    let+ hash = get_predecessor ~max_read state.cctxt state.chain hash in
+    let+ hash = get_predecessor ~max_read state hash in
     Option.map (fun hash -> (hash, level)) hash
 
 let get_predecessor ?max_read state ((hash, _) as head) =
@@ -521,6 +533,7 @@ module Internal_for_tests = struct
       protocols = None;
       last_seen = None;
       status = Disconnected;
+      cache = Precessor_cache.create ();
     }
 end
 
