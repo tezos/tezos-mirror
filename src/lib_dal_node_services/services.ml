@@ -93,12 +93,12 @@ let get_slot_content :
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
       / "content")
 
-let slot_pages :
-    < input : unit
-    ; meth : [`GET]
+let get_slot_pages :
+    < meth : [`GET]
+    ; input : unit
     ; output : Tezos_crypto_dal.Cryptobox.page list
-    ; params : (unit * int32) * int
     ; prefix : unit
+    ; params : (unit * Types.level) * Types.slot_index
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service

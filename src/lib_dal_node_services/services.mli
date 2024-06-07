@@ -72,13 +72,13 @@ val get_slot_content :
   ; query : unit >
   service
 
-(** Fetch a slot and return the list of its pages. *)
-val slot_pages :
-  < input : unit
-  ; meth : [`GET]
+(** Returns the pages of the slot identified by the given slot id. *)
+val get_slot_pages :
+  < meth : [`GET]
+  ; input : unit
   ; output : Tezos_crypto_dal.Cryptobox.page list
-  ; params : (unit * int32) * int
   ; prefix : unit
+  ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >
   service
 
