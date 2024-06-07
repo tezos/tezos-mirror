@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,3 +30,4 @@ module View_helpers = View_helpers
 module RPC = RPC
 module Metrics = Metrics_plugin
 module Script_interpreter_logging = Script_interpreter_logging
+module Http_cache_headers = Http_cache_headers
