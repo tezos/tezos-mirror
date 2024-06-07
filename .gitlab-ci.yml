@@ -163,7 +163,7 @@ build:canary:
 # Don't forget to specify ${ARCH} (and optionally ${OCTEZ_BRANCH}) variable when using this rule
 # ${TEZTALE_REF} is already defined globally
 .rename-build-artifacts:
-  before_script: &rename-build-artifacts:before_script
+  before_script:
     - mv ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/archiver/main.exe ./archiver/
     - mv ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/server/main.exe ./server/
 
@@ -233,11 +233,11 @@ docker:stable:
     - set -xv
     - >
       for BIN in archiver server ; do
-        docker build -t ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} -f Dockerfile.$BIN . ;
+        docker build -t ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF} -f Dockerfile.$BIN . ;
       done
     - >
       for BIN in archiver server ; do
-        docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} ;
+        docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF} ;
       done
   rules: !reference [.docker:rules, rules]
 
@@ -255,8 +255,8 @@ manifest:
     - set -xv
     - >
       for BIN in archiver server ; do
-        for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}" ; done ;
-        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}" ; done ;`;
-        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG} ;
+        for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${TEZTALE_REF}" ; done ;
+        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${TEZTALE_REF} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${TEZTALE_REF}" ; done ;`;
+        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${TEZTALE_REF} ;
       done ;
   rules: !reference [.docker:rules, rules]
