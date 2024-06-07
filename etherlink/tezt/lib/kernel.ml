@@ -5,20 +5,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This type is used to register test based on which kernel version the test
-    should run on. *)
-type t =
-  | All  (** The tests will run on all available kernels. *)
-  | Mainnet  (** The tests will run on mainnet kernel only. *)
-  | Latest  (** The tests will run latest kernel only. *)
+type t = Mainnet | Ghostnet | Latest
 
-(** Mainnet version is actually the ghostnet kernel. We can use the same
-    declaration as long a both run the same code. *)
-let mainnet = ("mainnet", Constant.WASM.ghostnet_evm_kernel)
-
-let latest = ("latest", Constant.WASM.evm_kernel)
+let all = [Mainnet; Ghostnet; Latest]
 
 let to_uses_and_tags = function
-  | All -> [mainnet; latest]
-  | Mainnet -> [mainnet]
-  | Latest -> [latest]
+  | Mainnet -> ("mainnet", Constant.WASM.mainnet_evm_kernel)
+  | Ghostnet -> ("ghostnet", Constant.WASM.ghostnet_evm_kernel)
+  | Latest -> ("latest", Constant.WASM.evm_kernel)
+
+let commit_of = function
+  | Mainnet -> Some Constant.WASM.mainnet_evm_commit
+  | Ghostnet -> Some Constant.WASM.ghostnet_evm_commit
+  | Latest -> None
+
+let upgrade_to = function
+  | Mainnet -> Latest
+  | Ghostnet -> Latest
+  | Latest -> Latest
+
+let of_use u =
+  if Uses.(tag u = tag Constant.WASM.mainnet_evm_kernel) then Mainnet
+  else if Uses.(tag u = tag Constant.WASM.ghostnet_evm_kernel) then Ghostnet
+  else if Uses.(tag u = tag Constant.WASM.evm_kernel) then Latest
+  else raise (Invalid_argument "Kernel.of_use")

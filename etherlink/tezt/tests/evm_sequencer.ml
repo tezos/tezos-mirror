@@ -423,7 +423,7 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernel = Kernel.All) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode
     ?additional_uses ~title ~tags body protocols =
   let register ~kernel ~threshold_encryption =
@@ -461,7 +461,7 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
         ~threshold_encryption:false
         ~title:(sf "%s (sequencer, %s)" title kernel_tag)
         ~tags)
-    (Kernel.to_uses_and_tags kernel) ;
+    (List.map Kernel.to_uses_and_tags kernels) ;
   List.iter
     (fun (kernel_tag, kernel) ->
       let tags = kernel_tag :: tags in
@@ -470,7 +470,27 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
         ~threshold_encryption:true
         ~title:(sf "%s (te_sequencer, %s)" title kernel_tag)
         ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags))
-    (Kernel.to_uses_and_tags Latest)
+    [Kernel.(to_uses_and_tags Latest)]
+
+let register_upgrade_both ~title ~tags ~genesis_timestamp
+    ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
+    ?(upgrade_to = Kernel.upgrade_to) ?(additional_uses = []) scenario protocols
+    =
+  List.iter
+    (fun from ->
+      let from_tag, _ = Kernel.to_uses_and_tags from in
+      let to_ = upgrade_to from in
+      let to_tag, to_use = Kernel.to_uses_and_tags to_ in
+      register_both
+        ~kernels:[from]
+        ~genesis_timestamp
+        ~time_between_blocks
+        ~tags:(tags @ ["upgrade_scenario"; to_tag])
+        ~title:Format.(sprintf "%s (%s -> %s)" title from_tag to_tag)
+        ~additional_uses:(to_use :: additional_uses)
+        (scenario from to_)
+        protocols)
+    kernels
 
 module Protocol = struct
   include Protocol
@@ -1236,7 +1256,7 @@ let test_init_from_rollup_node_data_dir =
   register_both
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade *)
-    ~kernel:Latest
+    ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
@@ -1876,6 +1896,7 @@ let test_self_upgrade_kernel =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_both
+    ~kernels:[Latest]
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "self"]
@@ -1956,24 +1977,36 @@ let test_upgrade_kernel_auto_sync =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_both
-    ~kernel:Kernel.Mainnet
+  register_upgrade_both
+    ~kernels:[Mainnet; Ghostnet]
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
     ~title:"Rollup-node kernel upgrade is applied to the sequencer state."
-    ~additional_uses:[Constant.WASM.evm_kernel]
-  @@ fun {
-           sc_rollup_node;
-           l1_contracts;
-           sc_rollup_address;
-           client;
-           sequencer;
-           proxy;
-           _;
-         }
+  @@ fun from
+             to_
+             {
+               sc_rollup_node;
+               l1_contracts;
+               sc_rollup_address;
+               client;
+               sequencer;
+               proxy;
+               _;
+             }
              _protocol ->
+  let* () =
+    match Kernel.commit_of from with
+    | Some from_commit ->
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:true from_commit
+        in
+        unit
+    | None -> unit
+  in
+
   (* Sends the upgrade to L1, but not to the sequencer. *)
+  let _, to_use = Kernel.to_uses_and_tags to_ in
   let* () =
     upgrade
       ~sc_rollup_node
@@ -1981,7 +2014,7 @@ let test_upgrade_kernel_auto_sync =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.evm_kernel
+      ~upgrade_to:to_use
       ~activation_timestamp
   in
 
@@ -2022,6 +2055,16 @@ let test_upgrade_kernel_auto_sync =
       ~right:proxy
       ~error_msg:"The head should be the same after the upgrade"
       ()
+  in
+
+  let* () =
+    match Kernel.commit_of to_ with
+    | Some to_commit ->
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:true to_commit
+        in
+        unit
+    | None -> unit
   in
 
   unit
@@ -2161,27 +2204,27 @@ let test_delayed_transfer_timeout_fails_l1_levels =
 
 (** This tests the situation where force kernel upgrade happens too soon. *)
 let test_force_kernel_upgrade_too_early =
-  (* Add a delay between first block and activation timestamp. *)
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  register_both
+  register_upgrade_both
+    ~kernels:[Latest]
+    ~upgrade_to:(fun _ -> Ghostnet)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
     ~title:"Force kernel upgrade fail too early"
-    ~additional_uses:
-      [Constant.WASM.ghostnet_evm_kernel; Constant.WASM.evm_kernel]
-  @@ fun {
-           sc_rollup_node;
-           l1_contracts;
-           sc_rollup_address;
-           client;
-           sequencer;
-           proxy;
-           kernel;
-           _;
-         }
+  @@ fun _from
+             to_
+             {
+               sc_rollup_node;
+               l1_contracts;
+               sc_rollup_address;
+               client;
+               sequencer;
+               proxy;
+               _;
+             }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -2201,6 +2244,7 @@ let test_force_kernel_upgrade_too_early =
      be forced now. *)
   let activation_timestamp = "2020-01-11T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
+  let _, to_use = Kernel.to_uses_and_tags to_ in
   let* () =
     upgrade
       ~sc_rollup_node
@@ -2208,10 +2252,7 @@ let test_force_kernel_upgrade_too_early =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:
-        (if kernel = Constant.WASM.ghostnet_evm_kernel then
-           Constant.WASM.evm_kernel
-         else Constant.WASM.ghostnet_evm_kernel)
+      ~upgrade_to:to_use
       ~activation_timestamp
   in
 
@@ -2228,27 +2269,26 @@ let test_force_kernel_upgrade_too_early =
 (** This tests the situation where the kernel does not produce blocks but
     still can be forced to upgrade via an external message. *)
 let test_force_kernel_upgrade =
-  (* Add a delay between first block and activation timestamp. *)
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  register_both
-    ~genesis_timestamp
-    ~time_between_blocks:Nothing
+  register_upgrade_both
+    ~kernels:[Latest]
+    ~upgrade_to:(fun _ -> Ghostnet)
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
+    ~genesis_timestamp
     ~title:"Force kernel upgrade"
-    ~additional_uses:
-      [Constant.WASM.ghostnet_evm_kernel; Constant.WASM.evm_kernel]
-  @@ fun {
-           sc_rollup_node;
-           l1_contracts;
-           sc_rollup_address;
-           client;
-           sequencer;
-           proxy;
-           kernel;
-           _;
-         }
+  @@ fun _from
+             to_
+             {
+               sc_rollup_node;
+               l1_contracts;
+               sc_rollup_address;
+               client;
+               sequencer;
+               proxy;
+               _;
+             }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -2268,6 +2308,7 @@ let test_force_kernel_upgrade =
      be forced immediatly. *)
   let activation_timestamp = "2020-01-09T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
+  let _, to_use = Kernel.to_uses_and_tags to_ in
   let* () =
     upgrade
       ~sc_rollup_node
@@ -2275,10 +2316,7 @@ let test_force_kernel_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:
-        (if kernel = Constant.WASM.ghostnet_evm_kernel then
-           Constant.WASM.evm_kernel
-         else Constant.WASM.ghostnet_evm_kernel)
+      ~upgrade_to:to_use
       ~activation_timestamp
   in
 
@@ -3247,7 +3285,7 @@ let test_preimages_endpoint =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
     ~title:"Sequencer use remote server to get preimages"
-    ~kernel:Kernel.Latest
+    ~kernels:[Latest]
     ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
   @@ fun {
            sc_rollup_node;
@@ -3415,7 +3453,7 @@ let test_txpool_content_empty_with_legacy_encoding =
     ~time_between_blocks:Nothing
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~additional_uses:[Constant.WASM.evm_kernel]
-    ~kernel:Kernel.Mainnet
+    ~kernels:[Mainnet]
     ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
@@ -3528,7 +3566,7 @@ let test_trace_transaction =
   register_both
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade *)
-    ~kernel:Latest
+    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -3594,7 +3632,7 @@ let test_trace_transaction_on_invalid_transaction =
   register_both
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade *)
-    ~kernel:Latest
+    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -3682,7 +3720,7 @@ let test_trace_transaction_call =
   register_both
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade *)
-    ~kernel:Latest
+    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
@@ -3795,7 +3833,7 @@ let test_miner =
   register_both
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade *)
-    ~kernel:Latest
+    ~kernels:[Latest]
     ~tags:["evm"; "miner"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
