@@ -82,3 +82,5 @@ val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
     {!Ethereum_types.transaction_object}. *)
 val find :
   Ethereum_types.hash -> Ethereum_types.transaction_object option tzresult Lwt.t
+
+val clear_popped_transactions : unit -> unit tzresult Lwt.t

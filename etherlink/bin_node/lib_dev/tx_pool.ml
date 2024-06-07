@@ -220,6 +220,7 @@ module Types = struct
     rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable pool : Pool.t;
+    mutable popped_txs : Pool.transaction list;
     mode : mode;
     tx_timeout_limit : int64;
     tx_pool_addr_limit : int;
@@ -260,6 +261,7 @@ module Request = struct
     | Find :
         Ethereum_types.hash
         -> (Ethereum_types.transaction_object option, tztrace) t
+    | Clear_popped_transactions : (unit, unit) t
 
   type view = View : _ t -> view
 
@@ -326,6 +328,12 @@ module Request = struct
              (req "tx_hash" Ethereum_types.hash_encoding))
           (function View (Find tx_hash) -> Some ((), tx_hash) | _ -> None)
           (fun ((), tx_hash) -> View (Find tx_hash));
+        case
+          (Tag 7)
+          ~title:"Clear_popped_transactions"
+          (obj1 (req "request" (constant "clear_popped_transactions")))
+          (function View Clear_popped_transactions -> Some () | _ -> None)
+          (fun () -> View Clear_popped_transactions);
       ]
 
   let pp ppf (View r) =
@@ -353,6 +361,8 @@ module Request = struct
           "Looking for tx %a in tx pool"
           Ethereum_types.pp_hash
           tx_hash
+    | Clear_popped_transactions ->
+        Format.fprintf ppf "Clearing popped transactions"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -571,6 +581,16 @@ let pop_transactions state ~maximum_cumulative_size =
              (txs, pool, !accumulated_size))
            ([], pool, 0)
     in
+    (* Store popped tx. *)
+    let*? () =
+      if List.is_empty state.popped_txs then (
+        state.popped_txs <- txs ;
+        Ok ())
+      else
+        Error_monad.error_with
+          "The current popped transactions have not been fully processed and \
+           cleared yet."
+    in
     (* Sorting transactions by index.
        First tx in the pool is the first tx to be sent to the batcher. *)
     let txs =
@@ -590,6 +610,8 @@ let pop_transactions state ~maximum_cumulative_size =
     (* update the pool *)
     state.pool <- pool ;
     return txs
+
+let clear_popped_transactions state = state.Types.popped_txs <- []
 
 let pop_and_inject_transactions state =
   let open Lwt_result_syntax in
@@ -619,6 +641,7 @@ let pop_and_inject_transactions state =
             ~smart_rollup_address:state.smart_rollup_address
             ~transactions:txs
         in
+        let () = clear_popped_transactions state in
         match hashes with
         | Error trace ->
             let*! () = Tx_pool_events.transaction_injection_failed trace in
@@ -650,7 +673,16 @@ let size_info (state : Types.state) =
   in
   {number_of_addresses; number_of_transactions}
 
-let find state tx_hash = Pool.find state.Types.pool tx_hash
+let find state tx_hash =
+  let res =
+    List.find_map
+      (fun Pool.{transaction_object; _} ->
+        match transaction_object with
+        | Some {hash; _} when hash = tx_hash -> transaction_object
+        | _ -> None)
+      state.Types.popped_txs
+  in
+  Option.either_f res (fun () -> Pool.find state.Types.pool tx_hash)
 
 module Handlers = struct
   type self = worker
@@ -689,6 +721,9 @@ module Handlers = struct
     | Request.Is_locked -> protect @@ fun () -> return (is_locked state)
     | Request.Size_info -> protect @@ fun () -> return (size_info state)
     | Request.Find tx_hash -> protect @@ fun () -> return (find state tx_hash)
+    | Request.Clear_popped_transactions ->
+        let () = clear_popped_transactions state in
+        return_unit
 
   type launch_error = error trace
 
@@ -709,6 +744,7 @@ module Handlers = struct
           rollup_node;
           smart_rollup_address;
           pool = Pool.empty;
+          popped_txs = [];
           mode;
           tx_timeout_limit;
           tx_pool_addr_limit;
@@ -884,3 +920,11 @@ let find tx_hash =
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker (Request.Find tx_hash)
   |> handle_request_error
+
+let clear_popped_transactions () =
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! (_pushed : bool) =
+    Worker.Queue.push_request w Request.Clear_popped_transactions
+  in
+  return_unit
