@@ -117,8 +117,8 @@ module Images_external = struct
   let opam_ubuntu_mantic =
     Image.mk_external ~image_path:"ocaml/opam:ubuntu-23.10"
 
-  let opam_debian_bullseye =
-    Image.mk_external ~image_path:"ocaml/opam:debian-11"
+  let opam_debian_bookworm =
+    Image.mk_external ~image_path:"ocaml/opam:debian-12"
 
   let ci_release =
     Image.mk_external

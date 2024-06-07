@@ -1285,27 +1285,39 @@ let jobs pipeline_type =
           Debian_bookworm;
         (* Test installing through opam *)
         job_install_opam_jammy;
-        (* Test compiling the [latest-release] branch on Bullseye *)
-        job_compile_sources
-          ~__POS__
-          ~name:"oc.compile_release_sources_bullseye"
-          ~image:Images.opam_debian_bullseye
-          ~project:"tezos/tezos"
-          ~branch:"latest-release";
-        (* Test compiling the [master] branch on Bullseye *)
-        job_compile_sources
-          ~__POS__
-          ~name:"oc.compile_sources_bullseye"
-          ~image:Images.opam_debian_bullseye
-          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
-        job_compile_sources
-          ~__POS__
-          ~name:"oc.compile_sources_mantic"
-          ~image:Images.opam_ubuntu_mantic
-          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
       ]
+      @
+      match pipeline_type with
+      (* These tests make sure that the compilation instructions
+         in master are still valid for the latest-release branch *)
+      | Schedule_extended_test ->
+          [
+            job_compile_sources
+              ~__POS__
+              ~name:"oc.compile_sources_doc_bookworm"
+              ~image:Images.opam_debian_bookworm
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+            job_compile_sources
+              ~__POS__
+              ~name:"oc.compile_sources_doc_mantic"
+              ~image:Images.opam_ubuntu_mantic
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+          ]
+          (* Test compiling the [master] branch on Bookworm, to make sure
+             that the compilation instructions in this branch are still
+             valid.
+          *)
+      | _ ->
+          [
+            job_compile_sources
+              ~__POS__
+              ~name:"oc.compile_sources_doc_bookworm"
+              ~image:Images.opam_debian_bookworm
+              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+          ]
     in
     (* Tezt jobs.
 
