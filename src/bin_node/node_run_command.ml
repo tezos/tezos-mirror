@@ -144,6 +144,7 @@ module Event = struct
   let node_is_ready =
     declare_0
       ~section
+      ~alternative_color:Internal_event.Green
       ~name:"node_is_ready"
       ~msg:"the Tezos node is now running"
       ~level:Notice

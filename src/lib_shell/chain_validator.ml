@@ -805,7 +805,7 @@ let on_launch w _ parameters =
             head
             chain_db
         else Lwt.return_unit
-    | _ -> Lwt.return_unit
+    | Synchronisation_heuristic.Not_synchronised -> Lwt.return_unit
   in
   let synchronisation_state =
     Synchronisation_heuristic.Bootstrapping.create

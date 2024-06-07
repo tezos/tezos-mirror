@@ -78,6 +78,7 @@ let loading_protocol =
 let bootstrapped =
   declare_0
     ~section
+    ~alternative_color:Internal_event.Cyan
     ~name:"bootstrapped"
     ~msg:"chain is bootstrapped"
     ~level:Notice
@@ -86,6 +87,7 @@ let bootstrapped =
 let synchronisation_status =
   declare_1
     ~section
+    ~alternative_color:Internal_event.Magenta
     ~name:"synchronisation_status"
     ~msg:"synchronisation status: {status}"
     ~level:Notice
@@ -96,7 +98,7 @@ let could_not_switch_testchain =
   declare_1
     ~section
     ~name:"could_not_switch_testchain"
-    ~msg:"error while switching testchina: {trace}"
+    ~msg:"error while switching testchain: {trace}"
     ~level:Error
     ~pp1:pp_print_top_error_of_trace
     ("trace", Error_monad.trace_encoding)

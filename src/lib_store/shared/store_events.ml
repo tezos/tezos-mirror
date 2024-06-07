@@ -257,6 +257,7 @@ let pp_int32 fmt i = Format.fprintf fmt "%ld" i
 
 let start_merging_stores =
   declare_1
+    ~alternative_color:Internal_event.Cyan
     ~section
     ~level:Notice
     ~name:"start_merging_stores"
@@ -266,6 +267,7 @@ let start_merging_stores =
 
 let end_merging_stores =
   declare_1
+    ~alternative_color:Internal_event.Cyan
     ~section
     ~level:Notice
     ~name:"end_merging_stores"
@@ -502,6 +504,7 @@ let restore_protocol_activation =
 let update_protocol_table =
   declare_4
     ~section
+    ~alternative_color:Internal_event.Blue
     ~level:Notice
     ~name:"update_protocol_table"
     ~msg:
