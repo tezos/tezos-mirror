@@ -1419,7 +1419,7 @@ let fee_history_encoding =
        (req "gasUsedRatio" (list float)))
 
 module Delayed_transaction = struct
-  type kind = Transaction | Deposit
+  type kind = Transaction | Deposit | Fa_deposit
 
   type t = {
     kind : kind;
@@ -1444,6 +1444,12 @@ module Delayed_transaction = struct
           (constant "deposit")
           (function Deposit -> Some () | _ -> None)
           (function () -> Deposit);
+        case
+          (Tag 2)
+          ~title:"fa_deposit"
+          (constant "fa_deposit")
+          (function Fa_deposit -> Some () | _ -> None)
+          (function () -> Fa_deposit);
       ]
 
   let encoding : t Data_encoding.t =
@@ -1453,7 +1459,8 @@ module Delayed_transaction = struct
       (fun (kind, hash, raw) -> {kind; hash; raw})
       (tup3 encoding_kind hash_encoding (string' Hex))
 
-  let of_rlp_content ?(transaction_tag = "\x03") hash rlp_content =
+  let of_rlp_content ?(transaction_tag = "\x03") ?(fa_deposit_tag = "\x04") hash
+      rlp_content =
     match rlp_content with
     | Rlp.(List [Value tag; content]) -> (
         match (Bytes.to_string tag, content) with
@@ -1468,6 +1475,11 @@ module Delayed_transaction = struct
         *)
         | tag, Rlp.Value raw_tx when tag = transaction_tag ->
             Some {kind = Transaction; hash; raw = Bytes.to_string raw_tx}
+        | tag, fa_deposit when tag = fa_deposit_tag ->
+            (* Delayed inbox item has tag 3, inbox::transaction has tag 4. Event
+               uses the inbox::transaction tag. *)
+            let raw = Rlp.encode fa_deposit |> Bytes.to_string in
+            Some {kind = Fa_deposit; hash; raw}
         | "\x02", deposit ->
             let raw = Rlp.encode deposit |> Bytes.to_string in
             Some {kind = Deposit; hash; raw}
@@ -1477,7 +1489,10 @@ module Delayed_transaction = struct
   let to_rlp {kind; raw; hash} =
     let open Rlp in
     let tag =
-      (match kind with Transaction -> "\x03" | Deposit -> "\x02")
+      (match kind with
+      | Transaction -> "\x03"
+      | Deposit -> "\x02"
+      | Fa_deposit -> "\x04")
       |> Bytes.of_string
     in
     let hash = hash_to_bytes hash |> Bytes.of_string in
@@ -1485,6 +1500,7 @@ module Delayed_transaction = struct
       match kind with
       | Transaction -> Value (Bytes.of_string raw)
       | Deposit -> decode_exn (Bytes.of_string raw)
+      | Fa_deposit -> decode_exn (Bytes.of_string raw)
     in
     let rlp = List [Value hash; List [Value tag; content]] in
     encode rlp
@@ -1492,6 +1508,7 @@ module Delayed_transaction = struct
   let pp_kind fmt = function
     | Transaction -> Format.pp_print_string fmt "Transaction"
     | Deposit -> Format.pp_print_string fmt "Deposit"
+    | Fa_deposit -> Format.pp_print_string fmt "FA_Deposit"
 
   let pp fmt {raw; kind; _} =
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
