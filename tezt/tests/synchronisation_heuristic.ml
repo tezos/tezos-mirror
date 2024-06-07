@@ -289,7 +289,7 @@ let test_threshold_one =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* baker = Baker.init ~protocol node client in
 
   Log.info "Check synchronisation state of first peer" ;
   let* () = check_sync_state client Synced in
@@ -302,6 +302,8 @@ let test_threshold_one =
       ()
   in
   let* () = Client.Admin.connect_address client ~peer:node1 in
+  let* _ = Node.wait_for_level node 2 in
+  let* () = Baker.kill baker in
 
   Log.info "Check bootstrapped state of second peer" ;
   let* () = Client.bootstrapped client1 in
@@ -327,7 +329,7 @@ let test_threshold_two =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* baker = Baker.init ~protocol node client in
 
   Log.info "Add nodes and connect in clique" ;
 
@@ -369,6 +371,7 @@ let test_threshold_two =
         unit)
       [node; node1; node2; node3]
   in
+  let* () = Baker.kill baker in
 
   let* () = Client.bootstrapped client in
   let* () = Client.bootstrapped client1 in
