@@ -18,7 +18,8 @@ extern crate hermit;
 pub use tezos_smart_rollup_utils as utils;
 
 pub mod entrypoint;
-// Deprecated in !13662
+
+#[allow(deprecated)]
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
 
 pub mod host {

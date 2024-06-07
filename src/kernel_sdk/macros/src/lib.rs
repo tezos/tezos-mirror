@@ -32,7 +32,7 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
         let err = format!(
             "Expected no attributes in kernel_entrypoint macro invocation, got: {attr}"
         );
-        let suggestion = "Try #[kernel_entrypoint]";
+        let suggestion = "Try #[entrypoint::main]";
         abort! { err,
             format!("Unexpected attributes {}", attr);
             note = err;
@@ -45,7 +45,27 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let kernel_fn_code: TokenStream = quote! {
         #item
-        tezos_smart_rollup::kernel_entry!(#fn_name);
+
+        /// The `kernel_run` function is called by the wasm host at regular intervals.
+        #[cfg(target_arch = "wasm32")]
+        #[no_mangle]
+        pub extern "C" fn kernel_run() {
+            tezos_smart_rollup::entrypoint::internal::set_panic_hook();
+            use tezos_smart_rollup::entrypoint::internal::RollupHost;
+            let mut host = unsafe { RollupHost::new() };
+            #fn_name(&mut host)
+        }
+
+        #[cfg(all(target_arch = "riscv64", target_os = "hermit"))]
+        pub fn main() -> ! {
+            tezos_smart_rollup::entrypoint::internal::set_panic_hook();
+            use tezos_smart_rollup::entrypoint::internal::RollupHost;
+            let mut host = unsafe { RollupHost::new() };
+            loop {
+                // TODO #6727: Capture and recover panics.
+                #fn_name(&mut host);
+            }
+        }
     }
     .into();
 
