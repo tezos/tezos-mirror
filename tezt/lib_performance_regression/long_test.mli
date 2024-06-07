@@ -340,10 +340,14 @@ val time_and_check_regression :
     {!time} measures time using [Unix.gettimeofday] around the whole execution
     of the function. If you only want to measure parts of the execution,
     or if you want to use something more precise than [Unix.gettimeofday],
-    or if you want to measure something which is not time, use [measure] instead. *)
+    or if you want to measure something which is not time, use [measure] instead.
+
+    [?field] specifies the field name for the InfluxDB data point
+    (see {!InfluxDB.val-data_point}). It defaults to ["duration"]. *)
 val measure :
   ?repeat:int ->
   ?tags:(string * string) list ->
+  ?field:InfluxDB.field ->
   InfluxDB.measurement ->
   (unit -> float) ->
   unit
@@ -357,6 +361,7 @@ val measure_and_check_regression :
   ?stddev:bool ->
   ?repeat:int ->
   ?tags:(string * string) list ->
+  ?field:InfluxDB.field ->
   InfluxDB.measurement ->
   (unit -> float) ->
   unit Lwt.t
@@ -389,6 +394,7 @@ val time_and_check_regression_lwt :
 val measure_lwt :
   ?repeat:int ->
   ?tags:(string * string) list ->
+  ?field:InfluxDB.field ->
   InfluxDB.measurement ->
   (unit -> float Lwt.t) ->
   unit Lwt.t
@@ -402,6 +408,7 @@ val measure_and_check_regression_lwt :
   ?stddev:bool ->
   ?repeat:int ->
   ?tags:(string * string) list ->
+  ?field:InfluxDB.field ->
   InfluxDB.measurement ->
   (unit -> float Lwt.t) ->
   unit Lwt.t

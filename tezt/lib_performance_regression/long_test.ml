@@ -784,12 +784,12 @@ let check_time_preconditions measurement =
   if String.contains measurement '\n' then
     invalid_arg "Long_test.time: newline character in measurement"
 
-let measure_data_points ~repeat ~tags measurement f =
+let measure_data_points ~repeat ~tags ?(field = "duration") measurement f =
   let data_points = ref [] in
   for _ = 1 to repeat do
-    let duration = f () in
+    let value = f () in
     let data_point =
-      InfluxDB.data_point ~tags measurement ("duration", Float duration)
+      InfluxDB.data_point ~tags measurement (field, Float value)
     in
     add_data_point data_point ;
     data_points := data_point :: !data_points
@@ -797,11 +797,12 @@ let measure_data_points ~repeat ~tags measurement f =
   !data_points
 
 let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
-    ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
+    ?check ?stddev ?(repeat = 1) ?(tags = []) ?(field = "duration") measurement
+    f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
-    let data_points = measure_data_points ~repeat ~tags measurement f in
+    let data_points = measure_data_points ~repeat ~tags ~field measurement f in
     check_regression
       ?previous_count
       ?minimum_previous_count
@@ -811,10 +812,10 @@ let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
       ~tags
       ~data_points
       measurement
-      "duration"
+      field
 
-let measure ?(repeat = 1) ?(tags = []) measurement f =
-  let _data_points = measure_data_points ~repeat ~tags measurement f in
+let measure ?(repeat = 1) ?(tags = []) ?field measurement f =
+  let _data_points = measure_data_points ~repeat ~tags ?field measurement f in
   ()
 
 let time ?repeat ?tags measurement f =
@@ -841,13 +842,13 @@ let time_and_check_regression ?previous_count ?minimum_previous_count ?margin
       let stop = Unix.gettimeofday () in
       stop -. start)
 
-let measure_data_points_lwt ~repeat ~tags measurement f =
+let measure_data_points_lwt ~repeat ~tags ?(field = "duration") measurement f =
   let data_points = ref [] in
   let* () =
     Base.repeat repeat @@ fun () ->
-    let* duration = f () in
+    let* value = f () in
     let data_point =
-      InfluxDB.data_point ~tags measurement ("duration", Float duration)
+      InfluxDB.data_point ~tags measurement (field, Float value)
     in
     add_data_point data_point ;
     data_points := data_point :: !data_points ;
@@ -856,11 +857,14 @@ let measure_data_points_lwt ~repeat ~tags measurement f =
   return !data_points
 
 let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
-    ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
+    ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) ?(field = "duration")
+    measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
-    let* data_points = measure_data_points_lwt ~repeat ~tags measurement f in
+    let* data_points =
+      measure_data_points_lwt ~repeat ~tags ~field measurement f
+    in
     check_regression
       ?previous_count
       ?minimum_previous_count
@@ -870,10 +874,12 @@ let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
       ~tags
       ~data_points
       measurement
-      "duration"
+      field
 
-let measure_lwt ?(repeat = 1) ?(tags = []) measurement f =
-  let* _data_points = measure_data_points_lwt ~repeat ~tags measurement f in
+let measure_lwt ?(repeat = 1) ?(tags = []) ?field measurement f =
+  let* _data_points =
+    measure_data_points_lwt ~repeat ~tags ?field measurement f
+  in
   Lwt.return_unit
 
 let time_lwt ?repeat ?tags measurement f =
