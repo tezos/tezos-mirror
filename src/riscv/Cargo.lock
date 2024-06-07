@@ -1294,6 +1294,7 @@ version = "0.0.0"
 dependencies = [
  "bincode",
  "derive_more",
+ "ed25519-dalek",
  "enum-tag",
  "goblin",
  "goldenfile",
