@@ -473,7 +473,7 @@ module Block_validator = struct
       Counter.v ~help ~namespace ?subsystem "validation_errors_count"
     in
     let commit_block_failed_count =
-      let help = "Number of requests to failed commit block" in
+      let help = "Number of requests that failed to commit a block" in
       Counter.v ~help ~namespace ?subsystem "commit_block_failed_count"
     in
     let preapplied_blocks_count =
