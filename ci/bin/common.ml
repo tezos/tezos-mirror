@@ -322,6 +322,7 @@ let changeset_octez =
           "src/**/*";
           "data-encoding/**/*";
           "etherlink/**/*";
+          "resto/**/*";
           "tezt/**/*";
           "michelson_test_scripts/**/*";
           "tzt_reference_test_suite/**/*";
