@@ -14,15 +14,15 @@ find_files_jj() {
   jj_tree="$(jj log -r @ -T commit_id --no-graph)"
 
   # shellcheck disable=SC2016
-  git -C "$jj_root/.jj/repo/store/git" ls-files --with-tree="$jj_tree" -z 'Cargo.lock' '**/Cargo.lock' ':!:contrib'
+  git -C "$jj_root/.jj/repo/store/git" ls-files --full-name --with-tree="$jj_tree" -z 'Cargo.lock' '**/Cargo.lock' ':!:contrib'
 }
 
 find_files_git() {
   # shellcheck disable=SC2016
-  git ls-files -z 'Cargo.lock' '**/Cargo.lock' ':!:contrib'
+  git ls-files -z --full-name 'Cargo.lock' '**/Cargo.lock' ':!:contrib'
 }
 
-if jj root > /dev/null; then
+if jj root 2> /dev/null > /dev/null; then
   find_files_jj | format_all
 else
   find_files_git | format_all
