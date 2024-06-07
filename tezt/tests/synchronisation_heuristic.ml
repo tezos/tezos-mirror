@@ -42,8 +42,7 @@ let wait_for ~statuses node =
   let filter json =
     let status = JSON.as_string json in
     Log.info "%s: %s" (Node.name node) status ;
-    if List.exists (fun st -> String.equal st status) statuses then Some ()
-    else None
+    if List.exists (fun st -> st =~ rex status) statuses then Some () else None
   in
   Node.wait_for node "synchronisation_status.v0" filter
 
