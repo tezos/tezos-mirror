@@ -128,6 +128,8 @@ prepare:canary:
     - .prepare
   before_script:
     - apk update && apk add git # docker:stable is base on alpine linux
+    - git config --global user.name "$GITLAB_USER_NAME"
+    - git config --global user.email "$GITLAB_USER_EMAIL"
     - *apply-proto-alpha-patch
     - !reference [.prepare, before_script]
 
