@@ -1492,12 +1492,13 @@ let jobs pipeline_type =
       ]
     in
     let jobs_kernels : tezos_job list =
-      let make_job_kernel ~__POS__ ~name ~changes script =
+      let make_job_kernel ?(stage = Stages.test) ~__POS__ ~name ~changes script
+          =
         job
           ~__POS__
           ~name
           ~image:Images.rust_toolchain
-          ~stage:Stages.test
+          ~stage
           ~rules:(make_rules ~dependent:true ~changes ())
           script
         |> enable_kernels |> enable_cargo_cache
@@ -1523,16 +1524,20 @@ let jobs pipeline_type =
           ~changes:changeset_test_etherlink_firehose
           ["make -C etherlink/firehose check"]
       in
+      let job_check_riscv_kernels : tezos_job =
+        make_job_kernel
+          ~stage:Stages.build
+          ~__POS__
+          ~name:"check_riscv_kernels"
+          ~changes:changeset_test_riscv_kernels
+          ["make -C src/riscv check"]
+      in
       let job_test_riscv_kernels : tezos_job =
         make_job_kernel
           ~__POS__
           ~name:"test_riscv_kernels"
           ~changes:changeset_test_riscv_kernels
-          [
-            "make -C src/riscv check";
-            "make -C src/riscv test";
-            "make -C src/riscv audit";
-          ]
+          ["make -C src/riscv test"; "make -C src/riscv audit"]
       in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel
@@ -1552,6 +1557,7 @@ let jobs pipeline_type =
         job_test_kernels;
         job_test_etherlink_kernel;
         job_test_etherlink_firehose;
+        job_check_riscv_kernels;
         job_test_riscv_kernels;
         job_test_evm_compatibility;
       ]
