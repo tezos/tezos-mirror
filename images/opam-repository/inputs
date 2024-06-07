@@ -1,0 +1,8 @@
+images/opam-repository
+images/create_opam_repository_images.sh
+images/ci_create_opam_repository_images.sh
+pyproject.toml
+poetry.lock
+opam/virtual/octez-deps.opam.locked
+images/common/install-nvm.sh
+scripts/install_dal_trusted_setup.sh

@@ -1,6 +1,6 @@
 # Octez base Docker images
 
-This repository contains different Docker images and artefacts used in
+This directory contains different Docker images and artefacts used in
 [Octez](https://gitlab.com/tezos/tezos) CI jobs:
 
 - `zcash-params/` contains the Sapling parameters
@@ -8,7 +8,7 @@ This repository contains different Docker images and artefacts used in
 
 ## Dockerfiles
 
-The images defined in this repo are used in the CI pipelines of
+The images defined in this directory are used in the CI pipelines of
 [Octez](https://gitlab.com/tezos/tezos), and as base images for the
 [Octez Docker distribution](https://hub.docker.com/r/tezos/tezos).
 
@@ -51,13 +51,13 @@ The images, their content and indented usage, are:
 | `runtime-e2etest-dependencies`     | `eth-cli`                          | CI: Octez integration tests       |
 
 For more details on the contents and usage of each image, see the
-header comment of each corresponding Dockerfile.
+header comment of each corresponding layer in the Dockerfile.
 
 ## Adding OPAM dependencies
 
 The images built in this repository are used to in the CI of
 [tezos/tezos](https://gitlab.com/tezos/tezos). To update the
-dependencies for `tezos/tezos`, this repo has to be modified. For an
+dependencies for `tezos/tezos`, these images have to be modified. For an
 in-depth guide, see the Tezos technical documentation's guide on [how
 to add or update opam
 dependencies](https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-dependency.html).
@@ -67,8 +67,7 @@ dependencies](https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-d
 `poetry.lock` and `pyproject.toml` defines the Python environment used
 to build the Octez documentation. This environment is installed in the
 image `runtime-build-test-dependencies` and used in the Octez CI to
-build documentation. These files must be kept identical to the ones provided
-in the Octez repository: modify them in both repositories at once.
+build documentation.
 
 [^1]: There are exceptions. For instance, the
     `runtime-prebuild-dependencies` image contains the sources of the

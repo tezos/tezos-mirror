@@ -258,7 +258,7 @@ WORKDIR /home/tezos
 # The js dependencies could be downloaded from tezos/tezos and installed
 # here.
 
-COPY --chown=tezos:tezos nodejs/install-nvm.sh /tmp/install-nvm.sh
+COPY --chown=tezos:tezos scripts/install-nvm.sh /tmp/install-nvm.sh
 RUN /tmp/install-nvm.sh \
  && rm -rf /tmp/*
 

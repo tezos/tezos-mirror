@@ -17,8 +17,8 @@ cd opam-repository
 git init
 git config --local protocol.version 2
 git remote add origin https://github.com/ocaml/opam-repository
-git fetch --depth 1 origin "$opam_repository_commit_hash"
-git checkout "$opam_repository_commit_hash"
+git fetch --depth 1 origin "$full_opam_repository_tag"
+git checkout "$full_opam_repository_tag"
 # No need to store the whole Git history in the Docker images.
 rm -rf .git .github .gitignore .gitattributes
 cd ..
