@@ -53,10 +53,14 @@ workflow:
   variables:
     OCTEZ_BRANCH: "${DEFAULT_OCTEZ_BRANCH}"
 
+# canary build are not meant to be stable, so they may break at any time
+# having a gitlab CI warning
 .canary:build:rules:
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      allow_failure: true
 
 .canary:variables:
   variables:
