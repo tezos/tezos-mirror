@@ -75,6 +75,8 @@ workflow:
 
 .docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
+.apply-proto-alpha-patch: &apply-proto-alpha-patch "git am < ProtoALpha.git.patch"
+
 ################
 # SANITY CHECK #
 ################
@@ -85,7 +87,7 @@ check:
   before_script:
     - opam-2.1 install ocamlformat.0.24.1
   script:
-    - git am < ProtoALpha.git.patch # Check that ProtoALpha patch can be applied
+    - *apply-proto-alpha-patch # Check that ProtoALpha patch can be applied
     - dune build @fmt # Check that code is properly formatted with ocamlformat
 
 #############################
@@ -121,6 +123,9 @@ prepare:canary:
     - .canary:variables
     - .canary:build:rules
     - .prepare
+  before_script:
+    - *apply-proto-alpha-patch
+    - !reference [.prepare, before_script]
 
 #########################################
 # BUILD ARCHIVER AND SERVER EXECUTABLES #
@@ -158,6 +163,9 @@ build:canary:
     - .canary:variables
     - .canary:build:rules
     - .build
+  before_script:
+    - *apply-proto-alpha-patch
+    - !reference [.build, before_script]
   needs:
     - job: prepare:canary
       artifacts: false
