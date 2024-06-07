@@ -55,8 +55,8 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?(profile = false) ?(kind = Events.Application) ~data_dir
-    ?(log_file = "kernel_log")
+let execute ?(wasm_pvm_fallback = false) ?(profile = false)
+    ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     evm_state inbox =
   let open Lwt_result_syntax in
@@ -85,8 +85,13 @@ let execute ?(profile = false) ?(kind = Events.Application) ~data_dir
       in
       return evm_state
     else
+      let hooks =
+        Tezos_scoru_wasm.Hooks.(
+          no_hooks |> fast_exec_fallback wasm_pvm_fallback)
+      in
       let* evm_state, _, _, _ =
         Wasm.Commands.eval
+          ~hooks
           ~write_debug
           ~wasm_entrypoint
           0l
@@ -95,6 +100,7 @@ let execute ?(profile = false) ?(kind = Events.Application) ~data_dir
           Inbox
           evm_state
       in
+
       return evm_state
   in
   let* evm_state = eval evm_state in
@@ -185,7 +191,7 @@ let current_block_hash evm_state =
    `execute_and_inspect` to 3. *)
 let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
 
-let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
+let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
     ~input:
       Simulation.Encodings.
         {messages; insight_requests; log_kernel_debug_file; _} ctxt =
@@ -204,6 +210,7 @@ let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
   let* evm_state =
     Lwt_pool.use pool @@ fun () ->
     execute
+      ?wasm_pvm_fallback
       ~kind:Simulation
       ?log_file:log_kernel_debug_file
       ~data_dir
@@ -224,8 +231,8 @@ type apply_result =
     }
   | Apply_failure
 
-let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
-    (blueprint : Blueprint_types.payload) =
+let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
+    evm_state (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
     List.map
@@ -235,6 +242,7 @@ let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
   let*! (Qty before_height) = current_block_height evm_state in
   let* evm_state =
     execute
+      ?wasm_pvm_fallback
       ?profile
       ~data_dir
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint

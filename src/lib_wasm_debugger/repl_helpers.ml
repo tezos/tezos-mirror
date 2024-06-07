@@ -49,6 +49,7 @@ let trap_exn f =
       | Import.Unknown (at, msg) -> error at "link failure" msg
       | Eval.Link (at, msg) -> error at "link failure" msg
       | Eval.Trap (at, msg) -> error at "runtime trap" msg
+      | Tezos_wasmer.Trap msg -> error Source.no_region "runtime trap" msg
       | Eval.Exhaustion (at, msg) -> error at "resource exhaustion" msg
       | Eval.Crash (at, msg) -> error at "runtime crash" msg
       | Encode.Code (at, msg) -> error at "encoding error" msg

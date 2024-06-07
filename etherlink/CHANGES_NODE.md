@@ -90,6 +90,7 @@
 - Add a private rpc `replay_block`. (!13196)
 - Open a read-only connection to the SQLite store in the context of the
   `replay` command. (!13456)
+- Prevent the node to fallback to the WASM PVM to apply blueprints. (!13671)
 
 ## Version for b9f6c9138719220db83086f0548e49c5c4c8421f
 

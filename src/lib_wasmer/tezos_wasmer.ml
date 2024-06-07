@@ -32,6 +32,8 @@ module Memory = Memory
 module Exports = Exports
 module Instance = Instance
 
+exception Trap = Trap.Trap
+
 type 'a typ = 'a Value_type.t
 
 let i32 = Value_type.I32

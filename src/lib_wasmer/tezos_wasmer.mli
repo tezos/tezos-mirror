@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Trap of string
+
 module Config : sig
   (** Compiler backend *)
   type compiler = CRANELIFT | LLVM | SINGLEPASS
