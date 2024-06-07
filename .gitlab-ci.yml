@@ -106,6 +106,7 @@ check:
     - ${RUNNER}
   services:
     - docker:dind
+    - docker:git # Used by canary builds for patch application
   before_script:
     - *docker-login
   script:
