@@ -181,6 +181,14 @@ end
 module type HTTP_CACHE_HEADERS = sig
   val hash : Protocol_hash.t
 
+  (** [get_round_end_time ctx curr_header] gets the time at which the 
+    current round ends which is the time at which the next round starts. 
+    Useful to get an estimate of when the next block should arrive.
+*)
+  val get_round_end_time :
+    get_context:(unit -> Tezos_protocol_environment.Context.t Lwt.t) ->
+    Tezos_base.Block_header.shell_header ->
+    Time.System.t option Lwt.t
 end
 
 (** Emtpy metrics module. All metrics are -1. *)
