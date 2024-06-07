@@ -4731,8 +4731,8 @@ let test_arg_boot_sector_file ~kind =
       ~exit_code:1
       ~msg:
         (rex
-           "Genesis commitment computed (.*) is not equal to the rollup \
-            genesis (.*) commitment.*")
+           "Computed genesis commitment hash .* is not equal to the rollup \
+            genesis commitment hash .* which commits state hash .*")
       rollup_node
   in
   (* Starts the rollup node with a valid boot sector. Asserts that the node

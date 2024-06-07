@@ -73,6 +73,7 @@ type error +=
   | Invalid_genesis_state of {
       expected : Commitment.Hash.t;
       actual : Commitment.Hash.t;
+      actual_state_hash : State_hash.t;
     }
 
 type error += Operator_not_in_whitelist
@@ -311,25 +312,31 @@ let () =
     ~title:"Invalid genesis state"
     ~description:
       "The rollup node computed an invalid genesis state, it cannot continue."
-    ~pp:(fun ppf (expected, actual) ->
+    ~pp:(fun ppf (expected, actual, actual_state_hash) ->
       Format.fprintf
         ppf
-        "Genesis commitment computed (%a) is not equal to the rollup genesis \
-         (%a) commitment. The rollup node cannot continue. If you used the \
-         argument `--boot-sector-file` you probably provided the wrong boot \
-         sector. If not, please report the bug."
+        "Computed genesis commitment hash %a is not equal to the rollup \
+         genesis commitment hash %a which commits state hash %a. The rollup \
+         node cannot continue. If you used the argument `--boot-sector-file` \
+         you probably provided the wrong boot sector. If not, please report \
+         the bug."
         Commitment.Hash.pp
         expected
         Commitment.Hash.pp
-        actual)
+        actual
+        State_hash.pp
+        actual_state_hash)
     Data_encoding.(
-      obj2
+      obj3
         (req "expected" Commitment.Hash.encoding)
-        (req "actual" Commitment.Hash.encoding))
+        (req "actual" Commitment.Hash.encoding)
+        (req "actual_state_hash" State_hash.encoding))
     (function
-      | Invalid_genesis_state {expected; actual} -> Some (expected, actual)
+      | Invalid_genesis_state {expected; actual; actual_state_hash} ->
+          Some (expected, actual, actual_state_hash)
       | _ -> None)
-    (fun (expected, actual) -> Invalid_genesis_state {expected; actual}) ;
+    (fun (expected, actual, actual_state_hash) ->
+      Invalid_genesis_state {expected; actual; actual_state_hash}) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_batcher"
