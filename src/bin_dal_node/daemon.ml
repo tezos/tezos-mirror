@@ -50,10 +50,6 @@ let fetch_dal_config cctxt =
 let init_cryptobox config dal_config
     (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/6906
-
-     We should load the verifier SRS by default.
-  *)
   let prover_srs =
     Profile_manager.is_prover_profile config.Configuration_file.profile
   in
@@ -183,7 +179,8 @@ module Handler = struct
           slot_index >= 0
           && slot_index < proto_parameters.Dal_plugin.number_of_slots
         then
-          (* We know the message is not [Outdated], because this has already been checked in {!gossipsub_app_messages_validation}. *)
+          (* We know the message is not [Outdated], because this has already
+             been checked in {!gossipsub_app_messages_validation}. *)
           `Unknown
         else `Invalid
 
@@ -269,13 +266,7 @@ module Handler = struct
               ~some:
                 (gossipsub_app_message_payload_validation cryptobox message_id)
         | other ->
-            (* 4. In the case the message id is not Valid.
-
-               FIXME: https://gitlab.com/tezos/tezos/-/issues/6460
-
-               This probably include cases where the message is in the future, in
-               which case we might return `Unknown for the moment. But then, when is
-               the message revalidated? *)
+            (* 4. In the case the message id is not Valid. *)
             other
 
   (* Set the profile context once we have the protocol plugin. This is supposed
@@ -497,12 +488,8 @@ module Handler = struct
         in
         let* () =
           (* If a slot header was posted to the L1 and we have the corresponding
-                 data, post it to gossipsub.
-
-             FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
-             Should we restrict published slot data to the slots for which
-             we have the producer role?
-          *)
+             data, post it to gossipsub.  Note that this is done independently
+             of the profile. *)
           List.iter_es
             (fun (slot_header, status) ->
               match status with
