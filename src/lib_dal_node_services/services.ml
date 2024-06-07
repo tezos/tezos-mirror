@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Services_legacy
 open Types
 
 type 'rpc service =
@@ -93,6 +92,22 @@ let get_slot_content :
     Tezos_rpc.Path.(
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
       / "content")
+
+let slot_pages :
+    < input : unit
+    ; meth : [`GET]
+    ; output : Tezos_crypto_dal.Cryptobox.page list
+    ; params : (unit * int32) * int
+    ; prefix : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"Fetch slot as list of pages"
+    ~query:Tezos_rpc.Query.empty
+    ~output:(Data_encoding.list Data_encoding.bytes)
+    Tezos_rpc.Path.(
+      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
+      / "pages")
 
 let get_slot_page_proof :
     < meth : [`GET]
