@@ -127,7 +127,7 @@ module Publish_commitment : Benchmark.S = struct
     let () =
       Lwt_main.run
       @@ Tezos_crypto_dal.Cryptobox.Config.init_prover_dal
-           ~find_srs_files:(Fun.const (Ok ("", "")))
+           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
            {activated = true; bootstrap_peers = []}
       |> function
       | Ok () -> ()
