@@ -44,7 +44,6 @@ run:
 .PHONY: check
 check:
 	@INBOX_FILE=$(INBOX_FILE) cargo check --all-features --workspace --locked
-	@cargo fmt --check
 	@INBOX_FILE=$(INBOX_FILE) cargo clippy --all-features -- --deny warnings
 
 .PHONY: inbox-bench

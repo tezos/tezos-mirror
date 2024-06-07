@@ -47,6 +47,9 @@ test: build
 
 .PHONY: check
 check:
+	# Check format of all crates
+	@exec ../../scripts/check-format-rust.sh
+
 	@cargo update --workspace --locked
 	@cargo check --workspace --all-targets
 	@cargo clippy --workspace --all-targets -- --deny warnings
@@ -54,9 +57,6 @@ check:
 	@make -C dummy_kernel check
 	@make -C jstz check
 	@make -C tests check
-
-	# Check format of all crates
-	@exec ../../scripts/check-format-rust.sh
 
 .PHONY: audit
 audit:
