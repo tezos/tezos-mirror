@@ -15,7 +15,7 @@ stages:
 # that can be used for for loops in scripts
 variables:
   supported_ARCH: "amd64 arm64"
-  DEFAULT_OCTEZ_BRANCH: "octez-v20.0"
+  STABLE_OCTEZ_BRANCH: "octez-v20.0"
   TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
   BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies-${ARCH}:${CONTAINER_TAG}"
@@ -51,7 +51,7 @@ workflow:
 
 .stable:variables:
   variables:
-    OCTEZ_BRANCH: "${DEFAULT_OCTEZ_BRANCH}"
+    OCTEZ_BRANCH: "${STABLE_OCTEZ_BRANCH}"
 
 # canary build are not meant to be stable, so they may break at any time
 # having a gitlab CI warning
