@@ -25,7 +25,7 @@ default-features = false
 
 [dependencies.tezos_data_encoding]
 version = "=0.5.2"
-deafult-features = false
+default-features = false
 
 [dependencies.hex]
 version = "0.4"
