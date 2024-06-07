@@ -293,6 +293,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
              devmode;
+             time_between_blocks;
            })
   in
   let* observer =
@@ -1485,6 +1486,7 @@ let test_get_balance_block_param =
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
              devmode = true;
+             time_between_blocks = Some Nothing;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -1559,6 +1561,7 @@ let test_get_block_by_number_block_param =
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
              devmode = true;
+             time_between_blocks = Some Nothing;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -1768,6 +1771,37 @@ let test_observer_forwards_transaction =
       Test.fail
         "Missing receipt in the sequencer node for transaction successfully \
          injected in the observer"
+
+let test_observer_timeout_when_necessary =
+  register_both
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "observer"; "timeout"]
+    ~title:"Observer timeouts when blocks do not arrive quickly enough"
+  @@ fun {sequencer; observer; _} _ ->
+  let* () = Evm_node.terminate observer in
+  let mode =
+    match Evm_node.mode observer with
+    | Observer conf ->
+        Evm_node.Observer
+          {conf with time_between_blocks = Some (Time_between_blocks 3.)}
+    | _ -> Test.fail "Should be an observer"
+  in
+
+  (* We have setup the sequencer to produce blocks on demand only (with the
+     [produceBlock] RPC). Our goal is to start a new EVM node in observer mode,
+     which expects block comming every 3s. *)
+  let* observer = Evm_node.init ~mode Evm_node.(endpoint sequencer) in
+
+  (* After enough time, the observer considers its connection with the
+     sequnecer is stalled and tries to reconnect. *)
+  let* () = Evm_node.wait_for_retrying_connect observer in
+
+  (* We produce a block, and verify that the observer nodes correctly applies
+     it. *)
+  let* _ = Rpc.produce_block sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  unit
 
 let test_sequencer_is_reimbursed =
   let tbb = 1. in
@@ -3844,6 +3878,7 @@ let () =
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_applies_blueprint_when_sequencer_restarted protocols ;
   test_observer_forwards_transaction protocols ;
+  test_observer_timeout_when_necessary protocols ;
   test_sequencer_is_reimbursed protocols ;
   test_upgrade_kernel_auto_sync protocols ;
   test_self_upgrade_kernel protocols ;
