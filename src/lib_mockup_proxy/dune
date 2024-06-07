@@ -10,7 +10,7 @@
   octez-shell-libs.client-base
   octez-proto-libs.protocol-environment
   octez-libs.rpc-http
-  resto-cohttp-self-serving-client
+  octez-libs.resto-cohttp-self-serving-client
   octez-libs.rpc-http-client
   octez-shell-libs.shell-services
   uri)

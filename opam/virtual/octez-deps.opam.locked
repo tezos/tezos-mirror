@@ -15,6 +15,7 @@ depends: [
   "aches-lwt" {= "1.0.0"}
   "afl-persistent" {= "1.4"}
   "alcotest" {= "1.7.0"}
+  "alcotest-lwt" {= "1.7.0" }
   "angstrom" {= "0.16.0"}
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.2.6"}
@@ -193,13 +194,6 @@ depends: [
   "re" {= "1.11.0"}
   "react" {= "1.2.2"}
   "repr" {= "0.7.0"}
-  "resto" {= "1.2"}
-  "resto-acl" {= "1.2"}
-  "resto-cohttp" {= "1.2"}
-  "resto-cohttp-client" {= "1.2"}
-  "resto-cohttp-self-serving-client" {= "1.2"}
-  "resto-cohttp-server" {= "1.2"}
-  "resto-directory" {= "1.2"}
   "result" {= "1.5"}
   "ringo" {= "1.0.0"}
   "rresult" {= "0.7.0"}
@@ -249,6 +243,14 @@ conflicts: [
   "json_data_encoding"
   "json_data_encoding_browser"
   "json_data_encoding_bson"
+  "resto"
+  "resto-acl"
+  "resto-cohttp"
+  "resto-cohttp-client"
+  "resto-cohttp-self-serving-client"
+  "resto-cohttp-server"
+  "resto-directory"
+  "resto-json"
   "result" {< "1.5"}
 ]
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"

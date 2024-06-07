@@ -17,3 +17,7 @@ val product_source : string list
 val data_encoding : Manifest.target
 
 val json_data_encoding : Manifest.target
+
+(* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/13631
+   Remove Bson support form Resto *)
+val json_data_encoding_bson : Manifest.target
