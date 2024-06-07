@@ -37,6 +37,9 @@ workflow:
     - if: $CI_COMMIT_TAG
       variables:
         TEZTALE_REF_BASE: "$CI_COMMIT_TAG"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      variables:
+        TEZTALE_REF_BASE: "latest"
     - if: $CI_COMMIT_REF_SLUG
       variables:
         TEZTALE_REF_BASE: "$CI_COMMIT_REF_SLUG"
