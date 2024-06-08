@@ -24,6 +24,13 @@ let upgrade_to = function
   | Ghostnet -> Latest
   | Latest -> Latest
 
+(** [mainnet_compat_kernel_config kernel] returns [true] when the [kernel]
+    requires the data model of the initial kernel originated on Mainnet. *)
+let mainnet_compat_kernel_config = function
+  | Mainnet -> true
+  | Ghostnet -> true
+  | Latest -> false
+
 let of_use u =
   if Uses.(tag u = tag Constant.WASM.mainnet_evm_kernel) then Mainnet
   else if Uses.(tag u = tag Constant.WASM.ghostnet_evm_kernel) then Ghostnet

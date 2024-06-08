@@ -142,9 +142,10 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
   return
     {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_governance}
 
-let setup_sequencer ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -172,9 +173,7 @@ let setup_sequencer ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-       Replace by ~devmode after the upgrade *)
-      ~devmode:(kernel = Constant.WASM.evm_kernel)
+      ~mainnet_compat
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
@@ -367,13 +366,14 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-let register_test ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?bootstrap_accounts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?history_mode body =
+let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
+    ?history_mode body =
   let additional_uses =
     if threshold_encryption then
       Constant.octez_dsn_node :: kernel :: additional_uses
@@ -382,6 +382,7 @@ let register_test ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
+        ~mainnet_compat
         ?genesis_timestamp
         ?time_between_blocks
         ?max_blueprints_lag
@@ -420,7 +421,9 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode
     ?additional_uses ~title ~tags body protocols =
   let register ~kernel ~threshold_encryption =
+    let _, kernel_use = Kernel.to_uses_and_tags kernel in
     register_test
+      ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
       ?genesis_timestamp
       ?time_between_blocks
       ?max_blueprints_lag
@@ -433,7 +436,7 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
       ?bootstrap_accounts
       ?sequencer
       ?sequencer_pool_address
-      ~kernel
+      ~kernel:kernel_use
       ?da_fee
       ?minimum_base_fee_per_gas
       ?preimages_dir
@@ -446,23 +449,25 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
       protocols
   in
   List.iter
-    (fun (kernel_tag, kernel) ->
+    (fun kernel ->
+      let kernel_tag, _ = Kernel.to_uses_and_tags kernel in
       let tags = kernel_tag :: tags in
       register
         ~kernel
         ~threshold_encryption:false
         ~title:(sf "%s (sequencer, %s)" title kernel_tag)
         ~tags)
-    (List.map Kernel.to_uses_and_tags kernels) ;
+    kernels ;
   List.iter
-    (fun (kernel_tag, kernel) ->
+    (fun kernel ->
+      let kernel_tag, _ = Kernel.to_uses_and_tags kernel in
       let tags = kernel_tag :: tags in
       register
         ~kernel
         ~threshold_encryption:true
         ~title:(sf "%s (te_sequencer, %s)" title kernel_tag)
         ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags))
-    [Kernel.(to_uses_and_tags Latest)]
+    [Latest]
 
 let register_upgrade_both ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)

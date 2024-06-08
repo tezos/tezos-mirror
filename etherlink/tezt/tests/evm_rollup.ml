@@ -278,9 +278,8 @@ type setup_mode =
     }
   | Setup_proxy
 
-let setup_evm_kernel ?devmode ?additional_config
-    ?(setup_kernel_root_hash = true)
-    ?(kernel_installee = Constant.WASM.evm_kernel)
+let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
+    ?(kernel = Kernel.Latest)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts =
@@ -292,6 +291,7 @@ let setup_evm_kernel ?devmode ?additional_config
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks protocol =
+  let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -336,8 +336,8 @@ let setup_evm_kernel ?devmode ?additional_config
     let output_config = Temp.file "config.yaml" in
     let*! () =
       Evm_node.make_kernel_installer_config
+        ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
         ~remove_whitelist:Option.(is_some whitelist)
-        ?devmode
         ?kernel_root_hash
         ~bootstrap_accounts
         ?da_fee_per_byte
@@ -450,10 +450,11 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     | Setup_sequencer _ -> "sequencer"
   in
   List.iter
-    (fun (kernel_tag, kernel) ->
+    (fun kernel ->
+      let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
       let uses _protocol =
         [
-          kernel;
+          kernel_use;
           Constant.octez_smart_rollup_node;
           Constant.octez_evm_node;
           Constant.smart_rollup_installer;
@@ -469,10 +470,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
         (fun protocol ->
           let* evm_setup =
             setup_evm_kernel
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-               Remove once the upgrade is done *)
-              ~devmode:(kernel = Constant.WASM.evm_kernel)
-              ~kernel_installee:kernel
+              ~kernel
               ?additional_config
               ?whitelist
               ?commitment_period
@@ -488,7 +486,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
           in
           f ~protocol ~evm_setup)
         protocols)
-    (List.map Kernel.to_uses_and_tags kernels)
+    kernels
 
 let register_proxy ~title ~tags ?kernels ?additional_uses ?admin
     ?commitment_period ?challenge_window ?bootstrap_accounts
@@ -2422,8 +2420,8 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?devmode ?setup_kernel_root_hash ?admin_contract
-    ?timestamp ?(activation_timestamp = "0") ?evm_setup ?rollup_address
+let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
+    ?(activation_timestamp = "0") ?evm_setup ?rollup_address
     ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
@@ -2439,7 +2437,6 @@ let gen_test_kernel_upgrade ?devmode ?setup_kernel_root_hash ?admin_contract
     | Some evm_setup -> return evm_setup
     | None ->
         setup_evm_kernel
-          ?devmode
           ?setup_kernel_root_hash
           ?timestamp
           ?with_administrator
@@ -2885,11 +2882,10 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
-      ~devmode:false
       ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
-      ~kernel_installee:Constant.WASM.ghostnet_evm_kernel
+      ~kernel:Ghostnet
       ~admin:(Some admin)
       protocol
   in
@@ -4873,12 +4869,7 @@ let test_ghostnet_kernel =
       ])
     ~title:"Regression test for Ghostnet kernel"
   @@ fun protocol ->
-  let* {evm_node; _} =
-    setup_evm_kernel
-      ~kernel_installee:Constant.WASM.ghostnet_evm_kernel
-      ~admin:None
-      protocol
-  in
+  let* {evm_node; _} = setup_evm_kernel ~kernel:Ghostnet ~admin:None protocol in
   let*@ version = Rpc.tez_kernelVersion evm_node in
   Check.((version = Constant.WASM.ghostnet_evm_commit) string)
     ~error_msg:"The ghostnet kernel has version %L but constant says %R" ;

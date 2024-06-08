@@ -186,7 +186,21 @@ let cors_allowed_origins_arg =
     ~doc:"List of accepted cors origins."
     Params.string_list
 
-let devmode_arg = Tezos_clic.switch ~long:"devmode" ~doc:"DEPRECATED" ()
+let devmode_arg =
+  Tezos_clic.switch
+    ~long:"devmode"
+    ~doc:
+      "DEPRECATED — The EVM node now aims to be backward compatible with the \
+       kernel deployed on Mainnet and Ghostnet"
+    ()
+
+let mainnet_compat_arg =
+  Tezos_clic.switch
+    ~long:"mainnet-compat"
+    ~doc:
+      "Generate a configuration compatible with the first Etherlink Mainnet \
+       kernel"
+    ()
 
 let profile_arg =
   Tezos_clic.switch
@@ -1444,7 +1458,7 @@ let make_kernel_config_command =
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
     (args20
-       devmode_arg
+       mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
        (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -1477,7 +1491,7 @@ let make_kernel_config_command =
          ~desc:"file path where the config will be written to"
          Params.string
     @@ stop)
-    (fun ( _devmode,
+    (fun ( mainnet_compat,
            kernel_root_hash,
            chain_id,
            sequencer,
@@ -1500,6 +1514,7 @@ let make_kernel_config_command =
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
+        ~mainnet_compat
         ?kernel_root_hash
         ?chain_id
         ?sequencer
