@@ -38,15 +38,6 @@ let team = Tag.layer1
 
 open Base
 
-let wait_for ~statuses node =
-  let filter json =
-    let status = JSON.as_string json in
-    Log.info "%s: %s" (Node.name node) status ;
-    if List.exists (fun st -> String.equal st status) statuses then Some ()
-    else None
-  in
-  Node.wait_for node "synchronisation_status.v0" filter
-
 let wait_for_sync node =
   let filter json =
     let status = JSON.as_string json in
@@ -124,7 +115,8 @@ let check_node_synchronization_state =
   (* We register this event before restarting the node to avoid to register it too late. *)
   let synchronisation_events =
     List.map
-      (fun node -> wait_for ~statuses:["synced"; "stuck"] node)
+      (fun node ->
+        Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node)
       (main_node :: nodes)
   in
   let* _ =
@@ -289,7 +281,7 @@ let test_threshold_one =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* baker = Baker.init ~protocol node client in
 
   Log.info "Check synchronisation state of first peer" ;
   let* () = check_sync_state client Synced in
@@ -302,6 +294,8 @@ let test_threshold_one =
       ()
   in
   let* () = Client.Admin.connect_address client ~peer:node1 in
+  let* _ = Node.wait_for_level node 2 in
+  let* () = Baker.kill baker in
 
   Log.info "Check bootstrapped state of second peer" ;
   let* () = Client.bootstrapped client1 in
@@ -327,7 +321,7 @@ let test_threshold_two =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* baker = Baker.init ~protocol node client in
 
   Log.info "Add nodes and connect in clique" ;
 
@@ -369,6 +363,7 @@ let test_threshold_two =
         unit)
       [node; node1; node2; node3]
   in
+  let* () = Baker.kill baker in
 
   let* () = Client.bootstrapped client in
   let* () = Client.bootstrapped client1 in
