@@ -285,6 +285,11 @@ module Q = struct
            LIMIT 1
     |}
 
+    let find_applied_before =
+      (level ->? upgrade)
+      @@ {|SELECT root_hash, activation_timestamp
+           FROM kernel_upgrades WHERE applied_before = ?|}
+
     let record_apply =
       (level ->. unit)
       @@ {|
@@ -522,6 +527,10 @@ module Kernel_upgrades = struct
   let find_latest_pending store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Kernel_upgrades.get_latest_unapplied ()
+
+  let find_applied_before store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Kernel_upgrades.find_applied_before level
 
   let record_apply store level =
     with_connection store @@ fun conn ->

@@ -470,13 +470,13 @@ module State = struct
     match ctxt.session.pending_upgrade with
     | None -> None
     | Some upgrade ->
-        if Time.Protocol.(upgrade.timestamp <= timestamp) then Some upgrade.hash
+        if Time.Protocol.(upgrade.timestamp <= timestamp) then Some upgrade
         else None
 
   let check_upgrade ctxt evm_state =
     let open Lwt_result_syntax in
     function
-    | Some root_hash ->
+    | Some Ethereum_types.Upgrade.({hash = root_hash; _} as kernel_upgrade) ->
         let*! bytes =
           Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
         in
@@ -498,8 +498,9 @@ module State = struct
               Events.failed_upgrade root_hash ctxt.session.next_blueprint_number
         in
 
-        return_true
-    | None -> return_false
+        (* Even if the upgrade failed, we consider it has been applied. *)
+        return_some kernel_upgrade
+    | None -> return_none
 
   (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
       the blueprint [payload] on the head of [ctxt], and commit the resulting
@@ -546,13 +547,11 @@ module State = struct
             {number = Qty blueprint_number; timestamp; payload}
         in
 
-        let root_hash_candidate = check_pending_upgrade ctxt timestamp in
-        let* applied_upgrade =
-          check_upgrade ctxt evm_state root_hash_candidate
-        in
+        let upgrade_candidate = check_pending_upgrade ctxt timestamp in
+        let* kernel_upgrade = check_upgrade ctxt evm_state upgrade_candidate in
 
         let* () =
-          when_ applied_upgrade @@ fun () ->
+          when_ Option.(is_some kernel_upgrade) @@ fun () ->
           Evm_store.Kernel_upgrades.record_apply
             conn
             ctxt.session.next_blueprint_number
@@ -578,7 +577,7 @@ module State = struct
           ( evm_state,
             context,
             current_block_hash,
-            applied_upgrade,
+            kernel_upgrade,
             delayed_transactions )
     | Apply_success _ (* Produced a block, but not of the expected height *)
     | Apply_failure (* Did not produce a block *) ->
@@ -605,7 +604,7 @@ module State = struct
     let* ( evm_state,
            context,
            current_block_hash,
-           applied_upgrade,
+           kernel_upgrade,
            delayed_transactions ) =
       with_store_transaction ctxt @@ fun conn ->
       apply_blueprint_store_unsafe
@@ -618,12 +617,13 @@ module State = struct
     let*! () =
       on_new_head
         ctxt
-        ~applied_upgrade
+        ~applied_upgrade:Option.(is_some kernel_upgrade)
         evm_state
         context
         current_block_hash
         {
           delayed_transactions;
+          kernel_upgrade;
           blueprint =
             {number = ctxt.session.next_blueprint_number; timestamp; payload};
         }
@@ -844,13 +844,17 @@ module State = struct
     let open Lwt_result_syntax in
     Evm_store.use ctxt.store @@ fun conn ->
     let* blueprint = Evm_store.Blueprints.find conn level in
+    let* kernel_upgrade =
+      Evm_store.Kernel_upgrades.find_applied_before conn level
+    in
     match blueprint with
     | None -> return None
     | Some blueprint ->
         let* delayed_transactions =
           Evm_store.Delayed_transactions.at_level conn level
         in
-        return_some Blueprint_types.{delayed_transactions; blueprint}
+        return_some
+          Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
 
   let messages_of_level ~levels_to_hashes ~l2_blocks ~messages level =
     let open Lwt_result_syntax in

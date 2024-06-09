@@ -1920,8 +1920,7 @@ let test_self_upgrade_kernel =
   in
 
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
-  and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer
-  and* _upgrade_info_observer = Evm_node.wait_for_pending_upgrade observer in
+  and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer in
 
   let* () =
     check_head_consistency
@@ -1976,6 +1975,7 @@ let test_upgrade_kernel_auto_sync =
                client;
                sequencer;
                proxy;
+               observer;
                _;
              }
              _protocol ->
@@ -1988,6 +1988,10 @@ let test_upgrade_kernel_auto_sync =
         unit
     | None -> unit
   in
+
+  (* Kill the observer to demonstrate the sequencer propagates the upgrade on
+     replay. *)
+  let* () = Evm_node.terminate observer in
 
   (* Sends the upgrade to L1, but not to the sequencer. *)
   let _, to_use = Kernel.to_uses_and_tags to_ in
@@ -2030,7 +2034,8 @@ let test_upgrade_kernel_auto_sync =
           Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
         in
         unit)
-  in
+  and* _upgrade = Evm_node.wait_for_successful_upgrade sequencer in
+
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   let* () =
@@ -2049,6 +2054,20 @@ let test_upgrade_kernel_auto_sync =
         in
         unit
     | None -> unit
+  in
+
+  (* Start the observer again and wait for a successful upgrade *)
+  let* () = Evm_node.run observer in
+  let* _upgrade = Evm_node.wait_for_successful_upgrade observer in
+
+  let* () = Evm_node.wait_for_blueprint_applied observer 4 in
+
+  let* () =
+    check_head_consistency
+      ~left:sequencer
+      ~right:observer
+      ~error_msg:"The head should be the same after the upgrade"
+      ()
   in
 
   unit
@@ -3377,8 +3396,7 @@ let test_txpool_content_empty_with_legacy_encoding =
   in
 
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
-  and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer
-  and* _upgrade_info_observer = Evm_node.wait_for_pending_upgrade observer in
+  and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer in
 
   (* Produce a block after activation timestamp, both the rollup
      node and the sequencer will upgrade to itself. *)

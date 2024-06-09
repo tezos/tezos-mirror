@@ -342,6 +342,8 @@ module Upgrade : sig
   val of_bytes : bytes -> t option
 
   val to_bytes : t -> bytes
+
+  val encoding : t Data_encoding.t
 end
 
 module Sequencer_upgrade : sig
