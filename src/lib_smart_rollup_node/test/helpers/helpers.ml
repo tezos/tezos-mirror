@@ -85,7 +85,8 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let predecessor = head in
   let predecessor_timestamp = Time.Protocol.epoch in
   let*? (module Plugin) =
-    Protocol_plugins.proto_plugin_for_protocol node_ctxt.current_protocol.hash
+    Protocol_plugins.proto_plugin_for_protocol
+      (Reference.get node_ctxt.current_protocol).hash
   in
   let inbox =
     (* The global inbox starts at level 0, with the origination. *)
@@ -243,7 +244,8 @@ let add_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
   in
   let predecessor = header_of_block predecessor_l2_block in
   let*? plugin =
-    Protocol_plugins.proto_plugin_for_protocol node_ctxt.current_protocol.hash
+    Protocol_plugins.proto_plugin_for_protocol
+      (Reference.get node_ctxt.current_protocol).hash
   in
   Rollup_node_daemon.Internal_for_tests.process_messages
     plugin

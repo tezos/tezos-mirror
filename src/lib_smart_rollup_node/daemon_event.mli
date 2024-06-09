@@ -68,6 +68,9 @@ val migration :
   Protocol_hash.t * int ->
   unit Lwt.t
 
+val switched_protocol :
+  Protocol_hash.t -> int -> Rollup_constants.protocol_constants -> unit Lwt.t
+
 (** Emit a fatal error for the daemon. *)
 val error : tztrace -> unit Lwt.t
 

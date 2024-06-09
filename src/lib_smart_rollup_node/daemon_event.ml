@@ -134,6 +134,19 @@ module Simple = struct
           ppf
           (if catching_up then "Catching up on migration" else "Migration"))
 
+  let switched_protocol =
+    declare_3
+      ~name:"smart_rollup_node_daemon_switched_protocol"
+      ~msg:"Switched to {protocol} ({proto_level}) with constants {constants} "
+      ~level:Notice
+      ("protocol", Protocol_hash.encoding)
+      ("proto_level", Data_encoding.int31)
+      ("constants", Rollup_constants.encoding)
+      ~pp3:(fun fmt c ->
+        Data_encoding.Json.pp
+          fmt
+          (Data_encoding.Json.construct Rollup_constants.encoding c))
+
   let error =
     declare_1
       ~section
@@ -220,6 +233,9 @@ let migration ~catching_up (old_protocol, old_protocol_level)
       old_protocol_level,
       new_protocol,
       new_protocol_level )
+
+let switched_protocol protocol proto_level constants =
+  Simple.(emit switched_protocol) (protocol, proto_level, constants)
 
 let error e = Simple.(emit error) e
 

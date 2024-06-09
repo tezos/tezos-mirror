@@ -74,7 +74,7 @@ let get_status (node_ctxt : _ Node_context.t) state =
   let*! current_level = PVM.get_current_level state in
   let* constants =
     match current_level with
-    | None -> return node_ctxt.current_protocol.constants
+    | None -> return (Reference.get node_ctxt.current_protocol).constants
     | Some level ->
         Protocol_plugins.get_constants_of_level
           node_ctxt

@@ -131,7 +131,7 @@ type 'a t = {
       (** Logger used for writing [kernel_debug] messages *)
   finaliser : unit -> unit Lwt.t;
       (** Aggregation of finalisers to run when the node context closes *)
-  mutable current_protocol : current_protocol;
+  current_protocol : current_protocol Reference.rw;
       (** Information about the current protocol. This value is changed in place
           on protocol upgrades. *)
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;

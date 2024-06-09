@@ -52,13 +52,13 @@ let executable_whitelist_update_message (node_ctxt : _ Node_context.t) =
   let*:* Node_context.{last_outbox_level_searched; last_whitelist_update} =
     Reference.get node_ctxt.private_info
   in
+  let current_protocol = Reference.get node_ctxt.current_protocol in
   let commitment_period =
     Int32.of_int
-      node_ctxt.Node_context.current_protocol.constants.sc_rollup
-        .commitment_period_in_blocks
+      current_protocol.constants.sc_rollup.commitment_period_in_blocks
   in
   let max_cemented_commitment =
-    node_ctxt.Node_context.current_protocol.constants.sc_rollup
+    current_protocol.constants.sc_rollup
       .max_number_of_stored_cemented_commitments
   in
   let rec fold_over_outbox_level_in_commmitment ~cemented_commitment_hash
