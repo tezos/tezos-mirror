@@ -1569,6 +1569,7 @@ dependencies = [
  "proc-macro-error",
  "quote",
  "syn 2.0.65",
+ "tezos-smart-rollup",
 ]
 
 [[package]]

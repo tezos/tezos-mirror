@@ -52,13 +52,11 @@ pub mod prelude {
     //!
     //! ```
     //! use tezos_smart_rollup::prelude::*;
-    //! use tezos_smart_rollup::kernel_entry;
     //!
+    //! #[entrypoint::main]
     //! fn kernel_run(host: &mut impl Runtime) {
     //!   debug_msg!(host, "Hello, world!");
     //! }
-    //!
-    //! kernel_entry!(kernel_run);
     //!
     //! # use tezos_smart_rollup::testing::prelude::MockHost;
     //! # let mut host = MockHost::default();
