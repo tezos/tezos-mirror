@@ -89,7 +89,6 @@ following quantities are kept the same:
 - the minimal time period of a cycle (namely, 2 days, 20 hours, and 16 minutes),
 - the length of the nonce revelation period (namely, around 2 hours and 8 minutes)
 - the number of nonce commitments per cycle (namely, 128),
-- the number of stake snapshots per cycle (namely, 16),
 - the maximum rewards per minute (namely 80 tez), and therefore roughly the same issuance,
 - the minimal "time to live" of an operation (namely, 1 hour),
 - the block gas limit per minute (namely, 10400000 gas),
