@@ -19,6 +19,7 @@ stages:
 # that can be used for for loops in scripts
 variables:
   supported_ARCH: "amd64 arm64"
+  DEFAULT_RUNNER_TAG: amd64 # Use this for jobs that do not require any specific arch
   STABLE_OCTEZ_BRANCH: "octez-v20.0"
   TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
@@ -87,6 +88,8 @@ workflow:
 check:
   stage: check
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
   before_script:
     - opam-2.1 install ocamlformat.0.24.1
   script:
@@ -192,6 +195,8 @@ build:canary:
   stage: deploy
   image: alpine
   parallel: *default_matrix
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
   before_script:
     - !reference [.rename-build-artifacts, before_script]
   script:
@@ -285,6 +290,8 @@ docker:canary:
 .docker:manifest:
   stage: docker
   image: docker
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
   before_script:
     - *docker-login
   script:
