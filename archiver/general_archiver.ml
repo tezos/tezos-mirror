@@ -280,7 +280,9 @@ module Loops (Archiver : Archiver.S) = struct
   let past_blocks chain starting cctx =
     mecanism chain starting cctx (fun {current_protocol; next_protocol} level ->
         if Protocol_hash.equal current_protocol next_protocol then
-          match Protocol_hash.Table.find past_block_machine current_protocol with
+          match
+            Protocol_hash.Table.find past_block_machine current_protocol
+          with
           | Some deal_with ->
               let* block_data = deal_with cctx level in
               let () = Archiver.add_block ~level block_data in
