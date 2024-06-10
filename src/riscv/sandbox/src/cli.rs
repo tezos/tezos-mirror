@@ -209,8 +209,8 @@ pub struct CommonOptions {
     #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
     pub posix_exit_mode: ExitMode,
 
-    #[arg(long, default_value_t = 1_000_000)]
-    pub max_steps: usize,
+    #[arg(long)]
+    pub max_steps: Option<usize>,
 
     #[command(flatten)]
     pub inbox: InboxOptions,
