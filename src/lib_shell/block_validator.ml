@@ -338,10 +338,12 @@ let on_validation_request w
               | Validation_error errs ->
                   may_commit_invalid_block w chain_db hash header errs
               | Validated -> (
-                  if advertise_after_validation then
-                    (* Headers which have been preapplied can be advertised
-                       before being fully applied. *)
-                    Distributed_db.Advertise.validated_head chain_db header ;
+                  let () =
+                    if advertise_after_validation then
+                      (* Headers which have been preapplied can be advertised
+                         before being fully applied. *)
+                      Distributed_db.Advertise.validated_head chain_db header
+                  in
                   let*! r =
                     apply_block
                       w
