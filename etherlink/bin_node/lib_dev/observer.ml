@@ -284,7 +284,7 @@ and[@tailrec] stream_loop ~time_between_blocks ~evm_node_endpoint
 
 let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
-  Metrics.Info.init ~devmode:config.devmode ~mode:"observer" ;
+  Metrics.Info.init ~mode:"observer" ;
   let rollup_node_endpoint = config.rollup_node_endpoint in
   let*? {
           evm_node_endpoint;

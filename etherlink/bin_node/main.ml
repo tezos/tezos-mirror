@@ -187,7 +187,20 @@ let cors_allowed_origins_arg =
     Params.string_list
 
 let devmode_arg =
-  Tezos_clic.switch ~long:"devmode" ~doc:"The EVM node in development mode." ()
+  Tezos_clic.switch
+    ~long:"devmode"
+    ~doc:
+      "DEPRECATED — The EVM node now aims to be backward compatible with the \
+       kernel deployed on Mainnet and Ghostnet"
+    ()
+
+let mainnet_compat_arg =
+  Tezos_clic.switch
+    ~long:"mainnet-compat"
+    ~doc:
+      "Generate a configuration compatible with the first Etherlink Mainnet \
+       kernel"
+    ()
 
 let profile_arg =
   Tezos_clic.switch
@@ -478,7 +491,7 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
       ]
   else Ok ()
 
-let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
+let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~verbose ~read_only () =
@@ -486,7 +499,6 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
   let* config =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ~keep_alive
       ?rpc_addr
       ?rpc_port
@@ -521,10 +533,7 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
-  let* () =
-    if config.devmode then Evm_node_lib_dev.Proxy.main config
-    else Evm_node_lib_prod.Proxy.main config
-  in
+  let* () = Evm_node_lib_dev.Proxy.main config in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in
   return_unit
@@ -548,7 +557,7 @@ let proxy_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -573,7 +582,6 @@ let proxy_command =
       in
       start_proxy
         ~data_dir
-        ~devmode
         ~keep_alive
         ?rpc_addr
         ?rpc_port
@@ -602,14 +610,14 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
-let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
-    ?rpc_port ?cors_origins ?cors_headers ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-    ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
-    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?genesis_timestamp ?kernel () =
+let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
+    ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+    ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
+    ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
+    ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
+    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp ?kernel ()
+    =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -620,7 +628,6 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
   let* configuration =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ?rpc_addr
       ?rpc_port
       ?cors_origins
@@ -668,25 +675,17 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
-  if configuration.devmode then
-    Evm_node_lib_dev.Sequencer.main
-      ~data_dir
-      ?genesis_timestamp
-      ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~configuration
-      ?kernel
-      ()
-  else
-    Evm_node_lib_prod.Sequencer.main
-      ~data_dir
-      ?genesis_timestamp
-      ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~configuration
-      ?kernel
-      ()
+
+  Evm_node_lib_dev.Sequencer.main
+    ~data_dir
+    ?genesis_timestamp
+    ~cctxt:(wallet_ctxt :> Client_context.wallet)
+    ~configuration
+    ?kernel
+    ()
 
 let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
-    ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
+    ~data_dir ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ~keep_alive ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
@@ -704,7 +703,6 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
   let* configuration =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ?rpc_addr
       ?rpc_port
       ?cors_origins
@@ -753,15 +751,13 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "te_sequencer" in
-  if configuration.devmode then
-    Evm_node_lib_dev.Threshold_encryption_sequencer.main
-      ~data_dir
-      ?genesis_timestamp
-      ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~configuration
-      ?kernel
-      ()
-  else failwith "Threshold encryption is not enabled in prod mode."
+  Evm_node_lib_dev.Threshold_encryption_sequencer.main
+    ~data_dir
+    ?genesis_timestamp
+    ~cctxt:(wallet_ctxt :> Client_context.wallet)
+    ~configuration
+    ?kernel
+    ()
 
 let sequencer_command =
   let open Tezos_clic in
@@ -798,7 +794,7 @@ let sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -838,7 +834,6 @@ let sequencer_command =
         ?password_filename
         ~wallet_dir
         ~data_dir
-        ~devmode
         ?rpc_addr
         ?rpc_port
         ?cors_origins
@@ -866,17 +861,16 @@ let sequencer_command =
         ?kernel
         ())
 
-let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
-    ?cors_origins ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
-    ?preimages_endpoint ?evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
-    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?kernel () =
+let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
+    ?cors_headers ~verbose ?preimages ?rollup_node_endpoint ?preimages_endpoint
+    ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
+    ?kernel () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode
       ~keep_alive
       ?rpc_addr
       ?rpc_port
@@ -918,9 +912,7 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  if config.devmode then
-    Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
-  else Evm_node_lib_prod.Observer.main ?kernel_path:kernel ~data_dir ~config ()
+  Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
 
 let observer_command =
   let open Tezos_clic in
@@ -948,7 +940,7 @@ let observer_command =
   @@ fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -977,7 +969,6 @@ let observer_command =
   in
   start_observer
     ~data_dir
-    ~devmode
     ~keep_alive
     ?rpc_addr
     ?rpc_port
@@ -997,41 +988,6 @@ let observer_command =
     ?log_filter_max_nb_blocks
     ?kernel
     ()
-
-let make_prod_messages ~kind ~smart_rollup_address data =
-  let open Lwt_result_syntax in
-  let open Evm_node_lib_dev in
-  let open Evm_node_lib_dev_encoding in
-  let transactions =
-    List.map
-      (fun s -> Ethereum_types.hex_of_string s |> Ethereum_types.hex_to_bytes)
-      data
-  in
-  let* messages =
-    match kind with
-    | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
-        let* blueprint =
-          Sequencer_blueprint.create
-            ~cctxt
-            ~sequencer_key:sk_uri
-            ~timestamp
-            ~smart_rollup_address
-            ~number:(Ethereum_types.quantity_of_z number)
-            ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
-            ~transactions
-            ~delayed_transactions:[]
-        in
-        return @@ List.map (fun (`External s) -> s) blueprint
-    | `Transaction ->
-        let*? chunks =
-          List.map_e
-            (fun tx ->
-              Transaction_format.make_encoded_messages ~smart_rollup_address tx)
-            transactions
-        in
-        return (chunks |> List.map snd |> List.flatten)
-  in
-  return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
 let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
@@ -1110,7 +1066,7 @@ let chunker_command =
             is prefixed with `file:`, the content is read from the given \
             filename and can contain a list of data separated by a whitespace."
          (Tezos_clic.parameter (fun _ -> from_data_or_file)))
-    (fun ( devmode,
+    (fun ( _devmode,
            rollup_address,
            as_blueprint,
            blueprint_timestamp,
@@ -1142,10 +1098,7 @@ let chunker_command =
       in
       let data = List.flatten data in
       let print_chunks smart_rollup_address data =
-        let* messages =
-          if devmode then make_dev_messages ~kind ~smart_rollup_address data
-          else make_prod_messages ~kind ~smart_rollup_address data
-        in
+        let* messages = make_dev_messages ~kind ~smart_rollup_address data in
         Format.printf "Chunked transactions :\n%!" ;
         List.iter (Format.printf "%s\n%!") messages ;
         return_unit
@@ -1173,14 +1126,10 @@ let make_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ stop)
-    (fun devmode root_hash timestamp () ->
+    (fun _devmode root_hash timestamp () ->
       let payload =
-        if devmode then
-          Evm_node_lib_dev_encoding.Ethereum_types.Upgrade.(
-            to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
-        else
-          Evm_node_lib_prod_encoding.Ethereum_types.Upgrade.(
-            to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
+        Evm_node_lib_dev_encoding.Ethereum_types.Upgrade.(
+          to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
@@ -1204,7 +1153,7 @@ let make_sequencer_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun (wallet_dir, devmode)
+    (fun (wallet_dir, _devmode)
          pool_address
          activation_timestamp
          sequencer_str
@@ -1219,16 +1168,11 @@ let make_sequencer_upgrade_command =
           sequencer_sk_opt
       in
       let* payload =
-        if devmode then
-          let open Evm_node_lib_dev_encoding.Ethereum_types in
-          let sequencer_upgrade : Sequencer_upgrade.t =
-            {sequencer; pool_address; timestamp = activation_timestamp}
-          in
-          return @@ Sequencer_upgrade.to_bytes sequencer_upgrade
-        else
-          tzfail
-            (error_of_fmt
-               "devmode must be set for producing the sequencer upgrade")
+        let open Evm_node_lib_dev_encoding.Ethereum_types in
+        let sequencer_upgrade : Sequencer_upgrade.t =
+          {sequencer; pool_address; timestamp = activation_timestamp}
+        in
+        return @@ Sequencer_upgrade.to_bytes sequencer_upgrade
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
@@ -1248,23 +1192,17 @@ let init_from_rollup_node_command =
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
     (fun ( data_dir,
-           devmode,
+           _devmode,
            omit_delayed_tx_events,
            reconstruct_from_boot_sector )
          rollup_node_data_dir
          () ->
-      if devmode then
-        Evm_node_lib_dev.Evm_context.init_from_rollup_node
-          ~omit_delayed_tx_events
-          ~data_dir
-          ~rollup_node_data_dir
-          ?reconstruct_from_boot_sector
-          ()
-      else
-        Evm_node_lib_prod.Evm_context.init_from_rollup_node
-          ~omit_delayed_tx_events
-          ~data_dir
-          ~rollup_node_data_dir)
+      Evm_node_lib_dev.Evm_context.init_from_rollup_node
+        ~omit_delayed_tx_events
+        ~data_dir
+        ~rollup_node_data_dir
+        ?reconstruct_from_boot_sector
+        ())
 
 let dump_to_rlp_command =
   let open Tezos_clic in
@@ -1277,7 +1215,7 @@ let dump_to_rlp_command =
     @@ prefixes ["to"; "rlp"]
     @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
     @@ stop)
-    (fun (devmode, keep_everything) dump_json dump_rlp () ->
+    (fun (_devmode, keep_everything) dump_json dump_rlp () ->
       let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
       let config =
         Data_encoding.Json.destruct
@@ -1298,26 +1236,8 @@ let dump_to_rlp_command =
               :: acc
             else acc
         in
-        if devmode then
-          let open Evm_node_lib_dev_encoding.Rlp in
-          List.fold_left aux [] config |> fun l -> encode (List l)
-        else
-          let aux =
-            let open Evm_node_lib_prod_encoding.Rlp in
-            if keep_everything then
-              fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
-              :: acc
-            else
-              fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-              if String.starts_with ~prefix:"/evm" to_ then
-                List
-                  [Value (String.to_bytes to_); Value (String.to_bytes value)]
-                :: acc
-              else acc
-          in
-          let open Evm_node_lib_prod_encoding.Rlp in
-          List.fold_left aux [] config |> fun l -> encode (List l)
+        let open Evm_node_lib_dev_encoding.Rlp in
+        List.fold_left aux [] config |> fun l -> encode (List l)
       in
 
       let write_bytes_to_file filename bytes =
@@ -1442,7 +1362,7 @@ mode.|}
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1482,7 +1402,6 @@ mode.|}
           ~data_dir
           ?rpc_addr
           ?rpc_port
-          ~devmode
           ?cors_origins
           ?cors_headers
           ?log_filter_max_nb_blocks
@@ -1539,7 +1458,7 @@ let make_kernel_config_command =
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
     (args20
-       devmode_arg
+       mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
        (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -1572,7 +1491,7 @@ let make_kernel_config_command =
          ~desc:"file path where the config will be written to"
          Params.string
     @@ stop)
-    (fun ( devmode,
+    (fun ( mainnet_compat,
            kernel_root_hash,
            chain_id,
            sequencer,
@@ -1594,52 +1513,29 @@ let make_kernel_config_command =
            bootstrap_accounts )
          output
          () ->
-      if devmode then
-        Evm_node_lib_dev.Kernel_config.make
-          ?kernel_root_hash
-          ?chain_id
-          ?sequencer
-          ?delayed_bridge
-          ?ticketer
-          ?admin
-          ?sequencer_governance
-          ?kernel_governance
-          ?kernel_security_governance
-          ?minimum_base_fee_per_gas
-          ?da_fee_per_byte
-          ?delayed_inbox_timeout
-          ?delayed_inbox_min_levels
-          ?sequencer_pool_address
-          ?maximum_allowed_ticks
-          ?maximum_gas_per_transaction
-          ?remove_whitelist
-          ~boostrap_balance
-          ?bootstrap_accounts
-          ~output
-          ()
-      else
-        Evm_node_lib_prod.Kernel_config.make
-          ?kernel_root_hash
-          ?chain_id
-          ?sequencer
-          ?delayed_bridge
-          ?ticketer
-          ?admin
-          ?sequencer_governance
-          ?kernel_governance
-          ?kernel_security_governance
-          ?minimum_base_fee_per_gas
-          ?da_fee_per_byte
-          ?delayed_inbox_timeout
-          ?delayed_inbox_min_levels
-          ?sequencer_pool_address
-          ?maximum_allowed_ticks
-          ?maximum_gas_per_transaction
-          ?remove_whitelist
-          ~boostrap_balance
-          ?bootstrap_accounts
-          ~output
-          ())
+      Evm_node_lib_dev.Kernel_config.make
+        ~mainnet_compat
+        ?kernel_root_hash
+        ?chain_id
+        ?sequencer
+        ?delayed_bridge
+        ?ticketer
+        ?admin
+        ?sequencer_governance
+        ?kernel_governance
+        ?kernel_security_governance
+        ?minimum_base_fee_per_gas
+        ?da_fee_per_byte
+        ?delayed_inbox_timeout
+        ?delayed_inbox_min_levels
+        ?sequencer_pool_address
+        ?maximum_allowed_ticks
+        ?maximum_gas_per_transaction
+        ?remove_whitelist
+        ~boostrap_balance
+        ?bootstrap_accounts
+        ~output
+        ())
 
 let proxy_simple_command =
   let open Tezos_clic in
@@ -1650,7 +1546,7 @@ let proxy_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1666,7 +1562,6 @@ let proxy_simple_command =
          () ->
       start_proxy
         ~data_dir
-        ~devmode
         ~keep_alive
         ?rpc_addr
         ?rpc_port
@@ -1709,7 +1604,7 @@ let sequencer_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1740,7 +1635,6 @@ let sequencer_simple_command =
         ?password_filename
         ~wallet_dir
         ~data_dir
-        ~devmode
         ?rpc_addr
         ?rpc_port
         ?cors_origins
@@ -1797,7 +1691,7 @@ let threshold_encryption_sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1829,7 +1723,6 @@ let threshold_encryption_sequencer_command =
         ?password_filename
         ~wallet_dir
         ~data_dir
-        ~devmode
         ?rpc_addr
         ?rpc_port
         ?cors_origins
@@ -1875,7 +1768,7 @@ let observer_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1895,7 +1788,6 @@ let observer_simple_command =
          () ->
       start_observer
         ~data_dir
-        ~devmode
         ~keep_alive
         ?rpc_addr
         ?rpc_port

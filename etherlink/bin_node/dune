@@ -16,7 +16,6 @@
   octez-version.value
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  octez-evm-node-libs.evm_node_lib_prod
   octez-evm-node-libs.evm_node_lib_dev
   octez-evm-node-libs.evm_node_config)
  (link_flags

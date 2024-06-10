@@ -9,6 +9,7 @@
     generates a configuration file located at [output], where
     [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make :
+  mainnet_compat:bool ->
   boostrap_balance:Ethereum_types.NonceMap.key ->
   ?bootstrap_accounts:string list ->
   ?kernel_root_hash:string * string ->

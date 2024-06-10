@@ -18,8 +18,8 @@ let parse_z_to_padded_32_le_int_bytes s =
   let z = Z.of_string s in
   padded_32_le_int_bytes z
 
-let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
-    ?sequencer ?delayed_bridge ?ticketer ?admin ?sequencer_governance
+let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
+    ?chain_id ?sequencer ?delayed_bridge ?ticketer ?admin ?sequencer_governance
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
@@ -43,13 +43,15 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
     String.of_bytes b
   in
   let instrs =
-    make_instr
-      ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
-      kernel_root_hash
+    (if mainnet_compat then make_instr ~path_prefix:"/evm/" ticketer
+     else
+       (* For compatibility reason for Mainnet and Ghostnet *)
+       make_instr ~path_prefix:"/evm/world_state/" ticketer)
+    @ make_instr
+        ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
+        kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
-    @ make_instr sequencer @ make_instr delayed_bridge
-    @ make_instr ~path_prefix:"/evm/world_state/" ticketer
-    @ make_instr admin
+    @ make_instr sequencer @ make_instr delayed_bridge @ make_instr admin
     @ make_instr sequencer_governance
     @ make_instr kernel_governance
     @ make_instr kernel_security_governance

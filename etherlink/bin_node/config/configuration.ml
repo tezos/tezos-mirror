@@ -67,7 +67,6 @@ type fee_history = {max_count : int option; max_past : int option}
 type t = {
   rpc_addr : string;
   rpc_port : int;
-  devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
@@ -114,8 +113,6 @@ let default_rpc_addr = "127.0.0.1"
 let default_rpc_port = 8545
 
 let default_sequencer_sidecar_endpoint = Uri.of_string "127.0.0.1:5303"
-
-let default_devmode = false
 
 let default_keep_alive = false
 
@@ -507,7 +504,6 @@ let encoding data_dir : t Data_encoding.t =
     (fun {
            rpc_addr;
            rpc_port;
-           devmode;
            cors_origins;
            cors_headers;
            log_filter;
@@ -527,7 +523,8 @@ let encoding data_dir : t Data_encoding.t =
          } ->
       ( ( rpc_addr,
           rpc_port,
-          devmode,
+          None
+          (* devmode is still part of the encoding for compatibiltiy reasons. *),
           cors_origins,
           cors_headers,
           log_filter,
@@ -546,7 +543,7 @@ let encoding data_dir : t Data_encoding.t =
           fee_history ) ))
     (fun ( ( rpc_addr,
              rpc_port,
-             devmode,
+             _devmode,
              cors_origins,
              cors_headers,
              log_filter,
@@ -566,7 +563,6 @@ let encoding data_dir : t Data_encoding.t =
       {
         rpc_addr;
         rpc_port;
-        devmode;
         cors_origins;
         cors_headers;
         log_filter;
@@ -588,7 +584,7 @@ let encoding data_dir : t Data_encoding.t =
        (obj10
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-          (dft "devmode" bool default_devmode)
+          (opt ~description:"DEPRECATED" "devmode" bool)
           (dft "cors_origins" (list string) default_cors_origins)
           (dft "cors_headers" (list string) default_cors_headers)
           (dft
@@ -669,7 +665,7 @@ let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
 
 module Cli = struct
-  let create ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
+  let create ~data_dir ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
       ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
       ~keep_alive ~rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
@@ -738,7 +734,6 @@ module Cli = struct
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
-      devmode;
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter;
@@ -764,8 +759,8 @@ module Cli = struct
       fee_history = default_fee_history;
     }
 
-  let patch_configuration_from_args ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+  let patch_configuration_from_args ~data_dir ?rpc_addr ?rpc_port ?cors_origins
+      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
@@ -983,7 +978,6 @@ module Cli = struct
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-      devmode = devmode || configuration.devmode;
       cors_origins =
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =
@@ -1016,7 +1010,7 @@ module Cli = struct
       fee_history = configuration.fee_history;
     }
 
-  let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
+  let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
@@ -1048,7 +1042,6 @@ module Cli = struct
       let configuration =
         patch_configuration_from_args
           ~data_dir
-          ~devmode
           ?rpc_addr
           ?rpc_port
           ?cors_origins
@@ -1087,7 +1080,6 @@ module Cli = struct
       let config =
         create
           ~data_dir
-          ~devmode
           ?rpc_addr
           ?rpc_port
           ?cors_origins

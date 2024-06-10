@@ -55,7 +55,7 @@ let next_rollup_node_level ~sc_rollup_node ~client =
 
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy _ ->
+  | Proxy ->
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
   | Sequencer _ | Threshold_encryption_sequencer _ ->

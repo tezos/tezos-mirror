@@ -102,7 +102,6 @@ type fee_history = {max_count : int option; max_past : int option}
 type t = {
   rpc_addr : string;
   rpc_port : int;
-  devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
@@ -200,7 +199,6 @@ val observer_config_dft :
 module Cli : sig
   val create :
     data_dir:string ->
-    devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?cors_origins:string list ->
@@ -232,7 +230,6 @@ module Cli : sig
 
   val create_or_read_config :
     data_dir:string ->
-    devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?cors_origins:string list ->
