@@ -246,13 +246,10 @@ _`Layer 1`
 
 _`Layer 2`
     Layer 2 (L2) includes sidechains, rollups, payment channels, etc. that batch their transactions and
-    write to the `layer 1`_ chain. By processing transactions on layer 2 networks,
+    write to the `Layer 1`_ chain. By processing transactions on layer 2 networks,
     greater scalability in speed and throughput can be achieved by the ecosystem overall, since the number of transactions
-    the layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
-    the security of the L1 chain backs those operations. In Tezos there are a number of layer 2 solutions,
-    including :doc:`Smart Optimistic Rollups <smart_rollups>`,
-    validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
-    zkChannels, and sidechains such as `Deku <https://deku.marigold.dev/>`_.
+    the Layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
+    the security of the L1 chain backs those operations. Currently, Layer 2 solutions on Tezos are built as `smart rollup`_\ s.
 
 _`Michelson`
     The built-in language used by a `smart contract`_.
@@ -278,6 +275,58 @@ _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
+_`PVM`
+   A PVM (Proof-generating Virtual Machine) is a reference
+   implementation for a device on top of which a `smart rollup`_ can be
+   executed. This reference implementation is part of the `economic
+   protocol`_ and is the unique source of truth regarding the semantics
+   of rollups. The PVM is able to produce proofs enforcing this truth.
+   This ability is used during the final step of a `refutation game`_.
+
+_`Refutation game`
+   A process by which the `economic protocol`_ solves a conflict between two
+   `rollup committer`_\ s.
+   Note that the refutation mechanism used in Tezos `smart rollup`_\ s corresponds to the notion of `fraud proofs <https://academy.binance.com/en/glossary/fraud-proof>`__ used in other blockchain/Layer 2 ecosystems.
+
+_`Refutation period`
+   When the first `rollup commitment`_ for a `rollup commitment period`_ is published, a refutation
+   period of two weeks starts to allow this commitment to be challenged.
+
+_`Roll`
+    deprecated; see `minimal stake`_.
+
+_`Rollup commitment`
+   A claim that the interpretation of all `rollup inbox`_ messages
+   published during a given period, and applied on the state of
+   a parent rollup commitment, led to a given new state by performing a given
+   number of execution steps of the `PVM`_.
+
+_`Rollup commitment period`
+   A period of roughly 15 minutes during which all `rollup inbox`_
+   messages must be processed by the `rollup node`_ state to compute a
+   `rollup commitment`_. A commitment must be published for each commitment
+   period.
+
+_`Rollup committer`
+   A `user account`_ that has published and made a deposit on a
+   `rollup commitment`_.
+
+_`Rollup inbox`
+   A sequence of messages from the Layer 1 to all the `smart rollup`_\ s.
+   The contents of the inbox are determined by the consensus of the
+   `economic protocol`_.
+
+_`Rollup node`
+   A daemon required for deploying and operating `smart rollup`_\ s.
+   The rollup node is responsible for making the rollup progress by publishing `rollup commitment`_\ s and by playing `refutation game`_\ s.
+
+_`Rollup outbox`
+   A sequence of messages from a `smart rollup`_ to the Layer 1.
+   Messages are `smart contract`_ calls, potentially containing tickets.
+   These calls can be triggered only when the related `rollup commitment`_ is
+   cemented (hence, at least two weeks after the actual execution of
+   the operation).
+
 .. _def_round_alpha:
 
 _`Round`
@@ -288,9 +337,6 @@ _`Round`
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
 
-_`Roll`
-    deprecated; see `minimal stake`_.
-
 _`Smart contract`
     Account_ which is associated to a Michelson_ script.
     They are created with an
@@ -298,8 +344,8 @@ _`Smart contract`
     originated accounts. The address of a smart contract always starts
     with the letters ``KT1``.
 
-_`Smart Optimistic Rollups`
-    Smart optimistic rollups constitute a `layer 2`_ solution that can be used to deploy either a general-purpose polyvalent layer 2 blockchain
+_`Smart Rollup`
+    Smart rollups constitute a `Layer 2`_ solution that can be used to deploy either a general-purpose polyvalent Layer 2 blockchain
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
