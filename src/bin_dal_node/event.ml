@@ -258,7 +258,7 @@ let removing_shards_failed =
     ~level:Warning
     ~msg:
       "removing shards for level {published_level} and index {slot_index} \
-       failed"
+       failed: {error}"
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
     ("error", Error_monad.trace_encoding)
@@ -269,7 +269,8 @@ let removing_slot_failed =
     ~name:"removing_slot_failed"
     ~level:Warning
     ~msg:
-      "removing slot for level {published_level} and index {slot_index} failed"
+      "removing slot for level {published_level} and index {slot_index} \
+       failed: {error}"
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
     ("error", Error_monad.trace_encoding)
@@ -279,7 +280,7 @@ let removing_status_failed =
     ~section
     ~name:"removing_status_failed"
     ~level:Warning
-    ~msg:"removing status file for level {level} failed"
+    ~msg:"removing status file for level {level} failed: {error}"
     ("level", Data_encoding.int32)
     ("error", Error_monad.trace_encoding)
 
@@ -288,7 +289,7 @@ let removing_skip_list_cells_failed =
     ~section
     ~name:"removing_skip_list_cells_failed"
     ~level:Warning
-    ~msg:"removing skip list cells for level {level} failed"
+    ~msg:"removing skip list cells for level {level} failed: {error}"
     ("level", Data_encoding.int32)
     ("error", Error_monad.trace_encoding)
 
