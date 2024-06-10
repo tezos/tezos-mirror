@@ -158,7 +158,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     Protocol_hash.Table.add
       live_block_machine
       Services.hash
-      (baking_rights, rights_of, get_applied_block)
+      (rights_of, get_applied_block)
 
   let rec pack_by_slot i e = function
     | ((i', l) as x) :: t ->
@@ -397,8 +397,7 @@ module Loops (Archiver : Archiver.S) = struct
                                       current_protocol)
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some (_baking_rights, rights_of, get_applied_block)
-                            ->
+                          | Some (rights_of, get_applied_block) ->
                               let recorder cctx level hash header reception_time
                                   =
                                 let* (( _block_info,
