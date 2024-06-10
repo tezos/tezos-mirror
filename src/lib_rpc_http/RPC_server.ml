@@ -53,10 +53,21 @@ module RPC_logging = struct
   let rpc_http_event_error = rpc_http_event "rpc_http_event_error" Error
 
   let emit_async event fmt =
-    Format.kasprintf (fun message -> Lwt.ignore_result (emit event message)) fmt
+    Format.kasprintf
+      (fun message ->
+        Lwt.ignore_result
+          (emit
+             event
+             (Printf.sprintf "[pid:%d][resto] %s" (Unix.getpid ()) message)))
+      fmt
 
   let emit_lwt event fmt =
-    Format.kasprintf (fun message -> emit event message) fmt
+    Format.kasprintf
+      (fun message ->
+        emit
+          event
+          (Printf.sprintf "[pid:%d][resto] %s" (Unix.getpid ()) message))
+      fmt
 
   let debug f = emit_async rpc_http_event_debug f
 
