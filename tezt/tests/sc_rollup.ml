@@ -2908,6 +2908,58 @@ let test_consecutive_commitments _protocol _rollup_node sc_rollup _tezos_node
   in
   unit
 
+let test_can_stake ~kind =
+  test_l1_scenario
+    ~kind
+    ~uses:(fun _ -> [Constant.octez_smart_rollup_node])
+    {
+      tags = ["commitment"; "stake"];
+      variant = None;
+      description = "Rollup node checks operator can stake";
+    }
+  @@ fun _protocol sc_rollup tezos_node tezos_client ->
+  let* operator = Client.gen_and_show_keys ~alias:"operator" tezos_client in
+  let rollup_node =
+    Sc_rollup_node.create
+      ~default_operator:operator.alias
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 5000)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:operator.alias
+      tezos_client
+  in
+  let* () = Client.bake_for_and_wait tezos_client in
+  let* () = Sc_rollup_node.run ~wait_ready:false rollup_node sc_rollup []
+  and* () =
+    Lwt.choose
+      [
+        (let* () = Lwt_unix.sleep 10. in
+         Test.fail "Rollup node did not exit");
+        Sc_rollup_node.check_error
+          ~exit_code:1
+          ~msg:(rex "needs more than 10000")
+          rollup_node;
+      ]
+  in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 6000)
+      ~burn_cap:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:operator.alias
+      tezos_client
+  in
+  let* () = Client.bake_for_and_wait tezos_client in
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:20. in
+  unit
+
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~kind ({allow_degraded; _} as scenario) =
   let regression =
@@ -6083,6 +6135,7 @@ let register_protocol_independent () =
   test_batcher_dont_reinject_already_injected_messages protocols ~kind ;
   test_private_rollup_node_publish_in_whitelist protocols ;
   test_private_rollup_node_publish_not_in_whitelist protocols ;
+  test_can_stake protocols ~kind ;
   test_rollup_node_inbox
     ~kind
     ~variant:"stops"
