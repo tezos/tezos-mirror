@@ -31,94 +31,43 @@
    Subject:      RISC-V integration and unit tests
 *)
 
+let hermit_loader =
+  Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/hermit-loader"
+
+let dummy_kernel = Uses.make ~tag:"riscv" ~path:"src/riscv/riscv-dummy.elf"
+
+let dummy_kernel_inbox =
+  Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/dummy-kernel-inbox.json"
+
 let test_dummy_kernel () =
-  Tezt_riscv_sandbox.run_kernel
-    ~input:"tezt/tests/riscv-tests/hermit-loader"
-    ~initrd:"src/riscv/riscv-dummy.elf"
+  Tezt_riscv_sandbox.run_pvm
+    ~input:hermit_loader
+    ~initrd:dummy_kernel
+    ~inbox:dummy_kernel_inbox
     ()
 
-let fold_dir_lwt ~f ~acc dirname =
-  let open Unix in
-  let d = opendir dirname in
-  let rec loop acc =
-    match readdir d with
-    | "." | ".." -> loop acc
-    | entry ->
-        let* acc = f entry acc in
-        loop acc
-    | exception End_of_file ->
-        closedir d ;
-        Lwt.return acc
-  in
-  loop acc
+let inline_asm_tests =
+  Uses.make
+    ~tag:"riscv"
+    ~path:"src/riscv/tests/inline_asm/rv64-inline-asm-tests"
 
-(* We run the official riscv test suite, available here:
-   https://github.com/riscv-software-src/riscv-tests
-
-   The tests are split along the following units, corresponding to subcomponents of the CPU.*)
-let riscv_test_units =
-  ["mi"; "si"; "ua"; "uc"; "ud"; "uf"; "ui"; "um"; "mzicbo"; "ssvnapot"; "uzfh"]
-
-let test_user_level_riscv_unit_tests riscv_test_unit () =
-  let directory = "tezt/tests/riscv-tests/generated" in
-  let is_in_unit program =
-    program =~ rex (sf "rv64%s.*-?-.*" riscv_test_unit)
-  in
-  let* kernels =
-    fold_dir_lwt directory ~acc:[] ~f:(fun kernel acc -> return (kernel :: acc))
-  in
-  (* [fold_dir_lwt] doesn't list in an OS-specific way, we make it canonical. *)
-  let kernels = List.sort String.compare kernels in
-  Lwt_list.iter_s
-    (fun kernel ->
-      if is_in_unit kernel then
-        Lwt.catch
-          (fun () ->
-            let* () =
-              Tezt_riscv_sandbox.run_kernel
-                ~posix:true
-                ~input:(directory // kernel)
-                ()
-            in
-            Printf.ksprintf Regression.capture "%s: success" kernel ;
-            Lwt.return_unit)
-          (fun _exn ->
-            Printf.ksprintf Regression.capture "%s: fail" kernel ;
-            Lwt.return_unit)
-      else Lwt.return_unit)
-    kernels
-
-let test_inline_asm () =
-  let input = "src/riscv/tests/inline_asm/rv64-inline-asm-tests" in
-  Tezt_riscv_sandbox.run_kernel ~posix:true ~input ()
+let test_inline_asm () = Tezt_riscv_sandbox.run_test ~input:inline_asm_tests ()
 
 let register () =
   Regression.register
     ~__FILE__
     ~title:"Run the dummy kernel"
     ~tags:["riscv"; "sandbox"; "dummy"]
-    ~uses:[Tezt_riscv_sandbox.riscv_sandbox]
+    ~uses:[Tezt_riscv_sandbox.riscv_sandbox; dummy_kernel; hermit_loader]
     ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
     test_dummy_kernel ;
-  List.iter
-    (fun test_unit ->
-      Regression.register
-        ~__FILE__
-        ~title:(sf "Run riscv unit tests (%s)" test_unit)
-        ~tags:["riscv"; "sandbox"; "unit"; test_unit]
-        ~uses:[Tezt_riscv_sandbox.riscv_sandbox]
-        ~uses_node:false
-        ~uses_client:false
-        ~uses_admin_client:false
-        (test_user_level_riscv_unit_tests test_unit))
-    riscv_test_units ;
   Regression.register
     ~__FILE__
     ~title:"Run inline asm tests"
     ~tags:["riscv"; "sandbox"; "inline_asm"]
-    ~uses:[Tezt_riscv_sandbox.riscv_sandbox]
+    ~uses:[Tezt_riscv_sandbox.riscv_sandbox; inline_asm_tests]
     ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
