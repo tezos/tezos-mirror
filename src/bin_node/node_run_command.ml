@@ -209,11 +209,11 @@ module Event = struct
       ~level:Warning
       ()
 
-  let enable_http_cache_headers =
+  let enable_http_cache_headers_for_local =
     declare_0
       ~section
-      ~name:"enable_http_cache_headers"
-      ~msg:"HTTP cache headers enabled"
+      ~name:"enable_http_cache_headers_for_local"
+      ~msg:"HTTP cache headers enabled for local rpc server"
       ~level:Notice
       ()
 end
@@ -546,8 +546,8 @@ let rpc_socket_path ~socket_dir ~id ~pid =
 (* Initializes an RPC server handled by the node process. It will be
    used by an external RPC process, identified by [id], to forward
    RPCs to the node through a Unix socket. *)
-let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
-    addr =
+let init_local_rpc_server_for_external_process ?middleware id
+    (config : Config_file.t) dir addr =
   let open Lwt_result_syntax in
   let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
   let pid = Unix.getpid () in
@@ -561,11 +561,12 @@ let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
         Lwt_unix.unlink comm_socket_path)
   in
   let* rpc_server =
-    launch_rpc_server config dir (Process comm_socket_path) addr
+    launch_rpc_server ?middleware config dir (Process comm_socket_path) addr
   in
   return (rpc_server, comm_socket_path)
 
-let init_external_rpc_server config node_version dir internal_events =
+let init_external_rpc_server ?middleware config node_version dir internal_events
+    =
   let open Lwt_result_syntax in
   (* Start one rpc_process for each rpc endpoint. *)
   let id = ref 0 in
@@ -585,6 +586,7 @@ let init_external_rpc_server config node_version dir internal_events =
                 in
                 let* local_rpc_server, comm_socket_path =
                   init_local_rpc_server_for_external_process
+                    ?middleware
                     id
                     config
                     dir
@@ -670,7 +672,8 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
     else
       let* middleware =
         if config.rpc.enable_http_cache_headers then
-          let*! () = Event.(emit enable_http_cache_headers ()) in
+          let*! () = Event.(emit enable_http_cache_headers_for_local ()) in
+
           let http_cache_headers_middleware =
             let Http_cache_headers.{get_estimated_time_to_next_level} =
               Node.http_cache_header_tools node
