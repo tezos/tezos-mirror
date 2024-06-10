@@ -28,9 +28,6 @@ variables:
   # architectures.
   # See https://gitlab.com/tezos/tezos/-/issues/1788
   BLST_PORTABLE: "yes"
-  # Without this option git will fail when trying to `git am < ProtoALpha.git.patch`
-  # See https://gitlab.com/gitlab-org/gitlab-runner/-/issues/37238
-  FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR: "true"
 
 # ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
 workflow:
@@ -79,7 +76,10 @@ workflow:
 
 .docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
-.apply-proto-alpha-patch: &apply-proto-alpha-patch "git am < ProtoALpha.git.patch"
+.apply-proto-alpha-patch:
+  &apply-proto-alpha-patch # Without this option git will fail when trying to `git am < ProtoALpha.git.patch`
+  - git config --global --add safe.directory $(pwd)
+  - git am < ProtoALpha.git.patch
 
 ################
 # SANITY CHECK #
@@ -262,7 +262,6 @@ release:canary:
     - if: $CI_REGISTRY_IMAGE
       when: manual
       allow_failure: true
-
 
 .docker:canary:rules:
   extends: .release:canary:rules
