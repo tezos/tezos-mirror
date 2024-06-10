@@ -108,11 +108,11 @@
         "opam-repository": "opam-repository"
       },
       "locked": {
-        "lastModified": 1704632392,
-        "narHash": "sha256-ZvZEC/yt1gYfsu7ZKOLYqDNJYGVmrjjaBKQ462J5pIA=",
+        "lastModified": 1716561961,
+        "narHash": "sha256-SgeZItYuUZV7WSaoX4G7J1ZpmwgeI3ocQCLP95E+O1U=",
         "owner": "vapourismo",
         "repo": "opam-nix-integration",
-        "rev": "3eabd5faea7d5030c01b4b66ab172482dae212ad",
+        "rev": "0f98236c75cdb436be7669ccaa249264456baa37",
         "type": "github"
       },
       "original": {
@@ -159,8 +159,7 @@
         "nixpkgs": "nixpkgs",
         "opam-nix-integration": "opam-nix-integration",
         "opam-repository": "opam-repository_2",
-        "rust-overlay": "rust-overlay",
-        "tezos-opam-repository": "tezos-opam-repository"
+        "rust-overlay": "rust-overlay"
       }
     },
     "rust-overlay": {
@@ -226,22 +225,6 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
-      }
-    },
-    "tezos-opam-repository": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1717144855,
-        "narHash": "sha256-XLYaizfFDwBEJVdu6IOUJaXT7MBYlrIF+8sC25j8Jjc=",
-        "owner": "tezos",
-        "repo": "opam-repository",
-        "rev": "b114b38e93159016d4f956dc9fce83f4223a8465",
-        "type": "gitlab"
-      },
-      "original": {
-        "owner": "tezos",
-        "repo": "opam-repository",
-        "type": "gitlab"
       }
     }
   },

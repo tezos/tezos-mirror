@@ -23,29 +23,18 @@ To this end:
   in :src:`scripts/version.sh` in the variable ``full_opam_repository_tag``;
 - ``make build-deps`` and ``make build-dev-deps`` use the lock file and the hash
   to select dependencies;
-- the CI uses Docker images that come with those dependencies pre-compiled.
-
-The Docker images for the CI are built by the CI of another repository,
-the so-called `Tezos opam repository <https://gitlab.com/tezos/opam-repository>`__.
-The set of dependencies that is used to build those images is also defined
-by a lock file and a commit hash from the public opam repository.
-Both must be kept synchronized with their counterpart in the ``tezos/tezos`` repository.
+- the CI builds and uses Docker images using this information.
 
 .. note::
 
-    Docker images contain additional dependencies
+    The CI Docker images contain additional dependencies
     such as ``odoc`` which are needed by the CI but not to build Octez.
 
-Adding, removing or updating dependencies thus requires to work both
-on the `main codebase <https://gitlab.com/tezos/tezos>`__ and on
-the `Tezos opam repository <https://gitlab.com/tezos/opam-repository>`__.
-Moreover, work between those two components must happen in a specific order.
-
-The rest of this document explains the process from the point-of-view of
-a developer (you). The instructions below assume you have already
-:ref:`set up your work environment <build_from_sources>`
-but that you installed *development* dependencies
-(``make build-dev-deps`` instead of ``make build-deps``).
+The rest of this document explains the process of adding, removing or
+updating dependencies from the point-of-view of a developer (you). The
+instructions below assume you have already :ref:`set up your work
+environment <build_from_sources>` but that you installed *development*
+dependencies (``make build-dev-deps`` instead of ``make build-deps``).
 
 Local work
 ----------
@@ -113,83 +102,10 @@ not an issue in general but it might explain some changes unrelated to your work
     as it does not guarantee that the set of dependencies is actually
     a valid solution that the opam solver could have chosen.
 
-Third, **create an MR on the Tezos opam repository.**
-This is the *opam repository MR*, its role is to prepare
-the environment for the *Octez MR* that we will create below.
-
-In order to create the opam repository MR:
-
-- If you haven’t already done so, clone
-  `the Tezos opam repository <https://gitlab.com/tezos/opam-repository>`__.
-- Create a branch from the repository's ``master`` and switch to it.
-- Update file ``scripts/version.sh`` (in the Tezos opam repository)
-  to set the value of ``opam_repository_commit_hash``
-  to match the value of ``full_opam_repository_tag`` that you have set in
-  :src:`scripts/version.sh` (in the Octez repository).
-- Copy file :src:`opam/virtual/octez-deps.opam.locked` (from the Octez repository)
-  to the root of the Tezos opam repository.
-- Commit the result. Take note of the commit hash, it will be useful later.
-- Push your branch.
-- Create the opam repository MR from this branch.
-
-You can test the result by running the following command in your local copy of Octez:
-``OPAM_REPOSITORY_TAG=<commit-id> make build-deps``. This will rebuild the
-dependencies locally using the ``<commit_id>`` of the opam-repository.
-
-Fourth, in your local copy of Octez, **update the** ``opam_repository_tag``
-**variable in the** :src:`scripts/version.sh` **file**. (**NB**: do not confuse this variable with the ``full_opam_repository_tag`` variable.)
-Specifically, set it
-to the hash of your commit on the opam repository MR.
-Afterwards, you will also need to regenerate the GitLab CI configuration
-by running ``make -C ci`` from the root of the repository.
-Commit the change of ``scripts/version.sh`` and the GitLab configuration
+Third, commit the change of ``scripts/version.sh`` and the updated lockfiles
 with a title along the lines of “CI: use dependency ``foo``”.
 
-This commit will point the build scripts and CI to the modified
-opam-repository and the associated Docker images. Do note that the CI on your
-branch of Octez will only be able to run after the CI on your branch of
-opam-repository has completed.
-
-Finally, still in your local copy of Octez, **push these changes and open
-an MR on the tezos/tezos project**. Make sure you add links referencing the opam-repository MR from
-the Octez MR and vice-versa. This gives the reviewers the necessary context to
-review.
-
-That’s it. You now have two MRs:
-
-- The *opam-repository MR* from ``tezos/opam-repository:<your-branch>``
-  onto ``tezos/opam-repository:master`` updates the environment in which
-  the Octez libraries and binaries are built.
-- The *Octez MR* from ``<your-organisation>/tezos:<your-branch>``
-  onto ``tezos/tezos:master`` uses this new environment.
-
-Merging the MR
---------------
-
-This section is for the :doc:`Octez merge team <merge_team>`. It is the last
-step in the lifetime
-of the MRs you have opened. Understanding the basics of this process may
-help you when communicating with the reviewers and the mergers of your
-MR. Understanding all the minutiae and details is not necessary. For
-this reason, this final section is addressed to whichever member of the
-Octez merge team takes care of this MR (you).
-
-After the iterative review-comment-edit process has reached a satisfying
-fixpoint, you can merge the two MRs opened by the developer. To avoid
-interference with other MRs, it is better to perform all the steps
-described below relatively quickly (the same day).
-
-First, **mention the MR on the** ``#opam-repo`` **Slack channel** and make sure
-there isn't another merge ongoing.
-
-Second, **merge the opam-repository MR**.
-Make sure that **the commit hash of** ``master`` **is the value of**
-``opam_repository_tag`` in :src:`scripts/version.sh`.
-The hash could have changed if a merge commit was introduced, if the branch
-had to be rebased, if it was squashed, etc.
-This is important because the name of the Docker images is based on this hash.
-
-Finally, **assign the Octez MR to Marge Bot** for merging.
+Finally, **push these changes and open an MR**.
 
 .. _tldr:
 
@@ -206,21 +122,9 @@ As a developer:
   a recent version of the public default opam repository.
 - You update :src:`opam/virtual/octez-deps.opam.locked`,
   for instance by executing :src:`scripts/update_opam_lock.sh`.
-- You open an opam repository MR from ``tezos/opam-repository:<your-branch>``
-  onto ``tezos/opam-repository:master`` that updates:
-
-  - variable ``opam_repository_commit_hash`` in ``scripts/version.sh``;
-  - file ``octez-deps.opam.locked`` at the root.
-
-- You update ``opam_repository_tag`` to the hash of the last commit of your opam repository MR
-  and regenerate the CI configuration.
 - You push the changes to your Octez MR.
-- You update the descriptions of your MRs to include links between them.
 
-As a merger:
+As a merger there are no special steps to take:
 
 - You test, review, etc. the code.
-- You merge the opam repository MR.
-- You make sure the commit hash has been preserved by merging
-  (no squashing, no rebasing, no merge commit…).
 - You assign the Octez MR to Marge Bot.

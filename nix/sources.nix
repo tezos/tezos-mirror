@@ -35,8 +35,6 @@ in
     };
 
     opam-repository = pkgs.callPackage ./opam-repo.nix {};
-
-    tezos-opam-repository = pkgs.callPackage ./tezos-opam-repo.nix {};
   in {
-    inherit pkgs riscv64Pkgs opam-repository tezos-opam-repository;
+    inherit pkgs riscv64Pkgs opam-repository;
   }
