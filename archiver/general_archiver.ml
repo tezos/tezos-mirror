@@ -107,18 +107,19 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         reception_times;
       }
 
-  let block_data cctx ((_, _, _, hash, _) as info) cycle_info reception_times =
+  let block_data_no_baking_rights cctx ((_, _, _, hash, _) as info) cycle_info
+      reception_times =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
     return
       ( block_info_data info reception_times,
         cycle_info,
         split_endorsements_preendorsements operations,
-        [] (* FIXME? Baking rights *) )
+        [] )
 
   let past_block ctxt level =
     let cctx = Services.wrap_full ctxt in
     let* block_info, cycle_info = Services.get_block_info cctx level in
-    block_data cctx block_info (Some cycle_info) []
+    block_data_no_baking_rights cctx block_info (Some cycle_info) []
 
   let () = Protocol_hash.Table.add past_block_machine Services.hash past_block
 
@@ -148,7 +149,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let*? round = Services.block_round header in
     let* delegate, cycle_info = Services.baker_and_cycle cctx hash in
     let predecessor = Some header.Block_header.shell.Block_header.predecessor in
-    block_data
+    block_data_no_baking_rights
       cctx
       (delegate, timestamp, round, hash, predecessor)
       (Some cycle_info)
