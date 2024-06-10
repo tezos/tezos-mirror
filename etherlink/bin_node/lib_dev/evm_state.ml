@@ -168,6 +168,23 @@ let current_block_hash evm_state =
   | Some h -> return (decode_block_hash h)
   | None -> return genesis_parent_hash
 
+(* The Fast Execution engine relies on Lwt_preemptive to execute Wasmer in
+   dedicated worker threads (`Lwt_preemptive.detach`), while pushing to lwt
+   event loop the resolutions of host functions (notably interacting with
+   Irmin) (`Lwt_preemptive.run_in_main`).
+
+   This means that parallel executions of the Etherlink kernel using the Fast
+   Execution engine competes for the access of the event loop. In practice, it
+   means it is possible for an attacker to slow down block production through
+   RPC calls leading to execute the Etherlink kernel (typically,
+   `eth_estimateGas`).
+
+   Under the hood, `Lwt_preemptive` relies on a pool of 4 workers (implemented
+   using native threads). With this patch, we ensure 1 of these workers is
+   always available to the block production, by limiting the concurrent call to
+   `execute_and_inspect` to 3. *)
+let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
+
 let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
     ~input:
       Simulation.Encodings.
@@ -185,6 +202,7 @@ let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
   (* Messages from simulation requests are already valid inputs. *)
   let messages = List.map (fun s -> `Input s) messages in
   let* evm_state =
+    Lwt_pool.use pool @@ fun () ->
     execute
       ~kind:Simulation
       ?log_file:log_kernel_debug_file
