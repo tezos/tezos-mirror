@@ -368,6 +368,25 @@ apt_repo_debian_current:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
+apt_repo_debian:
+  image: debian:bookworm
+  stage: publishing
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh debian bookworm
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: next
+
 oc.docker-build-ubuntu-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
@@ -490,6 +509,25 @@ apt_repo_ubuntu_current:
   variables:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+apt_repo_ubuntu:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  stage: publishing
+  tags:
+  - gcp
+  needs:
+  - oc.build-ubuntu
+  dependencies:
+  - oc.build-ubuntu
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh ubuntu focal jammy
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: next
 
 docker:promote_to_latest:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0

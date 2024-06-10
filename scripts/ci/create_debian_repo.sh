@@ -34,6 +34,9 @@ fi
 
 ARCHITECTURES=${ARCHITECTURES:-"amd64"}
 
+#The prefix used for these packages in the repository. E.g. 'next'
+PREFIX=${PREFIX:-""}
+
 # The linux distribution for which we are creating the apt repository
 # E.g. 'ubuntu' or 'debian'
 DISTRIBUTION=${1}
@@ -64,10 +67,10 @@ if [ -n "${gitlab_release_no_v:-}" ]; then
   # It a release tag, this can be either a real or test release
   if [ -n "${gitlab_release_rc_version}" ]; then
     # Release candidate
-    TARGETDIR="public/RC/$DISTRIBUTION"
+    TARGETDIR="public/$PREFIX/RC/$DISTRIBUTION"
   else
     # Release
-    TARGETDIR="public/$DISTRIBUTION"
+    TARGETDIR="public/$PREFIX/$DISTRIBUTION"
   fi
 else
   # Not a release tag. This is strictly for testing
@@ -81,13 +84,13 @@ else
       exit 1
     else
       # Branch is not protected, this is for testing ordinary MRs
-      TARGETDIR="public/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
+      TARGETDIR="public/$PREFIX/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
     fi
   else
     # For protected branches that are not release, we allow
     # a repository only for master.
     if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
-      TARGETDIR="public/master/$DISTRIBUTION"
+      TARGETDIR="public/$PREFIX/master/$DISTRIBUTION"
     else
       echo "Cannot create a repository for a protected branch that \
         is not associated with a release tag or it's master"
@@ -103,6 +106,7 @@ mkdir -p "$TARGETDIR/dists"
 for architecture in $ARCHITECTURES; do # amd64, arm64 ...
   for release in $RELEASES; do         # unstable, jammy, focal ...
     echo "Setting up APT repository for $DISTRIBUTION / $release / $architecture"
+    echo "targetdir: $TARGETDIR"
 
     # create the apt repository root directory and copy the public key
     cp scripts/packaging/package-signing-key.asc "$TARGETDIR/octez.asc"
@@ -157,7 +161,3 @@ export GOOGLE_OAUTH_ACCESS_TOKEN
 echo "Push to $BUCKET"
 
 gsutil -m cp -r public/* gs://"${BUCKET}"
-
-echo "Check the content of the bucket gs://${BUCKET}"
-
-gcloud storage ls -R gs://"${BUCKET}/*"
