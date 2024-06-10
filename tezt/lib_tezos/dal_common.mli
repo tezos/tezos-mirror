@@ -129,12 +129,6 @@ module RPC : sig
 
   type remote_uri_provider = Endpoint.t
 
-  (** [level_slot_pages ~published_level ~slot_index] gets the pages
-      of the slot published at level [published_level] on slot index
-      [slot_index]. *)
-  val level_slot_pages :
-    published_level:int -> slot_index:int -> string list RPC_core.t
-
   type commitment = string
 
   (** Profiles that operate on shards/slots. *)
@@ -175,6 +169,12 @@ module RPC : sig
         content associated with the given level and index. *)
   val get_level_slot_content :
     slot_level:int -> slot_index:int -> Helpers.slot RPC_core.t
+
+  (** [get_level_slot_pages ~published_level ~slot_index] gets the pages
+      of the slot published at level [published_level] on slot index
+      [slot_index]. *)
+  val get_level_slot_pages :
+    published_level:int -> slot_index:int -> string list RPC_core.t
 
   (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get

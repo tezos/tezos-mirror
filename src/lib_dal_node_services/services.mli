@@ -25,10 +25,6 @@
 
 (** This module provides different services related to DAL slots. *)
 
-(* We cannot include a raw mli file. But this will be removed once full
-   migration is done. *)
-include module type of Services_legacy
-
 open Tezos_crypto_dal
 
 type 'rpc service =
@@ -71,6 +67,16 @@ val get_slot_content :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.slot
+  ; prefix : unit
+  ; params : (unit * Types.level) * Types.slot_index
+  ; query : unit >
+  service
+
+(** Returns the pages of the slot identified by the given slot id. *)
+val get_slot_pages :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Tezos_crypto_dal.Cryptobox.page list
   ; prefix : unit
   ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >

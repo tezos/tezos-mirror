@@ -415,7 +415,7 @@ let register :
        (Profile_handlers.get_attestable_slots ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
-       Services.slot_pages
+       Services.get_slot_pages
        (Slots_handlers.get_slot_pages ctxt)
   |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
   |> add_service

@@ -50,7 +50,7 @@ let call (cctxt : #cctxt) = cctxt#call_service
 let get_slot_pages cctxt (slot_id : Types.slot_id) =
   call
     cctxt
-    Services.slot_pages
+    Services.get_slot_pages
     (((), slot_id.slot_level), slot_id.slot_index)
     ()
     ()

@@ -1272,7 +1272,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
       @@ get_level_slot_status ~slot_level:published_level ~slot_index)
   in
   let* pages =
-    Dal_RPC.(call dal_node @@ level_slot_pages ~published_level ~slot_index)
+    Dal_RPC.(call dal_node @@ get_level_slot_pages ~published_level ~slot_index)
   in
   Check.(
     slot_content = Helpers.(content_of_slot @@ slot_of_pages ~slot_size pages))
@@ -2126,7 +2126,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
         let* slot_pages =
           Dal_RPC.(
             call dal_node
-            @@ level_slot_pages
+            @@ get_level_slot_pages
                  ~published_level:slots_published_level
                  ~slot_index)
         in

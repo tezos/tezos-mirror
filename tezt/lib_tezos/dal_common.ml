@@ -124,19 +124,6 @@ module Dal_RPC = struct
   let get_bytes_from_json_string_node json =
     JSON.as_string json |> decode_hex_string_to_bytes
 
-  let level_slot_pages ~published_level ~slot_index =
-    make
-      GET
-      [
-        "levels";
-        string_of_int published_level;
-        "slots";
-        string_of_int slot_index;
-        "pages";
-      ]
-      (fun pages ->
-        pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
-
   type commitment = string
 
   type operator_profile =
@@ -213,6 +200,19 @@ module Dal_RPC = struct
         "content";
       ]
       get_bytes_from_json_string_node
+
+  let get_level_slot_pages ~published_level ~slot_index =
+    make
+      GET
+      [
+        "levels";
+        string_of_int published_level;
+        "slots";
+        string_of_int slot_index;
+        "pages";
+      ]
+      (fun pages ->
+        pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
 
   type commitment_proof = string
 
