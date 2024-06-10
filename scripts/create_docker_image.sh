@@ -12,8 +12,11 @@ cd "$src_dir"
 # defaults
 image_name="tezos-"
 image_version="latest"
-build_deps_image_name="registry.gitlab.com/tezos/opam-repository"
-build_deps_image_version=$opam_repository_tag
+# shellcheck disable=SC2154
+arch=${ARCH:-amd64}
+# Use the version of the build-deps image that corresponds to the state of the repo.
+# The image will be fetched from 'build_deps_image_name' from 'scripts/version.sh'.
+build_deps_image_version=${arch}--$(./images/image_tag.sh images/opam-repository)
 executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
@@ -55,11 +58,11 @@ DESCRIPTION
     The build uses following images from the build-deps suite:
      - BUILD_DEPS_IMAGE_NAME/runtime-dependencies:BUILD_DEPS_IMAGE_TAG
      - BUILD_DEPS_IMAGE_NAME/runtime-build-dependencies:BUILD_DEPS_IMAGE_TAG
-    The build-deps images are built in the
-    https://gitlab.com/tezos/opam-repository project,
-    and by default, BUILD_DEPS_IMAGE_NAME refers to the images from
-    this repository and BUILD_DEPS_IMAGE_TAG equals 'opam_repository_tag'
-    from 'scripts/version.sh'.
+    The build-deps images are defined in images/opam-repository,
+    and by default, BUILD_DEPS_IMAGE_NAME refers to the images build from
+    directory in the tezos/tezos CI. BUILD_DEPS_IMAGE_VERSION is set using
+    images/image_tag.sh such that a version corresponding to the local checkout
+    is used.
 
     If TARGET is 'with-evm-artifacts' then EVM artifacts are
     included. The image rust-toolchain is used to build these
@@ -90,7 +93,7 @@ OPTIONS
         --build-deps-image-name BUILD_DEPS_IMAGE_NAME
             Name of the build-deps image.
 
-        --build-deps-image-version BUILD_DEPS_IMAGE_TAG
+        --build-deps-image-version BUILD_DEPS_IMAGE_VERSION
             Version of the build-deps image.
 
         --rust-toolchain-image-name RUST_TOOLCHAIN_IMAGE_NAME
@@ -235,6 +238,19 @@ for executable in $executables; do
   echo "- $executable"
 done
 
+image_test="$build_deps_image_name/runtime-prebuild-dependencies:$build_deps_image_version"
+if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
+  echo "Build-deps image $image_test does not exist locally, attempt pull."
+  # This pull is just to check whether the image exists
+  # remotely. Although costly, it would've been pulled regardless in
+  # the docker builds below.
+  if ! docker pull "$image_test" > /dev/null 2>&1; then
+    echo "Failed to pull build-deps image $image_test."
+    echo "If you have modified any inputs to the build-deps image, then you have to rebuild it locally through ./images/create_opam_repository_images.sh."
+    exit 1
+  fi
+fi
+
 echo "### Building tezos..."
 
 docker build \
@@ -244,7 +260,7 @@ docker build \
   --target "$docker_target" \
   --cache-from "$build_image_name:$image_version" \
   --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies--$build_deps_image_version" \
+  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies:$build_deps_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
@@ -262,8 +278,8 @@ for variant in $variants; do
       --network host \
       -t "${image_name}debug:$image_version" \
       --build-arg "BASE_IMAGE=$build_deps_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$build_deps_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -278,8 +294,8 @@ for variant in $variants; do
       --network host \
       -t "${image_name}bare:$image_version" \
       --build-arg "BASE_IMAGE=$build_deps_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$build_deps_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -294,8 +310,8 @@ for variant in $variants; do
       --network host \
       -t "${image_name%?}:$image_version" \
       --build-arg "BASE_IMAGE=$build_deps_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$build_deps_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$build_deps_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \

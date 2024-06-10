@@ -4,13 +4,18 @@ set -eu
 # To run after the final Docker image was built on top of all the
 # other ones to display various software versions
 
-# shellcheck source=./scripts/docker.sh
-. ./scripts/docker.sh
+image_script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+repo_dir="$(dirname "$(dirname "$(dirname "$image_script_dir")")")"
+cd "$repo_dir"
 
-current_dir=$(cd "$(dirname "${0}")" && pwd)
+# shellcheck source=./images/opam-repository.inc.sh
+. ./images/opam-repository.inc.sh
 
-image_name="${1:-tezos/opam-repository}"
-image_tag_suffix="${2:-}"
+# shellcheck source=./scripts/version.sh
+. ./scripts/version.sh
+
+image_base="${1:-$build_deps_image_name}"
+image_tag_suffix="${2:-$(./images/image_tag.sh images/opam-repository)}"
 targetarch="${3:-amd64}"
 
 error=''
@@ -34,16 +39,13 @@ check_version() {
 }
 
 check_version_in_test_dependency_image() {
-  image_tag="$(docker_tag "runtime-build-test-dependencies" "$targetarch" "$image_tag_suffix")"
-
-  run="docker run --rm ${image_name}:${image_tag}"
+  image_tag="$(docker_tag "$targetarch" "$image_tag_suffix")"
+  image_name=${image_base}/runtime-build-test-dependencies:${image_tag}
+  run="docker run --rm ${image_name}"
 
   echo "###"
-  echo "### Version control for ${image_tag}"
+  echo "### Version control for ${image_name}"
   echo "###"
-
-  # shellcheck source=./scripts/version.sh
-  . "${current_dir}/version.sh"
 
   echo "### Distro info"
   eval "${run} cat /etc/os-release"
@@ -72,16 +74,13 @@ check_version_in_test_dependency_image() {
 }
 
 check_version_in_e2e_test_dependency_image() {
-  image_tag="$(docker_tag "runtime-e2etest-dependencies" "$targetarch" "$image_tag_suffix")"
-
-  run="docker run --rm ${image_name}:${image_tag}"
+  image_tag="$(docker_tag "$targetarch" "$image_tag_suffix")"
+  image_name=${image_base}/runtime-e2etest-dependencies:${image_tag}
+  run="docker run --rm ${image_name}"
 
   echo "###"
-  echo "### Version control for ${image_tag}"
+  echo "### Version control for ${image_name}"
   echo "###"
-
-  # shellcheck source=./scripts/version.sh
-  . "${current_dir}/version.sh"
 
   echo "### Distro info"
   eval "${run} cat /etc/os-release"

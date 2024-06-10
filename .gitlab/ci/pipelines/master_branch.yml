@@ -9,6 +9,44 @@ stages:
 - prepare_release
 - manual
 
+oc.docker:opam-repository:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./images/ci_create_opam_repository_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: opam_repository_image_tag.env
+
+oc.docker:opam-repository:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp_arm64
+  dependencies: []
+  before_script: []
+  script:
+  - ./images/ci_create_opam_repository_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+    ARCH: arm64
+  artifacts:
+    reports:
+      dotenv: opam_repository_image_tag.env
+
 oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
@@ -28,13 +66,14 @@ oc.docker:rust-toolchain:amd64:
       dotenv: rust_toolchain_image_tag.env
 
 oc.build:static-x86_64-linux-binaries:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -53,13 +92,14 @@ oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-binaries:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -78,14 +118,15 @@ oc.build:static-arm64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_arm64-released:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: manual
     allow_failure: true
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -112,14 +153,15 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_arm64-exp-dev-extra:
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: manual
     allow_failure: true
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -156,6 +198,7 @@ oc.docker:amd64:
   - when: always
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  - oc.docker:opam-repository:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -176,7 +219,8 @@ oc.docker:arm64:
   - gcp_arm64
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:arm64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -191,13 +235,14 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 oc.unified_coverage:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: test_coverage
   tags:
   - gcp
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - oc.docker:opam-repository:amd64
   allow_failure: true
   before_script:
   - . ./scripts/version.sh
@@ -226,7 +271,7 @@ oc.unified_coverage:
   coverage: '/Coverage: ([^%]+%)/'
 
 publish:documentation:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
   stage: doc
   tags:
   - gcp
@@ -244,8 +289,10 @@ publish:documentation:
     - tezt/**/*
     - vendors/**/*
     when: always
-  needs: []
-  dependencies: []
+  needs:
+  - oc.docker:opam-repository:amd64
+  dependencies:
+  - oc.docker:opam-repository:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
