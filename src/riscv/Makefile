@@ -23,6 +23,11 @@ riscv-sandbox::
 	@cargo build --release --package riscv-sandbox $(NATIVE_OPT)
 	@ln -f target/$(NATIVE_TARGET)/release/riscv-sandbox $@
 
+.PHONY: riscv-sandbox.prof
+riscv-sandbox.prof::
+	@cargo build --profile profiling --package riscv-sandbox
+	@ln -f target/profiling/riscv-sandbox $@
+
 riscv-dummy.elf::
 	@make -C dummy_kernel build
 	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@

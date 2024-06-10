@@ -8,19 +8,25 @@
 
 set -e
 
-USAGE="Usage: -t <num_transfers> [ -s: static inbox ]"
+USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ]"
 DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
 TX=""
 STATIC_INBOX=""
+SANDBOX_BIN="riscv-sandbox"
+PROFILING_WRAPPER=""
 
-while getopts "st:" OPTION; do
+while getopts "st:p" OPTION; do
   case "$OPTION" in
   t)
     TX="$OPTARG"
     ;;
   s)
     STATIC_INBOX="y"
+    ;;
+  p)
+    SANDBOX_BIN="riscv-sandbox.prof"
+    PROFILING_WRAPPER="samply record"
     ;;
   *)
     echo "$USAGE"
@@ -41,7 +47,7 @@ RISCV_DIR=$(dirname "$0")/..
 cd "$RISCV_DIR"
 
 echo "[INFO]: building sandbox"
-make riscv-sandbox &> /dev/null
+make "$SANDBOX_BIN" &> /dev/null
 echo "[INFO]: building bench tool"
 make -C jstz inbox-bench &> /dev/null
 
@@ -63,7 +69,8 @@ fi
 
 echo "[INFO]: running $TX transfers"
 LOG="${DATA_DIR}/log.out"
-./riscv-sandbox rvemu \
+$PROFILING_WRAPPER "./$SANDBOX_BIN" run \
+  --pvm \
   --input ../../tezt/tests/riscv-tests/hermit-loader \
   --initrd jstz/target/riscv64gc-unknown-hermit/release/jstz \
   --inbox-file "$RUN_INBOX" \
