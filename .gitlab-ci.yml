@@ -240,7 +240,6 @@ release:canary:
   stage: docker
   parallel: *default_matrix
   tags:
-    - devops
     - ${RUNNER}
   before_script:
     - !reference [.rename-build-artifacts, before_script]
