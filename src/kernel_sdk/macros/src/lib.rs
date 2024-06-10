@@ -13,7 +13,7 @@ use quote::{quote, ToTokens};
 /// Mark a function of type `fn(&mut impl Runtime)` as the entrypoint of the kernel.
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn entrypoint(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     if !attr.is_empty() {
         let err = format!(
             "Expected no attributes in kernel_entrypoint macro invocation, got: {attr}"

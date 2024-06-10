@@ -72,6 +72,10 @@ optional = true
 version = "=0.5.2"
 optional = true
 
+[dependencies.serde_json]
+version = "1.0.115"
+optional = true
+
 [target.'cfg(target_os = "hermit")'.dependencies.hermit]
 # TODO: remove pin once patched version of hermit is published
 git = "https://github.com/hermit-os/hermit-rs.git"
@@ -90,7 +94,7 @@ default = [
     "storage",
     "bls",
     "testing",
-    "extra"
+    "extra",
 ]
 crypto = ["tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]
@@ -116,5 +120,5 @@ experimental-host-in-memory-store = [
     "tezos-smart-rollup-entrypoint/proto-alpha",
     "tezos-smart-rollup-entrypoint/experimental-host-in-memory-store",
 ]
-extra = ["alloc", "std", "utils"]
+extra = ["alloc", "std", "utils", "dep:serde_json"]
 utils = ["dep:tezos-smart-rollup-utils"]

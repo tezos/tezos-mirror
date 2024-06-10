@@ -12,9 +12,10 @@
 - Add michelson `nat`.
 - Removes deprecated `proto-nairobi` feature flag.
 - Stabilise `OutboxMessage::WhitelistUpdate`.
-- Add `entrypoint` procedural macro to mark the kernel entrypoint function.
 - Add `tezos-smart-rollup-utils`, for tooling that interacts with non-kernel related standards in the Smart Rollup ecosystem.
 - Add `tezos_smart_rollup_utils::inbox` module, constructing inboxes for testing, and manipulating `inbox.json` files.
+- Add `tezos_smart_rollup::entrypoint` module for kernel entrypoint configuration & macros.
+- Add `entrypoint::main` procedural macro to mark the kernel entrypoint function.
 - Add `extra` feature flag, for functionalility not-expected to be used by kernels directly.
 
 ### Installer client/kernel
