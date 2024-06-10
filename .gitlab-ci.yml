@@ -54,7 +54,7 @@ workflow:
     matrix:
       - RUNNER: "gcp"
         ARCH: "amd64"
-      - RUNNER: "arm64"
+      - RUNNER: "gcp_arm64"
         ARCH: "arm64"
 
 .stable:variables:
