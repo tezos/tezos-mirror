@@ -11,6 +11,32 @@ let namespace = "dal"
 module Node_metrics = struct
   let subsystem = "node"
 
+  let number_of_reconstructions_started =
+    let name = "number_of_reconstructions_started" in
+    Prometheus.Counter.v
+      ~help:"Number of reconstructions started for observer's amplification"
+      ~namespace
+      ~subsystem
+      name
+
+  let number_of_reconstructions_done =
+    let name = "number_of_reconstructions_done" in
+    Prometheus.Counter.v
+      ~help:"Number of reconstructions finished for observer's amplification"
+      ~namespace
+      ~subsystem
+      name
+
+  let number_of_reconstructions_aborted =
+    let name = "number_of_reconstructions_aborted" in
+    Prometheus.Counter.v
+      ~help:
+        "Number of reconstructions aborted for observer's amplification, \
+         because observer received all the shards during its random delay"
+      ~namespace
+      ~subsystem
+      name
+
   let number_of_stored_shards =
     let name = "number_of_stored_shards" in
     Prometheus.Counter.v
@@ -369,6 +395,15 @@ module GS = struct
 
   let () = List.iter add_metric metrics
 end
+
+let reconstruction_started () =
+  Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_started
+
+let reconstruction_done () =
+  Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_done
+
+let reconstruction_aborted () =
+  Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_aborted
 
 let shard_stored () =
   Prometheus.Counter.inc_one Node_metrics.number_of_stored_shards

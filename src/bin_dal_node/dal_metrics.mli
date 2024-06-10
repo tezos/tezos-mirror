@@ -9,6 +9,16 @@
 (** Update the DAL metrics counter when a shard is stored. *)
 val shard_stored : unit -> unit
 
+(** Update the DAL metrics counter when a reconstruction is started. *)
+val reconstruction_started : unit -> unit
+
+(** Update the DAL metrics counter when a reconstruction is done. *)
+val reconstruction_done : unit -> unit
+
+(** Update the DAL metrics counter when a reconstruction is aborted because
+    enough shards have been received during the random delay. *)
+val reconstruction_aborted : unit -> unit
+
 (** Update the "waiting_for_attestation" status of the given slot index in the
     metrics. The value is set to 1 if [set] is true, and -1 otherwise. *)
 val slot_waiting_for_attestation : set:bool -> int -> unit
