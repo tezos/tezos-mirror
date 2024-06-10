@@ -3,13 +3,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{cli::RunOptions, posix_exit_mode};
+use crate::{cli::RunOptions, console::Console, posix_exit_mode};
 use octez_riscv::{
     exec_env::pvm::PvmSbiConfig,
     machine_state::bus::main_memory::M1G,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
-use std::{error::Error, fs};
+use std::{error::Error, fs, io::Write};
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
@@ -48,7 +48,16 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
 
     let rollup_address = SmartRollupAddress::from_b58check(opts.common.inbox.address.as_str())?;
 
-    let config = PvmSbiConfig::default();
+    let mut console = if opts.common.timings {
+        Console::with_timings()
+    } else {
+        Console::new()
+    };
+
+    let config = PvmSbiConfig::new(|c| {
+        let _written = console.write(&[c]).unwrap();
+    });
+
     let mut backend = PvmStepper::<'_, '_, M1G>::create_backend();
     let stepper = PvmStepper::new(
         &mut backend,
