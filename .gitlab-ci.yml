@@ -241,8 +241,10 @@ release:canary:
 ################################################
 
 .docker:release:
-  image: docker
   stage: docker
+  image: docker
+  services:
+    - docker:dind
   parallel: *default_matrix
   tags:
     - ${RUNNER}
