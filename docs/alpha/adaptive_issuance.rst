@@ -57,9 +57,8 @@ The values for participation rewards and
 the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
-The Adaptive-Issuance/Staking proposal
-introduces the possibility to activate Adaptive Issuance: a mechanism where the amount of
-participation rewards depends on the global **staked funds ratio** – that is, the
+Adaptive Issuance lets the amount of participation rewards depend on
+the global **staked funds ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
@@ -133,7 +132,9 @@ as follows.
 
 Where:
 
-- ``ai_activation_cycle`` is the first cycle with Adaptive Issuance active.
+- ``ai_activation_cycle`` is the first cycle with Adaptive Issuance
+  active, that is, :ref:`5 cycles after the activation of the Paris
+  protocol<feature_activation_alpha>`.
 - ``initial_period`` is a predefined period of time, set to 1 month in Paris.
 - ``transition_period`` is a predefined period of time, set to 5 months in Paris.
 
@@ -146,7 +147,10 @@ The issuance minimum ratio for Adaptive Issuance curve is then defined as follow
 
 Where:
 
-- ``issuance_ratio_initial_min`` (4.5%) is the initial minimum value. At the time of Adaptive Issuance‘s activation, the issuance rate is kept above this bound for the initial period.
+- ``issuance_ratio_initial_min`` (4.5%) is the initial minimum
+  value. At the time of :ref:`Adaptive Issuance
+  activation<feature_activation_alpha>`, the issuance rate is kept
+  above this bound for the initial period.
 - ``issuance_ratio_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
 
 
@@ -159,7 +163,10 @@ The issuance maximum ratio for Adaptive Issuance curve is then defined as follow
 
 Where:
 
-- ``issuance_ratio_initial_max`` (5.5%) controls the initial maximum value. At the time of Adaptive Issuance‘s activation, the issuance rate is kept below this bound for the initial period.
+- ``issuance_ratio_initial_max`` (5.5%) controls the initial maximum
+  value. At the time of :ref:`Adaptive Issuance
+  activation<feature_activation_alpha>`, the issuance rate is kept
+  below this bound for the initial period.
 - ``issuance_ratio_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
 .. _staked_ratio_alpha:
@@ -273,12 +280,13 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycl
 Adaptive rewards
 ----------------
 
-Before adaptive issuance activation, participation rewards
-are fixed values defined by protocol constants. With the
-proposed mechanism, the adaptive issuance rate
-provides instead a budget for the whole cycle, which gets allocated
-equally to each block of the cycle and distributed between the various
-rewards, in proportion to their relative :ref:`weights <rewards_weights_alpha>`.
+Before :ref:`Adaptive Issuance activation<feature_activation_alpha>`,
+participation rewards are fixed values defined by protocol
+constants. With the new mechanism, the adaptive issuance rate provides
+instead a budget for the whole cycle, which gets allocated equally to
+each block of the cycle and distributed between the various rewards,
+in proportion to their relative :ref:`weights
+<rewards_weights_alpha>`.
 
 .. _rewards_weights_alpha:
 
@@ -446,7 +454,9 @@ automatically shared between delegates and their
 stakers, delegates can use this parameter to collect an *edge* from the
 rewards attributable to their stakers.
 
-If and when the Adaptive-Issuance/Staking proposal activates, freezing and unfreezing of staked funds
+After :ref:`the activation of Adaptive Issuance and
+Staking<feature_activation_alpha>`, freezing and unfreezing of staked
+funds
 will be controlled directly by delegates and stakers, and will no longer
 be automatic. This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
@@ -461,11 +471,11 @@ the same name introduced for :ref:`user accounts <def_user_account_alpha>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
-**NB** Until :ref:`feature
-activation <feature_activation_alpha>`: only
+**NB** Until :ref:`the activation of Adaptive Issuance and Staking
+<feature_activation_alpha>`, only
 *delegates* can stake funds and the relative weight of staked and
 delegated funds remains unchanged. In the current implementation, only
-user accounts can become stakers. In other words, smart contracts
+*user accounts* can become stakers. In other words, smart contracts
 cannot stake funds (they can of course still delegate them).
 
 .. _staking_policy_configuration_alpha:
@@ -586,16 +596,17 @@ unfinalizable unstake request for token staked with the old delegate.
 
 .. _feature_activation_alpha:
 
-Feature activation vs protocol activation
-=========================================
+Activation of Adaptive Issuance and Staking
+===========================================
 
-Should the Adaptive-Issuance/Staking proposal be accepted by the community, and
-once the protocol becomes active on Tezos Mainnet, most of the features
-described in this document will **not** be enabled by default, only
-latent possibilities in the protocol, waiting for a separate activation.
+The Adaptive Issuance and Staking features will not be active
+immediately at the start of the Paris protocol. Instead, Adaptive
+Issuance and Staking will be automatically activated **5 cycles, that
+is, around 2 weeks** after the activation of Paris, in order to give
+the community enough time to get ready for these features.
 
-In particular, the following changes will require additional approval
-from delegates via separate feature activation vote mechanism:
+Here is the list of features and related changes that will only become
+active 5 cycles into the Paris protocol:
 
 -  Adaptive issuance – including notably the changes to the computation
    of consensus rewards.
@@ -604,10 +615,6 @@ from delegates via separate feature activation vote mechanism:
    **stake** funds.
 -  The changes in weight for staked and delegated funds towards the
    computation of baking and voting rights.
-
-Other changes described earlier would be enabled from the Adaptive-Issuance/Staking proposal’s
-activation:
-
 -  The new interface for stake manipulation based on
    *pseudo-operations*. Note that this entails the deprecation of the
    ``set/unset deposits limit`` interface and also the end of automatic
@@ -621,13 +628,6 @@ activation:
    participation rewards using the weight-based
    formulas, but these are defined so that they match the previous
    values when :ref:`Adaptive Issuance <adaptive_issuance_alpha>` is not active.
-
-
-**NB** In the implementation in the Adaptive-Issuance/Staking proposal, the issuance rate
-is computed 3 cycles in advance. Thus, in the first 3 cycles where is
-active, the protocol does not use the :ref:`adaptive reward
-formula <adaptive_rewards_alpha>` and keeps using the current reward
-values.
 
 .. [1]
    Note that if the nominal annual issuance rate is :math:`r`, the
