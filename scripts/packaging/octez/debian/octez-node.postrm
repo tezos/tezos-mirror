@@ -6,6 +6,10 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
+# systemctl should not be called directly. use this
+# wrapper script if available
+debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
+
 case "${1}" in
 remove | purge)
   rm -Rf /var/lib/octez-node
@@ -19,7 +23,7 @@ upgrade)
   if [ -f /var/lib/octez-node/daemon_was_running ] &&
     [ "$(cat /var/lib/octez-node/daemon_was_running)" = "1" ]; then
     # Start the daemon if it was running
-    systemctl start octez-node.service
+    $debsystemctl start octez-node.service
   fi
   ;;
 failed-upgrade | abort-install | abort-upgrade | disappear) ;;
