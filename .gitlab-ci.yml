@@ -149,6 +149,7 @@ prepare:canary:
   tags:
     - ${RUNNER}
   before_script:
+    - eval $(opam env)
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
   script:
     - dune build archiver/main.exe server/main.exe
