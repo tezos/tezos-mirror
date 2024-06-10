@@ -129,7 +129,7 @@ build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
 .PHONY: $(ALL_EXECUTABLES)
-$(ALL_EXECUTABLES): check-slim-mode
+$(ALL_EXECUTABLES): check-slim-mode check-custom-flags
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
@@ -163,6 +163,13 @@ validate-kaitai-struct-files:
 .PHONY: check-slim-mode
 check-slim-mode:
 	@if [ -f scripts/slim-mode.sh ]; then scripts/slim-mode.sh check; fi
+
+# If custom flags are active, print a message before building anything.
+# This check is disabled if file scripts/custom-flags.sh is not available,
+# which may be the case in Docker images or tarballs for instance.
+.PHONY: check-custom-flags
+check-custom-flags:
+	@if [ -f scripts/custom-flags.sh ]; then scripts/custom-flags.sh check; fi
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
@@ -213,7 +220,7 @@ clean-old-names:
 # See comment of clean-old-names for an explanation regarding why we do not try
 # to generate the symbolic links from *_EXECUTABLES.
 .PHONY: build
-build: check-slim-mode clean-old-names
+build: check-slim-mode check-custom-flags clean-old-names
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
