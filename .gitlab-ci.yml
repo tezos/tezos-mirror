@@ -117,6 +117,7 @@ check:
     - export DOCKER_CLI_EXPERIMENTAL=enabled
     - docker manifest inspect "${BUILD_CONTAINER_NAME}" && export DOCKER_ARGS="--build-arg BASE=${BUILD_CONTAINER_NAME}" && export OPAM_INSTALL_ARGS=--criteria="-changed,-removed" || export DOCKER_ARGS="" && export OPAM_INSTALL_ARGS=
     - echo DOCKER_ARGS="${DOCKER_ARGS}" OCTEZ_BRANCH="${OCTEZ_BRANCH}" OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}"
+    - while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' sleep 1; done
     - docker build -t "${BUILD_CONTAINER_NAME}" ${DOCKER_ARGS} --build-arg OCTEZ_BRANCH="${OCTEZ_BRANCH}" --build-arg OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}" -f Dockerfile.dependencies .
     - docker push "${BUILD_CONTAINER_NAME}"
 
