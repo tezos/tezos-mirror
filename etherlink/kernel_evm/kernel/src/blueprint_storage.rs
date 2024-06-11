@@ -501,7 +501,13 @@ mod tests {
             "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
         )
         .unwrap();
-        let dal = if enable_dal {Some(DalConfiguration {  }) } else {None};
+        let dal = if enable_dal {
+            Some(DalConfiguration {
+                slot_indices: vec![5],
+            })
+        } else {
+            None
+        };
         let mut config = Configuration {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Sequencer {

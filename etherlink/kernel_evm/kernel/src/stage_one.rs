@@ -200,7 +200,9 @@ mod tests {
         )
         .unwrap();
         let dal = if enable_dal {
-            Some(DalConfiguration {})
+            Some(DalConfiguration {
+                slot_indices: vec![6],
+            })
         } else {
             None
         };

@@ -2,7 +2,7 @@ use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
     delayed_inbox::DelayedInbox,
     storage::{
-        enable_dal, evm_node_flag, is_enable_fa_bridge,
+        dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
         max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
@@ -17,7 +17,9 @@ use tezos_smart_rollup_debug::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 
 #[derive(Debug, Clone, Default)]
-pub struct DalConfiguration {}
+pub struct DalConfiguration {
+    pub slot_indices: Vec<u8>,
+}
 
 pub enum ConfigurationMode {
     Proxy,
@@ -183,7 +185,8 @@ pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
 fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfiguration> {
     let enable_dal = enable_dal(host).unwrap_or(false);
     if enable_dal {
-        Some(DalConfiguration {})
+        let slot_indices: Vec<u8> = dal_slots(host).unwrap_or(None)?;
+        Some(DalConfiguration { slot_indices })
     } else {
         None
     }
