@@ -136,18 +136,13 @@ let process_included_l1_operation (type kind) ~catching_up
         {published_at_level; staked_hash = their_commitment_hash; _} ) ->
       (* Commitment published by someone else *)
       (* We first register the publication information *)
-      let* known_commitment =
-        Node_context.commitment_exists node_ctxt their_commitment_hash
-      in
       let* () =
-        if not known_commitment then return_unit
-        else
-          Node_context.register_published_commitment
-            node_ctxt
-            (Sc_rollup_proto_types.Commitment.to_octez their_commitment)
-            ~first_published_at_level:(Raw_level.to_int32 published_at_level)
-            ~level:head.Layer1.level
-            ~published_by_us:false
+        Node_context.register_published_commitment
+          node_ctxt
+          (Sc_rollup_proto_types.Commitment.to_octez their_commitment)
+          ~first_published_at_level:(Raw_level.to_int32 published_at_level)
+          ~level:head.Layer1.level
+          ~published_by_us:false
       in
       (* An accuser node will publish its commitment if the other one is
          refutable. *)
