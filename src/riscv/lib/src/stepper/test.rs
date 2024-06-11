@@ -5,8 +5,8 @@
 use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     exec_env::{
-        posix::{Posix, PosixState},
-        EcallOutcome, ExecutionEnvironment, ExecutionEnvironmentState,
+        posix::{PosixState, PosixStateLayout},
+        EcallOutcome,
     },
     kernel_loader,
     machine_state::bus::main_memory::{MainMemoryLayout, M1G},
@@ -72,14 +72,11 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-type TestStepperLayout<ML = M1G> = (
-    <Posix as ExecutionEnvironment>::Layout,
-    MachineStateLayout<ML>,
-);
+type TestStepperLayout<ML = M1G> = (PosixStateLayout, MachineStateLayout<ML>);
 
 pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
     machine_state: MachineState<ML, SliceManager<'a>>,
-    exec_env_state: PosixState<SliceManager<'a>>,
+    posix_state: PosixState<SliceManager<'a>>,
 }
 
 impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
@@ -91,11 +88,11 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
 
     fn bind_states(backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>) -> Self {
         let placed = TestStepperLayout::<ML>::placed().into_location();
-        let (exec_env_space, machine_state_space) = backend.allocate(placed);
-        let exec_env_state = PosixState::bind(exec_env_space);
+        let (posix_space, machine_state_space) = backend.allocate(placed);
+        let posix_state = PosixState::bind(posix_space);
         let machine_state = MachineState::bind(machine_state_space);
         Self {
-            exec_env_state,
+            posix_state,
             machine_state,
         }
     }
@@ -125,7 +122,7 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
         let mut stepper = Self::bind_states(backend);
 
         // By default the Posix EE expects to exit in a specific privilege mode.
-        stepper.exec_env_state.set_exit_mode(mode);
+        stepper.posix_state.set_exit_mode(mode);
 
         // The interpreter needs a program to run.
         let elf_program = Program::<ML>::from_elf(program)?;
@@ -151,7 +148,7 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
             // Evaluation function returned without error.
             None => {
                 // Check if the machine has exited.
-                if let Some(code) = self.exec_env_state.exit_code() {
+                if let Some(code) = self.posix_state.exit_code() {
                     Exit {
                         code: code as usize,
                         steps: result.steps,
@@ -186,11 +183,7 @@ impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
         let result = self.machine_state.step_range_handle(
             &steps,
             &mut should_continue,
-            |machine_state, exc| match self.exec_env_state.handle_call(
-                machine_state,
-                &mut Default::default(),
-                exc,
-            ) {
+            |machine_state, exc| match self.posix_state.handle_call(machine_state, exc) {
                 EcallOutcome::Fatal { message } => Err((exc, message)),
                 EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
             },

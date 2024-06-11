@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{EcallOutcome, ExecutionEnvironment, ExecutionEnvironmentState};
+use super::EcallOutcome;
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
@@ -14,16 +14,8 @@ use crate::{
     traps::EnvironException,
 };
 
-/// Posix execution environment
-pub enum Posix {}
-
-impl ExecutionEnvironment for Posix {
-    type Layout = (Atom<u64>, Atom<u8>, ModeLayout);
-
-    type State<M: Manager> = PosixState<M>;
-
-    type Config<'a> = ();
-}
+/// Layout for [`PosixState`]
+pub type PosixStateLayout = (Atom<u64>, Atom<u8>, ModeLayout);
 
 /// Posix execution environment state
 pub struct PosixState<M: Manager> {
@@ -48,16 +40,9 @@ impl<M: Manager> PosixState<M> {
     pub fn set_exit_mode(&mut self, mode: Mode) {
         self.exit_mode.write(mode);
     }
-}
 
-/// Implements a posix-ish environment for the RISC-V test suite.
-impl<M> ExecutionEnvironmentState<M> for PosixState<M>
-where
-    M: Manager,
-{
-    type ExecutionEnvironment = Posix;
-
-    fn bind(space: AllocatedOf<<Posix as ExecutionEnvironment>::Layout, M>) -> Self {
+    /// Bind the posix state to the given allocated space.
+    pub fn bind(space: AllocatedOf<PosixStateLayout, M>) -> Self {
         Self {
             code: space.0,
             exited: space.1,
@@ -65,16 +50,17 @@ where
         }
     }
 
-    fn reset(&mut self) {
+    /// Reset the entire Posix-related state.
+    pub fn reset(&mut self) {
         self.exited.write(0);
         self.code.write(0);
         self.exit_mode.write(Mode::Machine);
     }
 
-    fn handle_call<ML: MainMemoryLayout>(
+    /// Handle a POSIX system call.
+    pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
-        _config: &mut (),
         env_exception: EnvironException,
     ) -> EcallOutcome {
         if self.exited() {
