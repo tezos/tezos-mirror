@@ -20,7 +20,7 @@ To this end:
 - the set of opam dependencies and their exact version number is stored in
   :src:`an opam lock file <opam/virtual/octez-deps.opam.locked>`;
 - the hash of the commit to use from the public opam repository is stored
-  in :src:`scripts/version.sh` in the variable ``full_opam_repository_tag``;
+  in :src:`scripts/version.sh` in the variable ``opam_repository_tag``;
 - ``make build-deps`` and ``make build-dev-deps`` use the lock file and the hash
   to select dependencies;
 - the CI builds and uses Docker images using this information.
@@ -71,7 +71,7 @@ You must follow the steps below in order to produce the necessary Docker images,
 allowing your work to eventually be merged.
 
 First, in your local copy of Octez, **update the**
-``full_opam_repository_tag`` **variable in the** :src:`scripts/version.sh`
+``opam_repository_tag`` **variable in the** :src:`scripts/version.sh`
 **file**. You should set this variable to the commit hash of a recent version of
 the ``master`` branch of
 `the default opam repository <https://github.com/ocaml/opam-repository/commits/master>`__.
@@ -94,7 +94,7 @@ not an issue in general but it might explain some changes unrelated to your work
     followed by ``mv octez-deps.opam.locked opam/virtual``,
     or even edit the lock file manually.
     Neither of these guarantees that packages are available in the commit
-    identified by ``full_opam_repository_tag`` of the public opam repository,
+    identified by ``opam_repository_tag`` of the public opam repository,
     and even so, you may end up with unwanted versions of dependencies;
     so you should review the resulting lock file even more carefully.
     Editing the lock file manually is even less safe than running ``opam lock``
@@ -117,7 +117,7 @@ As a developer:
   onto ``tezos/tezos:master`` introducing a dependency to ``foo``.
 - You amend the ``manifest/`` files to declare the dependency.
 - You propagate the changes to ``opam`` and ``dune`` files by running ``make -C manifest``.
-- You update the ``full_opam_repository_tag`` to the commit hash of
+- You update the ``opam_repository_tag`` to the commit hash of
   a recent version of the public default opam repository.
 - You update :src:`opam/virtual/octez-deps.opam.locked`,
   for instance by executing :src:`scripts/update_opam_lock.sh`.

@@ -22,9 +22,9 @@ export opam_version_major=2
 export recommended_rust_version=1.74.0
 export recommended_node_version=18.18.2
 
-## full_opam_repository is a commit hash of the public opam repository, i.e.
+## opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
+export opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
