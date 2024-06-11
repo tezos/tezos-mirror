@@ -73,12 +73,6 @@ pub type Withdrawal = OutboxMessage<RouterInterface>;
 pub struct ExecutionOutcome {
     /// How much gas was used for processing an entire transaction.
     pub gas_used: u64,
-    /// Whether the transaction succeeded or not.
-    ///  - In case of transfer-, whether the funds were transferred
-    ///  - In case of call-, whether toplevel call returned or stopped (success), or
-    ///    something else (revert, invalid code, etc. are non-successes).
-    ///  - In case of create-, whethere a new contract was created or not.
-    pub is_success: bool,
     /// The sputnik reason for ending execution. In case of transfers, this is made up
     /// (sputnik Doesn't execute those - we do).
     pub reason: ExtendedExitReason,
@@ -93,6 +87,15 @@ pub struct ExecutionOutcome {
     pub withdrawals: Vec<Withdrawal>,
     /// Number of estimated ticks used at the end of the contract call
     pub estimated_ticks_used: u64,
+}
+
+impl ExecutionOutcome {
+    pub const fn is_success(&self) -> bool {
+        matches!(
+            self.reason,
+            ExtendedExitReason::Exit(ExitReason::Succeed(_))
+        )
+    }
 }
 
 /// The result of calling a contract as expected by the SputnikVM EVM implementation.
@@ -1482,7 +1485,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
             Ok(ExecutionOutcome {
                 gas_used,
-                is_success: true,
                 reason: reason.into(),
                 new_address,
                 logs: last_layer.logs,
@@ -1542,7 +1544,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         Ok(ExecutionOutcome {
             gas_used,
-            is_success: false,
             reason,
             new_address: None,
             logs: vec![],

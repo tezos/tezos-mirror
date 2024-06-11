@@ -187,7 +187,7 @@ where
         match outcome.reason {
             ExtendedExitReason::Exit(ExitReason::Revert(_))
             | ExtendedExitReason::OutOfTicks => pay_for_gas,
-            _ => pay_for_gas && outcome.is_success,
+            _ => pay_for_gas && outcome.is_success(),
         }
     }
 
@@ -249,7 +249,7 @@ where
                 trace_outcome(
                     handler,
                     tracing,
-                    result.is_success,
+                    result.is_success(),
                     &result.result,
                     result.gas_used,
                 )?;

@@ -377,6 +377,7 @@ impl BlockInProgress {
 
         match execution_outcome {
             Some(outcome) => {
+                let is_success = outcome.is_success();
                 let log_iter = outcome.logs.into_iter();
                 let logs: Vec<IndexedLog> = log_iter
                     .enumerate()
@@ -399,7 +400,7 @@ impl BlockInProgress {
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,
                     type_,
-                    status: if outcome.is_success {
+                    status: if is_success {
                         TransactionStatus::Success
                     } else {
                         TransactionStatus::Failure
