@@ -351,15 +351,27 @@ let recover_bond node_ctxt =
 
 (* Commitments can only be cemented after [sc_rollup_challenge_window] has
    passed since they were first published. *)
-let earliest_cementing_level node_ctxt commitment_hash =
-  let open Lwt_result_option_syntax in
-  let** {first_published_at_level; _} =
+let earliest_cementing_level node_ctxt commitment_hash inbox_level =
+  let open Lwt_result_syntax in
+  let* publication_info =
     Node_context.commitment_published_at_level node_ctxt commitment_hash
   in
   return
-  @@ Int32.add
-       first_published_at_level
-       (sc_rollup_challenge_window node_ctxt |> Int32.of_int)
+  @@
+  match publication_info with
+  | Some {first_published_at_level; _} ->
+      Int32.add
+        first_published_at_level
+        (sc_rollup_challenge_window node_ctxt |> Int32.of_int)
+  | None ->
+      (* NOTE: In case the publication information is missing from the rollup
+         node (this is possible if a snapshot produced before
+         https://gitlab.com/tezos/tezos/-/merge_requests/13724 was imported), we
+         under-approximate the first publication level by the inbox level + 3,
+         i.e. inbox level + block finality + injection block. *)
+      Int32.add
+        (Int32.add inbox_level 3l)
+        (sc_rollup_challenge_window node_ctxt |> Int32.of_int)
 
 (** [latest_cementable_commitment node_ctxt head] is the most recent commitment
       hash that could be cemented in [head]'s successor if:
@@ -405,17 +417,17 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
         return acc
     | Some commitment ->
         let* earliest_cementing_level =
-          earliest_cementing_level node_ctxt commitment_hash
+          earliest_cementing_level
+            node_ctxt
+            commitment_hash
+            commitment.inbox_level
         in
         let acc =
-          match earliest_cementing_level with
-          | None -> acc
-          | Some earliest_cementing_level ->
-              if earliest_cementing_level > head_level then
-                (* Commitments whose cementing level are after the head's
-                   successor won't be cementable in the next block. *)
-                acc
-              else commitment_hash :: acc
+          if earliest_cementing_level > head_level then
+            (* Commitments whose cementing level are after the head's
+               successor won't be cementable in the next block. *)
+            acc
+          else commitment_hash :: acc
         in
         gather acc commitment.predecessor
   in
