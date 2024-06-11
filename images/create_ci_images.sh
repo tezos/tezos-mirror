@@ -81,15 +81,15 @@ Assuming the result of ./images/image_tag.sh, used to set the default
 value of TAG_SUFFIX is 'deadbeef', this will create the following
 images:
 
- - runtime-dependencies          :amd64--deadbeef, :amd64--my_build
- - runtime-prebuild-dependencies :amd64--deadbeef, :amd64--my_build
+ - runtime   :amd64--deadbeef, :amd64--my_build
+ - prebuild  :amd64--deadbeef, :amd64--my_build
  - ...
 
 under '$ci_image_name',
 with caches fetched from
 
- - runtime-dependencies          :amd64--my_build, :amd64--master
- - runtime-prebuild-dependencies :amd64--my_build, :amd64--master
+ - runtime   :amd64--my_build, :amd64--master
+ - prebuild  :amd64--my_build, :amd64--master
  - ...
 
 EOT

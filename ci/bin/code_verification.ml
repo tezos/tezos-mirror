@@ -78,7 +78,7 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
     ?dependencies
     ~__POS__
     ~name:("opam:" ^ name)
-    ~image:Images.runtime_prebuild_dependencies
+    ~image:Images.CI.prebuild
     ~stage:Stages.packaging
       (* FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
          FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
@@ -211,7 +211,7 @@ let job_tezt ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
   let retry = if retry = 0 then None else Some retry in
   job
     ~__POS__
-    ~image:Images.runtime_e2etest_dependencies
+    ~image:Images.CI.e2etest
     ~name
     ?parallel
     ~tag
@@ -423,7 +423,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"sanity_ci"
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~stage:Stages.sanity
         ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
@@ -528,7 +528,7 @@ let jobs pipeline_type =
         (* We need:
            - Git (to run git diff)
            - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
-      ~image:Images.runtime_prebuild_dependencies
+      ~image:Images.CI.prebuild
       ~stage:Stages.build
       ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
       (script_propagate_exit_code "scripts/ci/select_tezts.sh")
@@ -579,7 +579,7 @@ let jobs pipeline_type =
     job
       ~__POS__
       ~name:"oc.tezt:fetch-records"
-      ~image:Images.runtime_build_dependencies
+      ~image:Images.CI.build
       ~stage:Stages.build
       ~before_script:
         (before_script
@@ -638,7 +638,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"ocaml-check"
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~stage:Stages.build
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
@@ -659,7 +659,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~stage:Stages.build
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~rules:(make_rules ~manual:Yes ())
         ~before_script:
           (before_script
@@ -699,7 +699,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"opam:prepare"
-        ~image:Images.runtime_prebuild_dependencies
+        ~image:Images.CI.prebuild
         ~stage:Stages.packaging
         ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~eval_opam:true [])
@@ -742,7 +742,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"kaitai_checks"
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
@@ -790,7 +790,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.check_lift_limits_patch"
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_lift_limits_patch ())
@@ -810,7 +810,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.misc_checks"
-        ~image:Images.runtime_build_test_dependencies
+        ~image:Images.CI.test
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_lint_files ())
@@ -838,7 +838,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.python_check"
-        ~image:Images.runtime_build_test_dependencies
+        ~image:Images.CI.test
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_python_files ())
@@ -854,7 +854,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.ocaml_fmt"
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
@@ -900,8 +900,8 @@ let jobs pipeline_type =
            [pipeline_type]. *)
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
-      let job_unit_test ~__POS__ ?(image = Images.runtime_build_dependencies)
-          ?timeout ?parallel_vector ~arch ~name ~make_targets () : tezos_job =
+      let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
+          ?parallel_vector ~arch ~name ~make_targets () : tezos_job =
         let arch_string = arch_to_string arch in
         let script = ["make $MAKE_TARGETS"] in
         let dependencies = build_dependencies arch in
@@ -952,7 +952,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:non-proto-x86_64"
           ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~make_targets:["test-nonproto-unit"]
           ()
         |> enable_coverage_instrumentation |> enable_coverage_output_artifact
@@ -985,7 +985,7 @@ let jobs pipeline_type =
           ~name:"oc.unit:non-proto-arm64"
           ~parallel_vector:2
           ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~make_targets:["test-nonproto-unit"; "test-webassembly"]
           ()
       in
@@ -994,7 +994,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:webassembly-x86_64"
           ~arch:Amd64 (* The wasm tests are written in Python *)
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.test
           ~dependencies:(build_dependencies Amd64)
           ~rules
@@ -1012,7 +1012,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:js_components"
           ~arch:Amd64
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.test
           ~dependencies:(build_dependencies Amd64)
           ~rules
@@ -1032,7 +1032,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:protocol_compiles"
           ~arch:Amd64
-          ~image:Images.runtime_build_dependencies
+          ~image:Images.CI.build
           ~stage:Stages.test
           ~dependencies:(build_dependencies Amd64)
           ~rules
@@ -1047,7 +1047,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:("de.unit:" ^ arch_to_string arch)
           ~arch
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.test
           ~rules:
             (make_rules
@@ -1065,7 +1065,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:("resto.unit:" ^ arch_to_string arch)
           ~arch
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.test
           ~rules:
             (make_rules
@@ -1095,7 +1095,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.integration:compiler-rejections"
         ~stage:Stages.test
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~rules:(make_rules ~changes:changeset_octez ())
         ~dependencies:
           (Dependent
@@ -1109,7 +1109,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.script:test-gen-genesis"
         ~stage:Stages.test
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_octez ())
         ~before_script:
@@ -1121,7 +1121,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.script:snapshot_alpha_and_link"
         ~stage:Stages.test
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~dependencies:order_after_build
           (* Since the above dependencies are only for ordering, we do not set [dependent] *)
         ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
@@ -1139,7 +1139,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.script:test_octez_release_versions"
         ~stage:Stages.test
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~dependencies:
           (Dependent
              [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
@@ -1161,7 +1161,7 @@ let jobs pipeline_type =
           (* Requires Python. Can be changed to a python image, but using
              the build docker image to keep in sync with the python
              version used for the tests *)
-        ~image:Images.runtime_build_test_dependencies
+        ~image:Images.CI.test
         ~rules:(make_rules ~changes:changeset_script_b58_prefix ())
         ~dependencies:dependencies_needs_start
         ~before_script:
@@ -1177,7 +1177,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.test-liquidity-baking-scripts"
         ~stage:Stages.test
-        ~image:Images.runtime_build_dependencies
+        ~image:Images.CI.build
         ~dependencies:
           (Dependent
              [
@@ -1588,7 +1588,7 @@ let jobs pipeline_type =
           job
             ~__POS__
             ~name:"commit_titles"
-            ~image:Images.runtime_prebuild_dependencies
+            ~image:Images.CI.prebuild
             ~stage:Stages.test
             ~dependencies:dependencies_needs_start
             (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
@@ -1619,7 +1619,7 @@ let jobs pipeline_type =
           let dependencies = List.rev !jobs_with_coverage_output in
           job
             ~__POS__
-            ~image:Images.runtime_e2etest_dependencies
+            ~image:Images.CI.e2etest
             ~name:"oc.unified_coverage"
             ~stage:Stages.test_coverage
             ~coverage:"/Coverage: ([^%]+%)/"
@@ -1632,7 +1632,7 @@ let jobs pipeline_type =
               [
                 (* This inhibits the Makefile's opam version check, which
                    this job's opam-less image
-                   ([runtime_e2etest_dependencies]) cannot pass. *)
+                   ([e2etest]) cannot pass. *)
                 ("TEZOS_WITHOUT_OPAM", "true");
               ]
             ~dependencies:(Staged dependencies)
@@ -1694,7 +1694,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"documentation:odoc"
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.doc
           ~dependencies:dependencies_needs_start
           ~rules
@@ -1712,7 +1712,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"documentation:manuals"
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.doc
           ~dependencies:dependencies_needs_start
           ~rules
@@ -1733,7 +1733,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"documentation:docgen"
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.doc
           ~dependencies:dependencies_needs_start
           ~rules
@@ -1759,7 +1759,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"documentation:build_all"
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.doc
           ~dependencies:doc_build_dependencies
             (* Warning: the [documentation:linkcheck] job must have at least the same
@@ -1786,7 +1786,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"documentation:linkcheck"
-          ~image:Images.runtime_build_test_dependencies
+          ~image:Images.CI.test
           ~stage:Stages.doc
           ~dependencies:
             (Dependent

@@ -74,10 +74,7 @@ let alpine_version =
 (* Register external images.
 
    Use this module to register images that are as built outside the
-   [tezos/tezos] CI.
-
-   For documentation on the [runtime_X_dependencies] and the
-   [rust_toolchain] images, refer to [images/README.md]. *)
+   [tezos/tezos] CI. *)
 module Images_external = struct
   let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
 
@@ -575,7 +572,10 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
 
     To make the distinction between internal and external images
     transparent to job definitions, this module also includes
-    {!Images_external}. *)
+    {!Images_external}.
+
+    For documentation on the [CI] images and the [rust_toolchain]
+    images, refer to [images/README.md]. *)
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
@@ -629,55 +629,48 @@ module Images = struct
       ~image_path
       ()
 
-  (* The job that builds the CI images.
-     This job is automatically included in any pipeline that uses any of these images. *)
-  let job_docker_ci arch =
-    let variables = Some [("ARCH", arch_to_string_alt arch)] in
-    job_docker_authenticated
-      ?variables
-      ~__POS__
-      ~arch
-      ~skip_docker_initialization:true
-      ~stage:Stages.images
-      ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
-      ~ci_docker_hub:false
-      ~artifacts:(artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
-      ["./images/ci_create_ci_images.sh"]
+  module CI = struct
+    (* The job that builds the CI images.
+       This job is automatically included in any pipeline that uses any of these images. *)
+    let job_docker_ci arch =
+      let variables = Some [("ARCH", arch_to_string_alt arch)] in
+      job_docker_authenticated
+        ?variables
+        ~__POS__
+        ~arch
+        ~skip_docker_initialization:true
+        ~stage:Stages.images
+        ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
+        ["./images/ci_create_ci_images.sh"]
 
-  let mk_ci_image ~image_path =
-    Image.mk_internal
-      ~image_builder_amd64:(job_docker_ci Amd64)
-      ~image_builder_arm64:(job_docker_ci Arm64)
-      ~image_path
-      ()
+    let mk_ci_image ~image_path =
+      Image.mk_internal
+        ~image_builder_amd64:(job_docker_ci Amd64)
+        ~image_builder_arm64:(job_docker_ci Arm64)
+        ~image_path
+        ()
 
-  (* Reuse the same image_builder job [job_docker_ci] for all
-     the below images, since they're all produced in that same job.
+    (* Reuse the same image_builder job [job_docker_ci] for all
+       the below images, since they're all produced in that same job.
 
-     Depending on any of these images ensures that the job
-     [job_docker_ci] is included exactly once in the pipeline. *)
-  let runtime_dependencies =
-    mk_ci_image
-      ~image_path:"${ci_image_name}/runtime-dependencies:${ci_image_tag}"
+       Depending on any of these images ensures that the job
+       [job_docker_ci] is included exactly once in the pipeline. *)
+    let runtime =
+      mk_ci_image ~image_path:"${ci_image_name}/runtime:${ci_image_tag}"
 
-  let runtime_prebuild_dependencies =
-    mk_ci_image
-      ~image_path:
-        "${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}"
+    let prebuild =
+      mk_ci_image ~image_path:"${ci_image_name}/prebuild:${ci_image_tag}"
 
-  let runtime_build_dependencies =
-    mk_ci_image
-      ~image_path:"${ci_image_name}/runtime-build-dependencies:${ci_image_tag}"
+    let build = mk_ci_image ~image_path:"${ci_image_name}/build:${ci_image_tag}"
 
-  let runtime_build_test_dependencies =
-    mk_ci_image
-      ~image_path:
-        "${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}"
+    let test = mk_ci_image ~image_path:"${ci_image_name}/test:${ci_image_tag}"
 
-  let runtime_e2etest_dependencies =
-    mk_ci_image
-      ~image_path:
-        "${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}"
+    let e2etest =
+      mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
+  end
 end
 
 (* This version of the job builds both released and experimental executables.
@@ -710,7 +703,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~stage:Stages.build
     ~arch
     ~name
-    ~image:Images.runtime_build_dependencies
+    ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
     ~artifacts
@@ -759,12 +752,12 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7293
 
        In reality, we actually require both
-       {!Images.runtime_dependencies} and
-       {!Images.runtime_build_dependencies}. But these two images are
+       {!Images.CI.runtime} and
+       {!Images.CI.build}. But these two images are
        created by the same job, and depending on them both will create
        a duplicated dependency on that single job, which GitLab CI
        does not allow. This should be somehow handled by CIAO. *)
-    [Images.runtime_dependencies]
+    [Images.CI.runtime]
     @ if with_evm_artifacts then [Images.rust_toolchain] else []
   in
   let variables =
@@ -1000,7 +993,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~stage:Stages.build
       ~arch
       ~name
-      ~image:Images.runtime_build_dependencies
+      ~image:Images.CI.build
       ~before_script:
         (before_script
            ~take_ownership:true
