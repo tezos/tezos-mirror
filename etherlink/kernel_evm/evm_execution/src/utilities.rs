@@ -7,8 +7,7 @@ use core::cmp::min;
 
 use alloc::vec::Vec;
 use primitive_types::{H160, H256};
-use sha2::Digest;
-use sha3::Keccak256;
+use sha3::{Digest, Keccak256};
 
 /// Get an array from the data, if data does not contain `start` to `len` bytes, add right padding with
 /// zeroes

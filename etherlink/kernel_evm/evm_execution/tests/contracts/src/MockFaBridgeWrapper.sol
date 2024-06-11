@@ -14,7 +14,7 @@ function calcTicketHash(bytes22 ticketer, bytes memory content)
 /**
  * MockWrapper is a mock token contract which represents a L1 token on L2.
  */
-contract MockWrapper {
+contract MockFaBridgeWrapper {
     uint256 private _ticketHash;
     address private _kernel;
 

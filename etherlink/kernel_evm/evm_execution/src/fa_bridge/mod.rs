@@ -30,3 +30,5 @@
 //! All the state updates (ticket table, outbox message counter) are done
 //! using the transactional Eth account storage, so that they are discarded
 //! in case of a revert/failure.
+
+pub mod ticket_table;

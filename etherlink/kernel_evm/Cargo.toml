@@ -8,15 +8,7 @@
 
 [workspace]
 
-members = [
-  "ethereum",
-  "fa_bridge",
-  "kernel",
-  "evm_execution",
-  "evm_evaluation",
-  "indexable_storage",
-  "logging",
-]
+members = ["ethereum", "kernel", "evm_execution", "evm_evaluation", "indexable_storage", "logging"]
 
 [workspace.dependencies]
 
@@ -56,7 +48,6 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
-fa-bridge = { path = "./fa_bridge" }
 tezos_ethereum = { path = "./ethereum" }
 evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }

@@ -157,7 +157,7 @@ const CODE_HASH_BYTES: [u8; WORD_SIZE] = Decoder::Hex
 pub const CODE_HASH_DEFAULT: H256 = H256(CODE_HASH_BYTES);
 
 /// Read a single unsigned 256 bit value from storage at the path given.
-fn read_u256(
+pub fn read_u256(
     host: &impl Runtime,
     path: &impl Path,
     default: U256,
@@ -167,6 +167,17 @@ fn read_u256(
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(err) => Err(err.into()),
     }
+}
+
+/// Write a single unsigned 256 but value to the storage at the given path
+pub fn write_u256(
+    host: &mut impl Runtime,
+    path: &impl Path,
+    x: U256,
+) -> Result<(), RuntimeError> {
+    let mut x_bytes = [0u8; 32];
+    x.to_little_endian(&mut x_bytes);
+    host.store_write(path, &x_bytes, 0)
 }
 
 /// Read a single unsigned 64 bit value from storage at the path given.
@@ -204,7 +215,7 @@ fn read_h256(
 
 /// Get the path corresponding to an index of H256. This is used to
 /// find the path to a value a contract stores in durable storage.
-fn path_from_h256(index: &H256) -> Result<OwnedPath, AccountStorageError> {
+pub fn path_from_h256(index: &H256) -> Result<OwnedPath, AccountStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(index.to_fixed_bytes()));
     OwnedPath::try_from(path_string).map_err(AccountStorageError::from)
 }
@@ -349,6 +360,14 @@ impl EthereumAccount {
 
         host.store_write_all(&path, &new_balance_bytes)
             .map_err(AccountStorageError::from)
+    }
+
+    /// Get the path to a custom account state section, can be used by precompiles
+    pub fn custom_path(
+        &self,
+        suffix: &impl Path,
+    ) -> Result<OwnedPath, AccountStorageError> {
+        concat(&self.path, suffix).map_err(AccountStorageError::from)
     }
 
     /// Get the path to an index in durable storage for an account.
@@ -1166,6 +1185,44 @@ mod test {
             a1.code_hash(&host)
                 .expect("Could not get code hash for account"),
             sample_code_hash
+        );
+    }
+
+    #[test]
+    fn test_read_u256_le() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/value");
+        assert_eq!(
+            read_u256(&host, &path, U256::from(128)).unwrap(),
+            U256::from(128)
+        );
+
+        host.store_write_all(&path, &[1u8; 20]).unwrap();
+        assert_eq!(read_u256(&host, &path, U256::zero()).unwrap(), U256::zero());
+
+        host.store_write_all(
+            &path,
+            &hex::decode(
+                "ff00000000000000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            read_u256(&host, &path, U256::zero()).unwrap(),
+            U256::from(255)
+        );
+    }
+
+    #[test]
+    fn test_write_u256_le() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/value");
+
+        write_u256(&mut host, &path, U256::from(255)).unwrap();
+        assert_eq!(
+            hex::encode(host.store_read_all(&path).unwrap()),
+            "ff00000000000000000000000000000000000000000000000000000000000000"
         );
     }
 }

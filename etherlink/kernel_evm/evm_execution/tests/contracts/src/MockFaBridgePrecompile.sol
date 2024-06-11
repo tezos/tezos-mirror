@@ -8,7 +8,7 @@ pragma solidity >=0.8.19;
  * MockWrapper is a helper contract to generate ABIs
  * for the FA brige precompile.
  */
-contract MockPrecompile {
+contract MockFaBridgePrecompile {
 
     event Deposit(
         uint256 indexed ticketHash,

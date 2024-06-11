@@ -24,6 +24,7 @@ mod access_record;
 
 pub mod abi;
 pub mod account_storage;
+pub mod fa_bridge;
 pub mod handler;
 pub mod precompiles;
 pub mod storage;
