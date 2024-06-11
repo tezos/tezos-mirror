@@ -912,6 +912,8 @@ let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
+let init_etherlink _cloud _agent = ()
+
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
   let* attesters_agents =
@@ -976,6 +978,7 @@ let init ~(configuration : configuration) cloud next_agent =
           agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
+  let* _etherlink_agent = next_agent ~name:"etherlink" in
   let etherlink = () in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
