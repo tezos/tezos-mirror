@@ -9,9 +9,11 @@ The images, their content and indented usage, are:
 |----------------------------|-----------------------------------------|--------------------------------|
 | `rust-toolchain`           | cargo                                   | CI: kernel build, test and SDK |
 | `client-libs-dependencies` | kaitai-struct-compiler, xxd, java, node | CI: Kaitai e2e tests           |
+| `ci`                       | ocaml, cargo, npm, python ...           | CI: the majority of jobs       |
 
-For more details on the contents and usage of each image, see below
-and in the header comment of each corresponding Dockerfile.
+For more details on the contents and usage of each image, see below,
+in the header comment of each corresponding Dockerfile and in the
+`IMAGE/README.md` file when applicable.
 
 ## Input hashes
 
@@ -69,6 +71,17 @@ The `client-libs-depencies` image is used in the CI to run end-to-end
 tests of client-libs. To build this image for local use, run
 `create_client_libs_dependencies_image.sh`.
 
+
+# `ci` images
+
+The `ci` images is a suite of images, defined as different layer in
+the Dockerfile `ci/Dockerfile`. It is used in the CI to run a wide
+variety of jobs.  Its `runtime-dependencies` and
+`runtime-build-dependencies` layers are also used as input for the Octez
+Docker distribution.  To build these images for local use, run
+`create_ci_image.sh`.
+
+
 # Common files in `common`
 
 Files that are shared between image built contexts are stored in
@@ -86,29 +99,29 @@ script will build the Octez Docker Distribution with the *released*
 set of executables (see `scripts-inputs/released-executables`) and
 without EVM artifacts.
 
-Building the Octez Docker distribution requires the build-deps images
+Building the Octez Docker distribution requires some of the CI images
 as input. The definition of these input images can be found in
-`images/opam-repository`, and they can be built locally using
-`./images/create_opam_repository_images.sh.`
+`images/ci`, and they can be built locally using
+`./images/create_ci_images.sh.`
 
 By default, the script `./scripts/create_docker_image.sh` looks for a
-version of the build-deps images that corresponds to the current state
+version of the CI images that corresponds to the current state
 of the checkout (see `images/image_tag.sh` for more info). To use a
-custom version, for instance the build-deps images built in a specific
-pipeline, see the parameters `--build-deps-image-name` and
-`--build-deps-image-version`.
+custom version, for instance the CI images built in a specific
+pipeline, see the parameters `--ci-image-name` and
+`--ci-image-version`.
 
 To build the Octez Docker Distribution with EVM artifacts, pass
 `--docker-target with-evm-artifacts` to
-`./scripts/create_docker_image.sh`. Building the EVM artifacts
-requires the rust-toolchain image as input. By default, the script
-will attempt to re-use the latest version of this image built on the
-`master` branch of the tezos/tezos CI. If you need to use a different
-image for the rust-toolchain image, follow the instructions in
-`./images/README.MD` and `./images/create_rust_toolchain_image.sh` to
-create one. Then specify the `--rust-toolchain-image-name` and
-`--rust-toolchain-image-tag` parameters to
-`./scripts/create_docker_image.sh` accordingly.
+`./scripts/create_docker_image.sh`. In addition the the CI images,
+building the EVM artifacts requires the rust-toolchain image as
+input. By default, the script will attempt to re-use the latest
+version of this image built on the `master` branch of the tezos/tezos
+CI. If you need to use a different image for the rust-toolchain image,
+follow the instructions in `./images/README.MD` and
+`./images/create_rust_toolchain_image.sh` to create one. Then specify
+the `--rust-toolchain-image-name` and `--rust-toolchain-image-tag`
+parameters to `./scripts/create_docker_image.sh` accordingly.
 
 For more info on how to configure:
  - naming of the built images in the Octez Docker distribution,
@@ -118,25 +131,25 @@ For more info on how to configure:
 
 see `./scripts/create_docker_image.sh --help`.
 
-## Using `opam-repository` build-deps images from tezos/tezos CI
+## Using the CI images from tezos/tezos CI
 
-Like the Octez Docker distribution, the base images are also built in
+Like the Octez Docker distribution, the CI images are also built in
 the tezos/tezos CI. By default, `./scripts/create_docker_image.sh` is
-configured to pull the build-deps images from the CI if they cannot be
-found locally.
+configured to pull the CI images from the CI if they cannot be found
+locally.
 
-## Using local `opam-repository`  base images
+## Using local CI images
 
-First, build the build-deps `opam-repository` images locally:
+First, build the `ci` images locally:
 
 ```
-$ ./images/create_opam_repository_images.sh
+$ ./images/create_ci_images.sh
 ```
 
 The newly built images will use the same naming scheme as the images
 built in the tezos/tezos CI. Therefore, you can now simply rebuild the
 Octez Docker distribution and it will automatically use the locally
-built build-deps images:
+built CI images:
 
 ```
 $ ./scripts/create_docker_image.sh
@@ -145,21 +158,21 @@ $ ./scripts/create_docker_image.sh
 To make this more explicit, run:
 
 ```
-$ ./images/create_opam_repository_images.sh \
-    --image-base octez-local-build-deps \
+$ ./images/create_ci_images.sh \
+    --image-base octez-local-ci \
     --tag-suffix ""
 $ ./scripts/create_docker_image.sh \
-    --build-deps-image-name octez-local-build-deps \
-    --build-deps-image-version "amd64"
+    --ci-image-name octez-local-ci \
+    --ci-image-version "amd64"
 ```
 
-The first command will create the set of build-deps images on the following naming scheme:
+The first command will create the set of CI images on the following naming scheme:
 
- - `octez-local-build-deps/runtime-dependencies:amd64`
- - `octez-local-build-deps/runtime-prebuild-dependencies:amd64`
+ - `octez-local-ci/runtime-dependencies:amd64`
+ - `octez-local-ci/runtime-prebuild-dependencies:amd64`
  - ...
 
 (These images are always tagged by architecture, and the architecture defaults to amd64).
 
 The parameters to the second command instructs
-`create_docker_image.sh` to use these images as build-deps.
+`create_docker_image.sh` to use these images as base images.

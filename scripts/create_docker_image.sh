@@ -14,9 +14,9 @@ image_name="tezos-"
 image_version="latest"
 # shellcheck disable=SC2154
 arch=${ARCH:-amd64}
-# Use the version of the build-deps image that corresponds to the state of the repo.
-# The image will be fetched from 'build_deps_image_name' from 'scripts/version.sh'.
-build_deps_image_version=${arch}--$(./images/image_tag.sh images/opam-repository)
+# Use the version of the CI images that corresponds to the state of the repo.
+# The image will be fetched from 'ci_image_name' from 'scripts/version.sh'.
+ci_image_version=${arch}--$(./images/image_tag.sh images/ci)
 executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
@@ -32,8 +32,8 @@ usage() {
 Usage:  $(basename "$0") [-h|--help]
   [--image-name <IMAGE_NAME> ]
   [--image-version <IMAGE_TAG> ]
-  [--build-deps-image-name <IMAGE_NAME> ]
-  [--build-deps-image-version <IMAGE_TAG> ]
+  [--ci-image-name <IMAGE_NAME> ]
+  [--ci-image-version <IMAGE_TAG> ]
   [--variants VARIANTS]
   [--docker-target <TARGET> ]
   [--rust-toolchain-image-name <IMAGE_NAME> ]
@@ -55,12 +55,12 @@ DESCRIPTION
     of the distribution are documented at
     https://hub.docker.com/r/tezos/tezos.
 
-    The build uses following images from the build-deps suite:
-     - BUILD_DEPS_IMAGE_NAME/runtime-dependencies:BUILD_DEPS_IMAGE_TAG
-     - BUILD_DEPS_IMAGE_NAME/runtime-build-dependencies:BUILD_DEPS_IMAGE_TAG
-    The build-deps images are defined in images/opam-repository,
-    and by default, BUILD_DEPS_IMAGE_NAME refers to the images build from
-    directory in the tezos/tezos CI. BUILD_DEPS_IMAGE_VERSION is set using
+    The build uses following images from the CI image suite:
+     - CI_IMAGE_NAME/runtime-dependencies:CI_IMAGE_VERSION
+     - CI_IMAGE_NAME/runtime-build-dependencies:CI_IMAGE_VERSION
+    The CI images are defined in images/ci,
+    and by default, CI_IMAGE_NAME refers to the images build from
+    directory in the tezos/tezos CI. CI_IMAGE_VERSION is set using
     images/image_tag.sh such that a version corresponding to the local checkout
     is used.
 
@@ -90,11 +90,11 @@ OPTIONS
             Tag of built images.
 
     Base image location
-        --build-deps-image-name BUILD_DEPS_IMAGE_NAME
-            Name of the build-deps image.
+        --ci-image-name CI_IMAGE_NAME
+            Name of the CI image.
 
-        --build-deps-image-version BUILD_DEPS_IMAGE_VERSION
-            Version of the build-deps image.
+        --ci-image-version CI_IMAGE_VERSION
+            Version of the CI image.
 
         --rust-toolchain-image-name RUST_TOOLCHAIN_IMAGE_NAME
             Name of the rust-toolchain image.
@@ -128,8 +128,8 @@ OPTIONS
 CURRENT VALUES
     IMAGE_NAME: $image_name
     IMAGE_VERSION: $image_version
-    BUILD_DEPS_IMAGE_NAME: $build_deps_image_name
-    BUILD_DEPS_IMAGE_VERSION: $build_deps_image_version
+    CI_IMAGE_NAME: $ci_image_name
+    CI_IMAGE_VERSION: $ci_image_version
     VARIANTS: $variants
     DOCKER_TARGET: $docker_target
     RUST_TOOLCHAIN_IMAGE_NAME: $rust_toolchain_image_name
@@ -146,7 +146,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,build-deps-image-name:,build-deps-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
+  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -159,13 +159,13 @@ while true; do
     shift
     image_version="$1"
     ;;
-  --build-deps-image-name)
+  --ci-image-name)
     shift
-    build_deps_image_name="$1"
+    ci_image_name="$1"
     ;;
-  --build-deps-image-version)
+  --ci-image-version)
     shift
-    build_deps_image_version="$1"
+    ci_image_version="$1"
     ;;
   --executables)
     shift
@@ -238,15 +238,15 @@ for executable in $executables; do
   echo "- $executable"
 done
 
-image_test="$build_deps_image_name/runtime-prebuild-dependencies:$build_deps_image_version"
+image_test="$ci_image_name/runtime-prebuild-dependencies:$ci_image_version"
 if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
-  echo "Build-deps image $image_test does not exist locally, attempt pull."
+  echo "CI image $image_test does not exist locally, attempt pull."
   # This pull is just to check whether the image exists
   # remotely. Although costly, it would've been pulled regardless in
   # the docker builds below.
   if ! docker pull "$image_test" > /dev/null 2>&1; then
-    echo "Failed to pull build-deps image $image_test."
-    echo "If you have modified any inputs to the build-deps image, then you have to rebuild it locally through ./images/create_opam_repository_images.sh."
+    echo "Failed to pull CI image $image_test."
+    echo "If you have modified any inputs to the CI images, then you have to rebuild them locally through ./images/create_ci_images.sh."
     exit 1
   fi
 fi
@@ -259,8 +259,8 @@ docker build \
   -f build.Dockerfile \
   --target "$docker_target" \
   --cache-from "$build_image_name:$image_version" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies:$build_deps_image_version" \
+  --build-arg "BASE_IMAGE=$ci_image_name" \
+  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
@@ -277,9 +277,9 @@ for variant in $variants; do
     docker build \
       --network host \
       -t "${image_name}debug:$image_version" \
-      --build-arg "BASE_IMAGE=$build_deps_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$build_deps_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$build_deps_image_version" \
+      --build-arg "BASE_IMAGE=$ci_image_name" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -293,9 +293,9 @@ for variant in $variants; do
     docker build \
       --network host \
       -t "${image_name}bare:$image_version" \
-      --build-arg "BASE_IMAGE=$build_deps_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$build_deps_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$build_deps_image_version" \
+      --build-arg "BASE_IMAGE=$ci_image_name" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -309,9 +309,9 @@ for variant in $variants; do
     docker build \
       --network host \
       -t "${image_name%?}:$image_version" \
-      --build-arg "BASE_IMAGE=$build_deps_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$build_deps_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$build_deps_image_version" \
+      --build-arg "BASE_IMAGE=$ci_image_name" \
+      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \

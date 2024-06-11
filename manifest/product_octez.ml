@@ -8135,7 +8135,7 @@ let _RPC_toy =
 (* Keeping uTop optional lets `make build` succeed, *)
 (* which uses tezos/opam-repository to resolve dependencies, *)
 (* on the CI. This prevents having to add dev-dependency to *)
-(* tezos/opam-repository unnecessarily *)
+(* images/ci unnecessarily *)
 (* We set [~static] to false because we don't release this as a static binary. *)
 let _tztop =
   public_exe

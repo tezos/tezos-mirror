@@ -8,14 +8,14 @@ image_script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 repo_dir="$(dirname "$(dirname "$(dirname "$image_script_dir")")")"
 cd "$repo_dir"
 
-# shellcheck source=./images/opam-repository.inc.sh
-. ./images/opam-repository.inc.sh
+# shellcheck source=./images/ci.inc.sh
+. ./images/ci.inc.sh
 
 # shellcheck source=./scripts/version.sh
 . ./scripts/version.sh
 
-image_base="${1:-$build_deps_image_name}"
-image_tag_suffix="${2:-$(./images/image_tag.sh images/opam-repository)}"
+image_base="${1:-$ci_image_name}"
+image_tag_suffix="${2:-$(./images/image_tag.sh images/ci)}"
 targetarch="${3:-amd64}"
 
 error=''

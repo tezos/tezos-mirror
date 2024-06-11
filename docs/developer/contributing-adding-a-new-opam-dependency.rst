@@ -43,8 +43,7 @@ The simplest way of using a new dependency on the Octez codebase when working
 locally (i.e., on your own machine) is to install it using ``opam``.
 
 Because you have used ``make build-dev-deps`` in order to install the
-Octez dependencies, you have access to the default opam repository in
-addition to the Tezos opam repository.
+Octez dependencies, you have access to the default opam repository.
 
 **Install your dependency:** ``opam install foo``
 

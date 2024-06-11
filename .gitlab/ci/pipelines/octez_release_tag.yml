@@ -8,7 +8,7 @@ stages:
 - publish_release_gitlab
 - publish_release
 
-oc.docker:opam-repository:amd64:
+oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
   tags:
@@ -16,7 +16,7 @@ oc.docker:opam-repository:amd64:
   dependencies: []
   before_script: []
   script:
-  - ./images/ci_create_opam_repository_images.sh
+  - ./images/ci_create_ci_images.sh
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -25,9 +25,9 @@ oc.docker:opam-repository:amd64:
     ARCH: amd64
   artifacts:
     reports:
-      dotenv: opam_repository_image_tag.env
+      dotenv: ci_image_tag.env
 
-oc.docker:opam-repository:arm64:
+oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
   tags:
@@ -35,7 +35,7 @@ oc.docker:opam-repository:arm64:
   dependencies: []
   before_script: []
   script:
-  - ./images/ci_create_opam_repository_images.sh
+  - ./images/ci_create_ci_images.sh
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -44,15 +44,15 @@ oc.docker:opam-repository:arm64:
     ARCH: arm64
   artifacts:
     reports:
-      dotenv: opam_repository_image_tag.env
+      dotenv: ci_image_tag.env
 
 oc.build:static-x86_64-linux-binaries:
-  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
+  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
   stage: build
   tags:
   - gcp
   dependencies:
-  - oc.docker:opam-repository:amd64
+  - oc.docker:ci:amd64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -72,12 +72,12 @@ oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-binaries:
-  image: ${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}
+  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
   dependencies:
-  - oc.docker:opam-repository:arm64
+  - oc.docker:ci:arm64
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -102,7 +102,7 @@ oc.docker:amd64:
   tags:
   - gcp
   dependencies:
-  - oc.docker:opam-repository:amd64
+  - oc.docker:ci:amd64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -122,7 +122,7 @@ oc.docker:arm64:
   tags:
   - gcp_arm64
   dependencies:
-  - oc.docker:opam-repository:arm64
+  - oc.docker:ci:arm64
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -265,12 +265,12 @@ gitlab:release:
   - ./scripts/ci/gitlab-release.sh
 
 opam:release:
-  image: ${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}
+  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
   stage: publish_release
   tags:
   - gcp
   dependencies:
-  - oc.docker:opam-repository:amd64
+  - oc.docker:ci:amd64
   interruptible: false
   script:
   - ./scripts/ci/opam-release.sh
