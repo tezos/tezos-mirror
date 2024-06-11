@@ -242,6 +242,8 @@ type producer = {
 
 type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
 
+type etherlink = unit
+
 type public_key_hash = string
 
 type commitment = string
@@ -285,6 +287,7 @@ type t = {
   bakers : baker list;
   producers : producer list;
   observers : observer list;
+  etherlink : etherlink;
   parameters : Dal_common.Parameters.t;
   infos : (int, per_level_info) Hashtbl.t;
   metrics : (int, metrics) Hashtbl.t;
@@ -973,6 +976,7 @@ let init ~(configuration : configuration) cloud next_agent =
           agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
+  let etherlink = () in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
   Hashtbl.replace metrics 1 default_metrics ;
@@ -987,6 +991,7 @@ let init ~(configuration : configuration) cloud next_agent =
       bakers;
       producers;
       observers;
+      etherlink;
       parameters;
       infos;
       metrics;
