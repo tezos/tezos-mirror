@@ -33,6 +33,24 @@ let tezt_etherlink =
       ]
     ~release_status:Unreleased
 
+let _tezt_tests_cloud =
+  private_exe
+    "main"
+    ~path:"tezt/tests/cloud"
+    ~opam:"tezt-tests-cloud"
+    ~synopsis:"Tezt tests using Tezt cloud"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
+        tezt_etherlink;
+      ]
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+
 (* Container of the registered sublibraries of [octez-evm-node] *)
 let registered_octez_evm_node_libs = Sub_lib.make_container ()
 

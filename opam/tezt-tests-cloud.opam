@@ -10,9 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs" { = version }
-  "tezt-tezos" { = version }
-  "tezt-cloud" { = version }
+  "octez-libs"
+  "tezt-tezos"
+  "tezt-cloud"
+  "tezt-etherlink" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
