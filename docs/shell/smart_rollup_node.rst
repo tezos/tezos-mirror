@@ -210,14 +210,14 @@ First, we need to decide on a mode the rollup node will run:
 
 #. ``accuser`` follows the layer1-chain and computes commitments but does not
    publish them. Only when a conflicting commitment (published by another
-   staker) is detected will the "accuser node" publish a commitment and
+   committer) is detected will the "accuser node" publish a commitment and
    participate in the subsequent refutation game.
 
-#. ``bailout`` mode is designed to assist stakers in recovering their bonds.
+#. ``bailout`` mode is designed to assist committers in recovering their bonds.
    It functions as a slightly modified version of "Accuser", differing in that it does not post any new
    commitments but instead focuses on defending the ones that have been previously
    submitted. When operating in bailout mode, the expectation is to initiate a recover bond
-   operation when the operator is no longer staked on any commitment. If the node detects that this
+   operation when the operator is no longer staking on any commitment. If the node detects that this
    operation has been successful, it can gratefully exit.
 
 #. ``custom`` mode refers to a mode where the users individually select which
