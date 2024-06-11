@@ -979,6 +979,7 @@ let benchmark () =
     + List.length configuration.stake
     + configuration.dal_node_producer
     + List.length configuration.observer_slot_indices
+    + if configuration.etherlink then 1 else 0
   in
   let vms =
     List.init vms (fun i ->
@@ -990,10 +991,16 @@ let benchmark () =
           | Some list -> (
               try {machine_type = List.nth list (i - 1)}
               with _ -> Cloud.default_vm_configuration)
-        else
+        else if
+          i
+          < List.length configuration.stake
+            + 1 + configuration.dal_node_producer
+        then
           match configuration.producer_machine_type with
           | None -> Cloud.default_vm_configuration
-          | Some machine_type -> {machine_type})
+          | Some machine_type -> {machine_type}
+        else (* Etherlink *)
+          Cloud.default_vm_configuration)
   in
   Cloud.register
     ~vms
