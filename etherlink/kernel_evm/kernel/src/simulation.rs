@@ -11,6 +11,7 @@
 use crate::configuration::fetch_limits;
 use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
 use crate::storage::read_sequencer_pool_address;
+use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
@@ -287,7 +288,9 @@ impl Evaluation {
             self.to,
             self.from.unwrap_or(default_caller),
             self.data.clone(),
-            self.gas.or(Some(u64::MAX)),
+            self.gas.map_or(Some(MAXIMUM_GAS_LIMIT), |gas| {
+                Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
+            }),
             gas_price,
             self.value,
             false,
