@@ -111,6 +111,8 @@ module Cli = struct
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
       Protocol.Alpha
+
+  let etherlink = Clap.flag ~section ~set_long:"etherlink" false
 end
 
 type configuration = {
