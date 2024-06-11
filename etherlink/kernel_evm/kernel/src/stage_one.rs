@@ -4,7 +4,9 @@
 
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{store_immediate_blueprint, store_inbox_blueprint};
-use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
+use crate::configuration::{
+    Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
+};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
@@ -100,7 +102,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
-    _enable_dal: bool,
+    _dal: Option<DalConfiguration>,
     enable_fa_deposits: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
@@ -140,7 +142,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_bridge,
             delayed_inbox,
             sequencer,
-            enable_dal,
+            dal,
             evm_node_flag: _,
             max_blueprint_lookahead_in_seconds: _,
         } => fetch_sequencer_blueprints(
@@ -150,7 +152,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_bridge.clone(),
             delayed_inbox,
             sequencer.clone(),
-            *enable_dal,
+            dal.clone(),
             config.enable_fa_bridge,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
@@ -197,6 +199,11 @@ mod tests {
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
         .unwrap();
+        let dal = if enable_dal {
+            Some(DalConfiguration {})
+        } else {
+            None
+        };
 
         let contracts = TezosContracts::default();
         Configuration {
@@ -208,7 +215,7 @@ mod tests {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
-                enable_dal,
+                dal,
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },

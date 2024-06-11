@@ -478,7 +478,7 @@ pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 mod tests {
 
     use super::*;
-    use crate::configuration::{Limits, TezosContracts};
+    use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
     use crate::storage::store_last_info_per_level_timestamp;
@@ -501,13 +501,14 @@ mod tests {
             "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
         )
         .unwrap();
+        let dal = if enable_dal {Some(DalConfiguration {  }) } else {None};
         let mut config = Configuration {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Sequencer {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
-                enable_dal,
+                dal,
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
