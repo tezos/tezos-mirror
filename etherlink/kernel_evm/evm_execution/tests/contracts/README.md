@@ -1,8 +1,8 @@
-# FA token bridge
+# FA bridge test contracts
 
-This crate contains primitives that are necessary to implement a permissionless ticket based asset bridge, as described in the [specification](https://hackmd.io/I_5FJBwoQcqOa2bTtRYH-w);
+Solidity contracts for FA bridge integration tests.
 
-## How to build test contracts
+## How to build
 
 [Foundry](https://github.com/foundry-rs/foundry) is required to compile test smart contracts. Please use actual [installation guide](https://book.getfoundry.sh/getting-started/installation).
 

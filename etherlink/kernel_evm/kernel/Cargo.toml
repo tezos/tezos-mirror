@@ -57,6 +57,12 @@ proptest = { workspace = true, optional = true }
 [dev-dependencies]
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-panic-hook.workspace = true
+proptest.workspace = true
+
+# Hack: getrandom will use custom implementation if kernel is being built for wasm32-unknown-unknown
+# See https://github.com/rust-random/getrandom/blob/a39033a34a0b81c5b15ef1fba28696ab93aac9db/src/custom.rs
+# Generally getrandom is not supposed to be used in wasm env, this trick is just to overcome build errors
+getrandom = { version = "=0.2.15", features = ["custom"] }
 
 [features]
 default = ["panic-hook"]

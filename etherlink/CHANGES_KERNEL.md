@@ -122,6 +122,7 @@
   kernel. (!12046)
 - Da fee is sent to sequencer pool address. (!12113)
 - Gas price adjusts itself to handle congestion. (!12167)
+- Add ticket table to account for FA deposits. (!12072)
 
 ### Bug fixes
 
