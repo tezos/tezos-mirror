@@ -58,19 +58,6 @@ let evm_node_config =
         octez_stdlib_unix |> open_;
       ]
 
-let _evm_node_sequencer_protobuf =
-  let protobuf_rules =
-    Dune.[protobuf_rule "narwhal"; protobuf_rule "exporter"]
-  in
-  octez_evm_node_lib
-    "evm_node_sequencer_protobuf"
-    ~path:"etherlink/bin_node/lib_sequencer_protobuf"
-    ~synopsis:
-      "gRPC libraries for interacting with a consensus node, generated from \
-       protobuf definitions"
-    ~deps:[ocaml_protoc_compiler]
-    ~dune:protobuf_rules
-
 let evm_node_migrations =
   octez_evm_node_lib
     "evm_node_migrations"

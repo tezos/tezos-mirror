@@ -471,8 +471,8 @@ module Dune = struct
         [
           S "run";
           H [S "protoc"; S "-I"; S "."];
-          S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
-          S "%{proto}";
+          S "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]";
+          H [S "--ocaml_out=."; S "%{proto}"];
         ]
 
   let install ?package files ~section =
