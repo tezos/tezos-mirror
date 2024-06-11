@@ -49,7 +49,7 @@ type t = {
   transactions : transactions;
   uncles : string list;
   baseFeePerGas : int64;
-  mixHash : string;
+  prevRandao : string;
 }
 
 let parse_transactions json =
@@ -102,9 +102,9 @@ let of_json json =
     transactions = json |-> "transactions" |> parse_transactions;
     uncles = json |-> "uncles" |> as_list |> List.map as_string;
     baseFeePerGas = json ||-> ("baseFeePerGas", 1000000000L, as_int64);
-    mixHash =
-      json
-      ||-> ( "mixHash",
-             "0x0000000000000000000000000000000000000000000000000000000000000000",
-             as_string );
+    prevRandao =
+      (let res = json |?-> ("mixHash", "prevRandao") in
+       if JSON.is_null res then
+         "0x0000000000000000000000000000000000000000000000000000000000000000"
+       else res |> as_string);
   }

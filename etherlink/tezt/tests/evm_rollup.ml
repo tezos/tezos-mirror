@@ -814,7 +814,7 @@ let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
      Replace by [Any] after the next upgrade *)
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "get_block_by_hash"]
-    ~title:"getBlockBy returns base fee per gas and mix hash"
+    ~title:"getBlockBy returns base fee per gas and previous random number"
     ~minimum_base_fee_per_gas:(Wei.to_wei_z @@ Z.of_int 100)
   @@ fun ~protocol:_ ~evm_setup ->
   let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
@@ -832,19 +832,19 @@ let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
   Check.((block_by_number.baseFeePerGas = 100L) int64)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   Check.(
-    (block_by_number.mixHash
+    (block_by_number.prevRandao
    = "0x0000000000000000000000000000000000000000000000000000000000000000")
       string)
-    ~error_msg:"Unexpected mix hash, should be %%R, but got %%L" ;
+    ~error_msg:"Unexpected previous random number, should be %%R, but got %%L" ;
 
   let* block_by_hash = get_block_by_hash evm_setup block_by_number.hash in
   Check.((block_by_hash.baseFeePerGas = 100L) int64)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   Check.(
-    (block_by_hash.mixHash
+    (block_by_hash.prevRandao
    = "0x0000000000000000000000000000000000000000000000000000000000000000")
       string)
-    ~error_msg:"Unexpected mix hash, should be %%R, but got %%L" ;
+    ~error_msg:"Unexpected previous random number, should be %%R, but got %%L" ;
   unit
 
 let test_l2_block_size_non_zero =
