@@ -1,10 +1,10 @@
 use crate::{
     delayed_inbox::DelayedInbox,
     storage::{
-        read_admin, read_delayed_transaction_bridge, read_kernel_governance,
-        read_kernel_security_governance, read_maximum_allowed_ticks,
-        read_maximum_gas_per_transaction, read_sequencer_governance, read_ticketer,
-        sequencer,
+        is_enable_fa_bridge, read_admin, read_delayed_transaction_bridge,
+        read_kernel_governance, read_kernel_security_governance,
+        read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
+        read_sequencer_governance, read_ticketer, sequencer,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -57,6 +57,7 @@ pub struct Configuration {
     pub tezos_contracts: TezosContracts,
     pub mode: ConfigurationMode,
     pub limits: Limits,
+    pub enable_fa_bridge: bool,
 }
 
 impl Default for Configuration {
@@ -65,6 +66,7 @@ impl Default for Configuration {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
+            enable_fa_bridge: false,
         }
     }
 }
@@ -73,8 +75,8 @@ impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Tezos Contracts: {}, Mode: {}",
-            &self.tezos_contracts, &self.mode
+            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}",
+            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge
         )
     }
 }
@@ -170,6 +172,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
+    let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -190,6 +193,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                         sequencer,
                     },
                     limits,
+                    enable_fa_bridge,
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
@@ -204,6 +208,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
             tezos_contracts,
             mode: ConfigurationMode::Proxy,
             limits,
+            enable_fa_bridge,
         },
     }
 }

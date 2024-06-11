@@ -1457,7 +1457,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args20
+    (args21
        mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
@@ -1484,9 +1484,13 @@ let make_kernel_config_command =
           ~default:"9999000000000000000000"
           ~placeholder:"9999000000000000000000"
        @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
-       bootstrap_account_arg)
+       bootstrap_account_arg
+       (switch
+          ~doc:"Enable the FA bridge in the kernel"
+          ~long:"enable-fa-bridge"
+          ()))
     (prefixes ["make"; "kernel"; "installer"; "config"]
-    @@ Tezos_clic.param
+    @@ param
          ~name:"kernel config file"
          ~desc:"file path where the config will be written to"
          Params.string
@@ -1510,7 +1514,8 @@ let make_kernel_config_command =
            maximum_gas_per_transaction,
            remove_whitelist,
            boostrap_balance,
-           bootstrap_accounts )
+           bootstrap_accounts,
+           enable_fa_bridge )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
@@ -1534,6 +1539,7 @@ let make_kernel_config_command =
         ?remove_whitelist
         ~boostrap_balance
         ?bootstrap_accounts
+        ~enable_fa_bridge
         ~output
         ())
 

@@ -153,8 +153,9 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
-    ?(drop_duplicate_when_injection = true) ?history_mode protocol =
+    ?enable_fa_bridge ?(threshold_encryption = false)
+    ?(wal_sqlite_journal_mode = true) ?(drop_duplicate_when_injection = true)
+    ?history_mode protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -188,6 +189,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
       ?maximum_gas_per_transaction
       ~bootstrap_accounts
       ~output:output_config
+      ?enable_fa_bridge
       ()
   in
   let* {output; _} =
@@ -371,7 +373,7 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?enable_fa_bridge
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
     ?history_mode body =
   let additional_uses =
@@ -401,6 +403,7 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
         ?preimages_dir
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
+        ?enable_fa_bridge
         ~threshold_encryption
         ?history_mode
         protocol
@@ -418,8 +421,8 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode
-    ?additional_uses ~title ~tags body protocols =
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?enable_fa_bridge
+    ?history_mode ?additional_uses ~title ~tags body protocols =
   let register ~kernel ~threshold_encryption =
     let _, kernel_use = Kernel.to_uses_and_tags kernel in
     register_test
@@ -442,6 +445,7 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
       ?preimages_dir
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
+      ?enable_fa_bridge
       ?additional_uses
       ~threshold_encryption
       ?history_mode
@@ -3770,6 +3774,24 @@ let test_miner =
       "Viewed coinbase should be the sequencer pool address, expected %R got %L" ;
   unit
 
+let test_fa_bridge_feature_flag =
+  register_both
+    ~tags:["fa_bridge"; "feature_flag"]
+    ~title:"FA bridge feature is set in storage"
+    ~enable_fa_bridge:true
+  @@ fun {sequencer; _} _protocol ->
+  (* We simply check that the flag is set in the storage. *)
+  let*@ flag =
+    Rpc.state_value sequencer Durable_storage_path.enable_fa_bridge
+  in
+  Check.is_true
+    (Option.is_some flag)
+    ~error_msg:
+      (sf
+         "Expected to have a value at %s"
+         Durable_storage_path.enable_fa_bridge) ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -3822,4 +3844,5 @@ let () =
   test_trace_transaction protocols ;
   test_trace_transaction_on_invalid_transaction protocols ;
   test_trace_transaction_call protocols ;
-  test_miner protocols
+  test_miner protocols ;
+  test_fa_bridge_feature_flag protocols

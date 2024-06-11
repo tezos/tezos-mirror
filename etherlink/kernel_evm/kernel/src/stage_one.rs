@@ -175,6 +175,7 @@ mod tests {
                 sequencer,
             },
             limits: Limits::default(),
+            enable_fa_bridge: false,
         }
     }
 
@@ -187,6 +188,7 @@ mod tests {
             },
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
+            enable_fa_bridge: false,
         }
     }
 

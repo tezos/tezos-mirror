@@ -470,6 +470,7 @@ mod tests {
                 sequencer,
             },
             limits: Limits::default(),
+            enable_fa_bridge: false,
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);

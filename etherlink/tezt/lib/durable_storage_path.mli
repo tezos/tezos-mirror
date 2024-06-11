@@ -101,6 +101,9 @@ val delayed_inbox_min_levels : path
 (** [reveal_config] is the path to the storage configuration. *)
 val reveal_config : path
 
+(** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
+val enable_fa_bridge : path
+
 module Ghostnet : sig
   val eth_accounts : path
 

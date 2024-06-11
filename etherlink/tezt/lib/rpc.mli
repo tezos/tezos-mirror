@@ -94,6 +94,9 @@ end
     provided the block will have timestamp [timestamp] (in RFC3339) format. *)
 val produce_block : ?timestamp:string -> Evm_node.t -> (int, error) result Lwt.t
 
+(** [state_value evm_node path] calls the private RPC [stateValue]. *)
+val state_value : Evm_node.t -> string -> (string option, error) result Lwt.t
+
 (** [send_raw_transaction ~raw_tx evm_node] calls [eth_sendRawTransaction]
     with [raw_tx] as argument. *)
 val send_raw_transaction :
