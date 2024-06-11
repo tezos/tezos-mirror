@@ -111,6 +111,8 @@ module Cli = struct
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
       Protocol.Alpha
+
+  let etherlink = Clap.flag ~section ~set_long:"etherlink" false
 end
 
 type configuration = {
@@ -120,6 +122,7 @@ type configuration = {
   observer_slot_indices : int list;
   protocol : Protocol.t;
   producer_machine_type : string option;
+  etherlink : bool;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -959,6 +962,7 @@ let configuration =
   let observer_slot_indices = Cli.observer_slot_indices in
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
+  let etherlink = Cli.etherlink in
   {
     stake;
     stake_machine_type;
@@ -966,6 +970,7 @@ let configuration =
     observer_slot_indices;
     protocol;
     producer_machine_type;
+    etherlink;
   }
 
 let benchmark () =
@@ -974,6 +979,7 @@ let benchmark () =
     + List.length configuration.stake
     + configuration.dal_node_producer
     + List.length configuration.observer_slot_indices
+    + if configuration.etherlink then 1 else 0
   in
   let vms =
     List.init vms (fun i ->
@@ -985,10 +991,16 @@ let benchmark () =
           | Some list -> (
               try {machine_type = List.nth list (i - 1)}
               with _ -> Cloud.default_vm_configuration)
-        else
+        else if
+          i
+          < List.length configuration.stake
+            + 1 + configuration.dal_node_producer
+        then
           match configuration.producer_machine_type with
           | None -> Cloud.default_vm_configuration
-          | Some machine_type -> {machine_type})
+          | Some machine_type -> {machine_type}
+        else (* Etherlink *)
+          Cloud.default_vm_configuration)
   in
   Cloud.register
     ~vms
