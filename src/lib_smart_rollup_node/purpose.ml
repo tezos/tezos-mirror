@@ -180,7 +180,7 @@ let () =
 
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kind : ex_purpose -> Operation_kind.t list = function
-  | Purpose Batching -> [Add_messages]
+  | Purpose Batching -> [Add_messages; Publish_dal_commitment]
   | Purpose Cementing -> [Cement]
   | Purpose Operating -> [Publish; Refute; Timeout]
   | Purpose Recovering -> [Recover]
