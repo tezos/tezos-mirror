@@ -66,7 +66,10 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
         let message = if let Some((level, id, bytes)) = self.inbox.next() {
             Some(Message::new(level, id, bytes))
         } else {
-            panic!("STATIC INBOX: out of input");
+            // We want to consume the rollup's inbox, but not polute the kernel's view of the inbox
+            // with that.
+            self.host.read_input()?;
+            None
         };
 
         Ok(message)
