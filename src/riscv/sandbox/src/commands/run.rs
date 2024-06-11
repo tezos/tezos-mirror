@@ -72,8 +72,13 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
     run_stepper(stepper, opts.common.max_steps)
 }
 
-fn run_stepper(mut stepper: impl Stepper, max_steps: usize) -> Result<(), Box<dyn Error>> {
-    match stepper.step_max(max_steps).to_stepper_status() {
+fn run_stepper(mut stepper: impl Stepper, max_steps: Option<usize>) -> Result<(), Box<dyn Error>> {
+    let result = match max_steps {
+        Some(max_steps) => stepper.step_range_while(..=max_steps, |_| true),
+        None => stepper.step_range_while(.., |_| true),
+    };
+
+    match result.to_stepper_status() {
         StepperStatus::Exited { success: true, .. } => Ok(()),
         result => Err(format!("{result:?}").into()),
     }

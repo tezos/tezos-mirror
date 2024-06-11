@@ -81,7 +81,7 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
     let mut bench_data = FineBenchData::new();
     let bench_start = quanta::Instant::now();
 
-    for _step in 0..opts.common.max_steps {
+    for _step in 0..opts.common.max_steps.unwrap_or(usize::MAX) {
         let instr = match get_current_instr(interpreter) {
             Ok(instr) => InstrType::Instr(instr.tag()),
             Err(err) => InstrType::FetchErr(err),
@@ -109,7 +109,7 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
 /// Provides basic benchmark data and interpreter result.
 fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
     let start = quanta::Instant::now();
-    let res = interpreter.step_max(opts.common.max_steps);
+    let res = interpreter.step_max(opts.common.max_steps.unwrap_or(usize::MAX));
     let duration = start.elapsed();
 
     use TestStepperResult::*;
