@@ -11,10 +11,11 @@ val default_vm_configuration : vm_configuration
 
 type t
 
-(** [register ?vms] is a wrapper around [Test.register]. It
+(** [register ?docker_push ?vms] is a wrapper around [Test.register]. It
     enables to run a test that can use machines deployed onto the
     cloud. *)
 val register :
+  ?docker_push:bool ->
   ?vms:vm_configuration list ->
   __FILE__:string ->
   title:string ->

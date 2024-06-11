@@ -16,6 +16,7 @@ module Cloud : sig
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module. *)
   val register :
+    ?docker_push:bool ->
     ?vms:vm_configuration list ->
     __FILE__:string ->
     title:string ->
