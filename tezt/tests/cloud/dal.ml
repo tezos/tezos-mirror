@@ -122,6 +122,7 @@ type configuration = {
   observer_slot_indices : int list;
   protocol : Protocol.t;
   producer_machine_type : string option;
+  etherlink : bool;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -961,6 +962,7 @@ let configuration =
   let observer_slot_indices = Cli.observer_slot_indices in
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
+  let etherlink = Cli.etherlink in
   {
     stake;
     stake_machine_type;
@@ -968,6 +970,7 @@ let configuration =
     observer_slot_indices;
     protocol;
     producer_machine_type;
+    etherlink;
   }
 
 let benchmark () =
