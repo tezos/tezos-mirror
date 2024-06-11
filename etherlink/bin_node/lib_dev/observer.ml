@@ -108,7 +108,8 @@ end) : Services_backend_sig.Backend = struct
 end
 
 let on_new_blueprint next_blueprint_number
-    ({delayed_transactions; blueprint} : Blueprint_types.with_events) =
+    ({delayed_transactions; kernel_upgrade; blueprint} :
+      Blueprint_types.with_events) =
   let open Lwt_result_syntax in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
@@ -118,6 +119,11 @@ let on_new_blueprint next_blueprint_number
         (fun delayed_transaction ->
           Ethereum_types.Evm_events.New_delayed_transaction delayed_transaction)
         delayed_transactions
+      @
+      match kernel_upgrade with
+      | Some kernel_upgrade ->
+          [Ethereum_types.Evm_events.Upgrade_event kernel_upgrade]
+      | None -> []
     in
     let* () = Evm_context.apply_evm_events events in
     let delayed_transactions =
@@ -357,7 +363,8 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
         rollup_node_endpoint;
         keep_alive = config.keep_alive;
         filter_event =
-          (function New_delayed_transaction _ -> false | _ -> true);
+          (function
+          | New_delayed_transaction _ | Upgrade_event _ -> false | _ -> true);
       }
   in
   let () =

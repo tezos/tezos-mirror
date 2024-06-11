@@ -18,6 +18,7 @@ type t = {
 type with_events = {
   delayed_transactions : Ethereum_types.Delayed_transaction.t list;
       (** The delayed transactions to apply before applying the blueprint. *)
+  kernel_upgrade : Ethereum_types.Upgrade.t option;
   blueprint : t;  (** The blueprint to execute. *)
 }
 
