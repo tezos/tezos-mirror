@@ -658,35 +658,33 @@ let jobs pipeline_type =
       |> enable_cargo_cache
     in
     let build_octez_source =
-      (* We check compilation of the octez tarball on scheduled pipelines because
-         it's not worth testing it for every merge request pipeline. *)
-      match pipeline_type with
-      | Schedule_extended_test ->
-          [
-            job
-              ~__POS__
-              ~stage:Stages.build
-              ~image:Images.runtime_build_dependencies
-              ~before_script:
-                (before_script
-                   ~take_ownership:true
-                   ~source_version:true
-                   ~eval_opam:true
-                   [])
-              ~name:"build_octez_source"
-              [
-                "./scripts/ci/restrict_export_to_octez_source.sh";
-                "./scripts/ci/create_octez_tarball.sh octez";
-                "mv octez.tar.bz2 ../";
-                "cd ../";
-                "tar xf octez.tar.bz2";
-                "cd octez/";
-                "eval $(opam env)";
-                "make octez";
-              ]
-            |> enable_cargo_cache;
-          ]
-      | Before_merging -> []
+      (* We check compilation of the octez tarball on scheduled
+         pipelines because it's not worth testing it for every merge
+         request pipeline. The job is manual on regular MR
+         pipelines. *)
+      job
+        ~__POS__
+        ~stage:Stages.build
+        ~image:Images.runtime_build_dependencies
+        ~rules:(make_rules ~manual:Yes ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ~name:"build_octez_source"
+        [
+          "./scripts/ci/restrict_export_to_octez_source.sh";
+          "./scripts/ci/create_octez_tarball.sh octez";
+          "mv octez.tar.bz2 ../";
+          "cd ../";
+          "tar xf octez.tar.bz2";
+          "cd octez/";
+          "eval $(opam env)";
+          "make octez";
+        ]
+      |> enable_cargo_cache
     in
     [
       job_build_arm64_release;
@@ -698,8 +696,9 @@ let jobs pipeline_type =
       job_build_kernels;
       job_tezt_fetch_records;
       job_select_tezts;
+      build_octez_source;
     ]
-    @ bin_packages_jobs @ build_octez_source
+    @ bin_packages_jobs
   in
   let packaging =
     let job_opam_prepare : tezos_job =
