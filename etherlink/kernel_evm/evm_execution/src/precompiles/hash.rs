@@ -118,7 +118,6 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
@@ -149,7 +148,6 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],

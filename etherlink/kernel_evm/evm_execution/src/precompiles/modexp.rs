@@ -398,7 +398,7 @@ mod tests {
 
             assert!(result.is_ok());
             let outcome = result.unwrap();
-            assert!(outcome.is_success);
+            assert!(outcome.is_success());
             assert_eq!(hex::encode(outcome.result.unwrap()), test.expected,);
         }
     }
@@ -410,7 +410,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
 
         assert_eq!("", hex::encode(outcome.result.unwrap()));
     }

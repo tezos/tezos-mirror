@@ -300,7 +300,7 @@ mod tests {
             assert!(result.is_ok());
             let outcome = result.unwrap();
             println!("{}", outcome.gas_used);
-            assert!(outcome.is_success);
+            assert!(outcome.is_success());
 
             let expected = hex::decode(test.expected).unwrap();
 

@@ -40,7 +40,7 @@ fn fa_deposit_reached_wrapper_contract() {
         &deposit,
         &caller,
     );
-    assert!(res.is_success);
+    assert!(res.is_success());
     assert_eq!(2, res.logs.len());
 
     let flag = get_storage_flag(&mock_runtime, &evm_account_storage, proxy);
@@ -251,7 +251,7 @@ fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
         &deposit,
         &caller,
     );
-    assert!(!res.is_success);
+    assert!(!res.is_success());
     assert!(res.logs.is_empty());
 
     let flag = get_storage_flag(&mock_runtime, &evm_account_storage, proxy);

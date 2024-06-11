@@ -264,7 +264,7 @@ fn check_results(
         Ok(execution_outcome_opt) => {
             let outcome_status = match execution_outcome_opt {
                 Some(execution_outcome) => {
-                    if execution_outcome.is_success {
+                    if execution_outcome.is_success() {
                         "[SUCCESS]"
                     } else {
                         "[FAILURE]"

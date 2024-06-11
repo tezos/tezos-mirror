@@ -4075,7 +4075,7 @@ mod test {
         );
 
         match result {
-            Ok(exec_out) if exec_out.is_success => {
+            Ok(exec_out) if exec_out.is_success() => {
                 assert_eq!(
                     get_balance(&mut handler, &contract),
                     U256::zero(),
@@ -4300,7 +4300,6 @@ mod test {
         assert_eq!(
             Ok(ExecutionOutcome {
                 gas_used: 53839, // costs 53841 on ethereum
-                is_success: true,
                 reason: ExtendedExitReason::Exit(ExitReason::Succeed(
                     ExitSucceed::Stopped
                 )),

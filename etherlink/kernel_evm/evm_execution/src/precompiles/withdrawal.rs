@@ -265,7 +265,6 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            is_success: true,
             new_address: None,
             logs: vec![],
             result: Some(expected_output),
@@ -320,7 +319,6 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            is_success: true,
             new_address: None,
             logs: vec![],
             result: Some(expected_output),
@@ -357,7 +355,6 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Revert(ExitRevert::Reverted).into(),
-            is_success: false,
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -380,7 +377,6 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Revert(ExitRevert::Reverted).into(),
-            is_success: false,
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
