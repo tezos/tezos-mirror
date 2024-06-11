@@ -85,6 +85,8 @@ let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
 
 let reveal_config = "/__tmp/reveal_config"
 
+let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
+
 module Ghostnet = struct
   let eth_accounts = evm "/eth_accounts"
 

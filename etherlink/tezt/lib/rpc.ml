@@ -76,6 +76,8 @@ module Request = struct
     in
     {method_ = "produceBlock"; parameters}
 
+  let stateValue path = {method_ = "stateValue"; parameters = `String path}
+
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
@@ -258,6 +260,15 @@ let produce_block ?timestamp evm_node =
   return
   @@ decode_or_error
        (fun json -> Evm_node.extract_result json |> JSON.as_int)
+       json
+
+let state_value evm_node path =
+  let* json =
+    Evm_node.call_evm_rpc ~private_:true evm_node (Request.stateValue path)
+  in
+  return
+  @@ decode_or_error
+       (fun json -> Evm_node.extract_result json |> JSON.as_string_opt)
        json
 
 let send_raw_transaction ~raw_tx evm_node =
