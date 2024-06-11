@@ -332,6 +332,8 @@ RUN apk update \
  && apk add --no-cache curl npm git file make jq \
  # We need eth since e2e tests. This requires git as well.
  && npm install -g eth-cli@2.0.2 \
+ # We need solc to compile solidity smart-contracts
+ && npm install -g solc@0.8.26 \
  # clean up
  && rm -rf /tmp/*
 
