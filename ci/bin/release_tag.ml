@@ -40,28 +40,6 @@ type release_tag_pipeline_type =
   | Beta_release_tag
   | Non_release_tag
 
-(* Push .deb artifacts to storagecloud apt repository. *)
-let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.prepare_release)
-    ?dependencies ?(archs = [Amd64]) ~image script : tezos_job =
-  let variables =
-    [
-      ( "ARCHITECTURES",
-        String.concat " " (List.map Tezos_ci.arch_to_string_alt archs) );
-      ("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg");
-    ]
-  in
-  job
-    ?rules
-    ?dependencies
-    ~__POS__
-    ~stage
-    ~name
-    ~image
-    ~before_script:
-      (before_script ~source_version:true ["./scripts/ci/prepare-apt-repo.sh"])
-    ~variables
-    script
-
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
@@ -113,7 +91,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
   let job_build_rpm_amd64 = job_build_rpm_amd64 () in
   let job_apt_repo_ubuntu =
-    job_apt_repo
+    Debian_repository.job_apt_repo
       ~__POS__
       ~name:"apt_repo_ubuntu"
       ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])
@@ -121,7 +99,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
   in
   let job_apt_repo_debian =
-    job_apt_repo
+    Debian_repository.job_apt_repo
       ~__POS__
       ~name:"apt_repo_debian"
       ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])

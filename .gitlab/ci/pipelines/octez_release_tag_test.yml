@@ -4,6 +4,7 @@
 stages:
 - images
 - build
+- packaging
 - prepare_release
 - publish_release_gitlab
 - publish_release
@@ -284,7 +285,7 @@ gitlab:release:
 
 apt_repo_debian:
   image: debian:bookworm
-  stage: prepare_release
+  stage: packaging
   tags:
   - gcp
   needs:
@@ -302,7 +303,7 @@ apt_repo_debian:
 
 apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
-  stage: prepare_release
+  stage: packaging
   tags:
   - gcp
   needs:
