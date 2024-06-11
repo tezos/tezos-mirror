@@ -10,6 +10,9 @@
 
 ## Internal
 
+- Add FA deposit structure and helper methods for its parsing and formatting. (!13720)
+- Add ticket table to account for FA deposits. (!12072)
+
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
 ### Features
@@ -132,7 +135,6 @@
   kernel. (!12046)
 - Da fee is sent to sequencer pool address. (!12113)
 - Gas price adjusts itself to handle congestion. (!12167)
-- Add ticket table to account for FA deposits. (!12072)
 
 ### Bug fixes
 
