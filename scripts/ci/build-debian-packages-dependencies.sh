@@ -57,12 +57,18 @@ else
   # we get the sha of the image of the "other" architecture
   OTHER_SHA=$(docker manifest inspect "${DEP_IMAGE}:$LATEST_TAG" | jq -r ".manifests[] | select(.platform.architecture != \"$ARCHITECTURE\") | .digest" | head -n1)
 
-  # we create a new manifest ( override the old one ) with both the
-  # local image and the image that was in the old manifest
-  docker buildx imagetools create \
-    -t "${DEP_IMAGE}:$LATEST_TAG" \
-    "$LOCAL_IMAGE_NAME" \
-    "$DEP_IMAGE@$OTHER_SHA"
+  if [ "${OTHER_SHA}" != "" ]; then
+    # we create a new manifest ( override the old one ) with both the
+    # local image and the image that was in the old manifest
+    docker buildx imagetools create \
+      -t "${DEP_IMAGE}:$LATEST_TAG" \
+      "$LOCAL_IMAGE_NAME" \
+      "$DEP_IMAGE@$OTHER_SHA"
+  else
+    # we associate to "$DEP_IMAGE:$LATEST_TAG" the latest image with tag
+    # "$LOCAL_IMAGE_NAME" and replace the old one.
+    docker buildx imagetools create -t "$DEP_IMAGE:$LATEST_TAG" "$LOCAL_IMAGE_NAME"
+  fi
 fi
 
 docker buildx imagetools inspect "${DEP_IMAGE}:${LATEST_TAG}"
