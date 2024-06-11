@@ -638,8 +638,7 @@ let post_export_checks ~snapshot_file =
     snapshot_metadata
     ~dest
 
-let operator_local_file_regexp =
-  Re.Str.regexp "^storage/\\(commitments_published_at_level.*\\|lpc$\\)"
+let operator_local_file_regexp = Re.Str.regexp "^storage/lpc$"
 
 let snapshotable_files_regexp =
   Re.Str.regexp
