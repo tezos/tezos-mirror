@@ -675,10 +675,10 @@ type block = {
   timestamp : quantity;
   transactions : block_transactions;
   uncles : hash list;
-  (* baseFeePerGas and mixHash are set optionnal because old blocks didn't have
+  (* baseFeePerGas and prevRandao are set optionnal because old blocks didn't have
      them*)
   baseFeePerGas : quantity option;
-  mixHash : block_hash option;
+  prevRandao : block_hash option;
 }
 
 let decode_list decoder list =
@@ -782,7 +782,7 @@ let block_from_rlp_v0 bytes =
         (* Post merge: always empty. *)
         uncles = [];
         baseFeePerGas = None;
-        mixHash = None;
+        prevRandao = None;
       }
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
@@ -805,7 +805,7 @@ let block_from_rlp_v1 bytes =
           Value gasUsed;
           Value timestamp;
           Value baseFeePerGas;
-          Value mixHash;
+          Value prevRandao;
         ]) ->
       let (Qty number) = decode_number number in
       let hash = decode_block_hash hash in
@@ -847,7 +847,7 @@ let block_from_rlp_v1 bytes =
       let gasUsed = decode_number gasUsed in
       let timestamp = decode_number timestamp in
       let baseFeePerGas = Some (decode_number baseFeePerGas) in
-      let mixHash = Some (decode_block_hash mixHash) in
+      let prevRandao = Some (decode_block_hash prevRandao) in
       {
         number = Qty number;
         hash;
@@ -879,7 +879,7 @@ let block_from_rlp_v1 bytes =
         (* Post merge: always empty. *)
         uncles = [];
         baseFeePerGas;
-        mixHash;
+        prevRandao;
       }
   | _ -> raise (Invalid_argument "Expected a List of 15 elements")
 
@@ -914,7 +914,7 @@ let block_encoding =
            transactions;
            uncles;
            baseFeePerGas;
-           mixHash;
+           prevRandao;
          } ->
       ( ( ( number,
             hash,
@@ -936,7 +936,7 @@ let block_encoding =
             transactions,
             uncles,
             baseFeePerGas ) ),
-        mixHash ))
+        prevRandao ))
     (fun ( ( ( number,
                hash,
                parent,
@@ -957,7 +957,7 @@ let block_encoding =
                transactions,
                uncles,
                baseFeePerGas ) ),
-           mixHash ) ->
+           prevRandao ) ->
       {
         number;
         hash;
@@ -979,7 +979,7 @@ let block_encoding =
         timestamp;
         transactions;
         uncles;
-        mixHash;
+        prevRandao;
       })
     (merge_objs
        (merge_objs
@@ -1005,7 +1005,7 @@ let block_encoding =
              (req "transactions" block_transactions_encoding)
              (req "uncles" (list hash_encoding))
              (opt "baseFeePerGas" quantity_encoding)))
-       (obj1 (opt "mixHash" block_hash_encoding)))
+       (obj1 (opt "prevRandao" block_hash_encoding)))
 
 type transaction = {
   from : address;
