@@ -77,7 +77,7 @@ Errors
 Protocol parameters
 -------------------
 
-8s Blocks Time (MR :gl:`!`)
+8s Blocks Time (MR :gl:`!12716`)
 ---------------------------------
 
 Blocks time have been reduced from 10 seconds to 8 seconds. That is, a block can
