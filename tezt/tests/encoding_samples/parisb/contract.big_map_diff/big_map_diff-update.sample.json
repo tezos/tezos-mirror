@@ -1,0 +1,11 @@
+[{
+  "action": "update",
+  "big_map": "0",
+  "key_hash": "exprv6UsC1sN3Fk2XfgcJCL8NCerP5rCGy1PRESZAqr7L2JdzX55EN",
+  "key": [{
+    "int": "1"
+  }],
+  "value": [{
+    "prim": "UNIT"
+  }]
+}]
