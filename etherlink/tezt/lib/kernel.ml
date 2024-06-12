@@ -20,7 +20,7 @@ let commit_of = function
   | Latest -> None
 
 let upgrade_to = function
-  | Mainnet -> Latest
+  | Mainnet -> Ghostnet
   | Ghostnet -> Latest
   | Latest -> Latest
 
