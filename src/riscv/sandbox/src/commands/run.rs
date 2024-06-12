@@ -6,7 +6,7 @@
 use crate::{cli::RunOptions, console::Console, posix_exit_mode};
 use octez_riscv::{
     machine_state::bus::main_memory::M1G,
-    pvm::PvmSbiConfig,
+    pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
 use std::{error::Error, fs, io::Write};
@@ -54,7 +54,7 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
         Console::new()
     };
 
-    let config = PvmSbiConfig::new(|c| {
+    let hooks = PvmHooks::new(|c| {
         let _written = console.write(&[c]).unwrap();
     });
 
@@ -64,7 +64,7 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
         program,
         initrd,
         inbox.build(),
-        config,
+        hooks,
         rollup_address.into_hash().0.try_into().unwrap(),
         opts.common.inbox.origination_level,
     )?;

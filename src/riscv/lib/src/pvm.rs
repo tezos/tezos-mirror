@@ -15,9 +15,38 @@ use crate::{
     traps::EnvironException,
 };
 use sbi::{PvmSbiLayout, PvmSbiState};
-use std::ops::RangeBounds;
+use std::{
+    io::{stdout, Write},
+    ops::RangeBounds,
+};
 
-pub use sbi::{PvmSbiConfig, PvmStatus};
+pub use sbi::PvmStatus;
+
+/// PVM configuration
+pub struct PvmHooks<'a> {
+    pub putchar_hook: Box<dyn FnMut(u8) + 'a>,
+}
+
+impl<'a> PvmHooks<'a> {
+    /// Create a new configuration.
+    pub fn new<F: FnMut(u8) + 'a>(putchar: F) -> Self {
+        Self {
+            putchar_hook: Box::new(putchar),
+        }
+    }
+}
+
+/// The default PVM configuration prints all debug information from the kernel
+/// to the standard output.
+impl<'a> Default for PvmHooks<'a> {
+    fn default() -> Self {
+        fn putchar(char: u8) {
+            stdout().lock().write_all(&[char]).unwrap();
+        }
+
+        Self::new(putchar)
+    }
+}
 
 /// PVM state layout
 pub type PvmLayout<ML> = (
@@ -61,7 +90,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// Handle an exception using the defined Execution Environment.
     pub fn handle_exception(
         &mut self,
-        config: &mut PvmSbiConfig<'_>,
+        hooks: &mut PvmHooks<'_>,
         exception: EnvironException,
     ) -> exec_env::EcallOutcome {
         match exception {
@@ -69,15 +98,15 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             | EnvironException::EnvCallFromSMode
             | EnvironException::EnvCallFromMMode => {
                 self.sbi_state
-                    .handle_call(&mut self.machine_state, config, exception)
+                    .handle_call(&mut self.machine_state, hooks, exception)
             }
         }
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, config: &mut PvmSbiConfig<'_>) -> Result<(), EvalError> {
+    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) -> Result<(), EvalError> {
         if let Err(exc) = self.machine_state.step() {
-            if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(config, exc) {
+            if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(hooks, exc) {
                 return Err(EvalError {
                     cause: exc,
                     error: message,
@@ -106,7 +135,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     // Trampoline style function for [eval_range]
     pub fn eval_range_while<F>(
         &mut self,
-        config: &mut PvmSbiConfig<'_>,
+        hooks: &mut PvmHooks<'_>,
         step_bounds: &impl RangeBounds<usize>,
         should_continue: F,
     ) -> EvalManyResult
@@ -117,7 +146,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             .step_range_handle(
                 step_bounds,
                 should_continue,
-                |machine_state, exc| match self.sbi_state.handle_call(machine_state, config, exc) {
+                |machine_state, exc| match self.sbi_state.handle_call(machine_state, hooks, exc) {
                     exec_env::EcallOutcome::Fatal { message } => Err(EvalError {
                         cause: exc,
                         error: message,
@@ -267,7 +296,7 @@ mod tests {
         type L = PvmLayout<ML>;
 
         let mut buffer = Vec::new();
-        let mut pvm_config = PvmSbiConfig::new(|c| buffer.push(c));
+        let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
         // Setup PVM
         let (mut backend, placed) = InMemoryBackend::<L>::new();
@@ -288,7 +317,7 @@ mod tests {
             pvm.machine_state.hart.xregisters.write(a0, char as u64);
             written.push(char);
 
-            let outcome = pvm.handle_exception(&mut pvm_config, EnvironException::EnvCallFromUMode);
+            let outcome = pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
             assert!(
                 matches!(
                     outcome,
@@ -300,8 +329,8 @@ mod tests {
             );
         }
 
-        // Drop `pvm_config` to regain access to the mutable references it kept
-        mem::drop(pvm_config);
+        // Drop `hooks` to regain access to the mutable references it kept
+        mem::drop(hooks);
 
         // Compare what characters have been passed to the hook verrsus what we
         // intended to write

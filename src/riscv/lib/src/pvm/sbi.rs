@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::PvmHooks;
 use crate::exec_env::EcallOutcome;
 use crate::{
     machine_state::{
@@ -14,11 +15,7 @@ use crate::{
     traps::EnvironException,
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use std::{
-    cmp,
-    error::Error,
-    io::{stdout, Write},
-};
+use std::{cmp, error::Error};
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
@@ -60,31 +57,6 @@ impl TryFrom<u8> for PvmStatus {
 impl From<PvmStatus> for u8 {
     fn from(value: PvmStatus) -> Self {
         value as u8
-    }
-}
-
-/// PVM configuration
-pub struct PvmSbiConfig<'a> {
-    pub putchar_hook: Box<dyn FnMut(u8) + 'a>,
-}
-
-impl<'a> PvmSbiConfig<'a> {
-    /// Create a new configuration.
-    pub fn new<F: FnMut(u8) + 'a>(putchar: F) -> Self {
-        Self {
-            putchar_hook: Box::new(putchar),
-        }
-    }
-}
-
-/// The default PVM configuration prints all debug information from the kernel
-/// to the standard output.
-impl<'a> Default for PvmSbiConfig<'a> {
-    fn default() -> Self {
-        fn putchar(char: u8) {
-            stdout().lock().write_all(&[char]).unwrap();
-        }
-        Self::new(putchar)
     }
 }
 
@@ -399,10 +371,10 @@ impl<M: Manager> PvmSbiState<M> {
     fn handle_console_putchar<ML: MainMemoryLayout>(
         &self,
         machine: &mut MachineState<ML, M>,
-        config: &mut PvmSbiConfig,
+        hooks: &mut PvmHooks,
     ) -> EcallOutcome {
         let char = machine.hart.xregisters.read(a0) as u8;
-        (config.putchar_hook)(char);
+        (hooks.putchar_hook)(char);
 
         // This call always succeeds.
         machine.hart.xregisters.write(a0, 0);
@@ -428,7 +400,7 @@ impl<M: Manager> PvmSbiState<M> {
     pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
-        config: &mut PvmSbiConfig,
+        hooks: &mut PvmHooks,
         env_exception: EnvironException,
     ) -> EcallOutcome {
         if let EnvironException::EnvCallFromMMode = env_exception {
@@ -447,7 +419,7 @@ impl<M: Manager> PvmSbiState<M> {
         let sbi_extension = machine.hart.xregisters.read(a7);
 
         match sbi_extension {
-            SBI_CONSOLE_PUTCHAR => self.handle_console_putchar(machine, config),
+            SBI_CONSOLE_PUTCHAR => self.handle_console_putchar(machine, hooks),
             SBI_SHUTDOWN => self.handle_shutdown(),
             SBI_FIRMWARE_TEZOS => {
                 let sbi_function = machine.hart.xregisters.read(a6);

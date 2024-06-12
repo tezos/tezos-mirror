@@ -16,7 +16,7 @@ use octez_riscv::{
         AccessType,
     },
     program::Program,
-    pvm::PvmSbiConfig,
+    pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, Stepper},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
@@ -186,7 +186,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout>
         rollup_address: [u8; 20],
         origination_level: u64,
     ) -> Result<()> {
-        let config = PvmSbiConfig::new(|_| {});
+        let hooks = PvmHooks::new(|_| {});
 
         let mut backend = PvmStepper::<'backend, 'hooks, ML>::create_backend();
         let mut stepper = PvmStepper::new(
@@ -194,7 +194,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout>
             program,
             initrd,
             inbox,
-            config,
+            hooks,
             rollup_address,
             origination_level,
         )?;
