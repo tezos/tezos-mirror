@@ -5583,7 +5583,7 @@ end = struct
             ("test_voting", true);
             ("test_zk_rollup", true);
             ("test_transfer_ticket", N.(number >= 016));
-            ("test_host_operation", N.(number >= 020));
+            ("test_host_operation", N.(number >= 021));
           ]
           |> conditional_list
         in
@@ -6619,7 +6619,7 @@ let hash = Protocol.hash
             octez_client_commands |> open_;
             octez_stdlib |> open_;
             octez_stdlib_unix |> open_;
-            octez_shell_context |> if_ N.(number <= 019) |> open_;
+            octez_shell_context |> if_ N.(number <= 020) |> open_;
             octez_context |> open_;
             octez_context_memory |> if_ (N.(number >= 012) && N.(number <= 019));
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
@@ -7017,7 +7017,7 @@ let hash = Protocol.hash
             octez_smart_rollup_node_lib |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
-            octez_riscv_pvm |> if_ N.(number >= 020);
+            octez_riscv_pvm |> if_ N.(number >= 021);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             octez_version_value;
           ]
