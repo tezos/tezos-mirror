@@ -5063,14 +5063,14 @@ end = struct
             ("test_frozen_bonds", true);
             ("test_adaptive_issuance_launch", N.(number >= 018));
             ( "test_adaptive_issuance_roundtrip",
-              N.(number == 018 || number == 019) );
-            ("test_scenario_base", N.(number >= 020));
-            ("test_scenario_stake", N.(number >= 020));
-            ("test_scenario_rewards", N.(number >= 020));
-            ("test_scenario_autostaking", N.(number >= 020));
-            ("test_scenario_slashing", N.(number >= 020));
-            ("test_scenario_slashing_stakers", N.(number >= 020));
-            ("test_scenario_deactivation", N.(number >= 020));
+              N.(number == 018 || number == 019 || number == 020) );
+            ("test_scenario_base", N.(number >= 021));
+            ("test_scenario_stake", N.(number >= 021));
+            ("test_scenario_rewards", N.(number >= 021));
+            ("test_scenario_autostaking", N.(number >= 021));
+            ("test_scenario_slashing", N.(number >= 021));
+            ("test_scenario_slashing_stakers", N.(number >= 021));
+            ("test_scenario_deactivation", N.(number >= 021));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
@@ -5192,8 +5192,8 @@ end = struct
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number >= 018));
             ("test_percentage", N.(number >= 019));
-            ("test_full_staking_balance_repr", N.(number >= 020));
-            ("test_slashing_percentage", N.(number >= 020));
+            ("test_full_staking_balance_repr", N.(number >= 021));
+            ("test_slashing_percentage", N.(number >= 021));
           ]
           |> conditional_list
         in
@@ -5851,7 +5851,7 @@ let hash = Protocol.hash
           [
             tezt_core_lib |> if_ N.(number >= 019) |> open_ |> open_ ~m:"Base";
             alcotezt |> if_ N.(number == 019);
-            tezt_tezos |> if_ N.(number >= 020);
+            tezt_tezos |> if_ N.(number >= 021);
             tezt_lib |> if_ N.(number >= 019);
             octez_base_test_helpers |> if_ N.(number == 019) |> open_;
             qcheck_alcotest;
