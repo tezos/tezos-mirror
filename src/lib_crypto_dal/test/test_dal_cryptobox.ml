@@ -824,8 +824,7 @@ module Test = struct
       Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
     Lwt_main.run
-      Cryptobox.Config.(
-        init_prover_dal ~find_srs_files ~srs_size_log2:5 default)
+      Cryptobox.Config.(init_prover_dal ~find_srs_files ~srs_size_log2:5 ())
     |> function
     | Ok () -> ()
     | Error err ->
@@ -837,8 +836,7 @@ module Test = struct
       Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
     Lwt_main.run
-      Cryptobox.Config.(
-        init_prover_dal ~find_srs_files ~srs_size_log2:6 default)
+      Cryptobox.Config.(init_prover_dal ~find_srs_files ~srs_size_log2:6 ())
     |> function
     | Error [Cryptobox.Failed_to_load_trusted_setup s] ->
         if

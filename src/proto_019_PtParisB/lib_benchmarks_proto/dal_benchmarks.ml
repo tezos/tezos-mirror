@@ -128,7 +128,7 @@ module Publish_commitment : Benchmark.S = struct
       Lwt_main.run
       @@ Tezos_crypto_dal.Cryptobox.Config.init_prover_dal
            ~find_srs_files:(Fun.const (Ok ("", "")))
-           {activated = true; bootstrap_peers = []}
+           ()
       |> function
       | Ok () -> ()
       | Error errs ->

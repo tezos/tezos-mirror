@@ -1210,30 +1210,25 @@ module Config = struct
 
   let default = Dal_config.default
 
-  let init_verifier_dal dal_config =
-    let open Result_syntax in
-    if dal_config.activated then
-      let initialisation_parameters = Verifier {is_fake = false} in
-      load_parameters initialisation_parameters
-    else return_unit
+  let init_verifier_dal () =
+    let initialisation_parameters = Verifier {is_fake = false} in
+    load_parameters initialisation_parameters
 
-  let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
+  let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) () =
     let open Lwt_result_syntax in
     Lwt.catch
       (fun () ->
-        if dal_config.activated then
-          let* initialisation_parameters =
-            let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
-            let* srs_g1, srs_g2 =
-              initialisation_parameters_from_files
-                ~srsu_g1_path
-                ~srsu_g2_path
-                ~srs_size:(1 lsl srs_size_log2)
-            in
-            return (Prover {is_fake = false; srs_g1; srs_g2})
+        let* initialisation_parameters =
+          let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
+          let* srs_g1, srs_g2 =
+            initialisation_parameters_from_files
+              ~srsu_g1_path
+              ~srsu_g2_path
+              ~srs_size:(1 lsl srs_size_log2)
           in
-          Lwt.return (load_parameters initialisation_parameters)
-        else return_unit)
+          return (Prover {is_fake = false; srs_g1; srs_g2})
+        in
+        Lwt.return (load_parameters initialisation_parameters))
       (fun exn ->
         tzfail (Failed_to_load_trusted_setup (Printexc.to_string exn)))
 end

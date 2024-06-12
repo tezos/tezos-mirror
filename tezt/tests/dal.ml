@@ -6323,7 +6323,7 @@ let dal_crypto_benchmark () =
       let* result =
         Config.init_prover_dal
           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-          Config.default
+          ()
       in
       Log.info "SRS loaded." ;
       let*? config =
@@ -6389,9 +6389,7 @@ let dal_crypto_benchmark () =
         in
         let* () =
           if verifier_srs then
-            let result =
-              Cryptobox.Config.init_verifier_dal Cryptobox.Config.default
-            in
+            let result = Cryptobox.Config.init_verifier_dal () in
             let*? config =
               Result.map_error
                 (fun x ->

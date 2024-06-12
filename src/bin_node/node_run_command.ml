@@ -707,10 +707,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
-  let*? () =
-    Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal
-      config.blockchain_network.dal_config
-  in
+  let*? () = Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal () in
   let*! node =
     init_node
       ?sandbox

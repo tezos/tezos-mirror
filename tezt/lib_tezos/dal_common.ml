@@ -559,7 +559,7 @@ module Helpers = struct
     let* init =
       Cryptobox.Config.init_prover_dal
         ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-        Cryptobox.Config.default
+        ()
     in
     match init with
     | Error e ->

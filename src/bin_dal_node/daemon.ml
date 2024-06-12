@@ -47,8 +47,7 @@ let fetch_dal_config cctxt =
   | Error e -> return_error e
   | Ok dal_config -> return_ok dal_config
 
-let init_cryptobox config dal_config
-    (proto_parameters : Dal_plugin.proto_parameters) =
+let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
   let prover_srs =
     Profile_manager.is_prover_profile config.Configuration_file.profile
@@ -56,9 +55,9 @@ let init_cryptobox config dal_config
   let* () =
     if prover_srs then
       let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      Cryptobox.Config.init_prover_dal ~find_srs_files dal_config
+      Cryptobox.Config.init_prover_dal ~find_srs_files ()
     else
-      let*? () = Cryptobox.Config.init_verifier_dal dal_config in
+      let*? () = Cryptobox.Config.init_verifier_dal () in
       return_unit
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
@@ -297,8 +296,7 @@ module Handler = struct
         let*! () = Node_context.set_profile_ctxt ctxt pctxt in
         return_unit
 
-  let resolve_plugin_and_set_ready config dal_config ctxt cctxt
-      ?last_notified_level () =
+  let resolve_plugin_and_set_ready config ctxt cctxt ?last_notified_level () =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
     let open Lwt_result_syntax in
@@ -313,7 +311,7 @@ module Handler = struct
          Instead of recomputing these parameters, they could be stored
          (for a given cryptobox). *)
       let* cryptobox, shards_proofs_precomputation =
-        init_cryptobox config dal_config proto_parameters
+        init_cryptobox config proto_parameters
       in
       Store.Value_size_hooks.set_share_size
         (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
@@ -888,7 +886,6 @@ let run ~data_dir ~configuration_override =
       [
         Handler.resolve_plugin_and_set_ready
           config
-          dal_config
           ctxt
           cctxt
           ?last_notified_level
