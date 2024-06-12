@@ -254,10 +254,10 @@ release:canary:
     - ${RUNNER}
   before_script:
     - !reference [.rename-build-artifacts, before_script]
+    - *wait-for-docker-daemon
     - *docker-login
   script:
     - set -xv
-    - *wait-for-docker-daemon
     - >
       for BIN in archiver server ; do
         docker build -t ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF} -f Dockerfile.$BIN . ;
@@ -303,6 +303,7 @@ docker:canary:
   tags:
     - ${DEFAULT_RUNNER_TAG}
   before_script:
+    - *wait-for-docker-daemon
     - *docker-login
   script:
     - set -xv
