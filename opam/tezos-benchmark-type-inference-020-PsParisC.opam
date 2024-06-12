@@ -11,27 +11,14 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "cmdliner" { >= "1.1.0" }
-  "octez-shell-libs" { = version }
-  "tezos-dal-node-lib" { = version }
-  "tezos-dal-node-services" { = version }
-  "octez-l2-libs" { = version }
-  "prometheus-app" { >= "1.2" }
-  "prometheus" { >= "1.2" }
-  "octez-crawler" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
-  "octez-protocol-020-PsParisC-libs" { = version }
-]
-depopts: [
-  "octez-protocol-alpha-libs"
-]
-conflicts: [
-  "checkseum" { = "0.5.0" }
-  "octez-protocol-alpha-libs" { != version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-protocol-020-PsParisC" { = version }
+  "hashcons"
+  "octez-protocol-020-PsParisC-libs" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `octez-dal-node` binary"
+synopsis: "Tezos: type inference for partial Michelson expressions"

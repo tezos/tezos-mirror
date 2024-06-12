@@ -11,27 +11,17 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "cmdliner" { >= "1.1.0" }
-  "octez-shell-libs" { = version }
-  "tezos-dal-node-lib" { = version }
-  "tezos-dal-node-services" { = version }
-  "octez-l2-libs" { = version }
-  "prometheus-app" { >= "1.2" }
-  "prometheus" { >= "1.2" }
-  "octez-crawler" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-type-inference-020-PsParisC" { = version }
+  "tezos-protocol-020-PsParisC" { = version }
+  "hashcons"
   "octez-protocol-020-PsParisC-libs" { = version }
-]
-depopts: [
-  "octez-protocol-alpha-libs"
-]
-conflicts: [
-  "checkseum" { = "0.5.0" }
-  "octez-protocol-alpha-libs" { != version }
+  "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `octez-dal-node` binary"
+synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"

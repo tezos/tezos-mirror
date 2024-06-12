@@ -10,28 +10,31 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "ppx_expect"
   "octez-libs" { = version }
-  "cmdliner" { >= "1.1.0" }
+  "tezos-protocol-020-PsParisC" { = version }
   "octez-shell-libs" { = version }
-  "tezos-dal-node-lib" { = version }
+  "uri" { >= "3.1.0" }
+  "tezt" { >= "4.1.0" & < "5.0.0" }
+  "tezt-tezos" { = version }
+  "qcheck-alcotest" { >= "0.20" }
+  "octez-proto-libs" { = version }
+  "octez-version" { = version }
   "tezos-dal-node-services" { = version }
+  "lwt-canceler" { >= "0.3" & < "0.4" }
+  "lwt-exit"
+  "octez-protocol-compiler" { = version }
+  "tezos-dal-node-lib" { = version }
+  "tezos-dac-lib" { = version }
+  "tezos-dac-client-lib" { = version }
+  "octez-injector" { = version }
   "octez-l2-libs" { = version }
-  "prometheus-app" { >= "1.2" }
-  "prometheus" { >= "1.2" }
-  "octez-crawler" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
-  "octez-protocol-020-PsParisC-libs" { = version }
-]
-depopts: [
-  "octez-protocol-alpha-libs"
-]
-conflicts: [
-  "checkseum" { = "0.5.0" }
-  "octez-protocol-alpha-libs" { != version }
+  "octez-alcotezt" { with-test & = version }
+  "tezos-dac-node-lib" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `octez-dal-node` binary"
+synopsis: "Octez protocol 020-PsParisC libraries"

@@ -12,24 +12,21 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "octez-libs" {with-test}
-  "octez-l2-libs" {with-test}
-  "octez-smart-rollup-node-lib" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.20" }
-  "qcheck-core" {with-test}
-  "logs" {with-test}
+  "octez-protocol-020-PsParisC-libs" {with-test}
+  "tezos-protocol-020-PsParisC" {with-test}
   "octez-alcotezt" {with-test}
+  "tezos-benchmark" {with-test}
+  "tezos-benchmark-020-PsParisC" {with-test}
+  "tezos-benchmark-type-inference-020-PsParisC" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "tezt-tezos" {with-test}
   "octez-shell-libs" {with-test}
-  "octez-smart-rollup-node-PtParisB" {with-test}
-  "octez-smart-rollup-node-PsParisC" {with-test}
-]
-depopts: [
-  "octez-smart-rollup-node-PtNairob" {with-test}
-  "octez-smart-rollup-node-Proxford" {with-test}
-  "octez-smart-rollup-node-alpha" {with-test}
+  "octez-proto-libs" {with-test}
+  "octez-l2-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tests for the smart rollup node library"
+synopsis: "Tezos/Protocol: tests for economic-protocol definition"

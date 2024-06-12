@@ -14,6 +14,7 @@ depends: [
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "octez-protocol-019-PtParisB-libs" { = version }
+  "octez-protocol-020-PsParisC-libs" { = version }
 ]
 depopts: [
   "tezos-client-genesis"

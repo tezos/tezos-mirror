@@ -1,6 +1,6 @@
-{0 Octez-protocol-019-PtParisB-libs: octez protocol 019-PtParisB libraries}
+{0 Octez-protocol-020-PsParisC-libs: octez protocol 020-PsParisC libraries}
 
-This is a package containing some libraries related to the Tezos 019-PtParisB protocol.
+This is a package containing some libraries related to the Tezos 020-PsParisC protocol.
 
 It contains the following libraries:
 

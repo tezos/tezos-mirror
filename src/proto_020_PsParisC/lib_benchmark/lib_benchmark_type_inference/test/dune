@@ -6,24 +6,24 @@
  (libraries
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-benchmark-type-inference-019-PtParisB
-  tezos-protocol-019-PtParisB.protocol
+  tezos-benchmark-type-inference-020-PsParisC
+  tezos-protocol-020-PsParisC.protocol
   octez-libs.error-monad
-  octez-protocol-019-PtParisB-libs.client)
+  octez-protocol-020-PsParisC-libs.client)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_benchmark_type_inference_019_PtParisB))
+  -open Tezos_benchmark_type_inference_020_PsParisC))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-019-PtParisB)
+ (package tezos-benchmark-type-inference-020-PsParisC)
  (action (run %{dep:./test_uf.exe})))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-019-PtParisB)
+ (package tezos-benchmark-type-inference-020-PsParisC)
  (action (run %{dep:./test_inference.exe})))
