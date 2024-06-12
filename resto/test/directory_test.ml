@@ -28,14 +28,6 @@ module Service = Resto.MakeService (Resto_json.Encoding)
 
 let ( let* ) = Lwt.bind
 
-let ( let*? ) = Lwt_result.bind
-
-let traverse = function
-  | Ok p ->
-      let* r = p in
-      Lwt.return @@ Ok r
-  | Error _ as err -> Lwt.return err
-
 let get_or_else f = function Ok i -> i | Error err -> f err
 
 module Resolve_uri_desc = struct
