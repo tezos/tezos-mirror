@@ -12,17 +12,16 @@ module Cli = C
 
 let docker_push () =
   let tezt_cloud = Lazy.force Env.tezt_cloud in
-  Log.info "TEZT_CLOUD_BASENAME variable found with value: %s" tezt_cloud ;
+  Log.info "TEZT_CLOUD environment variable found with value: %s" tezt_cloud ;
   let ssh_public_key = Lazy.force Env.ssh_public_key in
   Log.info "Checking the existence of ssh public key '%s'..." ssh_public_key ;
   let* ssh_public_key =
     let ssh_public_key_file = Lazy.force Env.ssh_public_key in
-    if not (Sys.file_exists ssh_public_key_file) then
-      Test.fail
-        "Could not find SSH key named %s. See README for more information why \
-         this ssh key is necessary."
-        ssh_public_key
-    else Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_file]
+    let* () =
+      if not (Sys.file_exists ssh_public_key_file) then Ssh.generate_key ()
+      else Lwt.return_unit
+    in
+    Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_file]
   in
   Log.info
     "Checking the existence of the docker file %s.Dockerfile..."
