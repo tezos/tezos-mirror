@@ -252,13 +252,15 @@ impl<T, const LEN: usize> DynRegion for [T; LEN] {
 
     fn read<E: Elem>(&self, address: usize) -> E {
         assert!(address + mem::size_of::<E>() <= Self::LEN);
-        unsafe {
+        let mut result = unsafe {
             self.as_ptr()
                 .cast::<u8>() // Calculate the offset in bytes
                 .add(address)
                 .cast::<E>()
                 .read_unaligned()
-        }
+        };
+        result.from_stored_in_place();
+        result
     }
 
     fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
@@ -269,11 +271,15 @@ impl<T, const LEN: usize> DynRegion for [T; LEN] {
                 .add(address)
                 .cast::<E>()
                 .copy_to(values.as_mut_ptr(), values.len())
+        };
+        for v in values.iter_mut() {
+            v.from_stored_in_place();
         }
     }
 
-    fn write<E: Elem>(&mut self, address: usize, value: E) {
+    fn write<E: Elem>(&mut self, address: usize, mut value: E) {
         assert!(address + mem::size_of_val(&value) <= Self::LEN);
+        value.to_stored_in_place();
         unsafe {
             self.as_mut_ptr()
                 .cast::<u8>() // Calculate the offset in bytes
@@ -285,12 +291,18 @@ impl<T, const LEN: usize> DynRegion for [T; LEN] {
 
     fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
         assert!(address + mem::size_of_val(values) <= Self::LEN);
+
         unsafe {
-            self.as_mut_ptr()
-                .cast::<u8>()
+            let ptr = self
+                .as_mut_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
                 .add(address)
-                .cast::<E>()
-                .copy_from(values.as_ptr(), values.len());
+                .cast::<E>();
+
+            for (i, mut value) in values.iter().copied().enumerate() {
+                value.to_stored_in_place();
+                ptr.add(i).write_unaligned(value)
+            }
         }
     }
 }
@@ -337,13 +349,46 @@ impl<T: DynRegion> DynRegion for &T {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::DynRegion;
     use crate::{
         backend_test,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, Elem, Region,
+            Array, Backend, Choreographer, Elem, Location, Region,
         },
     };
+
+    /// Dummy type that helps us implement custom normalisation via [Elem]
+    #[repr(packed)]
+    #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Default)]
+    struct Flipper {
+        a: u8,
+        b: u8,
+    }
+
+    impl Elem for Flipper {
+        fn store(&mut self, source: &Self) {
+            self.a = source.b;
+            self.b = source.a;
+        }
+
+        fn to_stored_in_place(&mut self) {
+            std::mem::swap(&mut self.a, &mut self.b);
+        }
+
+        fn from_stored_in_place(&mut self) {
+            std::mem::swap(&mut self.b, &mut self.a);
+        }
+
+        fn from_stored(source: &Self) -> Self {
+            Self {
+                a: source.b,
+                b: source.a,
+            }
+        }
+    }
+
+    const FLIPPER_SIZE: usize = std::mem::size_of::<Flipper>();
 
     backend_test!(test_region_overlap, F, {
         const LEN: usize = 64;
@@ -416,37 +461,87 @@ pub(crate) mod tests {
         assert_eq!(cell1.read(), cell1_value);
     });
 
+    #[should_panic]
+    #[test]
+    fn test_dynregion_oob() {
+        const LEN: usize = 8;
+
+        let mut flipper_array = [Flipper { a: 0, b: 0 }; LEN];
+
+        // This should panic because we are trying to write an element at the address which corresponds to the end of the buffer
+        DynRegion::write::<Flipper>(
+            &mut flipper_array,
+            LEN * FLIPPER_SIZE,
+            Flipper { a: 1, b: 2 },
+        );
+    }
+
+    backend_test!(test_dynregion_stored_format, F, {
+        struct FlipperLayout;
+
+        impl Layout for FlipperLayout {
+            type Placed = Location<[u8; 1024]>;
+
+            fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+                alloc.alloc()
+            }
+
+            type Allocated<B: super::Manager> = B::DynRegion<1024>;
+
+            fn allocate<B: super::Manager>(
+                backend: &mut B,
+                placed: Self::Placed,
+            ) -> Self::Allocated<B> {
+                backend.allocate_dyn_region(placed)
+            }
+        }
+        let mut backend = F::new::<FlipperLayout>();
+
+        // Writing to one item of the region must convert to stored format.
+        {
+            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+
+            region.write(0, Flipper { a: 13, b: 37 });
+            assert_eq!(region.read::<Flipper>(0), Flipper { a: 13, b: 37 });
+        }
+
+        let mut buffer = [0; 2];
+        backend.read(0, &mut buffer);
+        assert_eq!(buffer, [37, 13]);
+
+        // Writing to the entire region must convert properly to stored format.
+        {
+            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+
+            region.write_all::<Flipper>(
+                0,
+                &[
+                    Flipper { a: 11, b: 22 },
+                    Flipper { a: 13, b: 24 },
+                    Flipper { a: 15, b: 26 },
+                    Flipper { a: 17, b: 28 },
+                ],
+            );
+
+            let mut buff = [Flipper::default(); 4];
+            region.read_all::<Flipper>(0, &mut buff);
+            assert_eq!(
+                buff,
+                [
+                    Flipper { a: 11, b: 22 },
+                    Flipper { a: 13, b: 24 },
+                    Flipper { a: 15, b: 26 },
+                    Flipper { a: 17, b: 28 },
+                ]
+            );
+        }
+
+        let mut buffer = [0; 8];
+        backend.read(0, &mut buffer);
+        assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
+    });
+
     backend_test!(test_region_stored_format, F, {
-        /// Dummy type that helps us implement custom normalisation via [Elem]
-        #[repr(packed)]
-        #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
-        struct Flipper {
-            a: u8,
-            b: u8,
-        }
-
-        impl Elem for Flipper {
-            fn store(&mut self, source: &Self) {
-                self.a = source.b;
-                self.b = source.a;
-            }
-
-            fn to_stored_in_place(&mut self) {
-                std::mem::swap(&mut self.a, &mut self.b);
-            }
-
-            fn from_stored_in_place(&mut self) {
-                std::mem::swap(&mut self.b, &mut self.a);
-            }
-
-            fn from_stored(source: &Self) -> Self {
-                Self {
-                    a: source.b,
-                    b: source.a,
-                }
-            }
-        }
-
         type FlipperLayout = Array<Flipper, 4>;
         let mut backend = F::new::<FlipperLayout>();
 
