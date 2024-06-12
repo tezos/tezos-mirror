@@ -238,12 +238,50 @@ Where:
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
+.. _dynmax_rate_alpha:
+
+Dynamic Maximum
+......................
+
+In addition to the previous bounds, from Alpha onwards we are adding another upper bound to the issuance.
+Called **DynMax**, this maximum is defined as a function of the stake ratio, like the static rate. This
+bound ensures that the issuance rate stays close enough to the static rate, by bounding the dynamic rate
+following a function of the stake ratio.
+
+The function chosen for the maximum applied to the total issuance is the following:
+
+.. code-block:: python
+
+  def dynmax(stake_ratio):
+    r = stake_ratio
+    if r >= 0.5:
+      return 0.01
+    elif r <= 0.05:
+      return 0.1
+    dm = (5115 - 17670 * r + 19437 * (r ** 2)) / (24149 + 178695 * r)
+    if dm > 0.1:
+      return 0.1
+    elif dm < 0.01:
+      return 0.01
+    else:
+      return dm
+
+
+.. figure:: dynmax.png
+
+ Figure 2. DynMax compared to the static rate in the range from 5% to 50% of stake ratio.
+
+Note that before reaching the final value of the minimum in the previous section, it is possible for
+this maximum value to theoretically be smaller than  the minimum bound. In this case, the minimum value
+takes priority, and the max is set to the min. In other words, the bounds in the previous section are always
+applied, regardless of the value of dynmax.
+
 .. _issuance_rate_alpha:
 
 Issuance rate
 ......................
 
-Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the minimum and maximum rates computed for the cycle ``c + 1``.
+Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_alpha>`, along with the :ref:`dynamic maximum <dynmax_rate_alpha>`, computed for the cycle ``c + 1``.
 
 .. code-block:: python
 
@@ -252,7 +290,7 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycl
     static_rate = static_rate(adjusted_cycle - 1)
     dynamic_rate = dynamic_rate(adjusted_cycle - 1)
     minimum_rate = minimum_rate(adjusted_cycle)
-    maximum_rate = maximum_rate(adjusted_cycle)
+    maximum_rate = min(maximum_rate(adjusted_cycle), dynmax(stake_ratio(adjusted_cycle)))
     total_rate = static_rate + dynamic_rate
     return max( min(total_rate, maximum_rate), minimum_rate )
 
@@ -516,7 +554,7 @@ they remain otherwise within the staker’s account at all times.
 
 .. figure:: staked_funds_transitions.png
 
-  Figure 2: staked funds management using pseudo-operations.
+  Figure 3: staked funds management using pseudo-operations.
 
 To *stake* funds, a delegator uses the ``stake`` pseudo-operation,
 transferring the chosen amount of **spendable** tez to their own
