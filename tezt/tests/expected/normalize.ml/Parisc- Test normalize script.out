@@ -1,0 +1,42 @@
+
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz
+{ parameter unit ;
+  storage unit ;
+  code { PUSH (list (pair nat nat nat nat))
+              { Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 } ;
+         DROP 2 ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }
+
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz --unparsing-mode Readable
+{ parameter unit ;
+  storage unit ;
+  code { PUSH (list (pair nat nat nat nat))
+              { Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 } ;
+         DROP 2 ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }
+
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz --unparsing-mode Optimized
+{ parameter unit ;
+  storage unit ;
+  code { PUSH (list (pair nat nat nat nat))
+              { { 0 ; 3 ; 6 ; 9 } ; { 1 ; 4 ; 7 ; 10 } ; { 2 ; 5 ; 8 ; 11 } } ;
+         DROP 2 ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }
+
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz --unparsing-mode Optimized_legacy
+{ parameter unit ;
+  storage unit ;
+  code { PUSH (list (pair nat nat nat nat))
+              { Pair 0 (Pair 3 (Pair 6 9)) ;
+                Pair 1 (Pair 4 (Pair 7 10)) ;
+                Pair 2 (Pair 5 (Pair 8 11)) } ;
+         DROP 2 ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }
