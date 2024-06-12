@@ -6,13 +6,13 @@ set -eu
 # 'before_script'.
 . scripts/ci/docker.env
 
-# Note: 'opam_repository_image_name' is set in the variables section
+# Note: 'ci_image_name' is set in the variables section
 # of the top-level .gitlab-ci.yml.
-build_deps_image_name=${opam_repository_image_name:?"opam_repository_image_name: is unset"}
-# Note: 'opam_repository_image_tag' is dynamically set by an incoming
-# dotenv file from the job that produces the build_deps_image image
-# (currently: 'oc.docker:opam-repository:*')
-build_deps_image_version=${opam_repository_image_tag:?"opam_repository_image_tag: is unset"}
+ci_image_name=${ci_image_name:?"ci_image_name: is unset"}
+# Note: 'ci_image_tag' is dynamically set by an incoming
+# dotenv file from the job that produces the CI images
+# (currently: 'oc.docker:ci:*')
+ci_image_version=${ci_image_tag:?"ci_image_tag: is unset"}
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
@@ -31,8 +31,8 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 ./scripts/create_docker_image.sh \
   --image-name "${DOCKER_IMAGE_NAME}" \
   --image-version "${DOCKER_IMAGE_TAG}" \
-  --build-deps-image-name "${build_deps_image_name}" \
-  --build-deps-image-version "${build_deps_image_version}" \
+  --ci-image-name "${ci_image_name}" \
+  --ci-image-version "${ci_image_version}" \
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \

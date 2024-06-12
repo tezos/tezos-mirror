@@ -28,10 +28,8 @@ let variables : variables =
        consumed. This variable is defined at the tezos-group level and
        always contains the path to the unprotected Docker registry
        (unlike [GCP_REGISTRY], see below). This is used to locate the
-       [tezos/opam-repository] images, which are always pushed to the
-       public repository. *)
-    ( "opam_repository_image_name",
-      "${GCP_PUBLIC_REGISTRY}/${CI_PROJECT_PATH}/opam-repository" );
+       CI images, which are always pushed to the public repository. *)
+    ("ci_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci");
     (* /!\ GCP_REGISTRY is the variable containing the name of the registry to and from
        which docker images are produced and consumed. This variable is defined at tezos
        level with the value unprotected registry and at tezos/tezos level in its protected

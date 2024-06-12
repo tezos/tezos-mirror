@@ -31,10 +31,10 @@ fi
 opamswitch="$OPAMSWITCH"
 unset OPAMSWITCH
 
-echo "Use opam repository commit: $full_opam_repository_tag"
-full_opam_repository="https://github.com/ocaml/opam-repository.git#$full_opam_repository_tag"
-opam repository set-url tezos --dont-select "$full_opam_repository" ||
-  opam repository add tezos --dont-select "$full_opam_repository" > /dev/null 2>&1
+echo "Use opam repository commit: $opam_repository_tag"
+opam_repository="https://github.com/ocaml/opam-repository.git#$opam_repository_tag"
+opam repository set-url tezos --dont-select "$opam_repository" ||
+  opam repository add tezos --dont-select "$opam_repository" > /dev/null 2>&1
 
 # Note: there should be no need to 'opam update' since 'opam repository add/set-url'
 # should have fetched already and the repository cannot change since it is

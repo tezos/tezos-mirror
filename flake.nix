@@ -78,7 +78,7 @@
 
               source ${self}/scripts/version.sh
 
-              opam_repo_flake="github:ocaml/opam-repository/$full_opam_repository_tag"
+              opam_repo_flake="github:ocaml/opam-repository/$opam_repository_tag"
 
               if ! ( ${checkFlakeLock} ${opam-repository} $opam_repo_flake opam-repository );
               then

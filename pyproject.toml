@@ -1,5 +1,3 @@
-# If you modify this file, generate the lock file using `poetry lock` and copy
-# the resulting poetry.lock file with this one in https://gitlab.com/tezos/opam-repository
 [tool.poetry]
 name = "tezos"
 version = "0.1.0"

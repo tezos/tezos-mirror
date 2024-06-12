@@ -8,8 +8,8 @@ script_dir="$(dirname "$images_dir")/scripts"
 repo_dir="$(dirname "$images_dir")"
 cd "$repo_dir"
 
-# shellcheck source=./images/opam-repository.inc.sh
-. "$images_dir"/opam-repository.inc.sh
+# shellcheck source=./images/ci.inc.sh
+. "$images_dir"/ci.inc.sh
 
 # shellcheck source=./scripts/version.sh
 . "$script_dir"/version.sh
@@ -25,18 +25,20 @@ Usage: $0 [-h|--help]
   [--layer-targets <LAYER_TARGETS>]
   [-- docker build args]
 
-Creates all the tezos/tezos opam-repository images from
-'images/opam-repository/Dockerfile'. Each image corresponds to a
+Creates all the tezos/tezos CI images from
+'images/ci/Dockerfile'. Each image corresponds to a
 LAYER_TARGET in that file. The set of all targets are in the variable
-'docker_images' of 'opam-repository.inc.sh'. For more info on
-different targets, see 'images/opam-repository/README.md'.
+'docker_images' of 'ci.inc.sh'. For more info on
+different targets, see 'images/ci/README.md'.
 
 Each image is named IMAGE_BASE/LAYER_TARGET:IMAGE_TAG. If IMAGE_BASE
-is omitted, it defaults to 'tezos/opam-repository'. The tag IMAGE_TAG
-will be on the form TARGETARCH[--TAG_SUFFIX]. If omitted, TARGETARCH
-defaults to 'amd64'. The only other valid value is 'arm64'. TAG_SUFFIX
-typically identifies an input hash. See 'README.md' and 'image_tag.sh'
-in this folder for more info on input hashes.
+is omitted, it defaults to the value of
+  $ci_image_name
+from 'scripts/version.sh'. The tag IMAGE_TAG will be on the form
+TARGETARCH[--TAG_SUFFIX]. If omitted, TARGETARCH defaults to
+'amd64'. The only other valid value is 'arm64'. TAG_SUFFIX typically
+identifies an input hash. See 'README.md' and 'image_tag.sh' in this
+folder for more info on input hashes.
 
 Images use BuildKit inline layer caching. If TAG_CACHE_SUFFIX is
 supplied, then caches are fetched from
@@ -59,19 +61,19 @@ are:
 EXAMPLES
 
 With no argument, builds targets for amd64 tagged
-'tezos/opam-repository/TARGET:amd64' and without fetching any remote
-caches:
+  ${ci_image_name}/TARGET:amd64
+and without fetching any remote caches:
 
-  $ ./images/create_opam_repository_images.sh
+  $ ./images/create_ci_images.sh
 
 We can parameterize the script to fetch caches from a CI build of the
-opam-repository images in a given branch, e.g. 'master'. First, we
+CI images in a given branch, e.g. 'master'. First, we
 omit '--image-base', which will default to the same name used by the
 tezos/tezos CI. Then, the key is to set the TAG_CACHE_SUFFIX argument
 to the slugified version of the branch of interest -- here
 'master':
 
-  $ ./images/create_opam_repository_images.sh \\
+  $ ./images/create_ci_images.sh \\
         --tag-cache-suffix master \\
         --tag-extra my_build
 
@@ -83,7 +85,7 @@ images:
  - runtime-prebuild-dependencies :amd64--deadbeef, :amd64--my_build
  - ...
 
-under 'us-central1-docker.pkg.dev/nl-gitlab-runner/registry/tezos/tezos/opam-repository/',
+under '$ci_image_name',
 with caches fetched from
 
  - runtime-dependencies          :amd64--my_build, :amd64--master
@@ -95,8 +97,8 @@ EOT
 }
 
 # Default values for options
-image_base="$build_deps_image_name"
-tag_suffix="$(./images/image_tag.sh images/opam-repository)"
+image_base="$ci_image_name"
+tag_suffix="$(./images/image_tag.sh images/ci)"
 tag_cache_suffix=""
 tag_extra=""
 targetarch="amd64"
@@ -192,7 +194,7 @@ build() {
   echo
 
   # shellcheck disable=SC2046
-  cd "${images_dir}/opam-repository" &&
+  cd "${images_dir}/ci" &&
     tar -cvh . |
     docker build --network host \
       --target="$f_LAYER_TARGET" \

@@ -1,11 +1,11 @@
 #!/bin/sh
 
 ## Sourceable file with common variables and functions for scripts
-## related to the opam-repository images
+## related to the CI images
 
 export valid_layer_targets='runtime-dependencies runtime-prebuild-dependencies runtime-build-dependencies runtime-build-test-dependencies runtime-e2etest-dependencies'
 
-# Gives the Docker tag for a build-deps image based on:
+# Gives the Docker tag for a images/ci image based on:
 #  Argument 1: target architecture
 #  Optional argument 2: tag suffix, typically an input hash or a sanitized branch name
 # echoes "${target_architecture}(--${tag_suffix})"

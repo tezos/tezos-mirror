@@ -26,7 +26,7 @@ let _octez_tooling =
       [
         bisect_ppx;
         (* These next are only used in the CI, we add this dependency so that
-           it is added to tezos/opam-repository. *)
+           it is added to images/ci. *)
         ocamlformat;
       ]
     ~npm_deps:

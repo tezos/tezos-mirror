@@ -77,9 +77,7 @@ let alpine_version =
    [tezos/tezos] CI.
 
    For documentation on the [runtime_X_dependencies] and the
-   [rust_toolchain] images, refer to
-   {{:https://gitlab.com/tezos/opam-repository/}
-   tezos/opam-repository}. *)
+   [rust_toolchain] images, refer to [images/README.md]. *)
 module Images_external = struct
   let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
 
@@ -97,7 +95,7 @@ module Images_external = struct
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
 
   (* The Alpine version should be kept up to date with the version
-     used for the [build_deps_image_name] images and specified in the
+     used for the [ci_image_name] images and specified in the
      variable [alpine_version] in [scripts/version.sh]. This is
      checked by the jobs [start] and [sanity_ci]. *)
   let alpine = Image.mk_external ~image_path:("alpine:" ^ alpine_version)
@@ -607,9 +605,9 @@ module Images = struct
       ~image_path
       ()
 
-  (* The job that builds the opam repo images.
-     This job is automatically included in any pipeline that uses this image. *)
-  let job_docker_opam_repository arch =
+  (* The job that builds the CI images.
+     This job is automatically included in any pipeline that uses any of these images. *)
+  let job_docker_ci arch =
     let variables = Some [("ARCH", arch_to_string_alt arch)] in
     job_docker_authenticated
       ?variables
@@ -617,50 +615,45 @@ module Images = struct
       ~arch
       ~skip_docker_initialization:true
       ~stage:Stages.images
-      ~name:("oc.docker:opam-repository:" ^ arch_to_string_alt arch)
+      ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
       ~ci_docker_hub:false
-      ~artifacts:
-        (artifacts
-           ~reports:(reports ~dotenv:"opam_repository_image_tag.env" ())
-           [])
-      ["./images/ci_create_opam_repository_images.sh"]
+      ~artifacts:(artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
+      ["./images/ci_create_ci_images.sh"]
 
-  let mk_opam_repository_image ~image_path =
+  let mk_ci_image ~image_path =
     Image.mk_internal
-      ~image_builder_amd64:(job_docker_opam_repository Amd64)
-      ~image_builder_arm64:(job_docker_opam_repository Arm64)
+      ~image_builder_amd64:(job_docker_ci Amd64)
+      ~image_builder_arm64:(job_docker_ci Arm64)
       ~image_path
       ()
 
-  (* Reuse the same image_builder job [job_docker_opam_repository] for all
+  (* Reuse the same image_builder job [job_docker_ci] for all
      the below images, since they're all produced in that same job.
 
      Depending on any of these images ensures that the job
-     [job_docker_opam_repository] is included exactly once in the pipeline. *)
+     [job_docker_ci] is included exactly once in the pipeline. *)
   let runtime_dependencies =
-    mk_opam_repository_image
-      ~image_path:
-        "${opam_repository_image_name}/runtime-dependencies:${opam_repository_image_tag}"
+    mk_ci_image
+      ~image_path:"${ci_image_name}/runtime-dependencies:${ci_image_tag}"
 
   let runtime_prebuild_dependencies =
-    mk_opam_repository_image
+    mk_ci_image
       ~image_path:
-        "${opam_repository_image_name}/runtime-prebuild-dependencies:${opam_repository_image_tag}"
+        "${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}"
 
   let runtime_build_dependencies =
-    mk_opam_repository_image
-      ~image_path:
-        "${opam_repository_image_name}/runtime-build-dependencies:${opam_repository_image_tag}"
+    mk_ci_image
+      ~image_path:"${ci_image_name}/runtime-build-dependencies:${ci_image_tag}"
 
   let runtime_build_test_dependencies =
-    mk_opam_repository_image
+    mk_ci_image
       ~image_path:
-        "${opam_repository_image_name}/runtime-build-test-dependencies:${opam_repository_image_tag}"
+        "${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}"
 
   let runtime_e2etest_dependencies =
-    mk_opam_repository_image
+    mk_ci_image
       ~image_path:
-        "${opam_repository_image_name}/runtime-e2etest-dependencies:${opam_repository_image_tag}"
+        "${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}"
 end
 
 (* This version of the job builds both released and experimental executables.
