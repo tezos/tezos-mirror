@@ -1638,8 +1638,8 @@ let get_shards dal_node ~slot_level ~slot_index downloaded_shard_ids =
         @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index))
     downloaded_shard_ids
 
-let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
-    client dal_node =
+let test_dal_node_rebuild_from_shards _protocol parameters cryptobox node client
+    dal_node =
   (* Steps in this integration test:
      1. Run a dal node
      2. Generate and publish a full slot, then bake
@@ -1679,7 +1679,6 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     ({index = shard.index; share = shard.share} : Cryptobox.shard)
   in
   let shards = shards |> List.to_seq |> Seq.map shard_of_json in
-  let* cryptobox = Helpers.make_cryptobox parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
     | Ok p -> Cryptobox.polynomial_to_slot cryptobox p |> Bytes.to_string
