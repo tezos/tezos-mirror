@@ -1203,10 +1203,6 @@ module Internal_for_tests = struct
   let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
 end
 
-let init_verifier_dal () =
-  let initialisation_parameters = Verifier {is_fake = false} in
-  load_parameters initialisation_parameters
-
 let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) () =
   let open Lwt_result_syntax in
   Lwt.catch

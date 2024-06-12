@@ -572,14 +572,11 @@ end
    to initialize DAL. Given that in the default case [init_prover_dal] may take
    several seconds, it would be better to call this function only once. *)
 
-(** [init_verifier_dal ()] initializes the DAL, with a minimal SRS for the
-    verifier. Note that only verifying functions can be used with this setup. *)
-val init_verifier_dal : unit -> unit Error_monad.tzresult
-
-(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the
-    DAL, given the function [find_srs_files] to find the SRS files, and the
-    optional log2 of the SRS size [srs_size_log2]. Note that the both proving &
-    verifying functions can be used with this setup. *)
+(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the DAL
+    in "prover" mode, given the function [find_srs_files] to find the SRS files,
+    and the optional log2 of the SRS size [srs_size_log2]. Note that the both
+    proving & verifying functions can be used with this setup. If this function
+    is not called only verifying functions are available. *)
 val init_prover_dal :
   find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
   ?srs_size_log2:int ->

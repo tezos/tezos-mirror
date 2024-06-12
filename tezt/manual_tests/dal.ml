@@ -61,6 +61,7 @@ let dal_parameters ~is_fake =
     | Ok _ -> unit
     | Error (`Fail s) -> Test.fail "%s. Reason:@.%s@." error_msg s
   in
+  let* () = check_make "The set of parameters is invalid for the verifier" in
   let* () =
     let* res = init_prover_dal ~find_srs_files () in
     match res with
@@ -72,18 +73,7 @@ let dal_parameters ~is_fake =
              Tezos_error_monad.Error_monad.pp)
           errs
   in
-  let* () = check_make "The set of parameters is invalid for the verifier" in
-  let () =
-    match init_verifier_dal () with
-    | Ok () -> ()
-    | Error errs ->
-        Test.fail
-          "Could not init verifier. Reason:@.%a@."
-          (Tezos_error_monad.Error_monad.TzTrace.pp_print_top
-             Tezos_error_monad.Error_monad.pp)
-          errs
-  in
-  let* () = check_make "The set of parameters is invalid for the verifier." in
+  let* () = check_make "The set of parameters is invalid for the prover" in
   unit
 
 (** Start a layer 1 node on the given network, with the given data-dir and

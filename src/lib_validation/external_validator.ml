@@ -93,7 +93,6 @@ module Processing = struct
         _;
       } =
     let open Lwt_result_syntax in
-    let*? () = Tezos_crypto_dal.Cryptobox.init_verifier_dal () in
     let sandbox_parameters =
       Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
     in

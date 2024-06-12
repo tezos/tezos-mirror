@@ -203,7 +203,6 @@ let run socket_dir =
       ~config:parameters.Parameters.internal_events
       ()
   in
-  let*? () = Tezos_crypto_dal.Cryptobox.init_verifier_dal () in
   (* Updater needs to be initialized to be able to read the protocol
      sources from the store when a protocol is injected and
      compiled. *)
