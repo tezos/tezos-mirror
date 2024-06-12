@@ -83,92 +83,6 @@ adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
 and a :ref:`dynamic rate <dynamic_rate_alpha>`. The final result is clipped to
 ensure nominal emissions remain within the minimal and the maximum ratios.
 
-.. _minimum_and_maximum_ratios_alpha:
-
-Minimum and maximum ratios
-..........................
-
-For the upcoming Paris protocol proposal, the minimum and maximum
-issuance rates will evolve smoothly over a predefined period of time,
-with the window between the maximum and minimum values progressively
-widening.
-
-The following figure describes the progressive maximum and minimum
-values of Adaptive Issuance.
-
-
-.. figure:: ai-min-max-new.jpeg
-
- Figure 1. A gradual widening of the range ensures a smooth transition
- to Adaptive Issuance.
-
-The schedule consists of three periods:
-
-- an **initial** period, set to 1 month, where the minimum and maximum
-  issuance rates are close to the current issuance rate and stay
-  constant,
-- a **transition** period, set to 5 months, where they widen lineary, with
-  the minimum going lower and the maximum higher, and
-- a **final** period where the minimum and maximum have reached their
-  minimum and maximum values.
-
-Formally, we define the main function for computing progressive ratios
-as follows.
-
-.. code-block:: python
-
-  def compute_extremum(cycle, initial_value, final_value):
-    trans = transition_period + 1
-    initial_limit = ai_activation_cycle + initial_period
-    trans_limit = initial_limit + trans
-    if cycle <= initial_limit:
-        return initial_value
-    elif cycle >= trans_limit:
-        return final_value
-    else:
-        t = cycle - initial_limit
-        res = (t * (final_value - initial_value) / trans) + initial_value
-        return res
-
-Where:
-
-- ``ai_activation_cycle`` is the first cycle with Adaptive Issuance
-  active, that is, :ref:`5 cycles after the activation of the Paris
-  protocol<feature_activation_alpha>`.
-- ``initial_period`` is a predefined period of time, set to 1 month in Paris.
-- ``transition_period`` is a predefined period of time, set to 5 months in Paris.
-
-The issuance minimum ratio for Adaptive Issuance curve is then defined as follows.
-
-.. code-block:: python
-
-  def minimum_ratio(cycle):
-    return compute_extremum(cycle, issuance_ratio_initial_min, issuance_ratio_global_min)
-
-Where:
-
-- ``issuance_ratio_initial_min`` (4.5%) is the initial minimum
-  value. At the time of :ref:`Adaptive Issuance
-  activation<feature_activation_alpha>`, the issuance rate is kept
-  above this bound for the initial period.
-- ``issuance_ratio_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
-
-
-The issuance maximum ratio for Adaptive Issuance curve is then defined as follows.
-
-.. code-block:: python
-
-  def maximum_ratio(cycle):
-    return compute_extremum(cycle, issuance_ratio_initial_max, issuance_ratio_global_max)
-
-Where:
-
-- ``issuance_ratio_initial_max`` (5.5%) controls the initial maximum
-  value. At the time of :ref:`Adaptive Issuance
-  activation<feature_activation_alpha>`, the issuance rate is kept
-  below this bound for the initial period.
-- ``issuance_ratio_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
-
 .. _staked_ratio_alpha:
 
 Staked ratio
@@ -255,6 +169,92 @@ Where:
 
 
 In a nutshell, ``dyn(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[ratio_target - ratio_radius; ratio_target + ratio_radius]``, while ensuring that the adaptive issuance rate is kept within the minimum and maximum bounds.
+
+.. _minimum_and_maximum_ratios_alpha:
+
+Minimum and maximum ratios
+..........................
+
+For the upcoming Paris protocol proposal, the minimum and maximum
+issuance rates will evolve smoothly over a predefined period of time,
+with the window between the maximum and minimum values progressively
+widening.
+
+The following figure describes the progressive maximum and minimum
+values of Adaptive Issuance.
+
+
+.. figure:: ai-min-max-new.jpeg
+
+ Figure 1. A gradual widening of the range ensures a smooth transition
+ to Adaptive Issuance.
+
+The schedule consists of three periods:
+
+- an **initial** period, set to 1 month, where the minimum and maximum
+  issuance rates are close to the current issuance rate and stay
+  constant,
+- a **transition** period, set to 5 months, where they widen lineary, with
+  the minimum going lower and the maximum higher, and
+- a **final** period where the minimum and maximum have reached their
+  minimum and maximum values.
+
+Formally, we define the main function for computing progressive ratios
+as follows.
+
+.. code-block:: python
+
+  def compute_extremum(cycle, initial_value, final_value):
+    trans = transition_period + 1
+    initial_limit = ai_activation_cycle + initial_period
+    trans_limit = initial_limit + trans
+    if cycle <= initial_limit:
+        return initial_value
+    elif cycle >= trans_limit:
+        return final_value
+    else:
+        t = cycle - initial_limit
+        res = (t * (final_value - initial_value) / trans) + initial_value
+        return res
+
+Where:
+
+- ``ai_activation_cycle`` is the first cycle with Adaptive Issuance
+  active, that is, :ref:`5 cycles after the activation of the Paris
+  protocol<feature_activation_alpha>`.
+- ``initial_period`` is a predefined period of time, set to 1 month in Paris.
+- ``transition_period`` is a predefined period of time, set to 5 months in Paris.
+
+The issuance minimum ratio for Adaptive Issuance curve is then defined as follows.
+
+.. code-block:: python
+
+  def minimum_ratio(cycle):
+    return compute_extremum(cycle, issuance_ratio_initial_min, issuance_ratio_global_min)
+
+Where:
+
+- ``issuance_ratio_initial_min`` (4.5%) is the initial minimum
+  value. At the time of :ref:`Adaptive Issuance
+  activation<feature_activation_alpha>`, the issuance rate is kept
+  above this bound for the initial period.
+- ``issuance_ratio_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
+
+
+The issuance maximum ratio for Adaptive Issuance curve is then defined as follows.
+
+.. code-block:: python
+
+  def maximum_ratio(cycle):
+    return compute_extremum(cycle, issuance_ratio_initial_max, issuance_ratio_global_max)
+
+Where:
+
+- ``issuance_ratio_initial_max`` (5.5%) controls the initial maximum
+  value. At the time of :ref:`Adaptive Issuance
+  activation<feature_activation_alpha>`, the issuance rate is kept
+  below this bound for the initial period.
+- ``issuance_ratio_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
 .. _issuance_rate_alpha:
 
