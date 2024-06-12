@@ -844,6 +844,14 @@ module Sc_rollup : sig
 
       See module {!Sc_rollup_repr.Commitment} for details.
   *)
+  module Previous_commitment_period :
+    Single_data_storage with type value = int and type t := Raw_context.t
+
+  module Parisb2_activation_level :
+    Single_data_storage
+      with type value = Raw_level_repr.t
+       and type t := Raw_context.t
+
   module PVM_kind :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t

@@ -27,10 +27,10 @@
 
 type dal = {
   feature_enable : bool;
+  incentives_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
-  blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
 
@@ -39,39 +39,39 @@ let dal_encoding =
   conv
     (fun {
            feature_enable;
+           incentives_enable;
            number_of_slots;
            attestation_lag;
            attestation_threshold;
            cryptobox_parameters;
-           blocks_per_epoch;
          } ->
       ( ( feature_enable,
+          incentives_enable,
           number_of_slots,
           attestation_lag,
-          attestation_threshold,
-          blocks_per_epoch ),
+          attestation_threshold ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
+             incentives_enable,
              number_of_slots,
              attestation_lag,
-             attestation_threshold,
-             blocks_per_epoch ),
+             attestation_threshold ),
            cryptobox_parameters ) ->
       {
         feature_enable;
+        incentives_enable;
         number_of_slots;
         attestation_lag;
         attestation_threshold;
-        blocks_per_epoch;
         cryptobox_parameters;
       })
     (merge_objs
        (obj5
           (req "feature_enable" bool)
-          (req "number_of_slots" int16)
-          (req "attestation_lag" int16)
-          (req "attestation_threshold" int16)
-          (req "blocks_per_epoch" int32))
+          (req "incentives_enable" bool)
+          (req "number_of_slots" uint16)
+          (req "attestation_lag" uint8)
+          (req "attestation_threshold" uint8))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
@@ -90,6 +90,23 @@ type sc_rollup_reveal_activation_level = {
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
   dal_parameters : Raw_level_repr.t;
+  (* Once a DAL slot is attested, a rollup can only import it within the range
+     of levels [attested_level; attested_level +
+     dal_attested_slots_validity_lag]. *)
+  (* Warning: the semantics of valid slots needs to be adapted if the
+     value of this parameter is changed in the future.
+     - If it is increased, some attested slots that were outdated with
+       the old value will become valid again.
+     - If it is decreased, some attested slots that were valid with
+       the old value will become outdated.
+
+     In both cases, the status of slots before and after the value change is
+     different. Said otherwise, the validity of the slot may differ depending on
+     the time of the check, in particular it may be different in the following
+     two cases: (a) the slot is imported before the value upgrade, (2) a
+     refutation game targeting a page of that slot is started after the
+     upgrade. *)
+  dal_attested_slots_validity_lag : int;
 }
 
 let sc_rollup_reveal_hashing_schemes_encoding =
@@ -103,14 +120,30 @@ let sc_rollup_reveal_activation_level_encoding :
     sc_rollup_reveal_activation_level Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun t -> (t.raw_data, t.metadata, t.dal_page, t.dal_parameters))
-    (fun (raw_data, metadata, dal_page, dal_parameters) ->
-      {raw_data; metadata; dal_page; dal_parameters})
-    (obj4
+    (fun t ->
+      ( t.raw_data,
+        t.metadata,
+        t.dal_page,
+        t.dal_parameters,
+        t.dal_attested_slots_validity_lag ))
+    (fun ( raw_data,
+           metadata,
+           dal_page,
+           dal_parameters,
+           dal_attested_slots_validity_lag ) ->
+      {
+        raw_data;
+        metadata;
+        dal_page;
+        dal_parameters;
+        dal_attested_slots_validity_lag;
+      })
+    (obj5
        (req "raw_data" sc_rollup_reveal_hashing_schemes_encoding)
        (req "metadata" Raw_level_repr.encoding)
        (req "dal_page" Raw_level_repr.encoding)
-       (req "dal_parameters" Raw_level_repr.encoding))
+       (req "dal_parameters" Raw_level_repr.encoding)
+       (req "dal_attested_slots_validity_lag" Data_encoding.int31))
 
 type sc_rollup = {
   arith_pvm_enable : bool;
@@ -138,8 +171,12 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  issuance_ratio_min : Q.t;
-  issuance_ratio_max : Q.t;
+  issuance_ratio_final_min : Q.t;
+  issuance_ratio_final_max : Q.t;
+  issuance_ratio_initial_min : Q.t;
+  issuance_ratio_initial_max : Q.t;
+  initial_period : int;
+  transition_period : int;
   max_bonus : Issuance_bonus_repr.max_bonus;
   growth_rate : Q.t;
   center_dz : Q.t;
@@ -153,6 +190,8 @@ type adaptive_issuance = {
   adaptive_rewards_params : adaptive_rewards_params;
   activation_vote_enable : bool;
   autostaking_enable : bool;
+  force_activation : bool;
+  ns_enable : bool;
 }
 
 type issuance_weights = {
@@ -160,17 +199,17 @@ type issuance_weights = {
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
   attesting_reward_weight : int;
-  liquidity_baking_subsidy_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
 }
 
 type t = {
-  preserved_cycles : int;
+  consensus_rights_delay : int;
+  blocks_preservation_cycles : int;
+  delegate_parameters_activation_delay : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
-  blocks_per_stake_snapshot : int32;
   cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
@@ -185,6 +224,7 @@ type t = {
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
+  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -195,6 +235,8 @@ type t = {
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
   percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
+  max_slashing_per_block : Percentage.t;
+  max_slashing_threshold : int;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -206,6 +248,7 @@ type t = {
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
+  direct_ticket_spending_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -357,36 +400,56 @@ let adaptive_rewards_params_encoding =
   let open Data_encoding in
   conv
     (fun {
-           issuance_ratio_min;
-           issuance_ratio_max;
+           issuance_ratio_final_min;
+           issuance_ratio_final_max;
+           issuance_ratio_initial_min;
+           issuance_ratio_initial_max;
+           initial_period;
+           transition_period;
            max_bonus;
            growth_rate;
            center_dz;
            radius_dz;
          } ->
-      ( issuance_ratio_min,
-        issuance_ratio_max,
+      ( issuance_ratio_final_min,
+        issuance_ratio_final_max,
+        issuance_ratio_initial_min,
+        issuance_ratio_initial_max,
+        initial_period,
+        transition_period,
         max_bonus,
         growth_rate,
         center_dz,
         radius_dz ))
-    (fun ( issuance_ratio_min,
-           issuance_ratio_max,
+    (fun ( issuance_ratio_final_min,
+           issuance_ratio_final_max,
+           issuance_ratio_initial_min,
+           issuance_ratio_initial_max,
+           initial_period,
+           transition_period,
            max_bonus,
            growth_rate,
            center_dz,
            radius_dz ) ->
       {
-        issuance_ratio_min;
-        issuance_ratio_max;
+        issuance_ratio_final_min;
+        issuance_ratio_final_max;
+        issuance_ratio_initial_min;
+        issuance_ratio_initial_max;
+        initial_period;
+        transition_period;
         max_bonus;
         growth_rate;
         center_dz;
         radius_dz;
       })
-    (obj6
-       (req "issuance_ratio_min" extremum_encoding)
-       (req "issuance_ratio_max" extremum_encoding)
+    (obj10
+       (req "issuance_ratio_final_min" extremum_encoding)
+       (req "issuance_ratio_final_max" extremum_encoding)
+       (req "issuance_ratio_initial_min" extremum_encoding)
+       (req "issuance_ratio_initial_max" extremum_encoding)
+       (req "initial_period" uint8)
+       (req "transition_period" uint8)
        (req "max_bonus" Issuance_bonus_repr.max_bonus_encoding)
        (req "growth_rate" growth_rate_encoding)
        (req "center_dz" center_encoding)
@@ -402,19 +465,25 @@ let adaptive_issuance_encoding =
            adaptive_rewards_params;
            activation_vote_enable;
            autostaking_enable;
+           force_activation;
+           ns_enable;
          } ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
         launch_ema_threshold,
         adaptive_rewards_params,
         activation_vote_enable,
-        autostaking_enable ))
+        autostaking_enable,
+        force_activation,
+        ns_enable ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
            launch_ema_threshold,
            adaptive_rewards_params,
            activation_vote_enable,
-           autostaking_enable ) ->
+           autostaking_enable,
+           force_activation,
+           ns_enable ) ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
@@ -422,14 +491,18 @@ let adaptive_issuance_encoding =
         adaptive_rewards_params;
         activation_vote_enable;
         autostaking_enable;
+        force_activation;
+        ns_enable;
       })
-    (obj6
+    (obj8
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
        (req "adaptive_issuance_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding)
        (req "adaptive_issuance_activation_vote_enable" bool)
-       (req "autostaking_enable" bool))
+       (req "autostaking_enable" bool)
+       (req "adaptive_issuance_force_activation" bool)
+       (req "ns_enable" bool))
 
 let issuance_weights_encoding =
   let open Data_encoding in
@@ -439,7 +512,6 @@ let issuance_weights_encoding =
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
             attesting_reward_weight;
-            liquidity_baking_subsidy_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
           } :
@@ -448,14 +520,12 @@ let issuance_weights_encoding =
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
         attesting_reward_weight,
-        liquidity_baking_subsidy_weight,
         seed_nonce_revelation_tip_weight,
         vdf_revelation_tip_weight ))
     (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
-           liquidity_baking_subsidy_weight,
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight ) ->
       {
@@ -463,16 +533,14 @@ let issuance_weights_encoding =
         baking_reward_fixed_portion_weight;
         baking_reward_bonus_weight;
         attesting_reward_weight;
-        liquidity_baking_subsidy_weight;
         seed_nonce_revelation_tip_weight;
         vdf_revelation_tip_weight;
       })
-    (obj7
+    (obj6
        (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)
-       (req "liquidity_baking_subsidy_weight" int31)
        (req "seed_nonce_revelation_tip_weight" int31)
        (req "vdf_revelation_tip_weight" int31))
 
@@ -480,16 +548,17 @@ let encoding =
   let open Data_encoding in
   conv
     (fun c ->
-      ( ( c.preserved_cycles,
-          c.blocks_per_cycle,
-          c.blocks_per_commitment,
-          c.nonce_revelation_threshold,
-          c.blocks_per_stake_snapshot,
-          c.cycles_per_voting_period,
-          c.hard_gas_limit_per_operation,
-          c.hard_gas_limit_per_block,
-          c.proof_of_work_threshold,
-          c.minimal_stake ),
+      ( ( ( c.consensus_rights_delay,
+            c.blocks_preservation_cycles,
+            c.delegate_parameters_activation_delay ),
+          ( c.blocks_per_cycle,
+            c.blocks_per_commitment,
+            c.nonce_revelation_threshold,
+            c.cycles_per_voting_period,
+            c.hard_gas_limit_per_operation,
+            c.hard_gas_limit_per_block,
+            c.proof_of_work_threshold,
+            c.minimal_stake ) ),
         ( ( c.minimal_frozen_stake,
             c.vdf_difficulty,
             c.origination_size,
@@ -499,6 +568,7 @@ let encoding =
             c.quorum_min ),
           ( ( c.quorum_max,
               c.min_proposal_quorum,
+              c.liquidity_baking_subsidy,
               c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
@@ -509,23 +579,28 @@ let encoding =
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_attestation,
+                c.max_slashing_per_block,
+                c.max_slashing_threshold,
                 c.testnet_dictator,
                 c.initial_seed ),
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_issuance)) ) )
-          ) ) ))
-    (fun ( ( preserved_cycles,
-             blocks_per_cycle,
-             blocks_per_commitment,
-             nonce_revelation_threshold,
-             blocks_per_stake_snapshot,
-             cycles_per_voting_period,
-             hard_gas_limit_per_operation,
-             hard_gas_limit_per_block,
-             proof_of_work_threshold,
-             minimal_stake ),
+                ( c.dal,
+                  ( (c.sc_rollup, c.zk_rollup),
+                    (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
+              ) ) ) ) ))
+    (fun ( ( ( consensus_rights_delay,
+               blocks_preservation_cycles,
+               delegate_parameters_activation_delay ),
+             ( blocks_per_cycle,
+               blocks_per_commitment,
+               nonce_revelation_threshold,
+               cycles_per_voting_period,
+               hard_gas_limit_per_operation,
+               hard_gas_limit_per_block,
+               proof_of_work_threshold,
+               minimal_stake ) ),
            ( ( minimal_frozen_stake,
                vdf_difficulty,
                origination_size,
@@ -535,6 +610,7 @@ let encoding =
                quorum_min ),
              ( ( quorum_max,
                  min_proposal_quorum,
+                 liquidity_baking_subsidy,
                  liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
@@ -545,18 +621,24 @@ let encoding =
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
                    percentage_of_frozen_deposits_slashed_per_double_attestation,
+                   max_slashing_per_block,
+                   max_slashing_threshold,
                    testnet_dictator,
                    initial_seed ),
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) ) ) ->
+                   ( dal,
+                     ( (sc_rollup, zk_rollup),
+                       (adaptive_issuance, direct_ticket_spending_enable) ) ) )
+               ) ) ) ) ->
       {
-        preserved_cycles;
+        consensus_rights_delay;
+        blocks_preservation_cycles;
+        delegate_parameters_activation_delay;
         blocks_per_cycle;
         blocks_per_commitment;
         nonce_revelation_threshold;
-        blocks_per_stake_snapshot;
         cycles_per_voting_period;
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
@@ -571,6 +653,7 @@ let encoding =
         quorum_min;
         quorum_max;
         min_proposal_quorum;
+        liquidity_baking_subsidy;
         liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
@@ -581,6 +664,8 @@ let encoding =
         limit_of_delegation_over_baking;
         percentage_of_frozen_deposits_slashed_per_double_baking;
         percentage_of_frozen_deposits_slashed_per_double_attestation;
+        max_slashing_per_block;
+        max_slashing_threshold;
         testnet_dictator;
         initial_seed;
         cache_script_size;
@@ -590,23 +675,27 @@ let encoding =
         sc_rollup;
         zk_rollup;
         adaptive_issuance;
+        direct_ticket_spending_enable;
       })
     (merge_objs
-       (obj10
-          (req "preserved_cycles" uint8)
-          (req "blocks_per_cycle" int32)
-          (req "blocks_per_commitment" int32)
-          (req "nonce_revelation_threshold" int32)
-          (req "blocks_per_stake_snapshot" int32)
-          (req "cycles_per_voting_period" int32)
-          (req
-             "hard_gas_limit_per_operation"
-             Gas_limit_repr.Arith.z_integral_encoding)
-          (req
-             "hard_gas_limit_per_block"
-             Gas_limit_repr.Arith.z_integral_encoding)
-          (req "proof_of_work_threshold" int64)
-          (req "minimal_stake" Tez_repr.encoding))
+       (merge_objs
+          (obj3
+             (req "consensus_rights_delay" uint8)
+             (req "blocks_preservation_cycles" uint8)
+             (req "delegate_parameters_activation_delay" uint8))
+          (obj8
+             (req "blocks_per_cycle" int32)
+             (req "blocks_per_commitment" int32)
+             (req "nonce_revelation_threshold" int32)
+             (req "cycles_per_voting_period" int32)
+             (req
+                "hard_gas_limit_per_operation"
+                Gas_limit_repr.Arith.z_integral_encoding)
+             (req
+                "hard_gas_limit_per_block"
+                Gas_limit_repr.Arith.z_integral_encoding)
+             (req "proof_of_work_threshold" int64)
+             (req "minimal_stake" Tez_repr.encoding)))
        (merge_objs
           (obj7
              (req "minimal_frozen_stake" Tez_repr.encoding)
@@ -617,9 +706,10 @@ let encoding =
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj8
+             (obj9
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
+                (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
@@ -627,15 +717,17 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj6
+                (obj8
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
-                      Percentage.encoding_legacy_in_o)
+                      Percentage.encoding)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_attestation"
-                      Percentage.encoding_legacy_in_o)
+                      Percentage.encoding)
+                   (req "max_slashing_per_block" Percentage.encoding)
+                   (req "max_slashing_threshold" int31)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
@@ -647,4 +739,23 @@ let encoding =
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
-                         adaptive_issuance_encoding)))))))
+                         (merge_objs
+                            adaptive_issuance_encoding
+                            (obj1 (req "direct_ticket_spending_enable" bool))))))))))
+
+let update_sc_rollup_parameter ~block_time c =
+  let seconds_in_a_day = 60 * 60 * 24 in
+  let seconds_in_a_week = seconds_in_a_day * 7 in
+  {
+    c with
+    challenge_window_in_blocks = seconds_in_a_week * 2 / block_time;
+    (* Same as challenge_window_in_blocks *)
+    max_active_outbox_levels = Int32.of_int (seconds_in_a_week * 2 / block_time);
+    commitment_period_in_blocks = 60 * 15 / block_time;
+    max_lookahead_in_blocks = Int32.of_int (seconds_in_a_day * 30 / block_time);
+    timeout_period_in_blocks = seconds_in_a_week / block_time;
+  }
+
+module Internal_for_tests = struct
+  let sc_rollup_encoding = sc_rollup_encoding
+end

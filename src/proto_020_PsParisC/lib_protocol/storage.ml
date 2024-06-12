@@ -1821,6 +1821,26 @@ module Sc_rollup = struct
       add_or_remove ctxt key (Option.map Versioned_value.to_versioned value)
   end
 
+  (* TODO: To be removed in Q, to use [Tenderbake.First_level_of_protocol]
+     instead. *)
+  module Parisb2_activation_level =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["parisb2_activation_level"]
+      end)
+      (Raw_level_repr)
+
+  module Previous_commitment_period =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["previous_commitment_period"]
+      end)
+      (struct
+        type t = int
+
+        let encoding = Data_encoding.int31
+      end)
+
   module PVM_kind =
     Indexed_context.Make_carbonated_map
       (Registered)

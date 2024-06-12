@@ -275,17 +275,27 @@ let assert_commitment_period ctxt rollup commitment =
   let* pred, ctxt =
     Commitment_storage.get_commitment_unsafe ctxt rollup pred_hash
   in
+  let* last_proto_activation_level, last_commitment_period =
+    Sc_rollup_storage.previous_protocol_constants ctxt
+  in
   let pred_level = Commitment.(pred.inbox_level) in
   (* Commitments needs to be posted for inbox levels every [commitment_period].
      Therefore, [commitment.inbox_level] must be
      [predecessor_commitment.inbox_level + commitment_period]. *)
-  let sc_rollup_commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
+  let last_proto_expected_level =
+    Raw_level_repr.(add pred_level last_commitment_period)
+  in
+  let expected_level =
+    if Raw_level_repr.(last_proto_expected_level < last_proto_activation_level)
+    then last_proto_expected_level
+    else
+      Raw_level_repr.add
+        pred_level
+        Constants_storage.(sc_rollup_commitment_period_in_blocks ctxt)
   in
   let* () =
     fail_unless
-      Raw_level_repr.(
-        commitment.inbox_level = add pred_level sc_rollup_commitment_period)
+      Raw_level_repr.(commitment.inbox_level = expected_level)
       Sc_rollup_bad_inbox_level
   in
   return ctxt
@@ -761,11 +771,20 @@ let cement_commitment ctxt rollup =
   let* old_lcc, old_lcc_level, ctxt =
     Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
   in
-  let sc_rollup_commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
+  let* last_proto_activation_level, last_commitment_period =
+    Sc_rollup_storage.previous_protocol_constants ctxt
+  in
+  let new_lcc_previous_protocol =
+    Raw_level_repr.add old_lcc_level last_commitment_period
   in
   let new_lcc_level =
-    Raw_level_repr.add old_lcc_level sc_rollup_commitment_period
+    if Raw_level_repr.(new_lcc_previous_protocol < last_proto_activation_level)
+    then new_lcc_previous_protocol
+    else
+      let sc_rollup_commitment_period =
+        Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
+      in
+      Raw_level_repr.add old_lcc_level sc_rollup_commitment_period
   in
   (* Assert conditions to cement are met. *)
   let* ctxt, (new_lcc_commitment, new_lcc_commitment_hash), dangling_commitments
