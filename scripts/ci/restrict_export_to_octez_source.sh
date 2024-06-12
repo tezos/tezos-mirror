@@ -14,7 +14,8 @@ ignore="$(comm -2 -3 <(find . -maxdepth 1 | sed 's|^./||' | sort) <(sort "${octe
 for e in $ignore; do
   if ! [ "$e" = "." ] && ! [ "$e" = ".." ]; then
     # Note that $e must not have a trailing slash for the attribute to
-    # take hold.
-    echo "$e export-ignore" >> ./.gitattributes
+    # take hold. The path $e must be prefixed by a slash, to anchor
+    # the path at the root.
+    echo "/$e export-ignore" >> ./.gitattributes
   fi
 done
