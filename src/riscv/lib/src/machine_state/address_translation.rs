@@ -19,6 +19,7 @@ use crate::{
 
 mod physical_address;
 mod pte;
+pub mod translation_cache;
 mod virtual_address;
 
 /// Offset of the `page offset` field in virtual and physical addresses.

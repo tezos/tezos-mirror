@@ -5,7 +5,7 @@
 
 #![deny(rustdoc::broken_intra_doc_links)]
 
-mod address_translation;
+pub mod address_translation;
 pub mod bus;
 pub mod csregisters;
 pub mod hart_state;
@@ -33,6 +33,7 @@ use crate::{
     state_backend as backend,
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
+use address_translation::translation_cache::InstructionFetchTranslationCache;
 pub use address_translation::AccessType;
 use std::{cmp, ops::RangeBounds};
 use twiddle::Twiddle;
@@ -44,6 +45,7 @@ pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>);
 pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
     pub hart: HartState<M>,
     pub bus: Bus<ML, M>,
+    pub translation_cache: InstructionFetchTranslationCache,
 }
 
 /// How to modify the program counter
@@ -243,6 +245,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         Self {
             hart: HartState::bind(space.0),
             bus: Bus::bind(space.1),
+            translation_cache: InstructionFetchTranslationCache::new(),
         }
     }
 
@@ -255,18 +258,38 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// Fetch instruction from the address given by program counter
     /// The spec stipulates translation is performed for each byte respectively.
     /// However, we assume the `raw_pc` is 2-byte aligned.
-    fn fetch_instr(&self, raw_pc: Address) -> Result<Instr, Exception> {
+    fn fetch_instr(&mut self, raw_pc: Address) -> Result<Instr, Exception> {
+        let current_mode = self.hart.mode.read_default();
+        let current_satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
+
         // procedure to obtain 2 bytes of an instruction, either the first or last 2 bytes
-        let get_half_instr = |raw_pc: Address, with_translation: bool| {
+        let mut get_half_instr = |raw_pc: Address, with_translation: bool| {
             // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
             // If mtval is written with a nonzero value when a
             // breakpoint, address-misaligned, access-fault, or page-fault exception
             // occurs on an instruction fetch, load, or store, then mtval will contain the
             // faulting virtual address.
-            let translated_pc = match with_translation {
-                false => raw_pc,
-                true => self.translate(raw_pc, AccessType::Instruction)?,
+
+            let translated_pc = if !with_translation {
+                raw_pc
+            } else if let Some(translation) =
+                self.translation_cache
+                    .try_translate(current_mode, current_satp, raw_pc)
+            {
+                translation
+            } else {
+                let translation = self.translate(raw_pc, AccessType::Instruction)?;
+
+                self.translation_cache.update_cache(
+                    current_mode,
+                    current_satp,
+                    raw_pc,
+                    translation,
+                );
+
+                translation
             };
+
             let half_instr = self
                 .bus
                 .read(translated_pc)
