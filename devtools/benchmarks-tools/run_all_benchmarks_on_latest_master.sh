@@ -78,6 +78,11 @@ dated_log "Make"
 # BLST_PORTABLE=y is needed to benchmark BLS instructions
 BLST_PORTABLE=y make
 
+# Install DAL setup
+dated_log "Install DAL trusted setup"
+# required for DAL benchmarks
+./scripts/install_dal_trusted_setup.sh
+
 # Run benchmarks.
 dated_log "Running benchmarks"
 time dune exec tezt/snoop/main.exe -- --verbose
