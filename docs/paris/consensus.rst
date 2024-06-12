@@ -280,7 +280,6 @@ behavior. Notable changes however are as follows:
 * At the end of a cycle ``c``, the following actions happen:
 
   - the distribution of attesting rewards,
-  - the adjustment of stake balances,
   - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution.
 
 
@@ -334,7 +333,7 @@ CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
 Regarding the concrete values for rewards, before Adaptive Issuance, we first fix the total reward per
 level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 7.5``, ``total_rewards`` is 10.67 tez. With Adaptive Issuance, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
+Assuming ``blocks_per_minute = 6``, ``total_rewards`` is 13.33 tez. With Adaptive Issuance, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
 We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
@@ -346,16 +345,16 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 2.67`` tez,
-(maximum) ``bonus = 2.67`` tez, and ``attesting_rewards = 5.33`` tez.
+Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 3.33`` tez,
+(maximum) ``bonus = 3.33`` tez, and ``attesting_reward = 6.66`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional attestations included in a block). The rewards per
-attestation slot are ``attesting_rewards / CONSENSUS_COMMITTEE_SIZE``.
+attestation slot are ``attesting_reward / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
-``2.67 / (7000 / 3) = 0.001143`` tez and an attesting
-rewards per slot of ``5.33 / 7000 = 0.000761`` tez.
+``3.33 / (7000 / 3) = 0.001427`` tez and an attesting
+rewards per slot of ``6.66 / 7000 = 0.000951`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
@@ -363,15 +362,16 @@ A. Also, B includes attestations with attesting power ``5251``. Then A receives
 the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
-Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
-that B only included attestations corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
-maximum 2333 extra attestations it could have theoretically included.) Finally, consider some
+Therefore B receives the bonus ``(5251 - 4667) * 0.001427 = 0.833368`` tez. (Note
+that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
+maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose active stake at some cycle is 1% of the total stake. Note that
-his expected number of validator slots for that cycle is ``1/100 * 30720 * 7000 =
-2,150,400`` slots. Assume also that the attesting power of C's attestations
-included during that cycle has been ``1,987,456`` slots. Given that this number is
-bigger than the minimum required (``2,150,400 * 2 / 3``), it receives an attesting
-reward of ``2,150,400 * 0.000761 = 1636.4544`` tez for that cycle.
+his expected number of validator slots for that cycle is
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 24576 * 7000 = 1,720,320``
+slots. Assume also that the attesting power of C's attestations
+included during that cycle has been ``1,321,456`` slots. Given that this number is
+bigger than the minimum required (``1,720,320 * 2 / 3``), it receives an attesting
+reward of ``1,720,320 * 0.000951 = 1636.0243`` tez for that cycle.
 
 .. _slashing:
 .. _slashing_paris:
@@ -433,23 +433,23 @@ Consensus related protocol parameters
    * - ``CONSENSUS_THRESHOLD``
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
-     - 8s
+     - 10s
+   * - ``BLOCKS_PER_CYCLE``
+     - 24576
    * - ``DELAY_INCREMENT_PER_ROUND``
      - 5s
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
-   * - ``FROZEN_DEPOSITS_PERCENTAGE``
-     - 10
    * - ``MAX_SLASHING_PERIOD``
      - 2 cycles
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
      - 5%
    * - ``BAKING_REWARD_FIXED_PORTION``
-     - 2.67 tez
+     - 3.33 tez
    * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001143 tez
+     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001427 tez
    * - ``ATTESTING_REWARD_PER_SLOT``
-     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000761 tez
+     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000951 tez
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
      - 5
 
