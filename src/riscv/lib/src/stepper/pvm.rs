@@ -4,7 +4,6 @@
 
 use super::{Stepper, StepperStatus};
 use crate::{
-    exec_env::pvm::{PvmSbiConfig, PvmStatus},
     kernel_loader,
     machine_state::{
         bus::main_memory::{MainMemoryLayout, M1G},
@@ -12,7 +11,7 @@ use crate::{
         MachineError, MachineState,
     },
     program::Program,
-    pvm::{Pvm, PvmLayout},
+    pvm::{Pvm, PvmLayout, PvmSbiConfig, PvmStatus},
     range_utils,
     state_backend::{
         memory_backend::{InMemoryBackend, SliceManager},

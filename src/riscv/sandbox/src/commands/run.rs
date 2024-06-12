@@ -5,8 +5,8 @@
 
 use crate::{cli::RunOptions, console::Console, posix_exit_mode};
 use octez_riscv::{
-    exec_env::pvm::PvmSbiConfig,
     machine_state::bus::main_memory::M1G,
+    pvm::PvmSbiConfig,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
 use std::{error::Error, fs, io::Write};

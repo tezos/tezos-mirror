@@ -6,17 +6,18 @@
 #![allow(dead_code)]
 
 pub mod dummy_pvm;
+mod sbi;
 
 use crate::{
-    exec_env::{
-        self,
-        pvm::{PvmSbiConfig, PvmSbiLayout, PvmSbiState, PvmStatus},
-    },
+    exec_env::{self},
     machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
     traps::EnvironException,
 };
+use sbi::{PvmSbiLayout, PvmSbiState};
 use std::ops::RangeBounds;
+
+pub use sbi::{PvmSbiConfig, PvmStatus};
 
 /// PVM state layout
 pub type PvmLayout<ML> = (
@@ -166,7 +167,6 @@ pub type EvalManyResult = StepManyResult<EvalError>;
 mod tests {
     use super::*;
     use crate::{
-        exec_env::pvm::PvmSbiConfig,
         machine_state::{
             bus::{main_memory::M1M, start_of_main_memory, Addressable},
             registers::{a0, a1, a2, a6, a7},

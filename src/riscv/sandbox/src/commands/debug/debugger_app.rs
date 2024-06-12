@@ -8,7 +8,6 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use octez_riscv::{
     bits::Bits64,
-    exec_env::pvm::PvmSbiConfig,
     kernel_loader,
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
@@ -17,6 +16,7 @@ use octez_riscv::{
         AccessType,
     },
     program::Program,
+    pvm::PvmSbiConfig,
     stepper::{pvm::PvmStepper, test::TestStepper, Stepper},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::EcallOutcome;
+use crate::exec_env::EcallOutcome;
 use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Addressable},
