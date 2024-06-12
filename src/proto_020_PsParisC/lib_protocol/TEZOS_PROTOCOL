@@ -1,6 +1,6 @@
 {
     "expected_env_version": 12,
-    "hash": "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ",
+    "hash": "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi",
     "modules": [
         "Misc",
         "Non_empty_string",
@@ -206,8 +206,8 @@
         "Sc_rollup_commitment_storage",
         "Sc_rollup_outbox_storage",
         "Sc_rollup_whitelist_storage",
-        "Sc_rollup_stake_storage",
         "Sc_rollup_storage",
+        "Sc_rollup_stake_storage",
         "Dal_slot_storage",
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",

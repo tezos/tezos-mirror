@@ -109,143 +109,10 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
-let migrate_already_denounced_from_Oxford ctxt =
-  let open Lwt_syntax in
-  let migrate_cycle ctxt cycle =
-    let* ctxt =
-      Storage.Already_denounced__Oxford.fold
-        (ctxt, cycle)
-        ~order:`Undefined
-        ~init:ctxt
-        ~f:(fun (level, delegate) {for_double_attesting; for_double_baking} ctxt
-           ->
-          Storage.Already_denounced.add
-            (ctxt, cycle)
-            ((level, Round_repr.zero), delegate)
-            {
-              for_double_preattesting = for_double_attesting;
-              for_double_attesting;
-              for_double_baking;
-            })
-    in
-    Storage.Already_denounced__Oxford.clear (ctxt, cycle)
-  in
-  (* Since the max_slashing_period is 2, denunciations are only
-     relevant if the misbehaviour happened in either the current cycle
-     or the previous cycle. *)
-  let current_cycle = (Level_storage.current ctxt).cycle in
-  let* ctxt = migrate_cycle ctxt current_cycle in
-  match Cycle_repr.pred current_cycle with
-  | None -> return ctxt
-  | Some previous_cycle -> migrate_cycle ctxt previous_cycle
-
-(* This removes snapshots and moves the current [staking_balance] one level
-   up. Same thing for active delegates with minimal stake but renames the key
-   at the same time. *)
-let migrate_staking_balance_and_active_delegates_for_p ctxt =
-  let open Lwt_result_syntax in
-  let* staking_balance_tree =
-    Raw_context.get_tree ctxt ["staking_balance"; "current"]
-  in
-  let*! ctxt =
-    Raw_context.add_tree ctxt ["staking_balance"] staking_balance_tree
-  in
-  let* active_delegates_tree =
-    Raw_context.get_tree ctxt ["active_delegate_with_one_roll"; "current"]
-  in
-  let*! ctxt = Raw_context.remove ctxt ["active_delegate_with_one_roll"] in
-  let*! ctxt =
-    Raw_context.add_tree
-      ctxt
-      ["active_delegates_with_minimal_stake"]
-      active_delegates_tree
-  in
-  return ctxt
-
-(* This should clean most of the remaining fields [frozen_deposits].
-   The field was removed in Oxford but cleaning it using [remove] was too
-   costly as it iterated over all contracts.
-   Instead we iterate over activate delegates.
-   If there are remaining [frozen_deposits] once P activates, they can still be
-   removed one by one in Q. *)
-let clean_frozen_deposits_for_p ctxt =
-  let open Lwt_result_syntax in
-  let contracts_index = ["contracts"; "index"] in
-  let* contracts_tree = Raw_context.get_tree ctxt contracts_index in
-  let field = ["frozen_deposits"] in
-  let*! contracts_tree =
-    Storage.Stake.Active_delegates_with_minimal_stake.fold
-      ctxt
-      ~order:`Undefined
-      ~init:contracts_tree
-      ~f:(fun pkh contracts_tree ->
-        let path = Contract_repr.Index.to_path (Implicit pkh) field in
-        Raw_context.Tree.remove contracts_tree path)
-  in
-  Raw_context.update_tree ctxt contracts_index contracts_tree
-
-let cleanup_values_for_protocol_p ctxt
-    (previous_proto_constants : Constants_parametric_previous_repr.t option)
-    level =
-  let open Lwt_result_syntax in
-  let preserved_cycles =
-    let previous_proto_constants =
-      match previous_proto_constants with
-      | None ->
-          (* Shouldn't happen *)
-          failwith
-            "Internal error: cannot read previous protocol constants in \
-             context."
-      | Some c -> c
-    in
-    previous_proto_constants.preserved_cycles
-  in
-  let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
-  let new_cycle =
-    let next_level = Raw_level_repr.succ level in
-    let cycle_eras = Raw_context.cycle_eras ctxt in
-    (Level_repr.level_from_raw ~cycle_eras next_level).cycle
-  in
-  let* ctxt =
-    Stake_storage.cleanup_values_for_protocol_p
-      ctxt
-      ~preserved_cycles
-      ~consensus_rights_delay
-      ~new_cycle
-  in
-  let* ctxt =
-    Delegate_sampler.cleanup_values_for_protocol_p
-      ctxt
-      ~preserved_cycles
-      ~consensus_rights_delay
-      ~new_cycle
-  in
-  return ctxt
-
-let reset_adaptive_issuance_ema_for_p ctxt =
-  Storage.Adaptive_issuance.Launch_ema.add ctxt 0l
-
-(** Updates the total supply with refined estimation at the activation
-    of P using measures from
-    https://gitlab.com/tezos/tezos/-/merge_requests/11978.
-
-    Remove me in Q. *)
-let update_total_supply_for_p chain_id ctxt =
-  let open Lwt_result_syntax in
-  (* We only update the total supply for mainnet. *)
-  if Chain_id.equal Constants_repr.mainnet_id chain_id then
-    let* current_total_supply = Storage.Contract.Total_supply.get ctxt in
-    let*? updated_total_supply =
-      Tez_repr.(current_total_supply +? of_mutez_exn 16458634911983L)
-    in
-    let*! ctxt = Storage.Contract.Total_supply.add ctxt updated_total_supply in
-    return ctxt
-  else return ctxt
-
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
-  let* previous_protocol, previous_proto_constants, ctxt =
+  let* previous_protocol, _previous_proto_constants, ctxt =
     Raw_context.prepare_first_block ~level ~timestamp chain_id ctxt
   in
   let parametric = Raw_context.constants ctxt in
@@ -316,14 +183,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         in
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
         let* ctxt = Adaptive_issuance_storage.init ctxt in
+
+        (* TODO: Remove this for Q, and fallback to use the previous constants
+           and [Tenderbake.First_level_of_protocol] *)
+        let*! ctxt =
+          Storage.Sc_rollup.Parisb2_activation_level.add
+            ctxt
+            Raw_level_repr.root
+        in
+        let*! ctxt = Sc_rollup_storage.set_previous_commitment_period ctxt 1 in
+
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
-    | Oxford_018
-    (* Please update [next_protocol] and [previous_protocol] in
-       [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
-        (* TODO (#2704): possibly handle attestations for migration block (in bakers);
-           if that is done, do not set Storage.Tenderbake.First_level_of_protocol.
-           /!\ this storage is also use to add the smart rollup
-               inbox migration message. see `sc_rollup_inbox_storage`. *)
+    | ParisB_019 ->
         let*? level = Raw_level_repr.of_int32 level in
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
@@ -332,22 +203,37 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        (* Adaptive Issuance-related migrations from Oxford to P. *)
-        (* We usually clear the table at the end of the cycle but the migration
-           can happen in the middle of the cycle, so we clear it here.
-           Possible consequence: the slashing history could be inconsistent with
-           the pending denunciations, i.e., there could be unstaked_frozen_deposits
-           that are not slashed whereas unstake_requests are slashed. *)
-        let*! ctxt = Pending_denunciations_storage.clear ctxt in
-        let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
-        let* ctxt = migrate_staking_balance_and_active_delegates_for_p ctxt in
-        let* ctxt = clean_frozen_deposits_for_p ctxt in
-        let*! ctxt = Raw_context.remove ctxt ["last_snapshot"] in
-        let* ctxt =
-          cleanup_values_for_protocol_p ctxt previous_proto_constants level
+
+        (* TODO: Remove this for Q, and fallback to use the previous constants
+           and [Tenderbake.First_level_of_protocol].
+
+           We need to hard-code Oxford2 values, because they are the one of
+           interest, not ParisB2’s. *)
+        let parisb2_activation_level, previous_commitment_period =
+          if Chain_id.(chain_id = Constants_repr.mainnet_id) then
+            (Raw_level_repr.of_int32_exn 5726209l, 60)
+          else if Chain_id.(chain_id = Constants_repr.ghostnet_id) then
+            (Raw_level_repr.of_int32_exn 6422529l, 60)
+          else
+            (* Setting [paris2b_activation_level = Raw_level_repr.root] ensures
+               that we will never consider an uncemented commitment as posted
+               during the previous protocol. *)
+            (Raw_level_repr.root, 1)
         in
-        let* ctxt = update_total_supply_for_p chain_id ctxt in
-        let*! ctxt = reset_adaptive_issuance_ema_for_p ctxt in
+        (* Remember the previous commitment period value, in order to deal with
+           commitments posted during previous protocol but not yet cemented
+           when this protocol was activated. *)
+        let*! ctxt =
+          Sc_rollup_storage.set_previous_commitment_period
+            ctxt
+            previous_commitment_period
+        in
+        let*! ctxt =
+          Storage.Sc_rollup.Parisb2_activation_level.add
+            ctxt
+            parisb2_activation_level
+        in
+
         return (ctxt, [])
   in
   let* ctxt =

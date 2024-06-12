@@ -224,3 +224,18 @@ let must_exist ctxt rollup =
   let open Lwt_result_syntax in
   let* ctxt, exists = Store.Genesis_info.mem ctxt rollup in
   if exists then return ctxt else tzfail (Sc_rollup_does_not_exist rollup)
+
+let set_previous_commitment_period ctxt value =
+  Storage.Sc_rollup.Previous_commitment_period.add ctxt value
+
+let previous_protocol_constants ctxt =
+  let open Lwt_result_syntax in
+  let* activation_level =
+    Storage.Sc_rollup.Parisb2_activation_level.find ctxt
+  in
+  let* previous_commitment_period =
+    Storage.Sc_rollup.Previous_commitment_period.get ctxt
+  in
+  return
+    ( Option.value ~default:Raw_level_repr.root activation_level,
+      previous_commitment_period )

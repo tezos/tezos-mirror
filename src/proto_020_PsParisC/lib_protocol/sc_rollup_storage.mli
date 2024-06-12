@@ -100,3 +100,22 @@ val parameters_type :
     returned. *)
 val must_exist :
   Raw_context.t -> Sc_rollup_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [set_previous_commitment_period ctxt previous_period] is expected to be
+    called during the protocol stitching, to ensure the previous commitment
+    period length remains available in the next protocol, in order to deal
+    with the commitments posted during the previous protocol but not yet
+    cemented. *)
+val set_previous_commitment_period : Raw_context.t -> int -> Raw_context.t Lwt.t
+
+(** [previous_protocol_constants ctxt] fetches from [ctxt] the first level
+    of the current protocol and the previous commitment period.
+
+    Both values are bounded in size and small, so we don’t carbonate the
+    call.
+
+    {b Warning: b} This function requires that the previous commitment
+    period has been correctly set with {!set_previous_commitment_period}
+    during the latest stitching. *)
+val previous_protocol_constants :
+  Raw_context.t -> (Raw_level_repr.t * int) tzresult Lwt.t
