@@ -2,6 +2,16 @@
 
 ## Version NEXT
 
+## Breaking changes
+
+## Features
+
+## Bug fixes
+
+## Internal
+
+## Version ec7c3b349624896b269e179384d0a45cf39e1145
+
 ### Features
 
 - The kernel has now the ability to trace a transaction (via
@@ -19,7 +29,6 @@
 ### Breaking changes
 
 - Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
-
 - Introduce new block encoding to include `baseFeePerGas` and `mixHash`.
   New blocks would contain `baseFeePerGas` and a default `mixHash`. (!13159)
 

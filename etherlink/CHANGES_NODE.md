@@ -2,6 +2,18 @@
 
 ## Version for NEXT
 
+### Breaking changes
+
+### Features
+
+### Bug fixes
+
+### Experimental
+
+### Internal
+
+## Version for ec7c3b349624896b269e179384d0a45cf39e1145
+
 ### Features
 
 - Deprecate the `--devmode` CLI flag. The EVM node aims to be compatible with

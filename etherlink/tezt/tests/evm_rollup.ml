@@ -2878,14 +2878,14 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
-    ~scenario_prior ~scenario_after protocol =
+let gen_kernel_migration_test ~from ~to_ ?bootstrap_accounts
+    ?(admin = Constant.bootstrap5) ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
       ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
-      ~kernel:Ghostnet
+      ~kernel:from
       ~admin:(Some admin)
       protocol
   in
@@ -2898,12 +2898,9 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
     scenario_prior ~evm_setup:{evm_setup with evm_node; endpoint}
   in
   (* Upgrade the kernel. *)
+  let _, to_use = Kernel.to_uses_and_tags to_ in
   let* _ =
-    gen_test_kernel_upgrade
-      ~evm_setup
-      ~installee:Constant.WASM.evm_kernel
-      ~admin
-      protocol
+    gen_test_kernel_upgrade ~evm_setup ~installee:to_use ~admin protocol
   in
   let* _ =
     (* wait for the migration to be processed *)
@@ -2919,7 +2916,7 @@ let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
 
-let test_kernel_migration =
+let test_mainnet_ghostnet_kernel_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "migration"; "upgrade"]
@@ -2928,10 +2925,12 @@ let test_kernel_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
         Constant.WASM.ghostnet_evm_kernel;
+        Constant.WASM.mainnet_evm_kernel;
       ])
-    ~title:"Ensures EVM kernel's upgrade succeed with potential migration(s)."
+    ~title:
+      "Ensures EVM kernel's upgrade succeeds with potential migration(s). \
+       (mainnet -> ghostnet)"
   @@ fun protocol ->
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
@@ -3014,7 +3013,66 @@ let test_kernel_migration =
       ~config_result:sanity_check.config_result
       evm_setup
   in
-  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+  gen_kernel_migration_test
+    ~from:Mainnet
+    ~to_:Ghostnet
+    ~scenario_prior
+    ~scenario_after
+    protocol
+
+let test_ghostnet_latest_kernel_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.ghostnet_evm_kernel;
+      ])
+    ~title:
+      "Ensures EVM kernel's upgrade succeeds with potential migration(s) \
+       (ghostnet -> latest)."
+  @@ fun protocol ->
+  let sender, receiver =
+    (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
+  in
+
+  let scenario_prior ~evm_setup =
+    let* transfer_result =
+      make_transfer
+        ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
+        ~sender
+        ~receiver
+        evm_setup
+    in
+    let*@ block_result = latest_block evm_setup.evm_node in
+    let* config_result = config_setup evm_setup in
+    return {transfer_result; block_result; config_result}
+  in
+  let scenario_after ~evm_setup ~sanity_check =
+    let* () =
+      ensure_transfer_result_integrity
+        ~sender
+        ~receiver
+        ~transfer_result:sanity_check.transfer_result
+        evm_setup
+    in
+    let* () =
+      ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
+    in
+    ensure_config_setup_integrity
+      ~config_result:sanity_check.config_result
+      evm_setup
+  in
+  gen_kernel_migration_test
+    ~from:Ghostnet
+    ~to_:Latest
+    ~scenario_prior
+    ~scenario_after
+    protocol
 
 let test_cannot_prepayed_leads_to_no_inclusion =
   register_both
@@ -3194,7 +3252,13 @@ let test_deposit_before_and_after_migration =
     in
     check_balance ~receiver ~endpoint Tez.(amount_mutez + amount_mutez)
   in
-  gen_kernel_migration_test ~admin ~scenario_prior ~scenario_after protocol
+  gen_kernel_migration_test
+    ~from:Ghostnet
+    ~to_:Latest
+    ~admin
+    ~scenario_prior
+    ~scenario_after
+    protocol
 
 let test_block_storage_before_and_after_migration =
   Protocol.register_test
@@ -3226,7 +3290,12 @@ let test_block_storage_before_and_after_migration =
     assert (block.transactions = sanity_check.transactions) ;
     unit
   in
-  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+  gen_kernel_migration_test
+    ~from:Ghostnet
+    ~to_:Latest
+    ~scenario_prior
+    ~scenario_after
+    protocol
 
 let test_rpc_sendRawTransaction_invalid_chain_id =
   Protocol.register_test
@@ -3278,7 +3347,12 @@ let test_kernel_upgrade_version_change =
       ~error_msg:"The kernel version must change after an upgrade" ;
     unit
   in
-  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+  gen_kernel_migration_test
+    ~from:Ghostnet
+    ~to_:Latest
+    ~scenario_prior
+    ~scenario_after
+    protocol
 
 (** This tests that giving epoch (or any timestamps from the past) as
     the activation timestamp results in a immediate upgrade. *)
@@ -3375,6 +3449,8 @@ let test_transaction_storage_before_and_after_migration =
     Lwt_list.iter_p (check_one evm_setup) tx_hashes
   in
   gen_kernel_migration_test
+    ~from:Ghostnet
+    ~to_:Latest
     ~bootstrap_accounts:Eth_account.lots_of_address
     ~scenario_prior
     ~scenario_after
@@ -3448,7 +3524,8 @@ let test_kernel_root_hash_after_upgrade =
   unit
 
 let register_evm_migration ~protocols =
-  test_kernel_migration protocols ;
+  test_ghostnet_latest_kernel_migration protocols ;
+  test_mainnet_ghostnet_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
   test_transaction_storage_before_and_after_migration protocols

@@ -28,7 +28,7 @@ let upgrade_to = function
     requires the data model of the initial kernel originated on Mainnet. *)
 let mainnet_compat_kernel_config = function
   | Mainnet -> true
-  | Ghostnet -> true
+  | Ghostnet -> false
   | Latest -> false
 
 let of_use u =

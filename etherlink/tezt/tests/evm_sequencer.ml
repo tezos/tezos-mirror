@@ -486,7 +486,7 @@ let register_upgrade_both ~title ~tags ~genesis_timestamp
         ~kernels:[from]
         ~genesis_timestamp
         ~time_between_blocks
-        ~tags:(tags @ ["upgrade_scenario"; to_tag])
+        ~tags:("upgrade_scenario" :: to_tag :: tags)
         ~title:Format.(sprintf "%s (%s -> %s)" title from_tag to_tag)
         ~additional_uses:(to_use :: additional_uses)
         (scenario from to_)
