@@ -34,8 +34,8 @@ let ubuntu_package_release_matrix =
   [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
-let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.packaging) ?dependencies
-    ?(archs = [Amd64]) ~image script : tezos_job =
+let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+    ?dependencies ?(archs = [Amd64]) ~image script : tezos_job =
   let variables =
     [
       ( "ARCHITECTURES",
@@ -65,7 +65,7 @@ let jobs =
     job_docker_authenticated
       ~__POS__
       ~name
-      ~stage:Stages.build
+      ~stage:Stages.images
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -91,7 +91,7 @@ let jobs =
       ~__POS__
       ~name
       ~image:build_debian_packages_image
-      ~stage:Stages.packaging
+      ~stage:Stages.build
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -181,7 +181,7 @@ let jobs =
         ~name
         ~image
         ~dependencies
-        ~stage:Stages.packaging
+        ~stage:Stages.publishing_tests
         script
     in
     [
