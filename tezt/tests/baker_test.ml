@@ -213,7 +213,7 @@ let baker_check_consensus_branch =
   in
 
   let branch_s, branch_lvl =
-    if Protocol.number protocol >= Protocol.number Alpha then ("grandparent", 2)
+    if Protocol.number protocol >= Protocol.number ParisC then ("grandparent", 2)
     else ("parent", 1)
   in
   Log.info "Check that consensus operations are branched on %s block" branch_s ;
