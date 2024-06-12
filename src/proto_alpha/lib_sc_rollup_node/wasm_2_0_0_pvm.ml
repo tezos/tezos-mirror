@@ -197,6 +197,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~write_debug
+      ?hooks:None
 end
 
 include Impl

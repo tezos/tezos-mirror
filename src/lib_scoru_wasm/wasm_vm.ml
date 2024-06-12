@@ -573,10 +573,15 @@ let reveal_step payload pvm_state =
               "No reveal expected during collecting"))
   | Stuck _ | Padding -> return pvm_state.tick_state
 
-let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L) ?reveal_builtins
-    ?(write_debug = Builtins.Noop) should_continue pvm_state =
+let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L) ?hooks
+    ?reveal_builtins ?(write_debug = Builtins.Noop) should_continue pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
+  (* Hooks have been initially introduced for the Fast Execution engine; they
+     leak here because the WASM PVM and the Fast Exec share a common functor.
+     There are no hooks of interest for the WASM PVM yet, so we can safely
+     ignore this argument. *)
+  ignore hooks ;
   let* version = get_wasm_version pvm_state in
   let stack_size_limit = stack_size_limit version in
   let host_function_registry = Host_funcs.registry ~version ~write_debug in
@@ -648,11 +653,12 @@ let should_compute ?reveal_builtins pvm_state =
   | No_input_required -> true
   | Reveal_required _ -> Option.is_some reveal_builtins
 
-let compute_step_many ?reveal_builtins ?write_debug ?(stop_at_snapshot = false)
-    ~wasm_entrypoint ~max_steps pvm_state =
+let compute_step_many ?reveal_builtins ?hooks ?write_debug
+    ?(stop_at_snapshot = false) ~wasm_entrypoint ~max_steps pvm_state =
   compute_step_many_until
     ~wasm_entrypoint
     ~max_steps
+    ?hooks
     ?reveal_builtins
     ?write_debug
     (fun pvm_state ->
@@ -765,9 +771,3 @@ let get_info ({current_tick; last_input_info; _} as pvm_state) =
   return
   @@ Wasm_pvm_state.
        {current_tick; last_input_read = last_input_info; input_request}
-
-module Internal_for_tests = struct
-  let compute_step_many_with_hooks ?reveal_builtins ?write_debug
-      ?after_fast_exec:_ =
-    compute_step_many ?reveal_builtins ?write_debug
-end
