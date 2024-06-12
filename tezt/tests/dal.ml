@@ -227,7 +227,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks f ~protocol =
+    ?(parameters = []) ?(prover = true) ?smart_rollup_timeout_period_in_blocks f
+    ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -276,6 +277,22 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~parameters
       ~protocol
       ()
+  in
+  let* () =
+    let* init =
+      if prover then
+        Cryptobox.init_prover_dal
+          ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+          ()
+      else Lwt.return (Ok ())
+    in
+    match init with
+    | Error e ->
+        Test.fail
+          "Dal.with_layer1: init_prover_dal failed: %a@."
+          Tezos_error_monad.Error_monad.pp_print_trace
+          e
+    | Ok () -> unit
   in
   let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
@@ -377,7 +394,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles ?history_mode variant scenario =
+    ?bootstrap_profile ?producer_profiles ?history_mode ?prover variant scenario
+    =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -404,6 +422,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?commitment_period
         ?challenge_window
         ?activation_timestamp
+        ?prover
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
@@ -417,8 +436,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks ?(regression = true) variant scenario
-    =
+    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover variant
+    scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -449,6 +468,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?delay_increment_per_round
         ?activation_timestamp
         ?smart_rollup_timeout_period_in_blocks
+        ?prover
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
@@ -6884,6 +6904,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["rpc"]
     ~regression:true
+    ~prover:false
     "dal node list RPCs"
     test_dal_node_rpc_list
     protocols ;
@@ -6898,10 +6919,12 @@ let register ~protocols =
     test_dal_node_test_get_level_slot_content
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~prover:false
     "dal node PATCH+GET /profiles"
     test_dal_node_test_patch_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~prover:false
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
     test_dal_node_get_assigned_shard_indices
@@ -6910,6 +6933,7 @@ let register ~protocols =
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
     ~producer_profiles:[0]
+    ~prover:false
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
@@ -6936,11 +6960,13 @@ let register ~protocols =
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   scenario_with_layer1_and_dal_nodes
+    ~prover:false
     ~tags:["gossipsub"]
     "GS/P2P connection and disconnection"
     test_dal_node_p2p_connection_and_disconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~prover:false
     ~tags:["gossipsub"]
     "GS join topic"
     test_dal_node_join_topic
@@ -6967,11 +6993,13 @@ let register ~protocols =
     "baker registers profiles with dal node"
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~activation_timestamp:Now
+    ~prover:false
     test_baker_registers_profiles
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["bootstrap"; Tag.memory_3k]
     ~bootstrap_profile:true
+    ~prover:false
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
     protocols ;
@@ -6980,11 +7008,13 @@ let register ~protocols =
     ~tags:["bootstrap"; "trusted"; "connection"; Tag.memory_3k]
     ~bootstrap_profile:true
     "trusted peers reconnection"
+    ~prover:false
     test_peers_reconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["producer"; "profile"]
     "producer profile"
+    ~prover:false
     test_producer_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
@@ -7039,6 +7069,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing"
+    ~prover:false
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
 
