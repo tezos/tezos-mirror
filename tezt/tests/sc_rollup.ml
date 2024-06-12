@@ -42,10 +42,11 @@ open Sc_rollup_helpers
 
 *)
 
-let default_wasm_pvm_revision = function Protocol.Alpha | Paris -> "2.0.0-r4"
+let default_wasm_pvm_revision = function
+  | Protocol.Alpha | ParisB | ParisC -> "2.0.0-r4"
 
 let max_nb_ticks = function
-  | Protocol.Paris -> 50_000_000_000_000
+  | Protocol.ParisB | ParisC -> 50_000_000_000_000
   | Alpha -> 11_000_000_000
 
 let get_outbox_proof ?rpc_hooks ~__LOC__ sc_rollup_node ~message_index
