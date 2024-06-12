@@ -3,22 +3,22 @@
 
 (library
  (name
-  src_proto_019_PtParisB_lib_protocol_test_integration_michelson_tezt_lib)
+  src_proto_020_PsParisC_lib_protocol_test_integration_michelson_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-alcotezt
   octez-libs.base
-  tezos-protocol-019-PtParisB.protocol
-  octez-protocol-019-PtParisB-libs.test-helpers
+  tezos-protocol-020-PsParisC.protocol
+  octez-protocol-020-PsParisC-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-protocol-019-PtParisB-libs.client
+  octez-protocol-020-PsParisC-libs.client
   tezos-benchmark
   octez-libs.micheline
-  tezos-benchmark-019-PtParisB
-  tezos-benchmark-type-inference-019-PtParisB
-  octez-protocol-019-PtParisB-libs.plugin
-  tezos-protocol-019-PtParisB.parameters)
+  tezos-benchmark-020-PsParisC
+  tezos-benchmark-type-inference-020-PsParisC
+  octez-protocol-020-PsParisC-libs.plugin
+  tezos-protocol-020-PsParisC.parameters)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -26,14 +26,14 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_019_PtParisB
-  -open Tezos_019_PtParisB_test_helpers
+  -open Tezos_protocol_020_PsParisC
+  -open Tezos_020_PsParisC_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_client_019_PtParisB
+  -open Tezos_client_020_PsParisC
   -open Tezos_micheline
-  -open Tezos_benchmark_019_PtParisB
-  -open Tezos_benchmark_type_inference_019_PtParisB
-  -open Tezos_protocol_plugin_019_PtParisB)
+  -open Tezos_benchmark_020_PsParisC
+  -open Tezos_benchmark_type_inference_020_PsParisC
+  -open Tezos_protocol_plugin_020_PsParisC)
  (modules
   test_annotations
   test_block_time_instructions
@@ -62,7 +62,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_019_PtParisB_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_020_PsParisC_lib_protocol_test_integration_michelson_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -71,7 +71,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-019-PtParisB-tests)
+ (package tezos-protocol-020-PsParisC-tests)
  (deps
   (glob_files contracts/*)
   (glob_files patched_contracts/*)

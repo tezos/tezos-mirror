@@ -11,24 +11,13 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
+  "tezos-protocol-020-PsParisC" { = version }
+  "octez-protocol-020-PsParisC-libs" { = version }
   "octez-shell-libs" { = version }
-  "octez-l2-libs" { = version }
-  "octez-smart-rollup-node-lib" { = version }
-  "octez-smart-rollup-node-Proxford" { = version }
-  "octez-smart-rollup-node-PtParisB" { = version }
-  "octez-smart-rollup-node-PsParisC" { = version }
-]
-depopts: [
-  "octez-smart-rollup-node-PtNairob"
-  "octez-smart-rollup-node-alpha"
-]
-conflicts: [
-  "octez-smart-rollup-node-PtNairob" { != version }
-  "octez-smart-rollup-node-alpha" { != version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez: Smart rollup node"
+synopsis: "Tezos/Protocol: baker binary"

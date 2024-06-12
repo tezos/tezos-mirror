@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_type_inference_019_PtParisB)
- (public_name tezos-benchmark-type-inference-019-PtParisB)
+ (name tezos_benchmark_type_inference_020_PsParisC)
+ (public_name tezos-benchmark-type-inference-020-PsParisC)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.stdlib
@@ -11,7 +11,7 @@
   octez-libs.crypto
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-019-PtParisB.protocol
+  tezos-protocol-020-PsParisC.protocol
   hashcons)
  (flags
   (:standard)
@@ -20,4 +20,4 @@
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
-  -open Tezos_protocol_019_PtParisB))
+  -open Tezos_protocol_020_PsParisC))

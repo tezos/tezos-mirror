@@ -2,20 +2,20 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_baking_019_PtParisB)
- (public_name octez-protocol-019-PtParisB-libs.baking)
+ (name tezos_baking_020_PsParisC)
+ (public_name octez-protocol-020-PsParisC-libs.baking)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
   octez-version.value
-  tezos-protocol-019-PtParisB.protocol
-  tezos-protocol-019-PtParisB.protocol.lifted
-  octez-protocol-019-PtParisB-libs.plugin
+  tezos-protocol-020-PsParisC.protocol
+  tezos-protocol-020-PsParisC.protocol.lifted
+  octez-protocol-020-PsParisC-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-019-PtParisB-libs.client
+  octez-protocol-020-PsParisC-libs.client
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
@@ -35,12 +35,12 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_019_PtParisB
-  -open Tezos_protocol_019_PtParisB_lifted
-  -open Tezos_protocol_plugin_019_PtParisB
+  -open Tezos_protocol_020_PsParisC
+  -open Tezos_protocol_020_PsParisC_lifted
+  -open Tezos_protocol_plugin_020_PsParisC
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_019_PtParisB
+  -open Tezos_client_020_PsParisC
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
@@ -52,60 +52,60 @@
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (library
- (name tezos_baking_019_PtParisB_commands)
- (public_name octez-protocol-019-PtParisB-libs.baking-commands)
+ (name tezos_baking_020_PsParisC_commands)
+ (public_name octez-protocol-020-PsParisC-libs.baking-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-019-PtParisB.protocol
-  tezos-protocol-019-PtParisB.parameters
+  tezos-protocol-020-PsParisC.protocol
+  tezos-protocol-020-PsParisC.parameters
   octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-019-PtParisB-libs.client
+  octez-protocol-020-PsParisC-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-019-PtParisB-libs.baking
+  octez-protocol-020-PsParisC-libs.baking
   octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_019_PtParisB
-  -open Tezos_protocol_019_PtParisB_parameters
+  -open Tezos_protocol_020_PsParisC
+  -open Tezos_protocol_020_PsParisC_parameters
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_019_PtParisB
+  -open Tezos_client_020_PsParisC
   -open Tezos_client_commands
-  -open Tezos_baking_019_PtParisB)
+  -open Tezos_baking_020_PsParisC)
  (modules Baking_commands))
 
 (library
- (name tezos_baking_019_PtParisB_commands_registration)
- (public_name octez-protocol-019-PtParisB-libs.baking-commands.registration)
+ (name tezos_baking_020_PsParisC_commands_registration)
+ (public_name octez-protocol-020-PsParisC-libs.baking-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-019-PtParisB.protocol
+  tezos-protocol-020-PsParisC.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-019-PtParisB-libs.client
+  octez-protocol-020-PsParisC-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-019-PtParisB-libs.baking
-  octez-protocol-019-PtParisB-libs.baking-commands
+  octez-protocol-020-PsParisC-libs.baking
+  octez-protocol-020-PsParisC-libs.baking-commands
   octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_019_PtParisB
+  -open Tezos_protocol_020_PsParisC
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_019_PtParisB
+  -open Tezos_client_020_PsParisC
   -open Tezos_client_commands
-  -open Tezos_baking_019_PtParisB
-  -open Tezos_baking_019_PtParisB_commands)
+  -open Tezos_baking_020_PsParisC
+  -open Tezos_baking_020_PsParisC_commands)
  (modules Baking_commands_registration))

@@ -12,23 +12,28 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
+  "octez-protocol-020-PsParisC-libs" { = version }
+  "tezos-protocol-020-PsParisC" { = version }
+  "tezos-dal-node-services" { = version }
+  "tezos-dal-node-lib" { = version }
+  "tezos-dac-lib" { = version }
+  "tezos-dac-client-lib" { = version }
   "octez-l2-libs" { = version }
+  "octez-crawler" { = version }
+  "data-encoding" { >= "1.0.1" & < "1.1" }
+  "octez-internal-libs" { = version }
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
+  "octez-injector" { = version }
   "octez-smart-rollup-node-lib" { = version }
-  "octez-smart-rollup-node-Proxford" { = version }
-  "octez-smart-rollup-node-PtParisB" { = version }
-  "octez-smart-rollup-node-PsParisC" { = version }
-]
-depopts: [
-  "octez-smart-rollup-node-PtNairob"
-  "octez-smart-rollup-node-alpha"
+  "octez-version" { = version }
 ]
 conflicts: [
-  "octez-smart-rollup-node-PtNairob" { != version }
-  "octez-smart-rollup-node-alpha" { != version }
+  "checkseum" { = "0.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez: Smart rollup node"
+synopsis: "Protocol specific (for 020-PsParisC) library for smart rollup node"
