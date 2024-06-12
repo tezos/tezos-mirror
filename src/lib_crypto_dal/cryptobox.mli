@@ -567,11 +567,6 @@ module Internal_for_tests : sig
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
-   These initialization functions are currently used by each process that needs
-   to initialize DAL. Given that in the default case [init_prover_dal] may take
-   several seconds, it would be better to call this function only once. *)
-
 (** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the DAL
     in "prover" mode, given the function [find_srs_files] to find the SRS files,
     and the optional log2 of the SRS size [srs_size_log2]. Note that the both
