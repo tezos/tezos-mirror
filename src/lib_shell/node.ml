@@ -272,7 +272,6 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
                    context_root;
                    protocol_root;
                    sandbox_parameters;
-                   dal_config;
                    user_activated_upgrades;
                    user_activated_protocol_overrides;
                    operation_metadata_size_limit;

@@ -426,7 +426,6 @@ let replay ~internal_events ~singleprocess ~strict
                    context_root;
                    protocol_root;
                    sandbox_parameters = None;
-                   dal_config = config.blockchain_network.dal_config;
                    user_activated_upgrades =
                      config.blockchain_network.user_activated_upgrades;
                    user_activated_protocol_overrides =
