@@ -62,7 +62,7 @@ let dal_parameters ~is_fake =
     | Error (`Fail s) -> Test.fail "%s. Reason:@.%s@." error_msg s
   in
   let* () =
-    let* res = Config.init_prover_dal ~find_srs_files () in
+    let* res = init_prover_dal ~find_srs_files () in
     match res with
     | Ok () -> unit
     | Error errs ->
@@ -74,7 +74,7 @@ let dal_parameters ~is_fake =
   in
   let* () = check_make "The set of parameters is invalid for the verifier" in
   let () =
-    match Config.init_verifier_dal () with
+    match init_verifier_dal () with
     | Ok () -> ()
     | Error errs ->
         Test.fail

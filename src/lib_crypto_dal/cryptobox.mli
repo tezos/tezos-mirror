@@ -568,11 +568,23 @@ module Internal_for_tests : sig
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
+   These initialization functions are currently used by each process that needs
+   to initialize DAL. Given that in the default case [init_prover_dal] may take
+   several seconds, it would be better to call this function only once. *)
 
-   This configuration module is currently used by each process that
-   needs to initialize DAL. Given that in the default case [init_dal]
-   may take several seconds, it would be better to call this function
-   only once. *)
+(** [init_verifier_dal ()] initializes the DAL, with a minimal SRS for the
+    verifier. Note that only verifying functions can be used with this setup. *)
+val init_verifier_dal : unit -> unit Error_monad.tzresult
+
+(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the
+    DAL, given the function [find_srs_files] to find the SRS files, and the
+    optional log2 of the SRS size [srs_size_log2]. Note that the both proving &
+    verifying functions can be used with this setup. *)
+val init_prover_dal :
+  find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+  ?srs_size_log2:int ->
+  unit ->
+  unit Error_monad.tzresult Lwt.t
 
 (** node parameters for the DAL. *)
 module Config : sig
@@ -581,19 +593,4 @@ module Config : sig
   val encoding : t Data_encoding.t
 
   val default : t
-
-  (** [init_verifier_dal ()] initializes the DAL, with a minimal SRS for the
-      verifier.  Note that only verifying functions can be used with this
-      setup. *)
-  val init_verifier_dal : unit -> unit Error_monad.tzresult
-
-  (** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the
-      DAL, given the function [find_srs_files] to find the SRS files, and the
-      optional log2 of the SRS size [srs_size_log2].
-      Note that the proving & verifying functions can be used with this setup. *)
-  val init_prover_dal :
-    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
-    ?srs_size_log2:int ->
-    unit ->
-    unit Error_monad.tzresult Lwt.t
 end

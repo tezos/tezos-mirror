@@ -132,7 +132,7 @@ module Baker = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
-      let*? () = Cryptobox.Config.init_verifier_dal () in
+      let*? () = Cryptobox.init_verifier_dal () in
       let consumer = Protocol_logging.make_log_message_consumer () in
       Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates

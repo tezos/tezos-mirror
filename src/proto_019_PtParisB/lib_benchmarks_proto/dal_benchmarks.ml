@@ -126,7 +126,7 @@ module Publish_commitment : Benchmark.S = struct
   let create_benchmarks ~rng_state ~bench_num config =
     let () =
       Lwt_main.run
-      @@ Tezos_crypto_dal.Cryptobox.Config.init_prover_dal
+      @@ Tezos_crypto_dal.Cryptobox.init_prover_dal
            ~find_srs_files:(Fun.const (Ok ("", "")))
            ()
       |> function

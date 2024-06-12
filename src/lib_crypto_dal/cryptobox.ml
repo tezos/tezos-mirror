@@ -1203,32 +1203,31 @@ module Internal_for_tests = struct
   let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
 end
 
+let init_verifier_dal () =
+  let initialisation_parameters = Verifier {is_fake = false} in
+  load_parameters initialisation_parameters
+
+let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) () =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let* initialisation_parameters =
+        let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
+        let* srs_g1, srs_g2 =
+          initialisation_parameters_from_files
+            ~srsu_g1_path
+            ~srsu_g2_path
+            ~srs_size:(1 lsl srs_size_log2)
+        in
+        return (Prover {is_fake = false; srs_g1; srs_g2})
+      in
+      Lwt.return (load_parameters initialisation_parameters))
+    (fun exn -> tzfail (Failed_to_load_trusted_setup (Printexc.to_string exn)))
+
 module Config = struct
   type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}
 
   let encoding : t Data_encoding.t = Dal_config.encoding
 
   let default = Dal_config.default
-
-  let init_verifier_dal () =
-    let initialisation_parameters = Verifier {is_fake = false} in
-    load_parameters initialisation_parameters
-
-  let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) () =
-    let open Lwt_result_syntax in
-    Lwt.catch
-      (fun () ->
-        let* initialisation_parameters =
-          let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
-          let* srs_g1, srs_g2 =
-            initialisation_parameters_from_files
-              ~srsu_g1_path
-              ~srsu_g2_path
-              ~srs_size:(1 lsl srs_size_log2)
-          in
-          return (Prover {is_fake = false; srs_g1; srs_g2})
-        in
-        Lwt.return (load_parameters initialisation_parameters))
-      (fun exn ->
-        tzfail (Failed_to_load_trusted_setup (Printexc.to_string exn)))
 end

@@ -557,7 +557,7 @@ module Helpers = struct
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
       parameters =
     let* init =
-      Cryptobox.Config.init_prover_dal
+      Cryptobox.init_prover_dal
         ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
         ()
     in

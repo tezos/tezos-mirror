@@ -823,8 +823,7 @@ module Test = struct
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
-    Lwt_main.run
-      Cryptobox.Config.(init_prover_dal ~find_srs_files ~srs_size_log2:5 ())
+    Lwt_main.run Cryptobox.(init_prover_dal ~find_srs_files ~srs_size_log2:5 ())
     |> function
     | Ok () -> ()
     | Error err ->
@@ -835,8 +834,7 @@ module Test = struct
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
-    Lwt_main.run
-      Cryptobox.Config.(init_prover_dal ~find_srs_files ~srs_size_log2:6 ())
+    Lwt_main.run Cryptobox.(init_prover_dal ~find_srs_files ~srs_size_log2:6 ())
     |> function
     | Error [Cryptobox.Failed_to_load_trusted_setup s] ->
         if
