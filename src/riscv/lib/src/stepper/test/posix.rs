@@ -50,13 +50,6 @@ impl<M: Manager> PosixState<M> {
         }
     }
 
-    /// Reset the entire Posix-related state.
-    pub fn reset(&mut self) {
-        self.exited.write(0);
-        self.code.write(0);
-        self.exit_mode.write(Mode::Machine);
-    }
-
     /// Handle a POSIX system call.
     pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
