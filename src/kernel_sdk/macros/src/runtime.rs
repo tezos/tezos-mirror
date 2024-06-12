@@ -9,7 +9,6 @@ use syn::{
 
 #[derive(Debug)]
 pub(crate) struct RuntimeConfig {
-    #[allow(dead_code)] // Removed in !13597
     pub static_inbox: Option<String>,
 }
 
