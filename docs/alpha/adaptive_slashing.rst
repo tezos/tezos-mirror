@@ -16,14 +16,14 @@ Nonetheless, it overlooks the impact of double signing of attestations
 on the entire block committee, treating all cases uniformly and
 ignoring collusion among bakers.
 
-To better reflect this distinction, the Paris protocol
+To better reflect this distinction, protocols starting with Paris
 adjusts the amount of slashing based on the fraction of
 double-attestation in a single block. A low fraction of misconduct
 incurs moderate penalties, while a high fraction of misconduct is
 deemed to be critical and faces more serious repercussions.
 
-This document presents the definition of an :ref:`adaptive slashing
-function<adaptive_slashing_fn_alpha>` implementing this idea, as well as a
+This document presents the definition of the :ref:`adaptive slashing
+function<adaptive_slashing_fn_alpha>` implementing this idea, as well as the
 :ref:`new forbidden period<new_forbidden_period_alpha>`.
 
 .. _adaptive_slashing_fn_alpha:
@@ -65,7 +65,7 @@ following:
 | 100.00%                                  |                                        |
 +------------------------------------------+----------------------------------------+
 
-Instead of using a constant function as in Oxford2, we propose to use
+Instead of using a constant function as in Oxford2, we use
 a convex function that saturates at 100% when a critical fraction of
 doubled attestations are issued. Accidental double attestations are
 unlikely to cause a large amount of slashing to be applied, but
@@ -126,8 +126,8 @@ where :math:`(b, B) \in C` means that:
 
 .. _new_forbidden_period_alpha:
 
-A new definition for the forbidden period
-=========================================
+New definition for the forbidden period
+=======================================
 
 Given that slashing occurs with a delay, immediate action at
 denunciation time is necessary upon clear evidence of a baker's
