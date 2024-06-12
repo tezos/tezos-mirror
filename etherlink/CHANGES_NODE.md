@@ -12,6 +12,10 @@
 
 ### Internal
 
+- Limit the number of parallel execution of Etherlink’s kernel to answer RPC,
+  to improve the node’s resilience to a large number of concurrent requests.
+  (!13738)
+
 ## Version for ec7c3b349624896b269e179384d0a45cf39e1145
 
 ### Features
