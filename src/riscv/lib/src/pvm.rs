@@ -2,9 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Allow dead code while this module contains stubs.
-#![allow(dead_code)]
-
 pub mod dummy_pvm;
 mod sbi;
 
@@ -19,8 +16,6 @@ use std::{
     io::{stdout, Write},
     ops::RangeBounds,
 };
-
-pub use sbi::PvmStatus;
 
 /// PVM configuration
 pub struct PvmHooks<'a> {
@@ -54,6 +49,44 @@ pub type PvmLayout<ML> = (
     machine_state::MachineStateLayout<ML>,
     PvmSbiLayout,
 );
+
+/// PVM status
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum PvmStatus {
+    Evaluating,
+    WaitingForInput,
+    WaitingForMetadata,
+}
+
+impl Default for PvmStatus {
+    fn default() -> Self {
+        Self::Evaluating
+    }
+}
+
+impl TryFrom<u8> for PvmStatus {
+    type Error = u8;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        const EVALUATING: u8 = PvmStatus::Evaluating as u8;
+        const WAITING_FOR_INPUT: u8 = PvmStatus::WaitingForInput as u8;
+        const WAITING_FOR_METADATA: u8 = PvmStatus::WaitingForMetadata as u8;
+
+        match value {
+            EVALUATING => Ok(Self::Evaluating),
+            WAITING_FOR_INPUT => Ok(Self::WaitingForInput),
+            WAITING_FOR_METADATA => Ok(Self::WaitingForMetadata),
+            _ => Err(value),
+        }
+    }
+}
+
+impl From<PvmStatus> for u8 {
+    fn from(value: PvmStatus) -> Self {
+        value as u8
+    }
+}
 
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;

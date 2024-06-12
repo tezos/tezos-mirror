@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::PvmHooks;
+use super::{PvmHooks, PvmStatus};
 use crate::exec_env::EcallOutcome;
 use crate::{
     machine_state::{
@@ -21,44 +21,6 @@ use tezos_smart_rollup_constants::riscv::{
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
     SBI_TEZOS_METADATA_REVEAL,
 };
-
-/// PVM status
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u8)]
-pub enum PvmStatus {
-    Evaluating,
-    WaitingForInput,
-    WaitingForMetadata,
-}
-
-impl Default for PvmStatus {
-    fn default() -> Self {
-        Self::Evaluating
-    }
-}
-
-impl TryFrom<u8> for PvmStatus {
-    type Error = u8;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        const EVALUATING: u8 = PvmStatus::Evaluating as u8;
-        const WAITING_FOR_INPUT: u8 = PvmStatus::WaitingForInput as u8;
-        const WAITING_FOR_METADATA: u8 = PvmStatus::WaitingForMetadata as u8;
-
-        match value {
-            EVALUATING => Ok(Self::Evaluating),
-            WAITING_FOR_INPUT => Ok(Self::WaitingForInput),
-            WAITING_FOR_METADATA => Ok(Self::WaitingForMetadata),
-            _ => Err(value),
-        }
-    }
-}
-
-impl From<PvmStatus> for u8 {
-    fn from(value: PvmStatus) -> Self {
-        value as u8
-    }
-}
 
 /// Layout for [`PvmSbiState`]
 pub type PvmSbiLayout = EnumCellLayout<u8>;
