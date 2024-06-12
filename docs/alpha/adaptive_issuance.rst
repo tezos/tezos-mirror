@@ -58,16 +58,16 @@ the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
 Adaptive Issuance lets the amount of participation rewards depend on
-the global **staked funds ratio** – that is, the
+the global **staked ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
 At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
-regular issuance is adjusted, to nudge the staked funds ratio towards a
+regular issuance is adjusted, to nudge the staked ratio towards a
 protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
 are recomputed to match that budget. When the staked
-funds ratio decreases and diverges from the target, emission rates
+ratio decreases and diverges from the target, emission rates
 increase, incentivizing participants to stake funds to re-approach the
 target. Conversely, incentives decrease as the ratio increases beyond
 the target.
@@ -108,8 +108,8 @@ Static rate
 
 The **static rate** is a static mechanism, which approximates `a Dutch
 auction <https://en.wikipedia.org/wiki/Dutch_auction>`__ to compute a
-nominal issuance rate as a function of the staked funds ratio for a
-given cycle. Its value decreases as the staked funds ratio increases,
+nominal issuance rate as a function of the staked ratio for a
+given cycle. Its value decreases as the staked ratio increases,
 and *vice versa*. The static rate is defined as follows.
 
 .. code-block:: python
@@ -126,14 +126,14 @@ Where the function ``clip`` is defined as follows.
   def clip(value, min_value, max_value):
     return max(min_value, min(value, max_value))
 
-The choice of a scaling factor ensures that the curve takes reasonable values for plausible staking ratios. Moreover, assuming Adaptive Issuance is activated with a dynamic ratio of 0, and at current staked funds ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
+The choice of a scaling factor ensures that the curve takes reasonable values for plausible staking ratios. Moreover, assuming Adaptive Issuance is activated with a dynamic ratio of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
 
 .. _dynamic_rate_alpha:
 
 Dynamic rate
 ............
 
-The **dynamic reward rate** adjusts itself over time based on the distance between the staked funds ratio and the 50% (±2%) target ratio, increasing when < 48% and decreasing when > 52%, provided the total issuance rate is not hitting its lower or upper limit. The dynamic rate is defined as follows.
+The **dynamic reward rate** adjusts itself over time based on the distance between the staked ratio and the 50% (±2%) target ratio, increasing when < 48% and decreasing when > 52%, provided the total issuance rate is not hitting its lower or upper limit. The dynamic rate is defined as follows.
 
 .. code-block:: python
 
@@ -158,12 +158,12 @@ The **dynamic reward rate** adjusts itself over time based on the distance betwe
 
 Where:
 
-- ``ratio_target`` (0.5), ``ratio_radius`` (0.02) denote, respectively, the target staked funds ratio and the radius of the interval centered on the target ratio.
+- ``ratio_target`` (0.5), ``ratio_radius`` (0.02) denote, respectively, the target staked ratio and the radius of the interval centered on the target ratio.
 - ``blocks_per_cycle`` denotes the number of blocks in a Tezos cycle.
 - ``minimal_block_delay`` denotes the minimal duration of a block in seconds.
 - ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
-- ``dist`` denotes the distance between the staked funds ratio and the interval ``[ratio_target - ratio_radius; ratio_target + ratio_radius]``.
-- ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked funds ratio changes the dynamic rate by 0.01 percentage points per day.
+- ``dist`` denotes the distance between the staked ratio and the interval ``[ratio_target - ratio_radius; ratio_target + ratio_radius]``.
+- ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 - ``max_bonus`` is set to 50_000_000 tez in the protocol.
 - 86400 is the number of seconds in a day.
 
