@@ -939,3 +939,27 @@ let append_cache cache tezos_job =
   @@ fun job ->
   let caches = Option.value ~default:[] job.cache in
   {job with cache = Some (caches @ [cache])}
+
+let append_before_script script tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_before_script] attempting to append before_script to trigger \
+          job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
+  let before_script = Option.value ~default:[] job.before_script in
+  {job with before_script = Some (before_script @ script)}
+
+let append_after_script script tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_after_script] attempting to append after_script to trigger \
+          job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
+  let after_script = Option.value ~default:[] job.after_script in
+  {job with after_script = Some (after_script @ script)}
