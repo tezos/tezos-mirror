@@ -1604,28 +1604,44 @@ let test_rpc_txpool_content =
     "f86401830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a95a030d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970a045ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
   in
 
-  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
-  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx2 evm_node in
+  let*@ tx_hash1 = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
+
+  let*@! transaction_object =
+    Rpc.get_transaction_by_hash ~transaction_hash:tx_hash1 evm_node
+  in
+
+  Check.(
+    ((transaction_object.hash = tx_hash1) string)
+      ~error_msg:"Incorrect transaction hash, should be %R, but got %L.") ;
+  Check.(
+    ((transaction_object.blockHash = None) (option string))
+      ~error_msg:"Incorrect block hash, should be %R, but got %L.") ;
+  Check.(
+    ((transaction_object.blockNumber = None) (option int32))
+      ~error_msg:"Incorrect block number, should be %R, but got %L.") ;
+  Check.(
+    ((transaction_object.transactionIndex = None) (option int32))
+      ~error_msg:"Incorrect transaction index, should be %R, but got %L.") ;
+  let*@ _tx_hash2 = Rpc.send_raw_transaction ~raw_tx:tx2 evm_node in
   let*@ txpool_pending, txpool_queued = Rpc.txpool_content evm_node in
   Check.((List.length txpool_pending = 1) int)
     ~error_msg:
-      "Expected number of addresses with pending transaction to be %%R, got \
-       %%L." ;
+      "Expected number of addresses with pending transaction to be %R, got %L." ;
   Check.((List.length txpool_queued = 1) int)
     ~error_msg:
-      "Expected number of addresses with queued transaction to be %%R, got %%L." ;
+      "Expected number of addresses with queued transaction to be %R, got %L." ;
   let transaction_addr_pending = List.nth txpool_pending 0 in
   let transaction_addr_queued = List.nth txpool_queued 0 in
   Check.(
     (transaction_addr_pending.address
    = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
       string)
-    ~error_msg:"Expected caller of transaction_1 to be %%R, got %%L." ;
+    ~error_msg:"Expected caller of transaction_1 to be %R, got %L." ;
   Check.(
     (transaction_addr_queued.address
    = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
       string)
-    ~error_msg:"Expected caller of transaction_2 to be %%R, got %%L." ;
+    ~error_msg:"Expected caller of transaction_2 to be %R, got %L." ;
   let num_pending_transaction_addr_1 =
     List.length transaction_addr_pending.transactions
   in
@@ -1633,9 +1649,9 @@ let test_rpc_txpool_content =
     List.length transaction_addr_queued.transactions
   in
   Check.((num_pending_transaction_addr_1 = 1) int)
-    ~error_msg:"Expected number of pending transaction to be %%R, got %%L." ;
+    ~error_msg:"Expected number of pending transaction to be %R, got %L." ;
   Check.((num_queued_transaction_addr_1 = 1) int)
-    ~error_msg:"Expected number of queued transaction to be %%R, got %%L." ;
+    ~error_msg:"Expected number of queued transaction to be %R, got %L." ;
   let pending_transaction_addr_1_nonce, pending_transaction_addr_1_content =
     List.nth transaction_addr_pending.transactions 0
   in
@@ -1643,10 +1659,10 @@ let test_rpc_txpool_content =
     List.nth transaction_addr_queued.transactions 0
   in
   Check.((pending_transaction_addr_1_nonce = 0L) int64)
-    ~error_msg:"Expected nonce pending transaction to be %%R, got %%L." ;
+    ~error_msg:"Expected nonce pending transaction to be %R, got %L." ;
 
   Check.((queued_transaction_addr_1_nonce = 1L) int64)
-    ~error_msg:"Expected nonce queued transaction to be %%R, got %%L." ;
+    ~error_msg:"Expected nonce queued transaction to be %R, got %L." ;
 
   let () =
     check_transaction_content
@@ -1808,13 +1824,13 @@ let test_full_blocks =
         (fun index
              ({blockHash; blockNumber; transactionIndex; _} :
                Transaction.transaction_object) ->
-          Check.((block.hash = blockHash) string)
+          Check.((Some block.hash = blockHash) (option string))
             ~error_msg:
               (sf "The transaction should be in block %%L but found %%R") ;
-          Check.((block_number = blockNumber) int32)
+          Check.((Some block_number = blockNumber) (option int32))
             ~error_msg:
               (sf "The transaction should be in block %%L but found %%R") ;
-          Check.((Int32.of_int index = transactionIndex) int32)
+          Check.((Some (Int32.of_int index) = transactionIndex) (option int32))
             ~error_msg:
               (sf "The transaction should be at index %%L but found %%R"))
         transactions
@@ -2834,7 +2850,7 @@ let test_rpc_getTransactionByHash =
   let* transaction_hash =
     wait_for_application ~evm_node ~sc_rollup_node ~client send
   in
-  let*@ transaction_object =
+  let*@! transaction_object =
     Rpc.get_transaction_by_hash ~transaction_hash evm_node
   in
   Check.(
@@ -2846,6 +2862,7 @@ let test_rpc_getTransactionByHash =
   Check.(
     ((transaction_object.gasPrice = submitted_gas_price) int64)
       ~error_msg:"Incorrect gasPrice on transaction, should be %R, but got %L.") ;
+
   unit
 
 let test_rpc_getTransactionByBlockHashAndIndex =

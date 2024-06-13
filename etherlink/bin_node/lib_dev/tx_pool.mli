@@ -46,7 +46,9 @@ val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 (** [pop_transactions maximum_cumulative_size] pops as much valid transactions
     as possible from the pool, until their cumulative size exceeds
     `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
-val pop_transactions : maximum_cumulative_size:int -> string list tzresult Lwt.t
+val pop_transactions :
+  maximum_cumulative_size:int ->
+  (string * Ethereum_types.hash) list tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
     the pool using {!pop_transactions} and injects them using
@@ -74,3 +76,11 @@ type size_info = {number_of_addresses : int; number_of_transactions : int}
 val size_info : unit -> size_info tzresult Lwt.t
 
 val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
+
+(** [find tx_hash] look into the tx pool if a transaction with hash
+    [tx_hash] exists and returns it's corresponding
+    {!Ethereum_types.transaction_object}. *)
+val find :
+  Ethereum_types.hash -> Ethereum_types.transaction_object option tzresult Lwt.t
+
+val clear_popped_transactions : unit -> unit tzresult Lwt.t

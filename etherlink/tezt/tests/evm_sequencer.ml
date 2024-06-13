@@ -3299,7 +3299,7 @@ let test_replay_rpc =
          ~endpoint:(Evm_node.endpoint sequencer))
       sequencer
   in
-  let*@ {Transaction.blockNumber; _} =
+  let*@! {Transaction.blockNumber; _} =
     Rpc.get_transaction_by_hash ~transaction_hash sequencer
   in
   (* Block few levels to ensure we are replaying on an old block. *)
@@ -3308,6 +3308,11 @@ let test_replay_rpc =
         next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
   in
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let blockNumber =
+    match blockNumber with
+    | Some blockNumber -> blockNumber
+    | None -> Test.fail "Missing block number"
+  in
   let*@ original_block =
     Rpc.get_block_by_number
       ~full_tx_objects:false

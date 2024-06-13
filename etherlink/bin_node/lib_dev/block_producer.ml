@@ -108,18 +108,6 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let get_hashes ~transactions ~delayed_transactions =
-  let open Result_syntax in
-  let hashes =
-    List.map
-      (fun transaction ->
-        let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-        Ethereum_types.(
-          Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
-      transactions
-  in
-  return (delayed_transactions @ hashes)
-
 let take_delayed_transactions maximum_number_of_chunks =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
@@ -149,7 +137,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     let* delayed_transactions, remaining_cumulative_size =
       take_delayed_transactions maximum_number_of_chunks
     in
-    let* transactions =
+    let* transactions_and_hashes =
       (* Low key optimization to avoid even checking the txpool if there is not
          enough space for the smallest transaction. *)
       if remaining_cumulative_size <= minimum_ethereum_transaction_size then
@@ -158,13 +146,13 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
         Tx_pool.pop_transactions
           ~maximum_cumulative_size:remaining_cumulative_size
     in
+    let transactions, tx_hashes = List.split transactions_and_hashes in
     let n = List.length transactions + List.length delayed_transactions in
     if force || n > 0 then
       let*! head_info = Evm_context.head_info () in
       Misc.with_timing
         (Blueprint_events.blueprint_production head_info.next_blueprint_number)
       @@ fun () ->
-      let*? hashes = get_hashes ~transactions ~delayed_transactions in
       let* blueprint =
         Misc.with_timing
           (Blueprint_events.blueprint_proposal head_info.next_blueprint_number)
@@ -187,8 +175,9 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
       let*! () =
         List.iter_p
           (fun hash -> Block_producer_events.transaction_selected ~hash)
-          hashes
+          (tx_hashes @ delayed_transactions)
       in
+      let* () = Tx_pool.clear_popped_transactions () in
       return n
     else return 0
 
