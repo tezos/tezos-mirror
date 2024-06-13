@@ -20,6 +20,7 @@ val kernel_logs_directory : data_dir:string -> string
     [simulation] adds a prefix to the event to differenciate the logs.
 *)
 val execute :
+  ?wasm_pvm_fallback:bool ->
   ?profile:bool ->
   ?kind:Events.kernel_log_kind ->
   data_dir:string ->
@@ -50,6 +51,7 @@ val subkeys : t -> string -> string trace Lwt.t
     [kernel_run]) with [input] within the inbox of [evm_state], and
     returns [input.insights_requests]. *)
 val execute_and_inspect :
+  ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
   config:Config.config ->
@@ -82,6 +84,7 @@ type apply_result =
     {!kernel_logs_directory}.
 *)
 val apply_blueprint :
+  ?wasm_pvm_fallback:bool ->
   ?log_file:string ->
   ?profile:bool ->
   data_dir:string ->

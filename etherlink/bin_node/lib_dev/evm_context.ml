@@ -523,6 +523,7 @@ module State = struct
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
           Evm_state.apply_blueprint
+            ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
             ~data_dir
             ~config
             ctxt.session.evm_state

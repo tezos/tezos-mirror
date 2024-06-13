@@ -173,7 +173,9 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
         else Lwt.return (pvm_state, accum_ticks)
       in
       match pvm_state.tick_state with
-      | Snapshot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
+      | Snapshot when hooks.fast_exec_fallback ->
+          Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
+      | Snapshot -> go_like_the_wind ()
       | _ -> goto_snapshot_and_retry ())
   | _ ->
       (* The number of ticks we're asked to do is lower than the maximum number

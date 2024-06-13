@@ -450,12 +450,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
      starts a new one if already at snapshot point). *)
-  let eval_kernel_run ~wasm_entrypoint config tree =
+  let eval_kernel_run ?hooks ~wasm_entrypoint config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree, _ =
           Wasm_fast.compute_step_many
+            ?hooks
             ~wasm_entrypoint
             ~reveal_builtins:(reveals config)
             ~write_debug:(write_debug_default config)
@@ -469,7 +470,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         ))
 
   (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-  let eval_until_input_requested ?write_debug ~wasm_entrypoint config tree =
+  let eval_until_input_requested ?hooks ?write_debug ~wasm_entrypoint config
+      tree =
     let open Lwt_syntax in
     let write_debug =
       Option.value ~default:(write_debug_default config) write_debug
@@ -478,6 +480,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let* info_before = Wasm.get_info tree in
         let* tree =
           eval_until_input_requested
+            ?hooks
             ~wasm_entrypoint
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
@@ -613,7 +616,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval ?write_debug ~wasm_entrypoint level inboxes config step tree =
+  let eval ?hooks ?write_debug ~wasm_entrypoint level inboxes config step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
@@ -622,7 +625,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     match step with
     | Tick -> return' (compute_step config tree)
     | Result -> return' (eval_to_result config tree)
-    | Kernel_run -> return' (eval_kernel_run ~wasm_entrypoint config tree)
+    | Kernel_run ->
+        return' (eval_kernel_run ?hooks ~wasm_entrypoint config tree)
     | Inbox -> (
         let*! status = check_input_request tree in
         match status with
@@ -630,6 +634,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             let* tree, inboxes, level = load_inputs inboxes level tree in
             let* tree, ticks =
               eval_until_input_requested
+                ?hooks
                 ?write_debug
                 ~wasm_entrypoint
                 config
@@ -637,7 +642,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             in
             return (tree, ticks, inboxes, level)
         | Error _ ->
-            return' (eval_until_input_requested ~wasm_entrypoint config tree))
+            return'
+              (eval_until_input_requested ?hooks ~wasm_entrypoint config tree))
 
   let profile ~collapse ~with_time ~no_reboot level inboxes config
       function_symbols tree =
