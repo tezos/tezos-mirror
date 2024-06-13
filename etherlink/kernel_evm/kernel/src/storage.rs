@@ -9,7 +9,7 @@ use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use anyhow::Context;
-use evm_execution::account_storage::EthereumAccount;
+use evm_execution::account_storage::{AccountStorageError, EthereumAccount};
 use evm_execution::storage::blocks::add_new_block_hash;
 use evm_execution::trace::TracerInput;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -869,7 +869,9 @@ pub fn get_and_increment_deposit_nonce<Host: Runtime>(
     };
 
     let nonce = current_nonce().unwrap_or(0u32);
-    let new_nonce = nonce + 1;
+    let new_nonce = nonce
+        .checked_add(1)
+        .ok_or(AccountStorageError::NonceOverflow)?;
     host.store_write_all(&DEPOSIT_NONCE, &new_nonce.to_le_bytes())?;
     Ok(nonce)
 }
