@@ -30,6 +30,9 @@ variables:
   BLST_PORTABLE: "yes"
   DOCKER_BUILDKIT: "1"
   DOCKER_CLI_EXPERIMENTAL: enabled
+  # See https://stackoverflow.com/a/76436638 for DOCKER_HOST and DOCKER_TLS_CERTDIR variable
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_TLS_CERTDIR: ""
 
 # ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
 workflow:
