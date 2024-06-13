@@ -121,9 +121,26 @@ let get_next_baker_by_account pkh block =
       round,
       WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
 
+(* Returns the first baker able to bake that is not in the list of excluded keys. *)
 let get_next_baker_excluding excludes block =
   let open Lwt_result_wrap_syntax in
   let* bakers = Plugin.RPC.Baking_rights.get rpc_ctxt block in
+  let* baker_opt =
+    List.find_es
+      (fun {Plugin.RPC.Baking_rights.consensus_key; delegate; _} ->
+        let* info = Plugin.RPC.Delegates.info rpc_ctxt block delegate in
+        let* forbidden =
+          Plugin.RPC.Staking.is_forbidden rpc_ctxt block delegate
+        in
+        return
+        @@ ((not info.deactivated) && (not forbidden)
+           && not
+                (List.mem
+                   ~equal:Signature.Public_key_hash.equal
+                   consensus_key
+                   excludes)))
+      bakers
+  in
   let {
     Plugin.RPC.Baking_rights.delegate = pkh;
     consensus_key;
@@ -131,15 +148,7 @@ let get_next_baker_excluding excludes block =
     round;
     _;
   } =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
-           not
-             (List.mem
-                ~equal:Signature.Public_key_hash.equal
-                consensus_key
-                excludes))
-         bakers
+    WithExceptions.Option.get ~loc:__LOC__ baker_opt
   in
   let*?@ round = Round.to_int round in
   return
@@ -1246,11 +1255,13 @@ let current_cycle b =
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
-let last_block_of_cycle b =
-  let blocks_per_cycle = b.constants.blocks_per_cycle in
-  let current_level = b.header.shell.level in
-  let mod_plus_one = Int32.(rem (succ current_level) blocks_per_cycle) in
+let last_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  let mod_plus_one = Int32.(rem (succ level) blocks_per_cycle) in
   Int32.(equal mod_plus_one zero)
+
+let last_block_of_cycle b =
+  last_level_of_cycle b.constants ~level:b.header.shell.level
 
 let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   let open Lwt_result_syntax in

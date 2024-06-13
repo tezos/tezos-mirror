@@ -127,7 +127,7 @@ let test_valid_double_baking_evidence () =
   let autostaked = Block.autostaked baker1 end_cycle_metadata in
   let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
       -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
@@ -210,7 +210,7 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let p = Percentage.add_bounded p_de p_db in
   let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
       -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
@@ -291,7 +291,7 @@ let test_valid_double_attesting_followed_by_double_baking () =
   let p = Percentage.add_bounded p_de p_db in
   let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
       -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
@@ -370,7 +370,7 @@ let test_payload_producer_gets_evidence_rewards () =
     Context.Delegate.full_balance (B b') baker2
   in
   let real_reward_right_after =
-    Test_tez.(full_balance_with_rewards_right_after -! full_balance)
+    Tez_helpers.(full_balance_with_rewards_right_after -! full_balance)
   in
   let* () =
     Assert.equal_tez
@@ -391,7 +391,7 @@ let test_payload_producer_gets_evidence_rewards () =
   in
   let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Test_tez.(
+    Tez_helpers.(
       frozen_deposits_before
       -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
       +! autostaked)
@@ -404,7 +404,8 @@ let test_payload_producer_gets_evidence_rewards () =
       expected_frozen_deposits_after
   in
   let slashed_amount =
-    Test_tez.(frozen_deposits_before -! (frozen_deposits_after -! autostaked))
+    Tez_helpers.(
+      frozen_deposits_before -! (frozen_deposits_after -! autostaked))
   in
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
@@ -415,18 +416,19 @@ let test_payload_producer_gets_evidence_rewards () =
       (Int64.of_int
          c.parametric.adaptive_issuance.global_limit_of_staking_over_baking)
   in
-  let evidence_reward = Test_tez.(slashed_amount /! divider) in
+  let evidence_reward = Tez_helpers.(slashed_amount /! divider) in
   let baked_blocks =
     Int64.of_int
       (Int32.to_int b'.header.shell.level - Int32.to_int b1.header.shell.level)
   in
   let expected_reward =
-    Test_tez.((baking_reward_fixed_portion *! baked_blocks) +! evidence_reward)
+    Tez_helpers.(
+      (baking_reward_fixed_portion *! baked_blocks) +! evidence_reward)
   in
   let* full_balance_with_rewards =
     Context.Delegate.full_balance (B b') baker2
   in
-  let real_reward = Test_tez.(full_balance_with_rewards -! full_balance) in
+  let real_reward = Tez_helpers.(full_balance_with_rewards -! full_balance) in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_reward real_reward in
   (* [baker1] did not produce the payload, it does not receive the reward for the
      evidence *)
@@ -435,7 +437,7 @@ let test_payload_producer_gets_evidence_rewards () =
   Assert.equal_tez
     ~loc:__LOC__
     full_balance_at_b'
-    Test_tez.(full_balance_at_b1 -! slashed_amount)
+    Tez_helpers.(full_balance_at_b1 -! slashed_amount)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)

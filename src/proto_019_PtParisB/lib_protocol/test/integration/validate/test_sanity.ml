@@ -17,6 +17,9 @@ open Protocol
 open Alpha_context
 open Manager_operation_helpers
 
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["validation"; "operation"]
+
 (** The goal of this test is to ensure that [select_op] generate the
    wanted kind of manager operation
 
@@ -134,14 +137,9 @@ let covalidation_sanity () =
           | Single (Failing_noop _), _ -> assert false))
     all_kinds
 
-let tests =
-  List.map
-    (fun (name, f) -> Tztest.tztest name `Quick f)
-    [
-      ("manager operation coverage", ensure_manager_operation_coverage);
-      ("covalidation coverage", covalidation_sanity);
-    ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("sanity checks", tests)]
-  |> Lwt_main.run
+  register_test
+    ~title:"manager operation coverage"
+    ensure_manager_operation_coverage
+
+let () = register_test ~title:"covalidation coverage" covalidation_sanity

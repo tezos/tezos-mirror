@@ -207,7 +207,11 @@ let run_script transaction () =
   let* parameter, ctxt =
     match transaction with
     | With_lib {lib = {filename; storage}; parameter; _} ->
-        let* block, baker, _contract, _src2 = Contract_helpers.init () in
+        let* block, baker, _contract, _src2 =
+          Contract_helpers.init
+            ~hard_gas_limit_per_block:(Gas.Arith.integral_of_int_exn 10_000_000)
+            ()
+        in
         let sender = Contract.Implicit baker in
         let* src_addr, _script, block =
           Contract_helpers.originate_contract_from_string_hash
@@ -378,11 +382,11 @@ let () =
         ~storage:"{}"
         "spawn_identities";
       transaction
-        ~parameter:"Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3"
+        ~parameter:"Ticket \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" nat 17 3"
         ~storage:"None"
         "ticket_join";
       transaction
-        ~parameter:"Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3"
+        ~parameter:"Ticket \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" nat 17 3"
         ~storage:"Unit"
         "ticket_split";
       transaction ~parameter:"5" ~storage:"3" "view_toplevel_lib";

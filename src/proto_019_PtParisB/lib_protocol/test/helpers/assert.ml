@@ -33,6 +33,13 @@ let error ~loc v f =
   | Ok _ -> failwith "Unexpected successful result (%s)" loc
   | Error err -> failwith "@[Unexpected error (%s): %a@]" loc pp_print_trace err
 
+let join_errors e1 e2 =
+  let open Lwt_result_syntax in
+  match (e1, e2) with
+  | Ok (), Ok () -> return_unit
+  | Error e, Ok () | Ok (), Error e -> fail e
+  | Error e1, Error e2 -> fail (e1 @ e2)
+
 let test_error_encodings e =
   let module E = Environment.Error_monad in
   ignore (E.pp Format.str_formatter e) ;
@@ -63,6 +70,30 @@ let proto_error_with_info ?(error_info_field = `Title) ~loc v
         expected_error_info ;
       let info = info err in
       String.equal info expected_error_info)
+
+let as_proto_error = function
+  | Environment.Ecoproto_error err -> Ok err
+  | err -> Error err
+
+(** Similar to {!proto_error}, except that [errs] is directly an error
+    trace instead of a [tzresult].
+
+    [expect_error ~loc errs] has the right type to be used as the
+    [expect_failure] or [expect_apply_failure] argument of
+    {!Incremental.add_operation}. *)
+let expect_error ~loc errs f =
+  let open Lwt_result_syntax in
+  let proto_errs = List.map_e as_proto_error errs in
+  match proto_errs with
+  | Ok proto_errs when f proto_errs ->
+      List.iter test_error_encodings proto_errs ;
+      return_unit
+  | Ok _ | Error _ ->
+      failwith
+        "%s: expected a specific error, but instead got:@, %a"
+        loc
+        Error_monad.pp_print_trace
+        errs
 
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
   let open Lwt_result_syntax in
@@ -311,6 +342,20 @@ let assert_equal_list_opt ~loc eq msg pp =
     (Option.equal (List.equal eq))
     msg
     (Format.pp_print_option (pp_print_list pp))
+
+(** Checks that both lists have the same elements, not taking the
+    order of these elements into account, but taking their
+    multiplicity into account. *)
+let equal_list_any_order ~loc ~compare msg pp list1 list2 =
+  let ordered_list1 = List.sort compare list1 in
+  let ordered_list2 = List.sort compare list2 in
+  equal
+    ~loc
+    (List.equal (fun a b -> compare a b = 0))
+    msg
+    (pp_print_list pp)
+    ordered_list1
+    ordered_list2
 
 let to_json_string encoding x =
   x

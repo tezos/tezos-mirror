@@ -46,13 +46,15 @@ let () =
     (function Test_failure e -> Some e | _ -> None)
     (fun e -> Test_failure e)
 
+let dal_prover_srs =
+  lazy
+    (Cryptobox.Config.init_prover_dal
+       ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+       Cryptobox.Config.default)
+
 let mk_cryptobox dal_params =
   let open Lwt_result_syntax in
-  let* () =
-    Cryptobox.Config.init_prover_dal
-      ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-      Cryptobox.Config.default
-  in
+  let* () = Lazy.force dal_prover_srs in
   match Cryptobox.make dal_params with
   | Ok dal -> return dal
   | Error (`Fail s) -> fail [Test_failure s]
