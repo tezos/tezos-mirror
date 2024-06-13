@@ -19,7 +19,7 @@ stages:
 # that can be used for for loops in scripts
 variables:
   supported_ARCH: "amd64 arm64"
-  DEFAULT_RUNNER_TAG: gcp # Use this for jobs that do not require any specific arch
+  DEFAULT_RUNNER_TAG: gitlab-org # Use this for jobs that do not require any specific arch
   STABLE_OCTEZ_BRANCH: "octez-v20.0"
   TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
@@ -51,7 +51,7 @@ workflow:
   # >   - ${RUNNER}
   - &default_matrix
     matrix:
-      - RUNNER: "gcp"
+      - RUNNER: "gitlab-org"
         ARCH: "amd64"
       - RUNNER: "gcp_arm64"
         ARCH: "arm64"
