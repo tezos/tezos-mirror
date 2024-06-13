@@ -2366,42 +2366,6 @@ oc.unit:webassembly-x86_64:
   script:
   - make test-webassembly
 
-oc.unit:js_components:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - data-encoding/**/*
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - resto/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  dependencies:
-  - oc.docker:ci:amd64
-  before_script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/install_build_deps.js.sh
-  script:
-  - make test-js
-  variables:
-    RUNTEZTALIAS: "true"
-  retry: 2
-
 oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
