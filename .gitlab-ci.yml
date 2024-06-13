@@ -303,7 +303,6 @@ docker:canary:
   tags:
     - ${DEFAULT_RUNNER_TAG}
   before_script:
-    - *wait-for-docker-daemon
     - *docker-login
   script:
     - set -xv
