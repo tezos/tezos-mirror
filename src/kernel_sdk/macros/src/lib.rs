@@ -30,7 +30,7 @@ use syn::{parse_macro_input, ItemFn};
 pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     if !attr.is_empty() {
         let err = format!(
-            "Expected no attributes in kernel_entrypoint macro invocation, got: {attr}"
+            "Expected no attributes in entrypoint::main macro invocation, got: {attr}"
         );
         let suggestion = "Try #[entrypoint::main]";
         abort! { err,

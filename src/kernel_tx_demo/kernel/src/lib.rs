@@ -25,6 +25,7 @@ pub(crate) mod fake_hash;
 
 use crypto::hash::{ContractTz1Hash, HashTrait, HashType, SmartRollupHash};
 use inbox::DepositFromInternalPayloadError;
+use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
 use tezos_smart_rollup_encoding::michelson::ticket::{StringTicket, Ticket};
@@ -61,6 +62,7 @@ impl TryFrom<MichelsonPair<MichelsonString, StringTicket>> for InboxDeposit {
 }
 
 /// Entrypoint of the *transactions* kernel.
+#[cfg_attr(feature = "tx-kernel", entrypoint::main)]
 pub fn transactions_run<Host>(host: &mut Host)
 where
     Host: Runtime,
@@ -308,13 +310,6 @@ enum CachedTransactionError {
 
 const MAX_ENVELOPE_CONTENT_SIZE: usize =
     MAX_INPUT_MESSAGE_SIZE - HashType::SmartRollupHash.size() - 2;
-
-/// Define the `kernel_run` for the transactions kernel.
-#[cfg(feature = "tx-kernel")]
-pub mod tx_kernel {
-    use tezos_smart_rollup_entrypoint::kernel_entry;
-    kernel_entry!(crate::transactions_run);
-}
 
 #[cfg(test)]
 mod test {
