@@ -1,26 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -153,6 +136,15 @@ module type METRICS = sig
     unit Lwt.t
 end
 
+module type HTTP_CACHE_HEADERS = sig
+  val hash : Protocol_hash.t
+
+  val get_round_end_time :
+    get_context:(unit -> Tezos_protocol_environment.Context.t Lwt.t) ->
+    Tezos_base.Block_header.shell_header ->
+    Time.System.t option Lwt.t
+end
+
 module Undefined_metrics_plugin (Proto : sig
   val hash : Protocol_hash.t
 end) =
@@ -168,6 +160,10 @@ let rpc_table : (module RPC) Protocol_hash.Table.t =
 let metrics_table : (module METRICS) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
+let http_cache_headers_table : (module HTTP_CACHE_HEADERS) Protocol_hash.Table.t
+    =
+  Protocol_hash.Table.create 5
+
 let register_rpc (module Rpc : RPC) =
   assert (not (Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
   Protocol_hash.Table.add rpc_table Rpc.Proto.hash (module Rpc)
@@ -175,9 +171,21 @@ let register_rpc (module Rpc : RPC) =
 let register_metrics (module Metrics : METRICS) =
   Protocol_hash.Table.replace metrics_table Metrics.hash (module Metrics)
 
+let register_http_cache_headers_plugin
+    (module Http_cache_headers : HTTP_CACHE_HEADERS) =
+  assert (
+    not
+      (Protocol_hash.Table.mem http_cache_headers_table Http_cache_headers.hash)) ;
+  Protocol_hash.Table.add
+    http_cache_headers_table
+    Http_cache_headers.hash
+    (module Http_cache_headers)
+
 let find_rpc = Protocol_hash.Table.find rpc_table
 
 let find_metrics = Protocol_hash.Table.find metrics_table
+
+let find_http_cache_headers = Protocol_hash.Table.find http_cache_headers_table
 
 let safe_find_metrics hash =
   match find_metrics hash with
