@@ -239,6 +239,15 @@ let enable_coverage_report job : tezos_job =
        ["_coverage_report/"; "$BISECT_FILE"]
   |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
 
+(** Add common variables used by jobs compiling kernels *)
+let enable_kernels =
+  Tezos_ci.append_variables
+    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+
+(** {2 Caches} *)
+
+(* Common GitLab CI caches *)
+
 (** Add variable enabling sccache.
 
     This function should be applied to jobs that build rust files and
@@ -250,15 +259,6 @@ let enable_sccache ?error_log ?idle_timeout ?log
     @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
     @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
     @ opt_var "SCCACHE_LOG" Fun.id log)
-
-(** Add common variables used by jobs compiling kernels *)
-let enable_kernels =
-  Tezos_ci.append_variables
-    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
-
-(** {2 Caches} *)
-
-(* Common GitLab CI caches *)
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
