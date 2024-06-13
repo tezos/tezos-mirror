@@ -416,9 +416,13 @@ let export_snapshot
     | false, true -> Lwt.return Snapshots.No
   in
   let* snapshot_file =
-    if compact then
-      Snapshots.export_compact ~compression ~data_dir ~dest ~filename
-    else Snapshots.export ~no_checks ~compression ~data_dir ~dest ~filename
+    (if compact then Snapshots.export_compact else Snapshots.export)
+      cctxt
+      ~no_checks
+      ~compression
+      ~data_dir
+      ~dest
+      ~filename
   in
   let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
   return_unit
