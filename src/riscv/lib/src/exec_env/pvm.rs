@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{EcallOutcome, ExecutionEnvironment, ExecutionEnvironmentState};
+use super::EcallOutcome;
 use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Addressable},
@@ -88,16 +88,8 @@ impl<'a> Default for PvmSbiConfig<'a> {
     }
 }
 
-/// PVM execution environment
-pub enum PvmSbi {}
-
-impl ExecutionEnvironment for PvmSbi {
-    type Layout = EnumCellLayout<u8>;
-
-    type State<M: Manager> = PvmSbiState<M>;
-
-    type Config<'a> = PvmSbiConfig<'a>;
-}
+/// Layout for [`PvmSbiState`]
+pub type PvmSbiLayout = EnumCellLayout<u8>;
 
 /// PVM execution environment state
 pub struct PvmSbiState<M: Manager> {
@@ -419,25 +411,21 @@ impl<M: Manager> PvmSbiState<M> {
             continue_eval: true,
         }
     }
-}
 
-impl<M> ExecutionEnvironmentState<M> for PvmSbiState<M>
-where
-    M: Manager,
-{
-    type ExecutionEnvironment = PvmSbi;
-
-    fn bind(space: AllocatedOf<<PvmSbi as ExecutionEnvironment>::Layout, M>) -> Self {
+    /// Bind the PVM SBI handler state to the allocated space.
+    pub fn bind(space: AllocatedOf<PvmSbiLayout, M>) -> Self {
         Self {
             status: EnumCell::bind(space),
         }
     }
 
-    fn reset(&mut self) {
+    /// Reset the PVM SBI handler.
+    pub fn reset(&mut self) {
         self.status.reset();
     }
 
-    fn handle_call<ML: MainMemoryLayout>(
+    /// Handle a PVM SBI call.
+    pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
         config: &mut PvmSbiConfig,

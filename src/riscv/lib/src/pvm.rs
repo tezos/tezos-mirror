@@ -10,8 +10,7 @@ pub mod dummy_pvm;
 use crate::{
     exec_env::{
         self,
-        pvm::{PvmSbi, PvmSbiConfig, PvmSbiState, PvmStatus},
-        ExecutionEnvironment, ExecutionEnvironmentState,
+        pvm::{PvmSbiConfig, PvmSbiLayout, PvmSbiState, PvmStatus},
     },
     machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
@@ -23,7 +22,7 @@ use std::ops::RangeBounds;
 pub type PvmLayout<ML> = (
     state_backend::Atom<u64>,
     machine_state::MachineStateLayout<ML>,
-    <PvmSbi as ExecutionEnvironment>::Layout,
+    PvmSbiLayout,
 );
 
 /// Value for the initial version
@@ -35,7 +34,7 @@ pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> {
     pub(crate) machine_state: machine_state::MachineState<ML, M>,
 
     /// Execution environment state
-    pub exec_env_state: PvmSbiState<M>,
+    sbi_state: PvmSbiState<M>,
 }
 
 impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
@@ -47,7 +46,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
-            exec_env_state: PvmSbiState::<M>::bind(space.2),
+            sbi_state: PvmSbiState::<M>::bind(space.2),
         }
     }
 
@@ -55,7 +54,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     pub fn reset(&mut self) {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
-        self.exec_env_state.reset();
+        self.sbi_state.reset();
     }
 
     /// Handle an exception using the defined Execution Environment.
@@ -68,7 +67,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             EnvironException::EnvCallFromUMode
             | EnvironException::EnvCallFromSMode
             | EnvironException::EnvCallFromMMode => {
-                self.exec_env_state
+                self.sbi_state
                     .handle_call(&mut self.machine_state, config, exception)
             }
         }
@@ -117,11 +116,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             .step_range_handle(
                 step_bounds,
                 should_continue,
-                |machine_state, exc| match self.exec_env_state.handle_call(
-                    machine_state,
-                    config,
-                    exc,
-                ) {
+                |machine_state, exc| match self.sbi_state.handle_call(machine_state, config, exc) {
                     exec_env::EcallOutcome::Fatal { message } => Err(EvalError {
                         cause: exc,
                         error: message,
@@ -134,30 +129,26 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// Respond to a request for input with no input. Returns `false` in case the
     /// machine wasn't expecting any input, otherwise returns `true`.
     pub fn provide_no_input(&mut self) -> bool {
-        self.exec_env_state
-            .provide_no_input(&mut self.machine_state)
+        self.sbi_state.provide_no_input(&mut self.machine_state)
     }
 
     /// Provide input. Returns `false` if the machine state is not expecting
     /// input.
     pub fn provide_input(&mut self, level: u64, counter: u64, payload: &[u8]) -> bool {
-        self.exec_env_state
+        self.sbi_state
             .provide_input(&mut self.machine_state, level, counter, payload)
     }
 
     /// Provide metadata in response to a metadata request. Returns `false`
     /// if the machine is not expecting metadata.
     pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u64) -> bool {
-        self.exec_env_state.provide_metadata(
-            &mut self.machine_state,
-            rollup_address,
-            origination_level,
-        )
+        self.sbi_state
+            .provide_metadata(&mut self.machine_state, rollup_address, origination_level)
     }
 
     /// Get the current machine status.
     pub fn status(&self) -> PvmStatus {
-        self.exec_env_state.status()
+        self.sbi_state.status()
     }
 }
 
