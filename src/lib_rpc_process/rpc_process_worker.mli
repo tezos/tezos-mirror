@@ -51,8 +51,8 @@ val create :
     process if it dies at some point. Additionally, if the process
     fails to be restarted, it retries with an exponential back-off
     until the restart is successful.
-    The promise is blocking until the RPC server is not fully
-    available to answer to PCs. *)
+    The promise is blocking until the RPC server is fully
+    available to answer to RPCs. *)
 val start : t -> unit tzresult Lwt.t
 
 (** Stops gracefully the RPC process worker*)
