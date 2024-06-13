@@ -12,29 +12,29 @@
 //! See sections 5.4, 5.5, 5.6
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::machine_state::{
-    bus::Address,
-    csregisters::{ones, satp::SvLength, CSRRepr},
+use crate::{
+    bits::u64,
+    machine_state::{
+        bus::Address,
+        csregisters::{ones, satp::SvLength, CSRRepr},
+    },
 };
-use std::ops::RangeInclusive;
-use twiddle::Twiddle;
 
 /// Obtain `VPN[index]` from a VPN field specified by `sv_length` Standard.
 ///
 /// The VPN ranges are indexed from 0. (Ignores the page offset field)
 /// e.g. `raw_range_VPN[0] = 8..=0` ([`Twiddle`] expects reversed bit ranges)
-fn get_raw_vpn_i_range(sv_length: &SvLength, index: usize) -> Option<RangeInclusive<usize>> {
+fn get_raw_vpn_i_range(sv_length: &SvLength, index: usize) -> Option<(usize, usize)> {
     use SvLength::*;
     let bit_range = match (index, sv_length) {
-        (0, Sv39 | Sv48 | Sv57) => 0..=8,
-        (1, Sv39 | Sv48 | Sv57) => 9..=17,
-        (2, Sv39 | Sv48 | Sv57) => 18..=26,
-        (3, Sv48 | Sv57) => 27..=35,
-        (4, Sv57) => 36..=44,
+        (0, Sv39 | Sv48 | Sv57) => (8, 0),
+        (1, Sv39 | Sv48 | Sv57) => (17, 9),
+        (2, Sv39 | Sv48 | Sv57) => (26, 18),
+        (3, Sv48 | Sv57) => (35, 27),
+        (4, Sv57) => (44, 36),
         _ => return None,
     };
-
-    Some(*bit_range.end()..=*bit_range.start())
+    Some(bit_range)
 }
 
 // Get the page offset of a virtual address.
@@ -45,12 +45,11 @@ pub const fn get_page_offset(addr: u64) -> u64 {
 /// Obtain VPN[index] from a virtual address specified by `sv_length` Standard.
 pub fn get_vpn_idx(v_addr: Address, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
     let bit_range = get_raw_vpn_i_range(sv_length, index)?;
-    let (start, end) = (
-        bit_range.start() + PAGE_OFFSET_WIDTH,
-        bit_range.end() + PAGE_OFFSET_WIDTH,
-    );
-
-    Some(v_addr.bits(start..=end))
+    Some(u64::bits_subset(
+        v_addr,
+        bit_range.0 + PAGE_OFFSET_WIDTH,
+        bit_range.1 + PAGE_OFFSET_WIDTH,
+    ))
 }
 
 #[cfg(test)]

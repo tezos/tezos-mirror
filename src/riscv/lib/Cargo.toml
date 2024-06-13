@@ -21,7 +21,6 @@ tezos_crypto_rs.workspace = true
 tezos-smart-rollup-constants.workspace = true
 tezos-smart-rollup-utils.workspace = true
 thiserror.workspace = true
-twiddle.workspace = true
 vm-fdt.workspace = true
 
 [dependencies.ocaml]

@@ -21,6 +21,7 @@ use self::{
     csregisters::{values::CSRValue, CSRRepr},
 };
 use crate::{
+    bits::u64,
     devicetree,
     machine_state::{
         bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
@@ -37,7 +38,6 @@ use address_translation::translation_cache::InstructionFetchTranslationCache;
 pub use address_translation::AccessType;
 use mode::Mode;
 use std::{cmp, ops::RangeBounds};
-use twiddle::Twiddle;
 
 /// Layout for the machine state
 pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>);
@@ -605,22 +605,40 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         let mip: CSRRepr = self.hart.csregisters.read(CSRegister::mip);
         let active_interrupts = mip & possible;
 
-        if active_interrupts.bit(Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize) {
+        if u64::bit(
+            active_interrupts,
+            Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize,
+        ) {
             return Some(Interrupt::MachineExternal);
         }
-        if active_interrupts.bit(Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize) {
+        if u64::bit(
+            active_interrupts,
+            Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize,
+        ) {
             return Some(Interrupt::MachineSoftware);
         }
-        if active_interrupts.bit(Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize) {
+        if u64::bit(
+            active_interrupts,
+            Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize,
+        ) {
             return Some(Interrupt::MachineTimer);
         }
-        if active_interrupts.bit(Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize) {
+        if u64::bit(
+            active_interrupts,
+            Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize,
+        ) {
             return Some(Interrupt::SupervisorExternal);
         }
-        if active_interrupts.bit(Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize) {
+        if u64::bit(
+            active_interrupts,
+            Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize,
+        ) {
             return Some(Interrupt::SupervisorSoftware);
         }
-        if active_interrupts.bit(Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize) {
+        if u64::bit(
+            active_interrupts,
+            Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize,
+        ) {
             return Some(Interrupt::SupervisorTimer);
         }
 
@@ -639,7 +657,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         // Clear the bit in the set of pending interrupt, marking it as handled
         self.hart.csregisters.write(
             CSRegister::mip,
-            mip.set_bit(interrupt.exception_code() as usize, false),
+            u64::set_bit(mip, interrupt.exception_code() as usize, false),
         );
 
         let new_pc = self.hart.take_trap(interrupt, current_pc);
@@ -867,6 +885,7 @@ mod tests {
         bus::main_memory::tests::T1K,
         MachineState, MachineStateLayout,
     };
+    use crate::bits::u64;
     use crate::{
         backend_test, create_backend, create_state,
         machine_state::{
@@ -881,7 +900,6 @@ mod tests {
         traps::{EnvironException, Exception, Interrupt, TrapContext},
     };
     use proptest::{prop_assert_eq, proptest};
-    use twiddle::Twiddle;
 
     backend_test!(test_machine_state_reset, F, {
         test_determinism::<F, MachineStateLayout<T1K>, _>(|space| {
@@ -1023,13 +1041,8 @@ mod tests {
             state.hart.csregisters.write(CSRegister::stvec, stvec_addr);
             // mtvec is in VECTORED mode
             state.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
-            let mie = 0u64
-                .set_bit(Interrupt::MachineExternal.exception_code() as usize, true)
-                .set_bit(Interrupt::MachineTimer.exception_code() as usize, true);
-            let mip = 0u64
-                .set_bit(Interrupt::SupervisorSoftware.exception_code() as usize, true)
-                .set_bit(Interrupt::MachineExternal.exception_code() as usize, true)
-                .set_bit(Interrupt::SupervisorTimer.exception_code() as usize, true);
+            let mie = u64::set_bit(u64::set_bit(0u64, Interrupt::MachineTimer.exception_code() as usize, true), Interrupt::MachineExternal.exception_code() as usize, true);
+            let mip = u64::set_bit(u64::set_bit(u64::set_bit(0u64, Interrupt::SupervisorTimer.exception_code() as usize, true), Interrupt::MachineExternal.exception_code() as usize, true), Interrupt::SupervisorSoftware.exception_code() as usize, true);
             let mideleg_val = 1 << Interrupt::MachineExternal.exception_code() |
                 1 << Interrupt::SupervisorSoftware.exception_code() |
                 1 << Interrupt::MachineTimer.exception_code();
@@ -1118,12 +1131,8 @@ mod tests {
             state.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
             // mtvec is in BASE mode
             state.hart.csregisters.write(CSRegister::mtvec, mtvec_addr);
-            let mie = 0u64
-                .set_bit(Interrupt::SupervisorExternal.exception_code() as usize, true)
-                .set_bit(Interrupt::MachineSoftware.exception_code() as usize, true);
-            let mip = 0u64
-                .set_bit(Interrupt::SupervisorExternal.exception_code() as usize, true)
-                .set_bit(Interrupt::SupervisorTimer.exception_code() as usize, true);
+            let mie = u64::set_bit(u64::set_bit(0u64, Interrupt::MachineSoftware.exception_code() as usize, true), Interrupt::SupervisorExternal.exception_code() as usize, true);
+            let mip = u64::set_bit(u64::set_bit(0u64, Interrupt::SupervisorTimer.exception_code() as usize, true), Interrupt::SupervisorExternal.exception_code() as usize, true);
             let mideleg_val = 1 << Interrupt::SupervisorExternal.exception_code() |
                 1 << Interrupt::MachineExternal.exception_code() |
                 1 << Interrupt::MachineTimer.exception_code();

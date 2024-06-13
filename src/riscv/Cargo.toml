@@ -33,7 +33,6 @@ tezos-smart-rollup-encoding.path = "../kernel_sdk/encoding"
 tezos-smart-rollup-utils.path = "../kernel_sdk/utils"
 tezos-smart-rollup.path = "../kernel_sdk/sdk"
 thiserror = "1.0.57"
-twiddle = "1.1.0"
 vm-fdt = "0.3.0"
 goldenfile = "1.7.1"
 

@@ -1346,7 +1346,6 @@ dependencies = [
  "tezos-smart-rollup-utils",
  "tezos_crypto_rs",
  "thiserror",
- "twiddle",
  "vm-fdt",
 ]
 
@@ -2555,12 +2554,6 @@ dependencies = [
  "thread_local",
  "tracing-core",
 ]
-
-[[package]]
-name = "twiddle"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "088763b1ca6b94b878376544cb983a8c77f30de8282008e3dec3d6cceb27b771"
 
 [[package]]
 name = "typenum"

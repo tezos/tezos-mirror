@@ -7,13 +7,13 @@
 
 pub mod instruction;
 
+use crate::bits::u16;
 use crate::machine_state::{
     csregisters::{try_parse_csregister, CSRegister},
     registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
 };
 use core::ops::Range;
 use instruction::*;
-use twiddle::Twiddle;
 
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.
@@ -944,103 +944,109 @@ fn sign_extend_u16(value: u16, size: usize) -> i64 {
 
 fn clw_imm(instr: u16) -> i64 {
     // instr[5] | instr[12:10] | instr[6] | 00
-    let res = instr.bits(5..=5) << 6 | instr.bits(12..=10) << 3 | instr.bits(6..=6) << 2;
+    let res = u16::bits_subset(instr, 5, 5) << 6
+        | u16::bits_subset(instr, 12, 10) << 3
+        | u16::bits_subset(instr, 6, 6) << 2;
     res as i64
 }
 
 fn cld_imm(instr: u16) -> i64 {
     // instr[6:5] | instr[12:10] | 000
-    let res = instr.bits(6..=5) << 6 | instr.bits(12..=10) << 3;
+    let res = u16::bits_subset(instr, 6, 5) << 6 | u16::bits_subset(instr, 12, 10) << 3;
     res as i64
 }
 
 fn ci_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     sign_extend_u16(res, 6)
 }
 
 fn cslli_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     res as i64
 }
 
 fn ci_addi16sp_imm(instr: u16) -> i64 {
     // instr[12] | instr[4:3] | instr[5] | instr[2] | instr[6] | 0000
-    let res = instr.bits(12..=12) << 9
-        | instr.bits(4..=3) << 7
-        | instr.bits(5..=5) << 6
-        | instr.bits(2..=2) << 5
-        | instr.bits(6..=6) << 4;
+    let res = u16::bits_subset(instr, 12, 12) << 9
+        | u16::bits_subset(instr, 4, 3) << 7
+        | u16::bits_subset(instr, 5, 5) << 6
+        | u16::bits_subset(instr, 2, 2) << 5
+        | u16::bits_subset(instr, 6, 6) << 4;
     sign_extend_u16(res, 10)
 }
 
 fn ci_lwsp_imm(instr: u16) -> i64 {
     // instr[3:2] | instr[12] | instr[6:4] | 00
-    let res = instr.bits(3..=2) << 6 | instr.bits(12..=12) << 5 | instr.bits(6..=4) << 2;
+    let res = u16::bits_subset(instr, 3, 2) << 6
+        | u16::bits_subset(instr, 12, 12) << 5
+        | u16::bits_subset(instr, 6, 4) << 2;
     res as i64
 }
 
 fn ci_ldsp_imm(instr: u16) -> i64 {
     // instr[4:2] | instr[12] | instr[6:5] | 000
-    let res = instr.bits(4..=2) << 6 | instr.bits(12..=12) << 5 | instr.bits(6..=5) << 3;
+    let res = u16::bits_subset(instr, 4, 2) << 6
+        | u16::bits_subset(instr, 12, 12) << 5
+        | u16::bits_subset(instr, 6, 5) << 3;
     res as i64
 }
 
 fn css_swsp_imm(instr: u16) -> i64 {
     // instr[8:7] | instr[12:9] | 00
-    let res = instr.bits(8..=7) << 6 | instr.bits(12..=9) << 2;
+    let res = u16::bits_subset(instr, 8, 7) << 6 | u16::bits_subset(instr, 12, 9) << 2;
     res as i64
 }
 
 fn css_sdsp_imm(instr: u16) -> i64 {
     // instr[9:7] | instr[12:10] | 000
-    let res = instr.bits(9..=7) << 6 | instr.bits(12..=10) << 3;
+    let res = u16::bits_subset(instr, 9, 7) << 6 | u16::bits_subset(instr, 12, 10) << 3;
     res as i64
 }
 
 fn ciw_imm(instr: u16) -> i64 {
     // instr[10:7] | instr[12:11] | instr[5] | instr[6] | 00
-    let res = instr.bits(10..=7) << 6
-        | instr.bits(12..=11) << 4
-        | instr.bits(5..=5) << 3
-        | instr.bits(6..=6) << 2;
+    let res = u16::bits_subset(instr, 10, 7) << 6
+        | u16::bits_subset(instr, 12, 11) << 4
+        | u16::bits_subset(instr, 5, 5) << 3
+        | u16::bits_subset(instr, 6, 6) << 2;
     res as i64
 }
 
 fn cb_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:5] | instr[2] | instr[11:10] | instr[4:3] | 0
-    let res = instr.bits(12..=12) << 8
-        | instr.bits(6..=5) << 6
-        | instr.bits(2..=2) << 5
-        | instr.bits(11..=10) << 3
-        | instr.bits(4..=3) << 1;
+    let res = u16::bits_subset(instr, 12, 12) << 8
+        | u16::bits_subset(instr, 6, 5) << 6
+        | u16::bits_subset(instr, 2, 2) << 5
+        | u16::bits_subset(instr, 11, 10) << 3
+        | u16::bits_subset(instr, 4, 3) << 1;
     sign_extend_u16(res, 9)
 }
 
 fn cb_shamt_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     res as i64
 }
 
 fn cb_andi_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     sign_extend_u16(res, 6)
 }
 
 fn cj_imm(instr: u16) -> i64 {
     // instr[12] | instr[8] | instr[10:9] | instr[6] | instr[7] | instr[2] | instr[11] | instr[5:3] | 0
-    let res = instr.bits(12..=12) << 11
-        | instr.bits(8..=8) << 10
-        | instr.bits(10..=9) << 8
-        | instr.bits(6..=6) << 7
-        | instr.bits(7..=7) << 6
-        | instr.bits(2..=2) << 5
-        | instr.bits(11..=11) << 4
-        | instr.bits(5..=3) << 1;
+    let res = u16::bits_subset(instr, 12, 12) << 11
+        | u16::bits_subset(instr, 8, 8) << 10
+        | u16::bits_subset(instr, 10, 9) << 8
+        | u16::bits_subset(instr, 6, 6) << 7
+        | u16::bits_subset(instr, 7, 7) << 6
+        | u16::bits_subset(instr, 2, 2) << 5
+        | u16::bits_subset(instr, 11, 11) << 4
+        | u16::bits_subset(instr, 5, 3) << 1;
     sign_extend_u16(res, 12)
 }
 
@@ -1126,7 +1132,7 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
                 }),
             },
             C_F3_3 => {
-                if instr.bits(6..=2) == 0 && !instr.bit(12) {
+                if u16::bits_subset(instr, 6, 2) == 0 && !u16::bit(instr, 12) {
                     return UnknownCompressed { instr };
                 };
                 match c_rd_rs1(instr) {
@@ -1144,7 +1150,7 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
                 C_Q1_0 => cc_instr!(CSrli, cb_shamt_imm, instr),
                 C_Q1_1 => cc_instr!(CSrai, cb_shamt_imm, instr),
                 C_Q1_2 => cc_instr!(CAndi, cb_andi_imm, instr),
-                C_Q1_3 => match (instr.bit(12), c_q1_5(instr)) {
+                C_Q1_3 => match (u16::bit(instr, 12), c_q1_5(instr)) {
                     (false, C_Q1_0) => cr_instr!(CSub, instr),
                     (false, C_Q1_1) => cr_instr!(CXor, instr),
                     (false, C_Q1_2) => cr_instr!(COr, instr),
@@ -1184,7 +1190,7 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
                 }),
             },
 
-            C_F3_4 => match (instr.bit(12), c_rd_rs1(instr), c_rs2(instr)) {
+            C_F3_4 => match (u16::bit(instr, 12), c_rd_rs1(instr), c_rs2(instr)) {
                 (true, x0, x0) => CEbreak,
                 (_, x0, _) => UnknownCompressed { instr },
                 (true, rs1, x0) => CJalr(CRJTypeArgs { rs1 }),
