@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
+
 //! Traps doc
 //! There are 4 types of traps, depending on where they are handled and visibility to the hart.
 //! ### Contained:
@@ -108,6 +113,13 @@ pub enum Interrupt {
 }
 
 impl Interrupt {
+    pub const SUPERVISOR_SOFTWARE_EXCEPTION_CODE: CSRRepr = 1;
+    pub const MACHINE_SOFTWARE_EXCEPTION_CODE: CSRRepr = 3;
+    pub const SUPERVISOR_TIMER_EXCEPTION_CODE: CSRRepr = 5;
+    pub const MACHINE_TIMER_EXCEPTION_CODE: CSRRepr = 7;
+    pub const SUPERVISOR_EXTERNAL_EXCEPTION_CODE: CSRRepr = 9;
+    pub const MACHINE_EXTERNAL_EXCEPTION_CODE: CSRRepr = 11;
+
     /// Bitmask of all supervisor interrupts
     pub const SUPERVISOR_BIT_MASK: CSRRepr = 1
         << Interrupt::SupervisorSoftware.exception_code_const()
@@ -122,12 +134,12 @@ impl Interrupt {
     /// Exception code of interrupts
     pub const fn exception_code_const(&self) -> CSRRepr {
         match self {
-            Interrupt::SupervisorSoftware => 1,
-            Interrupt::MachineSoftware => 3,
-            Interrupt::SupervisorTimer => 5,
-            Interrupt::MachineTimer => 7,
-            Interrupt::SupervisorExternal => 9,
-            Interrupt::MachineExternal => 11,
+            Interrupt::SupervisorSoftware => Self::SUPERVISOR_SOFTWARE_EXCEPTION_CODE,
+            Interrupt::MachineSoftware => Self::MACHINE_SOFTWARE_EXCEPTION_CODE,
+            Interrupt::SupervisorTimer => Self::SUPERVISOR_TIMER_EXCEPTION_CODE,
+            Interrupt::MachineTimer => Self::MACHINE_TIMER_EXCEPTION_CODE,
+            Interrupt::SupervisorExternal => Self::SUPERVISOR_EXTERNAL_EXCEPTION_CODE,
+            Interrupt::MachineExternal => Self::MACHINE_EXTERNAL_EXCEPTION_CODE,
         }
     }
 }
