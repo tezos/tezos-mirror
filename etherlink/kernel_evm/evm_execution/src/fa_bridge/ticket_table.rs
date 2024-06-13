@@ -21,6 +21,9 @@ use crate::account_storage::{
 /// Path where global ticket table is stored
 const TICKET_TABLE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
 
+/// Global ticket table belongs to the zero account (system)
+pub const TICKET_TABLE_ACCOUNT: H160 = H160::zero();
+
 pub trait TicketTable {
     /// Increases ticket balance
     fn ticket_balance_add(
@@ -41,7 +44,7 @@ pub trait TicketTable {
     ) -> Result<bool, AccountStorageError>;
 }
 
-fn ticket_balance_path(
+pub(crate) fn ticket_balance_path(
     ticket_hash: &H256,
     address: &H160,
 ) -> Result<OwnedPath, AccountStorageError> {

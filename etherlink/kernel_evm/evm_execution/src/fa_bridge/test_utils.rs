@@ -1,0 +1,263 @@
+// SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+//
+// SPDX-License-Identifier: MIT
+
+use alloy_sol_types::{sol, SolConstructor};
+use crypto::hash::ContractKt1Hash;
+use evm::Config;
+use host::runtime::Runtime;
+use primitive_types::{H160, H256, U256};
+use tezos_data_encoding::enc::BinWriter;
+use tezos_ethereum::{
+    block::{BlockConstants, BlockFees},
+    Log,
+};
+use tezos_smart_rollup_encoding::{
+    contract::Contract,
+    michelson::{ticket::FA2_1Ticket, MichelsonOption, MichelsonPair},
+};
+use tezos_smart_rollup_mock::MockHost;
+
+use crate::{
+    account_storage::{account_path, read_u256, EthereumAccountStorage},
+    handler::ExecutionOutcome,
+    precompiles::precompile_set,
+    run_transaction,
+    utilities::keccak256_hash,
+};
+
+use super::{
+    deposit::{ticket_hash, FaDeposit},
+    execute_fa_deposit,
+    ticket_table::{ticket_balance_path, TicketTable, TICKET_TABLE_ACCOUNT},
+};
+
+sol!(
+    token_wrapper,
+    "tests/contracts/artifacts/MockFaBridgeWrapper.abi"
+);
+sol!(
+    kernel_wrapper,
+    "tests/contracts/artifacts/MockFaBridgePrecompile.abi"
+);
+
+const MOCK_WRAPPER_BYTECODE: &[u8] =
+    include_bytes!("../../tests/contracts/artifacts/MockFaBridgeWrapper.bytecode");
+
+/// Create a smart contract in the storage with the mocked token code
+pub fn deploy_mock_wrapper(
+    host: &mut MockHost,
+    evm_account_storage: &mut EthereumAccountStorage,
+    ticket: &FA2_1Ticket,
+    caller: &H160,
+    flag: u32,
+) -> ExecutionOutcome {
+    let code = MOCK_WRAPPER_BYTECODE.to_vec();
+    let (ticketer, content) = ticket_id(ticket);
+    let calldata = token_wrapper::constructorCall::new((
+        ticketer.into(),
+        content.into(),
+        caller.0.into(),
+        convert_u256(&U256::from(flag)),
+    ));
+
+    let block = dummy_block_constants();
+    let precompiles = precompile_set::<MockHost>();
+
+    set_balance(host, evm_account_storage, caller, U256::from(1_000_000));
+    run_transaction(
+        host,
+        &block,
+        evm_account_storage,
+        &precompiles,
+        Config::shanghai(),
+        None,
+        *caller,
+        [code, calldata.abi_encode()].concat(),
+        Some(300_000),
+        U256::one(),
+        None,
+        false,
+        1_000_000_000,
+        false,
+        false,
+        None,
+    )
+    .expect("Failed to deploy")
+    .unwrap()
+}
+
+/// Execute FA deposit
+pub fn run_fa_deposit(
+    host: &mut MockHost,
+    evm_account_storage: &mut EthereumAccountStorage,
+    deposit: &FaDeposit,
+    caller: &H160,
+) -> ExecutionOutcome {
+    let block = dummy_block_constants();
+    let precompiles = precompile_set::<MockHost>();
+
+    execute_fa_deposit(
+        host,
+        &block,
+        evm_account_storage,
+        &precompiles,
+        Config::shanghai(),
+        *caller,
+        deposit,
+        1_000_000_000,
+    )
+    .expect("Failed to execute deposit")
+}
+
+/// Create FA deposit given ticket and proxy address (optional)
+pub fn dummy_fa_deposit(ticket: FA2_1Ticket, proxy: Option<H160>) -> FaDeposit {
+    FaDeposit {
+        ticket_hash: ticket_hash(&ticket).expect("Failed to calc ticket hash"),
+        proxy,
+        amount: 42.into(),
+        receiver: H160([4u8; 20]),
+        inbox_level: 0,
+        inbox_msg_id: 0,
+    }
+}
+
+/// Get value of a specific slot in the proxy contract storage
+/// It is used to determine if the said contract was called
+///
+/// See MockFaBridgeWrapper.sol where the flag is set:
+///
+/// function setFlag(uint256 value) internal {
+///     bytes32 slot = keccak256(abi.encodePacked("FLAG_TAG"));
+///     assembly {
+///         sstore(slot, value)
+///     }
+/// }
+pub fn get_storage_flag(
+    host: &MockHost,
+    evm_account_storage: &EthereumAccountStorage,
+    proxy: H160,
+) -> u32 {
+    let proxy_account = evm_account_storage
+        .get(host, &account_path(&proxy).unwrap())
+        .unwrap()
+        .unwrap();
+
+    let flag = proxy_account
+        .get_storage(host, &keccak256_hash(b"FLAG_TAG"))
+        .unwrap();
+    U256::from_big_endian(&flag.0).as_u32()
+}
+
+/// Block constants for testing
+pub fn dummy_block_constants() -> BlockConstants {
+    let block_fees = BlockFees::new(
+        U256::from(21000),
+        U256::from(21000),
+        U256::from(2_000_000_000_000u64),
+    );
+    let gas_limit = 1u64;
+    BlockConstants::first_block(
+        U256::zero(),
+        U256::one(),
+        block_fees,
+        gas_limit,
+        H160::zero(),
+    )
+}
+
+/// Provision ticket balance for a specified account
+pub fn ticket_balance_add(
+    host: &mut impl Runtime,
+    evm_account_storage: &mut EthereumAccountStorage,
+    ticket_hash: &H256,
+    address: &H160,
+    balance: U256,
+) -> bool {
+    let mut system = evm_account_storage
+        .get_or_create(host, &account_path(&TICKET_TABLE_ACCOUNT).unwrap())
+        .unwrap();
+    system
+        .ticket_balance_add(host, ticket_hash, address, balance)
+        .unwrap()
+}
+
+/// Get ticket balance for a specified account
+pub fn ticket_balance_get(
+    host: &impl Runtime,
+    evm_account_storage: &EthereumAccountStorage,
+    ticket_hash: &H256,
+    address: &H160,
+) -> U256 {
+    let system = evm_account_storage
+        .get(host, &account_path(&TICKET_TABLE_ACCOUNT).unwrap())
+        .unwrap()
+        .unwrap();
+
+    let path = system
+        .custom_path(&ticket_balance_path(ticket_hash, address).unwrap())
+        .unwrap();
+    read_u256(host, &path, U256::zero()).unwrap()
+}
+
+/// Provision TEZ balance for a specified account
+pub fn set_balance(
+    host: &mut impl Runtime,
+    evm_account_storage: &mut EthereumAccountStorage,
+    address: &H160,
+    balance: U256,
+) {
+    let mut account = evm_account_storage
+        .get_or_create(host, &account_path(address).unwrap())
+        .unwrap();
+    let current_balance = account.balance(host).unwrap();
+    if current_balance > balance {
+        account
+            .balance_remove(host, current_balance - balance)
+            .unwrap();
+    } else {
+        account
+            .balance_add(host, balance - current_balance)
+            .unwrap();
+    }
+}
+
+/// Create ticket with dummy creator and content
+pub fn dummy_ticket() -> FA2_1Ticket {
+    let ticketer = ContractKt1Hash([1u8; 20].to_vec());
+    FA2_1Ticket::new(
+        Contract::from_b58check(&ticketer.to_base58_check()).unwrap(),
+        MichelsonPair(0.into(), MichelsonOption(None)),
+        1i32,
+    )
+    .expect("Failed to construct ticket")
+}
+
+/// Return ticket creator and content in forged form
+pub fn ticket_id(ticket: &FA2_1Ticket) -> ([u8; 22], Vec<u8>) {
+    let mut ticketer = Vec::new();
+    ticket.creator().0.bin_write(&mut ticketer).unwrap();
+
+    let mut content = Vec::new();
+    ticket.contents().bin_write(&mut content).unwrap();
+
+    (ticketer.try_into().unwrap(), content)
+}
+
+/// Convert U256 to the alloy primitive type
+pub fn convert_u256(value: &U256) -> alloy_primitives::U256 {
+    alloy_primitives::U256::from_limbs(value.0)
+}
+
+/// Convert H160 to the alloy primitive type
+pub fn convert_h160(value: &H160) -> alloy_primitives::Address {
+    alloy_primitives::Address::from_slice(&value.0)
+}
+
+/// Convert EVM Log to the alloy primitive type
+pub fn convert_log(log: &Log) -> alloy_primitives::LogData {
+    alloy_primitives::LogData::new_unchecked(
+        log.topics.iter().map(|x| x.0.into()).collect(),
+        log.data.clone().into(),
+    )
+}
