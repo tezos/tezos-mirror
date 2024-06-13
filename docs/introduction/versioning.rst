@@ -70,7 +70,7 @@ For example::
    is now 5 (previously 4). You can still use the previous version
    by calling the RPC with the parameter ?version=4.
 
-As a general rule (that we may break exceptionnaly), changing the
+As a general rule (that we may break exceptionally), changing the
 default version number of an RPC always follows a deprecation period.
 
 Deprecated Version
