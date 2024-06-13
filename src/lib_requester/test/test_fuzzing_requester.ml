@@ -32,8 +32,13 @@
 *)
 
 include Shared
-open Qcheck2_helpers
+open Qcheck2_helpers_no_alcotest
 open QCheck2
+
+let library_name = "Requester_PBT"
+
+let test_name test_set_name test_name =
+  sf "%s: %s (%s)" library_name test_set_name test_name
 
 (** Completely random key generator. Mitigated by also picking keys
  *  in the requester's domain, see [requester_and_keys_gen] below. *)
@@ -81,12 +86,13 @@ let print = Print.(triple (Fun.const "requester") string string)
 let qcheck_eq_true ~actual =
   qcheck_eq' ~pp:Format.pp_print_bool ~expected:true ~actual ()
 
-let test_read_read_opt =
-  Test.make
-    ~name:"Result.is_ok (read t key) = Option.is_some (read_opt t key)"
-    ~print
-    requester_and_keys_gen
-  @@ fun (t, key, _) ->
+let test_read_read_opt test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "Result.is_ok (read t key) = Option.is_some (read_opt t key)"
+  in
+  Test.make ~name ~print requester_and_keys_gen @@ fun (t, key, _) ->
   let open Lwt_syntax in
   let found_by_read =
     Lwt_main.run
@@ -100,12 +106,11 @@ let test_read_read_opt =
   in
   qcheck_eq ~pp:Format.pp_print_bool found_by_read found_by_read_opt
 
-let test_read_opt_known =
-  Test.make
-    ~name:"known t key = Option.is_some (read_opt t key)"
-    ~print
-    requester_and_keys_gen
-  @@ fun (t, key, _) ->
+let test_read_opt_known test_set_name =
+  let name =
+    test_name test_set_name "known t key = Option.is_some (read_opt t key)"
+  in
+  Test.make ~name ~print requester_and_keys_gen @@ fun (t, key, _) ->
   let open Lwt_syntax in
   let known = Lwt_main.run @@ Test_Requester.known t key in
   let found_by_read_opt =
@@ -115,9 +120,12 @@ let test_read_opt_known =
   in
   qcheck_eq ~pp:Format.pp_print_bool known found_by_read_opt
 
-let test_inject_read_opt =
+let test_inject_read_opt test_set_name =
+  let name =
+    test_name test_set_name "read_opt (inject t key value) = (Some value)"
+  in
   Test.make
-    ~name:"read_opt (inject t key value) = (Some value)"
+    ~name
     ~print:Print.(pair print int)
     Gen.(pair requester_and_keys_gen value_gen)
   @@ fun ((t, key, _), value) ->
@@ -130,9 +138,14 @@ let test_inject_read_opt =
     ~actual:read
     ()
 
-let test_inject_read_opt_other =
+let test_inject_read_opt_other test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "key <> key' ==> read_opt (inject t key' value) key = read_opt t key"
+  in
   Test.make
-    ~name:"key <> key' ==> read_opt (inject t key' value) key = read_opt t key"
+    ~name
     ~print:Print.(pair print int)
     Gen.(pair requester_and_keys_gen value_gen)
   @@ fun ((t, key, key'), value) ->
@@ -145,9 +158,14 @@ let test_inject_read_opt_other =
 let leq_opt opt1 opt2 =
   match (opt1, opt2) with None, _ | Some _, Some _ -> true | _ -> false
 
-let test_inject_growth =
+let test_inject_growth test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "read_opt t key <= read_opt (inject t key' value) key"
+  in
   Test.make
-    ~name:"read_opt t key <= read_opt (inject t key' value) key"
+    ~name
     ~print:Print.(pair print int)
     Gen.(pair requester_and_keys_gen value_gen)
   @@ fun ((t, key, key'), value) ->
@@ -156,9 +174,14 @@ let test_inject_growth =
   let read_opt_after = Lwt_main.run @@ Test_Requester.read_opt t key in
   qcheck_eq_true ~actual:(leq_opt read_opt_before read_opt_after)
 
-let test_inject_memory_table_length =
+let test_inject_memory_table_length test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "memory_table_length t <= memory_table_length (inject t key value)"
+  in
   Test.make
-    ~name:"memory_table_length t <= memory_table_length (inject t key value)"
+    ~name
     ~print:Print.(pair print int)
     Gen.(pair requester_and_keys_gen value_gen)
   @@ fun ((t, key, _), value) ->
@@ -167,23 +190,25 @@ let test_inject_memory_table_length =
   let length_after = Test_Requester.memory_table_length t in
   qcheck_eq_true ~actual:(length_before <= length_after)
 
-let test_clear_shrink =
-  Test.make
-    ~name:"read_opt (clear_or_cancel t key') key <= read_opt t key"
-    ~print
-    requester_and_keys_gen
-  @@ fun (t, key, key') ->
+let test_clear_shrink test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "read_opt (clear_or_cancel t key') key <= read_opt t key"
+  in
+  Test.make ~name ~print requester_and_keys_gen @@ fun (t, key, key') ->
   let read_opt_before = Lwt_main.run @@ Test_Requester.read_opt t key in
   Test_Requester.clear_or_cancel t key' ;
   let read_opt_after = Lwt_main.run @@ Test_Requester.read_opt t key in
   qcheck_eq_true ~actual:(leq_opt read_opt_after read_opt_before)
 
-let test_clear_memory_table_length =
-  Test.make
-    ~name:"memory_length (clear_or_cancel t key') key <= memory_length t"
-    ~print
-    requester_and_keys_gen
-  @@ fun (t, key, _) ->
+let test_clear_memory_table_length test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "memory_length (clear_or_cancel t key') key <= memory_length t"
+  in
+  Test.make ~name ~print requester_and_keys_gen @@ fun (t, key, _) ->
   let length_before = Test_Requester.memory_table_length t in
   Test_Requester.clear_or_cancel t key ;
   let length_after = Test_Requester.memory_table_length t in
@@ -193,12 +218,13 @@ let test_clear_memory_table_length =
     ~actual:(length_after <= length_before)
     ()
 
-let test_clear_pending =
-  Test.make
-    ~name:"pending (clear_or_cancel (fetch (fetch t key) key) key) key = true"
-    ~print
-    requester_and_keys_gen
-  @@ fun (t, key, _) ->
+let test_clear_pending test_set_name =
+  let name =
+    test_name
+      test_set_name
+      "pending (clear_or_cancel (fetch (fetch t key) key) key) key = true"
+  in
+  Test.make ~name ~print requester_and_keys_gen @@ fun (t, key, _) ->
   (* ensure that [key] is not in the memory_table *)
   Test_Requester.clear_or_cancel t key ;
   let _ = Test_Requester.fetch t key false in
@@ -216,22 +242,22 @@ let test_clear_pending =
     ()
 
 let () =
-  Alcotest.run
-    ~__FILE__
-    "Requester_PBT"
+  let tags = ["requester"] in
+  List.iter
+    (fun (test_set_name, tests) ->
+      List.iter
+        (fun test -> Qcheck_tezt.register ~__FILE__ ~tags (test test_set_name))
+        tests)
     [
-      ("read", qcheck_wrap [test_read_read_opt; test_read_opt_known]);
+      ("read", [test_read_read_opt; test_read_opt_known]);
       ( "inject",
-        qcheck_wrap
-          [
-            test_inject_read_opt;
-            test_inject_read_opt_other;
-            test_inject_growth;
-            test_inject_memory_table_length;
-          ] );
+        [
+          test_inject_read_opt;
+          test_inject_read_opt_other;
+          test_inject_growth;
+          test_inject_memory_table_length;
+        ] );
       ( "clear_or_cancel",
-        qcheck_wrap
-          [
-            test_clear_shrink; test_clear_memory_table_length; test_clear_pending;
-          ] );
+        [test_clear_shrink; test_clear_memory_table_length; test_clear_pending]
+      );
     ]
