@@ -277,16 +277,16 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       let origin_header = Header.get headers "origin" in
       (if (* Default OPTIONS handler for CORS preflight *)
           origin_header = None
-      then Directory.allowed_methods root () path
-      else
-        match Header.get headers "Access-Control-Request-Method" with
-        | None -> Directory.allowed_methods root () path
-        | Some meth -> (
-            match Code.method_of_string meth with
-            | #Resto.meth as meth ->
-                Directory.lookup root () meth path >>=? fun _handler ->
-                Lwt.return_ok [meth]
-            | _ -> Lwt.return_error `Not_found))
+       then Directory.allowed_methods root () path
+       else
+         match Header.get headers "Access-Control-Request-Method" with
+         | None -> Directory.allowed_methods root () path
+         | Some meth -> (
+             match Code.method_of_string meth with
+             | #Resto.meth as meth ->
+                 Directory.lookup root () meth path >>=? fun _handler ->
+                 Lwt.return_ok [meth]
+             | _ -> Lwt.return_error `Not_found))
       >>=? fun cors_allowed_meths ->
       let headers = Header.init () in
       let headers =
@@ -418,14 +418,14 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             (Header.get req_headers "origin")
         in
         (if not @@ Acl.allowed server.acl ~meth ~path then
-         Lwt.return_ok (`Unauthorized None)
-        else
-          match s.types.input with
-          | Service.No_input -> s.handler query () >>= Lwt.return_ok
-          | Service.Input input -> (
-              match input_media_type.destruct input body with
-              | Error s -> Lwt.return_error (`Cannot_parse_body s)
-              | Ok body -> s.handler query body >>= Lwt.return_ok))
+           Lwt.return_ok (`Unauthorized None)
+         else
+           match s.types.input with
+           | Service.No_input -> s.handler query () >>= Lwt.return_ok
+           | Service.Input input -> (
+               match input_media_type.destruct input body with
+               | Error s -> Lwt.return_error (`Cannot_parse_body s)
+               | Ok body -> s.handler query body >>= Lwt.return_ok))
         >>=? fun answer ->
         match answer with
         | (`Ok _ | `No_content | `Created _) as a ->

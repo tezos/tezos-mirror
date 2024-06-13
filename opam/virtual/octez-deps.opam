@@ -90,13 +90,13 @@ depends: [
   "qcheck-core"
   "re" { >= "1.10.0" }
   "repr"
-  "resto" { >= "1.2" }
-  "resto-acl" { >= "1.2" }
-  "resto-cohttp" { >= "1.2" }
-  "resto-cohttp-client" { >= "1.2" }
-  "resto-cohttp-self-serving-client" { >= "1.2" }
-  "resto-cohttp-server" { >= "1.2" }
-  "resto-directory" { >= "1.2" }
+  "resto" { = "1.2" }
+  "resto-acl" { = "1.2" }
+  "resto-cohttp" { = "1.2" }
+  "resto-cohttp-client" { = "1.2" }
+  "resto-cohttp-self-serving-client" { = "1.2" }
+  "resto-cohttp-server" { = "1.2" }
+  "resto-directory" { = "1.2" }
   "ringo" { >= "1.0.0" }
   "rusage"
   "secp256k1-internal" { >= "0.4.0" }

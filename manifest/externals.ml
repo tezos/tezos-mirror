@@ -239,24 +239,6 @@ let re = external_lib ~js_compatible:true "re" V.(at_least "1.10.0")
 
 let repr = external_lib "repr" V.True
 
-let resto_version = V.(at_least "1.2")
-
-let resto = external_lib ~js_compatible:true "resto" resto_version
-
-let resto_acl = external_lib "resto-acl" resto_version
-
-let resto_cohttp = external_lib "resto-cohttp" resto_version
-
-let resto_cohttp_client = external_lib "resto-cohttp-client" resto_version
-
-let resto_cohttp_self_serving_client =
-  external_lib "resto-cohttp-self-serving-client" resto_version
-
-let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
-
-let resto_directory =
-  external_lib ~js_compatible:true "resto-directory" resto_version
-
 let ringo = external_lib ~js_compatible:true "ringo" V.(at_least "1.0.0")
 
 let rusage = external_lib "rusage" V.True
