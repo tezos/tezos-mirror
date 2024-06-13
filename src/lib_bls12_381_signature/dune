@@ -14,16 +14,3 @@
   (flags (-Wall -Wextra :standard))
   (names blst_bindings_stubs))
  (c_library_flags (-Wall -Wextra :standard -lpthread)))
-
-(rule
- (targets needed-wasm-names)
- (mode promote)
- (deps (:files blst_bindings_stubs.js))
- (action
-  (with-outputs-to %{targets} (run ./gen_wasm_needed_names.exe %{files}))))
-
-(executable
- (name gen_wasm_needed_names)
- (libraries
-  re)
- (modules gen_wasm_needed_names))

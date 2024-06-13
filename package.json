@@ -1,13 +1,9 @@
 {
-  "DO NOT EDIT": "This file was automatically generated, edit file manifest/main.ml instead",
   "private": true,
   "type": "commonjs",
   "description": "n/a",
   "license": "n/a",
   "dependencies": {
-    "@nomadic-labs/secp256k1-wasm": ">=0.4.0",
-    "hacl-wasm": ">=1.4.0 <1.5.0",
-    "kaitai-struct": "0.10.0",
-    "ocaml-bls12-381": "file:src/lib_bls12_381/blst.js"
+    "kaitai-struct": "0.10.0"
   }
 }

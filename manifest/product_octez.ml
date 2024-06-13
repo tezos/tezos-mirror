@@ -679,61 +679,6 @@ let bls12_381 =
             ];
           ];
           [
-            S "rule";
-            [S "mode"; S "fallback"];
-            [
-              S "deps";
-              [S "source_tree"; S "libblst"];
-              S "needed-wasm-names";
-              S "blst_extended.c";
-              [S "glob_files"; S "*.h"];
-            ];
-            [S "targets"; S "blst.wasm"; S "blst.js"];
-            [
-              S "action";
-              [
-                S "progn";
-                [S "run"; S "cp"; S "-f"; S "blst_extended.c"; S "libblst/src/"];
-                [
-                  S "run";
-                  S "emcc";
-                  S "-Os";
-                  G [S "-o"; S "blst.js"];
-                  G [S "-I"; S "libblst/src/"];
-                  S "libblst/src/server.c";
-                  S "%{dep:blst_wrapper.c}";
-                  S "-DENABLE_EMSCRIPTEN_STUBS";
-                  S "-DENABLE_MODULE_RECOVERY";
-                  G [S "-s"; S "ALLOW_MEMORY_GROWTH=1"];
-                  G [S "-s"; S "WASM=1"];
-                  G [S "-s"; S "MALLOC=emmalloc"];
-                  G [S "-s"; S "EXPORT_ES6=0"];
-                  G [S "-s"; S "FILESYSTEM=0"];
-                  G [S "-s"; S "MODULARIZE=1"];
-                  G [S "-s"; S "EXPORT_NAME='_BLS12381'"];
-                  G [S "-s"; S "EXPORTED_FUNCTIONS=@needed-wasm-names"];
-                  S "--no-entry";
-                ];
-              ];
-            ];
-          ];
-          [
-            S "executable";
-            [S "name"; S "gen_wasm_needed_names"];
-            [S "modules"; S "gen_wasm_needed_names"];
-            [S "libraries"; S "re"];
-          ];
-          targets_rule
-            ["needed-wasm-names"]
-            ~promote:true
-            ~action:
-              [
-                S "with-outputs-to";
-                S "%{targets}";
-                [S "run"; S "./gen_wasm_needed_names.exe"; S "%{files}"];
-              ]
-            ~deps:[[S ":files"; S "blst_bindings_stubs.js"]];
-          [
             S "install";
             [
               S "files";
@@ -804,20 +749,6 @@ let octez_bls12_381_signature =
       }
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
     ~linkall:true
-    ~dune:
-      Dune.
-        [
-          targets_rule
-            ["needed-wasm-names"]
-            ~promote:true
-            ~action:
-              [
-                S "with-outputs-to";
-                S "%{targets}";
-                [S "run"; S "./gen_wasm_needed_names.exe"; S "%{files}"];
-              ]
-            ~deps:[[S ":files"; S "blst_bindings_stubs.js"]];
-        ]
 
 (* TODO: dep_globs aren't added to the rules for JS tests *)
 let _octez_bls12_381_signature_tests =
@@ -832,15 +763,6 @@ let _octez_bls12_381_signature_tests =
     ~deps:[bls12_381; octez_bls12_381_signature; alcotezt]
     ~dep_globs_rec:["test_vectors/*"]
 (* See above *)
-
-let _octez_bls12_381_signature_gen_wasm_needed_names =
-  private_exe
-    "gen_wasm_needed_names"
-    ~path:"src/lib_bls12_381_signature"
-    ~opam:"octez-libs"
-    ~bisect_ppx:No
-    ~modules:["gen_wasm_needed_names"]
-    ~deps:[re]
 
 let octez_crypto =
   octez_lib
