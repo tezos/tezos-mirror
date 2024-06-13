@@ -74,13 +74,12 @@ module S = struct
       ~output:Chain_id.encoding
       Tezos_rpc.Path.(path / "chain_id")
 
-  (* DEPRECATED: use `chains/<CHAIN_ID>/levels/{checkpoint, savepoint,
-     caboose, history_mode}` instead. *)
   let checkpoint =
     Tezos_rpc.Service.get_service
       ~description:
-        "DEPRECATED: use `../levels/{checkpoint, savepoint, caboose, \
-         history_mode}` instead. The current checkpoint for this chain."
+        "DEPRECATED: use `/chains/<chain_id>/{checkpoint, savepoint, caboose}` \
+         and `/config/history_mode` instead. The current checkpoint for this \
+         chain."
       ~query:Tezos_rpc.Query.empty
       ~output:checkpoint_encoding
       Tezos_rpc.Path.(path / "checkpoint")
