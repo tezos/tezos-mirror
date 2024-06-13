@@ -27,6 +27,7 @@ depends: [
   "alcotest-lwt" { >= "1.5.0" }
   "fmt" { >= "0.8.7" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
+  "qcheck-core"
   "qcheck-alcotest" { >= "0.20" }
   "pure-splitmix" { = "0.3" }
   "aches" { >= "1.0.0" }
@@ -76,7 +77,6 @@ depends: [
   "tezos-sapling-parameters" { >= "1.1.0" }
   "octez-rust-deps" { = version }
   "lwt-watcher" { = "0.2" }
-  "qcheck-core" {with-test}
   "bigstring" {with-test}
 ]
 x-opam-monorepo-opam-provided: [
