@@ -59,6 +59,16 @@ let () =
     (function Missing_socket_dir -> Some () | _ -> None)
     (fun () -> Missing_socket_dir)
 
+let rpc_metrics =
+  Prometheus.Summary.v_labels
+    ~label_names:["endpoint"; "method"]
+    ~help:"External RPC endpoint call counts and sum of execution times."
+    ~namespace:Tezos_version.Octez_node_version.namespace
+    ~subsystem:"external_rpc_process"
+    "calls"
+
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
+
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =
   List.map String.lowercase_ascii headers
@@ -116,8 +126,25 @@ let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
+  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
+    let path = Cohttp.Request.uri req |> Uri.path in
+    if path = "/metrics" then
+      let*! response = Metrics_server.callback conn req body in
+      Lwt.return (`Response response)
+    else
+      Forward_handler.callback
+        ~acl
+        server
+        params.rpc_comm_socket_path
+        conn
+        req
+        body
+  in
+  let update_metrics uri meth callback =
+    Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time) callback
+  in
   let callback =
-    Forward_handler.callback ~acl server params.rpc_comm_socket_path
+    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
   in
   let* callback =
     if params.config.rpc.enable_http_cache_headers then
