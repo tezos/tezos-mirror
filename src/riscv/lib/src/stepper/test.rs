@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod posix;
+
 use super::{StepResult, Stepper, StepperStatus};
 use crate::{
-    exec_env::{
-        posix::{PosixState, PosixStateLayout},
-        EcallOutcome,
-    },
+    exec_env::EcallOutcome,
     kernel_loader,
     machine_state::bus::main_memory::{MainMemoryLayout, M1G},
     machine_state::{mode, MachineError, MachineState, MachineStateLayout, StepManyResult},
@@ -19,6 +18,7 @@ use crate::{
     traps::EnvironException,
 };
 use derive_more::{Error, From};
+use posix::{PosixState, PosixStateLayout};
 use std::{collections::BTreeMap, ops::RangeBounds};
 
 #[derive(Clone, Debug)]

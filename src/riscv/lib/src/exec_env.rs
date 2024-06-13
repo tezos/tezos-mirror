@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub mod posix;
-
 /// Outcome of handling an ECALL
 #[derive(Debug)]
 pub enum EcallOutcome {
