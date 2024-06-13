@@ -193,7 +193,6 @@ unsafe impl SmartRollupCore for MockHost {
         metadata.len().try_into().unwrap()
     }
 
-    #[cfg(feature = "proto-alpha")]
     unsafe fn reveal(
         &self,
         _payload_addr: *const u8,

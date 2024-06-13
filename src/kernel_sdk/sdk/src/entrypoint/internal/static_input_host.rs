@@ -12,7 +12,6 @@
 use crate::core_unsafe::PREIMAGE_HASH_SIZE;
 use crate::host::{Runtime, RuntimeError, ValueType};
 use crate::storage::path::Path;
-#[cfg(feature = "proto-alpha")]
 use crate::types::RollupDalParameters;
 use crate::types::{Message, RollupMetadata};
 use crate::utils::inbox::{file::InboxFile, Inbox, InboxBuilder};
@@ -205,7 +204,6 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
         self.host.runtime_version()
     }
 
-    #[cfg(feature = "proto-alpha")]
     #[inline(always)]
     fn reveal_dal_page(
         &self,
@@ -218,7 +216,6 @@ impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
             .reveal_dal_page(published_level, slot_index, page_index, destination)
     }
 
-    #[cfg(feature = "proto-alpha")]
     #[inline(always)]
     fn reveal_dal_parameters(&self) -> RollupDalParameters {
         self.host.reveal_dal_parameters()
