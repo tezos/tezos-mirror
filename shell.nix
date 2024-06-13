@@ -54,7 +54,6 @@
           ];
 
           packageConstraints = [
-            "js_of_ocaml-compiler"
             "ocamlformat-rpc"
           ];
         })
