@@ -662,7 +662,6 @@ opam:bls12-381:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -730,7 +729,6 @@ opam:octez-accuser-Proxford:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -798,7 +796,6 @@ opam:octez-accuser-PtParisB:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -868,7 +865,6 @@ opam:octez-alcotezt:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -936,7 +932,6 @@ opam:octez-baker-Proxford:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1004,7 +999,6 @@ opam:octez-baker-PtParisB:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1072,7 +1066,6 @@ opam:octez-client:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1140,7 +1133,6 @@ opam:octez-codec:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1210,7 +1202,6 @@ opam:octez-crawler:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1278,7 +1269,6 @@ opam:octez-dac-client:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1346,7 +1336,6 @@ opam:octez-dac-node:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1414,7 +1403,6 @@ opam:octez-dal-node:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1484,7 +1472,6 @@ opam:octez-distributed-internal:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1554,7 +1541,6 @@ opam:octez-distributed-lwt-internal:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1622,7 +1608,6 @@ opam:octez-evm-node:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1692,7 +1677,6 @@ opam:octez-evm-node-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1762,7 +1746,6 @@ opam:octez-injector:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1832,7 +1815,6 @@ opam:octez-internal-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1902,7 +1884,6 @@ opam:octez-l2-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1972,7 +1953,6 @@ opam:octez-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2040,7 +2020,6 @@ opam:octez-node:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2110,7 +2089,6 @@ opam:octez-node-config:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2180,7 +2158,6 @@ opam:octez-proto-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2250,7 +2227,6 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2320,7 +2296,6 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2390,7 +2365,6 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2460,7 +2434,6 @@ opam:octez-protocol-003-PsddFKi3-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2530,7 +2503,6 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2600,7 +2572,6 @@ opam:octez-protocol-005-PsBabyM1-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2670,7 +2641,6 @@ opam:octez-protocol-006-PsCARTHA-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2740,7 +2710,6 @@ opam:octez-protocol-007-PsDELPH1-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2810,7 +2779,6 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2880,7 +2848,6 @@ opam:octez-protocol-009-PsFLoren-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2950,7 +2917,6 @@ opam:octez-protocol-010-PtGRANAD-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3020,7 +2986,6 @@ opam:octez-protocol-011-PtHangz2-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3090,7 +3055,6 @@ opam:octez-protocol-012-Psithaca-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3160,7 +3124,6 @@ opam:octez-protocol-013-PtJakart-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3230,7 +3193,6 @@ opam:octez-protocol-014-PtKathma-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3300,7 +3262,6 @@ opam:octez-protocol-015-PtLimaPt-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3370,7 +3331,6 @@ opam:octez-protocol-016-PtMumbai-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3440,7 +3400,6 @@ opam:octez-protocol-017-PtNairob-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3510,7 +3469,6 @@ opam:octez-protocol-018-Proxford-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3580,7 +3538,6 @@ opam:octez-protocol-019-PtParisB-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3650,7 +3607,6 @@ opam:octez-protocol-alpha-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3718,7 +3674,6 @@ opam:octez-protocol-compiler:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3786,7 +3741,6 @@ opam:octez-proxy-server:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3856,7 +3810,6 @@ opam:octez-riscv-api:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3926,7 +3879,6 @@ opam:octez-riscv-pvm:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3996,7 +3948,6 @@ opam:octez-rpc-process:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4066,7 +4017,6 @@ opam:octez-rust-deps:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4136,7 +4086,6 @@ opam:octez-shell-libs:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4204,7 +4153,6 @@ opam:octez-signer:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4272,7 +4220,6 @@ opam:octez-smart-rollup-node:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4342,7 +4289,6 @@ opam:octez-smart-rollup-node-Proxford:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4412,7 +4358,6 @@ opam:octez-smart-rollup-node-PtNairob:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4482,7 +4427,6 @@ opam:octez-smart-rollup-node-PtParisB:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4552,7 +4496,6 @@ opam:octez-smart-rollup-node-alpha:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4622,7 +4565,6 @@ opam:octez-smart-rollup-node-lib:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4690,7 +4632,6 @@ opam:octez-smart-rollup-wasm-debugger:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4760,7 +4701,6 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4830,7 +4770,6 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4898,7 +4837,6 @@ opam:octez-version:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4968,7 +4906,6 @@ opam:tezos-benchmark:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5038,7 +4975,6 @@ opam:tezos-client-demo-counter:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5108,7 +5044,6 @@ opam:tezos-client-genesis:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5178,7 +5113,6 @@ opam:tezos-dac-client-lib:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5248,7 +5182,6 @@ opam:tezos-dac-lib:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5318,7 +5251,6 @@ opam:tezos-dac-node-lib:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5388,7 +5320,6 @@ opam:tezos-dal-node-lib:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5458,7 +5389,6 @@ opam:tezos-dal-node-services:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5528,7 +5458,6 @@ opam:tezos-openapi:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5598,7 +5527,6 @@ opam:tezos-protocol-000-Ps9mPmXa:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5668,7 +5596,6 @@ opam:tezos-protocol-001-PtCJ7pwo:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5738,7 +5665,6 @@ opam:tezos-protocol-002-PsYLVpVv:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5808,7 +5734,6 @@ opam:tezos-protocol-003-PsddFKi3:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5878,7 +5803,6 @@ opam:tezos-protocol-004-Pt24m4xi:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5948,7 +5872,6 @@ opam:tezos-protocol-005-PsBABY5H:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6018,7 +5941,6 @@ opam:tezos-protocol-005-PsBabyM1:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6088,7 +6010,6 @@ opam:tezos-protocol-006-PsCARTHA:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6158,7 +6079,6 @@ opam:tezos-protocol-007-PsDELPH1:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6228,7 +6148,6 @@ opam:tezos-protocol-008-PtEdo2Zk:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6298,7 +6217,6 @@ opam:tezos-protocol-008-PtEdoTez:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6368,7 +6286,6 @@ opam:tezos-protocol-009-PsFLoren:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6438,7 +6355,6 @@ opam:tezos-protocol-010-PtGRANAD:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6508,7 +6424,6 @@ opam:tezos-protocol-011-PtHangz2:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6578,7 +6493,6 @@ opam:tezos-protocol-012-Psithaca:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6648,7 +6562,6 @@ opam:tezos-protocol-013-PtJakart:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6718,7 +6631,6 @@ opam:tezos-protocol-014-PtKathma:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6788,7 +6700,6 @@ opam:tezos-protocol-015-PtLimaPt:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6858,7 +6769,6 @@ opam:tezos-protocol-016-PtMumbai:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6928,7 +6838,6 @@ opam:tezos-protocol-017-PtNairob:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6998,7 +6907,6 @@ opam:tezos-protocol-018-Proxford:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7068,7 +6976,6 @@ opam:tezos-protocol-019-PtParisB:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7138,7 +7045,6 @@ opam:tezos-protocol-alpha:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7208,7 +7114,6 @@ opam:tezos-protocol-demo-counter:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7278,7 +7183,6 @@ opam:tezos-protocol-demo-noops:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7348,7 +7252,6 @@ opam:tezos-protocol-genesis:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7418,7 +7321,6 @@ opam:tezos-proxy-server-config:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7488,7 +7390,6 @@ opam:tezt-tezos:
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week

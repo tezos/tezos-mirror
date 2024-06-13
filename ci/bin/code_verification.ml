@@ -123,7 +123,6 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
   enable_sccache
     ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
     ~idle_timeout:"0"
-    ~log:"debug"
     ~dir:"$CI_PROJECT_DIR/_build/_sccache"
   |> enable_cargo_cache
 
