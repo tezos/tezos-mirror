@@ -580,22 +580,22 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         let mip: CSRRepr = self.hart.csregisters.read(CSRegister::mip);
         let active_interrupts = mip & possible;
 
-        if active_interrupts.bit(Interrupt::MachineExternal.exception_code() as usize) {
+        if active_interrupts.bit(Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize) {
             return Some(Interrupt::MachineExternal);
         }
-        if active_interrupts.bit(Interrupt::MachineSoftware.exception_code() as usize) {
+        if active_interrupts.bit(Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize) {
             return Some(Interrupt::MachineSoftware);
         }
-        if active_interrupts.bit(Interrupt::MachineTimer.exception_code() as usize) {
+        if active_interrupts.bit(Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize) {
             return Some(Interrupt::MachineTimer);
         }
-        if active_interrupts.bit(Interrupt::SupervisorExternal.exception_code() as usize) {
+        if active_interrupts.bit(Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize) {
             return Some(Interrupt::SupervisorExternal);
         }
-        if active_interrupts.bit(Interrupt::SupervisorSoftware.exception_code() as usize) {
+        if active_interrupts.bit(Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize) {
             return Some(Interrupt::SupervisorSoftware);
         }
-        if active_interrupts.bit(Interrupt::SupervisorTimer.exception_code() as usize) {
+        if active_interrupts.bit(Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize) {
             return Some(Interrupt::SupervisorTimer);
         }
 
