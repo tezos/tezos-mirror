@@ -31,4 +31,6 @@
 //! using the transactional Eth account storage, so that they are discarded
 //! in case of a revert/failure.
 
+pub mod deposit;
+pub mod error;
 pub mod ticket_table;
