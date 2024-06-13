@@ -17,6 +17,7 @@
 - Add `tezos_smart_rollup::entrypoint` module for kernel entrypoint configuration & macros.
 - Add `entrypoint::main` procedural macro to mark the kernel entrypoint function.
 - Add `extra` feature flag, for functionalility not-expected to be used by kernels directly.
+- Remove the `proto-alpha` flag restriction on DAL host functions.
 
 ### Installer client/kernel
 
