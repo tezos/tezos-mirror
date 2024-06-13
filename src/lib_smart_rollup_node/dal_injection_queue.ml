@@ -56,6 +56,36 @@ end
 
 open Dal_worker_types
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = "smart_rollup_node" :: Name.base
+
+  let request_failed =
+    declare_3
+      ~section
+      ~name:"request_failed"
+      ~msg:"Request {request} failed ({worker_status}): {errors}"
+      ~level:Warning
+      ("request", Request.encoding)
+      ~pp1:Request.pp
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp2:Worker_types.pp_status
+      ("errors", Error_monad.trace_encoding)
+      ~pp3:Error_monad.pp_print_trace
+
+  let request_completed =
+    declare_2
+      ~section
+      ~name:"request_completed"
+      ~msg:"{request} {worker_status}"
+      ~level:Debug
+      ("request", Request.encoding)
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp1:Request.pp
+      ~pp2:Worker_types.pp_status
+end
+
 type state = {node_ctxt : Node_context.ro}
 
 let inject_slot state ~slot_content ~slot_index =
@@ -134,15 +164,18 @@ module Handlers = struct
     let state = init_dal_worker_state node_ctxt in
     return state
 
-  let on_error (type a b) _w _st (r : (a, b) Request.t) (errs : b) :
+  let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let _request_view = Request.view r in
-    let emit_and_return_errors _errs = return_unit in
-    match r with Request.Register _ -> emit_and_return_errors errs
+    match r with
+    | Request.Register _ ->
+        let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
+        return_unit
 
-  let on_completion _w r _ _st =
-    match Request.view r with Request.View (Register _) -> Lwt.return_unit
+  let on_completion _w r _ st =
+    match r with
+    | Register _ ->
+        Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
 
