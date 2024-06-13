@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::EcallOutcome;
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
@@ -50,17 +49,15 @@ impl<M: Manager> PosixState<M> {
         }
     }
 
-    /// Handle a POSIX system call.
+    /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
     pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
         env_exception: EnvironException,
-    ) -> EcallOutcome {
+    ) -> Result<bool, String> {
         if self.exited() {
             // Can't exit twice
-            return EcallOutcome::Fatal {
-                message: "Machine has already exited".to_owned(),
-            };
+            return Err("Machine has already exited".to_owned());
         }
 
         let source_exception = env_exception.as_exception();
@@ -76,9 +73,7 @@ impl<M: Manager> PosixState<M> {
             let new_pc = machine.hart.take_trap(source_exception, return_pc);
             machine.hart.pc.write(new_pc);
 
-            return EcallOutcome::Handled {
-                continue_eval: true,
-            };
+            return Ok(true);
         }
 
         let mut handle_exit = |code| {
@@ -86,9 +81,7 @@ impl<M: Manager> PosixState<M> {
             self.exited.write(exited.saturating_add(1));
             self.code.write(code);
 
-            EcallOutcome::Handled {
-                continue_eval: false,
-            }
+            Ok(false)
         };
 
         // Successful physical memory tests set
@@ -109,9 +102,7 @@ impl<M: Manager> PosixState<M> {
             (93, code) | (0, code) => handle_exit(code),
 
             // Unimplemented
-            _ => EcallOutcome::Fatal {
-                message: format!("Unknown system call number {a7_val}"),
-            },
+            _ => Err(format!("Unknown system call number {a7_val}")),
         }
     }
 }

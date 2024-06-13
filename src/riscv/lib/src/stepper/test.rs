@@ -6,7 +6,6 @@ mod posix;
 
 use super::{StepResult, Stepper, StepperStatus};
 use crate::{
-    exec_env::EcallOutcome,
     kernel_loader,
     machine_state::bus::main_memory::{MainMemoryLayout, M1G},
     machine_state::{mode, MachineError, MachineState, MachineStateLayout, StepManyResult},
@@ -183,9 +182,10 @@ impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
         let result = self.machine_state.step_range_handle(
             &steps,
             &mut should_continue,
-            |machine_state, exc| match self.posix_state.handle_call(machine_state, exc) {
-                EcallOutcome::Fatal { message } => Err((exc, message)),
-                EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
+            |machine_state, exc| {
+                self.posix_state
+                    .handle_call(machine_state, exc)
+                    .map_err(|message| (exc, message))
             },
         );
         self.handle_step_result(result)
