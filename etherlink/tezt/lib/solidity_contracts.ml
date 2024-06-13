@@ -12,6 +12,33 @@ open Helpers
 
 type contract = {label : string; abi : string; bin : string}
 
+let solidity_contracts_path = "etherlink/kernel_evm/solidity_examples"
+
+let compile_contract ~source ~label ~contract ~evm_version =
+  let output_dir = Tezt.Temp.dir "contracts" in
+  let* () =
+    Tezt.Process.run
+      "npx"
+      [
+        "--yes";
+        "solc";
+        "--evm-version";
+        evm_version;
+        "-o";
+        output_dir ^ "/" ^ evm_version;
+        "--optimize";
+        "--bin";
+        "--abi";
+        source;
+      ]
+  in
+  return
+    {
+      label;
+      abi = Filename.concat output_dir (evm_version ^ "/" ^ contract ^ ".abi");
+      bin = Filename.concat output_dir (evm_version ^ "/" ^ contract ^ ".bin");
+    }
+
 (** The info for the "storage.sol" contract.
     See [etherlink/tezt/tests/evm_kernel_inputs/storage.*] *)
 let simple_storage =
