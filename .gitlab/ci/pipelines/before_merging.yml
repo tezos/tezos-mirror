@@ -177,19 +177,27 @@ oc.build_arm64-released:
   dependencies:
   - oc.docker:ci:arm64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -214,21 +222,29 @@ oc.build_arm64-exp-dev-extra:
   dependencies:
   - oc.docker:ci:arm64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -264,18 +280,26 @@ oc.build:static-x86_64-linux-binaries:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -304,19 +328,27 @@ oc.build_x86_64-released:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -353,21 +385,29 @@ oc.build_x86_64-exp-dev-extra:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -401,17 +441,25 @@ ocaml-check:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -543,13 +591,17 @@ build_octez_source:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/create_octez_tarball.sh octez
@@ -559,8 +611,12 @@ build_octez_source:
   - cd octez/
   - eval $(opam env)
   - make octez
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 opam:prepare:
   image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
@@ -7422,18 +7478,26 @@ kaitai_checks:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
     and commit the resulting diff.' ; false)
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 hour
     paths:
@@ -7485,19 +7549,27 @@ oc.check_lift_limits_patch:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) =
     "src/proto_alpha/lib_protocol/main.ml" ]'
   - git apply src/bin_tps_evaluation/lift_limits.patch
   - dune build @src/proto_alpha/lib_protocol/check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 oc.misc_checks:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -7631,16 +7703,24 @@ oc.integration:compiler-rejections:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_rejections
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
@@ -7695,17 +7775,25 @@ oc.script:snapshot_alpha_and_link:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
@@ -7806,16 +7894,25 @@ test_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7834,16 +7931,25 @@ test_etherlink_kernel:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk check
   - make -f etherlink.mk test
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7861,15 +7967,24 @@ test_etherlink_firehose:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C etherlink/firehose check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7887,15 +8002,24 @@ check_riscv_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 test_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7913,16 +8037,25 @@ test_riscv_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv test
   - make -C src/riscv audit
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7941,18 +8074,27 @@ test_evm_compatibility:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
   - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
   - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
     -c
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -7979,19 +8121,27 @@ oc.unit:non-proto-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8030,19 +8180,27 @@ oc.unit:other-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-other-unit
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8081,19 +8239,27 @@ oc.unit:proto-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-proto-unit
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8132,19 +8298,27 @@ oc.unit:non-proto-arm64:
   dependencies:
   - oc.docker:ci:arm64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: arm64
     MAKE_TARGETS: test-nonproto-unit test-webassembly
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -8247,16 +8421,24 @@ oc.unit:protocol_compiles:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_compile_protocol
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
 
 de.unit:x86_64:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -9123,15 +9305,23 @@ documentation:odoc:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C docs odoc-lite
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 hour
     paths:
@@ -9166,15 +9356,23 @@ documentation:manuals:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/documentation:manuals.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 week
     paths:
@@ -9210,15 +9408,23 @@ documentation:docgen:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C docs -j docexes-gen
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 week
     paths:

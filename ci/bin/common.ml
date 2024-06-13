@@ -713,7 +713,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
-  |> enable_cargo_cache
+  |> enable_cargo_cache |> enable_sccache
 
 (** Type of Docker build jobs.
 
@@ -1008,7 +1008,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache
+    |> enable_cargo_cache |> enable_sccache
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
