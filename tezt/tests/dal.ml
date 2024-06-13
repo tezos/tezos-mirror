@@ -939,8 +939,10 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let attestation =
     match metadata.dal_attestation with
     | None ->
-        assert false
         (* Field is part of the encoding when the feature flag is true *)
+        Test.fail
+          "Field dal_attestation in block headers is mandatory when DAL is \
+           activated"
     | Some x -> x
   in
   Check.(
