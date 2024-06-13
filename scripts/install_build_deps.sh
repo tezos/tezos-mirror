@@ -106,7 +106,7 @@ OPAMASSUMEDEPEXTS=true opam install conf-rust conf-rust-2021
 # We assume Opam >= 2.0.0 (2.0.0 was released in 2018; Debian Buster already had Opam 2.0.3).
 case $(opam --version) in
 2.0.*)
-  opam pin add -n -y octez-deps opam/virtual/ && opam depext octez-deps
+  opam pin add -n -y --locked=locked octez-deps opam/virtual/ && opam depext octez-deps
   opam pin remove octez-deps
   ;;
 *) opam install --depext-only opam/virtual/octez-deps.opam.locked ;;
