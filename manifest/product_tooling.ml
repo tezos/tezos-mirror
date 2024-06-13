@@ -30,15 +30,6 @@ let _octez_tooling =
         ocamlformat;
       ]
 
-let _node_wrapper =
-  private_exe
-    "node_wrapper"
-    ~path:"src/tooling"
-    ~opam:""
-    ~deps:[unix]
-    ~modules:["node_wrapper"]
-    ~bisect_ppx:No
-
 let _git_gas_diff =
   public_exe
     "git-gas-diff"

@@ -4,8 +4,6 @@
 
 (env
  (_
-  (binaries
-   (%{workspace_root}/src/tooling/node_wrapper.exe as node))
   (flags
    (:standard
     (:include custom-flags.sexp)))))
