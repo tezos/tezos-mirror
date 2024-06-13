@@ -440,7 +440,7 @@ oc.build_kernels:
   cache:
   - key: kernels-sccache
     paths:
-    - _sccache
+    - $CI_PROJECT_DIR/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -452,9 +452,9 @@ oc.build_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     RUSTC_WRAPPER: sccache
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -639,7 +639,7 @@ opam:bls12-381:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -706,7 +706,7 @@ opam:octez-accuser-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -773,7 +773,7 @@ opam:octez-accuser-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -842,7 +842,7 @@ opam:octez-alcotezt:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -909,7 +909,7 @@ opam:octez-baker-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -976,7 +976,7 @@ opam:octez-baker-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1043,7 +1043,7 @@ opam:octez-client:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1110,7 +1110,7 @@ opam:octez-codec:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1179,7 +1179,7 @@ opam:octez-crawler:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1246,7 +1246,7 @@ opam:octez-dac-client:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1313,7 +1313,7 @@ opam:octez-dac-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1380,7 +1380,7 @@ opam:octez-dal-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1449,7 +1449,7 @@ opam:octez-distributed-internal:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1518,7 +1518,7 @@ opam:octez-distributed-lwt-internal:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1585,7 +1585,7 @@ opam:octez-evm-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1654,7 +1654,7 @@ opam:octez-evm-node-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1723,7 +1723,7 @@ opam:octez-injector:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1792,7 +1792,7 @@ opam:octez-internal-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1861,7 +1861,7 @@ opam:octez-l2-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1930,7 +1930,7 @@ opam:octez-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1997,7 +1997,7 @@ opam:octez-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2066,7 +2066,7 @@ opam:octez-node-config:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2135,7 +2135,7 @@ opam:octez-proto-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2204,7 +2204,7 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2273,7 +2273,7 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2342,7 +2342,7 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2411,7 +2411,7 @@ opam:octez-protocol-003-PsddFKi3-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2480,7 +2480,7 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2549,7 +2549,7 @@ opam:octez-protocol-005-PsBabyM1-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2618,7 +2618,7 @@ opam:octez-protocol-006-PsCARTHA-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2687,7 +2687,7 @@ opam:octez-protocol-007-PsDELPH1-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2756,7 +2756,7 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2825,7 +2825,7 @@ opam:octez-protocol-009-PsFLoren-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2894,7 +2894,7 @@ opam:octez-protocol-010-PtGRANAD-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2963,7 +2963,7 @@ opam:octez-protocol-011-PtHangz2-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3032,7 +3032,7 @@ opam:octez-protocol-012-Psithaca-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3101,7 +3101,7 @@ opam:octez-protocol-013-PtJakart-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3170,7 +3170,7 @@ opam:octez-protocol-014-PtKathma-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3239,7 +3239,7 @@ opam:octez-protocol-015-PtLimaPt-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3308,7 +3308,7 @@ opam:octez-protocol-016-PtMumbai-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3377,7 +3377,7 @@ opam:octez-protocol-017-PtNairob-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3446,7 +3446,7 @@ opam:octez-protocol-018-Proxford-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3515,7 +3515,7 @@ opam:octez-protocol-019-PtParisB-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3584,7 +3584,7 @@ opam:octez-protocol-alpha-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3651,7 +3651,7 @@ opam:octez-protocol-compiler:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3718,7 +3718,7 @@ opam:octez-proxy-server:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3787,7 +3787,7 @@ opam:octez-riscv-api:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3856,7 +3856,7 @@ opam:octez-riscv-pvm:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3925,7 +3925,7 @@ opam:octez-rpc-process:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3994,7 +3994,7 @@ opam:octez-rust-deps:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4063,7 +4063,7 @@ opam:octez-shell-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4130,7 +4130,7 @@ opam:octez-signer:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4197,7 +4197,7 @@ opam:octez-smart-rollup-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4266,7 +4266,7 @@ opam:octez-smart-rollup-node-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4335,7 +4335,7 @@ opam:octez-smart-rollup-node-PtNairob:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4404,7 +4404,7 @@ opam:octez-smart-rollup-node-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4473,7 +4473,7 @@ opam:octez-smart-rollup-node-alpha:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4542,7 +4542,7 @@ opam:octez-smart-rollup-node-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4609,7 +4609,7 @@ opam:octez-smart-rollup-wasm-debugger:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4678,7 +4678,7 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4747,7 +4747,7 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4814,7 +4814,7 @@ opam:octez-version:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4883,7 +4883,7 @@ opam:tezos-benchmark:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4952,7 +4952,7 @@ opam:tezos-client-demo-counter:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5021,7 +5021,7 @@ opam:tezos-client-genesis:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5090,7 +5090,7 @@ opam:tezos-dac-client-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5159,7 +5159,7 @@ opam:tezos-dac-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5228,7 +5228,7 @@ opam:tezos-dac-node-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5297,7 +5297,7 @@ opam:tezos-dal-node-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5366,7 +5366,7 @@ opam:tezos-dal-node-services:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5435,7 +5435,7 @@ opam:tezos-openapi:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5504,7 +5504,7 @@ opam:tezos-protocol-000-Ps9mPmXa:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5573,7 +5573,7 @@ opam:tezos-protocol-001-PtCJ7pwo:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5642,7 +5642,7 @@ opam:tezos-protocol-002-PsYLVpVv:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5711,7 +5711,7 @@ opam:tezos-protocol-003-PsddFKi3:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5780,7 +5780,7 @@ opam:tezos-protocol-004-Pt24m4xi:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5849,7 +5849,7 @@ opam:tezos-protocol-005-PsBABY5H:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5918,7 +5918,7 @@ opam:tezos-protocol-005-PsBabyM1:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5987,7 +5987,7 @@ opam:tezos-protocol-006-PsCARTHA:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6056,7 +6056,7 @@ opam:tezos-protocol-007-PsDELPH1:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6125,7 +6125,7 @@ opam:tezos-protocol-008-PtEdo2Zk:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6194,7 +6194,7 @@ opam:tezos-protocol-008-PtEdoTez:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6263,7 +6263,7 @@ opam:tezos-protocol-009-PsFLoren:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6332,7 +6332,7 @@ opam:tezos-protocol-010-PtGRANAD:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6401,7 +6401,7 @@ opam:tezos-protocol-011-PtHangz2:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6470,7 +6470,7 @@ opam:tezos-protocol-012-Psithaca:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6539,7 +6539,7 @@ opam:tezos-protocol-013-PtJakart:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6608,7 +6608,7 @@ opam:tezos-protocol-014-PtKathma:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6677,7 +6677,7 @@ opam:tezos-protocol-015-PtLimaPt:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6746,7 +6746,7 @@ opam:tezos-protocol-016-PtMumbai:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6815,7 +6815,7 @@ opam:tezos-protocol-017-PtNairob:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6884,7 +6884,7 @@ opam:tezos-protocol-018-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6953,7 +6953,7 @@ opam:tezos-protocol-019-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7022,7 +7022,7 @@ opam:tezos-protocol-alpha:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7091,7 +7091,7 @@ opam:tezos-protocol-demo-counter:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7160,7 +7160,7 @@ opam:tezos-protocol-demo-noops:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7229,7 +7229,7 @@ opam:tezos-protocol-genesis:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7298,7 +7298,7 @@ opam:tezos-proxy-server-config:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7367,7 +7367,7 @@ opam:tezt-tezos:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache

@@ -251,14 +251,34 @@ let enable_kernels =
 (** Add variable enabling sccache.
 
     This function should be applied to jobs that build rust files and
-    which has a configured sccache Gitlab CI cache. *)
-let enable_sccache ?error_log ?idle_timeout ?log
-    ?(dir = "$CI_PROJECT_DIR/_sccache") : tezos_job -> tezos_job =
-  Tezos_ci.append_variables
-    ([("SCCACHE_DIR", dir); ("RUSTC_WRAPPER", "sccache")]
-    @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-    @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
-    @ opt_var "SCCACHE_LOG" Fun.id log)
+    which has a configured sccache Gitlab CI cache.
+
+    - [key] and [path] configure the key under which the cache is
+    stored, and the path that will be cached. By default, the [key]
+    contains the name of the job, thus scoping the cache to all
+    instances of that job. By default, [path] is the folder
+    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
+    environment dir [SCCACHE_DIR] such that sccache stores its caches
+    there.
+
+    - [error_log], [idle_timeout] and [log] sets the environment
+    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
+    [SCCACHE_LOG] respectively. See the sccache documentation for more
+    information on these variables. *)
+let enable_sccache ?key ?error_log ?idle_timeout ?log
+    ?(path = "$CI_PROJECT_DIR/_sccache") job =
+  let key =
+    Option.value
+      ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  job
+  |> append_variables
+       ([("SCCACHE_DIR", path); ("RUSTC_WRAPPER", "sccache")]
+       @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
+       @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
+       @ opt_var "SCCACHE_LOG" Fun.id log)
+  |> append_cache {key; paths = [path]}
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 

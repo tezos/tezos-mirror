@@ -116,14 +116,14 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
       ]
     ~artifacts:
       (artifacts ~expire_in:(Duration (Weeks 1)) ~when_:Always ["opam_logs/"])
-    ~cache:[{key = "opam-sccache"; paths = ["_build/_sccache"]}]
   |> (* We store caches in [_build] for two reasons: (1) the [_build]
         folder is excluded from opam's rsync. (2) gitlab ci cache
         requires that cached files are in a sub-folder of the checkout. *)
   enable_sccache
+    ~key:"opam-sccache"
     ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
     ~idle_timeout:"0"
-    ~dir:"$CI_PROJECT_DIR/_build/_sccache"
+    ~path:"$CI_PROJECT_DIR/_build/_sccache"
   |> enable_cargo_cache
 
 let ci_opam_package_tests = "script-inputs/ci-opam-package-tests"
@@ -574,8 +574,9 @@ let jobs pipeline_type =
              "src/riscv/riscv-dummy.elf";
              "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
            ])
-      ~cache:[{key = "kernels-sccache"; paths = ["_sccache"]}]
-    |> enable_kernels |> enable_cargo_cache |> enable_sccache
+    |> enable_kernels
+    |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
+    |> enable_cargo_cache
   in
   (* Fetch records for Tezt generated on the last merge request pipeline
          on the most recently merged MR and makes them available in artifacts
