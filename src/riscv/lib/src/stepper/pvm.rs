@@ -89,7 +89,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
                     Some(error) => StepperStatus::Errored {
                         steps: result.steps,
                         cause: error.cause.to_string(),
-                        message: error.error,
+                        message: error.error.to_string(),
                     },
                     None => StepperStatus::Running {
                         steps: result.steps,

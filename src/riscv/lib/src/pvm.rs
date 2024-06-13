@@ -6,12 +6,11 @@ pub mod dummy_pvm;
 mod sbi;
 
 use crate::{
-    exec_env::{self},
     machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
     traps::EnvironException,
 };
-use sbi::{PvmSbiLayout, PvmSbiState};
+use sbi::{PvmSbiFatalError, PvmSbiLayout, PvmSbiState};
 use std::{
     io::{stdout, Write},
     ops::RangeBounds,
@@ -125,7 +124,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         &mut self,
         hooks: &mut PvmHooks<'_>,
         exception: EnvironException,
-    ) -> exec_env::EcallOutcome {
+    ) -> Result<bool, PvmSbiFatalError> {
         match exception {
             EnvironException::EnvCallFromUMode
             | EnvironException::EnvCallFromSMode
@@ -139,10 +138,10 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// Perform one evaluation step.
     pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) -> Result<(), EvalError> {
         if let Err(exc) = self.machine_state.step() {
-            if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(hooks, exc) {
+            if let Err(err) = self.handle_exception(hooks, exc) {
                 return Err(EvalError {
                     cause: exc,
-                    error: message,
+                    error: err,
                 });
             }
         }
@@ -176,17 +175,14 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
     {
         self.machine_state
-            .step_range_handle(
-                step_bounds,
-                should_continue,
-                |machine_state, exc| match self.sbi_state.handle_call(machine_state, hooks, exc) {
-                    exec_env::EcallOutcome::Fatal { message } => Err(EvalError {
+            .step_range_handle(step_bounds, should_continue, |machine_state, exc| {
+                self.sbi_state
+                    .handle_call(machine_state, hooks, exc)
+                    .map_err(|err| EvalError {
                         cause: exc,
-                        error: message,
-                    }),
-                    exec_env::EcallOutcome::Handled { continue_eval } => Ok(continue_eval),
-                },
-            )
+                        error: err,
+                    })
+            })
     }
 
     /// Respond to a request for input with no input. Returns `false` in case the
@@ -219,7 +215,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 #[derive(Debug)]
 pub struct EvalError {
     pub cause: EnvironException,
-    pub error: String,
+    pub error: PvmSbiFatalError,
 }
 
 /// Result of [`Pvm::eval_range`]
@@ -276,12 +272,7 @@ mod tests {
         // Handle the ECALL successfully
         let outcome =
             pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
-        assert!(matches!(
-            outcome,
-            exec_env::EcallOutcome::Handled {
-                continue_eval: false
-            }
-        ));
+        assert!(matches!(outcome, Ok(false)));
 
         // After the ECALL we should be waiting for input
         assert_eq!(pvm.status(), PvmStatus::WaitingForInput);
@@ -352,12 +343,7 @@ mod tests {
 
             let outcome = pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
             assert!(
-                matches!(
-                    outcome,
-                    exec_env::EcallOutcome::Handled {
-                        continue_eval: true
-                    }
-                ),
+                matches!(outcome, Ok(true)),
                 "Unexpected outcome: {outcome:?}"
             );
         }

@@ -3,24 +3,72 @@
 // SPDX-License-Identifier: MIT
 
 use super::{PvmHooks, PvmStatus};
-use crate::exec_env::EcallOutcome;
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Addressable},
+        bus::{main_memory::MainMemoryLayout, Addressable, OutOfBounds},
         registers::{a0, a1, a2, a3, a6, a7},
         AccessType, MachineState,
     },
     parser::instruction::Instr,
     state_backend::{AllocatedOf, EnumCell, EnumCellLayout, Manager},
-    traps::EnvironException,
+    traps::{EnvironException, Exception},
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use std::{cmp, error::Error};
+use std::cmp;
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
     SBI_TEZOS_METADATA_REVEAL,
 };
+use thiserror::Error;
+
+/// Fatal errors that occur during SBI handling
+#[derive(Debug, Error)]
+pub enum PvmSbiFatalError {
+    /// The PVM was in an unexpected state.
+    #[error("Expected PVM status {expected:?}, got {got:?}")]
+    UnexpectedStatus { expected: PvmStatus, got: PvmStatus },
+
+    /// Unsupported SBI extension.
+    #[error("Unsupported SBI extension {sbi_extension}")]
+    BadSBIExtension { sbi_extension: u64 },
+
+    /// Unsupported Tezos SBI extension function.
+    #[error("Unsupported Tezos SBI extension function {sbi_function}")]
+    BadTezosSBIFunction { sbi_function: u64 },
+
+    /// Received an ECALL from M-mode.
+    #[error("ECALLs from M-mode are not supported")]
+    EcallFromMMode,
+
+    /// Encountered a machine exception (e.g. during address translation).
+    #[error("Encountered an exception: {exception:?}")]
+    Exception {
+        #[from]
+        exception: Exception,
+    },
+
+    /// A memory access was out of bounds.
+    #[error("Encountered an out-of-bounds memory access")]
+    MemoryAccess {
+        #[from]
+        oob: OutOfBounds,
+    },
+
+    /// A ed25519 operation failed.
+    #[error("Error during Ed25519 operation: {error:?}")]
+    Ed25519Error {
+        #[from]
+        error: ed25519_dalek::SignatureError,
+    },
+
+    /// A BLAKE2B operation failed.
+    #[error("Error during BLAKE2B operation: {error:?}")]
+    Blake2BError {
+        #[from]
+        error: tezos_crypto_rs::blake2b::Blake2bError,
+    },
+}
 
 /// Layout for [`PvmSbiState`]
 pub type PvmSbiLayout = EnumCellLayout<u8>;
@@ -164,30 +212,27 @@ impl<M: Manager> PvmSbiState<M> {
     }
 
     /// Handle a [SBI_TEZOS_INBOX_NEXT] call.
-    fn handle_tezos_inbox_next(&mut self) -> EcallOutcome {
+    fn handle_tezos_inbox_next(&mut self) -> Result<bool, PvmSbiFatalError> {
         // This method only makes sense when evaluating.
         match self.status() {
             PvmStatus::Evaluating => {}
             status => {
-                return EcallOutcome::Fatal {
-                    message: format!(
-                        "Called SBI_TEZOS_INBOX_NEXT while in non-Evaluating status {status:?}"
-                    ),
-                }
+                return Err(PvmSbiFatalError::UnexpectedStatus {
+                    expected: PvmStatus::Evaluating,
+                    got: status,
+                });
             }
         }
 
         // Prepare the EE state for an input tick.
         self.status.write(PvmStatus::WaitingForInput);
 
-        EcallOutcome::Handled {
-            // We can't evaluate after this. The next step is an input step.
-            continue_eval: false,
-        }
+        // We can't evaluate after this. The next step is an input step.
+        Ok(false)
     }
 
     /// Handle a [SBI_TEZOS_META] call.
-    fn handle_tezos_metadata_reveal(&mut self) -> EcallOutcome
+    fn handle_tezos_metadata_reveal(&mut self) -> Result<bool, PvmSbiFatalError>
     where
         M: Manager,
     {
@@ -195,138 +240,103 @@ impl<M: Manager> PvmSbiState<M> {
         match self.status() {
             PvmStatus::Evaluating => {}
             status => {
-                return EcallOutcome::Fatal {
-                    message: format!(
-                        "Called SBI_TEZOS_META while in non-Evaluating status {status:?}"
-                    ),
-                }
+                return Err(PvmSbiFatalError::UnexpectedStatus {
+                    got: status,
+                    expected: PvmStatus::Evaluating,
+                })
             }
         }
 
         // Prepare the EE state for a reveal metadata tick.
         self.status.write(PvmStatus::WaitingForMetadata);
 
-        EcallOutcome::Handled {
-            // We can't evaluate after this. The next step is a revelation step.
-            continue_eval: false,
-        }
+        // We can't evaluate after this. The next step is a revelation step.
+        Ok(false)
     }
 
     /// Produce a Ed25519 signature.
     fn handle_tezos_ed25519_sign<ML: MainMemoryLayout>(
         machine: &mut MachineState<ML, M>,
-    ) -> EcallOutcome {
-        // This part could benefit from using `try_blocks` once it becomes a stable feature.
-        let mut go = || -> Result<bool, Box<dyn Error>> {
-            let arg_sk_addr = machine.hart.xregisters.read(a0);
-            let arg_msg_addr = machine.hart.xregisters.read(a1);
-            let arg_msg_len = machine.hart.xregisters.read(a2);
-            let arg_sig_addr = machine.hart.xregisters.read(a3);
+    ) -> Result<bool, PvmSbiFatalError> {
+        let arg_sk_addr = machine.hart.xregisters.read(a0);
+        let arg_msg_addr = machine.hart.xregisters.read(a1);
+        let arg_msg_len = machine.hart.xregisters.read(a2);
+        let arg_sig_addr = machine.hart.xregisters.read(a3);
 
-            let sk_addr = machine.translate(arg_sk_addr, AccessType::Load)?;
-            let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
-            let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
+        let sk_addr = machine.translate(arg_sk_addr, AccessType::Load)?;
+        let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
+        let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
 
-            let mut sk_bytes = [0u8; 32];
-            machine.bus.read_all(sk_addr, &mut sk_bytes)?;
-            let sk = SigningKey::try_from(sk_bytes.as_slice())?;
-            sk_bytes.fill(0);
+        let mut sk_bytes = [0u8; 32];
+        machine.bus.read_all(sk_addr, &mut sk_bytes)?;
+        let sk = SigningKey::try_from(sk_bytes.as_slice())?;
+        sk_bytes.fill(0);
 
-            let mut msg_bytes = vec![0; arg_msg_len as usize];
-            machine.bus.read_all(msg_addr, &mut msg_bytes)?;
+        let mut msg_bytes = vec![0; arg_msg_len as usize];
+        machine.bus.read_all(msg_addr, &mut msg_bytes)?;
 
-            let sig = sk.sign(msg_bytes.as_slice());
-            let sig_bytes: [u8; 64] = sig.to_bytes();
-            machine.bus.write_all(sig_addr, &sig_bytes)?;
+        let sig = sk.sign(msg_bytes.as_slice());
+        let sig_bytes: [u8; 64] = sig.to_bytes();
+        machine.bus.write_all(sig_addr, &sig_bytes)?;
 
-            Ok(true)
-        };
-
-        match go() {
-            Ok(continue_eval) => EcallOutcome::Handled { continue_eval },
-            Err(err) => EcallOutcome::Fatal {
-                message: err.to_string(),
-            },
-        }
+        Ok(true)
     }
 
     /// Verify a Ed25519 signature.
     fn handle_tezos_ed25519_verify<ML: MainMemoryLayout>(
         machine: &mut MachineState<ML, M>,
-    ) -> EcallOutcome {
-        // This part could benefit from using `try_blocks` once it becomes a stable feature.
-        let mut go = || -> Result<bool, Box<dyn Error>> {
-            let arg_pk_addr = machine.hart.xregisters.read(a0);
-            let arg_sig_addr = machine.hart.xregisters.read(a1);
-            let arg_msg_addr = machine.hart.xregisters.read(a2);
-            let arg_msg_len = machine.hart.xregisters.read(a3);
+    ) -> Result<bool, PvmSbiFatalError> {
+        let arg_pk_addr = machine.hart.xregisters.read(a0);
+        let arg_sig_addr = machine.hart.xregisters.read(a1);
+        let arg_msg_addr = machine.hart.xregisters.read(a2);
+        let arg_msg_len = machine.hart.xregisters.read(a3);
 
-            let pk_addr = machine.translate(arg_pk_addr, AccessType::Load)?;
-            let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
-            let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
+        let pk_addr = machine.translate(arg_pk_addr, AccessType::Load)?;
+        let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
+        let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
 
-            let mut pk_bytes = [0u8; 32];
-            machine.bus.read_all(pk_addr, &mut pk_bytes)?;
+        let mut pk_bytes = [0u8; 32];
+        machine.bus.read_all(pk_addr, &mut pk_bytes)?;
 
-            let mut sig_bytes = [0u8; 64];
-            machine.bus.read_all(sig_addr, &mut sig_bytes)?;
+        let mut sig_bytes = [0u8; 64];
+        machine.bus.read_all(sig_addr, &mut sig_bytes)?;
 
-            let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-            machine.bus.read_all(msg_addr, &mut msg_bytes)?;
+        let mut msg_bytes = vec![0u8; arg_msg_len as usize];
+        machine.bus.read_all(msg_addr, &mut msg_bytes)?;
 
-            let pk = VerifyingKey::try_from(pk_bytes.as_slice())?;
-            let sig = Signature::from_slice(sig_bytes.as_slice())?;
-            let valid = pk.verify_strict(msg_bytes.as_slice(), &sig).is_ok();
+        let pk = VerifyingKey::try_from(pk_bytes.as_slice())?;
+        let sig = Signature::from_slice(sig_bytes.as_slice())?;
+        let valid = pk.verify_strict(msg_bytes.as_slice(), &sig).is_ok();
 
-            machine.hart.xregisters.write(a0, valid as u64);
+        machine.hart.xregisters.write(a0, valid as u64);
 
-            Ok(true)
-        };
-
-        match go() {
-            Ok(continue_eval) => EcallOutcome::Handled { continue_eval },
-            Err(err) => EcallOutcome::Fatal {
-                message: err.to_string(),
-            },
-        }
+        Ok(true)
     }
 
     /// Compute a BLAKE2B 256-bit digest.
     fn handle_tezos_blake2b_hash256<ML: MainMemoryLayout>(
         machine: &mut MachineState<ML, M>,
-    ) -> EcallOutcome {
-        // This part could benefit from using `try_blocks` once it becomes a stable feature.
-        let mut go = || -> Result<bool, Box<dyn Error>> {
-            let arg_out_addr = machine.hart.xregisters.read(a0);
-            let arg_msg_addr = machine.hart.xregisters.read(a1);
-            let arg_msg_len = machine.hart.xregisters.read(a2);
+    ) -> Result<bool, PvmSbiFatalError> {
+        let arg_out_addr = machine.hart.xregisters.read(a0);
+        let arg_msg_addr = machine.hart.xregisters.read(a1);
+        let arg_msg_len = machine.hart.xregisters.read(a2);
 
-            let out_addr = machine.translate(arg_out_addr, AccessType::Store)?;
-            let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
+        let out_addr = machine.translate(arg_out_addr, AccessType::Store)?;
+        let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
 
-            let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-            machine.bus.read_all(msg_addr, &mut msg_bytes)?;
+        let mut msg_bytes = vec![0u8; arg_msg_len as usize];
+        machine.bus.read_all(msg_addr, &mut msg_bytes)?;
 
-            let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice())?;
-            machine.bus.write_all(out_addr, hash.as_slice())?;
+        let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice())?;
+        machine.bus.write_all(out_addr, hash.as_slice())?;
 
-            Ok(true)
-        };
-
-        match go() {
-            Ok(continue_eval) => EcallOutcome::Handled { continue_eval },
-            Err(err) => EcallOutcome::Fatal {
-                message: err.to_string(),
-            },
-        }
+        Ok(true)
     }
 
     /// Handle a [SBI_SHUTDOWN] call.
-    fn handle_shutdown(&self) -> EcallOutcome {
+    fn handle_shutdown(&self) -> Result<bool, PvmSbiFatalError> {
         // Shutting down in the PVM does nothing at the moment.
-        EcallOutcome::Handled {
-            continue_eval: true,
-        }
+        Ok(true)
     }
 
     /// Handle a [SBI_CONSOLE_PUTCHAR] call.
@@ -334,16 +344,14 @@ impl<M: Manager> PvmSbiState<M> {
         &self,
         machine: &mut MachineState<ML, M>,
         hooks: &mut PvmHooks,
-    ) -> EcallOutcome {
+    ) -> Result<bool, PvmSbiFatalError> {
         let char = machine.hart.xregisters.read(a0) as u8;
         (hooks.putchar_hook)(char);
 
         // This call always succeeds.
         machine.hart.xregisters.write(a0, 0);
 
-        EcallOutcome::Handled {
-            continue_eval: true,
-        }
+        Ok(true)
     }
 
     /// Bind the PVM SBI handler state to the allocated space.
@@ -358,17 +366,15 @@ impl<M: Manager> PvmSbiState<M> {
         self.status.reset();
     }
 
-    /// Handle a PVM SBI call.
+    /// Handle a PVM SBI call. Returns `Ok(true)` if it makes sense to continue evaluation.
     pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
         hooks: &mut PvmHooks,
         env_exception: EnvironException,
-    ) -> EcallOutcome {
+    ) -> Result<bool, PvmSbiFatalError> {
         if let EnvironException::EnvCallFromMMode = env_exception {
-            return EcallOutcome::Fatal {
-                message: "ECALLs from M-mode are not supported".to_owned(),
-            };
+            return Err(PvmSbiFatalError::EcallFromMMode);
         }
 
         // No matter the outcome, we need to bump the
@@ -394,15 +400,12 @@ impl<M: Manager> PvmSbiState<M> {
                     SBI_TEZOS_BLAKE2B_HASH256 => Self::handle_tezos_blake2b_hash256(machine),
 
                     // Unimplemented
-                    _ => EcallOutcome::Fatal {
-                        message: format!("Unsupported Tezos SBI extension function {sbi_function}"),
-                    },
+                    _ => Err(PvmSbiFatalError::BadTezosSBIFunction { sbi_function }),
                 }
             }
+
             // Unimplemented
-            _ => EcallOutcome::Fatal {
-                message: format!("Unsupported SBI extension {sbi_extension}"),
-            },
+            _ => Err(PvmSbiFatalError::BadSBIExtension { sbi_extension }),
         }
     }
 }
