@@ -3647,8 +3647,6 @@ let octez_requester_tests =
         octez_stdlib |> open_;
         octez_stdlib_unix;
         octez_requester |> open_;
-        alcotezt;
-        qcheck_alcotest;
         qcheck_tezt;
       ]
 
