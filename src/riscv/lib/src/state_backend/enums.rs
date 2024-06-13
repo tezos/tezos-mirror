@@ -58,3 +58,27 @@ where
         T::try_from(self.cell.read()).unwrap_or(T::default())
     }
 }
+
+impl<T, R, M> CellRead for EnumCell<T, R, M>
+where
+    T: TryFrom<R> + Default,
+    R: From<T> + Elem,
+    M: Manager,
+{
+    type Value = T;
+
+    fn read(&self) -> Self::Value {
+        EnumCell::read_default(self)
+    }
+}
+
+impl<T, R, M> CellWrite for EnumCell<T, R, M>
+where
+    T: TryFrom<R> + Default,
+    R: From<T> + Elem,
+    M: Manager,
+{
+    fn write(&mut self, value: Self::Value) {
+        EnumCell::write(self, value)
+    }
+}

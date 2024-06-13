@@ -248,6 +248,7 @@ impl<E: CellRead> CellRead for &mut E {
         E::read(self)
     }
 }
+
 /// A cell that support writing.
 pub trait CellWrite: CellRead {
     /// Write the value managed by the cell.
