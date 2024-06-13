@@ -15,8 +15,8 @@ stages:
   - deploy
   - docker
 
-# Repeating supported_ARCH and supported_OCTEZ_BRANCH as variables
-# that can be used for for loops in scripts
+# DEFAULT_RUNNER_TAG is set to gitlab-org because NL's gcp runners quite often fail when preparing docker images for release
+# Either because of connexion issues or because of timeouts
 variables:
   supported_ARCH: "amd64 arm64"
   DEFAULT_RUNNER_TAG: gitlab-org # Use this for jobs that do not require any specific arch
@@ -51,7 +51,7 @@ workflow:
   # >   - ${RUNNER}
   - &default_matrix
     matrix:
-      - RUNNER: "gitlab-org"
+      - RUNNER: "gcp"
         ARCH: "amd64"
       - RUNNER: "gcp_arm64"
         ARCH: "arm64"
@@ -79,6 +79,11 @@ workflow:
 .docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
 .wait-for-docker-daemon: &wait-for-docker-daemon "while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done"
+
+.setup-docker-buildx: &setup-docker-buildx
+  - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
+  - docker buildx create --name teztale-dependencies --use --driver docker-container
+  - docker buildx inspect --bootstrap
 
 .apply-proto-alpha-patch:
   &apply-proto-alpha-patch # Without this option git will fail when trying to `git am < ProtoALpha.git.patch`
@@ -110,14 +115,12 @@ check:
   stage: prepare
   image: docker:latest
   tags:
-    - gcp
+    - ${DEFAULT_RUNNER_TAG}
   services:
     - docker:dind
   before_script:
     - *wait-for-docker-daemon
-    - docker run --privileged --rm tonistiigi/binfmt --install arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
-    - docker buildx create --name teztale-dependencies --use --driver docker-container
-    - docker buildx inspect --bootstrap
+    - *setup-docker-buildx
     - *docker-login
   script:
     - set -xv
@@ -246,25 +249,21 @@ release:canary:
 
 .docker:release:
   stage: docker
-  image: docker
+  image: docker:latest
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
   services:
     - docker:dind
-  parallel: *default_matrix
-  tags:
-    - ${RUNNER}
   before_script:
     - !reference [.rename-build-artifacts, before_script]
     - *wait-for-docker-daemon
+    - *setup-docker-buildx
     - *docker-login
   script:
     - set -xv
     - >
       for BIN in archiver server ; do
-        docker build -t ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF} -f Dockerfile.$BIN . ;
-      done
-    - >
-      for BIN in archiver server ; do
-        docker push ${CI_REGISTRY_IMAGE}/$BIN-${ARCH}:${OCTEZ_BRANCH}-${TEZTALE_REF} ;
+        docker buildx build --platform linux/arm64/v8,linux/amd64 -t ${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG} --push -f Dockerfile.$BIN . ;
       done
 
 .docker:stable:rules:
@@ -295,38 +294,3 @@ docker:canary:
   needs:
     - job: build:canary
       artifacts: true
-
-# Create multiarch manifest
-.docker:manifest:
-  stage: docker
-  image: docker
-  tags:
-    - ${DEFAULT_RUNNER_TAG}
-  before_script:
-    - *docker-login
-  script:
-    - set -xv
-    - >
-      for BIN in archiver server ; do
-        for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${TEZTALE_REF}" ; done ;
-        docker manifest create ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${TEZTALE_REF} `for ARCH in ${supported_ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${OCTEZ_BRANCH}-${TEZTALE_REF}" ; done ;`;
-        docker manifest push ${CI_REGISTRY_IMAGE}/$BIN:${OCTEZ_BRANCH}-${TEZTALE_REF} ;
-      done ;
-
-docker:manifest:stable:
-  extends:
-    - .stable:variables
-    - .docker:stable:rules
-    - .docker:manifest
-  needs:
-    - job: docker:stable
-      artifacts: false
-
-docker:manifest:canary:
-  extends:
-    - .canary:variables
-    - .docker:canary:rules
-    - .docker:manifest
-  needs:
-    - job: docker:canary
-      artifacts: false
