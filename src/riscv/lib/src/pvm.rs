@@ -7,7 +7,7 @@ mod sbi;
 
 use crate::{
     machine_state::{self, bus::main_memory, StepManyResult},
-    state_backend,
+    state_backend::{self, CellRead, CellWrite},
     traps::EnvironException,
 };
 use sbi::{PvmSbiFatalError, PvmSbiLayout, PvmSbiState};

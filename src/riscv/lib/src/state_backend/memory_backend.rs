@@ -204,7 +204,9 @@ pub mod test_helpers {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
+    use crate::state_backend::{
+        AllocatedOf, Array, Atom, Backend, Cell, CellRead, CellWrite, Manager, Region,
+    };
 
     #[test]
     fn test_ro() {

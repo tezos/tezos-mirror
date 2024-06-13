@@ -30,7 +30,7 @@ use crate::{
     parser::{instruction::Instr, parse},
     program::Program,
     range_utils::{range_bounds_saturating_sub, range_max, range_min},
-    state_backend as backend,
+    state_backend::{self as backend, CellRead, CellWrite},
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
 use address_translation::translation_cache::InstructionFetchTranslationCache;
@@ -877,6 +877,7 @@ mod tests {
             mode::Mode,
             registers::{a1, a2, t0, t2},
         },
+        state_backend::{CellRead, CellWrite},
         traps::{EnvironException, Exception, Interrupt, TrapContext},
     };
     use proptest::{prop_assert_eq, proptest};

@@ -10,7 +10,7 @@ use crate::{
         AccessType, MachineState,
     },
     parser::instruction::Instr,
-    state_backend::{AllocatedOf, EnumCell, EnumCellLayout, Manager},
+    state_backend::{AllocatedOf, CellRead, CellWrite, EnumCell, EnumCellLayout, Manager},
     traps::{EnvironException, Exception},
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};

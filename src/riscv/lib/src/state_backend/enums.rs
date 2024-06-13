@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{AllocatedOf, Atom, Cell, Elem, Manager};
+use super::{AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager};
 use std::marker::PhantomData;
 
 /// Cell representing an enumeration type

@@ -7,7 +7,7 @@ use crate::{
         registers,
         reservation_set::{self, ReservationSet},
     },
-    state_backend::{self as backend, Atom, Cell},
+    state_backend::{self as backend, Atom, Cell, CellWrite},
     traps::TrapContext,
 };
 

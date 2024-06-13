@@ -207,25 +207,63 @@ pub struct Cell<E: Elem, M: Manager + ?Sized> {
     pub region: M::Region<E, 1>,
 }
 
-impl<E: Elem, M: Manager + ?Sized> Cell<E, M> {
-    /// Read the value managed by the cell.
-    #[inline(always)]
-    pub fn read(&self) -> E {
-        self.region.read(0)
-    }
-
-    /// Write the value managed by the cell.
-    #[inline(always)]
-    pub fn write(&mut self, value: E) {
-        self.region.write(0, value)
-    }
-}
-
 impl<E: Elem, M: Manager> Cell<E, M> {
     pub fn bind(space: AllocatedOf<Atom<E>, M>) -> Self {
         Self {
             region: space.region,
         }
+    }
+}
+
+/// A cell that support reading only.
+pub trait CellRead {
+    /// Element type managed by the cell.
+    type Value;
+
+    /// Read the value managed by the cell.
+    fn read(&self) -> Self::Value;
+}
+
+impl<E: Elem, M: Manager> CellRead for Cell<E, M> {
+    type Value = E;
+
+    #[inline(always)]
+    fn read(&self) -> E {
+        self.region.read(0)
+    }
+}
+
+impl<E: CellRead> CellRead for &E {
+    type Value = E::Value;
+
+    fn read(&self) -> Self::Value {
+        E::read(self)
+    }
+}
+
+impl<E: CellRead> CellRead for &mut E {
+    type Value = E::Value;
+
+    fn read(&self) -> Self::Value {
+        E::read(self)
+    }
+}
+/// A cell that support writing.
+pub trait CellWrite: CellRead {
+    /// Write the value managed by the cell.
+    fn write(&mut self, value: Self::Value);
+}
+
+impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
+    #[inline(always)]
+    fn write(&mut self, value: E) {
+        self.region.write(0, value)
+    }
+}
+
+impl<E: CellWrite> CellWrite for &mut E {
+    fn write(&mut self, value: Self::Value) {
+        E::write(self, value)
     }
 }
 
@@ -354,7 +392,7 @@ pub(crate) mod tests {
         backend_test,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, Choreographer, Elem, Location, Region,
+            Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location, Region,
         },
     };
 
