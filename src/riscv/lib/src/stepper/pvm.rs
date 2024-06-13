@@ -4,7 +4,6 @@
 
 use super::{Stepper, StepperStatus};
 use crate::{
-    exec_env::pvm::{PvmSbiConfig, PvmStatus},
     kernel_loader,
     machine_state::{
         bus::main_memory::{MainMemoryLayout, M1G},
@@ -12,7 +11,7 @@ use crate::{
         MachineError, MachineState,
     },
     program::Program,
-    pvm::{Pvm, PvmLayout},
+    pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils,
     state_backend::{
         memory_backend::{InMemoryBackend, SliceManager},
@@ -35,7 +34,7 @@ pub enum PvmStepperError {
 /// Wrapper over a PVM that lets you step through it
 pub struct PvmStepper<'backend, 'hooks, ML: MainMemoryLayout = M1G> {
     pvm: Pvm<ML, SliceManager<'backend>>,
-    config: PvmSbiConfig<'hooks>,
+    hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
     origination_level: u64,
@@ -53,7 +52,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
         program: &[u8],
         initrd: Option<&[u8]>,
         inbox: Inbox,
-        config: PvmSbiConfig<'hooks>,
+        hooks: PvmHooks<'hooks>,
         rollup_address: [u8; 20],
         origination_level: u64,
     ) -> Result<Self, PvmStepperError> {
@@ -67,7 +66,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
 
         Ok(Self {
             pvm,
-            config,
+            hooks,
             inbox,
             rollup_address,
             origination_level,
@@ -84,7 +83,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
             PvmStatus::Evaluating => {
                 let result = self
                     .pvm
-                    .eval_range_while(&mut self.config, steps, should_continue);
+                    .eval_range_while(&mut self.hooks, steps, should_continue);
 
                 match result.error {
                     Some(error) => StepperStatus::Errored {

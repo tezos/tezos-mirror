@@ -2,21 +2,46 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Allow dead code while this module contains stubs.
-#![allow(dead_code)]
-
 pub mod dummy_pvm;
+mod sbi;
 
 use crate::{
-    exec_env::{
-        self,
-        pvm::{PvmSbiConfig, PvmSbiLayout, PvmSbiState, PvmStatus},
-    },
+    exec_env::{self},
     machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
     traps::EnvironException,
 };
-use std::ops::RangeBounds;
+use sbi::{PvmSbiLayout, PvmSbiState};
+use std::{
+    io::{stdout, Write},
+    ops::RangeBounds,
+};
+
+/// PVM configuration
+pub struct PvmHooks<'a> {
+    pub putchar_hook: Box<dyn FnMut(u8) + 'a>,
+}
+
+impl<'a> PvmHooks<'a> {
+    /// Create a new configuration.
+    pub fn new<F: FnMut(u8) + 'a>(putchar: F) -> Self {
+        Self {
+            putchar_hook: Box::new(putchar),
+        }
+    }
+}
+
+/// The default PVM configuration prints all debug information from the kernel
+/// to the standard output.
+impl<'a> Default for PvmHooks<'a> {
+    fn default() -> Self {
+        fn putchar(char: u8) {
+            stdout().lock().write_all(&[char]).unwrap();
+        }
+
+        Self::new(putchar)
+    }
+}
 
 /// PVM state layout
 pub type PvmLayout<ML> = (
@@ -24,6 +49,44 @@ pub type PvmLayout<ML> = (
     machine_state::MachineStateLayout<ML>,
     PvmSbiLayout,
 );
+
+/// PVM status
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum PvmStatus {
+    Evaluating,
+    WaitingForInput,
+    WaitingForMetadata,
+}
+
+impl Default for PvmStatus {
+    fn default() -> Self {
+        Self::Evaluating
+    }
+}
+
+impl TryFrom<u8> for PvmStatus {
+    type Error = u8;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        const EVALUATING: u8 = PvmStatus::Evaluating as u8;
+        const WAITING_FOR_INPUT: u8 = PvmStatus::WaitingForInput as u8;
+        const WAITING_FOR_METADATA: u8 = PvmStatus::WaitingForMetadata as u8;
+
+        match value {
+            EVALUATING => Ok(Self::Evaluating),
+            WAITING_FOR_INPUT => Ok(Self::WaitingForInput),
+            WAITING_FOR_METADATA => Ok(Self::WaitingForMetadata),
+            _ => Err(value),
+        }
+    }
+}
+
+impl From<PvmStatus> for u8 {
+    fn from(value: PvmStatus) -> Self {
+        value as u8
+    }
+}
 
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;
@@ -60,7 +123,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// Handle an exception using the defined Execution Environment.
     pub fn handle_exception(
         &mut self,
-        config: &mut PvmSbiConfig<'_>,
+        hooks: &mut PvmHooks<'_>,
         exception: EnvironException,
     ) -> exec_env::EcallOutcome {
         match exception {
@@ -68,15 +131,15 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             | EnvironException::EnvCallFromSMode
             | EnvironException::EnvCallFromMMode => {
                 self.sbi_state
-                    .handle_call(&mut self.machine_state, config, exception)
+                    .handle_call(&mut self.machine_state, hooks, exception)
             }
         }
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, config: &mut PvmSbiConfig<'_>) -> Result<(), EvalError> {
+    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) -> Result<(), EvalError> {
         if let Err(exc) = self.machine_state.step() {
-            if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(config, exc) {
+            if let exec_env::EcallOutcome::Fatal { message } = self.handle_exception(hooks, exc) {
                 return Err(EvalError {
                     cause: exc,
                     error: message,
@@ -105,7 +168,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     // Trampoline style function for [eval_range]
     pub fn eval_range_while<F>(
         &mut self,
-        config: &mut PvmSbiConfig<'_>,
+        hooks: &mut PvmHooks<'_>,
         step_bounds: &impl RangeBounds<usize>,
         should_continue: F,
     ) -> EvalManyResult
@@ -116,7 +179,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
             .step_range_handle(
                 step_bounds,
                 should_continue,
-                |machine_state, exc| match self.sbi_state.handle_call(machine_state, config, exc) {
+                |machine_state, exc| match self.sbi_state.handle_call(machine_state, hooks, exc) {
                     exec_env::EcallOutcome::Fatal { message } => Err(EvalError {
                         cause: exc,
                         error: message,
@@ -166,7 +229,6 @@ pub type EvalManyResult = StepManyResult<EvalError>;
 mod tests {
     use super::*;
     use crate::{
-        exec_env::pvm::PvmSbiConfig,
         machine_state::{
             bus::{main_memory::M1M, start_of_main_memory, Addressable},
             registers::{a0, a1, a2, a6, a7},
@@ -267,7 +329,7 @@ mod tests {
         type L = PvmLayout<ML>;
 
         let mut buffer = Vec::new();
-        let mut pvm_config = PvmSbiConfig::new(|c| buffer.push(c));
+        let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
         // Setup PVM
         let (mut backend, placed) = InMemoryBackend::<L>::new();
@@ -288,7 +350,7 @@ mod tests {
             pvm.machine_state.hart.xregisters.write(a0, char as u64);
             written.push(char);
 
-            let outcome = pvm.handle_exception(&mut pvm_config, EnvironException::EnvCallFromUMode);
+            let outcome = pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
             assert!(
                 matches!(
                     outcome,
@@ -300,8 +362,8 @@ mod tests {
             );
         }
 
-        // Drop `pvm_config` to regain access to the mutable references it kept
-        mem::drop(pvm_config);
+        // Drop `hooks` to regain access to the mutable references it kept
+        mem::drop(hooks);
 
         // Compare what characters have been passed to the hook verrsus what we
         // intended to write

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 pub mod posix;
-pub mod pvm;
 
 /// Outcome of handling an ECALL
 #[derive(Debug)]
