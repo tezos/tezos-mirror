@@ -279,6 +279,8 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
        @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
        @ opt_var "SCCACHE_LOG" Fun.id log)
   |> append_cache {key; paths = [path]}
+  |> append_before_script [". ./scripts/ci/sccache-start.sh"]
+  |> append_after_script ["sccache --stop-server || true"]
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 

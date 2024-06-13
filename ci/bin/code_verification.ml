@@ -94,12 +94,7 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
         ("package", name);
       ]
     ~before_script:
-      (before_script
-         ~eval_opam:true
-         [
-           "mkdir -p $CI_PROJECT_DIR/opam_logs";
-           ". ./scripts/ci/sccache-start.sh";
-         ])
+      (before_script ~eval_opam:true ["mkdir -p $CI_PROJECT_DIR/opam_logs"])
     [
       "opam remote add dev-repo ./_opam-repo-for-release";
       "opam install --yes ${package}.dev";
@@ -110,7 +105,6 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
        a second opam environment initialization. *)
     ~after_script:
       [
-        "sccache --stop-server || true";
         "eval $(opam env)";
         "OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh";
       ]

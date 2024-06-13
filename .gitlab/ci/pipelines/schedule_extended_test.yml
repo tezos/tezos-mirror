@@ -318,11 +318,15 @@ oc.build_kernels:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
   - make -C src/riscv riscv-sandbox riscv-dummy.elf
   - make -C src/riscv/tests/ build
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -600,9 +604,9 @@ opam:bls12-381:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: bls12-381
@@ -667,9 +671,9 @@ opam:octez-accuser-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-accuser-Proxford
@@ -734,9 +738,9 @@ opam:octez-accuser-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-accuser-PtParisB
@@ -803,9 +807,9 @@ opam:octez-alcotezt:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-alcotezt
@@ -870,9 +874,9 @@ opam:octez-baker-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-baker-Proxford
@@ -937,9 +941,9 @@ opam:octez-baker-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-baker-PtParisB
@@ -1004,9 +1008,9 @@ opam:octez-client:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-client
@@ -1071,9 +1075,9 @@ opam:octez-codec:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-codec
@@ -1140,9 +1144,9 @@ opam:octez-crawler:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-crawler
@@ -1207,9 +1211,9 @@ opam:octez-dac-client:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-dac-client
@@ -1274,9 +1278,9 @@ opam:octez-dac-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-dac-node
@@ -1341,9 +1345,9 @@ opam:octez-dal-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-dal-node
@@ -1410,9 +1414,9 @@ opam:octez-distributed-internal:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-distributed-internal
@@ -1479,9 +1483,9 @@ opam:octez-distributed-lwt-internal:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-distributed-lwt-internal
@@ -1546,9 +1550,9 @@ opam:octez-evm-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-evm-node
@@ -1615,9 +1619,9 @@ opam:octez-evm-node-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-evm-node-libs
@@ -1684,9 +1688,9 @@ opam:octez-injector:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-injector
@@ -1753,9 +1757,9 @@ opam:octez-internal-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-internal-libs
@@ -1822,9 +1826,9 @@ opam:octez-l2-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-l2-libs
@@ -1891,9 +1895,9 @@ opam:octez-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-libs
@@ -1958,9 +1962,9 @@ opam:octez-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-node
@@ -2027,9 +2031,9 @@ opam:octez-node-config:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-node-config
@@ -2096,9 +2100,9 @@ opam:octez-proto-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-proto-libs
@@ -2165,9 +2169,9 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-000-Ps9mPmXa-libs
@@ -2234,9 +2238,9 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-001-PtCJ7pwo-libs
@@ -2303,9 +2307,9 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-002-PsYLVpVv-libs
@@ -2372,9 +2376,9 @@ opam:octez-protocol-003-PsddFKi3-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-003-PsddFKi3-libs
@@ -2441,9 +2445,9 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-004-Pt24m4xi-libs
@@ -2510,9 +2514,9 @@ opam:octez-protocol-005-PsBabyM1-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-005-PsBabyM1-libs
@@ -2579,9 +2583,9 @@ opam:octez-protocol-006-PsCARTHA-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-006-PsCARTHA-libs
@@ -2648,9 +2652,9 @@ opam:octez-protocol-007-PsDELPH1-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-007-PsDELPH1-libs
@@ -2717,9 +2721,9 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-008-PtEdo2Zk-libs
@@ -2786,9 +2790,9 @@ opam:octez-protocol-009-PsFLoren-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-009-PsFLoren-libs
@@ -2855,9 +2859,9 @@ opam:octez-protocol-010-PtGRANAD-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-010-PtGRANAD-libs
@@ -2924,9 +2928,9 @@ opam:octez-protocol-011-PtHangz2-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-011-PtHangz2-libs
@@ -2993,9 +2997,9 @@ opam:octez-protocol-012-Psithaca-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-012-Psithaca-libs
@@ -3062,9 +3066,9 @@ opam:octez-protocol-013-PtJakart-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-013-PtJakart-libs
@@ -3131,9 +3135,9 @@ opam:octez-protocol-014-PtKathma-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-014-PtKathma-libs
@@ -3200,9 +3204,9 @@ opam:octez-protocol-015-PtLimaPt-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-015-PtLimaPt-libs
@@ -3269,9 +3273,9 @@ opam:octez-protocol-016-PtMumbai-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-016-PtMumbai-libs
@@ -3338,9 +3342,9 @@ opam:octez-protocol-017-PtNairob-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-017-PtNairob-libs
@@ -3407,9 +3411,9 @@ opam:octez-protocol-018-Proxford-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-018-Proxford-libs
@@ -3476,9 +3480,9 @@ opam:octez-protocol-019-PtParisB-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-019-PtParisB-libs
@@ -3545,9 +3549,9 @@ opam:octez-protocol-alpha-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-alpha-libs
@@ -3612,9 +3616,9 @@ opam:octez-protocol-compiler:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-compiler
@@ -3679,9 +3683,9 @@ opam:octez-proxy-server:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-proxy-server
@@ -3748,9 +3752,9 @@ opam:octez-riscv-api:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-riscv-api
@@ -3817,9 +3821,9 @@ opam:octez-riscv-pvm:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-riscv-pvm
@@ -3886,9 +3890,9 @@ opam:octez-rpc-process:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-rpc-process
@@ -3955,9 +3959,9 @@ opam:octez-rust-deps:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-rust-deps
@@ -4024,9 +4028,9 @@ opam:octez-shell-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-shell-libs
@@ -4091,9 +4095,9 @@ opam:octez-signer:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-signer
@@ -4158,9 +4162,9 @@ opam:octez-smart-rollup-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node
@@ -4227,9 +4231,9 @@ opam:octez-smart-rollup-node-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-Proxford
@@ -4296,9 +4300,9 @@ opam:octez-smart-rollup-node-PtNairob:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtNairob
@@ -4365,9 +4369,9 @@ opam:octez-smart-rollup-node-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtParisB
@@ -4434,9 +4438,9 @@ opam:octez-smart-rollup-node-alpha:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-alpha
@@ -4503,9 +4507,9 @@ opam:octez-smart-rollup-node-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-lib
@@ -4570,9 +4574,9 @@ opam:octez-smart-rollup-wasm-debugger:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger
@@ -4639,9 +4643,9 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-lib
@@ -4708,9 +4712,9 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-plugin
@@ -4775,9 +4779,9 @@ opam:octez-version:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-version
@@ -4844,9 +4848,9 @@ opam:tezos-benchmark:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-benchmark
@@ -4913,9 +4917,9 @@ opam:tezos-client-demo-counter:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-client-demo-counter
@@ -4982,9 +4986,9 @@ opam:tezos-client-genesis:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-client-genesis
@@ -5051,9 +5055,9 @@ opam:tezos-dac-client-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dac-client-lib
@@ -5120,9 +5124,9 @@ opam:tezos-dac-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dac-lib
@@ -5189,9 +5193,9 @@ opam:tezos-dac-node-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dac-node-lib
@@ -5258,9 +5262,9 @@ opam:tezos-dal-node-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dal-node-lib
@@ -5327,9 +5331,9 @@ opam:tezos-dal-node-services:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dal-node-services
@@ -5396,9 +5400,9 @@ opam:tezos-openapi:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-openapi
@@ -5465,9 +5469,9 @@ opam:tezos-protocol-000-Ps9mPmXa:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-000-Ps9mPmXa
@@ -5534,9 +5538,9 @@ opam:tezos-protocol-001-PtCJ7pwo:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-001-PtCJ7pwo
@@ -5603,9 +5607,9 @@ opam:tezos-protocol-002-PsYLVpVv:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-002-PsYLVpVv
@@ -5672,9 +5676,9 @@ opam:tezos-protocol-003-PsddFKi3:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-003-PsddFKi3
@@ -5741,9 +5745,9 @@ opam:tezos-protocol-004-Pt24m4xi:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-004-Pt24m4xi
@@ -5810,9 +5814,9 @@ opam:tezos-protocol-005-PsBABY5H:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBABY5H
@@ -5879,9 +5883,9 @@ opam:tezos-protocol-005-PsBabyM1:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBabyM1
@@ -5948,9 +5952,9 @@ opam:tezos-protocol-006-PsCARTHA:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-006-PsCARTHA
@@ -6017,9 +6021,9 @@ opam:tezos-protocol-007-PsDELPH1:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-007-PsDELPH1
@@ -6086,9 +6090,9 @@ opam:tezos-protocol-008-PtEdo2Zk:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdo2Zk
@@ -6155,9 +6159,9 @@ opam:tezos-protocol-008-PtEdoTez:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdoTez
@@ -6224,9 +6228,9 @@ opam:tezos-protocol-009-PsFLoren:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-009-PsFLoren
@@ -6293,9 +6297,9 @@ opam:tezos-protocol-010-PtGRANAD:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-010-PtGRANAD
@@ -6362,9 +6366,9 @@ opam:tezos-protocol-011-PtHangz2:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-011-PtHangz2
@@ -6431,9 +6435,9 @@ opam:tezos-protocol-012-Psithaca:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-012-Psithaca
@@ -6500,9 +6504,9 @@ opam:tezos-protocol-013-PtJakart:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-013-PtJakart
@@ -6569,9 +6573,9 @@ opam:tezos-protocol-014-PtKathma:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-014-PtKathma
@@ -6638,9 +6642,9 @@ opam:tezos-protocol-015-PtLimaPt:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-015-PtLimaPt
@@ -6707,9 +6711,9 @@ opam:tezos-protocol-016-PtMumbai:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-016-PtMumbai
@@ -6776,9 +6780,9 @@ opam:tezos-protocol-017-PtNairob:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-017-PtNairob
@@ -6845,9 +6849,9 @@ opam:tezos-protocol-018-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-018-Proxford
@@ -6914,9 +6918,9 @@ opam:tezos-protocol-019-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-019-PtParisB
@@ -6983,9 +6987,9 @@ opam:tezos-protocol-alpha:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-alpha
@@ -7052,9 +7056,9 @@ opam:tezos-protocol-demo-counter:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-counter
@@ -7121,9 +7125,9 @@ opam:tezos-protocol-demo-noops:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-noops
@@ -7190,9 +7194,9 @@ opam:tezos-protocol-genesis:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-genesis
@@ -7259,9 +7263,9 @@ opam:tezos-proxy-server-config:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-proxy-server-config
@@ -7328,9 +7332,9 @@ opam:tezt-tezos:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezt-tezos
