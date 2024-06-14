@@ -380,9 +380,6 @@ let init config =
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =
   let module SI = Set.Make (Int) in
   let open Lwt_result_syntax in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
-           https://gitlab.com/tezos/tezos/-/issues/4528
-     Handle statuses evolution. *)
   let slot_header_statuses = t.slot_header_statuses in
   let* waiting =
     List.fold_left_es
