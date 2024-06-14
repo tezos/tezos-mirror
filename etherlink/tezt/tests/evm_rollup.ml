@@ -488,19 +488,24 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
         protocols)
     kernels
 
-let register_proxy ~title ~tags ?kernels ?additional_uses ?admin
-    ?commitment_period ?challenge_window ?bootstrap_accounts
-    ?minimum_base_fee_per_gas ?maximum_allowed_ticks f protocols =
+let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
+    ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
+    ?maximum_allowed_ticks f protocols =
   register_test
     ~title
     ~tags
     ?kernels
     ?additional_uses
+    ?additional_config
     ?admin
     ?commitment_period
     ?challenge_window
     ?bootstrap_accounts
+    ?da_fee_per_byte
     ?minimum_base_fee_per_gas
+    ?whitelist
+    ?rollup_operator_key
     ?maximum_allowed_ticks
     f
     protocols
