@@ -241,11 +241,16 @@ let dispatch_request (config : Configuration.t)
   let open Ethereum_types in
   let*! value =
     match map_method_name method_ with
-    | Unknown -> Lwt.return_error (Rpc_errors.method_not_found method_)
-    | Unsupported -> Lwt.return_error (Rpc_errors.method_not_supported method_)
+    | Unknown ->
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unknown") ;
+        Lwt.return_error (Rpc_errors.method_not_found method_)
+    | Unsupported ->
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unsupported") ;
+        Lwt.return_error (Rpc_errors.method_not_supported method_)
     (* Ethereum JSON-RPC API methods we support *)
-    | Method (method_, module_) -> (
-        match method_ with
+    | Method (method_rpc, module_) -> (
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ method_) ;
+        match method_rpc with
         | Accounts.Method ->
             let f (_ : unit option) = rpc_ok [] in
             build ~f module_ parameters

@@ -132,6 +132,15 @@ module Rpc = struct
       ~namespace
       ~subsystem
       "calls"
+
+  let method_ =
+    Prometheus.Counter.v_label
+      ~registry
+      ~label_name:"method"
+      ~help:"Method call counts"
+      ~namespace
+      ~subsystem
+      "calls_method"
 end
 
 module Tx_pool = struct
