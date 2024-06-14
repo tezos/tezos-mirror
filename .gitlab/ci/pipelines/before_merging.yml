@@ -401,6 +401,10 @@ oc.build_x86_64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -418,6 +422,9 @@ oc.build_x86_64-exp-dev-extra:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -1821,6 +1828,10 @@ oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1833,6 +1844,9 @@ oc.script:snapshot_alpha_and_link:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2191,6 +2205,10 @@ oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2205,6 +2223,9 @@ oc.unit:non-proto-x86_64:
     MAKE_TARGETS: test-nonproto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -2252,6 +2273,10 @@ oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2266,6 +2291,9 @@ oc.unit:other-x86_64:
     MAKE_TARGETS: test-other-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -2313,6 +2341,10 @@ oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2327,6 +2359,9 @@ oc.unit:proto-x86_64:
     MAKE_TARGETS: test-proto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
