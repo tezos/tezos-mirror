@@ -122,8 +122,19 @@ for control_file in "$myhome"/*control.in; do
 
   # Zcash parameters ships with some packages
   #
-  zcashParams "${common}/${pg}-zcash" \
-    "${staging_dir}/usr/share/zcash-params"
+  if [ "$pg" = "node" ]; then
+    zcashParams "${common}/${pg}-zcash" \
+      "${staging_dir}/usr/share/zcash-params"
+  fi
+
+  if [ "$pg" = "dal-node" ]; then
+    # call the install script to make available the
+    # zcash parameters on the build host
+    scripts/install_dal_trusted_setup.sh
+    zcashParams "${common}/${pg}-zcash" \
+      "${staging_dir}/usr/share/dal-trusted-setup" \
+      _opam/share/dal-trusted-setup
+  fi
 
   # Build the package
   #
