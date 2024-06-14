@@ -354,7 +354,7 @@ let shutdown node = node.shutdown ()
 let http_cache_header_tools node =
   let store = node.store in
   let chain_store = Store.main_chain_store store in
-  Http_cache_headers.make_tools chain_store
+  Http_cache_headers.make_tools (fun () -> Some chain_store)
 
 let build_rpc_directory ~node_version node =
   let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
