@@ -300,6 +300,8 @@ docker:canary:
   image: docker:latest
   services:
     - docker:dind
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
   before_script:
     - *docker-wait-docker-daemon
     - *docker-login
