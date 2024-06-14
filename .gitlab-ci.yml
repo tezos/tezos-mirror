@@ -81,6 +81,8 @@ workflow:
 
 .docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
+.docker-wait-docker-daemon: &docker-wait-docker-daemon while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done
+
 ################
 # SANITY CHECK #
 ################
@@ -110,11 +112,11 @@ check:
   services:
     - docker:dind
   before_script:
-    - while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done
+    - *docker-wait-docker-daemon
+    - *docker-login
     - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
     - docker buildx create --name teztale-dependencies --use --driver docker-container
     - docker buildx inspect --bootstrap
-    - *docker-login
     - set -xv
     - docker version
     - docker buildx version
@@ -243,11 +245,14 @@ release:canary:
 .docker:release:
   stage: docker
   image: docker:latest
+  services:
+    - docker:dind
   parallel: *default_matrix
   tags:
     - ${RUNNER}
   before_script:
     - !reference [.rename-build-artifacts, before_script]
+    - *docker-wait-docker-daemon
     - *docker-login
     - set -xv
   script:
@@ -293,7 +298,10 @@ docker:canary:
 .docker:manifest:
   stage: docker
   image: docker:latest
+  services:
+    - docker:dind
   before_script:
+    - *docker-wait-docker-daemon
     - *docker-login
     - set -xv
   script:
