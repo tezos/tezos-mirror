@@ -15,7 +15,6 @@ stages:
   - deploy
   - docker
 
-# Either because of connexion issues or because of timeouts
 variables:
   supported_ARCH: "amd64 arm64"
   DEFAULT_RUNNER_TAG: gcp
@@ -23,6 +22,8 @@ variables:
   TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
   BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies:${CONTAINER_TAG}"
+  RELEASE_CONTAINER_GENERIC: "${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG}"
+  RELEASE_CONTAINER_ARCH: "${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}"
   # Build blst used by ocaml-bls12-381 without ADX to support old CPU
   # architectures.
   # See https://gitlab.com/tezos/tezos/-/issues/1788
@@ -80,21 +81,7 @@ workflow:
   - git config --global --add safe.directory $(pwd)
   - git am < ProtoALpha.git.patch
 
-.docker:dind:
-  image: docker:latest
-  tags:
-    - ${DEFAULT_RUNNER_TAG}
-  services:
-    - docker:dind
-  before_script:
-    - while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done
-    - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
-    - docker buildx create --name teztale-dependencies --use --driver docker-container
-    - docker buildx inspect --bootstrap
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - set -xv
-    - docker version
-    - docker buildx version
+.docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
 
 ################
 # SANITY CHECK #
@@ -119,7 +106,20 @@ check:
 # Build or update the docker image that will be used for the build job
 .prepare:
   stage: prepare
-  extends: .docker:dind
+  image: docker:latest
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
+  services:
+    - docker:dind
+  before_script:
+    - while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done
+    - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
+    - docker buildx create --name teztale-dependencies --use --driver docker-container
+    - docker buildx inspect --bootstrap
+    - *docker-login
+    - set -xv
+    - docker version
+    - docker buildx version
   script:
     - docker manifest inspect "${BUILD_CONTAINER_NAME}" && export DOCKER_ARGS="--build-arg BASE=${BUILD_CONTAINER_NAME}" && export OPAM_INSTALL_ARGS=--criteria="-changed,-removed" || export DOCKER_ARGS="" && export OPAM_INSTALL_ARGS=
     - echo DOCKER_ARGS="${DOCKER_ARGS}" OCTEZ_BRANCH="${OCTEZ_BRANCH}" OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}"
@@ -244,14 +244,22 @@ release:canary:
 
 .docker:release:
   stage: docker
-  extends: .docker:dind
+  image: docker:latest
+  parallel: *default_matrix
+  tags:
+    - ${RUNNER}
   before_script:
     - !reference [.rename-build-artifacts, before_script]
-    - !reference [.docker:dind, before_script]
+    - *docker-login
+    - set -xv
   script:
     - >
       for BIN in archiver server ; do
-        docker buildx build --platform linux/arm64/v8,linux/amd64 -t ${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG} --push -f Dockerfile.$BIN . ;
+        docker build -t "${RELEASE_CONTAINER_ARCH}" -f Dockerfile.$BIN . ;
+      done
+    - >
+      for BIN in archiver server ; do
+        docker push "${RELEASE_CONTAINER_ARCH}" ;
       done
 
 .docker:stable:rules:
@@ -282,3 +290,35 @@ docker:canary:
   needs:
     - job: build:canary
       artifacts: true
+
+# Create multiarch manifest
+.docker:manifest:
+  stage: docker
+  image: docker:latest
+  before_script:
+    - *docker-login
+    - set -xv
+  script:
+    - >
+      for BIN in archiver server ; do
+        docker manifest create "${RELEASE_CONTAINER_GENERIC}" `for ARCH in ${supported_ARCH} ; do echo " --amend ${RELEASE_CONTAINER_ARCH}" ; done ;`;
+        docker manifest push "${RELEASE_CONTAINER_GENERIC}" ;
+      done ;
+
+docker:manifest:stable:
+  extends:
+    - .stable:variables
+    - .docker:stable:rules
+    - .docker:manifest
+  needs:
+    - job: docker:stable
+      artifacts: false
+
+docker:manifest:canary:
+  extends:
+    - .canary:variables
+    - .docker:canary:rules
+    - .docker:manifest
+  needs:
+    - job: docker:canary
+      artifacts: false
