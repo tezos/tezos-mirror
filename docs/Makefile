@@ -1,7 +1,7 @@
 # TODO #2170: search for old/preceding protocol name AND number, and adapt
 
 # You can set these variables from the command line.
-SPHINXOPTS    = -j auto -aE -n -W --keep-going
+SPHINXOPTS    = -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
 TMPDOCDIR     = /tmp/octezdoc
