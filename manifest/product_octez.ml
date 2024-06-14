@@ -7279,7 +7279,7 @@ let hash = Protocol.hash
 
   let _017_PtNairob = frozen (Name.v "PtNairob" 017)
 
-  let _018_Proxford = active (Name.v "Proxford" 018)
+  let _018_Proxford = frozen (Name.v "Proxford" 018)
 
   let _019_PtParisB = active (Name.v "PtParisB" 019)
 

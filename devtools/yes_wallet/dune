@@ -10,7 +10,6 @@
   ezjsonm
   octez-node-config
   octez-shell-libs.store
-  tezos-protocol-018-Proxford.protocol
   tezos-protocol-019-PtParisB.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
