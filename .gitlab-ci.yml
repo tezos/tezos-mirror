@@ -15,11 +15,10 @@ stages:
   - deploy
   - docker
 
-# DEFAULT_RUNNER_TAG is set to gitlab-org because NL's gcp runners quite often fail when preparing docker images for release
 # Either because of connexion issues or because of timeouts
 variables:
   supported_ARCH: "amd64 arm64"
-  DEFAULT_RUNNER_TAG: gitlab-org # Use this for jobs that do not require any specific arch
+  DEFAULT_RUNNER_TAG: gcp
   STABLE_OCTEZ_BRANCH: "octez-v20.0"
   TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
