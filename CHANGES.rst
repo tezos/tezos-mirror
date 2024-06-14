@@ -28,6 +28,8 @@ General
 - Add and **experimental** switch to enable the use of the Brassaia context
   backend using ``TEZOS_CONTEXT_BACKEND=Brassaia`` environment variable. (MR :gl:`!13054`)
 
+- Removed binaries for Oxford. (MR :gl:`!13795`)
+
 Node
 ----
 
