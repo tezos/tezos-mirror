@@ -273,7 +273,7 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
        @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
        @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
        @ opt_var "SCCACHE_LOG" Fun.id log)
-  |> append_cache {key; paths = [path]}
+  |> append_cache (cache ~key [path])
   (* Starts sccache and sets [RUSTC_WRAPPER] *)
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
   |> append_after_script ["sccache --stop-server || true"]
@@ -294,10 +294,9 @@ let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
 let enable_cargo_cache job =
   job
   |> append_cache
-       {
-         key = ("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug));
-         paths = [cargo_home // "registry/cache"];
-       }
+       (cache
+          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [cargo_home // "registry/cache"])
   (* Allow Cargo to access the network *)
   |> enable_networked_cargo
 

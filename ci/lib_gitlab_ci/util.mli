@@ -120,3 +120,8 @@ val reports :
   ?coverage_report:coverage_report ->
   unit ->
   reports
+
+(** [cache ~key paths] is a cache indexed [key] for [paths].
+
+    - [policy:] is [Push_pull] if [policy] is [omitted]. *)
+val cache : ?policy:cache_policy -> key:string -> string list -> cache

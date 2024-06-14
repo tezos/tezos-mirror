@@ -475,7 +475,7 @@ let jobs pipeline_type =
              ~/.config/nix/nix.conf";
           ]
         ["nix run .#ci-check-version-sh-lock"]
-        ~cache:[{key = "nix-store"; paths = ["/nix/store"]}]
+        ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
     let job_docker_hadolint =
       job
