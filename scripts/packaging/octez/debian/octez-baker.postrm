@@ -6,6 +6,10 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
+# systemctl should not be called directly. use this
+# wrapper script if available
+debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
+
 case "${1}" in
 purge)
   rm -Rf /var/lib/octez-baker
@@ -20,7 +24,7 @@ upgrade)
       if [ -f "/var/lib/octez-baker/$s-$p-daemon_was_running" ] &&
         [ "$(cat "/var/lib/octez-baker/$s-$p-daemon_was_running")" = "1" ]; then
         # Start the daemon if it was running
-        systemctl "start octez-$s-$p.service"
+        $debsystemctl "start octez-$s-$p.service"
       fi
     done
   done

@@ -6,6 +6,10 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
+# systemctl should not be called directly. use this
+# wrapper script if available
+debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
+
 # temp file to make sure we remember to restart the
 # daemon when we upgrade
 DAEMON_RUNNING=/var/run/octez-dal-node/daemon_was_running
@@ -22,7 +26,7 @@ upgrade)
   if [ -f "$DAEMON_RUNNING" ] &&
     [ "$(cat "$DAEMON_RUNNING")" = "1" ]; then
     # Start the daemon if it was running
-    systemctl "start octez-dal-node.service"
+    $debsystemctl "start octez-dal-node.service"
   fi
   ;;
 remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;

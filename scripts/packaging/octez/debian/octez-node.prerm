@@ -45,3 +45,5 @@ if systemctl is-active --quiet octez-node.service; then
   echo "Stopping octez-node"
   sudo systemctl stop octez-node.service
 fi
+
+#DEBHELPER#
