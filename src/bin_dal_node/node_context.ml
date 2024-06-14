@@ -125,12 +125,22 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
           ctxt.profile_ctxt
           ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
       in
-      let attestation_lag = proto_parameters.attestation_lag in
       let* proto_plugins =
-        Proto_plugins.initial_plugins
-          cctxt
-          ~current_level:level
-          ~attestation_lag
+        (* We resolve the plugins for all levels starting with [first_level]. It
+           is currently not necessary to go as far in the past, because only the
+           protocol parameters for these past levels are needed, and these do
+           not change for now (and are not retrieved for these past
+           levels). However, if/when they do change, it will be necessary to
+           retrieve them, using the right plugins. *)
+        let relevant_period =
+          Profile_manager.get_attested_data_default_store_period
+            ctxt.profile_ctxt
+            proto_parameters
+        in
+        let first_level =
+          Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
+        in
+        Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
       in
       ctxt.status <-
         Ready
@@ -190,7 +200,7 @@ let get_all_plugins ctxt =
   | Starting _ -> []
   | Ready {proto_plugins; _} -> Proto_plugins.to_list proto_plugins
 
-let next_level_to_gc_slots_and_shards ctxt ~current_level =
+let level_to_gc ctxt ~current_level =
   match ctxt.config.history_mode with
   | Full -> Int32.zero
   | Rolling {blocks = `Some n} ->
@@ -200,20 +210,11 @@ let next_level_to_gc_slots_and_shards ctxt ~current_level =
       | Starting _ -> Int32.zero
       | Ready {proto_parameters; _} ->
           let n =
-            Profile_manager.get_default_shard_store_period
-              proto_parameters
+            Profile_manager.get_attested_data_default_store_period
               ctxt.profile_ctxt
+              proto_parameters
           in
           Int32.(max zero (sub current_level (of_int n))))
-
-let next_level_to_gc_skip_list_cells ctxt ~current_level =
-  match ctxt.status with
-  | Starting _ -> Int32.zero
-  | Ready {proto_parameters; _} ->
-      let n =
-        Profile_manager.get_skip_list_cells_store_period proto_parameters
-      in
-      Int32.(max zero (sub current_level (of_int n)))
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 

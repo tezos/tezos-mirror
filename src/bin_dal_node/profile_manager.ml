@@ -165,31 +165,45 @@ let get_profiles t =
 
 (* Returns the period relevant for a refutation game. With a block time of 10
    seconds, this corresponds to about 42 days. *)
-let get_rollup_period proto_parameters =
+let get_refutation_game_period proto_parameters =
   proto_parameters.Dal_plugin.sc_rollup_challenge_window_in_blocks
   + proto_parameters.commitment_period_in_blocks
   + proto_parameters.dal_attested_slots_validity_lag
 
-let get_default_shard_store_period proto_parameters t =
-  (* For each profile we double the period, to give some slack just in case
-     (finalisation period, off by one, attestation_lag, refutation games reset
-     after a protocol upgrade, ...). *)
-  let rollup_period = 2 * get_rollup_period proto_parameters in
+(* This function returns whether the node should store skip list cells, in
+   addition to the retention period for attested data (slots, shards, etc). *)
+let get_attested_data_default_store_period t proto_parameters =
+  (* We double the period (no matter the profile), to give some slack, just in
+     case (finalisation period, off by one, attestation_lag, refutation games
+     reset after a protocol upgrade, ...). *)
+  let refutation_game_period =
+    2 * get_refutation_game_period proto_parameters
+  in
   let attestation_period = 2 * proto_parameters.attestation_lag in
-  match get_profiles t with
-  (* For observer & Producer, we keep the shards long enough for rollup to work
-     correctly; for attester & other profiles, we only want to keep the shards
-     during attestation lag period *)
-  | Random_observer -> rollup_period
-  | Operator op ->
-      if Operator_profile.(has_producer op || has_observer op) then
-        rollup_period
-      else attestation_period
-  | Bootstrap -> attestation_period
+  let should_store_skip_list_cells, period =
+    match get_profiles t with
+    (* For observer & Producer, we keep the data long enough for rollups to work
+       correctly; for attester & other profiles, we only want to keep the data
+       during attestation lag period *)
+    | Random_observer -> (true, refutation_game_period)
+    | Operator op ->
+        let is_not_attester_only =
+          Operator_profile.(has_producer op || has_observer op)
+        in
+        let period =
+          if is_not_attester_only then refutation_game_period
+          else attestation_period
+        in
+        (is_not_attester_only, period)
+    | Bootstrap -> (false, attestation_period)
+  in
+  (should_store_skip_list_cells, period)
 
-let get_skip_list_cells_store_period proto_parameters =
-  (* We double the period, to give us a safety margin, just in case... *)
-  2 * get_rollup_period proto_parameters
+let get_attested_data_default_store_period t proto_parameters =
+  snd @@ get_attested_data_default_store_period t proto_parameters
+
+and should_store_skip_list_cells t proto_parameters =
+  fst @@ get_attested_data_default_store_period t proto_parameters
 
 let profiles_filename = "profiles.json"
 

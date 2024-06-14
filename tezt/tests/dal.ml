@@ -5622,7 +5622,6 @@ module Garbage_collection = struct
 
     (* Create & configure attester *)
     let attester = Dal_node.create ~name:"attester" ~node () in
-    Dal_node.log_events attester ;
     let* () =
       Dal_node.init_config ~attester_profiles:[attester_pkh] ~peers attester
     in
@@ -5630,7 +5629,6 @@ module Garbage_collection = struct
     Log.info "attester DAL node ready" ;
 
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
-    Dal_node.log_events slot_producer ;
     let* () =
       Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
     in
@@ -5644,7 +5642,6 @@ module Garbage_collection = struct
 
     (* Create & configure observer *)
     let observer = Dal_node.create ~name:"observer" ~node () in
-    Dal_node.log_events observer ;
     let* () =
       Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
     in
