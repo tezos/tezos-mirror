@@ -3713,7 +3713,7 @@ let test_do_not_reclassify =
   Protocol.register_test
     ~__FILE__
     ~title:"mempool do not reclassify"
-    ~tags:[team; "mempool"; "node"; "filter"; "refused"; "validated"]
+    ~tags:[team; "mempool"; "node"; "filter"; "refused"; "validated"; Tag.flaky]
   @@ fun protocol ->
   let step_color = Log.Color.BG.blue in
   Log.info

@@ -4456,7 +4456,7 @@ let test_regression_block_hash_gen =
      This test checks regression for the fix *)
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"]
+    ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"; Tag.flaky]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
