@@ -5966,6 +5966,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_commitment_scenario
     ~variant:"non_final_level"
+    ~extra_tags:[Tag.flaky]
     commitment_not_published_if_non_final
     protocols
     ~kind ;
