@@ -936,6 +936,8 @@ let test_refutation_migration ~migrate_from ~migrate_to =
         ])
     tests
 
+let assume cond test = if cond then test () else ()
+
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
   test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to ;
@@ -952,6 +954,7 @@ let register_migration_only_wasm ~migrate_from ~migrate_to =
   test_refutation_migration ~migrate_from ~migrate_to
 
 let register ~migrate_from ~migrate_to =
+  assume (migrate_to <> Protocol.ParisC) @@ fun () ->
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
   register_migration ~kind:"wasm_2_0_0" ~migrate_from ~migrate_to ;
   register_migration_only_wasm ~migrate_from ~migrate_to
