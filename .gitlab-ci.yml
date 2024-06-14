@@ -22,8 +22,6 @@ variables:
   TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
   BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies:${CONTAINER_TAG}"
-  RELEASE_CONTAINER_GENERIC: "${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG}"
-  RELEASE_CONTAINER_ARCH: "${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}"
   # Build blst used by ocaml-bls12-381 without ADX to support old CPU
   # architectures.
   # See https://gitlab.com/tezos/tezos/-/issues/1788
@@ -255,11 +253,11 @@ release:canary:
   script:
     - >
       for BIN in archiver server ; do
-        docker build -t "${RELEASE_CONTAINER_ARCH}" -f Dockerfile.$BIN . ;
+        docker build -t "${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}" -f Dockerfile.$BIN . ;
       done
     - >
       for BIN in archiver server ; do
-        docker push "${RELEASE_CONTAINER_ARCH}" ;
+        docker push "${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}" ;
       done
 
 .docker:stable:rules:
@@ -301,8 +299,8 @@ docker:canary:
   script:
     - >
       for BIN in archiver server ; do
-        docker manifest create "${RELEASE_CONTAINER_GENERIC}" `for ARCH in ${supported_ARCH} ; do echo " --amend ${RELEASE_CONTAINER_ARCH}" ; done ;`;
-        docker manifest push "${RELEASE_CONTAINER_GENERIC}" ;
+        docker manifest create "${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG}" `for ARCH in ${supported_ARCH} ; do echo " --amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}" ; done ;`;
+        docker manifest push "${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG}" ;
       done ;
 
 docker:manifest:stable:
