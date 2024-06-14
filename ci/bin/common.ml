@@ -239,18 +239,6 @@ let enable_coverage_report job : tezos_job =
        ["_coverage_report/"; "$BISECT_FILE"]
   |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
 
-(** Add variable enabling sccache.
-
-    This function should be applied to jobs that build rust files and
-    which has a configured sccache Gitlab CI cache. *)
-let enable_sccache ?error_log ?idle_timeout ?log
-    ?(dir = "$CI_PROJECT_DIR/_sccache") : tezos_job -> tezos_job =
-  Tezos_ci.append_variables
-    ([("SCCACHE_DIR", dir); ("RUSTC_WRAPPER", "sccache")]
-    @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-    @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
-    @ opt_var "SCCACHE_LOG" Fun.id log)
-
 (** Add common variables used by jobs compiling kernels *)
 let enable_kernels =
   Tezos_ci.append_variables
@@ -259,6 +247,41 @@ let enable_kernels =
 (** {2 Caches} *)
 
 (* Common GitLab CI caches *)
+
+(** Add variable enabling sccache.
+
+    This function should be applied to jobs that build rust files and
+    which has a configured sccache Gitlab CI cache.
+
+    - [key] and [path] configure the key under which the cache is
+    stored, and the path that will be cached. By default, the [key]
+    contains the name of the job, thus scoping the cache to all
+    instances of that job. By default, [path] is the folder
+    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
+    environment dir [SCCACHE_DIR] such that sccache stores its caches
+    there.
+
+    - [error_log], [idle_timeout] and [log] sets the environment
+    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
+    [SCCACHE_LOG] respectively. See the sccache documentation for more
+    information on these variables. *)
+let enable_sccache ?key ?error_log ?idle_timeout ?log
+    ?(path = "$CI_PROJECT_DIR/_sccache") job =
+  let key =
+    Option.value
+      ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  job
+  |> append_variables
+       ([("SCCACHE_DIR", path)]
+       @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
+       @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
+       @ opt_var "SCCACHE_LOG" Fun.id log)
+  |> append_cache {key; paths = [path]}
+  (* Starts sccache and sets [RUSTC_WRAPPER] *)
+  |> append_before_script [". ./scripts/ci/sccache-start.sh"]
+  |> append_after_script ["sccache --stop-server || true"]
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
@@ -691,7 +714,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
-  |> enable_cargo_cache
+  |> enable_cargo_cache |> enable_sccache
 
 (** Type of Docker build jobs.
 
@@ -986,7 +1009,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache
+    |> enable_cargo_cache |> enable_sccache
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job

@@ -177,19 +177,26 @@ oc.build_arm64-released:
   dependencies:
   - oc.docker:ci:arm64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -214,21 +221,28 @@ oc.build_arm64-exp-dev-extra:
   dependencies:
   - oc.docker:ci:arm64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -264,18 +278,25 @@ oc.build:static-x86_64-linux-binaries:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -304,19 +325,26 @@ oc.build_x86_64-released:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -353,21 +381,28 @@ oc.build_x86_64-exp-dev-extra:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -401,17 +436,24 @@ ocaml-check:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -440,21 +482,24 @@ oc.build_kernels:
   cache:
   - key: kernels-sccache
     paths:
-    - _sccache
+    - $CI_PROJECT_DIR/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
   - make -C src/riscv riscv-sandbox riscv-dummy.elf
   - make -C src/riscv/tests/ build
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
+    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -539,13 +584,17 @@ build_octez_source:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/create_octez_tarball.sh octez
@@ -555,8 +604,11 @@ build_octez_source:
   - cd octez/
   - eval $(opam env)
   - make octez
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 opam:prepare:
   image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
@@ -639,7 +691,7 @@ opam:bls12-381:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -652,17 +704,15 @@ opam:bls12-381:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: bls12-381
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -707,7 +757,7 @@ opam:octez-accuser-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -720,17 +770,15 @@ opam:octez-accuser-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-accuser-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -775,7 +823,7 @@ opam:octez-accuser-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -788,17 +836,15 @@ opam:octez-accuser-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-accuser-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -845,7 +891,7 @@ opam:octez-alcotezt:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -858,17 +904,15 @@ opam:octez-alcotezt:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-alcotezt
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -913,7 +957,7 @@ opam:octez-baker-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -926,17 +970,15 @@ opam:octez-baker-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-baker-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -981,7 +1023,7 @@ opam:octez-baker-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -994,17 +1036,15 @@ opam:octez-baker-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-baker-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1049,7 +1089,7 @@ opam:octez-client:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1062,17 +1102,15 @@ opam:octez-client:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-client
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1117,7 +1155,7 @@ opam:octez-codec:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1130,17 +1168,15 @@ opam:octez-codec:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-codec
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1187,7 +1223,7 @@ opam:octez-crawler:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1200,17 +1236,15 @@ opam:octez-crawler:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-crawler
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1255,7 +1289,7 @@ opam:octez-dac-client:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1268,17 +1302,15 @@ opam:octez-dac-client:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-dac-client
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1323,7 +1355,7 @@ opam:octez-dac-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1336,17 +1368,15 @@ opam:octez-dac-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-dac-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1391,7 +1421,7 @@ opam:octez-dal-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1404,17 +1434,15 @@ opam:octez-dal-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-dal-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1461,7 +1489,7 @@ opam:octez-distributed-internal:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1474,17 +1502,15 @@ opam:octez-distributed-internal:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-distributed-internal
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1531,7 +1557,7 @@ opam:octez-distributed-lwt-internal:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1544,17 +1570,15 @@ opam:octez-distributed-lwt-internal:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-distributed-lwt-internal
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1599,7 +1623,7 @@ opam:octez-evm-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1612,17 +1636,15 @@ opam:octez-evm-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-evm-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1669,7 +1691,7 @@ opam:octez-evm-node-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1682,17 +1704,15 @@ opam:octez-evm-node-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-evm-node-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1739,7 +1759,7 @@ opam:octez-injector:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1752,17 +1772,15 @@ opam:octez-injector:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-injector
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1809,7 +1827,7 @@ opam:octez-internal-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1822,17 +1840,15 @@ opam:octez-internal-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-internal-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1879,7 +1895,7 @@ opam:octez-l2-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1892,17 +1908,15 @@ opam:octez-l2-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-l2-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -1949,7 +1963,7 @@ opam:octez-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -1962,17 +1976,15 @@ opam:octez-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2017,7 +2029,7 @@ opam:octez-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2030,17 +2042,15 @@ opam:octez-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2087,7 +2097,7 @@ opam:octez-node-config:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2100,17 +2110,15 @@ opam:octez-node-config:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-node-config
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2157,7 +2165,7 @@ opam:octez-proto-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2170,17 +2178,15 @@ opam:octez-proto-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-proto-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2227,7 +2233,7 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2240,17 +2246,15 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-000-Ps9mPmXa-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2297,7 +2301,7 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2310,17 +2314,15 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-001-PtCJ7pwo-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2367,7 +2369,7 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2380,17 +2382,15 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-002-PsYLVpVv-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2437,7 +2437,7 @@ opam:octez-protocol-003-PsddFKi3-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2450,17 +2450,15 @@ opam:octez-protocol-003-PsddFKi3-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-003-PsddFKi3-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2507,7 +2505,7 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2520,17 +2518,15 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-004-Pt24m4xi-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2577,7 +2573,7 @@ opam:octez-protocol-005-PsBabyM1-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2590,17 +2586,15 @@ opam:octez-protocol-005-PsBabyM1-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-005-PsBabyM1-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2647,7 +2641,7 @@ opam:octez-protocol-006-PsCARTHA-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2660,17 +2654,15 @@ opam:octez-protocol-006-PsCARTHA-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-006-PsCARTHA-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2717,7 +2709,7 @@ opam:octez-protocol-007-PsDELPH1-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2730,17 +2722,15 @@ opam:octez-protocol-007-PsDELPH1-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-007-PsDELPH1-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2787,7 +2777,7 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2800,17 +2790,15 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-008-PtEdo2Zk-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2857,7 +2845,7 @@ opam:octez-protocol-009-PsFLoren-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2870,17 +2858,15 @@ opam:octez-protocol-009-PsFLoren-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-009-PsFLoren-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2927,7 +2913,7 @@ opam:octez-protocol-010-PtGRANAD-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -2940,17 +2926,15 @@ opam:octez-protocol-010-PtGRANAD-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-010-PtGRANAD-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -2997,7 +2981,7 @@ opam:octez-protocol-011-PtHangz2-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3010,17 +2994,15 @@ opam:octez-protocol-011-PtHangz2-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-011-PtHangz2-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3067,7 +3049,7 @@ opam:octez-protocol-012-Psithaca-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3080,17 +3062,15 @@ opam:octez-protocol-012-Psithaca-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-012-Psithaca-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3137,7 +3117,7 @@ opam:octez-protocol-013-PtJakart-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3150,17 +3130,15 @@ opam:octez-protocol-013-PtJakart-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-013-PtJakart-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3207,7 +3185,7 @@ opam:octez-protocol-014-PtKathma-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3220,17 +3198,15 @@ opam:octez-protocol-014-PtKathma-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-014-PtKathma-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3277,7 +3253,7 @@ opam:octez-protocol-015-PtLimaPt-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3290,17 +3266,15 @@ opam:octez-protocol-015-PtLimaPt-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-015-PtLimaPt-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3347,7 +3321,7 @@ opam:octez-protocol-016-PtMumbai-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3360,17 +3334,15 @@ opam:octez-protocol-016-PtMumbai-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-016-PtMumbai-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3417,7 +3389,7 @@ opam:octez-protocol-017-PtNairob-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3430,17 +3402,15 @@ opam:octez-protocol-017-PtNairob-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-017-PtNairob-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3487,7 +3457,7 @@ opam:octez-protocol-018-Proxford-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3500,17 +3470,15 @@ opam:octez-protocol-018-Proxford-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-018-Proxford-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3557,7 +3525,7 @@ opam:octez-protocol-019-PtParisB-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3570,17 +3538,15 @@ opam:octez-protocol-019-PtParisB-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-019-PtParisB-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3627,7 +3593,7 @@ opam:octez-protocol-alpha-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3640,17 +3606,15 @@ opam:octez-protocol-alpha-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-alpha-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3695,7 +3659,7 @@ opam:octez-protocol-compiler:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3708,17 +3672,15 @@ opam:octez-protocol-compiler:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-protocol-compiler
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3763,7 +3725,7 @@ opam:octez-proxy-server:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3776,17 +3738,15 @@ opam:octez-proxy-server:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-proxy-server
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3833,7 +3793,7 @@ opam:octez-riscv-api:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3846,17 +3806,15 @@ opam:octez-riscv-api:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-riscv-api
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3903,7 +3861,7 @@ opam:octez-riscv-pvm:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3916,17 +3874,15 @@ opam:octez-riscv-pvm:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-riscv-pvm
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -3973,7 +3929,7 @@ opam:octez-rpc-process:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -3986,17 +3942,15 @@ opam:octez-rpc-process:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-rpc-process
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4043,7 +3997,7 @@ opam:octez-rust-deps:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4056,17 +4010,15 @@ opam:octez-rust-deps:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-rust-deps
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4113,7 +4065,7 @@ opam:octez-shell-libs:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4126,17 +4078,15 @@ opam:octez-shell-libs:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-shell-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4181,7 +4131,7 @@ opam:octez-signer:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4194,17 +4144,15 @@ opam:octez-signer:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-signer
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4249,7 +4197,7 @@ opam:octez-smart-rollup-node:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4262,17 +4210,15 @@ opam:octez-smart-rollup-node:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4319,7 +4265,7 @@ opam:octez-smart-rollup-node-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4332,17 +4278,15 @@ opam:octez-smart-rollup-node-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4389,7 +4333,7 @@ opam:octez-smart-rollup-node-PtNairob:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4402,17 +4346,15 @@ opam:octez-smart-rollup-node-PtNairob:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtNairob
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4459,7 +4401,7 @@ opam:octez-smart-rollup-node-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4472,17 +4414,15 @@ opam:octez-smart-rollup-node-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4529,7 +4469,7 @@ opam:octez-smart-rollup-node-alpha:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4542,17 +4482,15 @@ opam:octez-smart-rollup-node-alpha:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-alpha
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4599,7 +4537,7 @@ opam:octez-smart-rollup-node-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4612,17 +4550,15 @@ opam:octez-smart-rollup-node-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4667,7 +4603,7 @@ opam:octez-smart-rollup-wasm-debugger:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4680,17 +4616,15 @@ opam:octez-smart-rollup-wasm-debugger:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4737,7 +4671,7 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4750,17 +4684,15 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4807,7 +4739,7 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4820,17 +4752,15 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-plugin
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4875,7 +4805,7 @@ opam:octez-version:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4888,17 +4818,15 @@ opam:octez-version:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: octez-version
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -4945,7 +4873,7 @@ opam:tezos-benchmark:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -4958,17 +4886,15 @@ opam:tezos-benchmark:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-benchmark
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5015,7 +4941,7 @@ opam:tezos-client-demo-counter:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5028,17 +4954,15 @@ opam:tezos-client-demo-counter:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-client-demo-counter
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5085,7 +5009,7 @@ opam:tezos-client-genesis:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5098,17 +5022,15 @@ opam:tezos-client-genesis:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-client-genesis
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5155,7 +5077,7 @@ opam:tezos-dac-client-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5168,17 +5090,15 @@ opam:tezos-dac-client-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dac-client-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5225,7 +5145,7 @@ opam:tezos-dac-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5238,17 +5158,15 @@ opam:tezos-dac-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dac-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5295,7 +5213,7 @@ opam:tezos-dac-node-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5308,17 +5226,15 @@ opam:tezos-dac-node-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dac-node-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5365,7 +5281,7 @@ opam:tezos-dal-node-lib:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5378,17 +5294,15 @@ opam:tezos-dal-node-lib:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dal-node-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5435,7 +5349,7 @@ opam:tezos-dal-node-services:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5448,17 +5362,15 @@ opam:tezos-dal-node-services:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-dal-node-services
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5505,7 +5417,7 @@ opam:tezos-openapi:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5518,17 +5430,15 @@ opam:tezos-openapi:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-openapi
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5575,7 +5485,7 @@ opam:tezos-protocol-000-Ps9mPmXa:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5588,17 +5498,15 @@ opam:tezos-protocol-000-Ps9mPmXa:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-000-Ps9mPmXa
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5645,7 +5553,7 @@ opam:tezos-protocol-001-PtCJ7pwo:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5658,17 +5566,15 @@ opam:tezos-protocol-001-PtCJ7pwo:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-001-PtCJ7pwo
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5715,7 +5621,7 @@ opam:tezos-protocol-002-PsYLVpVv:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5728,17 +5634,15 @@ opam:tezos-protocol-002-PsYLVpVv:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-002-PsYLVpVv
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5785,7 +5689,7 @@ opam:tezos-protocol-003-PsddFKi3:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5798,17 +5702,15 @@ opam:tezos-protocol-003-PsddFKi3:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-003-PsddFKi3
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5855,7 +5757,7 @@ opam:tezos-protocol-004-Pt24m4xi:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5868,17 +5770,15 @@ opam:tezos-protocol-004-Pt24m4xi:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-004-Pt24m4xi
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5925,7 +5825,7 @@ opam:tezos-protocol-005-PsBABY5H:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -5938,17 +5838,15 @@ opam:tezos-protocol-005-PsBABY5H:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBABY5H
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -5995,7 +5893,7 @@ opam:tezos-protocol-005-PsBabyM1:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6008,17 +5906,15 @@ opam:tezos-protocol-005-PsBabyM1:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBabyM1
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6065,7 +5961,7 @@ opam:tezos-protocol-006-PsCARTHA:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6078,17 +5974,15 @@ opam:tezos-protocol-006-PsCARTHA:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-006-PsCARTHA
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6135,7 +6029,7 @@ opam:tezos-protocol-007-PsDELPH1:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6148,17 +6042,15 @@ opam:tezos-protocol-007-PsDELPH1:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-007-PsDELPH1
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6205,7 +6097,7 @@ opam:tezos-protocol-008-PtEdo2Zk:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6218,17 +6110,15 @@ opam:tezos-protocol-008-PtEdo2Zk:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdo2Zk
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6275,7 +6165,7 @@ opam:tezos-protocol-008-PtEdoTez:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6288,17 +6178,15 @@ opam:tezos-protocol-008-PtEdoTez:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdoTez
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6345,7 +6233,7 @@ opam:tezos-protocol-009-PsFLoren:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6358,17 +6246,15 @@ opam:tezos-protocol-009-PsFLoren:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-009-PsFLoren
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6415,7 +6301,7 @@ opam:tezos-protocol-010-PtGRANAD:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6428,17 +6314,15 @@ opam:tezos-protocol-010-PtGRANAD:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-010-PtGRANAD
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6485,7 +6369,7 @@ opam:tezos-protocol-011-PtHangz2:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6498,17 +6382,15 @@ opam:tezos-protocol-011-PtHangz2:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-011-PtHangz2
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6555,7 +6437,7 @@ opam:tezos-protocol-012-Psithaca:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6568,17 +6450,15 @@ opam:tezos-protocol-012-Psithaca:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-012-Psithaca
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6625,7 +6505,7 @@ opam:tezos-protocol-013-PtJakart:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6638,17 +6518,15 @@ opam:tezos-protocol-013-PtJakart:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-013-PtJakart
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6695,7 +6573,7 @@ opam:tezos-protocol-014-PtKathma:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6708,17 +6586,15 @@ opam:tezos-protocol-014-PtKathma:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-014-PtKathma
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6765,7 +6641,7 @@ opam:tezos-protocol-015-PtLimaPt:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6778,17 +6654,15 @@ opam:tezos-protocol-015-PtLimaPt:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-015-PtLimaPt
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6835,7 +6709,7 @@ opam:tezos-protocol-016-PtMumbai:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6848,17 +6722,15 @@ opam:tezos-protocol-016-PtMumbai:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-016-PtMumbai
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6905,7 +6777,7 @@ opam:tezos-protocol-017-PtNairob:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6918,17 +6790,15 @@ opam:tezos-protocol-017-PtNairob:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-017-PtNairob
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -6975,7 +6845,7 @@ opam:tezos-protocol-018-Proxford:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -6988,17 +6858,15 @@ opam:tezos-protocol-018-Proxford:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-018-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7045,7 +6913,7 @@ opam:tezos-protocol-019-PtParisB:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7058,17 +6926,15 @@ opam:tezos-protocol-019-PtParisB:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-019-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7115,7 +6981,7 @@ opam:tezos-protocol-alpha:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7128,17 +6994,15 @@ opam:tezos-protocol-alpha:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-alpha
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7185,7 +7049,7 @@ opam:tezos-protocol-demo-counter:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7198,17 +7062,15 @@ opam:tezos-protocol-demo-counter:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-counter
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7255,7 +7117,7 @@ opam:tezos-protocol-demo-noops:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7268,17 +7130,15 @@ opam:tezos-protocol-demo-noops:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-noops
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7325,7 +7185,7 @@ opam:tezos-protocol-genesis:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7338,17 +7198,15 @@ opam:tezos-protocol-genesis:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-genesis
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7395,7 +7253,7 @@ opam:tezos-proxy-server-config:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7408,17 +7266,15 @@ opam:tezos-proxy-server-config:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezos-proxy-server-config
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7465,7 +7321,7 @@ opam:tezt-tezos:
   cache:
   - key: opam-sccache
     paths:
-    - _build/_sccache
+    - $CI_PROJECT_DIR/_build/_sccache
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
@@ -7478,17 +7334,15 @@ opam:tezt-tezos:
   - opam install --yes ${package}.dev
   - opam reinstall --yes --with-test ${package}.dev
   after_script:
-  - sccache --stop-server || true
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --stop-server || true
   variables:
     RUNTEZTALIAS: "true"
     package: tezt-tezos
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_LOG: debug
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -7517,18 +7371,25 @@ kaitai_checks:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
     and commit the resulting diff.' ; false)
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     expire_in: 1 hour
     paths:
@@ -7580,19 +7441,26 @@ oc.check_lift_limits_patch:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) =
     "src/proto_alpha/lib_protocol/main.ml" ]'
   - git apply src/bin_tps_evaluation/lift_limits.patch
   - dune build @src/proto_alpha/lib_protocol/check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.misc_checks:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -7726,16 +7594,23 @@ oc.integration:compiler-rejections:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_rejections
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
@@ -7790,17 +7665,24 @@ oc.script:snapshot_alpha_and_link:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
@@ -7901,16 +7783,24 @@ test_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7929,16 +7819,24 @@ test_etherlink_kernel:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk check
   - make -f etherlink.mk test
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7956,15 +7854,23 @@ test_etherlink_firehose:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C etherlink/firehose check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7982,15 +7888,23 @@ check_riscv_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv check
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 test_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -8008,16 +7922,24 @@ test_riscv_kernels:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv test
   - make -C src/riscv audit
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -8036,18 +7958,26 @@ test_evm_compatibility:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
   - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
   - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
     -c
+  after_script:
+  - sccache --stop-server || true
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -8074,19 +8004,26 @@ oc.unit:non-proto-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8125,19 +8062,26 @@ oc.unit:other-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-other-unit
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8176,19 +8120,26 @@ oc.unit:proto-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-proto-unit
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8227,19 +8178,26 @@ oc.unit:non-proto-arm64:
   dependencies:
   - oc.docker:ci:arm64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  after_script:
+  - sccache --stop-server || true
   variables:
     ARCH: arm64
     MAKE_TARGETS: test-nonproto-unit test-webassembly
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -8342,16 +8300,23 @@ oc.unit:protocol_compiles:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_compile_protocol
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 de.unit:x86_64:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -9218,15 +9183,22 @@ documentation:odoc:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C docs odoc-lite
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     expire_in: 1 hour
     paths:
@@ -9261,15 +9233,22 @@ documentation:manuals:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/documentation:manuals.sh
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     expire_in: 1 week
     paths:
@@ -9305,15 +9284,22 @@ documentation:docgen:
   dependencies:
   - oc.docker:ci:amd64
   cache:
-    key: cargo-$CI_JOB_NAME_SLUG
+  - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
   before_script:
   - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
   script:
   - make -C docs -j docexes-gen
+  after_script:
+  - sccache --stop-server || true
   variables:
     CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
   artifacts:
     expire_in: 1 week
     paths:

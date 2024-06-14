@@ -94,12 +94,7 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
         ("package", name);
       ]
     ~before_script:
-      (before_script
-         ~eval_opam:true
-         [
-           "mkdir -p $CI_PROJECT_DIR/opam_logs";
-           ". ./scripts/ci/sccache-start.sh";
-         ])
+      (before_script ~eval_opam:true ["mkdir -p $CI_PROJECT_DIR/opam_logs"])
     [
       "opam remote add dev-repo ./_opam-repo-for-release";
       "opam install --yes ${package}.dev";
@@ -110,21 +105,19 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
        a second opam environment initialization. *)
     ~after_script:
       [
-        "sccache --stop-server || true";
         "eval $(opam env)";
         "OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh";
       ]
     ~artifacts:
       (artifacts ~expire_in:(Duration (Weeks 1)) ~when_:Always ["opam_logs/"])
-    ~cache:[{key = "opam-sccache"; paths = ["_build/_sccache"]}]
   |> (* We store caches in [_build] for two reasons: (1) the [_build]
         folder is excluded from opam's rsync. (2) gitlab ci cache
         requires that cached files are in a sub-folder of the checkout. *)
   enable_sccache
+    ~key:"opam-sccache"
     ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
     ~idle_timeout:"0"
-    ~log:"debug"
-    ~dir:"$CI_PROJECT_DIR/_build/_sccache"
+    ~path:"$CI_PROJECT_DIR/_build/_sccache"
   |> enable_cargo_cache
 
 let ci_opam_package_tests = "script-inputs/ci-opam-package-tests"
@@ -575,8 +568,9 @@ let jobs pipeline_type =
              "src/riscv/riscv-dummy.elf";
              "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
            ])
-      ~cache:[{key = "kernels-sccache"; paths = ["_sccache"]}]
-    |> enable_kernels |> enable_cargo_cache |> enable_sccache
+    |> enable_kernels
+    |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
+    |> enable_cargo_cache
   in
   (* Fetch records for Tezt generated on the last merge request pipeline
          on the most recently merged MR and makes them available in artifacts
@@ -655,7 +649,7 @@ let jobs pipeline_type =
              ~eval_opam:true
              [])
         ["dune build @check"]
-      |> enable_cargo_cache
+      |> enable_cargo_cache |> enable_sccache
     in
     let build_octez_source =
       (* We check compilation of the octez tarball on scheduled
@@ -684,7 +678,7 @@ let jobs pipeline_type =
           "eval $(opam env)";
           "make octez";
         ]
-      |> enable_cargo_cache
+      |> enable_cargo_cache |> enable_sccache
     in
     [
       job_build_arm64_release;
@@ -764,7 +758,7 @@ let jobs pipeline_type =
              ~expire_in:(Duration (Hours 1))
              ~when_:On_success
              ["_build/default/client-libs/bin_codec_kaitai/codec.exe"])
-      |> enable_cargo_cache
+      |> enable_cargo_cache |> enable_sccache
     in
     let job_kaitai_e2e_checks =
       job
@@ -810,7 +804,7 @@ let jobs pipeline_type =
           "git apply src/bin_tps_evaluation/lift_limits.patch";
           "dune build @src/proto_alpha/lib_protocol/check";
         ]
-      |> enable_cargo_cache
+      |> enable_cargo_cache |> enable_sccache
     in
     let job_oc_misc_checks : tezos_job =
       job
@@ -951,7 +945,7 @@ let jobs pipeline_type =
                ~when_:Always)
           ~before_script:(before_script ~source_version:true ~eval_opam:true [])
           script
-        |> enable_cargo_cache
+        |> enable_cargo_cache |> enable_sccache
       in
       let oc_unit_non_proto_x86_64 =
         job_unit_test
@@ -1044,7 +1038,7 @@ let jobs pipeline_type =
           ~rules
           ~before_script:(before_script ~source_version:true ~eval_opam:true [])
           ["dune build @runtest_compile_protocol"]
-        |> enable_cargo_cache
+        |> enable_cargo_cache |> enable_sccache
       in
       (* "de" stands for data-encoding, since data-encoding is considered
          to be a separate product. *)
@@ -1090,7 +1084,7 @@ let jobs pipeline_type =
              [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         ["dune build @runtest_rejections"]
-      |> enable_cargo_cache
+      |> enable_cargo_cache |> enable_sccache
     in
     let job_oc_script_test_gen_genesis : tezos_job =
       job
@@ -1120,7 +1114,7 @@ let jobs pipeline_type =
              ~eval_opam:true
              [])
         ["./scripts/ci/script:snapshot_alpha_and_link.sh"]
-      |> enable_cargo_cache
+      |> enable_cargo_cache |> enable_sccache
     in
     let job_oc_script_test_release_versions : tezos_job =
       job
@@ -1485,7 +1479,7 @@ let jobs pipeline_type =
           ~stage
           ~rules:(make_rules ~dependent:true ~changes ())
           script
-        |> enable_kernels |> enable_cargo_cache
+        |> enable_kernels |> enable_cargo_cache |> enable_sccache
       in
       let job_test_kernels : tezos_job =
         make_job_kernel
@@ -1687,7 +1681,7 @@ let jobs pipeline_type =
                (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
                ["docs/_build/api/odoc/"; "docs/odoc.log"])
           ["make -C docs odoc-lite"]
-        |> enable_cargo_cache
+        |> enable_cargo_cache |> enable_sccache
       in
       let job_manuals =
         job
@@ -1708,7 +1702,7 @@ let jobs pipeline_type =
                  "docs/user/node-config.json";
                ])
           ["./scripts/ci/documentation:manuals.sh"]
-        |> enable_cargo_cache
+        |> enable_cargo_cache |> enable_sccache
       in
       let job_docgen =
         job
@@ -1730,7 +1724,7 @@ let jobs pipeline_type =
                  "docs/shell/p2p_api.rst";
                ])
           ["make -C docs -j docexes-gen"]
-        |> enable_cargo_cache
+        |> enable_cargo_cache |> enable_sccache
       in
       let doc_build_dependencies =
         Dependent

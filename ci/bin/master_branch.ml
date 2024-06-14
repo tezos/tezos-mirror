@@ -132,7 +132,7 @@ let jobs =
         (* Manually set SSL_CERT_DIR as default setting points to empty dir *)
         "SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk";
       ]
-    |> enable_cargo_cache
+    |> enable_cargo_cache |> enable_sccache
   in
   (* arm builds are manual on the master branch pipeline *)
   let build_arm_rules = [job_rule ~when_:Manual ~allow_failure:Yes ()] in
@@ -153,7 +153,7 @@ let jobs =
     (* Stage: test_coverage *)
     job_unified_coverage_default;
     (* Stage: doc *)
-    job_publish_documentation |> enable_cargo_cache;
+    job_publish_documentation |> enable_cargo_cache |> enable_sccache;
     (* Stage: prepare_release *)
     job_docker_merge_manifests;
     (* Stage: manual *)
