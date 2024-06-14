@@ -3,10 +3,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{cli::RvemuOptions, console::Console};
+use crate::cli::RvemuOptions;
 use rvemu::emulator::Emulator;
 use std::error::Error;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_smart_rollup::utils::console::Console;
 use tezos_smart_rollup::utils::inbox;
 use tezos_smart_rollup_encoding::{
     michelson::MichelsonUnit, public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,

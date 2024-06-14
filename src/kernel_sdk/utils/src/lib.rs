@@ -5,4 +5,5 @@
 //! Utilities related to smart rollups, but expected to be
 //! used within a kernel - instead, for example, for testing.
 
+pub mod console;
 pub mod inbox;
