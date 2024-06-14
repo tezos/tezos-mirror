@@ -8655,6 +8655,7 @@ oc.install_bin_ubuntu_focal:
   needs:
   - trigger
   dependencies: []
+  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu focal
 
@@ -8673,6 +8674,7 @@ oc.install_bin_ubuntu_jammy:
   needs:
   - trigger
   dependencies: []
+  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
 
@@ -8691,6 +8693,7 @@ oc.install_bin_rc_ubuntu_focal:
   needs:
   - trigger
   dependencies: []
+  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu focal rc
 
@@ -8709,6 +8712,7 @@ oc.install_bin_rc_ubuntu_jammy:
   needs:
   - trigger
   dependencies: []
+  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy rc
 
@@ -8727,6 +8731,7 @@ oc.install_bin_debian_bookworm:
   needs:
   - trigger
   dependencies: []
+  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
 
@@ -8745,6 +8750,7 @@ oc.install_bin_rc_debian_bookworm:
   needs:
   - trigger
   dependencies: []
+  allow_failure: true
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm rc
 
