@@ -7795,6 +7795,9 @@ test_kernels:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -7824,6 +7827,9 @@ test_etherlink_kernel:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -7853,6 +7859,9 @@ test_etherlink_firehose:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -7909,6 +7918,9 @@ test_riscv_kernels:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - check_riscv_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -7938,6 +7950,9 @@ test_evm_compatibility:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
