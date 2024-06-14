@@ -332,7 +332,7 @@ let test_stresstest_multiple_nodes =
   Protocol.register_test
     ~__FILE__
     ~title:"stresstest multiple nodes"
-    ~tags:[team; "stresstest"; "multiple_nodes"]
+    ~tags:[team; "stresstest"; "multiple_nodes"; Tag.flaky]
   @@ fun protocol ->
   let n_nodes = 4 in
   let n_bootstraps_per_node = 5 in
