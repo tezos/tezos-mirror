@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -eu
+
 # TODO: https://github.com/mozilla/sccache/issues/2076
 # Once the above-described race-condition has been resolved, we can
 # upgrade sccache and do away with this wrapper.
