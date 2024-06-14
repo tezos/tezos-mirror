@@ -274,11 +274,12 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   in
   job
   |> append_variables
-       ([("SCCACHE_DIR", path); ("RUSTC_WRAPPER", "sccache")]
+       ([("SCCACHE_DIR", path)]
        @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
        @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
        @ opt_var "SCCACHE_LOG" Fun.id log)
   |> append_cache {key; paths = [path]}
+  (* Starts sccache and sets [RUSTC_WRAPPER] *)
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
   |> append_after_script ["sccache --stop-server || true"]
 

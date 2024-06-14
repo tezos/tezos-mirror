@@ -73,7 +73,6 @@ oc.build:static-x86_64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 90 days
     paths:
@@ -106,7 +105,6 @@ oc.build:static-arm64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 90 days
     paths:

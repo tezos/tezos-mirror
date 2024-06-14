@@ -142,7 +142,6 @@ oc.build_arm64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -186,7 +185,6 @@ oc.build_arm64-exp-dev-extra:
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -227,7 +225,6 @@ oc.build:static-x86_64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -262,7 +259,6 @@ oc.build_x86_64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -307,7 +303,6 @@ oc.build_x86_64-exp-dev-extra:
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -348,7 +343,6 @@ ocaml-check:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -379,7 +373,6 @@ oc.build_kernels:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
     CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
@@ -478,7 +471,6 @@ build_octez_source:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 oc.build:dpkg:amd64:
   image: $DISTRIBUTION
@@ -667,7 +659,6 @@ opam:bls12-381:
     RUNTEZTALIAS: "true"
     package: bls12-381
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -734,7 +725,6 @@ opam:octez-accuser-Proxford:
     RUNTEZTALIAS: "true"
     package: octez-accuser-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -801,7 +791,6 @@ opam:octez-accuser-PtParisB:
     RUNTEZTALIAS: "true"
     package: octez-accuser-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -870,7 +859,6 @@ opam:octez-alcotezt:
     RUNTEZTALIAS: "true"
     package: octez-alcotezt
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -937,7 +925,6 @@ opam:octez-baker-Proxford:
     RUNTEZTALIAS: "true"
     package: octez-baker-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1004,7 +991,6 @@ opam:octez-baker-PtParisB:
     RUNTEZTALIAS: "true"
     package: octez-baker-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1071,7 +1057,6 @@ opam:octez-client:
     RUNTEZTALIAS: "true"
     package: octez-client
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1138,7 +1123,6 @@ opam:octez-codec:
     RUNTEZTALIAS: "true"
     package: octez-codec
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1207,7 +1191,6 @@ opam:octez-crawler:
     RUNTEZTALIAS: "true"
     package: octez-crawler
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1274,7 +1257,6 @@ opam:octez-dac-client:
     RUNTEZTALIAS: "true"
     package: octez-dac-client
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1341,7 +1323,6 @@ opam:octez-dac-node:
     RUNTEZTALIAS: "true"
     package: octez-dac-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1408,7 +1389,6 @@ opam:octez-dal-node:
     RUNTEZTALIAS: "true"
     package: octez-dal-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1477,7 +1457,6 @@ opam:octez-distributed-internal:
     RUNTEZTALIAS: "true"
     package: octez-distributed-internal
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1546,7 +1525,6 @@ opam:octez-distributed-lwt-internal:
     RUNTEZTALIAS: "true"
     package: octez-distributed-lwt-internal
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1613,7 +1591,6 @@ opam:octez-evm-node:
     RUNTEZTALIAS: "true"
     package: octez-evm-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1682,7 +1659,6 @@ opam:octez-evm-node-libs:
     RUNTEZTALIAS: "true"
     package: octez-evm-node-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1751,7 +1727,6 @@ opam:octez-injector:
     RUNTEZTALIAS: "true"
     package: octez-injector
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1820,7 +1795,6 @@ opam:octez-internal-libs:
     RUNTEZTALIAS: "true"
     package: octez-internal-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1889,7 +1863,6 @@ opam:octez-l2-libs:
     RUNTEZTALIAS: "true"
     package: octez-l2-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1958,7 +1931,6 @@ opam:octez-libs:
     RUNTEZTALIAS: "true"
     package: octez-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2025,7 +1997,6 @@ opam:octez-node:
     RUNTEZTALIAS: "true"
     package: octez-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2094,7 +2065,6 @@ opam:octez-node-config:
     RUNTEZTALIAS: "true"
     package: octez-node-config
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2163,7 +2133,6 @@ opam:octez-proto-libs:
     RUNTEZTALIAS: "true"
     package: octez-proto-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2232,7 +2201,6 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-000-Ps9mPmXa-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2301,7 +2269,6 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-001-PtCJ7pwo-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2370,7 +2337,6 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-002-PsYLVpVv-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2439,7 +2405,6 @@ opam:octez-protocol-003-PsddFKi3-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-003-PsddFKi3-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2508,7 +2473,6 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-004-Pt24m4xi-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2577,7 +2541,6 @@ opam:octez-protocol-005-PsBabyM1-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-005-PsBabyM1-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2646,7 +2609,6 @@ opam:octez-protocol-006-PsCARTHA-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-006-PsCARTHA-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2715,7 +2677,6 @@ opam:octez-protocol-007-PsDELPH1-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-007-PsDELPH1-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2784,7 +2745,6 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-008-PtEdo2Zk-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2853,7 +2813,6 @@ opam:octez-protocol-009-PsFLoren-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-009-PsFLoren-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2922,7 +2881,6 @@ opam:octez-protocol-010-PtGRANAD-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-010-PtGRANAD-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2991,7 +2949,6 @@ opam:octez-protocol-011-PtHangz2-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-011-PtHangz2-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3060,7 +3017,6 @@ opam:octez-protocol-012-Psithaca-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-012-Psithaca-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3129,7 +3085,6 @@ opam:octez-protocol-013-PtJakart-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-013-PtJakart-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3198,7 +3153,6 @@ opam:octez-protocol-014-PtKathma-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-014-PtKathma-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3267,7 +3221,6 @@ opam:octez-protocol-015-PtLimaPt-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-015-PtLimaPt-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3336,7 +3289,6 @@ opam:octez-protocol-016-PtMumbai-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-016-PtMumbai-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3405,7 +3357,6 @@ opam:octez-protocol-017-PtNairob-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-017-PtNairob-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3474,7 +3425,6 @@ opam:octez-protocol-018-Proxford-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-018-Proxford-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3543,7 +3493,6 @@ opam:octez-protocol-019-PtParisB-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-019-PtParisB-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3612,7 +3561,6 @@ opam:octez-protocol-alpha-libs:
     RUNTEZTALIAS: "true"
     package: octez-protocol-alpha-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3679,7 +3627,6 @@ opam:octez-protocol-compiler:
     RUNTEZTALIAS: "true"
     package: octez-protocol-compiler
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3746,7 +3693,6 @@ opam:octez-proxy-server:
     RUNTEZTALIAS: "true"
     package: octez-proxy-server
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3815,7 +3761,6 @@ opam:octez-riscv-api:
     RUNTEZTALIAS: "true"
     package: octez-riscv-api
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3884,7 +3829,6 @@ opam:octez-riscv-pvm:
     RUNTEZTALIAS: "true"
     package: octez-riscv-pvm
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -3953,7 +3897,6 @@ opam:octez-rpc-process:
     RUNTEZTALIAS: "true"
     package: octez-rpc-process
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4022,7 +3965,6 @@ opam:octez-rust-deps:
     RUNTEZTALIAS: "true"
     package: octez-rust-deps
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4091,7 +4033,6 @@ opam:octez-shell-libs:
     RUNTEZTALIAS: "true"
     package: octez-shell-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4158,7 +4099,6 @@ opam:octez-signer:
     RUNTEZTALIAS: "true"
     package: octez-signer
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4225,7 +4165,6 @@ opam:octez-smart-rollup-node:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4294,7 +4233,6 @@ opam:octez-smart-rollup-node-Proxford:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4363,7 +4301,6 @@ opam:octez-smart-rollup-node-PtNairob:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtNairob
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4432,7 +4369,6 @@ opam:octez-smart-rollup-node-PtParisB:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4501,7 +4437,6 @@ opam:octez-smart-rollup-node-alpha:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-alpha
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4570,7 +4505,6 @@ opam:octez-smart-rollup-node-lib:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4637,7 +4571,6 @@ opam:octez-smart-rollup-wasm-debugger:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4706,7 +4639,6 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4775,7 +4707,6 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-plugin
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4842,7 +4773,6 @@ opam:octez-version:
     RUNTEZTALIAS: "true"
     package: octez-version
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4911,7 +4841,6 @@ opam:tezos-benchmark:
     RUNTEZTALIAS: "true"
     package: tezos-benchmark
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -4980,7 +4909,6 @@ opam:tezos-client-demo-counter:
     RUNTEZTALIAS: "true"
     package: tezos-client-demo-counter
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5049,7 +4977,6 @@ opam:tezos-client-genesis:
     RUNTEZTALIAS: "true"
     package: tezos-client-genesis
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5118,7 +5045,6 @@ opam:tezos-dac-client-lib:
     RUNTEZTALIAS: "true"
     package: tezos-dac-client-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5187,7 +5113,6 @@ opam:tezos-dac-lib:
     RUNTEZTALIAS: "true"
     package: tezos-dac-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5256,7 +5181,6 @@ opam:tezos-dac-node-lib:
     RUNTEZTALIAS: "true"
     package: tezos-dac-node-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5325,7 +5249,6 @@ opam:tezos-dal-node-lib:
     RUNTEZTALIAS: "true"
     package: tezos-dal-node-lib
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5394,7 +5317,6 @@ opam:tezos-dal-node-services:
     RUNTEZTALIAS: "true"
     package: tezos-dal-node-services
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5463,7 +5385,6 @@ opam:tezos-openapi:
     RUNTEZTALIAS: "true"
     package: tezos-openapi
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5532,7 +5453,6 @@ opam:tezos-protocol-000-Ps9mPmXa:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-000-Ps9mPmXa
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5601,7 +5521,6 @@ opam:tezos-protocol-001-PtCJ7pwo:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-001-PtCJ7pwo
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5670,7 +5589,6 @@ opam:tezos-protocol-002-PsYLVpVv:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-002-PsYLVpVv
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5739,7 +5657,6 @@ opam:tezos-protocol-003-PsddFKi3:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-003-PsddFKi3
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5808,7 +5725,6 @@ opam:tezos-protocol-004-Pt24m4xi:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-004-Pt24m4xi
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5877,7 +5793,6 @@ opam:tezos-protocol-005-PsBABY5H:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBABY5H
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -5946,7 +5861,6 @@ opam:tezos-protocol-005-PsBabyM1:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBabyM1
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6015,7 +5929,6 @@ opam:tezos-protocol-006-PsCARTHA:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-006-PsCARTHA
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6084,7 +5997,6 @@ opam:tezos-protocol-007-PsDELPH1:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-007-PsDELPH1
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6153,7 +6065,6 @@ opam:tezos-protocol-008-PtEdo2Zk:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdo2Zk
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6222,7 +6133,6 @@ opam:tezos-protocol-008-PtEdoTez:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdoTez
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6291,7 +6201,6 @@ opam:tezos-protocol-009-PsFLoren:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-009-PsFLoren
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6360,7 +6269,6 @@ opam:tezos-protocol-010-PtGRANAD:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-010-PtGRANAD
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6429,7 +6337,6 @@ opam:tezos-protocol-011-PtHangz2:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-011-PtHangz2
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6498,7 +6405,6 @@ opam:tezos-protocol-012-Psithaca:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-012-Psithaca
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6567,7 +6473,6 @@ opam:tezos-protocol-013-PtJakart:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-013-PtJakart
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6636,7 +6541,6 @@ opam:tezos-protocol-014-PtKathma:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-014-PtKathma
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6705,7 +6609,6 @@ opam:tezos-protocol-015-PtLimaPt:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-015-PtLimaPt
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6774,7 +6677,6 @@ opam:tezos-protocol-016-PtMumbai:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-016-PtMumbai
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6843,7 +6745,6 @@ opam:tezos-protocol-017-PtNairob:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-017-PtNairob
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6912,7 +6813,6 @@ opam:tezos-protocol-018-Proxford:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-018-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -6981,7 +6881,6 @@ opam:tezos-protocol-019-PtParisB:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-019-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7050,7 +6949,6 @@ opam:tezos-protocol-alpha:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-alpha
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7119,7 +7017,6 @@ opam:tezos-protocol-demo-counter:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-counter
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7188,7 +7085,6 @@ opam:tezos-protocol-demo-noops:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-noops
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7257,7 +7153,6 @@ opam:tezos-protocol-genesis:
     RUNTEZTALIAS: "true"
     package: tezos-protocol-genesis
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7326,7 +7221,6 @@ opam:tezos-proxy-server-config:
     RUNTEZTALIAS: "true"
     package: tezos-proxy-server-config
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7395,7 +7289,6 @@ opam:tezt-tezos:
     RUNTEZTALIAS: "true"
     package: tezt-tezos
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -7435,7 +7328,6 @@ kaitai_checks:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 hour
     paths:
@@ -7492,7 +7384,6 @@ oc.check_lift_limits_patch:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 oc.misc_checks:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -7590,7 +7481,6 @@ oc.integration:compiler-rejections:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
@@ -7635,7 +7525,6 @@ oc.script:snapshot_alpha_and_link:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
@@ -7723,7 +7612,6 @@ test_kernels:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7753,7 +7641,6 @@ test_etherlink_kernel:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7782,7 +7669,6 @@ test_etherlink_firehose:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7811,7 +7697,6 @@ check_riscv_kernels:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 test_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7841,7 +7726,6 @@ test_riscv_kernels:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -7873,7 +7757,6 @@ test_evm_compatibility:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -7909,7 +7792,6 @@ oc.unit:non-proto-x86_64:
     MAKE_TARGETS: test-nonproto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -7957,7 +7839,6 @@ oc.unit:other-x86_64:
     MAKE_TARGETS: test-other-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8005,7 +7886,6 @@ oc.unit:proto-x86_64:
     MAKE_TARGETS: test-proto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -8053,7 +7933,6 @@ oc.unit:non-proto-arm64:
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -8140,7 +8019,6 @@ oc.unit:protocol_compiles:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
 
 de.unit:x86_64:
   image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
@@ -8762,7 +8640,6 @@ documentation:odoc:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 hour
     paths:
@@ -8796,7 +8673,6 @@ documentation:manuals:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 week
     paths:
@@ -8831,7 +8707,6 @@ documentation:docgen:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    RUSTC_WRAPPER: sccache
   artifacts:
     expire_in: 1 week
     paths:
