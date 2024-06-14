@@ -57,6 +57,7 @@ Node
    - store merge start/end events are now Cyan
    - update to protocol table is now Blue
 
+- Removed Oxford mempool plugin. (MR :gl:`!13798`)
 
 Client
 ------
