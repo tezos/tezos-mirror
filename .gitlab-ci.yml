@@ -30,9 +30,6 @@ variables:
   BLST_PORTABLE: "yes"
   DOCKER_BUILDKIT: "1"
   DOCKER_CLI_EXPERIMENTAL: enabled
-  # See https://stackoverflow.com/a/76436638 for DOCKER_HOST and DOCKER_TLS_CERTDIR variable
-  DOCKER_HOST: "tcp://docker:2375"
-  DOCKER_TLS_CERTDIR: ""
 
 # ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
 workflow:
@@ -79,19 +76,26 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       allow_failure: true
 
-.docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
-
-.wait-for-docker-daemon: &wait-for-docker-daemon "while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done"
-
-.setup-docker-buildx: &setup-docker-buildx
-  - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
-  - docker buildx create --name teztale-dependencies --use --driver docker-container
-  - docker buildx inspect --bootstrap
-
 .apply-proto-alpha-patch:
   &apply-proto-alpha-patch # Without this option git will fail when trying to `git am < ProtoALpha.git.patch`
   - git config --global --add safe.directory $(pwd)
   - git am < ProtoALpha.git.patch
+
+.docker:dind:
+  image: docker:latest
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
+  services:
+    - docker:dind
+  before_script:
+    - while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done
+    - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
+    - docker buildx create --name teztale-dependencies --use --driver docker-container
+    - docker buildx inspect --bootstrap
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - set -xv
+    - docker version
+    - docker buildx version
 
 ################
 # SANITY CHECK #
@@ -116,19 +120,8 @@ check:
 # Build or update the docker image that will be used for the build job
 .prepare:
   stage: prepare
-  image: docker:latest
-  tags:
-    - ${DEFAULT_RUNNER_TAG}
-  services:
-    - docker:dind
-  before_script:
-    - *wait-for-docker-daemon
-    - *setup-docker-buildx
-    - *docker-login
+  extends: .docker:dind
   script:
-    - set -xv
-    - docker version
-    - docker buildx version
     - docker manifest inspect "${BUILD_CONTAINER_NAME}" && export DOCKER_ARGS="--build-arg BASE=${BUILD_CONTAINER_NAME}" && export OPAM_INSTALL_ARGS=--criteria="-changed,-removed" || export DOCKER_ARGS="" && export OPAM_INSTALL_ARGS=
     - echo DOCKER_ARGS="${DOCKER_ARGS}" OCTEZ_BRANCH="${OCTEZ_BRANCH}" OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}"
     - docker buildx build --platform linux/arm64/v8,linux/amd64 -t "${BUILD_CONTAINER_NAME}" ${DOCKER_ARGS} --build-arg OCTEZ_BRANCH="${OCTEZ_BRANCH}" --build-arg OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}" --push -f Dockerfile.dependencies .
@@ -252,18 +245,11 @@ release:canary:
 
 .docker:release:
   stage: docker
-  image: docker:latest
-  tags:
-    - ${DEFAULT_RUNNER_TAG}
-  services:
-    - docker:dind
+  extends: .docker:dind
   before_script:
     - !reference [.rename-build-artifacts, before_script]
-    - *wait-for-docker-daemon
-    - *setup-docker-buildx
-    - *docker-login
+    - !reference [.docker:dind, before_script]
   script:
-    - set -xv
     - >
       for BIN in archiver server ; do
         docker buildx build --platform linux/arm64/v8,linux/amd64 -t ${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG} --push -f Dockerfile.$BIN . ;
