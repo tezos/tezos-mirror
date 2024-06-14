@@ -1504,11 +1504,11 @@ let check_published_commitment_in_l1 ?(force_new_level = true) sc_rollup client
     (published_commitment, "published") ;
   unit
 
-let test_commitment_scenario ?supports ?commitment_period ?challenge_window
-    ?(extra_tags = []) ~variant =
+let test_commitment_scenario ?supports ?(commitment_period = 10)
+    ?challenge_window ?(extra_tags = []) ~variant =
   test_full_scenario
     ?supports
-    ?commitment_period
+    ~commitment_period
     ?challenge_window
     {
       tags = ["commitment"] @ extra_tags;
