@@ -292,7 +292,7 @@ let save config =
 
 let load ~data_dir =
   let open Lwt_result_syntax in
-  let+ json =
+  let* json =
     let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
     match json with
     | Ok json -> return json
@@ -300,7 +300,10 @@ let load ~data_dir =
     | Error e -> fail e
   in
   let config = Data_encoding.Json.destruct encoding json in
-  {config with data_dir}
+  let config = {config with data_dir} in
+  (* We save the config so that its format is that of the latest version. *)
+  let* () = save config in
+  return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
