@@ -7,3 +7,4 @@
 
 pub mod console;
 pub mod inbox;
+pub mod native_cli;

@@ -63,11 +63,9 @@ unsafe impl SmartRollupCore for MockHost {
     }
 
     unsafe fn write_debug(&self, src: *const u8, num_bytes: usize) {
-        let debug_out = from_raw_parts(src, num_bytes).to_vec();
+        let debug_out = from_raw_parts(src, num_bytes);
 
-        let debug = String::from_utf8(debug_out).expect("unexpected non-utf8 debug log");
-
-        eprint!("{}", &debug);
+        self.debug_log.borrow_mut().write_all(debug_out).unwrap();
     }
 
     unsafe fn write_output(&self, src: *const u8, num_bytes: usize) -> i32 {

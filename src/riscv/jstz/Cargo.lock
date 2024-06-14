@@ -2132,6 +2132,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
+ "tezos-smart-rollup-utils",
 ]
 
 [[package]]
