@@ -63,6 +63,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
     (slot_id : Types.slot_id) ~number_of_already_stored_shards
     ~number_of_needed_shards ~number_of_shards gs_worker proto_parameters =
   let open Lwt_result_syntax in
+  Dal_metrics.reconstruction_started () ;
   let*! () =
     Event.(
       emit
@@ -174,6 +175,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
         Event.(
           emit reconstruct_finished (slot_id.slot_level, slot_id.slot_index))
       in
+      Dal_metrics.reconstruction_done () ;
       return_unit
 
 let try_amplification (node_store : Store.t) commitment
@@ -253,14 +255,15 @@ let try_amplification (node_store : Store.t) commitment
         in
         (* If we have received all the shards while waiting the random
            delay, there is no point in reconstructing anymore *)
-        if number_of_already_stored_shards = number_of_shards then
+        if number_of_already_stored_shards = number_of_shards then (
           let*! () =
             Event.(
               emit
                 reconstruct_no_missing_shard
                 (slot_id.slot_level, slot_id.slot_index))
           in
-          return_unit
+          Dal_metrics.reconstruction_aborted () ;
+          return_unit)
         else
           amplify
             node_store
