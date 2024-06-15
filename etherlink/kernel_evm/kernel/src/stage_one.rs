@@ -102,9 +102,14 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
-    _dal: Option<DalConfiguration>,
+    dal: Option<DalConfiguration>,
     enable_fa_bridge: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
+    if let Some(_dal_config) = dal {
+        log!(host, Info, "Revealing DAL parameters");
+        let params = host.reveal_dal_parameters();
+        log!(host, Info, "DAL params: {:?}", params);
+    };
     match read_sequencer_inbox(
         host,
         smart_rollup_address,
