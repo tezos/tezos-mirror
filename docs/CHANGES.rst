@@ -3,6 +3,20 @@
 Changelog
 '''''''''
 
+Version 20.1
+============
+
+General
+-------
+
+- Added binaries for ParisC. (MR :gl:`!13747`)
+
+Smart Rollup node
+-----------------
+
+- New command ``repair commitments`` which allows the rollup node to recompute
+  correct commitments for a protocol upgrade which did not. (MR :gl:`!13615`)
+
 Version 20.0
 ============
 
