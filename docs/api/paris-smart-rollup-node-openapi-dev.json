@@ -2,8 +2,8 @@
   "info":
     { "title": "Smart Rollup Node RPCs",
       "description":
-        "Smart Rollup Node RPC API for protocol PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ",
-      "version": "Octez 0.0+dev (4fe3cc43)" },
+        "Smart Rollup Node RPC API for protocol PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi",
+      "version": "Octez 20.1 (1a991a03)" },
   "paths":
     { "/describe":
         { "get":
@@ -589,10 +589,10 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -618,13 +618,13 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -703,10 +703,10 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -732,13 +732,13 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -898,10 +898,10 @@
                                                                     "properties":
                                                                     { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -929,13 +929,13 @@
                                                                     "properties":
                                                                     { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -1852,12 +1852,12 @@
                                     "The full list of errors is available with the global RPC `GET errors`" } } } } } } } },
   "components":
     { "schemas":
-        { "019-PtParisB.contract_id.originated":
+        { "020-PsParisC.contract_id.originated":
             { "title": "A contract handle -- originated account",
               "description":
                 "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
-          "019-PtParisB.michelson.v1.primitives":
+          "020-PsParisC.michelson.v1.primitives":
             { "type": "string",
               "enum":
                 [ "SHA256", "GT", "RIGHT", "SAPLING_EMPTY_STATE", "False",
@@ -2017,7 +2017,7 @@
                     "properties":
                       { "kind": { "type": "string", "enum": [ "Padding" ] } },
                     "required": [ "kind" ] } ] },
-          "micheline.019-PtParisB.michelson_v1.expression":
+          "micheline.020-PsParisC.michelson_v1.expression":
             { "oneOf":
                 [ { "title": "Int", "type": "object",
                     "properties":
@@ -2037,7 +2037,7 @@
                   { "title": "Sequence", "type": "array",
                     "items":
                       { "$ref":
-                          "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" } },
+                          "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" } },
                   { "title": "Prim__generic",
                     "description":
                       "Generic primitive (any number of args with or without annotations)",
@@ -2045,12 +2045,12 @@
                     "properties":
                       { "prim":
                           { "$ref":
-                              "#/components/schemas/019-PtParisB.michelson.v1.primitives" },
+                              "#/components/schemas/020-PsParisC.michelson.v1.primitives" },
                         "args":
                           { "type": "array",
                             "items":
                               { "$ref":
-                                  "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" } },
+                                  "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" } },
                         "annots":
                           { "type": "array",
                             "items":
