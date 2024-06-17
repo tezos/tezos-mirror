@@ -20,6 +20,7 @@
    (-> void_for_linking-octez_smart_rollup_node_PtNairob.empty))
   octez_smart_rollup_node_Proxford
   octez_smart_rollup_node_PtParisB
+  octez_smart_rollup_node_PsParisC
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))

@@ -1,0 +1,24 @@
+
+./octez-client --mode mockup normalize type nat
+nat
+
+./octez-client --mode mockup normalize type 'list nat'
+list nat
+
+./octez-client --mode mockup normalize type 'pair nat int'
+pair nat int
+
+./octez-client --mode mockup normalize type 'list (pair nat int)'
+list (pair nat int)
+
+./octez-client --mode mockup normalize type 'pair nat int bool'
+pair nat (pair int bool)
+
+./octez-client --mode mockup normalize type 'list (pair nat int bool)'
+list (pair nat (pair int bool))
+
+./octez-client --mode mockup normalize type 'pair nat int bool bytes'
+pair nat (pair int (pair bool bytes))
+
+./octez-client --mode mockup normalize type 'list (pair nat int bool bytes)'
+list (pair nat (pair int (pair bool bytes)))

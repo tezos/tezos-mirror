@@ -26,6 +26,8 @@ depends: [
   "octez-protocol-018-Proxford-libs" { = version }
   "tezos-protocol-019-PtParisB" { = version }
   "octez-protocol-019-PtParisB-libs" { = version }
+  "tezos-protocol-020-PsParisC" { = version }
+  "octez-protocol-020-PsParisC-libs" { = version }
 ]
 depopts: [
   "tezos-protocol-genesis"

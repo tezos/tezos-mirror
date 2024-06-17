@@ -1,0 +1,44 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_020_PsParisC)
+ (public_name tezos-benchmarks-proto-020-PsParisC)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  tezos-protocol-020-PsParisC.parameters
+  octez-libs.lazy-containers
+  tezos-benchmark
+  tezos-benchmark-020-PsParisC
+  tezos-benchmark-type-inference-020-PsParisC
+  tezos-protocol-020-PsParisC.protocol
+  octez-libs.crypto
+  octez-shell-libs.shell-benchmarks
+  octez-libs.micheline
+  octez-protocol-020-PsParisC-libs.test-helpers
+  octez-libs.tezos-sapling
+  octez-protocol-020-PsParisC-libs.client
+  octez-protocol-020-PsParisC-libs.plugin
+  octez-proto-libs.protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_protocol_020_PsParisC_parameters
+  -open Tezos_lazy_containers
+  -open Tezos_benchmark
+  -open Tezos_benchmark_020_PsParisC
+  -open Tezos_benchmark_type_inference_020_PsParisC
+  -open Tezos_protocol_020_PsParisC
+  -open Tezos_protocol_020_PsParisC.Protocol
+  -open Tezos_micheline
+  -open Tezos_020_PsParisC_test_helpers
+  -open Tezos_client_020_PsParisC
+  -open Tezos_protocol_plugin_020_PsParisC))

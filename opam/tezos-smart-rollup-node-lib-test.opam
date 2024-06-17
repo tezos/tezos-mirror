@@ -21,6 +21,7 @@ depends: [
   "octez-shell-libs" {with-test}
   "octez-smart-rollup-node-Proxford" {with-test}
   "octez-smart-rollup-node-PtParisB" {with-test}
+  "octez-smart-rollup-node-PsParisC" {with-test}
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob" {with-test}

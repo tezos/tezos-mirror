@@ -15,6 +15,7 @@ depends: [
   "uri" { >= "3.1.0" }
   "octez-protocol-018-Proxford-libs" { = version }
   "octez-protocol-019-PtParisB-libs" { = version }
+  "octez-protocol-020-PsParisC-libs" { = version }
 ]
 depopts: [
   "tezos-client-genesis"
