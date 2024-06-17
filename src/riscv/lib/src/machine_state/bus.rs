@@ -8,6 +8,7 @@ pub mod main_memory;
 use crate::machine_state::{backend, registers};
 use derive_more::Error;
 use std::mem;
+use tezos_smart_rollup_constants::riscv::SbiError;
 
 /// Bus address
 pub type Address = registers::XValue;
@@ -15,6 +16,12 @@ pub type Address = registers::XValue;
 /// An address is out of bounds.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Error, derive_more::Display)]
 pub struct OutOfBounds;
+
+impl From<OutOfBounds> for SbiError {
+    fn from(_value: OutOfBounds) -> Self {
+        SbiError::InvalidAddress
+    }
+}
 
 /// Addressable space
 pub trait Addressable<E: backend::Elem> {

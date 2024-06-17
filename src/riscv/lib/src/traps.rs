@@ -21,6 +21,7 @@
 //! A trap which causes the execution environment to halt the machine.
 //!
 
+use tezos_smart_rollup_constants::riscv::SbiError;
 use crate::machine_state::{bus::Address, csregisters::CSRRepr};
 use std::fmt::Formatter;
 
@@ -97,6 +98,24 @@ impl core::fmt::Debug for Exception {
             Self::StoreAMOPageFault(adr) => write!(f, "StoreAMOPageFault({adr:#X})"),
             Self::LoadAccessFault(adr) => write!(f, "LoadAccessFault({adr:#X})"),
             other => write!(f, "{other}"),
+        }
+    }
+}
+
+impl From<Exception> for SbiError {
+    fn from(value: Exception) -> Self {
+        match value {
+            Exception::InstructionAccessFault(_)
+            | Exception::InstructionPageFault(_)
+            | Exception::LoadAccessFault(_)
+            | Exception::LoadPageFault(_)
+            | Exception::StoreAMOAccessFault(_)
+            | Exception::StoreAMOPageFault(_) => SbiError::InvalidAddress,
+            Exception::IllegalInstruction
+            | Exception::Breakpoint
+            | Exception::EnvCallFromUMode
+            | Exception::EnvCallFromSMode
+            | Exception::EnvCallFromMMode => SbiError::Failed,
         }
     }
 }

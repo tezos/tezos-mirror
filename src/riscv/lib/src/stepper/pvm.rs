@@ -99,9 +99,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
 
             PvmStatus::WaitingForInput => match self.inbox.next() {
                 Some((level, counter, payload)) => {
-                    let success =
-                        self.pvm
-                            .provide_input(level as u64, counter as u64, payload.as_slice());
+                    let success = self.pvm.provide_input(level, counter, payload.as_slice());
 
                     if success {
                         StepperStatus::Running { steps: 1 }
