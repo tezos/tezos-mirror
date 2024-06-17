@@ -28,7 +28,7 @@ variables:
   BLST_PORTABLE: "yes"
   DOCKER_BUILDKIT: "1"
   DOCKER_CLI_EXPERIMENTAL: enabled
-  ARTIFACTS_PATH: "./${ARCH}/${TEZTALE_REF}/"
+  ARTIFACTS_PATH: "./${ARCH}/${TEZTALE_REF}"
 
 # ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
 workflow:
