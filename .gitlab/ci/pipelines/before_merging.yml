@@ -721,72 +721,6 @@ opam:bls12-381:
     when: always
   retry: 2
 
-opam:octez-accuser-Proxford:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
-  stage: packaging
-  tags:
-  - gcp
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 1 minute
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    when: delayed
-    start_in: 1 minute
-  needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-  before_script:
-  - eval $(opam env)
-  - mkdir -p $CI_PROJECT_DIR/opam_logs
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - opam remote add dev-repo ./_opam-repo-for-release
-  - opam install --yes ${package}.dev
-  - opam reinstall --yes --with-test ${package}.dev
-  after_script:
-  - eval $(opam env)
-  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
-  variables:
-    RUNTEZTALIAS: "true"
-    package: octez-accuser-Proxford
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    SCCACHE_IDLE_TIMEOUT: "0"
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - opam_logs/
-    when: always
-  retry: 2
-
 opam:octez-accuser-PtParisB:
   image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
   stage: packaging
@@ -910,72 +844,6 @@ opam:octez-alcotezt:
   variables:
     RUNTEZTALIAS: "true"
     package: octez-alcotezt
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    SCCACHE_IDLE_TIMEOUT: "0"
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - opam_logs/
-    when: always
-  retry: 2
-
-opam:octez-baker-Proxford:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
-  stage: packaging
-  tags:
-  - gcp
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 1 minute
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    when: delayed
-    start_in: 1 minute
-  needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-  before_script:
-  - eval $(opam env)
-  - mkdir -p $CI_PROJECT_DIR/opam_logs
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - opam remote add dev-repo ./_opam-repo-for-release
-  - opam install --yes ${package}.dev
-  - opam reinstall --yes --with-test ${package}.dev
-  after_script:
-  - eval $(opam env)
-  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
-  variables:
-    RUNTEZTALIAS: "true"
-    package: octez-baker-Proxford
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
@@ -3899,10 +3767,10 @@ opam:octez-rpc-process:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 3 minutes
+    start_in: 4 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 3 minutes
+    start_in: 4 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -3919,7 +3787,7 @@ opam:octez-rpc-process:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 3 minutes
+    start_in: 4 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -4371,10 +4239,10 @@ opam:octez-smart-rollup-node-PtParisB:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 2 minutes
+    start_in: 1 minute
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 2 minutes
+    start_in: 1 minute
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -4391,7 +4259,7 @@ opam:octez-smart-rollup-node-PtParisB:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 2 minutes
+    start_in: 1 minute
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -5319,10 +5187,10 @@ opam:tezos-dal-node-services:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5339,7 +5207,7 @@ opam:tezos-dal-node-services:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -5387,10 +5255,10 @@ opam:tezos-openapi:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5407,7 +5275,7 @@ opam:tezos-openapi:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -5795,10 +5663,10 @@ opam:tezos-protocol-005-PsBABY5H:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 4 minutes
+    start_in: 5 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 4 minutes
+    start_in: 5 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5815,7 +5683,7 @@ opam:tezos-protocol-005-PsBABY5H:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 4 minutes
+    start_in: 5 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -5863,10 +5731,10 @@ opam:tezos-protocol-005-PsBabyM1:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 4 minutes
+    start_in: 5 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 4 minutes
+    start_in: 5 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -5883,7 +5751,7 @@ opam:tezos-protocol-005-PsBabyM1:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 4 minutes
+    start_in: 5 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -6747,10 +6615,10 @@ opam:tezos-protocol-017-PtNairob:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6767,7 +6635,7 @@ opam:tezos-protocol-017-PtNairob:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -6815,10 +6683,10 @@ opam:tezos-protocol-018-Proxford:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6835,7 +6703,7 @@ opam:tezos-protocol-018-Proxford:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -6883,10 +6751,10 @@ opam:tezos-protocol-019-PtParisB:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -6903,7 +6771,7 @@ opam:tezos-protocol-019-PtParisB:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 5 minutes
+    start_in: 6 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -7223,10 +7091,10 @@ opam:tezos-proxy-server-config:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -7243,7 +7111,7 @@ opam:tezos-proxy-server-config:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
@@ -7291,10 +7159,10 @@ opam:tezt-tezos:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   - changes:
     - '**/*.dune.inc'
     - '**/*.opam'
@@ -7311,7 +7179,7 @@ opam:tezt-tezos:
       || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
       == "merge_train")
     when: delayed
-    start_in: 6 minutes
+    start_in: 7 minutes
   needs:
   - oc.docker:ci:amd64
   - opam:prepare
