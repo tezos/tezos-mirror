@@ -21,9 +21,9 @@
 //! A trap which causes the execution environment to halt the machine.
 //!
 
-use tezos_smart_rollup_constants::riscv::SbiError;
 use crate::machine_state::{bus::Address, csregisters::CSRRepr};
 use std::fmt::Formatter;
+use tezos_smart_rollup_constants::riscv::SbiError;
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
 #[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Clone, Copy)]

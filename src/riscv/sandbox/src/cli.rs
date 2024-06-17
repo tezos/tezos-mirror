@@ -235,7 +235,7 @@ pub struct InboxOptions {
 
     /// Rollup origination level
     #[arg(short = 'l', long, default_value_t = 0)]
-    pub origination_level: u64,
+    pub origination_level: u32,
 
     /// Path to the file containing inbox messages
     #[arg(long = "inbox-file")]

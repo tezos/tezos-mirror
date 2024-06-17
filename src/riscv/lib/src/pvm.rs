@@ -6,7 +6,7 @@ pub mod dummy_pvm;
 mod sbi;
 
 use crate::{
-    machine_state::{self, bus::main_memory, StepManyResult},
+    machine_state::{self, bus::main_memory},
     state_backend::{self, CellRead, CellWrite, EnumCell, EnumCellLayout},
     traps::EnvironException,
 };
@@ -127,12 +127,10 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) -> Result<(), EvalError> {
+    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) {
         if let Err(exc) = self.machine_state.step() {
             self.handle_exception(hooks, exc);
         }
-
-        Ok(())
     }
 
     /// Perform a range of evaluation steps. Returns the actual number of steps
@@ -156,12 +154,12 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         hooks: &mut PvmHooks<'_>,
         step_bounds: &impl RangeBounds<usize>,
         should_continue: F,
-    ) -> EvalManyResult
+    ) -> usize
     where
         F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
     {
         self.machine_state
-            .step_range_handle(step_bounds, should_continue, |machine_state, exc| {
+            .step_range_handle::<Infallible>(step_bounds, should_continue, |machine_state, exc| {
                 Ok(sbi::handle_call(
                     &mut self.status,
                     machine_state,
@@ -169,6 +167,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
                     exc,
                 ))
             })
+            .steps
     }
 
     /// Respond to a request for input with no input. Returns `false` in case the
@@ -191,7 +190,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 
     /// Provide metadata in response to a metadata request. Returns `false`
     /// if the machine is not expecting metadata.
-    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u64) -> bool {
+    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) -> bool {
         sbi::provide_metadata(
             &mut self.status,
             &mut self.machine_state,
@@ -205,16 +204,6 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         self.status.read_default()
     }
 }
-
-/// Error during evaluation
-#[derive(Debug)]
-pub struct EvalError {
-    pub cause: EnvironException,
-    pub error: Infallible,
-}
-
-/// Result of [`Pvm::eval_range`]
-pub type EvalManyResult = StepManyResult<EvalError>;
 
 #[cfg(test)]
 mod tests {
@@ -289,7 +278,7 @@ mod tests {
 
         // Returned data is as expected
         assert_eq!(
-            pvm.machine_state.hart.xregisters.read(a1) as usize,
+            pvm.machine_state.hart.xregisters.read(a0) as usize,
             BUFFER_LEN
         );
         assert_eq!(pvm.machine_state.bus.read(level_addr), Ok(level));

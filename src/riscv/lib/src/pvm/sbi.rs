@@ -35,6 +35,12 @@ fn sbi_return_error<ML: MainMemoryLayout, M: Manager>(
 /// Write an arbitrary value as single return value.
 #[inline(always)]
 fn sbi_return1<ML: MainMemoryLayout, M: Manager>(machine: &mut MachineState<ML, M>, value: XValue) {
+    // The SBI caller interprets the return value as a [i64]. We don't want the value to be
+    // interpreted as negative because that indicates an error.
+    if (value as i64) < 0 {
+        return sbi_return_error(machine, SbiError::Failed);
+    }
+
     machine.hart.xregisters.write(a0, value);
 }
 
@@ -124,11 +130,9 @@ where
         machine.bus.write(phys_level_addr, level)?;
         machine.bus.write(phys_counter_addr, counter)?;
 
-        // The SBI caller interprets the return value as a [i64]. We don't want the value to be
-        // interpreted as negative because that indicates an error.
-        // At the moment, his case is unlikely to occur because we cap [max_buffer_size] at
+        // At the moment, this case is unlikely to occur because we cap [max_buffer_size] at
         // [MAX_INPUT_MESSAGE_SIZE].
-        Ok(max_buffer_size.min(i64::MAX as usize) as u64)
+        Ok(max_buffer_size as u64)
     });
 
     true
@@ -140,7 +144,7 @@ pub fn provide_metadata<S, ML, M>(
     status: &mut S,
     machine: &mut MachineState<ML, M>,
     rollup_address: &[u8; 20],
-    origination_level: u64,
+    origination_level: u32,
 ) -> bool
 where
     S: CellWrite<Value = PvmStatus>,
@@ -159,6 +163,7 @@ where
     sbi_wrap(machine, |machine| {
         // These arguments should have been set by the previous SBI call.
         let arg_buffer_addr = machine.hart.xregisters.read(a0);
+
         // The argument address is a virtual address. We need to translate it to
         // a physical address.
         let phys_dest_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
@@ -168,7 +173,7 @@ where
             .write_all(phys_dest_addr, rollup_address.as_slice())?;
 
         // [origination_level] should not wrap around and become negative.
-        Ok(origination_level.min(i64::MAX as u64))
+        Ok(origination_level as u64)
     });
 
     true
@@ -318,7 +323,7 @@ where
     sbi_return_error(machine, SbiError::NotSupported);
 }
 
-/// Handle a PVM SBI call. Returns `Ok(true)` if it makes sense to continue evaluation.
+/// Handle a PVM SBI call. Returns `true` if it makes sense to continue evaluation.
 #[inline]
 pub fn handle_call<S, ML, M>(
     status: &mut S,

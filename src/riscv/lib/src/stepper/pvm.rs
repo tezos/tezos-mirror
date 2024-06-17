@@ -37,7 +37,7 @@ pub struct PvmStepper<'backend, 'hooks, ML: MainMemoryLayout = M1G> {
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
-    origination_level: u64,
+    origination_level: u32,
 }
 
 impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
@@ -54,7 +54,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
         inbox: Inbox,
         hooks: PvmHooks<'hooks>,
         rollup_address: [u8; 20],
-        origination_level: u64,
+        origination_level: u32,
     ) -> Result<Self, PvmStepperError> {
         let placed = <PvmLayout<ML> as Layout>::placed().into_location();
         let space = backend.allocate(placed);
@@ -81,20 +81,11 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
     {
         match self.pvm.status() {
             PvmStatus::Evaluating => {
-                let result = self
+                let steps = self
                     .pvm
                     .eval_range_while(&mut self.hooks, steps, should_continue);
 
-                match result.error {
-                    Some(error) => StepperStatus::Errored {
-                        steps: result.steps,
-                        cause: error.cause.to_string(),
-                        message: error.error.to_string(),
-                    },
-                    None => StepperStatus::Running {
-                        steps: result.steps,
-                    },
-                }
+                StepperStatus::Running { steps }
             }
 
             PvmStatus::WaitingForInput => match self.inbox.next() {
