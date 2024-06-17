@@ -58,6 +58,7 @@ depends: [
   "ptime" { >= "1.1.0" }
   "mtime" { >= "2.0.0" }
   "conf-libev"
+  "progress" { >= "0.1.0" }
   "uutf"
   "lwt-exit"
   "ppxlib"
@@ -68,7 +69,6 @@ depends: [
   "ocamlgraph"
   "optint"
   "rusage"
-  "progress" { >= "0.1.0" }
   "lru" { >= "0.3.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
   "semaphore-compat" { >= "1.0.1" }
