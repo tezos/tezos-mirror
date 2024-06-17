@@ -126,7 +126,7 @@ module Cli = struct
       ~section
       ~long:"producers"
       ~description:"Specify the number of DAL producers for this test"
-      1
+      0
 
   let producer_machine_type =
     Clap.optional_string
