@@ -241,316 +241,337 @@ let dispatch_request (config : Configuration.t)
   let open Ethereum_types in
   let*! value =
     match map_method_name method_ with
-    | Unknown -> Lwt.return_error (Rpc_errors.method_not_found method_)
-    | Unsupported -> Lwt.return_error (Rpc_errors.method_not_supported method_)
+    | Unknown ->
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unknown") ;
+        Lwt.return_error (Rpc_errors.method_not_found method_)
+    | Unsupported ->
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unsupported") ;
+        Lwt.return_error (Rpc_errors.method_not_supported method_)
     (* Ethereum JSON-RPC API methods we support *)
-    | Method (Accounts.Method, module_) ->
-        let f (_ : unit option) = rpc_ok [] in
-        build ~f module_ parameters
-    | Method (Network_id.Method, module_) ->
-        let f (_ : unit option) =
-          let open Lwt_result_syntax in
-          let* (Qty chain_id) = Backend_rpc.chain_id () in
-          rpc_ok (Z.to_string chain_id)
-        in
-        build ~f module_ parameters
-    | Method (Chain_id.Method, module_) ->
-        let f (_ : unit option) =
-          let* chain_id = Backend_rpc.chain_id () in
-          rpc_ok chain_id
-        in
-        build ~f module_ parameters
-    | Method (Get_balance.Method, module_) ->
-        let f (address, block_param) =
-          let* balance = Backend_rpc.balance address block_param in
-          rpc_ok balance
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_storage_at.Method, module_) ->
-        let f (address, position, block_param) =
-          let* value = Backend_rpc.storage_at address position block_param in
-          rpc_ok value
-        in
-        build_with_input ~f module_ parameters
-    | Method (Block_number.Method, module_) ->
-        let f (_ : unit option) =
-          let* block_number = Backend_rpc.current_block_number () in
-          rpc_ok block_number
-        in
-        build ~f module_ parameters
-    | Method (Get_block_by_number.Method, module_) ->
-        let f (block_param, full_transaction_object) =
-          let* block =
-            get_block_by_number
-              ~full_transaction_object
-              block_param
-              (module Backend_rpc)
-          in
-          rpc_ok block
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_block_by_hash.Method, module_) ->
-        let f (block_hash, full_transaction_object) =
-          let* block =
-            Backend_rpc.block_by_hash ~full_transaction_object block_hash
-          in
-          rpc_ok block
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_block_receipts.Method, module_) ->
-        let f block_param =
-          let* receipts = get_block_receipts block_param (module Backend_rpc) in
-          rpc_ok receipts
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_code.Method, module_) ->
-        let f (address, block_param) =
-          let* code = Backend_rpc.code address block_param in
-          rpc_ok code
-        in
-        build_with_input ~f module_ parameters
-    | Method (Gas_price.Method, module_) ->
-        let f (_ : unit option) =
-          let* base_fee = Backend_rpc.base_fee_per_gas () in
-          rpc_ok base_fee
-        in
-        build ~f module_ parameters
-    | Method (Get_transaction_count.Method, module_) ->
-        let f (address, block_param) =
-          match block_param with
-          | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
-              let* nonce = Tx_pool.nonce address in
-              rpc_ok nonce
-          | _ ->
-              let* nonce = Backend_rpc.nonce address block_param in
-              let nonce = Option.value ~default:Qty.zero nonce in
-              rpc_ok nonce
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_block_transaction_count_by_hash.Method, module_) ->
-        let f block_hash =
-          let* block =
-            Backend_rpc.block_by_hash ~full_transaction_object:false block_hash
-          in
-          rpc_ok (block_transaction_count block)
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_block_transaction_count_by_number.Method, module_) ->
-        let f block_param =
-          let* block =
-            get_block_by_number
-              ~full_transaction_object:false
-              block_param
-              (module Backend_rpc)
-          in
-          rpc_ok (block_transaction_count block)
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_uncle_count_by_block_hash.Method, module_) ->
-        let f _block_param = rpc_ok Qty.zero in
-        build_with_input ~f module_ parameters
-    | Method (Get_uncle_count_by_block_number.Method, module_) ->
-        let f _block_param = rpc_ok Qty.zero in
-        build_with_input ~f module_ parameters
-    | Method (Get_transaction_receipt.Method, module_) ->
-        let f tx_hash =
-          let* receipt = Backend_rpc.transaction_receipt tx_hash in
-          rpc_ok receipt
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_transaction_by_hash.Method, module_) ->
-        let f tx_hash =
-          let* transaction_object =
-            let* transaction_object = Tx_pool.find tx_hash in
-            match transaction_object with
-            | Some transaction_object -> return_some transaction_object
-            | None -> Backend_rpc.transaction_object tx_hash
-          in
-          rpc_ok transaction_object
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_transaction_by_block_hash_and_index.Method, module_) ->
-        let f (block_hash, Qty index) =
-          let* block =
-            Backend_rpc.block_by_hash ~full_transaction_object:false block_hash
-          in
-          let* transaction_object =
-            get_transaction_from_index
-              block
-              (Z.to_int index)
-              (module Backend_rpc)
-          in
-          rpc_ok transaction_object
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_transaction_by_block_number_and_index.Method, module_) ->
-        let f (block_number, Qty index) =
-          let* block =
-            get_block_by_number
-              ~full_transaction_object:false
-              block_number
-              (module Backend_rpc)
-          in
-          let* transaction_object =
-            get_transaction_from_index
-              block
-              (Z.to_int index)
-              (module Backend_rpc)
-          in
-          rpc_ok transaction_object
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_uncle_by_block_hash_and_index.Method, module_) ->
-        let f (_block_hash, _index) =
-          (* A block cannot have uncles. *)
-          rpc_ok None
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_uncle_by_block_number_and_index.Method, module_) ->
-        let f (_block_number, _index) =
-          (* A block cannot have uncles. *)
-          rpc_ok None
-        in
-        build_with_input ~f module_ parameters
-    | Method (Send_raw_transaction.Method, module_) ->
-        if not config.experimental_features.enable_send_raw_transaction then
-          Lwt.return_error
-          @@ Rpc_errors.transaction_rejected
-               "the node is in read-only mode, it doesn't accept transactions"
-               None
-        else
-          let f tx_raw =
-            let txn = Ethereum_types.hex_to_bytes tx_raw in
-            let* is_valid = Backend_rpc.is_tx_valid txn in
-            match is_valid with
-            | Error err ->
-                let*! () =
-                  Tx_pool_events.invalid_transaction ~transaction:tx_raw
-                in
-                rpc_error (Rpc_errors.transaction_rejected err None)
-            | Ok is_valid -> (
-                let* tx_hash = Tx_pool.add is_valid txn in
-                match tx_hash with
-                | Ok tx_hash -> rpc_ok tx_hash
-                | Error reason ->
-                    rpc_error (Rpc_errors.transaction_rejected reason None))
-          in
-          build_with_input ~f module_ parameters
-    | Method (Eth_call.Method, module_) ->
-        let f (call, block_param) =
-          let* call_result = Backend_rpc.simulate_call call block_param in
-          match call_result with
-          | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
-          | Ok (Ok {value = None; gas_used = _}) -> rpc_ok (hash_of_string "")
-          | Ok (Error reason) ->
-              rpc_error
-              @@ Rpc_errors.transaction_rejected
-                   "execution reverted"
-                   (Some reason)
-          | Error reason ->
-              rpc_error (Rpc_errors.transaction_rejected reason None)
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_estimate_gas.Method, module_) ->
-        let f (call, _) =
-          let* result = Backend_rpc.estimate_gas call in
-          match result with
-          | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
-          | Ok (Ok {value = _; gas_used = None}) ->
-              rpc_error
-                (Rpc_errors.limit_exceeded
-                   "Simulation failed before execution, cannot estimate gas."
-                   None)
-          | Ok (Error reason) ->
-              rpc_error
-              @@ Rpc_errors.limit_exceeded "execution reverted" (Some reason)
-          | Error reason -> rpc_error (Rpc_errors.limit_exceeded reason None)
-        in
-        build_with_input ~f module_ parameters
-    | Method (Txpool_content.Method, module_) ->
-        let f (_ : unit option) =
-          let* txpool_content = Tx_pool.get_tx_pool_content () in
-          rpc_ok txpool_content
-        in
-        build ~f module_ parameters
-    | Method (Web3_clientVersion.Method, module_) ->
-        let f (_ : unit option) = rpc_ok client_version in
-        build ~f module_ parameters
-    | Method (Web3_sha3.Method, module_) ->
-        let f data =
-          let open Ethereum_types in
-          let (Hex h) = data in
-          let bytes = Hex.to_bytes_exn (`Hex h) in
-          let hash_bytes = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
-          let hash = Hex.of_bytes hash_bytes |> Hex.show in
-          rpc_ok (Hash (Hex hash))
-        in
-        build_with_input ~f module_ parameters
-    | Method (Get_logs.Method, module_) ->
-        let f filter =
-          let* logs =
-            Filter_helpers.get_logs
-              config.log_filter
-              (module Backend_rpc)
-              filter
-          in
-          rpc_ok logs
-        in
-        build_with_input ~f module_ parameters
-        (* Internal RPC methods *)
-    | Method (Kernel_version.Method, module_) ->
-        let f (_ : unit option) =
-          let* kernel_version = Backend_rpc.kernel_version () in
-          rpc_ok kernel_version
-        in
-        build ~f module_ parameters
-    | Method (Kernel_root_hash.Method, module_) ->
-        let f (_ : unit option) =
-          let* kernel_root_hash = Backend_rpc.kernel_root_hash () in
-          rpc_ok kernel_root_hash
-        in
-        build ~f module_ parameters
-    | Method (Eth_max_priority_fee_per_gas.Method, module_) ->
-        let f (_ : unit option) = rpc_ok Qty.zero in
-        build ~f module_ parameters
-    | Method (Trace_transaction.Method, module_) ->
-        let f ((hash, config) : Tracer_types.input) =
-          let*! trace = Backend_rpc.trace_transaction hash config in
-          match trace with
-          | Ok trace -> rpc_ok trace
-          | Error (Tracer_types.Not_supported :: _) ->
-              rpc_error
-                (Rpc_errors.method_not_supported Trace_transaction.method_)
-          | Error (Tracer_types.Transaction_not_found hash :: _) ->
-              rpc_error (Rpc_errors.trace_transaction_not_found hash)
-          | Error (Tracer_types.Block_not_found number :: _) ->
-              rpc_error (Rpc_errors.trace_block_not_found number)
-          | Error (Tracer_types.Trace_not_found :: _) ->
-              rpc_error Rpc_errors.trace_not_found
-          | Error e ->
-              let msg = Format.asprintf "%a" pp_print_trace e in
-              rpc_error (Rpc_errors.internal_error msg)
-        in
-        build_with_input ~f module_ parameters
-    | Method (Eth_fee_history.Method, module_) ->
-        let f (Qty block_count, newest_block, _reward_percentile) =
-          if block_count = Z.zero then
-            rpc_error
-              (Rpc_errors.invalid_params
-                 "Number of block should be greater than 0.")
-          else
-            let* fee_history_result =
-              get_fee_history
-                block_count
-                newest_block
-                config
-                (module Backend_rpc)
+    | Method (method_rpc, module_) -> (
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ method_) ;
+        match method_rpc with
+        | Accounts.Method ->
+            let f (_ : unit option) = rpc_ok [] in
+            build ~f module_ parameters
+        | Network_id.Method ->
+            let f (_ : unit option) =
+              let open Lwt_result_syntax in
+              let* (Qty chain_id) = Backend_rpc.chain_id () in
+              rpc_ok (Z.to_string chain_id)
             in
-            rpc_ok fee_history_result
-        in
-        build_with_input ~f module_ parameters
-    | Method (_, _) ->
-        Stdlib.failwith "The pattern matching of methods is not exhaustive"
+            build ~f module_ parameters
+        | Chain_id.Method ->
+            let f (_ : unit option) =
+              let* chain_id = Backend_rpc.chain_id () in
+              rpc_ok chain_id
+            in
+            build ~f module_ parameters
+        | Get_balance.Method ->
+            let f (address, block_param) =
+              let* balance = Backend_rpc.balance address block_param in
+              rpc_ok balance
+            in
+            build_with_input ~f module_ parameters
+        | Get_storage_at.Method ->
+            let f (address, position, block_param) =
+              let* value =
+                Backend_rpc.storage_at address position block_param
+              in
+              rpc_ok value
+            in
+            build_with_input ~f module_ parameters
+        | Block_number.Method ->
+            let f (_ : unit option) =
+              let* block_number = Backend_rpc.current_block_number () in
+              rpc_ok block_number
+            in
+            build ~f module_ parameters
+        | Get_block_by_number.Method ->
+            let f (block_param, full_transaction_object) =
+              let* block =
+                get_block_by_number
+                  ~full_transaction_object
+                  block_param
+                  (module Backend_rpc)
+              in
+              rpc_ok block
+            in
+            build_with_input ~f module_ parameters
+        | Get_block_by_hash.Method ->
+            let f (block_hash, full_transaction_object) =
+              let* block =
+                Backend_rpc.block_by_hash ~full_transaction_object block_hash
+              in
+              rpc_ok block
+            in
+            build_with_input ~f module_ parameters
+        | Get_block_receipts.Method ->
+            let f block_param =
+              let* receipts =
+                get_block_receipts block_param (module Backend_rpc)
+              in
+              rpc_ok receipts
+            in
+            build_with_input ~f module_ parameters
+        | Get_code.Method ->
+            let f (address, block_param) =
+              let* code = Backend_rpc.code address block_param in
+              rpc_ok code
+            in
+            build_with_input ~f module_ parameters
+        | Gas_price.Method ->
+            let f (_ : unit option) =
+              let* base_fee = Backend_rpc.base_fee_per_gas () in
+              rpc_ok base_fee
+            in
+            build ~f module_ parameters
+        | Get_transaction_count.Method ->
+            let f (address, block_param) =
+              match block_param with
+              | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
+                  let* nonce = Tx_pool.nonce address in
+                  rpc_ok nonce
+              | _ ->
+                  let* nonce = Backend_rpc.nonce address block_param in
+                  let nonce = Option.value ~default:Qty.zero nonce in
+                  rpc_ok nonce
+            in
+            build_with_input ~f module_ parameters
+        | Get_block_transaction_count_by_hash.Method ->
+            let f block_hash =
+              let* block =
+                Backend_rpc.block_by_hash
+                  ~full_transaction_object:false
+                  block_hash
+              in
+              rpc_ok (block_transaction_count block)
+            in
+            build_with_input ~f module_ parameters
+        | Get_block_transaction_count_by_number.Method ->
+            let f block_param =
+              let* block =
+                get_block_by_number
+                  ~full_transaction_object:false
+                  block_param
+                  (module Backend_rpc)
+              in
+              rpc_ok (block_transaction_count block)
+            in
+            build_with_input ~f module_ parameters
+        | Get_uncle_count_by_block_hash.Method ->
+            let f _block_param = rpc_ok Qty.zero in
+            build_with_input ~f module_ parameters
+        | Get_uncle_count_by_block_number.Method ->
+            let f _block_param = rpc_ok Qty.zero in
+            build_with_input ~f module_ parameters
+        | Get_transaction_receipt.Method ->
+            let f tx_hash =
+              let* receipt = Backend_rpc.transaction_receipt tx_hash in
+              rpc_ok receipt
+            in
+            build_with_input ~f module_ parameters
+        | Get_transaction_by_hash.Method ->
+            let f tx_hash =
+              let* transaction_object =
+                let* transaction_object = Tx_pool.find tx_hash in
+                match transaction_object with
+                | Some transaction_object -> return_some transaction_object
+                | None -> Backend_rpc.transaction_object tx_hash
+              in
+              rpc_ok transaction_object
+            in
+            build_with_input ~f module_ parameters
+        | Get_transaction_by_block_hash_and_index.Method ->
+            let f (block_hash, Qty index) =
+              let* block =
+                Backend_rpc.block_by_hash
+                  ~full_transaction_object:false
+                  block_hash
+              in
+              let* transaction_object =
+                get_transaction_from_index
+                  block
+                  (Z.to_int index)
+                  (module Backend_rpc)
+              in
+              rpc_ok transaction_object
+            in
+            build_with_input ~f module_ parameters
+        | Get_transaction_by_block_number_and_index.Method ->
+            let f (block_number, Qty index) =
+              let* block =
+                get_block_by_number
+                  ~full_transaction_object:false
+                  block_number
+                  (module Backend_rpc)
+              in
+              let* transaction_object =
+                get_transaction_from_index
+                  block
+                  (Z.to_int index)
+                  (module Backend_rpc)
+              in
+              rpc_ok transaction_object
+            in
+            build_with_input ~f module_ parameters
+        | Get_uncle_by_block_hash_and_index.Method ->
+            let f (_block_hash, _index) =
+              (* A block cannot have uncles. *)
+              rpc_ok None
+            in
+            build_with_input ~f module_ parameters
+        | Get_uncle_by_block_number_and_index.Method ->
+            let f (_block_number, _index) =
+              (* A block cannot have uncles. *)
+              rpc_ok None
+            in
+            build_with_input ~f module_ parameters
+        | Send_raw_transaction.Method ->
+            if not config.experimental_features.enable_send_raw_transaction then
+              Lwt.return_error
+              @@ Rpc_errors.transaction_rejected
+                   "the node is in read-only mode, it doesn't accept \
+                    transactions"
+                   None
+            else
+              let f tx_raw =
+                let txn = Ethereum_types.hex_to_bytes tx_raw in
+                let* is_valid = Backend_rpc.is_tx_valid txn in
+                match is_valid with
+                | Error err ->
+                    let*! () =
+                      Tx_pool_events.invalid_transaction ~transaction:tx_raw
+                    in
+                    rpc_error (Rpc_errors.transaction_rejected err None)
+                | Ok is_valid -> (
+                    let* tx_hash = Tx_pool.add is_valid txn in
+                    match tx_hash with
+                    | Ok tx_hash -> rpc_ok tx_hash
+                    | Error reason ->
+                        rpc_error (Rpc_errors.transaction_rejected reason None))
+              in
+              build_with_input ~f module_ parameters
+        | Eth_call.Method ->
+            let f (call, block_param) =
+              let* call_result = Backend_rpc.simulate_call call block_param in
+              match call_result with
+              | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
+              | Ok (Ok {value = None; gas_used = _}) ->
+                  rpc_ok (hash_of_string "")
+              | Ok (Error reason) ->
+                  rpc_error
+                  @@ Rpc_errors.transaction_rejected
+                       "execution reverted"
+                       (Some reason)
+              | Error reason ->
+                  rpc_error (Rpc_errors.transaction_rejected reason None)
+            in
+            build_with_input ~f module_ parameters
+        | Get_estimate_gas.Method ->
+            let f (call, _) =
+              let* result = Backend_rpc.estimate_gas call in
+              match result with
+              | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
+              | Ok (Ok {value = _; gas_used = None}) ->
+                  rpc_error
+                    (Rpc_errors.limit_exceeded
+                       "Simulation failed before execution, cannot estimate \
+                        gas."
+                       None)
+              | Ok (Error reason) ->
+                  rpc_error
+                  @@ Rpc_errors.limit_exceeded
+                       "execution reverted"
+                       (Some reason)
+              | Error reason ->
+                  rpc_error (Rpc_errors.limit_exceeded reason None)
+            in
+            build_with_input ~f module_ parameters
+        | Txpool_content.Method ->
+            let f (_ : unit option) =
+              let* txpool_content = Tx_pool.get_tx_pool_content () in
+              rpc_ok txpool_content
+            in
+            build ~f module_ parameters
+        | Web3_clientVersion.Method ->
+            let f (_ : unit option) = rpc_ok client_version in
+            build ~f module_ parameters
+        | Web3_sha3.Method ->
+            let f data =
+              let open Ethereum_types in
+              let (Hex h) = data in
+              let bytes = Hex.to_bytes_exn (`Hex h) in
+              let hash_bytes = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
+              let hash = Hex.of_bytes hash_bytes |> Hex.show in
+              rpc_ok (Hash (Hex hash))
+            in
+            build_with_input ~f module_ parameters
+        | Get_logs.Method ->
+            let f filter =
+              let* logs =
+                Filter_helpers.get_logs
+                  config.log_filter
+                  (module Backend_rpc)
+                  filter
+              in
+              rpc_ok logs
+            in
+            build_with_input ~f module_ parameters
+            (* Internal RPC methods *)
+        | Kernel_version.Method ->
+            let f (_ : unit option) =
+              let* kernel_version = Backend_rpc.kernel_version () in
+              rpc_ok kernel_version
+            in
+            build ~f module_ parameters
+        | Kernel_root_hash.Method ->
+            let f (_ : unit option) =
+              let* kernel_root_hash = Backend_rpc.kernel_root_hash () in
+              rpc_ok kernel_root_hash
+            in
+            build ~f module_ parameters
+        | Eth_max_priority_fee_per_gas.Method ->
+            let f (_ : unit option) = rpc_ok Qty.zero in
+            build ~f module_ parameters
+        | Trace_transaction.Method ->
+            let f ((hash, config) : Tracer_types.input) =
+              let*! trace = Backend_rpc.trace_transaction hash config in
+              match trace with
+              | Ok trace -> rpc_ok trace
+              | Error (Tracer_types.Not_supported :: _) ->
+                  rpc_error
+                    (Rpc_errors.method_not_supported Trace_transaction.method_)
+              | Error (Tracer_types.Transaction_not_found hash :: _) ->
+                  rpc_error (Rpc_errors.trace_transaction_not_found hash)
+              | Error (Tracer_types.Block_not_found number :: _) ->
+                  rpc_error (Rpc_errors.trace_block_not_found number)
+              | Error (Tracer_types.Trace_not_found :: _) ->
+                  rpc_error Rpc_errors.trace_not_found
+              | Error e ->
+                  let msg = Format.asprintf "%a" pp_print_trace e in
+                  rpc_error (Rpc_errors.internal_error msg)
+            in
+            build_with_input ~f module_ parameters
+        | Eth_fee_history.Method ->
+            let f (Qty block_count, newest_block, _reward_percentile) =
+              if block_count = Z.zero then
+                rpc_error
+                  (Rpc_errors.invalid_params
+                     "Number of block should be greater than 0.")
+              else
+                let* fee_history_result =
+                  get_fee_history
+                    block_count
+                    newest_block
+                    config
+                    (module Backend_rpc)
+                in
+                rpc_ok fee_history_result
+            in
+            build_with_input ~f module_ parameters
+        | _ ->
+            Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in
   Lwt.return JSONRPC.{value; id}
 

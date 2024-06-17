@@ -6,6 +6,9 @@
 
 ### Features
 
+- Metrics register the number of calls to each RPC method, e.g. `eth_blockNumber`.
+  (!13786)
+
 ### Bug fixes
 
 ### Experimental
