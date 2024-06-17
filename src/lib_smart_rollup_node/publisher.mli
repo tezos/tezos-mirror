@@ -55,6 +55,17 @@ val process_head :
   Context.rw ->
   Commitment.Hash.t option tzresult Lwt.t
 
+(** [create_commitment_if_necessary plugin node_ctxt ~predecessor level ctxt]
+    returns the commitment for inbox level [level] if there needs to be
+    one. [ctxt] should be the context checkouted for [level]. *)
+val create_commitment_if_necessary :
+  (module Protocol_plugin_sig.S) ->
+  'a Node_context.t ->
+  predecessor:Block_hash.t ->
+  int32 ->
+  'a Context.t ->
+  (Commitment.t option, tztrace) result Lwt.t
+
 (** [publish_single_commitment node_ctxt commitment] publishes a single
     [commitment] if it is missing. This function is meant to be used by the {e
     accuser} mode to sparingly publish commitments when it detects a
