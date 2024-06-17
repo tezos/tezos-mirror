@@ -184,6 +184,10 @@ module Cli = struct
 
   let etherlink = Clap.flag ~section ~set_long:"etherlink" false
 
+  let etherlink_sequencer =
+    (* We want the sequencer to be active by default if etherlink is activated. *)
+    Clap.flag ~section ~unset_long:"no-etherlink-sequencer" etherlink
+
   let disconnect =
     let disconnect_typ =
       let parse string =
