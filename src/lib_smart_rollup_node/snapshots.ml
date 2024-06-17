@@ -778,9 +778,13 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   in
   let* first_block = Store.L2_blocks.read store.l2_blocks first_block_hash in
   let _, first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
-  Format.eprintf "Exporting context snapshot with first level %ld@." first_level ;
   let* () =
-    Context.export_snapshot context first_block.context ~path:tmp_context_dir
+    Progress_bar.Lwt.with_background_spinner
+      ~message:
+        (Format.sprintf
+           "Exporting context snapshot with first level %ld"
+           first_level)
+    @@ Context.export_snapshot context first_block.context ~path:tmp_context_dir
   in
   let ( // ) = Filename.concat in
   let copy_dir a =
