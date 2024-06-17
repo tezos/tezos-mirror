@@ -19,7 +19,7 @@ variables:
   supported_ARCH: "amd64 arm64"
   DEFAULT_RUNNER_TAG: gcp
   STABLE_OCTEZ_BRANCH: "octez-v20.0"
-  TEZTALE_REF: "${TEZTALE_REF_BASE}_${OCTEZ_BRANCH}${TEZTALE_REF_SUFFIX}"
+  TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
   CONTAINER_TAG: "${TEZTALE_REF}"
   BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies:${CONTAINER_TAG}"
   # Build blst used by ocaml-bls12-381 without ADX to support old CPU
@@ -28,6 +28,7 @@ variables:
   BLST_PORTABLE: "yes"
   DOCKER_BUILDKIT: "1"
   DOCKER_CLI_EXPERIMENTAL: enabled
+  ARTIFACTS_PATH: "./${ARCH}/${TEZTALE_REF}/"
 
 # ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
 workflow:
@@ -155,14 +156,14 @@ prepare:canary:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
   script:
     - dune build archiver/main.exe server/main.exe
-    - mkdir -p ./${ARCH}/${TEZTALE_REF}/{archiver,server}
-    - cp --parents {archiver,server}/main.exe ./${ARCH}/${TEZTALE_REF}/
+    - mkdir -p ${ARTIFACTS_PATH}/{archiver,server}
+    - cp --parents {archiver,server}/main.exe ${ARTIFACTS_PATH}
   artifacts:
     name: teztale-${ARCH}-${TEZTALE_REF}
     expire_in: 1 week
     paths:
-      - ./${ARCH}/${TEZTALE_REF}/archiver/main.exe
-      - ./${ARCH}/${TEZTALE_REF}/server/main.exe
+      - ${ARTIFACTS_PATH}/archiver/main.exe
+      - ${ARTIFACTS_PATH}/server/main.exe
 
 build:stable:
   extends:
@@ -192,8 +193,8 @@ build:canary:
 # ${TEZTALE_REF} is already defined globally
 .rename-build-artifacts:
   before_script:
-    - mv ./${ARCH}/${TEZTALE_REF}/archiver/main.exe ./archiver/
-    - mv ./${ARCH}/${TEZTALE_REF}/server/main.exe ./server/
+    - mv ${ARTIFACTS_PATH}/archiver/main.exe ./archiver/
+    - mv ${ARTIFACTS_PATH}/server/main.exe ./server/
 
 # When extending this, use a before_script in order to provide `archiver/main.exe` and `server/main.exe` files
 .release:
