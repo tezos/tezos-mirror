@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
 include Progress
 
 type 'a line = {when_tty : 'a Line.t; when_no_tty : string}
