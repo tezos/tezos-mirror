@@ -35,6 +35,7 @@ use crate::{
 };
 use address_translation::translation_cache::InstructionFetchTranslationCache;
 pub use address_translation::AccessType;
+use mode::Mode;
 use std::{cmp, ops::RangeBounds};
 use twiddle::Twiddle;
 
@@ -258,8 +259,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// Fetch instruction from the address given by program counter
     /// The spec stipulates translation is performed for each byte respectively.
     /// However, we assume the `raw_pc` is 2-byte aligned.
-    fn fetch_instr(&mut self, raw_pc: Address) -> Result<Instr, Exception> {
-        let current_mode = self.hart.mode.read_default();
+    fn fetch_instr(&mut self, raw_pc: Address, current_mode: Mode) -> Result<Instr, Exception> {
         let current_satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
 
         // procedure to obtain 2 bytes of an instruction, either the first or last 2 bytes
@@ -574,16 +574,18 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Fetch & run the instruction located at address `instr_pc`
-    fn run_instr_at(&mut self, instr_pc: u64) -> Result<ProgramCounterUpdate, Exception> {
-        let instr = self.fetch_instr(instr_pc)?;
+    fn run_instr_at(
+        &mut self,
+        instr_pc: u64,
+        current_mode: Mode,
+    ) -> Result<ProgramCounterUpdate, Exception> {
+        let instr = self.fetch_instr(instr_pc, current_mode)?;
         self.run_instr(instr)
     }
 
     /// Return the current [`Interrupt`] with highest priority to be handled
     /// or [`None`] if there isn't any available
-    fn get_pending_interrupt(&self) -> Option<Interrupt> {
-        let current_mode = self.hart.mode.read_default();
-
+    fn get_pending_interrupt(&self, current_mode: Mode) -> Option<Interrupt> {
         let possible = match self.hart.csregisters.possible_interrupts(current_mode) {
             0 => return None,
             possible => possible,
@@ -674,15 +676,17 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// the execution environment, narrowed down by the type [`EnvironException`].
     #[inline]
     pub fn step(&mut self) -> Result<(), EnvironException> {
+        let current_mode = self.hart.mode.read_default();
+
         // Try to take an interrupt if available, and then
         // obtain the pc for the next instruction to be executed
-        let instr_pc = match self.get_pending_interrupt() {
+        let instr_pc = match self.get_pending_interrupt(current_mode) {
             None => self.hart.pc.read(),
             Some(interrupt) => self.address_on_interrupt(interrupt)?,
         };
 
         // Fetch & run the instruction
-        let instr_result = self.run_instr_at(instr_pc);
+        let instr_result = self.run_instr_at(instr_pc, current_mode);
 
         // Take exception if needed
         let pc_update = match instr_result {
