@@ -5764,6 +5764,22 @@ module Garbage_collection = struct
     let* () = bake_loop 25 in
     Log.info "Blocks baked !" ;
 
+    Log.info "Checking that the slot was attested" ;
+    let* () =
+      let* status =
+        Dal_RPC.(
+          call slot_producer
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index)
+      in
+      Check.(status = "attested")
+        ~__LOC__
+        Check.string
+        ~error_msg:
+          "The value of the fetched status should match the expected one \
+           (current = %L, expected = %R)" ;
+      unit
+    in
+
     Log.info "Wait for first shard attester" ;
     let* () = wait_remove_shards_attester_promise in
 
