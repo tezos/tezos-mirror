@@ -115,3 +115,12 @@ let machine_type =
       "Can specify a GCP machine type (see \
        https://cloud.google.com/compute/docs/general-purpose-machines#c3d_series)"
     "n1-standard-2"
+
+let dockerfile =
+  Clap.optional_string
+    ~section
+    ~long:"dockerfile"
+    ~description:
+      "Specify the name of the dockerfile to use (default is given by the \
+       environment variable `TEZT_CLOUD`)"
+    ()

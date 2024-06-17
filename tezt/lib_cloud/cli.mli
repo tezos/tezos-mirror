@@ -58,3 +58,7 @@ val prometheus_snapshot : string option
     Default is: "n1-standard-2".
     *)
 val machine_type : string
+
+(** Specify the dockerfile image to use. If not specified, the image
+    name will be given by the value of the variable `TEZT_CLOUD`. *)
+val dockerfile : string option

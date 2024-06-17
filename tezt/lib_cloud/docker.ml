@@ -16,11 +16,8 @@ let build ?(tag = "latest") ?dockerfile ~args () =
     |> List.concat
   in
   let tezt_cloud = Lazy.force Env.tezt_cloud in
-  let dockerfile =
-    Option.value
-      ~default:(Path.docker // tezt_cloud // ".Dockerfile")
-      dockerfile
-  in
+  let dockerfile_path = Lazy.force Env.dockerfile in
+  let dockerfile = Option.value ~default:dockerfile_path dockerfile in
   let tag = ["-t"; Format.asprintf "%s:%s" tezt_cloud tag] in
   let args = ["build"; "-f"; dockerfile] @ build_args @ tag @ ["."] in
   let value = Process.spawn ~name ~color "docker" args in
