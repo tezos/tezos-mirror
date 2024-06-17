@@ -5536,7 +5536,10 @@ module Garbage_collection = struct
     in
 
     Log.info "Every shard published for the commitment; baking blocks" ;
-    let* () = bake_for ~count:30 client in
+    let* () = bake_for ~count:dal_parameters.attestation_lag client in
+    (* The slot wasn't attested (because there is no attester running
+       in this scenario) so it got removed despite not being older
+       than the history length of the slot producer DAL node. *)
     Log.info "Blocks baked." ;
 
     Log.info "Wait for the shards of the commitment to be removed" ;
@@ -7238,7 +7241,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "simple"; Tag.memory_3k]
     ~producer_profiles:[0]
-    ~history_mode:(Dal_node.Custom 15)
+    ~history_mode:(Dal_node.Custom 150)
     ~number_of_slots:1
     "garbage collection of shards for producer"
     Garbage_collection.test_gc_simple_producer
