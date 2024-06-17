@@ -67,6 +67,8 @@ Client
   Michelson-related commands, now allow file names as argument. (MR
   :gl:`!13311`)
 
+- **Breaking change** Removed read-write commands specific to Oxford. (MR :gl:`!13799`)
+
 Baker
 -----
 
