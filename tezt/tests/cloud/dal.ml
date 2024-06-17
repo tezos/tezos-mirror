@@ -251,6 +251,7 @@ type etherlink = {
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
   evm_node : Tezt_etherlink.Evm_node.t;
+  accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
 type public_key_hash = string
@@ -977,8 +978,13 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
   let preimages_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
+  let* remote_output_config = Agent.copy agent ~source:output_config in
   let* {output; _} =
-    prepare_installer_kernel ~agent ~preimages_dir Constant.WASM.evm_kernel
+    prepare_installer_kernel
+      ~config:(`Path remote_output_config)
+      ~agent
+      ~preimages_dir
+      Constant.WASM.evm_kernel
   in
   let pvm_kind = "wasm_2_0_0" in
   let l = Node.get_last_seen_level node in
@@ -1027,7 +1033,8 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       (Sc_rollup_node.endpoint sc_rollup_node)
       agent
   in
-  return {node; client; sc_rollup_node; evm_node}
+  let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
+  return {node; client; sc_rollup_node; evm_node; accounts}
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
