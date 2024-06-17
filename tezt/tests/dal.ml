@@ -5744,6 +5744,7 @@ module Garbage_collection = struct
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
+    let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
     let rec bake_loop n =
       if n <= 0 then unit
       else
@@ -5753,7 +5754,9 @@ module Garbage_collection = struct
             (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
             [attester; observer; dal_bootstrap; slot_producer]
         in
-        let* () = bake_for client in
+        let* () =
+          bake_for ~dal_node_endpoint:attester_dal_node_endpoint client
+        in
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
