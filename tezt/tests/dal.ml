@@ -5584,12 +5584,16 @@ module Garbage_collection = struct
     (* When configuring the other DAL nodes, we use dal_bootstrap as
        the single peer. *)
     let peers = [Dal_node.listen_addr dal_bootstrap] in
-    let attester_pkh = Account.Bootstrap.keys.(0).public_key_hash in
+    let bootstrap_pkhs =
+      Array.to_seq Account.Bootstrap.keys
+      |> Seq.map (fun account -> account.Account.public_key_hash)
+      |> List.of_seq
+    in
 
     (* Create & configure attester *)
     let attester = Dal_node.create ~name:"attester" ~node () in
     let* () =
-      Dal_node.init_config ~attester_profiles:[attester_pkh] ~peers attester
+      Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
     in
     let* () = Dal_node.run ~wait_ready:true attester in
     Log.info "attester DAL node ready" ;
@@ -5634,9 +5638,10 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         attester
-        ~expected:Dal_RPC.(Operator [Attester attester_pkh])
+        ~expected:
+          (Dal_RPC.Operator
+             (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
     in
-
     Log.info "Attester DAL node is running" ;
 
     (* Now that all the DAL nodes are running, we need some of them to
@@ -5662,13 +5667,9 @@ module Garbage_collection = struct
       Lwt.pick [check_graft ~from:node1 node2; check_graft ~from:node2 node1]
     in
     let check_graft_promises =
-      check_graft slot_producer attester attester_pkh
-      :: check_graft observer attester attester_pkh
-      :: Account.(
-           Array.to_list
-           @@ (Array.map (fun key ->
-                   check_graft slot_producer observer key.public_key_hash))
-                Bootstrap.keys)
+      List.map (check_graft slot_producer attester) bootstrap_pkhs
+      @ List.map (check_graft observer attester) bootstrap_pkhs
+      @ List.map (check_graft slot_producer observer) bootstrap_pkhs
     in
     Log.info "Waiting for grafting of the DAL nodes connections" ;
     (* The attester DAL node won't join the DAL network until it has
