@@ -7992,6 +7992,9 @@ test_kernels:
     - kernels.mk
     - src/kernel_*/**/*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -8028,6 +8031,9 @@ test_etherlink_kernel:
     - images/**/*
     - src/kernel_sdk/**/*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -8063,6 +8069,9 @@ test_etherlink_firehose:
     - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
     - images/**/*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -8131,6 +8140,9 @@ test_riscv_kernels:
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - check_riscv_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:
@@ -8167,6 +8179,9 @@ test_evm_compatibility:
     - etherlink/kernel_evm/evm_execution/**/*
     - images/**/*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
   cache:

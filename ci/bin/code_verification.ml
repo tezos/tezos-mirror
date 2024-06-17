@@ -1488,9 +1488,10 @@ let jobs pipeline_type =
       ]
     in
     let jobs_kernels : tezos_job list =
-      let make_job_kernel ?(stage = Stages.test) ~__POS__ ~name ~changes script
-          =
+      let make_job_kernel ?dependencies ?(stage = Stages.test) ~__POS__ ~name
+          ~changes script =
         job
+          ?dependencies
           ~__POS__
           ~name
           ~image:Images.rust_toolchain
@@ -1504,6 +1505,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"test_kernels"
           ~changes:changeset_test_kernels
+          ~dependencies:(Dependent [Job job_build_kernels])
           ["make -f kernels.mk check"; "make -f kernels.mk test"]
       in
       let job_test_etherlink_kernel : tezos_job =
@@ -1511,6 +1513,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"test_etherlink_kernel"
           ~changes:changeset_test_etherlink_kernel
+          ~dependencies:(Dependent [Job job_build_kernels])
           ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
       in
       let job_test_etherlink_firehose : tezos_job =
@@ -1518,6 +1521,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"test_etherlink_firehose"
           ~changes:changeset_test_etherlink_firehose
+          ~dependencies:(Dependent [Job job_build_kernels])
           ["make -C etherlink/firehose check"]
       in
       let job_check_riscv_kernels : tezos_job =
@@ -1533,6 +1537,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"test_riscv_kernels"
           ~changes:changeset_test_riscv_kernels
+          ~dependencies:(Dependent [Job job_check_riscv_kernels])
           ["make -C src/riscv test"; "make -C src/riscv audit"]
       in
       let job_test_evm_compatibility : tezos_job =
@@ -1540,6 +1545,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"test_evm_compatibility"
           ~changes:changeset_test_evm_compatibility
+          ~dependencies:(Dependent [Job job_build_kernels])
           [
             "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
              evm-evaluation-assessor";
