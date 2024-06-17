@@ -6,6 +6,7 @@
 use crate::handler::EvmHandler;
 use crate::precompiles::tick_model;
 use crate::precompiles::PrecompileOutcome;
+use crate::precompiles::WITHDRAWAL_ADDRESS;
 use crate::{abi, fail_if_too_much, EthereumError};
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
@@ -23,8 +24,8 @@ const WITHDRAWAL_COST: u64 = 880;
 pub fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _context: &Context,
-    _is_static: bool,
+    context: &Context,
+    is_static: bool,
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_withdraw(), handler);
@@ -56,6 +57,14 @@ pub fn withdrawal_precompile<Host: Runtime>(
         log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: no transfer");
         return Ok(revert_withdrawal())
     };
+
+    if transfer.target != WITHDRAWAL_ADDRESS
+        || context.address != WITHDRAWAL_ADDRESS
+        || context.caller == WITHDRAWAL_ADDRESS
+        || is_static
+    {
+        return Ok(revert_withdrawal());
+    }
 
     let minimal_amount = U256::from(10).pow(U256::from(12));
     if transfer.value < minimal_amount {
