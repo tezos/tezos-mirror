@@ -1109,7 +1109,7 @@ let test_all_available_slots _protocol parameters cryptobox node client
    [List.hd] on an empty list), though care was taken to avoid this as much as
    possible, as it is a bit hard to make sure an attester is in the TB committee
    but not in the DAL committee).*)
-let test_slots_attestation_operation_dal_committee_membership_check protocol
+let test_slots_attestation_operation_dal_committee_membership_check _protocol
     parameters _cryptobox node client _bootstrap_key =
   (* The attestation from the bootstrap account should succeed as the bootstrap
      node has sufficient stake to be in the DAL committee. *)
@@ -1130,9 +1130,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let consensus_rights_delay =
-    if Protocol.number protocol > Protocol.number Protocol.Oxford then
-      JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
-    else JSON.(proto_params |-> "preserved_cycles" |> as_int)
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
@@ -1888,7 +1886,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
-    ~supports:(Protocol.From_protocol 19)
+    ~supports:(Protocol.From_protocol 20)
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
