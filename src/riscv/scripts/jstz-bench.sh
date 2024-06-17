@@ -15,6 +15,7 @@ TX=""
 STATIC_INBOX=""
 SANDBOX_BIN="riscv-sandbox"
 PROFILING_WRAPPER=""
+SAMPLY_OUT="riscv-sandbox-profile.json"
 
 while getopts "st:p" OPTION; do
   case "$OPTION" in
@@ -26,7 +27,7 @@ while getopts "st:p" OPTION; do
     ;;
   p)
     SANDBOX_BIN="riscv-sandbox.prof"
-    PROFILING_WRAPPER="samply record"
+    PROFILING_WRAPPER="samply record -s -o $SAMPLY_OUT"
     ;;
   *)
     echo "$USAGE"
@@ -77,9 +78,17 @@ $PROFILING_WRAPPER "./$SANDBOX_BIN" run \
   --address "$DEFAULT_ROLLUP_ADDRESS" \
   --timings > "$LOG" 2> /dev/null
 
+if [ -n "$PROFILING_WRAPPER" ]; then
+  echo "[INFO]: Samply data saved to: $SAMPLY_OUT"
+fi
+
 echo "[INFO]: collecting results"
 echo -e "\033[1m"
 ./jstz/inbox-bench results --inbox-file "$INBOX_FILE" --log-file "$LOG"
 echo -e "\033[0m"
+
+if [ -n "$PROFILING_WRAPPER" ]; then
+  samply load $SAMPLY_OUT
+fi
 
 cd "$CURR"
