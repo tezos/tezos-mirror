@@ -90,11 +90,9 @@ module Processing = struct
         genesis;
         readonly;
         sandbox_parameters;
-        dal_config;
         _;
       } =
     let open Lwt_result_syntax in
-    let*? () = Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal dal_config in
     let sandbox_parameters =
       Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
     in

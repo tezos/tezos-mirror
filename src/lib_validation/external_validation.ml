@@ -36,7 +36,6 @@ type parameters = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
-  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   internal_events : Tezos_base.Internal_event_config.t;
 }
 
@@ -160,7 +159,6 @@ let parameters_encoding =
            user_activated_protocol_overrides;
            operation_metadata_size_limit;
            sandbox_parameters;
-           dal_config;
            internal_events;
          } ->
       ( (context_root, protocol_root, genesis, readonly, data_dir),
@@ -168,14 +166,12 @@ let parameters_encoding =
           user_activated_protocol_overrides,
           operation_metadata_size_limit,
           sandbox_parameters,
-          dal_config,
           internal_events ) ))
     (fun ( (context_root, protocol_root, genesis, readonly, data_dir),
            ( user_activated_upgrades,
              user_activated_protocol_overrides,
              operation_metadata_size_limit,
              sandbox_parameters,
-             dal_config,
              internal_events ) ) ->
       {
         context_root;
@@ -187,7 +183,6 @@ let parameters_encoding =
         user_activated_protocol_overrides;
         operation_metadata_size_limit;
         sandbox_parameters;
-        dal_config;
         internal_events;
       })
   @@ merge_objs
@@ -197,7 +192,7 @@ let parameters_encoding =
           (req "genesis" Genesis.encoding)
           (req "readonly" bool)
           (req "data_dir" string))
-       (obj6
+       (obj5
           (req "user_activated_upgrades" User_activated.upgrades_encoding)
           (req
              "user_activated_protocol_overrides"
@@ -206,7 +201,6 @@ let parameters_encoding =
              "operation_metadata_size_limit"
              Shell_limits.operation_metadata_size_limit_encoding)
           (opt "sandbox_parameters" json)
-          (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
           (req "internal_events" Tezos_base.Internal_event_config.encoding))
 
 type packed_request = Erequest : _ request -> packed_request

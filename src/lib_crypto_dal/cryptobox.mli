@@ -567,12 +567,16 @@ module Internal_for_tests : sig
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
-
-   This configuration module is currently used by each process that
-   needs to initialize DAL. Given that in the default case [init_dal]
-   may take several seconds, it would be better to call this function
-   only once. *)
+(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the DAL
+    in "prover" mode, given the function [find_srs_files] to find the SRS files,
+    and the optional log2 of the SRS size [srs_size_log2]. Note that the both
+    proving & verifying functions can be used with this setup. If this function
+    is not called only verifying functions are available. *)
+val init_prover_dal :
+  find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+  ?srs_size_log2:int ->
+  unit ->
+  unit Error_monad.tzresult Lwt.t
 
 (** node parameters for the DAL. *)
 module Config : sig
@@ -581,20 +585,4 @@ module Config : sig
   val encoding : t Data_encoding.t
 
   val default : t
-
-  (** [init_verifier_dal config] initializes the DAL according to the DAL
-      configuration [config], with a minimal SRS for the verifier.
-     Note that only verifying functions can be used with this setup *)
-  val init_verifier_dal : t -> unit Error_monad.tzresult
-
-  (** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) config] initializes
-      the DAL according to the DAL configuration [config], a function to find
-      the SRS files [find_srs_files] and the optional log2 of the SRS size
-      [srs_size_log2].
-      Note that the proving & verifying functions can be used with this setup *)
-  val init_prover_dal :
-    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
-    ?srs_size_log2:int ->
-    t ->
-    unit Error_monad.tzresult Lwt.t
 end

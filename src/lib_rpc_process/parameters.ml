@@ -28,29 +28,17 @@ type t = {
   rpc_comm_socket_path : string;
   internal_events : Tezos_base.Internal_event_config.t;
   node_version : Tezos_version.Octez_node_version.t;
-  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 let parameters_encoding =
   let open Data_encoding in
   conv
-    (fun {
-           config;
-           rpc_comm_socket_path;
-           internal_events;
-           node_version;
-           dal_config;
-         } ->
-      (config, rpc_comm_socket_path, internal_events, node_version, dal_config))
-    (fun ( config,
-           rpc_comm_socket_path,
-           internal_events,
-           node_version,
-           dal_config ) ->
-      {config; rpc_comm_socket_path; internal_events; node_version; dal_config})
-    (obj5
+    (fun {config; rpc_comm_socket_path; internal_events; node_version} ->
+      (config, rpc_comm_socket_path, internal_events, node_version))
+    (fun (config, rpc_comm_socket_path, internal_events, node_version) ->
+      {config; rpc_comm_socket_path; internal_events; node_version})
+    (obj4
        (req "config" Config_file.encoding)
        (req "rpc_comm_socket_path" Data_encoding.string)
        (req "internal_events" Tezos_base.Internal_event_config.encoding)
-       (req "node_version" Tezos_version.Octez_node_version.encoding)
-       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding))
+       (req "node_version" Tezos_version.Octez_node_version.encoding))
