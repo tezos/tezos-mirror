@@ -1269,10 +1269,16 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let evm_context_dir = State.store_path ~data_dir in
   let*! () = Lwt_utils_unix.create_dir evm_context_dir in
   let* () =
-    Irmin_context.export_snapshot
-      rollup_node_index
-      checkpoint
-      ~path:evm_context_dir
+    Progress_bar.Lwt.with_background_spinner
+      ~message:
+        (Format.sprintf
+           "Exporting context for %ld in %s"
+           final_level
+           evm_context_dir)
+    @@ Irmin_context.export_snapshot
+         rollup_node_index
+         checkpoint
+         ~path:evm_context_dir
   in
   let* evm_node_index =
     Irmin_context.load ~cache_size:100_000 Read_write evm_context_dir
