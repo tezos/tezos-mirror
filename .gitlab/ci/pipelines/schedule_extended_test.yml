@@ -8260,6 +8260,42 @@ de.unit:arm64:
   script:
   - dune runtest data-encoding
 
+resto.unit:x86_64:
+  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest resto
+
+resto.unit:arm64:
+  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:arm64
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:arm64
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest resto
+
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   stage: test

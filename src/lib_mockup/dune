@@ -25,7 +25,7 @@
   octez-libs.base.unix
   octez-shell-libs.client-base
   octez-shell-libs.mockup-proxy
-  resto-cohttp-self-serving-client
+  octez-libs.resto-cohttp-self-serving-client
   octez-libs.rpc
   octez-libs.tezos-p2p-services
   octez-shell-libs.p2p

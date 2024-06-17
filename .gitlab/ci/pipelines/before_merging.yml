@@ -268,6 +268,7 @@ oc.build:static-x86_64-linux-binaries:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -315,6 +316,7 @@ oc.build_x86_64-released:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -371,6 +373,7 @@ oc.build_x86_64-exp-dev-extra:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -472,6 +475,7 @@ oc.build_kernels:
     - irmin/**/*
     - kernels.mk
     - michelson_test_scripts/**/*
+    - resto/**/*
     - scripts/ci/**/*
     - src/**/*
     - tezt/**/*
@@ -529,6 +533,7 @@ oc.tezt:fetch-records:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -7787,6 +7792,7 @@ oc.integration:compiler-rejections:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -7830,6 +7836,7 @@ oc.script:test-gen-genesis:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -7902,6 +7909,7 @@ oc.script:test_octez_release_versions:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8197,6 +8205,7 @@ oc.unit:non-proto-x86_64:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8255,6 +8264,7 @@ oc.unit:other-x86_64:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8313,6 +8323,7 @@ oc.unit:proto-x86_64:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8371,6 +8382,7 @@ oc.unit:non-proto-arm64:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8427,6 +8439,7 @@ oc.unit:webassembly-x86_64:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8458,6 +8471,7 @@ oc.unit:js_components:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8493,6 +8507,7 @@ oc.unit:protocol_compiles:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8565,6 +8580,50 @@ de.unit:arm64:
   - eval $(opam env)
   script:
   - dune runtest data-encoding
+
+resto.unit:x86_64:
+  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - resto/**
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest resto
+
+resto.unit:arm64:
+  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - resto/**
+    when: on_success
+  needs:
+  - oc.docker:ci:arm64
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:arm64
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest resto
 
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
@@ -8770,6 +8829,7 @@ tezt:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8840,6 +8900,7 @@ tezt-memory-3k:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8910,6 +8971,7 @@ tezt-memory-4k:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -8980,6 +9042,7 @@ tezt-time-sensitive:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -9049,6 +9112,7 @@ tezt-slow:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -9116,6 +9180,7 @@ tezt-flaky:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -9186,6 +9251,7 @@ tezt:static-binaries:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -9265,6 +9331,7 @@ oc.unified_coverage:
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - resto/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*

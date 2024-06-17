@@ -8,8 +8,8 @@
  (libraries
   octez-libs.data-encoding
   octez-libs.error-monad
-  resto
-  resto-directory
+  octez-libs.resto
+  octez-libs.resto-directory
   uri)
  (js_of_ocaml)
  (flags

@@ -12,6 +12,7 @@ depends: [
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
   "alcotest" { >= "1.5.0" }
+  "alcotest-lwt" { >= "1.5.0" }
   "astring"
   "base-unix"
   "bheap"
@@ -27,7 +28,9 @@ depends: [
   "checkseum" { != "0.5.0" }
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
+  "cohttp-lwt" { >= "5.2.0" }
   "cohttp-lwt-unix" { >= "5.2.0" }
+  "conduit-lwt-unix" { = "6.2.2" }
   "conf-libev"
   "conf-rust"
   "crowbar" { >= "0.2" }
@@ -90,13 +93,6 @@ depends: [
   "qcheck-core"
   "re" { >= "1.10.0" }
   "repr"
-  "resto" { = "1.2" }
-  "resto-acl" { = "1.2" }
-  "resto-cohttp" { = "1.2" }
-  "resto-cohttp-client" { = "1.2" }
-  "resto-cohttp-self-serving-client" { = "1.2" }
-  "resto-cohttp-server" { = "1.2" }
-  "resto-directory" { = "1.2" }
   "ringo" { >= "1.0.0" }
   "rusage"
   "secp256k1-internal" { >= "0.4.0" }
@@ -123,6 +119,14 @@ conflicts: [
   "json_data_encoding"
   "json_data_encoding_browser"
   "json_data_encoding_bson"
+  "resto"
+  "resto-acl"
+  "resto-cohttp"
+  "resto-cohttp-client"
+  "resto-cohttp-self-serving-client"
+  "resto-cohttp-server"
+  "resto-directory"
+  "resto-json"
   "result" { < "1.5" }
 ]
 build: []

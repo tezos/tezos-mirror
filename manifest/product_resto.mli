@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val product_source : string list
+
 val resto : Manifest.target
 
 val resto_directory : Manifest.target
