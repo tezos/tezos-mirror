@@ -40,4 +40,9 @@ val with_reporter : 'a line -> (('a -> unit) -> 'b) -> 'b
 module Lwt : sig
   (** Same as {!with_reporter} for Lwt functions. *)
   val with_reporter : 'a line -> (('a -> unit Lwt.t) -> 'b Lwt.t) -> 'b Lwt.t
+
+  (** [with_background_spinner ~message promise] displays a spinner with
+      [messages] while the [promise] is pending. This function is to be used for
+      code that cannot be instrumented for progress. *)
+  val with_background_spinner : message:string -> 'a Lwt.t -> 'a Lwt.t
 end
