@@ -1225,6 +1225,4 @@ let serve_files ?(on_request = fun _ -> ()) ~name ~port ~root f =
   in
   Lwt.finalize f stopper
 
-let ticks_per_snapshot = function
-  | Protocol.Alpha | Paris -> 50_000_000_000_000
-  | Oxford -> 11_000_000_000
+let ticks_per_snapshot = 50_000_000_000_000

@@ -1121,7 +1121,7 @@ let test_all_available_slots _protocol parameters cryptobox node client
    from a DAL-committee member. This test creates a new account and registers it
    as a bakers, and bakes blocks until it reaches a level where the new account
    is in the TB committee but not in the DAL committee).*)
-let test_slots_attestation_operation_dal_committee_membership_check protocol
+let test_slots_attestation_operation_dal_committee_membership_check _protocol
     parameters _cryptobox node client _bootstrap_key =
   (* The attestation from the bootstrap account should succeed as the bootstrap
      node has sufficient stake to be in the DAL committee. *)
@@ -1144,9 +1144,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let consensus_rights_delay =
-    if Protocol.number protocol > Protocol.number Protocol.Oxford then
-      JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
-    else JSON.(proto_params |-> "preserved_cycles" |> as_int)
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
@@ -1860,7 +1858,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
-    ~supports:(Protocol.From_protocol 19)
+    ~supports:(Protocol.From_protocol 20)
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
@@ -4722,7 +4720,7 @@ module History_rpcs = struct
     let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
     let description = "test commitments history with migration" in
     let slot_index = 3 in
-    let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
+    let scenario ~migrate_to ~migration_level dal_parameters =
       let lag = dal_parameters.Dal.Parameters.attestation_lag in
       Check.(
         (migration_level > lag)
@@ -4732,19 +4730,13 @@ module History_rpcs = struct
              lag (%R)") ;
       (* The first cell level has this value, if the previous protocol
          doesn't have the DAL activated. *)
-      let first_cell_level =
-        if Protocol.number migrate_from <= 018 then migration_level - lag else 0
-      in
-      let first_dal_level =
-        if Protocol.number migrate_from > 018 then 1 else migration_level
-      in
       (* We'll have 3 levels with a published and attested slot. *)
       let last_confirmed_published_level = migration_level + 3 in
       let initial_blocks_to_bake = migration_level - 1 in
       scenario
         ~slot_index
-        ~first_cell_level
-        ~first_dal_level
+        ~first_cell_level:0
+        ~first_dal_level:1
         ~last_confirmed_published_level
         ~initial_blocks_to_bake
         migrate_to
@@ -4754,7 +4746,7 @@ module History_rpcs = struct
       ~migrate_from
       ~migrate_to
       ~scenario:(fun ~migration_level dal_parameters ->
-        scenario ~migrate_from ~migrate_to ~migration_level dal_parameters)
+        scenario ~migrate_to ~migration_level dal_parameters)
       ~tags
       ~description
       ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
@@ -7164,20 +7156,10 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
           ~check_rpc)
       offsets
   in
-  (* These tests can be removed when the Oxford protocol is removed from tezt
-     tests. Here [check = false] because these tests fail when [check =
-     true]. *)
-  tests ~migrate_from:Oxford ~migrate_to:Paris ~check_rpc:false ;
   tests ~migrate_from ~migrate_to ~check_rpc:true
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
-  (* This test can be safely removed when Paris is activated (and the Oxford
-     protocol is removed from tezt tests). *)
-  History_rpcs.test_commitments_history_rpcs_with_migration
-    ~migration_level:10
-    ~migrate_from:Oxford
-    ~migrate_to:Paris ;
   History_rpcs.test_commitments_history_rpcs_with_migration
     ~migration_level:10
     ~migrate_from

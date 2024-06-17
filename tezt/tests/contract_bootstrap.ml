@@ -36,7 +36,6 @@ let test_bootstrap_contract_with_given_hash =
     ~__FILE__
     ~title:"Bootstrap contract with given hash"
     ~tags:[team; "bootstrap"; "contract"; "michelson"]
-    ~supports:(Protocol.From_protocol 018)
     (fun protocol ->
       let address = "KT1KqcpWDCy8A3MSAPcxDFkg3LSSgFokTb12" in
       let script =

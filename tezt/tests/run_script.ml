@@ -232,7 +232,6 @@ let test_other_contracts =
     ~title:"Run script with other_contracts"
     ~tags:[team; "client"; "michelson"]
     ~uses_node:false
-    ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let unused_address = {|"KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"|} in

@@ -2862,7 +2862,7 @@ let test_stage_one_reboot =
     ~title:
       "Checks the stage one reboots when reading too much chunks in a single \
        L1 level"
-  @@ fun {sc_rollup_node; client; sc_rollup_address; _} protocol ->
+  @@ fun {sc_rollup_node; client; sc_rollup_address; _} _protocol ->
   let* chunks =
     Lwt_list.map_s (fun i ->
         Evm_node.chunk_data
@@ -2915,7 +2915,6 @@ let test_stage_one_reboot =
 
   (* The PVM takes 11G ticks for collecting inputs, 11G for a kernel_run. As such,
      an L1 level is at least 22G ticks. *)
-  let ticks_per_snapshot = Sc_rollup_helpers.ticks_per_snapshot protocol in
   let min_ticks_per_l1_level = ticks_per_snapshot * 2 in
   (* If the inbox is not empty, the kernel enforces a reboot after reading it,
      to give the maximum ticks available for the first block production. *)

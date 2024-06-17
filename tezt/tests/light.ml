@@ -243,11 +243,6 @@ module NoUselessRpc = struct
         (["votes"; "proposals"], []);
       ]
     in
-    let paths =
-      if Protocol.(number protocol <= number Oxford) then
-        (["helpers"; "endorsing_rights"], []) :: paths
-      else paths
-    in
     Lwt_list.iter_s
       (fun (sub_path, query_string) ->
         test_no_useless_rpc
@@ -295,7 +290,7 @@ let test_compare_light =
   let tz_log =
     [("proxy_rpc", "debug"); ("light_mode", "debug"); ("proxy_getter", "debug")]
   in
-  check_equivalence ~protocol ~tz_log alt_mode clients
+  check_equivalence ~tz_log alt_mode clients
 
 let register_protocol_independent () =
   test_no_endpoint () ;

@@ -139,17 +139,11 @@ let check_samples protocols =
   protocol_sample "operation.internal" ;
   protocol_sample "operation" ;
   protocol_sample
-    ~supports:Protocol.(Between_protocols (18, 18))
-    "operation_with_attestation" ;
-  protocol_sample
     ~title:"operation_with_legacy"
     ~supports:Protocol.(From_protocol 19)
     "operation_with_legacy_attestation_name" ;
   protocol_sample "operation.raw" ;
   protocol_sample "operation.unsigned" ;
-  protocol_sample
-    ~supports:Protocol.(Between_protocols (18, 18))
-    "operation_with_attestation.unsigned" ;
   protocol_sample
     ~title:"operation_with_legacy.unsigned"
     ~supports:Protocol.(From_protocol 19)
