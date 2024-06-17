@@ -205,7 +205,7 @@ let test_equivalence =
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
   let tz_log = [("proxy_rpc", "debug"); ("proxy_getter", "debug")] in
-  check_equivalence ~protocol ~tz_log alt_mode clients
+  check_equivalence ~tz_log alt_mode clients
 
 let test_wrong_data_dir =
   Protocol.register_test
@@ -275,7 +275,7 @@ let test_multi_protocols =
   (* Launch the proxy server and plug the client to it *)
   let* proxy_server = Proxy_server.init node in
   Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
-  let check_attestation_levels ~__LOC__ ?block ~expected_level proto =
+  let check_attestation_levels ~__LOC__ ?block ~expected_level () =
     let check levels =
       let returned_level = JSON.(levels |> geti 0 |> get "level" |> as_int) in
       Check.(
@@ -292,28 +292,13 @@ let test_multi_protocols =
       @@ RPC.get_chain_block_helper_attestation_rights ?block ()
     in
     check proto_attestation_rights ;
-    if Protocol.(number proto <= number Oxford) then (
-      let* proto_endorsing_rights =
-        Client.RPC.call client
-        @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
-           This RPC helper should be removed once Oxford will be frozen. *)
-      in
-      check proto_endorsing_rights ;
-      unit)
-    else unit
+    unit
   in
   (* Ensure the proxy serves a query to a block in [to_protocol] *)
-  let* () =
-    check_attestation_levels ~__LOC__ ~block:"3" ~expected_level:3 from_protocol
-  in
+  let* () = check_attestation_levels ~__LOC__ ~block:"3" ~expected_level:3 () in
   (* Ensure the proxy serves a query to a block in [from_protocol] *)
   let* () =
-    check_attestation_levels
-      ~__LOC__
-      ~block:"head~1"
-      ~expected_level:5
-      to_protocol
+    check_attestation_levels ~__LOC__ ~block:"head~1" ~expected_level:5 ()
   in
   unit
 

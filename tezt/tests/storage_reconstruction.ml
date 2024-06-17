@@ -41,17 +41,12 @@ let pp_snapshot_history_mode fmt v =
        | Node.Rolling_history -> "rolling" | Node.Full_history -> "full")
        v)
 
-let get_constants ~protocol client =
+let get_constants client =
   let* constants =
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_preservation_cycles =
-    let v =
-      if Protocol.number protocol > Protocol.number Protocol.Oxford then
-        "blocks_preservation_cycles"
-      else "preserved_cycles"
-    in
-    JSON.(constants |-> v |> as_int)
+    JSON.(constants |-> "blocks_preservation_cycles" |> as_int)
   in
   let* blocks_per_cycle =
     return JSON.(constants |-> "blocks_per_cycle" |> as_int)
@@ -148,7 +143,7 @@ let test_storage_reconstruction =
       ()
   in
   let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
-    get_constants ~protocol client
+    get_constants client
   in
   Log.info "Baking a few blocks so that the savepoint is still at genesis." ;
   let blocks_to_bake_1 = blocks_preservation_cycles * blocks_per_cycle in

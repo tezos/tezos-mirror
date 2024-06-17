@@ -96,15 +96,10 @@ let test_update_consensus_key =
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
-    let consensus_rights_delay_str =
-      if Protocol.number protocol > Protocol.number Protocol.Oxford then
-        "consensus_rights_delay"
-      else "preserved_cycles"
-    in
     [
       (["blocks_per_cycle"], `Int blocks_per_cycle);
       (["nonce_revelation_threshold"], `Int 2);
-      ([consensus_rights_delay_str], `Int consensus_rights_delay);
+      (["consensus_rights_delay"], `Int consensus_rights_delay);
     ]
   in
   let* parameter_file =
@@ -638,15 +633,10 @@ let register ?(regression = true) title test =
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
-    let consensus_rights_delay_str =
-      if Protocol.number protocol > Protocol.number Protocol.Oxford then
-        "consensus_rights_delay"
-      else "preserved_cycles"
-    in
     [
       (["blocks_per_cycle"], `Int blocks_per_cycle);
       (["nonce_revelation_threshold"], `Int 2);
-      ([consensus_rights_delay_str], `Int consensus_rights_delay);
+      (["consensus_rights_delay"], `Int consensus_rights_delay);
     ]
   in
   let* parameter_file =
