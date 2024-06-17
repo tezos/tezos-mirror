@@ -6,6 +6,8 @@
 
 ## Features
 
+- Blueprints provided by the sequencer must have increasing timestamps. (!13807)
+
 ## Bug fixes
 
 ## Internal

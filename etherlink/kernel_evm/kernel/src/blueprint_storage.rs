@@ -18,6 +18,7 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
@@ -196,22 +197,10 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 pub enum BlueprintValidity {
     Valid(Blueprint),
     InvalidParentHash,
+    InvalidTimestamp,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
     BlueprintTooLarge,
-}
-
-/// Check that the parent hash of the [blueprint_with_hashes] is equal
-/// to the current block hash
-#[cfg_attr(feature = "benchmark", allow(dead_code))]
-fn valid_parent_hash<Host: Runtime>(
-    host: &Host,
-    blueprint_with_hashes: &BlueprintWithDelayedHashes,
-) -> bool {
-    let genesis_parent = |_| GENESIS_PARENT_HASH;
-    let current_block_hash =
-        storage::read_current_block_hash(host).unwrap_or_else(genesis_parent);
-    current_block_hash == blueprint_with_hashes.parent_hash
 }
 
 fn fetch_delayed_txs<Host: Runtime>(
@@ -270,24 +259,28 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     current_blueprint_size: usize,
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
-    match rlp::decode(bytes) {
+    match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
+            let head = storage::read_current_block(host);
+            let (head_hash, head_timestamp) = match head {
+                Ok(block) => (block.hash, block.timestamp),
+                Err(_) => (GENESIS_PARENT_HASH, Timestamp::from(0)),
+            };
+
             // Validate parent hash
             #[cfg(not(feature = "benchmark"))]
-            if !valid_parent_hash(host, &blueprint_with_hashes) {
-                Ok((BlueprintValidity::InvalidParentHash, bytes.len()))
-            } else {
-                // Fetch delayed transactions
-                fetch_delayed_txs(
-                    host,
-                    blueprint_with_hashes,
-                    delayed_inbox,
-                    current_blueprint_size,
-                )
+            if head_hash != blueprint_with_hashes.parent_hash {
+                return Ok((BlueprintValidity::InvalidParentHash, bytes.len()));
             }
 
-            #[cfg(feature = "benchmark")]
+            // Validate parent timestamp
+            #[cfg(not(feature = "benchmark"))]
+            if blueprint_with_hashes.timestamp < head_timestamp {
+                return Ok((BlueprintValidity::InvalidTimestamp, bytes.len()));
+            }
+
+            // Fetch delayed transactions
             fetch_delayed_txs(
                 host,
                 blueprint_with_hashes,
