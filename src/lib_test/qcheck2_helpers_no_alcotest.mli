@@ -23,25 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module is deprecated, use [Qcheck2_helpers_no_alcotest] and
-   [Qcheck_tezt]. *)
-
-(** Wrap QCheck tests into Alcotest. *)
-val qcheck_wrap :
-  ?verbose:bool ->
-  ?long:bool ->
-  ?rand:Random.State.t ->
-  QCheck2.Test.t list ->
-  unit Alcotest.test_case list
-
-(** Wrap QCheck tests into Alcotest_lwt. *)
-val qcheck_wrap_lwt :
-  ?verbose:bool ->
-  ?long:bool ->
-  ?rand:Random.State.t ->
-  QCheck2.Test.t list ->
-  (string * [`Quick | `Slow] * (unit -> unit Lwt.t)) list
-
 (** [qcheck_make_result ?print ?pp_error ?count ?check ~name ~gen f]
     is a wrapper around {!QCheck2.Test.make} where [f] returns a
     result type. If [check] is not provided and if the result of [f] is
