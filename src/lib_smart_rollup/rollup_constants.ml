@@ -53,3 +53,114 @@ type protocol_constants = {
   sc_rollup : sc_rollup_constants;
   dal : dal_constants;
 }
+
+let reveal_activation_level_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           blake2B;
+           metadata;
+           dal_page;
+           dal_parameters;
+           dal_attested_slots_validity_lag;
+         } ->
+      ( blake2B,
+        metadata,
+        dal_page,
+        dal_parameters,
+        dal_attested_slots_validity_lag ))
+    (fun ( blake2B,
+           metadata,
+           dal_page,
+           dal_parameters,
+           dal_attested_slots_validity_lag ) ->
+      {
+        blake2B;
+        metadata;
+        dal_page;
+        dal_parameters;
+        dal_attested_slots_validity_lag;
+      })
+  @@ obj5
+       (req "blake2B" int32)
+       (req "metadata" int32)
+       (req "dal_page" int32)
+       (req "dal_parameters" int32)
+       (req "dal_attested_slots_validity_lag" int32)
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           minimal_block_delay;
+           delay_increment_per_round;
+           sc_rollup =
+             {
+               challenge_window_in_blocks;
+               commitment_period_in_blocks;
+               reveal_activation_level;
+               max_number_of_stored_cemented_commitments;
+             };
+           dal =
+             {
+               feature_enable;
+               attestation_lag;
+               number_of_slots;
+               cryptobox_parameters;
+             };
+         } ->
+      ( minimal_block_delay,
+        delay_increment_per_round,
+        ( challenge_window_in_blocks,
+          commitment_period_in_blocks,
+          reveal_activation_level,
+          max_number_of_stored_cemented_commitments ),
+        (feature_enable, attestation_lag, number_of_slots, cryptobox_parameters)
+      ))
+    (fun ( minimal_block_delay,
+           delay_increment_per_round,
+           ( challenge_window_in_blocks,
+             commitment_period_in_blocks,
+             reveal_activation_level,
+             max_number_of_stored_cemented_commitments ),
+           ( feature_enable,
+             attestation_lag,
+             number_of_slots,
+             cryptobox_parameters ) ) ->
+      {
+        minimal_block_delay;
+        delay_increment_per_round;
+        sc_rollup =
+          {
+            challenge_window_in_blocks;
+            commitment_period_in_blocks;
+            reveal_activation_level;
+            max_number_of_stored_cemented_commitments;
+          };
+        dal =
+          {
+            feature_enable;
+            attestation_lag;
+            number_of_slots;
+            cryptobox_parameters;
+          };
+      })
+  @@ obj4
+       (req "minimal_block_delay" int64)
+       (req "delay_increment_per_round" int64)
+       (req
+          "sc_rollup"
+          (obj4
+             (req "challenge_window_in_blocks" int31)
+             (req "commitment_period_in_blocks" int31)
+             (opt "reveal_activation_level" reveal_activation_level_encoding)
+             (req "max_number_of_stored_cemented_commitments" int31)))
+       (req
+          "dal"
+          (obj4
+             (req "feature_enable" bool)
+             (req "attestation_lag" int31)
+             (req "number_of_slots" int31)
+             (req
+                "cryptobox_parameters"
+                Tezos_crypto_dal.Cryptobox.parameters_encoding)))

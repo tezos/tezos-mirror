@@ -15,6 +15,10 @@
 
 open Sc_rollup_helpers
 
+let block_time_to_trigger_constant_update_on_migration = function
+  | Protocol.Alpha -> Some 5
+  | ParisB | ParisC -> Some 8
+
 let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
     ?variant ?(tags = []) ?(timeout = 10) ?(commitment_period = 10) ~kind
     ~migrate_from ~migrate_to ~scenario_prior ~scenario_after ~description () =
@@ -426,8 +430,9 @@ let test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to =
 
 let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
     ?(operator = Constant.bootstrap1.alias) ?boot_sector ?commitment_period
-    ?challenge_window ?timeout ?variant ?(tags = []) ~kind ~migrate_from
-    ~migrate_to ~scenario_prior ~scenario_after ~description () =
+    ?challenge_window ?(with_constant_change = false) ?timeout ?variant
+    ?(tags = []) ~kind ~migrate_from ~migrate_to ~scenario_prior ~scenario_after
+    ~description () =
   let tags =
     Tag.etherlink :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: kind :: "l2" :: "migration" :: tags
@@ -443,8 +448,17 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
          (Protocol.name migrate_to)
          (format_title_scenario kind {variant; tags; description}))
   @@ fun () ->
+  let minimal_block_delay =
+    if not with_constant_change then None
+    else block_time_to_trigger_constant_update_on_migration migrate_to
+  in
   let* tezos_node, tezos_client =
-    setup_l1 ?commitment_period ?challenge_window ?timeout migrate_from
+    setup_l1
+      ?commitment_period
+      ?challenge_window
+      ?minimal_block_delay
+      ?timeout
+      migrate_from
   in
   let* rollup_node, sc_rollup =
     setup_rollup
@@ -456,7 +470,7 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
       tezos_node
       tezos_client
   in
-  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  let* () = Sc_rollup_node.run rollup_node sc_rollup ~event_level:`Debug [] in
   let* prior_res =
     scenario_prior ~sc_rollup ~rollup_node tezos_node tezos_client
   in
@@ -480,19 +494,32 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   scenario_after ~sc_rollup ~rollup_node tezos_node tezos_client prior_res
 
 let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
-  let tags = ["store"] in
-  let description = "node can read data after store migration" in
-  let commitment_period = 5 in
-  let challenge_window = 5 in
-  let scenario_prior ~sc_rollup:_ ~rollup_node _tezos_node tezos_client =
-    let* () = Sc_rollup_helpers.send_messages commitment_period tezos_client in
+  let tags = ["store"; "commitment"] in
+  let description = "node can commit after migration" in
+  let commitment_period = 8 in
+  let challenge_window = 20 in
+  let scenario_prior ~sc_rollup:_ ~rollup_node tezos_node tezos_client =
+    let* constants =
+      Client.RPC.call tezos_client @@ RPC.get_chain_block_context_constants ()
+    in
+    let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+    (* Do migration at end of second cycle *)
+    let* level = Node.get_level tezos_node in
+    let* () =
+      Sc_rollup_helpers.send_messages
+        ((2 * blocks_per_cycle) - level - 1)
+        tezos_client
+    in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     unit
   in
   let scenario_after ~sc_rollup ~rollup_node tezos_node tezos_client () =
     let* migration_level = Node.get_level tezos_node in
+    let* {commitment_period_in_blocks = new_commitment_period; _} =
+      Sc_rollup_helpers.get_sc_rollup_constants tezos_client
+    in
     let* () =
-      Sc_rollup_helpers.send_messages (commitment_period + 3) tezos_client
+      Sc_rollup_helpers.send_messages (new_commitment_period + 2) tezos_client
     in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let* _l2_block =
@@ -523,6 +550,7 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
     ~kind
     ~commitment_period
     ~challenge_window
+    ~with_constant_change:true
     ~migrate_from
     ~migrate_to
     ~scenario_prior
