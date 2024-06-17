@@ -250,6 +250,7 @@ type etherlink = {
   node : Node.t;
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
+  evm_node : Tezt_etherlink.Evm_node.t;
 }
 
 type public_key_hash = string
@@ -991,7 +992,10 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  return {node; client; sc_rollup_node}
+  let* evm_node =
+    Evm_node.Agent.init (Sc_rollup_node.endpoint sc_rollup_node) agent
+  in
+  return {node; client; sc_rollup_node; evm_node}
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in

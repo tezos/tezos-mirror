@@ -125,6 +125,7 @@ val name : t -> string
     [mode] defaults to [Proxy].
 *)
 val create :
+  ?path:string ->
   ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
@@ -378,3 +379,25 @@ val make_kernel_installer_config :
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t
+
+module Agent : sig
+  val create :
+    ?path:string ->
+    ?name:string ->
+    ?data_dir:string ->
+    ?rpc_addr:string ->
+    ?mode:mode ->
+    string ->
+    Tezt_tezos.Agent.t ->
+    t Lwt.t
+
+  val init :
+    ?patch_config:(JSON.t -> JSON.t) ->
+    ?name:string ->
+    ?mode:mode ->
+    ?data_dir:string ->
+    ?rpc_addr:string ->
+    string ->
+    Tezt_tezos.Agent.t ->
+    t Lwt.t
+end
