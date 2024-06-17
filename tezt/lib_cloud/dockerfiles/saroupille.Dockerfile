@@ -47,4 +47,5 @@ COPY ./octez-client $BINARIES_DESTINATION_PATH/octez-client
 COPY ./octez-baker-alpha $BINARIES_DESTINATION_PATH/octez-baker-alpha
 COPY ./octez-smart-rollup-node $BINARIES_DESTINATION_PATH/octez-smart-rollup-node
 COPY ./smart-rollup-installer $BINARIES_DESTINATION_PATH/smart-rollup-installer
+COPY ./octez-evm-node  $BINARIES_DESTINATION_PATH/octez-evm-node
 
