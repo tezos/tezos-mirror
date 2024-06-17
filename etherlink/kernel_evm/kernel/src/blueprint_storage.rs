@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::block::GENESIS_PARENT_HASH;
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
@@ -11,7 +12,7 @@ use crate::storage::{
     self, read_current_block_number, read_rlp, store_read_slice, store_rlp,
 };
 use crate::{delayed_inbox, DelayedInbox};
-use primitive_types::{H256, U256};
+use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
@@ -207,14 +208,7 @@ fn valid_parent_hash<Host: Runtime>(
     host: &Host,
     blueprint_with_hashes: &BlueprintWithDelayedHashes,
 ) -> bool {
-    let genesis_parent = |_| {
-        H256::from_slice(
-            &hex::decode(
-                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            )
-            .unwrap(),
-        )
-    };
+    let genesis_parent = |_| GENESIS_PARENT_HASH;
     let current_block_hash =
         storage::read_current_block_hash(host).unwrap_or_else(genesis_parent);
     current_block_hash == blueprint_with_hashes.parent_hash

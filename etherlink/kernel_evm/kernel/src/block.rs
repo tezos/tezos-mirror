@@ -38,6 +38,8 @@ use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
 
+pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
+
 pub const GAS_LIMIT: u64 = 1 << 50;
 
 /// Struct used to allow the compiler to check that the tick counter value is
@@ -379,9 +381,11 @@ pub fn produce<Host: Runtime>(
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
                 (
-                    BlockConstants::first_block(timestamp, chain_id, block_fees, GAS_LIMIT, coinbase),
+                    BlockConstants::first_block(
+                        timestamp, chain_id, block_fees, GAS_LIMIT, coinbase,
+                    ),
                     U256::zero(),
-                    H256::from_slice(&hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()),
+                    GENESIS_PARENT_HASH,
                 )
             }
         };
