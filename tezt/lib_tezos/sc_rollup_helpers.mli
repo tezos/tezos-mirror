@@ -397,4 +397,4 @@ val serve_files :
   (unit -> 'a Lwt.t) ->
   'a Lwt.t
 
-val ticks_per_snapshot : Protocol.t -> int
+val ticks_per_snapshot : int

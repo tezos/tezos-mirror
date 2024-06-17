@@ -173,9 +173,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
        gone, we should rather get the "blocks_preservation_cycles"
        protocol parameter -- or hardcode it to 1 for every
        protocol. *)
-    let preservation_cycles =
-      match protocol with Oxford -> 2 | Paris | Alpha -> 1
-    in
+    let preservation_cycles = 1 in
     (* Here, we assume that we have 8 blocks per cycle -- this is
        already assumed in the rest of the test. *)
     let preserved_blocks = preservation_cycles * 8 in

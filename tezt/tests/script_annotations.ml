@@ -109,10 +109,7 @@ let register =
      root was allowed in legacy mode *)
   let* () =
     typecheck_script
-      ?res:
-        (if Protocol.(number protocol >= number Oxford) then
-           Some (rex "unexpected annotation")
-         else None)
+      ~res:(rex "unexpected annotation")
       ~legacy:true
       ~script:"parameter %r unit; storage unit; code { FAILWITH }"
       client

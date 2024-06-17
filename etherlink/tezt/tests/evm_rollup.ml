@@ -4490,7 +4490,7 @@ let test_reboot_out_of_ticks =
        for a single run"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~maximum_allowed_ticks:9_000_000_000L
-  @@ fun ~protocol ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs =
     read_file (kernel_inputs_path ^ "/loops-out-of-ticks")
@@ -4566,10 +4566,6 @@ let test_reboot_out_of_ticks =
     total_tick_number_with_expected_reboots
     - total_tick_number_before_expected_reboots
   in
-
-  (* The PVM takes one reboot ticks for collecting inputs, and another for a
-     kernel_run. As such, an L1 level is at least 2 * ticks per snapshot. *)
-  let ticks_per_snapshot = Sc_rollup_helpers.ticks_per_snapshot protocol in
   let min_ticks_per_l1_level = ticks_per_snapshot * 2 in
   Check.(
     (ticks_after_expected_reboot
