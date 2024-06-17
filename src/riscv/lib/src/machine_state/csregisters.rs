@@ -1231,20 +1231,24 @@ impl<M: backend::Manager> CSRegisters<M> {
         // regardless of the setting of the global yIE
         // bit for the higher-privilege mode."
 
-        let mstatus: MStatus = self.read(CSRegister::mstatus);
-        let ie_machine = match mstatus.mie() {
-            true => self.read(CSRegister::mie),
-            false => 0,
-        };
-        let ie_supervisor = match mstatus.sie() {
-            true => self.read(CSRegister::sie),
-            false => 0,
-        };
-
         match current_mode {
             Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
-            Mode::Supervisor => ie_supervisor | Interrupt::MACHINE_BIT_MASK,
-            Mode::Machine => ie_machine,
+            Mode::Supervisor => {
+                let mstatus: MStatus = self.read(CSRegister::mstatus);
+                let ie_supervisor = match mstatus.sie() {
+                    true => self.read(CSRegister::sie),
+                    false => 0,
+                };
+
+                ie_supervisor | Interrupt::MACHINE_BIT_MASK
+            }
+            Mode::Machine => {
+                let mstatus: MStatus = self.read(CSRegister::mstatus);
+                match mstatus.mie() {
+                    true => self.read(CSRegister::mie),
+                    false => 0,
+                }
+            }
         }
     }
 
