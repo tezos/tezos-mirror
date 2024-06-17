@@ -119,7 +119,14 @@ let test_baking_deactivation =
   --> stake "delegate" Half
   --> set_delegate "delegate" (Some "delegate")
   (* No rights yet, but active *)
-  --> assert_failure (next_block_with_baker "delegate")
+  --> assert_failure
+        ~expected_error:(fun (_, state) errs ->
+          let delegate = State.find_account "delegate" state in
+          Error_helpers.expect_no_slots_found_for
+            ~loc:__LOC__
+            ~pkh:delegate.pkh
+            errs)
+        (next_block_with_baker "delegate")
   --> check_is_active ~loc:__LOC__ "delegate"
   --> wait_n_cycles_f (fun (_, state) ->
           state.State.constants.consensus_rights_delay + 1)

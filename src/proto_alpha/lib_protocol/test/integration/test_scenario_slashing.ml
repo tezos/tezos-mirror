@@ -117,7 +117,12 @@ let test_multiple_misbehaviors =
     Empty
     [1; 3]
 
-let check_is_forbidden baker = assert_failure (next_block_with_baker baker)
+let check_is_forbidden ~loc baker =
+  assert_failure
+    ~expected_error:(fun (_, state) errs ->
+      let baker = State.find_account baker state in
+      Error_helpers.expect_forbidden_delegate ~loc ~delegate:baker.contract errs)
+    (next_block_with_baker baker)
 
 let check_is_not_forbidden baker =
   let open Lwt_result_syntax in
@@ -148,7 +153,7 @@ let test_delegate_forbidden =
        check_is_not_forbidden "delegate"
        --> make_denunciations ()
        --> (* delegate is forbidden directly after the first denunciation *)
-       check_is_forbidden "delegate"
+       check_is_forbidden ~loc:__LOC__ "delegate"
       |+ Tag "Is forbidden after single misbehavior"
          --> double_attest "delegate"
          --> (Tag "very early first denounce"
@@ -157,18 +162,24 @@ let test_delegate_forbidden =
              |+ Tag "in next cycle" --> next_cycle
                 --> exclude_bakers ["delegate"]
                 --> make_denunciations ())
-         --> check_is_forbidden "delegate"
+         --> check_is_forbidden ~loc:__LOC__ "delegate"
       |+ Tag "Is unforbidden after CONSENSUS_RIGHTS_DELAY after slash cycles"
          --> double_attest "delegate"
          --> exclude_bakers ["delegate"]
          --> make_denunciations ()
-         --> check_is_forbidden "delegate"
+         --> check_is_forbidden ~loc:__LOC__ "delegate"
          --> next_cycle (* slash occured *) --> stake "delegate" Half
          --> wait_n_cycles_f crd
          --> check_is_not_forbidden "delegate"
       |+ Tag "Is not forbidden after a denunciation is outdated"
          --> double_attest "delegate" --> wait_n_cycles 2
-         --> assert_failure (make_denunciations ())
+         --> assert_failure
+               ~expected_error:(fun (_block, state) errs ->
+                 Error_helpers.expect_outdated_denunciation_state
+                   ~loc:__LOC__
+                   ~state
+                   errs)
+               (make_denunciations ())
          --> check_is_not_forbidden "delegate"
       |+ Tag
            "Two double attestations, in consecutive cycles, denounce out of \
@@ -183,7 +194,7 @@ let test_delegate_forbidden =
                  (not denounced)
                  && Protocol.Raw_level_repr.to_int32 level <= 10l)
                ()
-         --> check_is_forbidden "delegate")
+         --> check_is_forbidden ~loc:__LOC__ "delegate")
 
 let test_slash_unstake =
   init_constants ()
@@ -299,7 +310,7 @@ let test_no_shortcut_for_cheaters =
          (Tag "wait 0 cycles" --> Empty)
          (Stdlib.List.init (consensus_rights_delay - 1) (fun i -> i + 1))
        --> stake "delegate" amount
-       --> assert_failure (check_snapshot_balances "init")
+       --> assert_failure_in_check_snapshot_balances ~loc:__LOC__ "init"
       |+ Tag "wait enough cycles (consensus_rights_delay + 1)"
          --> wait_n_cycles (consensus_rights_delay + 1)
          --> stake "delegate" amount

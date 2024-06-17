@@ -39,6 +39,7 @@ type error +=
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
   | Empty_transaction of Contract.t
+  | Staking_to_delegate_that_refuses_external_staking
 
 type mode =
   | Application of {
