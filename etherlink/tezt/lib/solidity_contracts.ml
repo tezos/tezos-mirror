@@ -254,3 +254,21 @@ let block_constants =
     abi = kernel_inputs_path ^ "/block_constants.abi";
     bin = kernel_inputs_path ^ "/block_constants.bin";
   }
+
+(** The info for the "call_withdrawal.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/call_withdrawal.sol] *)
+let call_withdrawal =
+  {
+    label = "call_withdrawal";
+    abi = kernel_inputs_path ^ "/call_withdrawal.abi";
+    bin = kernel_inputs_path ^ "/call_withdrawal.bin";
+  }
+
+(** The info for the "callcode_withdrawal.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/callcode_withdrawal.sol] *)
+let callcode_withdrawal =
+  {
+    label = "callcode_withdrawal";
+    abi = kernel_inputs_path ^ "/callcode_withdrawal.abi";
+    bin = kernel_inputs_path ^ "/callcode_withdrawal.bin";
+  }

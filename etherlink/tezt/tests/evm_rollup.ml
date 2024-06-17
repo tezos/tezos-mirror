@@ -2513,6 +2513,92 @@ let test_withdraw_amount =
   in
   unit
 
+let test_withdraw_via_calls =
+  let admin = Constant.bootstrap5 in
+  register_proxy
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "withdraw"; "call"; "staticcall"; "delegatecall"; "callcode"]
+    ~title:"Withdrawal via different kind of calls"
+    ~admin
+  @@ fun ~protocol:_
+             ~evm_setup:
+               ({client; sc_rollup_node; endpoint; evm_node; _} as evm_setup) ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+
+  let* contract, _tx = deploy ~contract:call_withdrawal ~sender evm_setup in
+
+  (* Call works, it transfers funds to the precompiled contract and produce
+     a withdrawal. *)
+  let call =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:call_withdrawal.label
+      ~address:contract
+      ~method_call:"testCall()"
+      ~gas:100_000
+      ~value:(Wei.of_eth_int 1)
+  in
+  let* tx = wait_for_application ~evm_node ~sc_rollup_node ~client call in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  (* Delegate call does not produce a transfer, the precompiled contract
+     reverts. *)
+  let delegate_call =
+    Eth_cli.contract_send
+      ~expect_failure:true
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:call_withdrawal.label
+      ~address:contract
+      ~method_call:"testDelegatecall()"
+      ~gas:100_000
+      ~value:(Wei.of_eth_int 1)
+  in
+  let* tx =
+    wait_for_application ~evm_node ~sc_rollup_node ~client delegate_call
+  in
+  let* () = check_tx_failed ~endpoint ~tx in
+
+  (* Static call does not produce a transfer, the precompiled contract
+     reverts. *)
+  let static_call =
+    Eth_cli.contract_send
+      ~expect_failure:true
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:call_withdrawal.label
+      ~address:contract
+      ~method_call:"testStaticcall()"
+      ~gas:100_000
+      ~value:(Wei.of_eth_int 1)
+  in
+  let* tx =
+    wait_for_application ~evm_node ~sc_rollup_node ~client static_call
+  in
+  let* () = check_tx_failed ~endpoint ~tx in
+
+  (* Deploy a new contract that uses CALLCODE, it's in a different contract
+     because solidity deprecation blablabla. *)
+  let* contract, _tx = deploy ~contract:callcode_withdrawal ~sender evm_setup in
+
+  (* Static call does not produce a transfer, the precompiled contract
+     reverts. *)
+  let callcode =
+    Eth_cli.contract_send
+      ~expect_failure:true
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:callcode_withdrawal.label
+      ~address:contract
+      ~method_call:"testCallcode()"
+      ~gas:100_000
+      ~value:(Wei.of_eth_int 1)
+  in
+  let* tx = wait_for_application ~evm_node ~sc_rollup_node ~client callcode in
+  let* () = check_tx_failed ~endpoint ~tx in
+  unit
+
 let get_kernel_boot_wasm ~sc_rollup_node =
   let rpc_hooks : RPC_core.rpc_hooks =
     let on_request _verb ~uri:_ _data = Regression.capture "<boot.wasm>" in
@@ -6227,6 +6313,7 @@ let register_evm_node ~protocols =
   test_preinitialized_evm_kernel protocols ;
   test_deposit_and_withdraw protocols ;
   test_withdraw_amount protocols ;
+  test_withdraw_via_calls protocols ;
   test_estimate_gas protocols ;
   test_estimate_gas_additionnal_field protocols ;
   test_kernel_upgrade_epoch protocols ;
