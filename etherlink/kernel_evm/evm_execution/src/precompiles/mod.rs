@@ -11,7 +11,7 @@
 //! provided by SputnikVM, as we require the Host type and object
 //! for writing to the log.
 
-use std::{str::FromStr, vec};
+use std::vec;
 
 mod blake2;
 mod ecdsa;
@@ -143,6 +143,12 @@ pub fn call_precompile_with_gas_draining<Host: Runtime>(
     }
 }
 
+// Prefixed by 'ff' to make sure we will not conflict with any
+// upcoming Ethereum upgrades.
+pub const WITHDRAWAL_ADDRESS: H160 = H160([
+    0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+]);
+
 /// Factory function for generating the precompileset that the EVM kernel uses.
 pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
@@ -183,10 +189,7 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             blake2f_precompile as PrecompileFn<Host>,
         ),
         (
-            // Prefixed by 'ff' to make sure we will not conflict with any
-            // upcoming Ethereum upgrades.
-            // NB: The `unwrap()` here is safe.
-            H160::from_str("ff00000000000000000000000000000000000001").unwrap(),
+            WITHDRAWAL_ADDRESS,
             withdrawal_precompile as PrecompileFn<Host>,
         ),
     ])
