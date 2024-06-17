@@ -19,8 +19,8 @@ variables:
   supported_ARCH: "amd64 arm64"
   DEFAULT_RUNNER_TAG: gcp
   STABLE_OCTEZ_BRANCH: "octez-v20.0"
-  TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
-  CONTAINER_TAG: "${OCTEZ_BRANCH}-${TEZTALE_REF}"
+  TEZTALE_REF: "${TEZTALE_REF_BASE}_${OCTEZ_BRANCH}${TEZTALE_REF_SUFFIX}"
+  CONTAINER_TAG: "${TEZTALE_REF}"
   BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies:${CONTAINER_TAG}"
   # Build blst used by ocaml-bls12-381 without ADX to support old CPU
   # architectures.
@@ -157,14 +157,14 @@ prepare:canary:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
   script:
     - dune build archiver/main.exe server/main.exe
-    - mkdir -p ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/{archiver,server}
-    - cp --parents {archiver,server}/main.exe ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/
+    - mkdir -p ./${ARCH}/${TEZTALE_REF}/{archiver,server}
+    - cp --parents {archiver,server}/main.exe ./${ARCH}/${TEZTALE_REF}/
   artifacts:
-    name: binaries-${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}
+    name: teztale-${ARCH}-${TEZTALE_REF}
     expire_in: 1 week
     paths:
-      - ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/archiver/main.exe
-      - ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/server/main.exe
+      - ./${ARCH}/${TEZTALE_REF}/archiver/main.exe
+      - ./${ARCH}/${TEZTALE_REF}/server/main.exe
 
 build:stable:
   extends:
@@ -194,8 +194,8 @@ build:canary:
 # ${TEZTALE_REF} is already defined globally
 .rename-build-artifacts:
   before_script:
-    - mv ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/archiver/main.exe ./archiver/
-    - mv ./${ARCH}-${OCTEZ_BRANCH}-${TEZTALE_REF}/server/main.exe ./server/
+    - mv ./${ARCH}/${TEZTALE_REF}/archiver/main.exe ./archiver/
+    - mv ./${ARCH}/${TEZTALE_REF}/server/main.exe ./server/
 
 # When extending this, use a before_script in order to provide `archiver/main.exe` and `server/main.exe` files
 .release:
@@ -208,8 +208,8 @@ build:canary:
     - !reference [.rename-build-artifacts, before_script]
   script:
     - apk add zip curl
-    - zip ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip archiver/main.exe server/main.exe
-    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./binaries-${ARCH}-${OCTEZ_BRANCH}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${TEZTALE_REF}/${ARCHIVE}"
+    - zip ./${ARCH}-${TEZTALE_REF}.zip archiver/main.exe server/main.exe
+    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./${ARCH}-${TEZTALE_REF}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${TEZTALE_REF}/"
 
 # To release specific package version, create a (gitlab) tag on branch main
 release:stable:
