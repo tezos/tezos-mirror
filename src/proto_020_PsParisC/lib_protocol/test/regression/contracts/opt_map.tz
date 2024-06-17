@@ -1,0 +1,12 @@
+{
+  parameter int;
+  storage (option int);
+  code {
+         UNPAIR;
+         SWAP ;
+         MAP { DIP { DUP } ; ADD ; } ;
+         DIP { DROP } ;
+         NIL operation ;
+         PAIR ;
+       }
+}

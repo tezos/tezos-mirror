@@ -44,7 +44,7 @@ open Sc_rollup_helpers
 
 let default_wasm_pvm_revision = function
   | Protocol.Alpha -> "2.0.0-r5"
-  | Paris -> "2.0.0-r4"
+  | ParisB | ParisC -> "2.0.0-r4"
 
 let max_nb_ticks = 50_000_000_000_000
 
@@ -1587,11 +1587,11 @@ let check_published_commitment_in_l1 ?(force_new_level = true) sc_rollup client
     (published_commitment, "published") ;
   unit
 
-let test_commitment_scenario ?supports ?commitment_period ?challenge_window
-    ?(extra_tags = []) ~variant =
+let test_commitment_scenario ?supports ?(commitment_period = 10)
+    ?challenge_window ?(extra_tags = []) ~variant =
   test_full_scenario
     ?supports
-    ?commitment_period
+    ~commitment_period
     ?challenge_window
     {
       tags = ["commitment"] @ extra_tags;

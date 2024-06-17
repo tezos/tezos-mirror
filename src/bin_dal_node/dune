@@ -37,6 +37,7 @@
   prometheus
   octez-crawler
   octez-protocol-019-PtParisB-libs.dal
+  octez-protocol-020-PsParisC-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))

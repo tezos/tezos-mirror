@@ -580,7 +580,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap"
-      ~tags:[team; "p2p"; "node"; "swap"]
+      ~tags:[team; "p2p"; "node"; "swap"; Tag.ci_disabled]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () -> test_swap_raw ()

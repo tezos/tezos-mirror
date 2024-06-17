@@ -62,7 +62,8 @@ let test_protocol_migration_message ~from_version ~to_version
 let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
   | Nairobi -> "Nairobi"
   | Oxford -> "Oxford"
-  | Paris -> "Paris"
+  | ParisB -> "ParisB"
+  | ParisC -> "ParisC"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =
@@ -84,7 +85,11 @@ let tests =
            ~to_version
            ~after_protocol_activation:protocol))
     [
-      (V4, V5, Proto_alpha); (V2, V4, Paris); (V1, V2, Oxford); (V0, V1, Nairobi);
+      (V4, V5, Proto_alpha);
+      (V2, V4, ParisB);
+      (V2, V4, ParisC);
+      (V1, V2, Oxford);
+      (V0, V1, Nairobi);
     ]
 
 let () =
