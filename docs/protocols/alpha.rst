@@ -30,6 +30,10 @@ Smart Rollups
 
 - Bumped WASM PVM to V5. (MR :gl:`!12999`)
 
+- Reworked constants migration to preserve the various period duration instead
+  of indiscriminately imposing them (e.g., imposing 2 weeks for the challenge
+  window or 15 minutes for the commitment period). (MR :gl:`!13821`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 

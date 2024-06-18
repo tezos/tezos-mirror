@@ -951,10 +951,11 @@ module Constants : sig
 
     val encoding : t Data_encoding.t
 
-    val update_sc_rollup_parameter : block_time:int -> sc_rollup -> sc_rollup
-
     module Internal_for_tests : sig
       val sc_rollup_encoding : sc_rollup Data_encoding.t
+
+      val update_sc_rollup_parameter :
+        (int32 -> int32) -> sc_rollup -> sc_rollup
     end
   end
 
