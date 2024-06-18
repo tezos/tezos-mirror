@@ -21,7 +21,8 @@
   ptime.clock.os
   mtime
   mtime.clock.os
-  uri)
+  uri
+  progress)
  (flags
   (:standard)
   -open Tezos_error_monad

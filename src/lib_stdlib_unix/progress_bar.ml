@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
 include Progress
 
 type 'a line = {when_tty : 'a Line.t; when_no_tty : string}
@@ -89,4 +90,15 @@ module Lwt = struct
     let open Lwt_syntax in
     let* tty = Lwt_unix.isatty Lwt_unix.stderr in
     if tty then with_reporter_tty line f else with_reporter_no_tty line f
+
+  let with_background_spinner ~message promise =
+    let open Lwt_syntax in
+    let spinner = spinner ~message in
+    with_reporter spinner @@ fun count_progress ->
+    let rec spin_loop () =
+      let* () = Lwt_unix.sleep 0.1 in
+      let* () = count_progress 1 in
+      spin_loop ()
+    in
+    Lwt.pick [promise; spin_loop ()]
 end

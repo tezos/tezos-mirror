@@ -1670,6 +1670,7 @@ let octez_stdlib_unix =
         mtime_clock_os;
         conf_libev;
         uri;
+        progress;
       ]
 
 let _octez_stdlib_unix_test =
