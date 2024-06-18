@@ -1037,7 +1037,10 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
 
 pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
     if let Some(ValueType::Value) = host.store_has(&ENABLE_DAL)? {
-        Ok(true)
+        // When run from the EVM node, the DAL feature is always
+        // considered as disabled.
+        let b = evm_node_flag(host)?;
+        Ok(!b)
     } else {
         Ok(false)
     }
