@@ -1397,9 +1397,9 @@ let get_commitment_succeeds expected_commitment response =
 let get_commitment_not_found _commit r =
   RPC_core.check_string_response ~code:404 r
 
-let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
+let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
     ~number_of_headers =
-  let* number_of_published_commitments =
+  let* number_of_stored_commitments =
     Lwt_list.fold_left_s
       (fun accu slot_index ->
         let* response =
@@ -1414,7 +1414,7 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
       0
       (List.init number_of_slots Fun.id)
   in
-  Check.(number_of_published_commitments = number_of_headers)
+  Check.(number_of_stored_commitments = number_of_headers)
     ~__LOC__
     Check.int
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
@@ -1423,7 +1423,7 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
 let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     =
   let test (slot_index, commitment) =
-    let* commitment_is_published =
+    let* commitment_is_stored =
       let rpc = Dal_RPC.get_level_index_commitment ~slot_level ~slot_index in
       let* response = Dal_RPC.call_raw dal_node rpc in
       match response.code with
@@ -1434,13 +1434,12 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
           return (commitment = published_commitment)
       | _ -> return false
     in
-    match (commitment_is_published, expected_status) with
+    match (commitment_is_stored, expected_status) with
     | false, None -> unit
     | true, None ->
         Test.fail
           ~__LOC__
-          "It was expected that the given commitment was not published but it \
-           was."
+          "It was expected that the given commitment is not stored, but it is."
     | true, Some expected_status ->
         let* status =
           Dal_RPC.(
@@ -1456,8 +1455,7 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     | false, Some _ ->
         Test.fail
           ~__LOC__
-          "The commitment published for the given slot id is not the expected \
-           one."
+          "It was expected that the given commitment is stored, but it is not."
   in
   Lwt_list.iter_s test slots_info
 
@@ -1465,8 +1463,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let number_of_slots = parameters.Dal.Parameters.number_of_slots in
-  let check_published_level_headers =
-    check_published_level_headers dal_node ~number_of_slots
+  let check_stored_level_headers =
+    check_stored_level_headers dal_node ~number_of_slots
   in
   let* level = Node.get_level node in
   let pub_level = level + 1 in
@@ -1481,7 +1479,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot1 = publish Constant.bootstrap2 ~index:1 "test1" in
   let* () =
     (* The slot headers are not yet in a block. *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
 
   (* slot2_a and slot3 will not be included as successful, because slot2_b has
@@ -1511,7 +1509,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   let* () =
     (* The slot headers are still not yet in a block. *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
 
   let wait_block_processing1 = wait_for_layer1_head dal_node pub_level in
@@ -1540,7 +1538,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
     (* There are 3 published slots: slot0, slot1, and slot2_b *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   let* slot_headers =
     Lwt_list.filter_map_s
@@ -1609,21 +1607,19 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = bake_for ~count:2 client in
   let* () = wait_block_processing3 in
   let* () =
-    (* The number of published slots has not changed *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    (* The unattested slot has been removed. *)
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
   in
 
   Log.info "Check that the store is as expected" ;
   (* Slots confirmed. *)
-  let* () = check_get_commitment get_commitment_succeeds ok in
-  (* Slot that were waiting for attestation and now attested. *)
+  let* () = check_get_commitment get_commitment_succeeds attested in
+  (* Slots that were waiting for attestation and now attested. *)
   let* () = check_slot_status ~__LOC__ ~expected_status:"attested" attested in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
-  (* Slot that were waiting for attestation and now unattested. *)
-  let* () =
-    check_slot_status ~__LOC__ ~expected_status:"unattested" unattested
-  in
+  (* Slots that were waiting for attestation and now unattested. *)
+  let* () = check_slot_status ~__LOC__ unattested in
   (* slot2_a is still not selected. *)
   let* () = check_slot_status ~__LOC__ [slot2_a] in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
@@ -1631,17 +1627,17 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* slot4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
   let* () = check_slot_status ~__LOC__ [slot4] in
-  (* The number of published slots has not changed *)
+  (* The number of stored slots has not changed. *)
   let* () =
-    check_published_level_headers
+    check_stored_level_headers
       ~__LOC__
       ~pub_level:(pub_level - 1)
       ~number_of_headers:0
   in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
   in
-  check_published_level_headers
+  check_stored_level_headers
     ~__LOC__
     ~pub_level:(pub_level + 1)
     ~number_of_headers:0
