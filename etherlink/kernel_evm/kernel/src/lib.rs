@@ -345,6 +345,10 @@ mod tests {
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::configuration::{Configuration, Limits};
     use crate::fees;
+    use crate::main;
+    use crate::mock_internal::MockInternal;
+    use crate::safe_storage::SafeStorage;
+    use crate::storage::store_chain_id;
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
@@ -352,14 +356,28 @@ mod tests {
         upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
+    use evm_execution::handler::RouterInterface;
+    use evm_execution::utilities::keccak256_hash;
+    use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
+    use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
+    use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::{
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
     };
+
+    use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
+    use tezos_smart_rollup::michelson::{
+        MichelsonContract, MichelsonOption, MichelsonPair,
+    };
+    use tezos_smart_rollup::outbox::{OutboxMessage, OutboxMessageTransaction};
+    use tezos_smart_rollup::types::{Contract, Entrypoint};
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     use tezos_smart_rollup_debug::Runtime;
+    use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
+    use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
@@ -614,5 +632,130 @@ mod tests {
 
         assert!(base_fee.is_ok());
         assert_eq!(curr_base_fee, base_fee.unwrap());
+    }
+
+    #[test]
+    fn test_xtz_withdrawal_applied() {
+        // init host
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut safe_storage = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
+        safe_storage
+            .store_write_all(
+                &NATIVE_TOKEN_TICKETER_PATH,
+                b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
+            )
+            .unwrap();
+        store_chain_id(&mut safe_storage, DUMMY_CHAIN_ID).unwrap();
+
+        // run level in order to initialize outbox counter (by SOL message)
+        let level = safe_storage.host.run_level(|_| ());
+
+        // provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender_initial_balance = U256::from(10000000000000000000u64);
+        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
+        set_balance(
+            &mut safe_storage,
+            &mut evm_account_storage,
+            &sender,
+            sender_initial_balance,
+        );
+
+        // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
+        let data = hex::decode(
+            "cda4fee2\
+             0000000000000000000000000000000000000000000000000000000000000020\
+             0000000000000000000000000000000000000000000000000000000000000024\
+             747a31526a745a5556654c6841444648444c385577445a4136766a5757686f6a70753577\
+             00000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
+
+        // create and sign precompile call
+        let gas_price = U256::from(40000000000u64);
+        let to = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
+        let tx = EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(DUMMY_CHAIN_ID),
+            0,
+            gas_price,
+            gas_price,
+            2000000,
+            Some(to),
+            U256::from(1000000000000000000u64),
+            data,
+            vec![],
+            None,
+        );
+
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+        let tx_payload = tx
+            .sign_transaction(
+                "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                    .to_string(),
+            )
+            .unwrap()
+            .to_bytes();
+
+        let tx_hash = keccak256_hash(&tx_payload);
+
+        // encode as external message and submit to inbox
+        let mut contents = Vec::new();
+        contents.push(0x00); // simple tx tag
+        contents.extend_from_slice(tx_hash.as_bytes());
+        contents.extend_from_slice(&tx_payload);
+
+        let message = ExternalMessageFrame::Targetted {
+            address: SmartRollupAddress::from_b58check(
+                "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57",
+            )
+            .unwrap(),
+            contents,
+        };
+
+        safe_storage.host.add_external(message);
+
+        // run kernel twice to get to the stage with block creation:
+        main(&mut safe_storage).expect("Kernel error");
+        main(&mut safe_storage).expect("Kernel error");
+
+        // verify outbox is not empty
+        let outbox = safe_storage.host.outbox_at(level + 1);
+        assert!(!outbox.is_empty());
+
+        // check message contents:
+        let message_bytes = &outbox[0];
+        let (remaining, decoded_message) =
+            OutboxMessage::nom_read(message_bytes.as_slice()).unwrap();
+        assert!(remaining.is_empty());
+
+        let ticketer =
+            Contract::from_b58check("KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT").unwrap();
+        let ticket = FA2_1Ticket::new(
+            ticketer.clone(),
+            MichelsonPair(0.into(), MichelsonOption(None)),
+            1000000u64,
+        )
+        .unwrap();
+        let receiver =
+            Contract::from_b58check("tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w").unwrap();
+        let parameters: RouterInterface =
+            MichelsonPair(MichelsonContract(receiver), ticket);
+        let destination = ticketer;
+        let entrypoint = Entrypoint::try_from("burn".to_string()).unwrap();
+
+        let expected_transaction = OutboxMessageTransaction {
+            parameters,
+            destination,
+            entrypoint,
+        };
+        let expected_message =
+            OutboxMessage::AtomicTransactionBatch(vec![expected_transaction].into());
+
+        assert_eq!(expected_message, decoded_message);
     }
 }

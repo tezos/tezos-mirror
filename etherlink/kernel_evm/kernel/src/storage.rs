@@ -40,7 +40,6 @@ pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_ve
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
 
-pub const TICKETER: RefPath = RefPath::assert_from(b"/evm/world_state/ticketer");
 pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/sequencer_governance");
@@ -821,11 +820,6 @@ fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<Contract
     store_read_slice(host, path, &mut buffer, 36).ok()?;
     let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
-}
-
-/// Reads the ticketer address set by the installer, if any, encoded in b58.
-pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &TICKETER.into())
 }
 
 pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {

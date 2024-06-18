@@ -4,10 +4,11 @@ use crate::{
         is_enable_fa_bridge, read_admin, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
-        read_sequencer_governance, read_ticketer, sequencer,
+        read_sequencer_governance, sequencer,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
+use evm_execution::read_ticketer;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_debug::Runtime;

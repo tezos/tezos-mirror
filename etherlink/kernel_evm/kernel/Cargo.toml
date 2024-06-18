@@ -64,6 +64,8 @@ proptest.workspace = true
 # Generally getrandom is not supposed to be used in wasm env, this trick is just to overcome build errors
 getrandom = { version = "=0.2.15", features = ["custom"] }
 
+pretty_assertions.workspace = true
+
 [features]
 default = ["panic-hook"]
 panic-hook = []
