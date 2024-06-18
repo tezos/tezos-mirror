@@ -1202,8 +1202,9 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_install_jobs ~manual:Yes ()
       in
       (* Test installation of the current deb binary packages. *)
-      let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
-          distribution =
+      let job_install_bin ~__POS__ ~name
+          ?(allow_failure : Gitlab_ci.Types.allow_failure_job = Yes)
+          ?(rc = false) distribution =
         let script =
           match distribution with
           | Ubuntu_focal ->
@@ -1217,7 +1218,7 @@ let jobs pipeline_type =
               ^ if rc then " rc" else ""
         in
         job
-          ?allow_failure
+          ~allow_failure
           ~__POS__
           ~name
           ~image:(image_of_distribution distribution)
