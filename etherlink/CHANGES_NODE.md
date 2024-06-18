@@ -10,6 +10,8 @@
   (!13786)
 - Spinner for `init from rollup node` command. (!13801)
 - Log the errors trace when blueprint injection fails. (!13859)
+- Add support for `max_blueprint_lookahead_in_seconds` in the kernel config helper
+  command. (!13827)
 
 ### Bug fixes
 

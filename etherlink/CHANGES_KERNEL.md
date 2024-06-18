@@ -7,6 +7,10 @@
 ## Features
 
 - Blueprints provided by the sequencer must have increasing timestamps. (!13807)
+- Blueprints provided by the sequencer are accepted by the rollup node only
+  if they are smaller than current view of the L1 timestamp plus an margin
+  error of 5 minutes. 5 minutes is the default value but can be configured by
+  the installer. (!13827)
 
 ## Bug fixes
 
@@ -25,9 +29,10 @@
 - Add FA deposit execution methods. (!13773)
 - Add ticket table to account for FA deposits. (!12072)
 - Refactor withdrawals handling to keep `OutboxMessage` in the `ExecutionOutcome`. (!13751)
-
--  Compress h256 hash when encoding. Transaction encoded with `r` or
-   `s` hash compressed were impacted. (!13654)
+- Compress h256 hash when encoding. Transaction encoded with `r` or
+  `s` hash compressed were impacted. (!13654)
+- Allows a `/__evm_node` flag in the kernel to have a different logic whether
+  the kernel is run by the evm-node or the rollup node. (!13827)
 
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
