@@ -2585,20 +2585,13 @@ let test_timestamp_from_the_future =
     ~title:"Timestamp from the future are refused"
   @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
   (* In this test the time between blocks is 1 second. *)
-  let l1_timestamp () =
-    let* l1_header = Client.RPC.call client @@ RPC.get_chain_block_header () in
-    return
-      JSON.(
-        l1_header |-> "timestamp" |> as_string |> Client.Time.of_notation_exn)
-  in
 
   (* Producing a block 4:50 minutes after the L1 timestamp will be accepted. We
      do not check precisely 4:59 minutes to avoid flakiness w.r.t to blueprint
      inclusion. *)
-  let* current_l1_timestamp = l1_timestamp () in
+  let* current_l1_timestamp = l1_timestamp client in
   let accepted_timestamp =
-    Ptime.(add_span current_l1_timestamp (Span.of_int_s 270))
-    |> Option.get |> Ptime.to_rfc3339
+    Tezos_base.Time.Protocol.(add current_l1_timestamp 270L |> to_notation)
   in
   (* The sequencer will accept it anyway, but we need to check that the rollup
      node accepts it. *)
@@ -2607,10 +2600,9 @@ let test_timestamp_from_the_future =
 
   (* Producing a block 5:30 minutes after the L1 timetamp will be accepted by
      the sequencer and not the rollup node. *)
-  let* current_l1_timestamp = l1_timestamp () in
+  let* current_l1_timestamp = l1_timestamp client in
   let refused_timestamp =
-    Ptime.(add_span current_l1_timestamp (Span.of_int_s 330))
-    |> Option.get |> Ptime.to_rfc3339
+    Tezos_base.Time.Protocol.(add current_l1_timestamp 330L |> to_notation)
   in
   let*@ (_ : int) = Rpc.produce_block ~timestamp:refused_timestamp sequencer in
   let* _ =
