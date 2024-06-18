@@ -441,3 +441,32 @@ let reconstruct_error =
     ~pp2:Format.pp_print_int
     ("slot_index", Data_encoding.int31)
     ("error", Error_monad.trace_encoding)
+
+let store_upgrade_error_moving_directory =
+  declare_3
+    ~section
+    ~name:"store_upgrade_error_moving_directory"
+    ~msg:"There was an error trying to move {src} to {dst}: {exn}"
+    ~level:Warning
+    ("src", Data_encoding.string)
+    ("dst", Data_encoding.string)
+    ("exn", Data_encoding.string)
+
+let store_upgrade_error_creating_directory =
+  declare_2
+    ~section
+    ~name:"store_upgrade_error_creating_directory"
+    ~msg:"There was an error trying to create directory {path}: {exn}"
+    ~level:Warning
+    ("path", Data_encoding.string)
+    ("exn", Data_encoding.string)
+
+let store_upgraded =
+  declare_2
+    ~section
+    ~name:"store_upgraded"
+    ~msg:
+      "The store has been upgraded from version {old_version} to {new_version}."
+    ~level:Notice
+    ("old_version", Data_encoding.int31)
+    ("new_version", Data_encoding.int31)

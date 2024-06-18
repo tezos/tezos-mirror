@@ -116,7 +116,7 @@ module Version = struct
       (fun () -> Data_encoding.Json.destruct encoding json |> return)
       (fun _ -> tzfail (Could_not_read_data_dir_version file_path))
 
-  let _write_version_file ~base_dir =
+  let write_version_file ~base_dir =
     let version_file = version_file_path ~base_dir in
     Lwt_utils_unix.Json.write_file
       version_file
@@ -457,12 +457,96 @@ let cache_entry node_store commitment slot shares shard_proofs =
     commitment
     (slot, shares, shard_proofs)
 
+let upgrade_from_v0_to_v1 ~base_dir =
+  let open Lwt_syntax in
+  let ( // ) = Filename.Infix.( // ) in
+  let rec move_directory_contents src dst =
+    let stream = Lwt_unix.files_of_directory src in
+    Lwt_stream.iter_s
+      (fun name ->
+        Lwt.catch
+          (fun () ->
+            match name with
+            | "." | ".." -> Lwt.return_unit
+            | file_name -> (
+                let src_path = src // file_name in
+                let dst_path = dst // file_name in
+                let* stats = Lwt_unix.lstat src_path in
+                match stats.st_kind with
+                | Unix.S_REG | S_LNK -> Lwt_unix.rename src_path dst_path
+                | S_DIR ->
+                    let* () = Lwt_unix.mkdir dst_path stats.st_perm in
+                    let* () = move_directory_contents src_path dst_path in
+                    Lwt_utils_unix.remove_dir src_path
+                | _ -> Lwt.return_unit))
+          (fun exn ->
+            let src_path = src // name in
+            let dst_path = dst // name in
+            let* () =
+              Event.(
+                emit
+                  store_upgrade_error_moving_directory
+                  (src_path, dst_path, Printexc.to_string exn))
+            in
+            Lwt.return_unit))
+      stream
+  in
+  let move_and_rename old_path new_path =
+    let* () =
+      Lwt.catch
+        (fun () -> Lwt_unix.mkdir new_path 0o700)
+        (fun exn ->
+          let* () =
+            Event.(
+              emit
+                store_upgrade_error_creating_directory
+                (new_path, Printexc.to_string exn))
+          in
+          Lwt.return ())
+    in
+    let* () = move_directory_contents old_path new_path in
+    Lwt_utils_unix.remove_dir old_path
+  in
+  (* Remove the Irmin store, that is, delete the "index" directory and all files
+     that start with "store". *)
+  let stream = Lwt_unix.files_of_directory base_dir in
+  let irmin_prefix = "store" in
+  let* () =
+    Lwt_stream.iter_p
+      (fun name ->
+        let path = Filename.Infix.(base_dir // name) in
+        if String.equal name "index" then
+          (* that's Irmin related *)
+          Lwt_utils_unix.remove_dir path
+        else if String.starts_with ~prefix:irmin_prefix name then
+          Lwt_unix.unlink path
+        else if String.equal name "shard_store" then
+          (* The V0 shard store uses a different layout. We just delete it, for
+             simplicity. *)
+          Lwt_utils_unix.remove_dir path
+        else if String.equal name "skip_list" then
+          (* The skip list store is not handled by this module, but we treat this
+             case here, for simplicity *)
+          let new_path = Filename.Infix.(base_dir // "skip_list_store") in
+          move_and_rename path new_path
+        else Lwt.return ())
+      stream
+  in
+  Event.(emit store_upgraded (Version.make 0, Version.make 1))
+
 (* Returns [upgradable old_version new_version] returns an upgrade function if
    the store is upgradable from [old_version] to [new_version]. Otherwise it
    returns [None]. *)
-let upgradable _old_version _new_version :
+let upgradable old_version new_version :
     (base_dir:string -> unit tzresult Lwt.t) option =
-  None
+  let open Lwt_result_syntax in
+  match (old_version, new_version) with
+  | 0, 1 ->
+      Some
+        (fun ~base_dir ->
+          let*! () = upgrade_from_v0_to_v1 ~base_dir in
+          return_unit)
+  | _ -> None
 
 (* Checks the version of the store with the respect to the current
    version. Returns [None] if the store does not need an upgrade and [Some
@@ -484,7 +568,9 @@ let check_version_and_may_upgrade base_dir =
   if Version.(equal version current_version) then return_unit
   else
     match upgradable version Version.current_version with
-    | Some upgrade -> upgrade ~base_dir
+    | Some upgrade ->
+        let* () = upgrade ~base_dir in
+        Version.write_version_file ~base_dir
     | None ->
         tzfail
           (Version.Invalid_data_dir_version
