@@ -104,6 +104,12 @@ val reveal_config : path
 (** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
 val enable_fa_bridge : path
 
+module Ticket_table : sig
+  (** [balance ~ticket_hash ~account] returns the path where the balance of
+      [account] of ticket [ticket_hash] is. *)
+  val balance : ticket_hash:path -> account:path -> path
+end
+
 module Ghostnet : sig
   val eth_accounts : path
 

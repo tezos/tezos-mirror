@@ -23,10 +23,14 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
+    enable_fa_deposits: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
-    if let Some(ProxyInboxContent { transactions }) =
-        read_proxy_inbox(host, smart_rollup_address, tezos_contracts)?
-    {
+    if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
+        host,
+        smart_rollup_address,
+        tezos_contracts,
+        enable_fa_deposits,
+    )? {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
             transactions,
@@ -88,6 +92,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn fetch_sequencer_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
@@ -96,6 +101,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
     _enable_dal: bool,
+    enable_fa_deposits: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
         host,
@@ -104,6 +110,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         delayed_bridge,
         sequencer,
         delayed_inbox,
+        enable_fa_deposits,
     )? {
         StageOneStatus::Done => {
             // Check if there are timed-out transactions in the delayed inbox
@@ -144,10 +151,14 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_inbox,
             sequencer.clone(),
             *enable_dal,
+            config.enable_fa_bridge,
         ),
-        ConfigurationMode::Proxy => {
-            fetch_proxy_blueprints(host, smart_rollup_address, &config.tezos_contracts)
-        }
+        ConfigurationMode::Proxy => fetch_proxy_blueprints(
+            host,
+            smart_rollup_address,
+            &config.tezos_contracts,
+            config.enable_fa_bridge,
+        ),
     }
 }
 
@@ -426,8 +437,13 @@ mod tests {
         ));
         let mut conf = dummy_sequencer_config(enable_dal);
 
-        match read_proxy_inbox(&mut host, DEFAULT_SR_ADDRESS, &conf.tezos_contracts)
-            .unwrap()
+        match read_proxy_inbox(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &conf.tezos_contracts,
+            false,
+        )
+        .unwrap()
         {
             None => panic!("There should be an InboxContent"),
             Some(ProxyInboxContent { transactions, .. }) => assert_eq!(

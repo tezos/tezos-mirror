@@ -11,6 +11,8 @@ use evm::{ExitError, ExitReason, ExitSucceed};
 use evm_execution::account_storage::{
     account_path, EthereumAccount, EthereumAccountStorage,
 };
+use evm_execution::fa_bridge::deposit::FaDeposit;
+use evm_execution::fa_bridge::execute_fa_deposit;
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
@@ -41,6 +43,7 @@ impl Transaction {
     fn to(&self) -> Option<H160> {
         match &self.content {
             TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
+            TransactionContent::FaDeposit(_) => Some(H160::zero()),
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.to,
         }
@@ -48,7 +51,7 @@ impl Transaction {
 
     fn data(&self) -> Vec<u8> {
         match &self.content {
-            TransactionContent::Deposit(_) => vec![],
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => vec![],
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => {
                 transaction.data.clone()
@@ -59,6 +62,7 @@ impl Transaction {
     fn value(&self) -> U256 {
         match &self.content {
             TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
+            &TransactionContent::FaDeposit(_) => U256::zero(),
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.value,
         }
@@ -66,7 +70,7 @@ impl Transaction {
 
     fn nonce(&self) -> u64 {
         match &self.content {
-            TransactionContent::Deposit(_) => 0,
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => 0,
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.nonce,
         }
@@ -74,7 +78,7 @@ impl Transaction {
 
     fn signature(&self) -> Option<TxSignature> {
         match &self.content {
-            TransactionContent::Deposit(_) => None,
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => None,
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => {
                 transaction.signature.clone()
@@ -145,7 +149,7 @@ fn make_object_info(
         TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
             (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
         }
-        TransactionContent::Deposit(_) => {
+        TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
             (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
         }
     };
@@ -462,6 +466,35 @@ fn apply_deposit<Host: Runtime>(
     }))
 }
 
+fn apply_fa_deposit<Host: Runtime>(
+    host: &mut Host,
+    evm_account_storage: &mut EthereumAccountStorage,
+    fa_deposit: &FaDeposit,
+    block_constants: &BlockConstants,
+    precompiles: &PrecompileBTreeMap<Host>,
+    allocated_ticks: u64,
+) -> Result<ExecutionResult<TransactionResult>, Error> {
+    let caller = H160::zero();
+    let outcome = execute_fa_deposit(
+        host,
+        block_constants,
+        evm_account_storage,
+        precompiles,
+        CONFIG,
+        caller,
+        fa_deposit,
+        allocated_ticks,
+    )
+    .map_err(Error::InvalidRunTransaction)?;
+
+    Ok(ExecutionResult::Valid(TransactionResult {
+        caller,
+        gas_used: outcome.gas_used.into(),
+        estimated_ticks_used: outcome.estimated_ticks_used,
+        execution_outcome: Some(outcome),
+    }))
+}
+
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
     RefPath::assert_from(b"/evm/world_state/__outbox_queue");
 
@@ -613,6 +646,17 @@ pub fn apply_transaction<Host: Runtime>(
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
             apply_deposit(host, evm_account_storage, deposit)?
+        }
+        TransactionContent::FaDeposit(fa_deposit) => {
+            log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
+            apply_fa_deposit(
+                host,
+                evm_account_storage,
+                fa_deposit,
+                block_constants,
+                precompiles,
+                allocated_ticks,
+            )?
         }
     };
 

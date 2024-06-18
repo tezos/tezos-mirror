@@ -308,11 +308,12 @@ let wait_for_retrying_connect ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"retrying_connect.v0"
   @@ Fun.const (Some ())
 
-type delayed_transaction_kind = Deposit | Transaction
+type delayed_transaction_kind = Deposit | Transaction | FaDeposit
 
 let delayed_transaction_kind_of_string = function
   | "transaction" -> Transaction
   | "deposit" -> Deposit
+  | "fa_deposit" -> FaDeposit
   | s -> Test.fail "%s is neither a transaction or deposit" s
 
 let wait_for_rollup_node_follower_connection_acquired ?timeout evm_node =

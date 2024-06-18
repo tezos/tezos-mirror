@@ -9,6 +9,7 @@ use crate::{
     storage,
 };
 use anyhow::Result;
+use evm_execution::fa_bridge::deposit::FaDeposit;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
     rlp_helpers, transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
@@ -30,6 +31,9 @@ pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
 
 // Tag that indicates the delayed transaction is a deposit.
 pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
+
+// Tag that indicates the delayed transaction is a FA deposit.
+pub const DELAYED_FA_DEPOSIT_TAG: u8 = 0x03;
 
 /// Hash of a transaction
 ///
@@ -65,6 +69,7 @@ impl AsRef<[u8]> for Hash {
 pub enum DelayedTransaction {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
+    FaDeposit(FaDeposit),
 }
 
 impl Encodable for DelayedTransaction {
@@ -78,6 +83,10 @@ impl Encodable for DelayedTransaction {
             DelayedTransaction::Deposit(delayed_deposit) => {
                 stream.append(&DELAYED_DEPOSIT_TAG);
                 stream.append(delayed_deposit);
+            }
+            DelayedTransaction::FaDeposit(delayed_fa_deposit) => {
+                stream.append(&DELAYED_FA_DEPOSIT_TAG);
+                stream.append(delayed_fa_deposit);
             }
         }
     }
@@ -103,6 +112,10 @@ impl Decodable for DelayedTransaction {
             DELAYED_DEPOSIT_TAG => {
                 let deposit = Deposit::decode(&payload)?;
                 Ok(DelayedTransaction::Deposit(deposit))
+            }
+            DELAYED_FA_DEPOSIT_TAG => {
+                let fa_deposit = FaDeposit::decode(&payload)?;
+                Ok(DelayedTransaction::FaDeposit(fa_deposit))
             }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
@@ -172,6 +185,7 @@ impl DelayedInbox {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
+            TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit)
         };
         let item = DelayedInboxItem {
             transaction,
@@ -203,6 +217,10 @@ impl DelayedInbox {
             DelayedTransaction::Deposit(deposit) => Transaction {
                 tx_hash: tx_hash.0,
                 content: TransactionContent::Deposit(deposit),
+            },
+            DelayedTransaction::FaDeposit(fa_deposit) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::FaDeposit(fa_deposit),
             },
         }
     }

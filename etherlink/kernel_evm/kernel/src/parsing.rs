@@ -18,6 +18,8 @@ use crate::{
     upgrade::KernelUpgrade,
     upgrade::SequencerUpgrade,
 };
+use evm_execution::fa_bridge::deposit::FaDeposit;
+use evm_execution::fa_bridge::TICKS_PER_FA_DEPOSIT_PARSING;
 use primitive_types::{H160, U256};
 use rlp::Encodable;
 use sha3::{Digest, Keccak256};
@@ -119,6 +121,7 @@ pub enum SequencerInput {
 pub enum Input<Mode> {
     ModeSpecific(Mode),
     Deposit(Deposit),
+    FaDeposit(FaDeposit),
     Upgrade(KernelUpgrade),
     SequencerUpgrade(SequencerUpgrade),
     RemoveSequencer,
@@ -173,6 +176,8 @@ pub trait Parsable {
         Self: std::marker::Sized;
 
     fn on_deposit(context: &mut Self::Context);
+
+    fn on_fa_deposit(context: &mut Self::Context);
 }
 
 impl ProxyInput {
@@ -270,6 +275,8 @@ impl Parsable for ProxyInput {
     }
 
     fn on_deposit(_: &mut Self::Context) {}
+
+    fn on_fa_deposit(_: &mut Self::Context) {}
 }
 
 pub struct SequencerParsingContext {
@@ -364,6 +371,12 @@ impl Parsable for SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_PER_DEPOSIT_PARSING);
     }
+
+    fn on_fa_deposit(context: &mut Self::Context) {
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(TICKS_PER_FA_DEPOSIT_PARSING);
+    }
 }
 
 impl<Mode: Parsable> InputResult<Mode> {
@@ -417,24 +430,43 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
+    fn parse_fa_deposit<Host: Runtime>(
+        host: &mut Host,
+        ticket: FA2_1Ticket,
+        routing_info: MichelsonBytes,
+        inbox_level: u32,
+        inbox_msg_id: u32,
+        context: &mut Mode::Context,
+    ) -> Self {
+        // Account for tick at the beginning of the deposit, in case it fails
+        // directly. We prefer to overapproximate rather than under approximate.
+        Mode::on_fa_deposit(context);
+        match FaDeposit::try_parse(ticket, routing_info, inbox_level, inbox_msg_id) {
+            Ok(fa_deposit) => {
+                log!(host, Debug, "Parsed from input: {}", fa_deposit.display());
+                InputResult::Input(Input::FaDeposit(fa_deposit))
+            }
+            Err(err) => {
+                log!(
+                    host,
+                    Debug,
+                    "Deposit ignored because of parsing errors: {}",
+                    err
+                );
+                InputResult::Unparsable
+            }
+        }
+    }
+
     fn parse_deposit<Host: Runtime>(
         host: &mut Host,
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
-        ticketer: &Option<ContractKt1Hash>,
         context: &mut Mode::Context,
     ) -> Self {
         // Account for tick at the beginning of the deposit, in case it fails
         // directly. We prefer to overapproximate rather than under approximate.
         Mode::on_deposit(context);
-        match &ticket.creator().0 {
-            Contract::Originated(kt1) if Some(kt1) == ticketer.as_ref() => (),
-            _ => {
-                log!(host, Info, "Deposit ignored because of different ticketer");
-                return InputResult::Unparsable;
-            }
-        };
-
         // Amount
         let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
         // We use the `U256::from_little_endian` as it takes arbitrary long
@@ -461,12 +493,16 @@ impl<Mode: Parsable> InputResult<Mode> {
         Self::Input(Input::Deposit(content))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn parse_internal_transfer<Host: Runtime>(
         host: &mut Host,
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
         context: &mut Mode::Context,
+        inbox_level: u32,
+        inbox_msg_id: u32,
+        enable_fa_deposits: bool,
     ) -> Self {
         if transfer.destination.hash().0 != smart_rollup_address {
             log!(
@@ -482,13 +518,37 @@ impl<Mode: Parsable> InputResult<Mode> {
         match transfer.payload {
             MichelsonOr::Left(left) => match left {
                 MichelsonOr::Left(MichelsonPair(receiver, ticket)) => {
-                    Self::parse_deposit(
-                        host,
-                        ticket,
-                        receiver,
-                        &tezos_contracts.ticketer,
-                        context,
-                    )
+                    match &ticket.creator().0 {
+                        Contract::Originated(kt1) => {
+                            if Some(kt1) == tezos_contracts.ticketer.as_ref() {
+                                Self::parse_deposit(host, ticket, receiver, context)
+                            } else if enable_fa_deposits {
+                                Self::parse_fa_deposit(
+                                    host,
+                                    ticket,
+                                    receiver,
+                                    inbox_level,
+                                    inbox_msg_id,
+                                    context,
+                                )
+                            } else {
+                                log!(
+                                    host,
+                                    Info,
+                                    "FA deposit ignored because the feature is disabled"
+                                );
+                                InputResult::Unparsable
+                            }
+                        }
+                        _ => {
+                            log!(
+                                host,
+                                Info,
+                                "Deposit ignored because of invalid ticketer"
+                            );
+                            InputResult::Unparsable
+                        }
+                    }
                 }
                 MichelsonOr::Right(MichelsonBytes(bytes)) => {
                     Mode::parse_internal_bytes(source, &bytes, context)
@@ -509,6 +569,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn parse_internal<Host: Runtime>(
         host: &mut Host,
         message: InternalInboxMessage<RollupType>,
@@ -516,6 +577,8 @@ impl<Mode: Parsable> InputResult<Mode> {
         tezos_contracts: &TezosContracts,
         context: &mut Mode::Context,
         level: u32,
+        msg_id: u32,
+        enable_fa_deposits: bool,
     ) -> Self {
         match message {
             InternalInboxMessage::InfoPerLevel(info) => {
@@ -527,6 +590,9 @@ impl<Mode: Parsable> InputResult<Mode> {
                 smart_rollup_address,
                 tezos_contracts,
                 context,
+                level,
+                msg_id,
+                enable_fa_deposits,
             ),
             _ => InputResult::Unparsable,
         }
@@ -538,6 +604,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         smart_rollup_address: [u8; 20],
         tezos_contracts: &TezosContracts,
         context: &mut Mode::Context,
+        enable_fa_deposits: bool,
     ) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
@@ -548,6 +615,12 @@ impl<Mode: Parsable> InputResult<Mode> {
         if *input_tag == EVM_NODE_DELAYED_INPUT_TAG {
             let mut delayed_inbox = DelayedInbox::new(host).unwrap();
             if let Ok(transaction) = Transaction::from_rlp_bytes(remaining) {
+                if !enable_fa_deposits {
+                    if let TransactionContent::FaDeposit(_) = &transaction.content {
+                        log!(host, Info, "Skipping delayed FA deposit because the FA bridge feature is off");
+                        return InputResult::Unparsable;
+                    }
+                }
                 delayed_inbox
                     .save_transaction(host, transaction, 0.into(), 0u32)
                     .unwrap();
@@ -567,6 +640,8 @@ impl<Mode: Parsable> InputResult<Mode> {
                     tezos_contracts,
                     context,
                     input.level,
+                    input.id,
+                    enable_fa_deposits,
                 ),
             },
             Err(_) => InputResult::Unparsable,
@@ -600,6 +675,7 @@ mod tests {
                     kernel_security_governance: None,
                 },
                 &mut (),
+                false,
             ),
             InputResult::Unparsable
         )

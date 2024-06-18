@@ -69,6 +69,7 @@ type l1_contracts = {
   bridge : string;
   admin : string;
   sequencer_governance : string;
+  ticket_router_tester : string;
 }
 
 type sequencer_setup = {
@@ -139,8 +140,29 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
+  (* Originates the ticket router tester (FA bridge) contract. *)
+  let* ticket_router_tester =
+    Client.originate_contract
+      ~alias:"ticket-router-tester"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap4.public_key_hash
+      ~init:
+        "Pair (Pair 0x01000000000000000000000000000000000000000000 (Pair (Left \
+         Unit) 0)) {}"
+      ~prg:(ticket_router_tester_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   return
-    {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_governance}
+    {
+      delayed_transaction_bridge;
+      exchanger;
+      bridge;
+      admin;
+      sequencer_governance;
+      ticket_router_tester;
+    }
 
 let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
@@ -365,6 +387,32 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
       ~amount
       ~giver:depositor.Account.public_key_hash
       ~receiver:l1_contracts.bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  unit
+
+let send_fa_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
+    ~sc_rollup_node ~sc_rollup_address client =
+  let* () =
+    Client.transfer
+      ~entrypoint:"set"
+      ~arg:(sf "Pair %S (Pair (Right (Right %s)) 0)" sc_rollup_address receiver)
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.ticket_router_tester
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* () =
+    Client.transfer
+      ~entrypoint:"mint"
+      ~arg:(sf "Pair (Pair 0 None) %d" amount)
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.ticket_router_tester
       ~burn_cap:Tez.one
       client
   in
@@ -1049,7 +1097,7 @@ let check_delayed_inbox_is_empty ~sc_rollup_node =
          ~key:Durable_storage_path.delayed_inbox
          ()
   in
-  Check.((List.length subkeys = 1) int)
+  Check.((List.length subkeys <= 1) int)
     ~error_msg:"Expected no elements in the delayed inbox" ;
   unit
 
@@ -1219,6 +1267,189 @@ let test_delayed_deposit_is_included =
   in
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
+  unit
+
+let encode_data json codec =
+  let* hex_string = Codec.encode ~name:codec json in
+  let hex = `Hex (Durable_storage_path.no_0x hex_string) in
+  return (Hex.to_bytes hex)
+
+let ticket_hash ticketer token_id =
+  let* ticketer_bytes =
+    encode_data (Ezjsonm.string ticketer) "alpha.contract"
+  in
+  let* content_bytes =
+    encode_data
+      (Ezjsonm.from_string
+         (sf
+            "{\"prim\": \"Pair\", \"args\": [{\"int\": \"%d\"}, {\"prim\": \
+             \"None\"}]}"
+            token_id))
+      "alpha.script.expr"
+  in
+  let payload = Bytes.concat Bytes.empty [ticketer_bytes; content_bytes] in
+  let payload_digest = Tezos_crypto.Hacl.Hash.Keccak_256.digest payload in
+  return (payload_digest |> Hex.of_bytes |> Hex.show)
+
+let ticket_balance ~ticket_hash ~account endpoint =
+  let account =
+    account |> Durable_storage_path.no_0x |> String.lowercase_ascii
+  in
+  let* ticket_balance =
+    let key = Durable_storage_path.Ticket_table.balance ~ticket_hash ~account in
+    match endpoint with
+    | Either.Left sc_rollup_node ->
+        Sc_rollup_node.RPC.call
+          sc_rollup_node
+          ~rpc_hooks:Tezos_regression.rpc_hooks
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind:"wasm_2_0_0"
+             ~operation:Sc_rollup_rpc.Value
+             ~key
+             ()
+    | Either.Right evm_node ->
+        let*@ v = Rpc.state_value evm_node key in
+        return v
+  in
+  return
+  @@ Option.fold
+       ~none:0
+       ~some:(fun ticket_balance ->
+         `Hex ticket_balance |> Hex.to_string |> Z.of_bits |> Z.to_int)
+       ticket_balance
+
+let test_delayed_fa_deposit_is_included =
+  register_both
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:
+      [
+        "evm"; "sequencer"; "delayed_inbox"; "inclusion"; "fa_deposit"; "enabled";
+      ]
+    ~title:"Delayed FA deposit is included"
+    ~enable_fa_bridge:true
+    ~kernels:[Kernel.Latest]
+    ~additional_uses:[Constant.octez_codec]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (* let endpoint = Evm_node.endpoint sequencer in *)
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
+
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+
+  let* ticket_balance_via_rollup_node =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Left sc_rollup_node)
+  in
+  Check.((amount = ticket_balance_via_rollup_node) int)
+    ~error_msg:
+      "After deposit we expect %L ticket balance in the rollup node, got %R" ;
+  let* ticket_balance_via_sequencer =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_via_sequencer) int)
+    ~error_msg:
+      "After deposit we expect %L ticket balance in the sequencer, got %R" ;
+  unit
+
+let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
+  register_both
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "delayed_inbox";
+        "inclusion";
+        "fa_deposit";
+        "disabled";
+      ]
+    ~title:"Delayed FA deposit is ignored if bridge feature is disabled"
+    ~enable_fa_bridge:false
+    ~kernels:[Kernel.Latest]
+    ~additional_uses:[Constant.octez_codec]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (* let endpoint = Evm_node.endpoint sequencer in *)
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
+
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+
+  let* ticket_balance_via_rollup_node =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Left sc_rollup_node)
+  in
+  Check.((0 = ticket_balance_via_rollup_node) int)
+    ~error_msg:
+      "The deposit should have been refused by rollup node, but balance is %R" ;
+  let* ticket_balance_via_sequencer =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((0 = ticket_balance_via_sequencer) int)
+    ~error_msg:
+      "The deposit should have been refused by sequencer, but balance is %R" ;
   unit
 
 let test_delayed_deposit_from_init_rollup_node =
@@ -4042,6 +4273,8 @@ let () =
   test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
+  test_delayed_fa_deposit_is_included protocols ;
+  test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
   test_largest_delayed_transfer_is_included protocols ;
   test_delayed_deposit_from_init_rollup_node protocols ;
   test_init_from_rollup_node_data_dir protocols ;

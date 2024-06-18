@@ -232,7 +232,7 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-type delayed_transaction_kind = Deposit | Transaction
+type delayed_transaction_kind = Deposit | Transaction | FaDeposit
 
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
