@@ -58,6 +58,7 @@ type error +=
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
   | Cannot_checkout_l2_header
   | No_batcher
+  | No_dal_injector
   | No_publisher
   | Refutation_player_failed_to_start
   | No_refutation_coordinator
@@ -348,6 +349,17 @@ let () =
     Data_encoding.unit
     (function No_batcher -> Some () | _ -> None)
     (fun () -> No_batcher) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_dal_injector"
+    ~title:"No dal injector for this node"
+    ~description:"This node does not have a ADL injector"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This rollup node does not have DAL injector.")
+    `Permanent
+    Data_encoding.unit
+    (function No_dal_injector -> Some () | _ -> None)
+    (fun () -> No_dal_injector) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_publisher"

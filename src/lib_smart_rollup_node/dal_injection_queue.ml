@@ -177,10 +177,13 @@ let init (node_ctxt : _ Node_context.t) =
       return_unit
   | Lwt.Fail exn ->
       (* Worker crashed, not recoverable. *)
-      fail [Rollup_node_errors.No_batcher; Exn exn]
+      fail [Rollup_node_errors.No_dal_injector; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      if start_in_mode node_ctxt.config.mode then start node_ctxt
+      if
+        Option.is_some node_ctxt.Node_context.dal_cctxt
+        && start_in_mode node_ctxt.config.mode
+      then start node_ctxt
       else return_unit
 
 (* This is a DAL inection worker for a single scoru *)
@@ -189,7 +192,7 @@ let worker =
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
     | Lwt.Fail exn -> Error (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error Rollup_node_errors.No_batcher)
+    | Lwt.Sleep -> Error Rollup_node_errors.No_dal_injector)
 
 let handle_request_error rq =
   let open Lwt_syntax in
