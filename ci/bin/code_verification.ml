@@ -617,7 +617,7 @@ let jobs pipeline_type =
            of pipelines. So we start this job as early as possible,
            without waiting for sanity_ci. *)
       ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez ())
+      ~rules:(make_rules ~manual:Yes ())
       ()
   in
   let build =
@@ -1474,7 +1474,7 @@ let jobs pipeline_type =
                  Artifacts job_static_x86_64_experimental;
                  Artifacts job_tezt_fetch_records;
                ])
-          ~rules
+          ~rules:(make_rules ~dependent:true ~manual:Yes ())
           ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
           ()
       in
