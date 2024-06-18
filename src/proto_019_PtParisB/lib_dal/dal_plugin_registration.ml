@@ -33,6 +33,8 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
+  type attested_indices = Bitset.t
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)
@@ -122,7 +124,7 @@ module Plugin = struct
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let attested_slot_headers (block : block_info) ~number_of_slots =
+  let attested_slot_headers (block : block_info) =
     let open Result_syntax in
     let* metadata =
       Option.to_result
@@ -130,16 +132,10 @@ module Plugin = struct
         ~none:
           (TzTrace.make @@ Layer1_services.Cannot_read_block_metadata block.hash)
     in
-    let confirmed_slots = metadata.protocol_data.dal_attestation in
-    let* all_slots =
-      Dal.Slot_index.slots_range
-        ~number_of_slots
-        ~lower:0
-        ~upper:(number_of_slots - 1)
-      |> wrap
-    in
-    List.filter (Dal.Attestation.is_attested confirmed_slots) all_slots
-    |> Dal.Slot_index.to_int_list |> return
+    return (metadata.protocol_data.dal_attestation :> Bitset.t)
+
+  let is_attested attestation slot_index =
+    match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
 
   (* Section of helpers for Skip lists *)
 

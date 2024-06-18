@@ -98,15 +98,15 @@ module Statuses : sig
   type t
 
   (** [update_selected_slot_headers_statuses ~block_level
-      ~attestation_lag ~number_of_slots attested store] updates the
-      status of all accepted slots at level [block_level -
-      attestation_lag] to either `Attested (when present in the
-      [attested] list) or `Unattested (when absent). *)
+      ~attestation_lag ~number_of_slots attested is_attested store]
+      updates the status of all accepted slots at level [block_level -
+      attestation_lag] to either `Attested ([attested] returns [true])
+      or `Unattested (when [attested] returns [false]). *)
   val update_selected_slot_headers_statuses :
     block_level:int32 ->
     attestation_lag:int ->
     number_of_slots:int ->
-    int list ->
+    (int -> bool) ->
     t ->
     unit tzresult Lwt.t
 

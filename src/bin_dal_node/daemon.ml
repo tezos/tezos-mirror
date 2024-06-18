@@ -360,6 +360,37 @@ module Handler = struct
     let profile = Node_context.get_profile_ctxt ctxt in
     Profile_manager.should_store_skip_list_cells profile dal_constants
 
+  (* This function removes from the store the given slot and its
+     shards. In case of error, this function emits a warning instead
+     of failing. *)
+  let remove_slots_and_shards ~slot_size (store : Store.t)
+      (slot_id : Types.slot_id) =
+    let open Lwt_syntax in
+    let* () =
+      let* res = Store.Shards.remove store.shards slot_id in
+      match res with
+      | Ok () ->
+          Event.(
+            emit removed_slot_shards (slot_id.slot_level, slot_id.slot_index))
+      | Error err ->
+          Event.(
+            emit
+              removing_shards_failed
+              (slot_id.slot_level, slot_id.slot_index, err))
+    in
+    let* () =
+      let* res = Store.Slots.remove_slot store.slots ~slot_size slot_id in
+      match res with
+      | Ok () ->
+          Event.(emit removed_slot (slot_id.slot_level, slot_id.slot_index))
+      | Error err ->
+          Event.(
+            emit
+              removing_slot_failed
+              (slot_id.slot_level, slot_id.slot_index, err))
+    in
+    return_unit
+
   (* This function removes from the store slot data (slots, their shards, and
      their status) for commitments published at level exactly
      {!Node_context.level_to_gc ~current_level}. It also removes skip list
@@ -398,28 +429,32 @@ module Handler = struct
     List.iter_s
       (fun slot_index ->
         let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
-        let* () =
-          let* res = Store.Shards.remove store.shards slot_id in
-          match res with
-          | Ok () -> Event.(emit removed_slot_shards (oldest_level, slot_index))
-          | Error err ->
-              Event.(
-                emit removing_shards_failed (oldest_level, slot_index, err))
-        in
-        let* () =
-          let* res =
-            Store.Slots.remove_slot
-              store.slots
-              ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-              slot_id
-          in
-          match res with
-          | Ok () -> Event.(emit removed_slot (oldest_level, slot_index))
-          | Error err ->
-              Event.(emit removing_slot_failed (oldest_level, slot_index, err))
-        in
-        return_unit)
+        remove_slots_and_shards
+          ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+          store
+          slot_id)
       (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
+
+  (* [attestation_lag] levels after the publication of a commitment,
+     if it has not been attested it will never be so we can safely
+     remove it from the store. This function removes from the store
+     all the slots (and their shards) published at the given level and
+     which are not listed in the [attested] list. *)
+  let remove_unattested_slots_and_shards proto_parameters ctxt ~published_level
+      attested =
+    let open Lwt_syntax in
+    let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
+    let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+    let store = Node_context.get_store ctxt in
+    List.iter_s
+      (fun slot_index ->
+        if attested slot_index then return_unit
+        else
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
+          in
+          remove_slots_and_shards ~slot_size store slot_id)
+      (0 -- (number_of_slots - 1))
 
   let process_block ctxt cctxt proto_parameters skip_list_cells_store
       finalized_shell_header =
@@ -507,18 +542,22 @@ module Handler = struct
               | Dal_plugin.Failed -> return_unit)
             slot_headers
         in
-        let*? attested_slots =
-          Plugin.attested_slot_headers
-            block_info
-            ~number_of_slots:proto_parameters.number_of_slots
-        in
+        let*? attested_slots = Plugin.attested_slot_headers block_info in
         let* () =
           Slot_manager.update_selected_slot_headers_statuses
             ~block_level
             ~attestation_lag:proto_parameters.attestation_lag
             ~number_of_slots:proto_parameters.number_of_slots
-            attested_slots
+            (Plugin.is_attested attested_slots)
             (Node_context.get_store ctxt)
+        in
+        let*! () =
+          remove_unattested_slots_and_shards
+            proto_parameters
+            ctxt
+            ~published_level:
+              Int32.(sub block_level (of_int proto_parameters.attestation_lag))
+            (Plugin.is_attested attested_slots)
         in
         let* committee = Node_context.fetch_committee ctxt ~level:block_level in
         let () =

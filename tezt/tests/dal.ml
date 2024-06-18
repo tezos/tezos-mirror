@@ -1397,9 +1397,9 @@ let get_commitment_succeeds expected_commitment response =
 let get_commitment_not_found _commit r =
   RPC_core.check_string_response ~code:404 r
 
-let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
+let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
     ~number_of_headers =
-  let* number_of_published_commitments =
+  let* number_of_stored_commitments =
     Lwt_list.fold_left_s
       (fun accu slot_index ->
         let* response =
@@ -1414,7 +1414,7 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
       0
       (List.init number_of_slots Fun.id)
   in
-  Check.(number_of_published_commitments = number_of_headers)
+  Check.(number_of_stored_commitments = number_of_headers)
     ~__LOC__
     Check.int
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
@@ -1423,7 +1423,7 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
 let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     =
   let test (slot_index, commitment) =
-    let* commitment_is_published =
+    let* commitment_is_stored =
       let rpc = Dal_RPC.get_level_index_commitment ~slot_level ~slot_index in
       let* response = Dal_RPC.call_raw dal_node rpc in
       match response.code with
@@ -1434,13 +1434,12 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
           return (commitment = published_commitment)
       | _ -> return false
     in
-    match (commitment_is_published, expected_status) with
+    match (commitment_is_stored, expected_status) with
     | false, None -> unit
     | true, None ->
         Test.fail
           ~__LOC__
-          "It was expected that the given commitment was not published but it \
-           was."
+          "It was expected that the given commitment is not stored, but it is."
     | true, Some expected_status ->
         let* status =
           Dal_RPC.(
@@ -1456,8 +1455,7 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     | false, Some _ ->
         Test.fail
           ~__LOC__
-          "The commitment published for the given slot id is not the expected \
-           one."
+          "It was expected that the given commitment is stored, but it is not."
   in
   Lwt_list.iter_s test slots_info
 
@@ -1465,8 +1463,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let number_of_slots = parameters.Dal.Parameters.number_of_slots in
-  let check_published_level_headers =
-    check_published_level_headers dal_node ~number_of_slots
+  let check_stored_level_headers =
+    check_stored_level_headers dal_node ~number_of_slots
   in
   let* level = Node.get_level node in
   let pub_level = level + 1 in
@@ -1481,7 +1479,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot1 = publish Constant.bootstrap2 ~index:1 "test1" in
   let* () =
     (* The slot headers are not yet in a block. *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
 
   (* slot2_a and slot3 will not be included as successful, because slot2_b has
@@ -1511,7 +1509,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   let* () =
     (* The slot headers are still not yet in a block. *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
 
   let wait_block_processing1 = wait_for_layer1_head dal_node pub_level in
@@ -1540,7 +1538,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
     (* There are 3 published slots: slot0, slot1, and slot2_b *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   let* slot_headers =
     Lwt_list.filter_map_s
@@ -1609,21 +1607,19 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = bake_for ~count:2 client in
   let* () = wait_block_processing3 in
   let* () =
-    (* The number of published slots has not changed *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    (* The unattested slot has been removed. *)
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
   in
 
   Log.info "Check that the store is as expected" ;
   (* Slots confirmed. *)
-  let* () = check_get_commitment get_commitment_succeeds ok in
-  (* Slot that were waiting for attestation and now attested. *)
+  let* () = check_get_commitment get_commitment_succeeds attested in
+  (* Slots that were waiting for attestation and now attested. *)
   let* () = check_slot_status ~__LOC__ ~expected_status:"attested" attested in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
-  (* Slot that were waiting for attestation and now unattested. *)
-  let* () =
-    check_slot_status ~__LOC__ ~expected_status:"unattested" unattested
-  in
+  (* Slots that were waiting for attestation and now unattested. *)
+  let* () = check_slot_status ~__LOC__ unattested in
   (* slot2_a is still not selected. *)
   let* () = check_slot_status ~__LOC__ [slot2_a] in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
@@ -1631,17 +1627,17 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* slot4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
   let* () = check_slot_status ~__LOC__ [slot4] in
-  (* The number of published slots has not changed *)
+  (* The number of stored slots has not changed. *)
   let* () =
-    check_published_level_headers
+    check_stored_level_headers
       ~__LOC__
       ~pub_level:(pub_level - 1)
       ~number_of_headers:0
   in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
   in
-  check_published_level_headers
+  check_stored_level_headers
     ~__LOC__
     ~pub_level:(pub_level + 1)
     ~number_of_headers:0
@@ -5536,7 +5532,10 @@ module Garbage_collection = struct
     in
 
     Log.info "Every shard published for the commitment; baking blocks" ;
-    let* () = bake_for ~count:30 client in
+    let* () = bake_for ~count:dal_parameters.attestation_lag client in
+    (* The slot wasn't attested (because there is no attester running
+       in this scenario) so it got removed despite not being older
+       than the history length of the slot producer DAL node. *)
     Log.info "Blocks baked." ;
 
     Log.info "Wait for the shards of the commitment to be removed" ;
@@ -5547,6 +5546,216 @@ module Garbage_collection = struct
       get_shard_rpc_failure_expected
         ~slot_level:published_level
         ~slot_index
+        slot_producer
+    in
+
+    Log.info "End of test" ;
+    unit
+
+  (* This simple test checks the basic feature, with just a producer that
+     produces shards & deletes them and an attester with attests them. *)
+  let test_gc_producer_and_attester _protocol dal_parameters _cryptobox node
+      client dal_bootstrap =
+    let slot_index = 0 in
+    (* Parameters and constants. *)
+    let Dal.Parameters.
+          {number_of_slots; cryptobox = {Dal.Cryptobox.slot_size; _}; _} =
+      dal_parameters
+    in
+
+    (* Note: we don't need to configure and start the DAL bootstrap
+       node because it is the node started by the
+       scenario_with_layer1_and_dal_nodes wrapper. Instead, we check
+       that the dal node passed as argument to this test function is a
+       running bootstrap DAL node. If not, this means that we forgot
+       to register the test with ~bootstrap_profile:true *)
+    let* () =
+      check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap
+    in
+    Log.info "bootstrap DAL node is running" ;
+
+    (* When configuring the other DAL nodes, we use dal_bootstrap as
+       the single peer. *)
+    let peers = [Dal_node.listen_addr dal_bootstrap] in
+
+    (* Create & configure attester *)
+    let attester = Dal_node.create ~name:"attester" ~node () in
+    let bootstrap_pkhs =
+      Array.to_seq Account.Bootstrap.keys
+      |> Seq.map (fun account -> account.Account.public_key_hash)
+      |> List.of_seq
+    in
+    Dal_node.log_events attester ;
+    let* () =
+      Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
+    in
+    let* () = Dal_node.run ~wait_ready:true attester in
+    Log.info "attester DAL node ready" ;
+
+    let slot_producer = Dal_node.create ~name:"producer" ~node () in
+    Dal_node.log_events slot_producer ;
+    let* () =
+      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
+    in
+    (* Promise which will be resolved once the slot producer will be
+       connected to all the other DAL nodes (attester + bootstrap). *)
+    let wait_for_connections_of_producer_promise =
+      Dal_node.wait_for_connections slot_producer 2
+    in
+    let* () = Dal_node.run ~wait_ready:true slot_producer in
+
+    (* Check that the DAL nodes have the expected profiles. *)
+    let* () =
+      check_profiles
+        ~__LOC__
+        slot_producer
+        ~expected:Dal_RPC.(Operator [Producer slot_index])
+    in
+    Log.info "Slot producer DAL node is running" ;
+
+    let* () =
+      check_profiles
+        ~__LOC__
+        attester
+        ~expected:
+          (Dal_RPC.Operator
+             (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
+    in
+
+    Log.info "Attester DAL node is running" ;
+
+    (* Now that all the DAL nodes are running, we need some of them to
+       establish grafted connections. The connections between the
+       attester and the slot producer have no reason to be grafted on
+       other slot indices than the one the slot producer is subscribed
+       to, so we instruct [check_events_with_topic] to skip all events
+       but the one for [slot_index]. *)
+    let already_seen_slots =
+      Array.init number_of_slots (fun index -> slot_index <> index)
+    in
+    (* Wait for a GRAFT message between all nodes. *)
+    let check_graft node1 node2 attester_pkh =
+      let check_graft ~from:node1 node2 =
+        let* id1 = Dal_node.read_identity node1 in
+        check_events_with_topic
+          ~event_with_topic:(Graft id1)
+          node2
+          ~num_slots:number_of_slots
+          ~already_seen_slots
+          attester_pkh
+      in
+      Lwt.pick [check_graft ~from:node1 node2; check_graft ~from:node2 node1]
+    in
+    let check_graft_promises =
+      List.map (check_graft slot_producer attester) bootstrap_pkhs
+    in
+    Log.info "Waiting for grafting of the DAL nodes connections" ;
+    (* The attester DAL node won't join the DAL network until it has
+       processed some finalized L1 block in which the associated baker
+       is reported to have some rights. For this to happen, we need to
+       bake a few blocks. *)
+    let* () = bake_for ~count:3 client in
+    let* () = Lwt.join check_graft_promises in
+    Log.info "Attester - producer connections grafted" ;
+
+    let* () = wait_for_connections_of_producer_promise in
+
+    Log.info "DAL network is ready" ;
+
+    let wait_slot ~published_level ~slot_index =
+      (* We don’t wait for the producer because at this step it already stored
+         its shards *)
+      Log.info "Waiting for first shard to be stored by the attester" ;
+      wait_for_first_shard ~published_level ~slot_index attester
+    in
+
+    let* published_level, _commitment, shard_index_attester =
+      publish_store_and_wait_slot
+        node
+        client
+        slot_producer
+        Constant.bootstrap1
+        ~index:slot_index
+        ~wait_slot
+        ~number_of_extra_blocks_to_bake:2
+      @@ Helpers.make_slot ~slot_size "content"
+    in
+
+    Log.info "RPC first shard producer" ;
+    let* _shard_producer =
+      get_shard_rpc
+        ~slot_level:published_level
+        ~slot_index
+        ~shard_index:0
+        slot_producer
+    in
+    Log.info "RPC first shard attester" ;
+    let* _shard_attester =
+      get_shard_rpc
+        ~slot_level:published_level
+        ~slot_index
+        ~shard_index:shard_index_attester
+        attester
+    in
+
+    let wait_remove_shards_attester_promise =
+      Log.info "Waiting for first shard to be removed by the attester" ;
+      wait_remove_shards ~published_level ~slot_index attester
+    in
+
+    Log.info "All nodes received a shard, waiting for blocks to be baked" ;
+    let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
+    let rec bake_loop n =
+      if n <= 0 then unit
+      else
+        let* level = Client.level client in
+        let wait_block_p =
+          List.map
+            (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
+            [attester; dal_bootstrap; slot_producer]
+        in
+        let* () =
+          bake_for ~dal_node_endpoint:attester_dal_node_endpoint client
+        in
+        let* () = Lwt.join wait_block_p in
+        bake_loop (n - 1)
+    in
+    let* () = bake_loop 25 in
+    Log.info "Blocks baked !" ;
+
+    Log.info "Checking that the slot was attested" ;
+    let* () =
+      let* status =
+        Dal_RPC.(
+          call slot_producer
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index)
+      in
+      Check.(status = "attested")
+        ~__LOC__
+        Check.string
+        ~error_msg:
+          "The value of the fetched status should match the expected one \
+           (current = %L, expected = %R)" ;
+      unit
+    in
+
+    Log.info "Wait for first shard attester" ;
+    let* () = wait_remove_shards_attester_promise in
+
+    Log.info "RPC deleted shard attester" ;
+    let* () =
+      get_shard_rpc_failure_expected
+        ~slot_level:published_level
+        ~slot_index
+        attester
+    in
+
+    Log.info "RPC shard still stored producer" ;
+    let* _shard_producer =
+      get_shard_rpc
+        ~slot_level:published_level
+        ~slot_index
+        ~shard_index:0
         slot_producer
     in
 
@@ -5584,12 +5793,16 @@ module Garbage_collection = struct
     (* When configuring the other DAL nodes, we use dal_bootstrap as
        the single peer. *)
     let peers = [Dal_node.listen_addr dal_bootstrap] in
-    let attester_pkh = Account.Bootstrap.keys.(0).public_key_hash in
+    let bootstrap_pkhs =
+      Array.to_seq Account.Bootstrap.keys
+      |> Seq.map (fun account -> account.Account.public_key_hash)
+      |> List.of_seq
+    in
 
     (* Create & configure attester *)
     let attester = Dal_node.create ~name:"attester" ~node () in
     let* () =
-      Dal_node.init_config ~attester_profiles:[attester_pkh] ~peers attester
+      Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
     in
     let* () = Dal_node.run ~wait_ready:true attester in
     Log.info "attester DAL node ready" ;
@@ -5634,9 +5847,10 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         attester
-        ~expected:Dal_RPC.(Operator [Attester attester_pkh])
+        ~expected:
+          (Dal_RPC.Operator
+             (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
     in
-
     Log.info "Attester DAL node is running" ;
 
     (* Now that all the DAL nodes are running, we need some of them to
@@ -5662,13 +5876,9 @@ module Garbage_collection = struct
       Lwt.pick [check_graft ~from:node1 node2; check_graft ~from:node2 node1]
     in
     let check_graft_promises =
-      check_graft slot_producer attester attester_pkh
-      :: check_graft observer attester attester_pkh
-      :: Account.(
-           Array.to_list
-           @@ (Array.map (fun key ->
-                   check_graft slot_producer observer key.public_key_hash))
-                Bootstrap.keys)
+      List.map (check_graft slot_producer attester) bootstrap_pkhs
+      @ List.map (check_graft observer attester) bootstrap_pkhs
+      @ List.map (check_graft slot_producer observer) bootstrap_pkhs
     in
     Log.info "Waiting for grafting of the DAL nodes connections" ;
     (* The attester DAL node won't join the DAL network until it has
@@ -5744,6 +5954,7 @@ module Garbage_collection = struct
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
+    let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
     let rec bake_loop n =
       if n <= 0 then unit
       else
@@ -5753,12 +5964,30 @@ module Garbage_collection = struct
             (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
             [attester; observer; dal_bootstrap; slot_producer]
         in
-        let* () = bake_for client in
+        let* () =
+          bake_for ~dal_node_endpoint:attester_dal_node_endpoint client
+        in
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
     let* () = bake_loop 25 in
     Log.info "Blocks baked !" ;
+
+    Log.info "Checking that the slot was attested" ;
+    let* () =
+      let* status =
+        Dal_RPC.(
+          call slot_producer
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index)
+      in
+      Check.(status = "attested")
+        ~__LOC__
+        Check.string
+        ~error_msg:
+          "The value of the fetched status should match the expected one \
+           (current = %L, expected = %R)" ;
+      unit
+    in
 
     Log.info "Wait for first shard attester" ;
     let* () = wait_remove_shards_attester_promise in
@@ -7008,10 +7237,17 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "simple"; Tag.memory_3k]
     ~producer_profiles:[0]
-    ~history_mode:(Dal_node.Custom 15)
+    ~history_mode:(Dal_node.Custom 150)
     ~number_of_slots:1
     "garbage collection of shards for producer"
     Garbage_collection.test_gc_simple_producer
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gc"; "attester"; Tag.memory_4k]
+    ~bootstrap_profile:true
+    ~number_of_slots:1
+    "garbage collection of shards for producer and attester"
+    Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "multi"; Tag.memory_4k]
