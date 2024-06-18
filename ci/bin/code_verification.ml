@@ -73,11 +73,14 @@ let opam_rules ~only_final_pipeline ?batch_index () =
       ();
   ]
 
-let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
+let job_opam_packages ?dependencies group batch_index packages : tezos_job =
   job
     ?dependencies
     ~__POS__
-    ~name:("opam:" ^ name)
+    ~name:
+      ("opam:"
+      ^ (match group with All -> "all" | Executable -> "exec")
+      ^ "_" ^ string_of_int batch_index)
     ~image:Images.CI.prebuild
     ~stage:Stages.packaging
       (* FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
@@ -91,8 +94,8 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
       [
         (* See [.gitlab-ci.yml] for details on [RUNTEZTALIAS] *)
         ("RUNTEZTALIAS", "true");
-        ("package", name);
       ]
+    ~parallel:(Matrix [[("package", packages)]])
     ~before_script:
       (before_script ~eval_opam:true ["mkdir -p $CI_PROJECT_DIR/opam_logs"])
     [
@@ -119,6 +122,22 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
     ~idle_timeout:"0"
     ~path:"$CI_PROJECT_DIR/_build/_sccache"
   |> enable_cargo_cache
+
+let jobs_opam_packages ?dependencies opam_packages : tezos_job list =
+  let package_by_group_index = Hashtbl.create 5 in
+  List.iter
+    (fun pkg ->
+      let key = (pkg.group, pkg.batch_index) in
+      let packages =
+        Option.value ~default:[] @@ Hashtbl.find_opt package_by_group_index key
+      in
+      Hashtbl.replace package_by_group_index key (pkg.name :: packages))
+    opam_packages ;
+  Hashtbl.fold
+    (fun (group, index) packages jobs ->
+      job_opam_packages ?dependencies group index packages :: jobs)
+    package_by_group_index
+    []
 
 let ci_opam_package_tests = "script-inputs/ci-opam-package-tests"
 
@@ -713,10 +732,9 @@ let jobs pipeline_type =
         ]
     in
     let (jobs_opam_packages : tezos_job list) =
-      read_opam_packages
-      |> List.map
-           (job_opam_package
-              ~dependencies:(Dependent [Artifacts job_opam_prepare]))
+      jobs_opam_packages
+        ~dependencies:(Dependent [Artifacts job_opam_prepare])
+        read_opam_packages
     in
     job_opam_prepare :: jobs_opam_packages
   in
