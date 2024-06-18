@@ -1025,26 +1025,6 @@ let jobs pipeline_type =
           ~timeout:(Minutes 20)
           ["make test-webassembly"]
       in
-      let oc_unit_js_components =
-        job
-          ~__POS__
-          ~name:"oc.unit:js_components"
-          ~arch:Amd64
-          ~image:Images.CI.test
-          ~stage:Stages.test
-          ~dependencies:(build_dependencies Amd64)
-          ~rules
-          ~retry:2
-          ~variables:[("RUNTEZTALIAS", "true")]
-          ~before_script:
-            (before_script
-               ~take_ownership:true
-               ~source_version:true
-               ~eval_opam:true
-               ~install_js_deps:true
-               [])
-          ["make test-js"]
-      in
       let oc_unit_protocol_compiles =
         job
           ~__POS__
@@ -1100,7 +1080,6 @@ let jobs pipeline_type =
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;
         oc_unit_webassembly_x86_64;
-        oc_unit_js_components;
         oc_unit_protocol_compiles;
         de_unit Amd64;
         de_unit Arm64;

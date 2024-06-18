@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
-
 (library
  (name tezos_shell_services)
  (public_name octez-shell-libs.shell-services)
@@ -15,7 +13,6 @@
   octez-libs.context.sigs
   octez-libs.tezos-context.merkle_proof_encoding
   octez-libs.crypto-dal.dal-config)
- (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -40,7 +40,6 @@ let json_data_encoding_stdlib =
     ~internal_name:"json_data_encoding_stdlib"
     ~path:"data-encoding/json-data-encoding/src"
     ~conflicts
-    ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~opam:"octez-libs"
@@ -53,7 +52,6 @@ let json_data_encoding =
     ~internal_name:"json_data_encoding"
     ~path:"data-encoding/json-data-encoding/src"
     ~conflicts
-    ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["json_encoding"; "json_query"; "json_repr"; "json_schema"]
@@ -71,9 +69,7 @@ let _json_data_encoding_tests =
     ]
     ~opam:"octez-libs"
     ~path:"data-encoding/json-data-encoding/test"
-    ~js_compatible:true
-    ~modes:[Native; JS]
-    ~deps:[json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler]
+    ~deps:[json_data_encoding; crowbar; alcotest]
 
 let json_data_encoding_bson =
   public_lib
@@ -81,7 +77,6 @@ let json_data_encoding_bson =
     ~internal_name:"json_data_encoding_bson"
     ~path:"data-encoding/json-data-encoding/src"
     ~conflicts
-    ~js_compatible:true
     ~wrapped:false
     ~bisect_ppx:No
     ~modules:["json_repr_bson"]
@@ -95,37 +90,18 @@ let _json_data_encoding_bson_tests =
     ~path:"data-encoding/json-data-encoding/test-bson"
     ~deps:[crowbar; alcotest; json_data_encoding; json_data_encoding_bson]
 
-let _json_data_encoding_browser =
-  public_lib
-    "octez-libs.json-data-encoding-browser"
-    ~internal_name:"json_data_encoding_browser"
-    ~path:"data-encoding/json-data-encoding/src"
-    ~conflicts
-    ~js_compatible:true
-    ~wrapped:false
-    ~bisect_ppx:No
-    ~modules:["json_repr_browser"]
-    ~deps:
-      [
-        json_data_encoding;
-        js_of_ocaml |> open_;
-        json_data_encoding_stdlib |> open_;
-      ]
-
 let data_encoding =
   public_lib
     "octez-libs.data-encoding"
     ~internal_name:"data_encoding"
     ~path:"data-encoding/src"
     ~conflicts
-    ~js_compatible:true
     ~preprocess:[pps ppx_hash]
     ~bisect_ppx:No
     ~deps:
       [
         ezjsonm;
         zarith;
-        zarith_stubs_js;
         hex;
         json_data_encoding;
         json_data_encoding_bson;
@@ -139,10 +115,7 @@ let _data_encoding_tests =
     "test"
     ~opam:"octez-libs"
     ~path:"data-encoding/test"
-    ~js_compatible:true
-    ~modes:[Native; JS]
-    ~deps:
-      [data_encoding; zarith; zarith_stubs_js; alcotest; js_of_ocaml_compiler]
+    ~deps:[data_encoding; zarith; alcotest]
 
 let _data_encoding_expect_tests =
   private_lib
@@ -150,11 +123,9 @@ let _data_encoding_expect_tests =
     ~path:"data-encoding/test/expect"
     ~inline_tests:ppx_expect
     ~bisect_ppx:No
-    ~deps:[data_encoding; zarith; zarith_stubs_js; ezjsonm; bigstringaf]
+    ~deps:[data_encoding; zarith; ezjsonm; bigstringaf]
     ~opam:"octez-libs"
 
-(* Some tests require [--stack-size] to be runnable with node.js.
-   The version of node in our runners does not support [--stack-size]. *)
 let _data_encoding_pbt_tests =
   tests
     [
@@ -167,7 +138,5 @@ let _data_encoding_pbt_tests =
     ]
     ~opam:"octez-libs"
     ~path:"data-encoding/test/pbt"
-    ~js_compatible:false
-    ~modes:[Native]
     ~bisect_ppx:No
-    ~deps:[data_encoding; zarith; zarith_stubs_js; crowbar; bigstringaf]
+    ~deps:[data_encoding; zarith; crowbar; bigstringaf]

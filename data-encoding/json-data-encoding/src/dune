@@ -6,7 +6,6 @@
  (public_name octez-libs.json-data-encoding.stdlib)
  (libraries
   uri)
- (js_of_ocaml)
  (wrapped false)
  (modules json_data_encoding_stdlib list_override))
 
@@ -17,7 +16,6 @@
   uri
   hex
   octez-libs.json-data-encoding.stdlib)
- (js_of_ocaml)
  (wrapped false)
  (flags
   (:standard)
@@ -31,24 +29,8 @@
   octez-libs.json-data-encoding
   ocplib-endian
   octez-libs.json-data-encoding.stdlib)
- (js_of_ocaml)
  (wrapped false)
  (flags
   (:standard)
   -open Json_data_encoding_stdlib)
  (modules json_repr_bson))
-
-(library
- (name json_data_encoding_browser)
- (public_name octez-libs.json-data-encoding-browser)
- (libraries
-  octez-libs.json-data-encoding
-  js_of_ocaml
-  octez-libs.json-data-encoding.stdlib)
- (js_of_ocaml)
- (wrapped false)
- (flags
-  (:standard)
-  -open Js_of_ocaml
-  -open Json_data_encoding_stdlib)
- (modules json_repr_browser))

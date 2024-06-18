@@ -16,8 +16,8 @@ open Externals
    As a result, we have to do a little dance here where we inject the external
    dependencies (declared in [Externals]) into the tezt maker (declared in
    [Manifest]). *)
-let tezt ~product ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
-    ?dep_globs_rec ?dep_files ?opam_with_test ?dune_with_test ?synopsis
+let tezt ~product ~opam ~path ?modes ?(deps = []) ?dep_globs ?dep_globs_rec
+    ?dep_files ?opam_with_test ?dune_with_test ?synopsis
     ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
     ?preprocessor_deps ?source l =
   Manifest.tezt
@@ -26,12 +26,10 @@ let tezt ~product ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ~opam
     ~path
     ?synopsis
-    ?js_compatible
     ?modes
     ~lib_deps:
       ((tezt_core_lib |> Manifest.open_ |> Manifest.open_ ~m:"Base") :: deps)
     ~exe_deps:[tezt_lib]
-    ~js_deps:[tezt_js_lib]
     ?dep_globs
     ?dep_globs_rec
     ?dep_files

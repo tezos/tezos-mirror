@@ -7,13 +7,11 @@
  (libraries
   ezjsonm
   zarith
-  zarith_stubs_js
   hex
   octez-libs.json-data-encoding
   octez-libs.json-data-encoding-bson
   bigstringaf
   ppx_hash)
- (preprocess (pps ppx_hash))
- (js_of_ocaml))
+ (preprocess (pps ppx_hash)))
 
 (include dune.inc)

@@ -7,7 +7,6 @@
   octez-libs.error-monad
   octez-libs.crypto
   zarith
-  zarith_stubs_js
   octez-libs.data-encoding
   lwt.unix
   ptime)

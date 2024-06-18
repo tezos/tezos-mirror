@@ -145,10 +145,6 @@ let () =
          p_dev
          ~key:"flags"
          Dune.[S ":standard"; S "-w"; S warnings_for_dev]
-    |> Env.add
-         Env.Any
-         ~key:"js_of_ocaml"
-         Dune.[S "runtest_alias"; S "runtest_js"]
   in
   let dune =
     Dune.

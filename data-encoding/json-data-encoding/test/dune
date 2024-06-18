@@ -9,13 +9,10 @@
   test_list_map
   test_mu
   test_seq_is_lazy)
- (modes native js)
  (libraries
   octez-libs.json-data-encoding
   crowbar
-  alcotest
-  js_of_ocaml-compiler)
- (js_of_ocaml))
+  alcotest))
 
 (rule
  (alias runtest)
@@ -46,33 +43,3 @@
  (alias runtest)
  (package octez-libs)
  (action (run %{dep:./test_seq_is_lazy.exe})))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (run node %{dep:./test_big_streaming.bc.js})))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (run node %{dep:./test_destruct.bc.js})))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (run node %{dep:./test_generated.bc.js})))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (run node %{dep:./test_list_map.bc.js})))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (run node %{dep:./test_mu.bc.js})))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (action (run node %{dep:./test_seq_is_lazy.bc.js})))

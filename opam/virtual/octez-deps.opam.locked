@@ -72,7 +72,6 @@ depends: [
   "cstruct-lwt" {= "6.2.0"}
   "ctypes" {= "0.20.2"}
   "ctypes-foreign" {= "0.18.0"}
-  "ctypes_stubs_js" {= "0.1"}
   "decompress" {= "1.5.3"}
   "digestif" {= "1.2.0"}
   "dmap" {= "0.5"}
@@ -101,15 +100,10 @@ depends: [
   "hkdf" {= "1.0.4"}
   "index" {= "1.6.2"}
   "integers" {= "0.7.0"}
-  "integers_stubs_js" {= "1.0"}
   "ipaddr" {= "5.5.0"}
   "ipaddr-sexp" {= "5.5.0"}
   "jane-street-headers" {= "v0.16.0"}
   "jingoo" {= "1.5.0"}
-  "js_of_ocaml" {= "5.8.1"}
-  "js_of_ocaml-compiler" {= "5.8.1"}
-  "js_of_ocaml-lwt" {= "5.8.1"}
-  "js_of_ocaml-ppx" {= "5.8.1"}
   "jsonm" {= "1.0.2"}
   "jst-config" {= "v0.16.0"}
   "lambda-term" {= "3.3.2"}
@@ -233,7 +227,6 @@ depends: [
   "yaml" {= "3.2.0"}
   "yojson" {= "2.1.2"}
   "zarith" {= "1.13"}
-  "zarith_stubs_js" {= "v0.16.1"}
   "zed" {= "3.2.3"}
 ]
 conflicts: [

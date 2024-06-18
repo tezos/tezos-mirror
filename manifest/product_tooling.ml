@@ -29,20 +29,6 @@ let _octez_tooling =
            it is added to images/ci. *)
         ocamlformat;
       ]
-    ~npm_deps:
-      [
-        Npm.make "kaitai-struct" (Version (V.exactly "0.10.0"))
-        (* Client-libs project requires Javascript Kaitai runtime. *);
-      ]
-
-let _node_wrapper =
-  private_exe
-    "node_wrapper"
-    ~path:"src/tooling"
-    ~opam:""
-    ~deps:[unix]
-    ~modules:["node_wrapper"]
-    ~bisect_ppx:No
 
 let _git_gas_diff =
   public_exe

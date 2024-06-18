@@ -9,11 +9,9 @@
   test_json_stream_sizes
   test_classifiers
   json_roundtrip_in_binary)
- (modes native)
  (libraries
   octez-libs.data-encoding
   zarith
-  zarith_stubs_js
   crowbar
   bigstringaf))
 

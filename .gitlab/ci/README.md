@@ -61,7 +61,6 @@ A job's `before_script:` section should be used to:
  - source `scripts/version.sh`
  - load opam environment with `eval $(opam env)`
  - load Python venv with `. $HOME/.venv/bin/activate`
- - install NPM dependencies with `. ./scripts/install_build_deps.js.sh`
 
 For consistency, these actions (or a subset thereof) should be taken
 in the order listed above.
