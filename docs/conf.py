@@ -115,7 +115,15 @@ html_theme = "sphinx_book_theme"
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {'logo_only': True, 'sticky_navigation': False}
+html_theme_options = {
+    'path_to_docs': 'docs/',
+    'repository_url': 'https://gitlab.com/tezos/tezos',
+    'repository_branch': 'master',
+    'use_repository_button': True,
+    'use_issues_button': True,
+    'use_download_button': False,
+    'use_fullscreen_button': True,
+}
 
 html_logo = "logo.svg"
 # Add any paths that contain custom static files (such as style sheets) here,
