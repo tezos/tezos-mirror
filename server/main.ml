@@ -213,11 +213,22 @@ let get_stats ~logger db_pool =
       | Some (level, round, timestamp) ->
           reply_public_json
             Data_encoding.(
-              obj3
-                (req "level" int32)
-                (req "round" int32)
-                (req "timestamp" string))
-            (level, round, Tezos_base.Time.Protocol.to_notation timestamp)
+              obj5
+                (req
+                   "highest_block"
+                   (obj3
+                      (req "level" int32)
+                      (req "round" int32)
+                      (req "timestamp" string)))
+                (req "teztale_version" string)
+                (req "teztale_commit_ref" string)
+                (req "tezos_branch" string)
+                (req "tezos_commit_ref" string))
+            ( (level, round, Tezos_base.Time.Protocol.to_notation timestamp),
+              Teztale_lib.Version.teztale_version,
+              Teztale_lib.Version.teztale_commit_ref,
+              Teztale_lib.Version.tezos_branch,
+              Teztale_lib.Version.tezos_commit_ref )
       | None ->
           let body = "No registered block yet." in
           Cohttp_lwt_unix.Server.respond_error ~body ())

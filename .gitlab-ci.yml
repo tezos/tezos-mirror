@@ -154,6 +154,10 @@ prepare:canary:
   before_script:
     - eval $(opam env)
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
+    - sed -i "s|let teztale_version = \"\"|let teztale_version = \"${TEZTALE_REF}\"|g" ./lib/version.ml
+    - sed -i "s|let teztale_commit_ref = \"\"|let teztale_commit_ref = \"${CI_COMMIT_SHA}\"|g" ./lib/version.ml
+    - sed -i "s|let tezos_branch = \"\"|let tezos_branch = \"${OCTEZ_BRANCH}\"|g" ./lib/version.ml
+    - sed -i "s|let tezos_commit_ref = \"\"|let tezos_commit_ref = \"`cd tezos && git rev-parse HEAD`\"|g" ./lib/version.ml
   script:
     - dune build archiver/main.exe server/main.exe
     - mkdir -p ${ARTIFACTS_PATH}/{archiver,server}
