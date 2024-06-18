@@ -5,6 +5,18 @@
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
+module Name = struct
+  (* We only have a single batcher in the node *)
+  type t = unit
+
+  let encoding = Data_encoding.unit
+
+  let base = ["dal-injection"; "worker"]
+
+  let pp _ _ = ()
+
+  let equal () () = true
+end
 
 module Dal_worker_types = struct
   module Request = struct
@@ -96,19 +108,6 @@ module Types = struct
   type nonrec state = state
 
   type parameters = {node_ctxt : Node_context.ro}
-end
-
-module Name = struct
-  (* We only have a single DAL worker in the node *)
-  type t = unit
-
-  let encoding = Data_encoding.unit
-
-  let base = ["dal-injection"; "worker"]
-
-  let pp _ _ = ()
-
-  let equal () () = true
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
