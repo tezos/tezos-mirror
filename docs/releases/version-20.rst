@@ -1,17 +1,34 @@
-Version 20.0
+Version 20.1
 ============
 
 Version 20 contains a new version (V12) of the protocol environment,
 which is the set of functions that a protocol can call.
-This new version is used by the :doc:`ParisB 2<../protocols/019_paris>`,
-protocol, which is the successor of :doc:`Oxford  <../protocols/018_oxford>`.
-This release contains the ParisB 2 protocol, a patched protocol upgrade for ParisB  as well as its associated protocol-specific executable binaries (baker, accuser, etc).
+This new version is used by the :doc:`Paris<../protocols/019_paris>` protocol,
+which is the successor of :doc:`Oxford<../protocols/018_oxford>`.
+The executables associated with the Nairobi protocol have been removed as this protocol
+is now inactive.
 
-Note ParisB 2 is included in v20.0 as a *User-Activated Protocol Override* (UAPO). This means that nodes running v20.0 will activate ParisB 2, ``PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ`` instead of the original ParisB proposal before block #5,726,209.
+Three potentially critical issues were discovered in the ParisB protocol, the protocol proposal selected via Tezos' on-chain governance process, after its injection but before its scheduled activation on Mainnet.
+Version 20.0 thus contained the ParisB 2 protocol, a patched protocol upgrade for ParisB
+as well as its associated protocol-specific executable binaries (baker, accuser, etc).
+These issues were addressed in the `ParisB 2 <https://research-development.nomadic-labs.com/parisB2-announcement.html>`_ protocol, included in Octez v20.0 together with
+its associated protocol-specific executable binaries (baker, accuser, etc).
+ParisB 2 was included in v20.0 as a *User-Activated Protocol Override* (UAPO).
+This meant that nodes running v20.0 activated ParisB 2,
+``PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ`` instead of
+the original ParisB proposal before block `#5,726,209 <https://tzkt.io/5726209>`__.
 
-The binaries associated to the Nairobi protocol have been removed as this protocol is now unactive.
+Additional issues were discovered after the activation of ParisB 2, including a critical liveness issue with Smart Rollups.
+These issues are solved in the bug-fix protocol upgrade ParisC included in Octez v20.1.
+ParisC is included in v20.1 as a *User-Activated Upgrade* (UAU).
+This means that nodes running v20.1 will automatically activate ParisC at the end of cycle 749, just before `#5,898,24 <https://tzkt.io/5898241>`_.
 
-Version v20 introduces the following changes or new features:
+Octez v20.1 also includes minor fixes to Smart Rollup nodes addressing issues observed after the activation of Paris. More precisely, the Smart Rollup nodes released with Octez v20 and earlier keep using the constants of the previous protocol even after the activation of a new one. This means that at activation of ParisB Smart Rollup nodes did not use the correct commitment period to compute and publish commitments. To fix that, in Octez v20.1, the Smart Rollup node:
+
+- correctly handles constant updates at protocol activation;
+- features a new command ``repair commitments`` to recompute commitments with the correct period if necessary.
+
+Version 20.0 introduced the following changes or new features:
 
 Node
 ~~~~
@@ -54,14 +71,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v20.0
+  git checkout octez-v20.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v20.0`` Docker images of Octez.
+If you are using Docker instead, use the ``v20.1`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -90,5 +107,6 @@ For more details, see :ref:`the installation instructions <installing_binaries>`
 Changelog
 ---------
 
+- `Version 20.1 <../CHANGES.html#version-20-1>`_
 - `Version 20.0 <../CHANGES.html#version-20-0>`_
 - `Version 20.0~rc1 <../CHANGES.html#version-20-0-rc1>`_

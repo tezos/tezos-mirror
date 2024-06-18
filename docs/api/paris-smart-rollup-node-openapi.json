@@ -3,7 +3,7 @@
     { "title": "Smart Rollup Node RPCs",
       "description":
         "Smart Rollup Node RPC API for protocol PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5",
-      "version": "Octez 20.0 (0dcf32097f)" },
+      "version": "Octez 20.1 (1a991a03)" },
   "paths":
     { "/describe":
         { "get":
@@ -589,10 +589,10 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -618,13 +618,13 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -703,10 +703,10 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -732,13 +732,13 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -898,10 +898,10 @@
                                                                     "properties":
                                                                     { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -929,13 +929,13 @@
                                                                     "properties":
                                                                     { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
+                                                                    "#/components/schemas/020-PsParisC.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -2292,27 +2292,27 @@
               "description":
                 "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, a base58 originated transaction rollup, or a base58 originated smart rollup.",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
-          "019-PtParisB.big_map_id":
+          "020-PsParisC.big_map_id":
             { "title": "Big map identifier",
               "description": "A big map identifier",
               "oneOf": [ { "$ref": "#/components/schemas/bignum" } ] },
-          "019-PtParisB.bond_id":
+          "020-PsParisC.bond_id":
             { "type": "object",
               "properties":
                 { "smart_rollup":
                     { "$ref": "#/components/schemas/smart_rollup_address" } },
               "required": [ "smart_rollup" ] },
-          "019-PtParisB.contract_id":
+          "020-PsParisC.contract_id":
             { "title": "A contract handle",
               "description":
                 "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
-          "019-PtParisB.contract_id.originated":
+          "020-PsParisC.contract_id.originated":
             { "title": "A contract handle -- originated account",
               "description":
                 "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
-          "019-PtParisB.entrypoint":
+          "020-PsParisC.entrypoint":
             { "title": "entrypoint",
               "description": "Named entrypoint to a Michelson smart contract",
               "oneOf":
@@ -2335,7 +2335,7 @@
                     "enum": [ "set_delegate_parameters" ] },
                   { "title": "named",
                     "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] } ] },
-          "019-PtParisB.expressionKind":
+          "020-PsParisC.expressionKind":
             { "title": "Expression kind",
               "description":
                 "One of the four possible kinds of expression (integer, string, primitive application or sequence).",
@@ -2343,7 +2343,7 @@
               "enum":
                 [ "string", "integer", "sequence", "primitiveApplication",
                   "bytes" ] },
-          "019-PtParisB.michelson.v1.primitives":
+          "020-PsParisC.michelson.v1.primitives":
             { "type": "string",
               "enum":
                 [ "SHA256", "GT", "RIGHT", "SAPLING_EMPTY_STATE", "False",
@@ -2377,11 +2377,11 @@
                   "EMPTY_MAP", "UPDATE", "chain_id", "TICKET_DEPRECATED",
                   "EMPTY_SET", "FAILWITH", "MAP", "SOURCE", "DIP", "COMPARE",
                   "EQ", "SELF_ADDRESS", "code" ] },
-          "019-PtParisB.michelson_v1.context_desc":
+          "020-PsParisC.michelson_v1.context_desc":
             { "type": "string", "enum": [ "View", "Lambda" ] },
-          "019-PtParisB.mutez":
+          "020-PsParisC.mutez":
             { "$ref": "#/components/schemas/positive_bignum" },
-          "019-PtParisB.operation_conflict":
+          "020-PsParisC.operation_conflict":
             { "title": "Conflict error",
               "description": "Conflict between two operations",
               "type": "object",
@@ -2391,7 +2391,7 @@
                   "new_operation":
                     { "$ref": "#/components/schemas/Operation_hash" } },
               "required": [ "existing", "new_operation" ] },
-          "019-PtParisB.primitiveNamespace":
+          "020-PsParisC.primitiveNamespace":
             { "title": "Primitive namespace",
               "description":
                 "One of the five possible namespaces of primitive (data constructor, type name, instruction, keyword, or constant hash).",
@@ -2399,10 +2399,10 @@
               "enum":
                 [ "constant", "type", "constant_hash", "keyword",
                   "instruction" ] },
-          "019-PtParisB.scripted.contracts":
+          "020-PsParisC.scripted.contracts":
             { "type": "object", "properties": { "code": {}, "storage": {} },
               "required": [ "code", "storage" ] },
-          "019-PtParisB.transaction_destination":
+          "020-PsParisC.transaction_destination":
             { "title": "A destination of a transaction",
               "description":
                 "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, a base58 originated transaction rollup, or a base58 originated smart rollup.",
@@ -3029,7 +3029,7 @@
                             "items":
                               { "$ref": "#/components/schemas/unistring" } } },
                     "required": [ "prim" ] } ] },
-          "micheline.019-PtParisB.generic.expression":
+          "micheline.020-PsParisC.generic.expression":
             { "oneOf":
                 [ { "title": "Int", "type": "object",
                     "properties":
@@ -3049,7 +3049,7 @@
                   { "title": "Sequence", "type": "array",
                     "items":
                       { "$ref":
-                          "#/components/schemas/micheline.019-PtParisB.generic.expression" } },
+                          "#/components/schemas/micheline.020-PsParisC.generic.expression" } },
                   { "title": "Prim__generic",
                     "description":
                       "Generic primitive (any number of args with or without annotations)",
@@ -3060,13 +3060,13 @@
                           { "type": "array",
                             "items":
                               { "$ref":
-                                  "#/components/schemas/micheline.019-PtParisB.generic.expression" } },
+                                  "#/components/schemas/micheline.020-PsParisC.generic.expression" } },
                         "annots":
                           { "type": "array",
                             "items":
                               { "$ref": "#/components/schemas/unistring" } } },
                     "required": [ "prim" ] } ] },
-          "micheline.019-PtParisB.michelson_v1.expression":
+          "micheline.020-PsParisC.michelson_v1.expression":
             { "oneOf":
                 [ { "title": "Int", "type": "object",
                     "properties":
@@ -3086,7 +3086,7 @@
                   { "title": "Sequence", "type": "array",
                     "items":
                       { "$ref":
-                          "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" } },
+                          "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" } },
                   { "title": "Prim__generic",
                     "description":
                       "Generic primitive (any number of args with or without annotations)",
@@ -3094,12 +3094,12 @@
                     "properties":
                       { "prim":
                           { "$ref":
-                              "#/components/schemas/019-PtParisB.michelson.v1.primitives" },
+                              "#/components/schemas/020-PsParisC.michelson.v1.primitives" },
                         "args":
                           { "type": "array",
                             "items":
                               { "$ref":
-                                  "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" } },
+                                  "#/components/schemas/micheline.020-PsParisC.michelson_v1.expression" } },
                         "annots":
                           { "type": "array",
                             "items":
