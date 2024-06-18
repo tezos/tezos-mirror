@@ -55,6 +55,8 @@ module Ring =
       let equal = Int32.equal
     end)
 
+let supported_protocols = ref []
+
 let registered_rights_levels = Ring.create 120
 
 let rights_machine = Protocol_hash.Table.create 10
@@ -80,6 +82,8 @@ let dump_my_current_endorsements (module A : Archiver.S) ~unaccurate ~level
   return_unit
 
 module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
+  let () = supported_protocols := Services.hash :: !supported_protocols
+
   let rights_of ctxt level =
     let cctx = Services.wrap_full ctxt in
     Services.endorsing_rights cctx ~reference_level:level level

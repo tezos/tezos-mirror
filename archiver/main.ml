@@ -221,6 +221,11 @@ let select_commands _ctxt Client_config.{chain; _} =
         (fun (backup_path, level) endpoints cctxt ->
           Option.iter (fun level -> Teztale_lib.Log.verbosity := level) level ;
           let logger = Teztale_lib.Log.logger () in
+          List.iter
+            (fun h ->
+              Teztale_lib.Log.info logger (fun () ->
+                  Protocol_hash.to_b58check h))
+            !General_archiver.supported_protocols ;
           let*! ctx =
             match X509.Authenticator.of_string "none" with
             | Error _ -> Conduit_lwt_unix.init ()
