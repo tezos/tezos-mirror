@@ -149,6 +149,9 @@ const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
 
+// If the flag is set, the kernel consider that this is local evm node execution.
+const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
+
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,
     path: &T,
@@ -1100,6 +1103,14 @@ pub fn read_tracer_input<Host: Runtime>(
 
 pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
     if let Some(ValueType::Value) = host.store_has(&ENABLE_FA_BRIDGE)? {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+pub fn evm_node_flag(host: &impl Runtime) -> anyhow::Result<bool> {
+    if let Some(ValueType::Value) = host.store_has(&EVM_NODE_FLAG)? {
         Ok(true)
     } else {
         Ok(false)

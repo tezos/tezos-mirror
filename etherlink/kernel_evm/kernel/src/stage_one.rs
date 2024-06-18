@@ -115,6 +115,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_inbox,
             sequencer,
             enable_dal,
+            evm_node_flag: _,
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
@@ -177,6 +178,7 @@ mod tests {
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 enable_dal,
+                evm_node_flag: false,
             },
             limits: Limits::default(),
             enable_fa_bridge: false,

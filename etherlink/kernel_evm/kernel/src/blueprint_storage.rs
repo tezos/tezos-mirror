@@ -455,6 +455,7 @@ mod tests {
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 enable_dal,
+                evm_node_flag: false,
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
