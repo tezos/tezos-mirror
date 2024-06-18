@@ -66,7 +66,7 @@ oc.docker:ci:arm64:
       dotenv: ci_image_tag.env
 
 oc.build:static-x86_64-linux-binaries:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -99,7 +99,7 @@ oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-binaries:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
@@ -132,7 +132,7 @@ oc.build:static-arm64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_arm64-released:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
@@ -174,7 +174,7 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_arm64-exp-dev-extra:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
@@ -263,7 +263,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 oc.unified_coverage:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test_coverage
   tags:
   - gcp
@@ -299,7 +299,7 @@ oc.unified_coverage:
   coverage: '/Coverage: ([^%]+%)/'
 
 publish:documentation:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
   tags:
   - gcp

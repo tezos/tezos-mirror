@@ -19,20 +19,20 @@ docker-do-%:
 	@cd .. \
 	    && . ./scripts/version.sh \
 	    && docker run -it -w$$(pwd) -v$$(pwd):$$(pwd) --entrypoint opam \
-	         $${ci_image_name}/runtime-build-dependencies:amd64--$$(images/image_tag.sh images/ci) exec -- \
+	         $${ci_image_name}/build:amd64--$$(images/image_tag.sh images/ci) exec -- \
 			 make --always-make -C ci $* # --always-make to not mix build artifacts from host and guest system.
 
 .PHONY: docker-all
-docker-all: docker-do-all # Build the target 'all' using the 'runtime-build-dependencies' Docker image.
+docker-all: docker-do-all # Build the target 'all' using the 'build' Docker image.
 
 .PHONY: docker-verbose
-docker-verbose: docker-do-verbose # Build the target 'verbose' using the 'runtime-build-dependencies' Docker image.
+docker-verbose: docker-do-verbose # Build the target 'verbose' using the 'build' Docker image.
 
 .PHONY: docker-inline-source-info
-docker-inline-source-info: docker-do-inline-source-info # Build the target 'inline-source-info' using the 'runtime-build-dependencies' Docker image.
+docker-inline-source-info: docker-do-inline-source-info # Build the target 'inline-source-info' using the 'build' Docker image.
 
 .PHONY: docker-remove-extra-files
-docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remove-extra-files' using the 'runtime-build-dependencies' Docker image.
+docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remove-extra-files' using the 'build' Docker image.
 
 .PHONY: check
 check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.

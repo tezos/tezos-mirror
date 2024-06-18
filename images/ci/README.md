@@ -12,43 +12,30 @@ The images defined in this directory are used in the CI pipelines of
 [Octez](https://gitlab.com/tezos/tezos), and as base images for the
 [Octez Docker distribution](https://hub.docker.com/r/tezos/tezos).
 
-All images except `runtime-e2etest-dependencies`, are built on top of each
+All images except `e2etest`, are built on top of each
 other, such that the contents of image N is also in N+1[^1]. The image
-`runtime-e2etest-dependencies` is built on top of
-`runtime-dependencies` and additionally copies some binaries from
-`runtime-build-dependencies`:
+`e2etest` is built on top of
+`dependencies` and additionally copies some binaries from
+`build`:
 
 ```mermaid
 graph TB
-
-    subgraph runtime
-        direction TB
-
-        R[runtime-dependencies]
-        RP[runtime-prebuild-dependencies]
-        RB[runtime-build-dependencies]
-        RT[runtime-build-test-dependencies]
-        RE[runtime-e2etest-dependencies]
-
-        R -->|FROM| RP
-        RP -->|FROM| RB
-        RB -->|FROM| RT
-
-        R -->|FROM| RE
-        RT -.->|COPY bisect-ppx-report, ocamlformat| RE
-    end
-
+  dependencies -->|FROM| prebuild
+  dependencies -->|FROM| e2etest
+  prebuild -->|FROM| build
+  build -->|FROM| test
+  test -.->|COPY bisect-ppx-report, ocamlformat| e2etest
 ```
 
 The images, their content and indented usage, are:
 
-| Image                              | Contents                           | Usage                             |
-|------------------------------------|------------------------------------|-----------------------------------|
-| `runtime-dependencies`             | run-time libraries + zcash-params  | distributing Octez executables    |
-| `runtime-prebuild-dependencies`    | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
-| `runtime-build-dependencies`       | opam packages                      | CI: Building Octez                |
-| `runtime-build-test-dependencies`  | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
-| `runtime-e2etest-dependencies`     | `eth-cli`                          | CI: Octez integration tests       |
+| Image          | Contents                           | Usage                             |
+|----------------|------------------------------------|-----------------------------------|
+| `dependencies` | run-time libraries + zcash-params  | distributing Octez executables    |
+| `prebuild`     | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
+| `build`        | opam packages                      | CI: Building Octez                |
+| `test`         | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
+| `e2etest`      | `eth-cli`                          | CI: Octez integration tests       |
 
 For more details on the contents and usage of each image, see the
 header comment of each corresponding layer in the Dockerfile.
@@ -66,12 +53,12 @@ dependencies](https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-d
 
 `poetry.lock` and `pyproject.toml` defines the Python environment used
 to build the Octez documentation. This environment is installed in the
-image `runtime-build-test-dependencies` and used in the Octez CI to
+image `test` and used in the Octez CI to
 build documentation.
 
 [^1]: There are exceptions. For instance, the
-    `runtime-prebuild-dependencies` image contains the sources of the
+    `prebuild` image contains the sources of the
     OPAM packages from `packages/`, which are used in the `opam` tests
     of `tezos/tezos`. However, they serve no use and are not present
     in the images that build on top of it
-    (`runtime-build-dependencies` etc).
+    (`build` etc).

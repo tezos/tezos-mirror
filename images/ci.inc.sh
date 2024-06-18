@@ -3,7 +3,7 @@
 ## Sourceable file with common variables and functions for scripts
 ## related to the CI images
 
-export valid_layer_targets='runtime-dependencies runtime-prebuild-dependencies runtime-build-dependencies runtime-build-test-dependencies runtime-e2etest-dependencies'
+export valid_layer_targets='runtime prebuild build test e2etest'
 
 # Gives the Docker tag for a images/ci image based on:
 #  Argument 1: target architecture

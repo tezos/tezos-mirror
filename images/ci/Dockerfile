@@ -10,7 +10,7 @@
 
 ARG BUILD_IMAGE
 # hadolint ignore=DL3006
-FROM ${BUILD_IMAGE} as runtime-dependencies
+FROM ${BUILD_IMAGE} as runtime
 
 # We must re-introduce BUILD_IMAGE in the scope to use it in the label.
 ARG BUILD_IMAGE
@@ -27,7 +27,7 @@ LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
       org.opencontainers.image.documentation="https://tezos.gitlab.io/" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://gitlab.com/tezos/tezos" \
-      org.opencontainers.image.title="runtime-dependencies" \
+      org.opencontainers.image.title="runtime" \
       org.opencontainers.image.url="https://gitlab.com/tezos/tezos" \
       org.opencontainers.image.vendor="Nomadic Labs"
 
@@ -76,10 +76,10 @@ WORKDIR /home/tezos
 
 # runtime + prebuild dependencies
 #
-# This image builds upon the `runtime-dependencies` image, see its
+# This image builds upon the `runtime` image, see its
 # header for details on its content.
 #
-# It adds upon the contents of `runtime-dependencies`:
+# It adds upon the contents of `runtime`:
 # - non-opam build-dependencies (rust dependencies)
 # - cache for opam build-dependencies
 #
@@ -87,13 +87,13 @@ WORKDIR /home/tezos
 # - testing the buildability of tezos opam packages
 # - building images on top of it in the image stack (see README.md)
 
-FROM runtime-dependencies as runtime-prebuild-dependencies
+FROM runtime as prebuild
 
-LABEL org.opencontainers.image.title="runtime-prebuild-dependencies"
+LABEL org.opencontainers.image.title="prebuild"
 
 USER root
 
-# SHELL already set in runtime-dependencies
+# SHELL already set in runtime
 
 WORKDIR /tmp
 
@@ -184,7 +184,7 @@ CMD [ "/bin/sh" ]
 
 # runtime + build dependencies
 #
-# This image builds upon the `runtime-prebuild-dependencies` image,
+# This image builds upon the `prebuild` image,
 # see its header for details on its content.
 #
 # It removes the `cache for opam build-dependencies` from that image, and adds:
@@ -194,11 +194,11 @@ CMD [ "/bin/sh" ]
 # - building tezos from source
 # - building images on top of it in the image stack (see README.md)
 
-FROM runtime-prebuild-dependencies as runtime-build-dependencies
+FROM prebuild as build
 
-LABEL org.opencontainers.image.title="runtime-build-dependencies"
+LABEL org.opencontainers.image.title="build"
 
-# SHELL already set in runtime-dependencies
+# SHELL already set in runtime
 
 USER tezos
 WORKDIR /home/tezos
@@ -213,14 +213,14 @@ ENV BLST_PORTABLE=yes
 RUN opam install --yes $(opam list --all --short | grep -v ocaml-option-) \
     && opam clean
 
-# ENTRYPOINT and CMD already set in runtime-prebuild-dependencies
+# ENTRYPOINT and CMD already set in prebuild
 
 # runtime + build + test dependencies
 #
-# This image builds upon the `runtime-build-dependencies` image, see
+# This image builds upon the `build` image, see
 # its header for details on its content.
 #
-# It adds upon the contents of `runtime-build-dependencies`:
+# It adds upon the contents of `build`:
 # - shellcheck
 # - a python environment for building the octez documentation
 # - nvm for javascript backend testing
@@ -231,11 +231,11 @@ RUN opam install --yes $(opam list --all --short | grep -v ocaml-option-) \
 # - building images on top of it in the image stack (see README.md)
 
 
-FROM runtime-build-dependencies as runtime-build-test-dependencies
+FROM build as test
 
-LABEL org.opencontainers.image.title="runtime-build-test-dependencies"
+LABEL org.opencontainers.image.title="test"
 
-# SHELL already set in runtime-dependencies
+# SHELL already set in runtime
 
 USER root
 
@@ -277,14 +277,14 @@ RUN poetry config virtualenvs.in-project true \
  && poetry install \
  && rm -rf /tmp/* /home/tezos/.cache/pip /home/tezos/.cache/pypoetry
 
-# ENTRYPOINT and CMD already set in runtime-prebuild-dependencies
+# ENTRYPOINT and CMD already set in prebuild
 
 # runtime + end-to-end test dependencies
 #
 # This image builds on the runtime dependencies and additionally includes:
 #
 # - ocamlformat and bisect-ppx-report, copied from the
-#   runtime-build-dependencies image.
+#   build image.
 # - eth-cli, installed from npm
 # - some utilities used in the Tezt integration test suite: curl, git, file
 # - some utilities used in the [unified_coverage] job: make, jq
@@ -296,13 +296,13 @@ ARG OCAML_IMAGE
 ARG BUILD_IMAGE
 
 # hadolint ignore=DL3006
-FROM runtime-dependencies as runtime-e2etest-dependencies
+FROM runtime as e2etest
 
-LABEL org.opencontainers.image.title="runtime-e2etest-dependencies"
+LABEL org.opencontainers.image.title="e2etest"
 
 USER root
 
-# SHELL already set in runtime-dependencies
+# SHELL already set in runtime
 
 WORKDIR /tmp
 
@@ -311,14 +311,14 @@ ARG TARGETARCH
 
 # Retrieve ocamlformat, used in the snoop tests.
 ARG OCAML_VERSION
-COPY --from=runtime-build-dependencies \
+COPY --from=build \
     /home/tezos/.opam/ocaml-base-compiler.${OCAML_VERSION}/bin/ocamlformat \
     /home/tezos/.opam/ocaml-base-compiler.${OCAML_VERSION}/bin/bisect-ppx-report \
     /bin/
 
 # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
 # We could install npm via nvm if we tackle this issue.
-# In the meantime, removes nvm installed in runtime-build-test-dependencies and
+# In the meantime, removes nvm installed in test and
 # install npm via apk.
 
 # Fixing some ipv6 issues on the runner. Always prioritizing ipv4

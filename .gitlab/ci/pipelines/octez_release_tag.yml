@@ -47,7 +47,7 @@ oc.docker:ci:arm64:
       dotenv: ci_image_tag.env
 
 oc.build:static-x86_64-linux-binaries:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -79,7 +79,7 @@ oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-binaries:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
@@ -279,7 +279,7 @@ gitlab:release:
   - ./scripts/ci/gitlab-release.sh
 
 opam:release:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: publish_release
   tags:
   - gcp

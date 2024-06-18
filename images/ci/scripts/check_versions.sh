@@ -40,7 +40,7 @@ check_version() {
 
 check_version_in_test_dependency_image() {
   image_tag="$(docker_tag "$targetarch" "$image_tag_suffix")"
-  image_name=${image_base}/runtime-build-test-dependencies:${image_tag}
+  image_name=${image_base}/test:${image_tag}
   run="docker run --rm ${image_name}"
 
   echo "###"
@@ -75,7 +75,7 @@ check_version_in_test_dependency_image() {
 
 check_version_in_e2e_test_dependency_image() {
   image_tag="$(docker_tag "$targetarch" "$image_tag_suffix")"
-  image_name=${image_base}/runtime-e2etest-dependencies:${image_tag}
+  image_name=${image_base}/e2etest:${image_tag}
   run="docker run --rm ${image_name}"
 
   echo "###"

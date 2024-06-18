@@ -153,7 +153,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   let job_opam_release : Tezos_ci.tezos_job =
     job
       ~__POS__
-      ~image:Images.runtime_build_test_dependencies
+      ~image:Images.CI.test
       ~stage:Stages.publish_release
       ~interruptible:false
       ~name:"opam:release"

@@ -58,7 +58,7 @@ let jobs =
   let job_unified_coverage_default : tezos_job =
     job
       ~__POS__
-      ~image:Images.runtime_build_test_dependencies
+      ~image:Images.CI.test
       ~name:"oc.unified_coverage"
       ~stage:Stages.test_coverage
       ~variables:
@@ -89,7 +89,7 @@ let jobs =
     job
       ~__POS__
       ~name:"publish:documentation"
-      ~image:Images.runtime_build_test_dependencies
+      ~image:Images.CI.test
       ~stage:Stages.doc
       ~dependencies:(Dependent [])
       ~before_script:

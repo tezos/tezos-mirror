@@ -105,7 +105,7 @@ trigger:
   - ./scripts/ci/check_alpine_version.sh
 
 sanity_ci:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: sanity
   tags:
   - gcp
@@ -165,7 +165,7 @@ nix:
     when: on_failure
 
 oc.build_arm64-released:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
@@ -209,7 +209,7 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_arm64-exp-dev-extra:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
@@ -255,7 +255,7 @@ oc.build_arm64-exp-dev-extra:
     when: on_success
 
 oc.build:static-x86_64-linux-binaries:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -303,7 +303,7 @@ oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_x86_64-released:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -360,7 +360,7 @@ oc.build_x86_64-released:
     when: on_success
 
 oc.build_x86_64-exp-dev-extra:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -419,7 +419,7 @@ oc.build_x86_64-exp-dev-extra:
     when: on_success
 
 ocaml-check:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -520,7 +520,7 @@ oc.build_kernels:
     when: on_success
 
 oc.tezt:fetch-records:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -559,7 +559,7 @@ oc.tezt:fetch-records:
     when: always
 
 select_tezts:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -579,7 +579,7 @@ select_tezts:
     when: always
 
 build_octez_source:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
@@ -616,7 +616,7 @@ build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 opam:prepare:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -659,7 +659,7 @@ opam:prepare:
     - _opam-repo-for-release/
 
 opam:bls12-381:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -727,7 +727,7 @@ opam:bls12-381:
   retry: 2
 
 opam:octez-accuser-PsParisC:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -793,7 +793,7 @@ opam:octez-accuser-PsParisC:
   retry: 2
 
 opam:octez-accuser-PtParisB:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -859,7 +859,7 @@ opam:octez-accuser-PtParisB:
   retry: 2
 
 opam:octez-alcotezt:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -927,7 +927,7 @@ opam:octez-alcotezt:
   retry: 2
 
 opam:octez-baker-PsParisC:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -993,7 +993,7 @@ opam:octez-baker-PsParisC:
   retry: 2
 
 opam:octez-baker-PtParisB:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1059,7 +1059,7 @@ opam:octez-baker-PtParisB:
   retry: 2
 
 opam:octez-client:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1125,7 +1125,7 @@ opam:octez-client:
   retry: 2
 
 opam:octez-codec:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1191,7 +1191,7 @@ opam:octez-codec:
   retry: 2
 
 opam:octez-crawler:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1259,7 +1259,7 @@ opam:octez-crawler:
   retry: 2
 
 opam:octez-dac-client:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1325,7 +1325,7 @@ opam:octez-dac-client:
   retry: 2
 
 opam:octez-dac-node:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1391,7 +1391,7 @@ opam:octez-dac-node:
   retry: 2
 
 opam:octez-dal-node:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1457,7 +1457,7 @@ opam:octez-dal-node:
   retry: 2
 
 opam:octez-distributed-internal:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1525,7 +1525,7 @@ opam:octez-distributed-internal:
   retry: 2
 
 opam:octez-distributed-lwt-internal:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1593,7 +1593,7 @@ opam:octez-distributed-lwt-internal:
   retry: 2
 
 opam:octez-evm-node:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1659,7 +1659,7 @@ opam:octez-evm-node:
   retry: 2
 
 opam:octez-evm-node-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1727,7 +1727,7 @@ opam:octez-evm-node-libs:
   retry: 2
 
 opam:octez-injector:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1795,7 +1795,7 @@ opam:octez-injector:
   retry: 2
 
 opam:octez-internal-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1863,7 +1863,7 @@ opam:octez-internal-libs:
   retry: 2
 
 opam:octez-l2-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1931,7 +1931,7 @@ opam:octez-l2-libs:
   retry: 2
 
 opam:octez-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -1999,7 +1999,7 @@ opam:octez-libs:
   retry: 2
 
 opam:octez-node:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2065,7 +2065,7 @@ opam:octez-node:
   retry: 2
 
 opam:octez-node-config:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2133,7 +2133,7 @@ opam:octez-node-config:
   retry: 2
 
 opam:octez-proto-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2201,7 +2201,7 @@ opam:octez-proto-libs:
   retry: 2
 
 opam:octez-protocol-000-Ps9mPmXa-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2269,7 +2269,7 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
   retry: 2
 
 opam:octez-protocol-001-PtCJ7pwo-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2337,7 +2337,7 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
   retry: 2
 
 opam:octez-protocol-002-PsYLVpVv-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2405,7 +2405,7 @@ opam:octez-protocol-002-PsYLVpVv-libs:
   retry: 2
 
 opam:octez-protocol-003-PsddFKi3-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2473,7 +2473,7 @@ opam:octez-protocol-003-PsddFKi3-libs:
   retry: 2
 
 opam:octez-protocol-004-Pt24m4xi-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2541,7 +2541,7 @@ opam:octez-protocol-004-Pt24m4xi-libs:
   retry: 2
 
 opam:octez-protocol-005-PsBabyM1-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2609,7 +2609,7 @@ opam:octez-protocol-005-PsBabyM1-libs:
   retry: 2
 
 opam:octez-protocol-006-PsCARTHA-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2677,7 +2677,7 @@ opam:octez-protocol-006-PsCARTHA-libs:
   retry: 2
 
 opam:octez-protocol-007-PsDELPH1-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2745,7 +2745,7 @@ opam:octez-protocol-007-PsDELPH1-libs:
   retry: 2
 
 opam:octez-protocol-008-PtEdo2Zk-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2813,7 +2813,7 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
   retry: 2
 
 opam:octez-protocol-009-PsFLoren-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2881,7 +2881,7 @@ opam:octez-protocol-009-PsFLoren-libs:
   retry: 2
 
 opam:octez-protocol-010-PtGRANAD-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -2949,7 +2949,7 @@ opam:octez-protocol-010-PtGRANAD-libs:
   retry: 2
 
 opam:octez-protocol-011-PtHangz2-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3017,7 +3017,7 @@ opam:octez-protocol-011-PtHangz2-libs:
   retry: 2
 
 opam:octez-protocol-012-Psithaca-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3085,7 +3085,7 @@ opam:octez-protocol-012-Psithaca-libs:
   retry: 2
 
 opam:octez-protocol-013-PtJakart-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3153,7 +3153,7 @@ opam:octez-protocol-013-PtJakart-libs:
   retry: 2
 
 opam:octez-protocol-014-PtKathma-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3221,7 +3221,7 @@ opam:octez-protocol-014-PtKathma-libs:
   retry: 2
 
 opam:octez-protocol-015-PtLimaPt-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3289,7 +3289,7 @@ opam:octez-protocol-015-PtLimaPt-libs:
   retry: 2
 
 opam:octez-protocol-016-PtMumbai-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3357,7 +3357,7 @@ opam:octez-protocol-016-PtMumbai-libs:
   retry: 2
 
 opam:octez-protocol-017-PtNairob-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3425,7 +3425,7 @@ opam:octez-protocol-017-PtNairob-libs:
   retry: 2
 
 opam:octez-protocol-018-Proxford-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3493,7 +3493,7 @@ opam:octez-protocol-018-Proxford-libs:
   retry: 2
 
 opam:octez-protocol-019-PtParisB-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3561,7 +3561,7 @@ opam:octez-protocol-019-PtParisB-libs:
   retry: 2
 
 opam:octez-protocol-020-PsParisC-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3629,7 +3629,7 @@ opam:octez-protocol-020-PsParisC-libs:
   retry: 2
 
 opam:octez-protocol-alpha-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3697,7 +3697,7 @@ opam:octez-protocol-alpha-libs:
   retry: 2
 
 opam:octez-protocol-compiler:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3763,7 +3763,7 @@ opam:octez-protocol-compiler:
   retry: 2
 
 opam:octez-proxy-server:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3829,7 +3829,7 @@ opam:octez-proxy-server:
   retry: 2
 
 opam:octez-riscv-api:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3897,7 +3897,7 @@ opam:octez-riscv-api:
   retry: 2
 
 opam:octez-riscv-pvm:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -3965,7 +3965,7 @@ opam:octez-riscv-pvm:
   retry: 2
 
 opam:octez-rpc-process:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4033,7 +4033,7 @@ opam:octez-rpc-process:
   retry: 2
 
 opam:octez-rust-deps:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4101,7 +4101,7 @@ opam:octez-rust-deps:
   retry: 2
 
 opam:octez-shell-libs:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4169,7 +4169,7 @@ opam:octez-shell-libs:
   retry: 2
 
 opam:octez-signer:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4235,7 +4235,7 @@ opam:octez-signer:
   retry: 2
 
 opam:octez-smart-rollup-node:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4301,7 +4301,7 @@ opam:octez-smart-rollup-node:
   retry: 2
 
 opam:octez-smart-rollup-node-Proxford:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4369,7 +4369,7 @@ opam:octez-smart-rollup-node-Proxford:
   retry: 2
 
 opam:octez-smart-rollup-node-PsParisC:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4437,7 +4437,7 @@ opam:octez-smart-rollup-node-PsParisC:
   retry: 2
 
 opam:octez-smart-rollup-node-PtNairob:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4505,7 +4505,7 @@ opam:octez-smart-rollup-node-PtNairob:
   retry: 2
 
 opam:octez-smart-rollup-node-PtParisB:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4573,7 +4573,7 @@ opam:octez-smart-rollup-node-PtParisB:
   retry: 2
 
 opam:octez-smart-rollup-node-alpha:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4641,7 +4641,7 @@ opam:octez-smart-rollup-node-alpha:
   retry: 2
 
 opam:octez-smart-rollup-node-lib:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4709,7 +4709,7 @@ opam:octez-smart-rollup-node-lib:
   retry: 2
 
 opam:octez-smart-rollup-wasm-debugger:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4775,7 +4775,7 @@ opam:octez-smart-rollup-wasm-debugger:
   retry: 2
 
 opam:octez-smart-rollup-wasm-debugger-lib:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4843,7 +4843,7 @@ opam:octez-smart-rollup-wasm-debugger-lib:
   retry: 2
 
 opam:octez-smart-rollup-wasm-debugger-plugin:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4911,7 +4911,7 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
   retry: 2
 
 opam:octez-version:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -4977,7 +4977,7 @@ opam:octez-version:
   retry: 2
 
 opam:tezos-benchmark:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5045,7 +5045,7 @@ opam:tezos-benchmark:
   retry: 2
 
 opam:tezos-client-demo-counter:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5113,7 +5113,7 @@ opam:tezos-client-demo-counter:
   retry: 2
 
 opam:tezos-client-genesis:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5181,7 +5181,7 @@ opam:tezos-client-genesis:
   retry: 2
 
 opam:tezos-dac-client-lib:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5249,7 +5249,7 @@ opam:tezos-dac-client-lib:
   retry: 2
 
 opam:tezos-dac-lib:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5317,7 +5317,7 @@ opam:tezos-dac-lib:
   retry: 2
 
 opam:tezos-dac-node-lib:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5385,7 +5385,7 @@ opam:tezos-dac-node-lib:
   retry: 2
 
 opam:tezos-dal-node-lib:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5453,7 +5453,7 @@ opam:tezos-dal-node-lib:
   retry: 2
 
 opam:tezos-dal-node-services:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5521,7 +5521,7 @@ opam:tezos-dal-node-services:
   retry: 2
 
 opam:tezos-openapi:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5589,7 +5589,7 @@ opam:tezos-openapi:
   retry: 2
 
 opam:tezos-protocol-000-Ps9mPmXa:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5657,7 +5657,7 @@ opam:tezos-protocol-000-Ps9mPmXa:
   retry: 2
 
 opam:tezos-protocol-001-PtCJ7pwo:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5725,7 +5725,7 @@ opam:tezos-protocol-001-PtCJ7pwo:
   retry: 2
 
 opam:tezos-protocol-002-PsYLVpVv:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5793,7 +5793,7 @@ opam:tezos-protocol-002-PsYLVpVv:
   retry: 2
 
 opam:tezos-protocol-003-PsddFKi3:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5861,7 +5861,7 @@ opam:tezos-protocol-003-PsddFKi3:
   retry: 2
 
 opam:tezos-protocol-004-Pt24m4xi:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5929,7 +5929,7 @@ opam:tezos-protocol-004-Pt24m4xi:
   retry: 2
 
 opam:tezos-protocol-005-PsBABY5H:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -5997,7 +5997,7 @@ opam:tezos-protocol-005-PsBABY5H:
   retry: 2
 
 opam:tezos-protocol-005-PsBabyM1:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6065,7 +6065,7 @@ opam:tezos-protocol-005-PsBabyM1:
   retry: 2
 
 opam:tezos-protocol-006-PsCARTHA:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6133,7 +6133,7 @@ opam:tezos-protocol-006-PsCARTHA:
   retry: 2
 
 opam:tezos-protocol-007-PsDELPH1:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6201,7 +6201,7 @@ opam:tezos-protocol-007-PsDELPH1:
   retry: 2
 
 opam:tezos-protocol-008-PtEdo2Zk:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6269,7 +6269,7 @@ opam:tezos-protocol-008-PtEdo2Zk:
   retry: 2
 
 opam:tezos-protocol-008-PtEdoTez:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6337,7 +6337,7 @@ opam:tezos-protocol-008-PtEdoTez:
   retry: 2
 
 opam:tezos-protocol-009-PsFLoren:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6405,7 +6405,7 @@ opam:tezos-protocol-009-PsFLoren:
   retry: 2
 
 opam:tezos-protocol-010-PtGRANAD:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6473,7 +6473,7 @@ opam:tezos-protocol-010-PtGRANAD:
   retry: 2
 
 opam:tezos-protocol-011-PtHangz2:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6541,7 +6541,7 @@ opam:tezos-protocol-011-PtHangz2:
   retry: 2
 
 opam:tezos-protocol-012-Psithaca:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6609,7 +6609,7 @@ opam:tezos-protocol-012-Psithaca:
   retry: 2
 
 opam:tezos-protocol-013-PtJakart:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6677,7 +6677,7 @@ opam:tezos-protocol-013-PtJakart:
   retry: 2
 
 opam:tezos-protocol-014-PtKathma:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6745,7 +6745,7 @@ opam:tezos-protocol-014-PtKathma:
   retry: 2
 
 opam:tezos-protocol-015-PtLimaPt:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6813,7 +6813,7 @@ opam:tezos-protocol-015-PtLimaPt:
   retry: 2
 
 opam:tezos-protocol-016-PtMumbai:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6881,7 +6881,7 @@ opam:tezos-protocol-016-PtMumbai:
   retry: 2
 
 opam:tezos-protocol-017-PtNairob:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -6949,7 +6949,7 @@ opam:tezos-protocol-017-PtNairob:
   retry: 2
 
 opam:tezos-protocol-018-Proxford:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7017,7 +7017,7 @@ opam:tezos-protocol-018-Proxford:
   retry: 2
 
 opam:tezos-protocol-019-PtParisB:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7085,7 +7085,7 @@ opam:tezos-protocol-019-PtParisB:
   retry: 2
 
 opam:tezos-protocol-020-PsParisC:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7153,7 +7153,7 @@ opam:tezos-protocol-020-PsParisC:
   retry: 2
 
 opam:tezos-protocol-alpha:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7221,7 +7221,7 @@ opam:tezos-protocol-alpha:
   retry: 2
 
 opam:tezos-protocol-demo-counter:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7289,7 +7289,7 @@ opam:tezos-protocol-demo-counter:
   retry: 2
 
 opam:tezos-protocol-demo-noops:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7357,7 +7357,7 @@ opam:tezos-protocol-demo-noops:
   retry: 2
 
 opam:tezos-protocol-genesis:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7425,7 +7425,7 @@ opam:tezos-protocol-genesis:
   retry: 2
 
 opam:tezos-proxy-server-config:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7493,7 +7493,7 @@ opam:tezos-proxy-server-config:
   retry: 2
 
 opam:tezt-tezos:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
   - gcp
@@ -7561,7 +7561,7 @@ opam:tezt-tezos:
   retry: 2
 
 kaitai_checks:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7633,7 +7633,7 @@ kaitai_e2e_checks:
     2>/dev/null
 
 oc.check_lift_limits_patch:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7672,7 +7672,7 @@ oc.check_lift_limits_patch:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.misc_checks:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7706,7 +7706,7 @@ oc.misc_checks:
   - ./scripts/ci/lint_check_licenses.sh
 
 oc.python_check:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7731,7 +7731,7 @@ oc.python_check:
   - ./scripts/ci/lint_misc_python_check.sh
 
 oc.ocaml_fmt:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7779,7 +7779,7 @@ oc.semgrep:
   - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 oc.integration:compiler-rejections:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7823,7 +7823,7 @@ oc.integration:compiler-rejections:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.script:test-gen-genesis:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7853,7 +7853,7 @@ oc.script:test-gen-genesis:
   - dune build gen_genesis.exe
 
 oc.script:snapshot_alpha_and_link:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7896,7 +7896,7 @@ oc.script:snapshot_alpha_and_link:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.script:test_octez_release_versions:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7928,7 +7928,7 @@ oc.script:test_octez_release_versions:
   - ./scripts/test_octez_release_version.sh
 
 oc.script:b58_prefix:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -7953,7 +7953,7 @@ oc.script:b58_prefix:
   - poetry run pytest scripts/b58_prefix/test_b58_prefix.py
 
 oc.test-liquidity-baking-scripts:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8207,7 +8207,7 @@ test_evm_compatibility:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 oc.unit:non-proto-x86_64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8266,7 +8266,7 @@ oc.unit:non-proto-x86_64:
   retry: 2
 
 oc.unit:other-x86_64:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8325,7 +8325,7 @@ oc.unit:other-x86_64:
   retry: 2
 
 oc.unit:proto-x86_64:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8384,7 +8384,7 @@ oc.unit:proto-x86_64:
   retry: 2
 
 oc.unit:non-proto-arm64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp_arm64
@@ -8441,7 +8441,7 @@ oc.unit:non-proto-arm64:
   parallel: 2
 
 oc.unit:webassembly-x86_64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8473,7 +8473,7 @@ oc.unit:webassembly-x86_64:
   - make test-webassembly
 
 oc.unit:js_components:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8509,7 +8509,7 @@ oc.unit:js_components:
   retry: 2
 
 oc.unit:protocol_compiles:
-  image: ${ci_image_name}/runtime-build-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8553,7 +8553,7 @@ oc.unit:protocol_compiles:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 de.unit:x86_64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8575,7 +8575,7 @@ de.unit:x86_64:
   - dune runtest data-encoding
 
 de.unit:arm64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp_arm64
@@ -8597,7 +8597,7 @@ de.unit:arm64:
   - dune runtest data-encoding
 
 resto.unit:x86_64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -8619,7 +8619,7 @@ resto.unit:x86_64:
   - dune runtest resto
 
 resto.unit:arm64:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
   - gcp_arm64
@@ -8837,7 +8837,7 @@ oc.compile_sources_mantic:
     CARGO_NET_OFFLINE: "false"
 
 tezt:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
@@ -8908,7 +8908,7 @@ tezt:
   parallel: 60
 
 tezt-memory-3k:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
@@ -8979,7 +8979,7 @@ tezt-memory-3k:
   parallel: 6
 
 tezt-memory-4k:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
@@ -9050,7 +9050,7 @@ tezt-memory-4k:
   parallel: 4
 
 tezt-time-sensitive:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
@@ -9120,7 +9120,7 @@ tezt-time-sensitive:
   retry: 2
 
 tezt-slow:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
@@ -9188,7 +9188,7 @@ tezt-slow:
   parallel: 10
 
 tezt-flaky:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
@@ -9259,7 +9259,7 @@ tezt-flaky:
   retry: 2
 
 tezt:static-binaries:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -9321,7 +9321,7 @@ tezt:static-binaries:
     when: always
 
 commit_titles:
-  image: ${ci_image_name}/runtime-prebuild-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: test
   tags:
   - gcp
@@ -9336,7 +9336,7 @@ commit_titles:
   - ./scripts/ci/check_commit_messages.sh || exit $?
 
 oc.unified_coverage:
-  image: ${ci_image_name}/runtime-e2etest-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test_coverage
   tags:
   - gcp
@@ -9449,7 +9449,7 @@ oc.install_python_bullseye:
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
 documentation:odoc:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
   tags:
   - gcp
@@ -9499,7 +9499,7 @@ documentation:odoc:
     when: always
 
 documentation:manuals:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
   tags:
   - gcp
@@ -9550,7 +9550,7 @@ documentation:manuals:
     - docs/user/node-config.json
 
 documentation:docgen:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
   tags:
   - gcp
@@ -9602,7 +9602,7 @@ documentation:docgen:
     - docs/shell/p2p_api.rst
 
 documentation:build_all:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
   tags:
   - gcp
@@ -9644,7 +9644,7 @@ documentation:build_all:
     expose_as: Documentation - excluding old protocols
 
 documentation:linkcheck:
-  image: ${ci_image_name}/runtime-build-test-dependencies:${ci_image_tag}
+  image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
   tags:
   - gcp

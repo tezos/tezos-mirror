@@ -76,10 +76,9 @@ tests of client-libs. To build this image for local use, run
 
 The `ci` images is a suite of images, defined as different layer in
 the Dockerfile `ci/Dockerfile`. It is used in the CI to run a wide
-variety of jobs.  Its `runtime-dependencies` and
-`runtime-build-dependencies` layers are also used as input for the Octez
-Docker distribution.  To build these images for local use, run
-`create_ci_image.sh`.
+variety of jobs.  Its `runtime` and `build` layers are also used as
+input for the Octez Docker distribution.  To build these images for
+local use, run `create_ci_image.sh`.
 
 
 # Common files in `common`
@@ -168,8 +167,8 @@ $ ./scripts/create_docker_image.sh \
 
 The first command will create the set of CI images on the following naming scheme:
 
- - `octez-local-ci/runtime-dependencies:amd64`
- - `octez-local-ci/runtime-prebuild-dependencies:amd64`
+ - `octez-local-ci/runtime:amd64`
+ - `octez-local-ci/prebuild:amd64`
  - ...
 
 (These images are always tagged by architecture, and the architecture defaults to amd64).
