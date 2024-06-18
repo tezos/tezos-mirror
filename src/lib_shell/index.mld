@@ -10,6 +10,7 @@ It contains the following libraries:
 - {{!module-Tezos_client_base_unix}Tezos_client_base_unix}: Tezos: common helpers for `octez-client` (unix-specific fragment)
 - {{!module-Tezos_client_commands}Tezos_client_commands}: Tezos: protocol agnostic commands for `octez-client`
 - {{!module-Tezos_context_ops}Tezos_context_ops}: Backend-agnostic operations on contexts
+- {{!module-Tezos_duo_context_lib}Tezos_duo_context_lib}
 - {{!module-Tezos_mockup}Tezos_mockup}: Tezos: library of auto-documented RPCs (mockup mode)
 - {{!module-Tezos_mockup_commands}Tezos_mockup_commands}: Tezos: library of auto-documented RPCs (commands)
 - {{!module-Tezos_mockup_proxy}Tezos_mockup_proxy}: Tezos: local RPCs

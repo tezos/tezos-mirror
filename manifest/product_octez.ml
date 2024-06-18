@@ -3194,6 +3194,19 @@ let octez_brassaia_context =
         octez_context_brassaia;
       ]
 
+let octez_duo_context_lib =
+  octez_shell_lib
+    "duo-context-lib"
+    ~internal_name:"tezos_duo_context_lib"
+    ~path:"src/lib_protocol_environment/duo_context_lib"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_protocol_environment;
+        octez_context_brassaia;
+        octez_context;
+      ]
+
 let _octez_protocol_environment_tests =
   tezt
     [
@@ -3231,6 +3244,7 @@ let octez_context_ops =
         octez_context_brassaia |> open_;
         octez_shell_context |> open_;
         octez_brassaia_context |> open_;
+        octez_duo_context_lib |> open_;
       ]
 
 let _octez_protocol_shell_context_tests =

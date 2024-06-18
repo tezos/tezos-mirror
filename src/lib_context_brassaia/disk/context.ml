@@ -743,7 +743,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
            ~lru_size
            root)
     in
-
     {path = root; repo; patch_context; readonly}
 
   let close index =
