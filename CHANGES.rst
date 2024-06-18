@@ -137,6 +137,11 @@ Smart Rollup node
 - Ensure penultimate commitment is published on snapshot export as a
   failsafe. (MR :gl:`!13544`)
 
+- Include commitment publication information in snapshots. (MR :gl:`!13724`)
+
+- Under-approximate publication level for cementation when it is missing. (MR
+  :gl:`!13725`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
