@@ -2510,6 +2510,27 @@ let test_no_automatic_block_production =
     ~error_msg:"No transaction hash expected" ;
   unit
 
+let test_non_increasing_timestamp =
+  register_both
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "block"; "timestamp"]
+    ~title:"Non increasing timestamp are forbidden"
+  @@ fun {sequencer; _} _protocol ->
+  let*@ (_ : int) =
+    Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
+  in
+  (* This produce block will fail as the timestamp is before the previous block. *)
+  let*@? (_err : Rpc.error) =
+    Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
+  in
+  (* However the same timestamp is accepted. *)
+  let*@ (_ : int) =
+    Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
+  in
+  unit
+
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_sequencer_upgrade =
@@ -2662,6 +2683,7 @@ let test_sequencer_upgrade =
     diverged from the other. *)
 let test_sequencer_diverge =
   register_both
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
@@ -2669,7 +2691,9 @@ let test_sequencer_diverge =
   @@ fun {sc_rollup_node; client; sequencer; observer; _} _protocol ->
   let* () =
     repeat 4 (fun () ->
-        let*@ _l2_level = Rpc.produce_block sequencer in
+        let*@ _l2_level =
+          Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
+        in
         unit)
   in
   let* () =
@@ -2730,8 +2754,10 @@ let test_sequencer_diverge =
       ]
   and* () =
     (* diff timestamp to differ *)
-    let* _ = Rpc.produce_block ~timestamp:"0" sequencer
-    and* _ = Rpc.produce_block ~timestamp:"1" sequencer_bis in
+    let* _ = Rpc.produce_block ~timestamp:"2020-01-01T00:13:00Z" sequencer
+    and* _ =
+      Rpc.produce_block ~timestamp:"2020-01-01T00:12:00Z" sequencer_bis
+    in
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
@@ -3833,6 +3859,7 @@ let () =
   test_delayed_transfer_timeout_fails_l1_levels protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
+  test_non_increasing_timestamp protocols ;
   test_sequencer_upgrade protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;
