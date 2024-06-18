@@ -87,12 +87,12 @@ module Events = struct
   let section = ["node"; "context_brassaia"; "disk"]
 
   let init_context =
-    declare_3
+    declare_4
       ~section
       ~level:Info
       ~name:"init_context"
       ~msg:
-        "initializing context (readonly: {readonly}, index_log_size: \
+        "initializing context in {root} (readonly: {readonly}, index_log_size: \
          {index_log_size}, lru_size: {lru_size})"
       ~pp1:Format.pp_print_bool
       ("readonly", Data_encoding.bool)
@@ -100,6 +100,7 @@ module Events = struct
       ("index_log_size", Data_encoding.int31)
       ~pp3:Format.pp_print_int
       ("lru_size", Data_encoding.int31)
+      ("root", Data_encoding.string)
 
   let starting_gc =
     declare_1
@@ -731,7 +732,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       in
       let lru_size = env.lru_size in
       let* () =
-        Events.(emit init_context (readonly, index_log_size, lru_size))
+        Events.(emit init_context (readonly, index_log_size, lru_size, root))
       in
       let* () = Events.(emit warning_experimental ()) in
       Store.Repo.init
@@ -742,6 +743,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
            ~lru_size
            root)
     in
+
     {path = root; repo; patch_context; readonly}
 
   let close index =

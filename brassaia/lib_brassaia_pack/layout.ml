@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let toplevel name ~root = Filename.(concat root name)
+let toplevel name ~root = Filename.(concat root ("brassaia_" ^ name))
 
 module V1_and_v2 = struct
   let pack = toplevel "store.pack"
@@ -125,18 +125,23 @@ module Classification = struct
 
     let init s : t =
       match String.split_on_char '.' s with
-      | [ "store"; "pack" ] -> `V1_or_v2_pack
-      | [ "store"; "branches" ] -> `Branch
-      | [ "store"; "control" ] -> `Control
-      | [ "store"; "control"; "tmp" ] -> `Control_tmp
-      | [ "store"; "dict" ] -> `Dict
-      | [ "store"; g; "out" ] when is_number g -> `Gc_result (int_of_string g)
-      | [ "store"; g; "reachable" ] when is_number g ->
+      | [ "brassaia_store"; "pack" ] -> `V1_or_v2_pack
+      | [ "brassaia_store"; "branches" ] -> `Branch
+      | [ "brassaia_store"; "control" ] -> `Control
+      | [ "brassaia_store"; "control"; "tmp" ] -> `Control_tmp
+      | [ "brassaia_store"; "dict" ] -> `Dict
+      | [ "brassaia_store"; g; "out" ] when is_number g ->
+          `Gc_result (int_of_string g)
+      | [ "brassaia_store"; g; "reachable" ] when is_number g ->
           `Reachable (int_of_string g)
-      | [ "store"; g; "sorted" ] when is_number g -> `Sorted (int_of_string g)
-      | [ "store"; g; "mapping" ] when is_number g -> `Mapping (int_of_string g)
-      | [ "store"; g; "prefix" ] when is_number g -> `Prefix (int_of_string g)
-      | [ "store"; g; "suffix" ] when is_number g -> `Suffix (int_of_string g)
+      | [ "brassaia_store"; g; "sorted" ] when is_number g ->
+          `Sorted (int_of_string g)
+      | [ "brassaia_store"; g; "mapping" ] when is_number g ->
+          `Mapping (int_of_string g)
+      | [ "brassaia_store"; g; "prefix" ] when is_number g ->
+          `Prefix (int_of_string g)
+      | [ "brassaia_store"; g; "suffix" ] when is_number g ->
+          `Suffix (int_of_string g)
       | _ -> `Unknown
   end
 
@@ -146,11 +151,11 @@ module Classification = struct
 
     let open_volume s : t =
       match String.split_on_char '.' s with
-      | [ "volume"; "control" ] -> `Control
-      | [ "volume"; g; "control" ] when is_number g ->
+      | [ "brassaia_volume"; "control" ] -> `Control
+      | [ "brassaia_volume"; g; "control" ] when is_number g ->
           `Control_tmp (int_of_string g)
-      | [ "volume"; "mapping" ] -> `Mapping
-      | [ "volume"; "data" ] -> `Data
+      | [ "brassaia_volume"; "mapping" ] -> `Mapping
+      | [ "brassaia_volume"; "data" ] -> `Data
       | _ -> `Unknown
   end
 end
