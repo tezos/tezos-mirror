@@ -9,7 +9,8 @@ use crate::error::{Error, StorageError};
 use crate::inbox::{Transaction, TransactionContent};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
 use crate::storage::{
-    self, read_current_block_number, read_rlp, store_read_slice, store_rlp,
+    self, read_current_block_number, read_last_info_per_level_timestamp, read_rlp,
+    store_read_slice, store_rlp,
 };
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::U256;
@@ -197,7 +198,8 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 pub enum BlueprintValidity {
     Valid(Blueprint),
     InvalidParentHash,
-    InvalidTimestamp,
+    TimestampFromPast,
+    TimestampFromFuture,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
     BlueprintTooLarge,
@@ -264,6 +266,8 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     bytes: &[u8],
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
+    evm_node_flag: bool,
+    max_blueprint_lookahead_in_seconds: i64,
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
@@ -284,7 +288,41 @@ fn parse_and_validate_blueprint<Host: Runtime>(
             // Validate parent timestamp
             #[cfg(not(feature = "benchmark"))]
             if blueprint_with_hashes.timestamp < head_timestamp {
-                return Ok((BlueprintValidity::InvalidTimestamp, bytes.len()));
+                return Ok((BlueprintValidity::TimestampFromPast, bytes.len()));
+            }
+
+            // The timestamp must be within  max_blueprint_lookahead_in_seconds
+            // of the current view of the L1 timestamp.
+            //
+            // That means that the sequencer cannot produce blueprints too much
+            // in the future. If the L1 timestamp is not progressing i.e.
+            // the network is stuck, the sequencer will have to reinject the
+            // blueprint when the L1 timestamp is finally greater than
+            // blueprint timestamp.
+            //
+            // All this prevents the sequencer to manipulate too much the
+            // timestamps.
+            #[cfg(not(feature = "benchmark"))]
+            {
+                let last_seen_l1_timestamp = read_last_info_per_level_timestamp(host)?;
+                let accepted_bound = Timestamp::from(
+                    last_seen_l1_timestamp
+                        .i64()
+                        .saturating_add(max_blueprint_lookahead_in_seconds),
+                );
+
+                // In the sequencer we don't have a valid `last_seen_l1_timesteamp`
+                // so it must not fails on this.
+                if !evm_node_flag && blueprint_with_hashes.timestamp > accepted_bound {
+                    log!(
+                        host,
+                        Debug,
+                        "Accepted bound is {}, Blueprint.timestamp is {}",
+                        accepted_bound,
+                        blueprint_with_hashes.timestamp
+                    );
+                    return Ok((BlueprintValidity::TimestampFromFuture, bytes.len()));
+                }
             }
 
             // Fetch delayed transactions
@@ -346,12 +384,19 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     }
     match &mut config.mode {
         ConfigurationMode::Proxy => Ok((None, size)),
-        ConfigurationMode::Sequencer { delayed_inbox, .. } => {
+        ConfigurationMode::Sequencer {
+            delayed_inbox,
+            evm_node_flag,
+            max_blueprint_lookahead_in_seconds,
+            ..
+        } => {
             let validity = parse_and_validate_blueprint(
                 host,
                 chunks.concat().as_slice(),
                 delayed_inbox,
                 size,
+                *evm_node_flag,
+                *max_blueprint_lookahead_in_seconds,
             )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
@@ -436,6 +481,7 @@ mod tests {
     use crate::configuration::{Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
+    use crate::storage::store_last_info_per_level_timestamp;
     use crate::Timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -500,6 +546,8 @@ mod tests {
             signature,
         };
 
+        store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
+
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
@@ -508,6 +556,8 @@ mod tests {
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
             0,
+            false,
+            500,
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
@@ -571,6 +621,8 @@ mod tests {
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
             0,
+            false,
+            500,
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
