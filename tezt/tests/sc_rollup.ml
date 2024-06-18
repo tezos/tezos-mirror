@@ -1021,10 +1021,10 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   (* We want to produce snapshots for rollup node which have cemented
      commitments *)
   let* level = Node.get_level node in
-  let level_snapshot = level + (2 * challenge_window) in
+  let level_snapshot = level + (commitment_period + 4) in
   (* We want to build an L2 chain that goes beyond the snapshots (and has
      additional commitments). *)
-  let total_blocks = level_snapshot + (4 * commitment_period) in
+  let total_blocks = level_snapshot + (2 * commitment_period) in
   let stop_rollup_node_2_levels = challenge_window + 2 in
   let maybe_add_unsafe_pvm_patches_in_config sc_rollup_node =
     if unsafe_pvm_patches then
@@ -6183,22 +6183,22 @@ let register_protocol_independent () =
     protocols ;
   test_snapshots
     ~kind
-    ~challenge_window:5
-    ~commitment_period:4
+    ~challenge_window:10
+    ~commitment_period:10
     ~history_mode:Full
     ~compact:false
     protocols ;
   test_snapshots
     ~kind
-    ~challenge_window:5
-    ~commitment_period:4
+    ~challenge_window:10
+    ~commitment_period:10
     ~history_mode:Full
     ~compact:true
     protocols ;
   test_snapshots
     ~kind
     ~challenge_window:10
-    ~commitment_period:5
+    ~commitment_period:10
     ~history_mode:Archive
     ~compact:false
     protocols ;
@@ -6206,7 +6206,7 @@ let register_protocol_independent () =
     ~unsafe_pvm_patches:true
     ~kind
     ~challenge_window:10
-    ~commitment_period:5
+    ~commitment_period:10
     ~history_mode:Archive
     ~compact:false
     protocols ;
