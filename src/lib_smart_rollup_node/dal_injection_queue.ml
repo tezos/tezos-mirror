@@ -61,6 +61,20 @@ module Events = struct
 
   let section = "smart_rollup_node" :: Name.base
 
+  let injected =
+    declare_3
+      ~section
+      ~name:"injected"
+      ~msg:
+        "Injected a DAL slot {slot_commitment} at index {slot_index} with hash \
+         {operation_hash}"
+      ~level:Info
+      ~pp1:Tezos_crypto_dal.Cryptobox.Commitment.pp
+      ~pp3:Injector.Inj_operation.Id.pp
+      ("slot_commitment", Tezos_crypto_dal.Cryptobox.Commitment.encoding)
+      ("slot_index", Data_encoding.uint8)
+      ("operation_hash", Injector.Inj_operation.Id.encoding)
+
   let request_failed =
     declare_3
       ~section
@@ -91,15 +105,16 @@ type state = {node_ctxt : Node_context.ro}
 let inject_slot state ~slot_content ~slot_index =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
-  let* operation =
+  let* commitment, operation =
     match dal_cctxt with
     | Some dal_cctxt ->
         let* commitment, commitment_proof =
           Dal_node_client.post_slot dal_cctxt slot_content
         in
         return
-        @@ L1_operation.Publish_dal_commitment
-             {slot_index; commitment; commitment_proof}
+          ( commitment,
+            L1_operation.Publish_dal_commitment
+              {slot_index; commitment; commitment_proof} )
     | None ->
         (* This should not be reachable, as we tested that some [dal_cctxt] is set
            at startup before launching the worker. *)
@@ -110,15 +125,15 @@ let inject_slot state ~slot_content ~slot_index =
       state.node_ctxt.config.mode
       operation
   in
-  let+ l1_hash =
+  let* l1_hash =
     match l1_hash with
     | Some l1_hash -> return l1_hash
     | None ->
         let op = Injector.Inj_operation.make operation in
         return op.id
   in
-  ignore l1_hash ;
-  ()
+  let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
+  return_unit
 
 let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -173,8 +188,8 @@ module Handlers = struct
         return_unit
 
   let on_completion _w r _ st =
-    match r with
-    | Register _ ->
+    match Request.view r with
+    | Request.View (Register _) ->
         Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
