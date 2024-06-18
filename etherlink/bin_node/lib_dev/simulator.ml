@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori  <contact@functori.com>                       *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -41,7 +42,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         ~block:block_param
         ~log_file:"simulate_call"
         ~input_encoder:Simulation.encode
-        ~input:call
+        ~input:{call; with_da_fees = Some true}
         ()
     in
     Lwt.return (Simulation.simulation_result bytes)
@@ -63,7 +64,9 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let double (Qty z) = Qty Z.(mul (of_int 2) z) in
     let reached_max (Qty z) = z >= max_gas_limit in
     let new_call = {call with gas = Some gas} in
-    let* result = call_estimate_gas new_call in
+    let* result =
+      call_estimate_gas {call = new_call; with_da_fees = Some false}
+    in
     match result with
     | Error _ | Ok (Error _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6984
@@ -72,11 +75,17 @@ module Make (SimulationBackend : SimulationBackend) = struct
         if reached_max new_gas then
           failwith "Gas estimate reached max gas limit."
         else confirm_gas call new_gas
-    | Ok (Ok _) -> return gas
+    | Ok (Ok _) -> (
+        (* Since the gas computation related to execution is fine. We can
+           call the estimation with the da fees taken into account. *)
+        let* res = call_estimate_gas {call; with_da_fees = Some true} in
+        match res with
+        | Ok (Ok {gas_used = Some gas; _}) -> return gas
+        | _ -> failwith "The gas estimation simulation with DA fees failed.")
 
   let estimate_gas call =
     let open Lwt_result_syntax in
-    let* res = call_estimate_gas call in
+    let* res = call_estimate_gas {call; with_da_fees = Some false} in
     match res with
     | Ok (Ok {gas_used = Some gas; value}) ->
         let+ gas_used = confirm_gas call gas in

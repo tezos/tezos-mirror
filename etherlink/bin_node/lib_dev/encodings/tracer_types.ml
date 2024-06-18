@@ -102,12 +102,12 @@ let input_encoding =
     config_encoding
     default_config
 
+(* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
+let bool_encoding b =
+  if b then Rlp.Value (Bytes.make 1 '\001') else Rlp.Value Bytes.empty
+
 let input_rlp_encoder hash config =
   let open Rlp in
-  (* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
-  let bool_encoding b =
-    if b then Value (Bytes.make 1 '\001') else Value Bytes.empty
-  in
   let hash = Value (Ethereum_types.hash_to_bytes hash |> Bytes.of_string) in
   let return_data = bool_encoding config.tracer_config.enable_return_data in
   let memory = bool_encoding config.tracer_config.enable_memory in
