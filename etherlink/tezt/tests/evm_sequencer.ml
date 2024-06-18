@@ -2181,6 +2181,108 @@ let test_delayed_transfer_timeout =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
+let test_forced_blueprint_takes_pred_timestamp =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+    ~delayed_inbox_timeout:1
+    ~delayed_inbox_min_levels:1
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
+    ~title:"Forced blueprint can take predecessor timestamp"
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (* The head timestamp will be high enough that we don't use the L1 timestamp
+     for the forced blueprint and just take the same timestamp. *)
+  let*@ (_ : int) =
+    Rpc.produce_block ~timestamp:"2020-01-01T00:04:00Z" sequencer
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+  (* Make a delayed transaction and force it by creating L1 blocks. *)
+  let raw_transfer =
+    "f86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  Check.(
+    (Tezos_base.Time.Protocol.to_notation proxy_head.timestamp
+    = "2020-01-01T00:04:00Z")
+      string)
+    ~error_msg:
+      "The forced blueprint should have the same timestamp as its predecessor" ;
+  let* l1_timestamp = l1_timestamp client in
+  Check.(
+    (Tezos_base.Time.Protocol.to_seconds proxy_head.timestamp
+    > Tezos_base.Time.Protocol.to_seconds l1_timestamp)
+      int64)
+    ~error_msg:"The proxy should have taken a timestamp greater than L1 one" ;
+  unit
+
+let test_forced_blueprint_takes_l1_timestamp =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+    ~delayed_inbox_timeout:1
+    ~delayed_inbox_min_levels:1
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
+    ~title:"Forced blueprint can take l1 timestamp"
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let*@ (_ : int) =
+    Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+  (* Make a delayed transaction and force it by creating L1 blocks. *)
+  let raw_transfer =
+    "f86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  let* l1_timestamp = l1_timestamp client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  (* The forced block will have a timestamp of l1_timestamp. *)
+  Check.(
+    (Tezos_base.Time.Protocol.to_notation proxy_head.timestamp
+    = Tezos_base.Time.Protocol.to_notation l1_timestamp)
+      string)
+    ~error_msg:
+      "Forced blueprint should have timestamp of L1. (proxy has %L, l1 has %R)" ;
+  unit
+
 let test_delayed_transfer_timeout_fails_l1_levels =
   register_both
     ~delayed_inbox_timeout:3
@@ -3957,6 +4059,8 @@ let () =
   test_external_transaction_to_delayed_inbox_fails protocols ;
   test_delayed_transfer_timeout protocols ;
   test_delayed_transfer_timeout_fails_l1_levels protocols ;
+  test_forced_blueprint_takes_pred_timestamp protocols ;
+  test_forced_blueprint_takes_l1_timestamp protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_non_increasing_timestamp protocols ;

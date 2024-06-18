@@ -45,7 +45,7 @@ type t = {
   size : int32;
   gasLimit : int64;
   gasUsed : int64;
-  timestamp : int32;
+  timestamp : Tezos_base.Time.Protocol.t;
   transactions : transactions;
   uncles : string list;
   baseFeePerGas : int64;
@@ -98,7 +98,8 @@ let of_json json =
     size = json |-> "size" |> as_int32;
     gasLimit = json |-> "gasLimit" |> as_int64;
     gasUsed = json |-> "gasUsed" |> as_int64;
-    timestamp = json |-> "timestamp" |> as_int32;
+    timestamp =
+      json |-> "timestamp" |> as_int64 |> Tezos_base.Time.Protocol.of_seconds;
     transactions = json |-> "transactions" |> parse_transactions;
     uncles = json |-> "uncles" |> as_list |> List.map as_string;
     baseFeePerGas = json ||-> ("baseFeePerGas", 1000000000L, as_int64);

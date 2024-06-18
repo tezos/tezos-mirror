@@ -5454,11 +5454,12 @@ let test_block_constants_opcode =
         ~method_call:"view_stored_block_timestamp()"
         ()
     in
-    return (Int32.of_string @@ String.trim storage_block_timestamp)
+    return (Int64.of_string @@ String.trim storage_block_timestamp)
   in
   Check.(
-    (block_timestamp.timestamp = storage_block_timestamp)
-      int32
+    (Tezos_base.Time.Protocol.to_seconds block_timestamp.timestamp
+    = storage_block_timestamp)
+      int64
       ~error_msg:
         "Expected same block timestamp, block is %L and block.timestamp is %R") ;
   unit
