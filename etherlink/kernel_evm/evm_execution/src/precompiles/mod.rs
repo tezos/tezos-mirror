@@ -21,7 +21,7 @@ mod modexp;
 mod withdrawal;
 mod zero_knowledge;
 
-use crate::handler::EvmHandler;
+use crate::handler::{EvmHandler, Withdrawal};
 use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
@@ -32,7 +32,6 @@ use host::runtime::Runtime;
 use identity::identity_precompile;
 use modexp::modexp_precompile;
 use primitive_types::H160;
-use tezos_ethereum::withdrawal::Withdrawal;
 use withdrawal::withdrawal_precompile;
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 
@@ -242,8 +241,10 @@ mod test_helpers {
     use crate::handler::EvmHandler;
     use crate::handler::ExecutionOutcome;
     use crate::EthereumError;
+    use crate::NATIVE_TOKEN_TICKETER_PATH;
     use evm::Config;
     use evm::Transfer;
+    use host::runtime::Runtime;
     use primitive_types::{H160, U256};
     use tezos_ethereum::block::BlockConstants;
     use tezos_ethereum::block::BlockFees;
@@ -251,6 +252,7 @@ mod test_helpers {
 
     use super::precompile_set;
     const DUMMY_ALLOCATED_TICKS: u64 = 100_000_000;
+    pub const DUMMY_TICKETER: &str = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5";
 
     pub fn set_balance(
         host: &mut MockHost,
@@ -298,6 +300,8 @@ mod test_helpers {
         let config = Config::shanghai();
         let gas_price = U256::from(21000);
 
+        set_ticketer(&mut mock_runtime, DUMMY_TICKETER);
+
         if let Some(Transfer { source, value, .. }) = transfer {
             set_balance(
                 &mut mock_runtime,
@@ -335,5 +339,10 @@ mod test_helpers {
             gas_limit,
             is_static,
         )
+    }
+
+    fn set_ticketer(host: &mut MockHost, address: &str) {
+        host.store_write(&NATIVE_TOKEN_TICKETER_PATH, address.as_bytes(), 0)
+            .unwrap();
     }
 }

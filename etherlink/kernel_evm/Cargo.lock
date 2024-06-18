@@ -640,6 +640,7 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "num-traits",
+ "pretty_assertions",
  "primitive-types",
  "proptest",
  "rlp",
@@ -2251,7 +2252,6 @@ dependencies = [
  "sha3",
  "tezos-smart-rollup-encoding",
  "tezos_crypto_rs",
- "tezos_data_encoding",
  "thiserror",
 ]
 

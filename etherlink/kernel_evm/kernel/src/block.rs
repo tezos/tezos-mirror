@@ -27,7 +27,6 @@ use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::IndexableStorage;
@@ -75,7 +74,6 @@ fn compute<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
     is_first_block_of_reboot: bool,
-    ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     trace_input: &Option<TracerInput>,
@@ -134,7 +132,6 @@ fn compute<Host: Runtime>(
             accounts_index,
             allocated_ticks,
             retriable,
-            ticketer,
             sequencer_pool_address,
             limits,
             trace_input,
@@ -252,7 +249,6 @@ fn compute_bip<Host: KernelRuntime>(
     accounts_index: &mut IndexableStorage,
     tick_counter: &mut TickCounter,
     first_block_of_reboot: &mut bool,
-    ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     trace_input: &Option<TracerInput>,
@@ -266,7 +262,6 @@ fn compute_bip<Host: KernelRuntime>(
         evm_account_storage,
         accounts_index,
         *first_block_of_reboot,
-        ticketer,
         sequencer_pool_address,
         limits,
         trace_input,
@@ -425,7 +420,6 @@ pub fn produce<Host: Runtime>(
                 &mut accounts_index,
                 &mut tick_counter,
                 &mut first_block_of_reboot,
-                &config.tezos_contracts.ticketer,
                 sequencer_pool_address,
                 &config.limits,
                 &trace_input,
@@ -504,7 +498,6 @@ pub fn produce<Host: Runtime>(
             &mut accounts_index,
             &mut tick_counter,
             &mut first_block_of_reboot,
-            &config.tezos_contracts.ticketer,
             sequencer_pool_address,
             &config.limits,
             &trace_input,
@@ -1382,7 +1375,6 @@ mod tests {
             &mut evm_account_storage,
             &mut accounts_index,
             true,
-            &None,
             None,
             &limits,
             &None,

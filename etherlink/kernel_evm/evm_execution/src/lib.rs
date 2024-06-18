@@ -10,10 +10,11 @@
 use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
+use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
 use evm::ExitReason;
 use handler::EvmHandler;
-use host::runtime::Runtime;
+use host::{path::RefPath, runtime::Runtime};
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
@@ -267,6 +268,17 @@ where
         };
         Ok(None)
     }
+}
+
+pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/ticketer");
+
+/// Reads the ticketer address set by the installer, if any, encoded in b58.
+pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
+    let ticketer = host.store_read_all(&NATIVE_TOKEN_TICKETER_PATH).ok()?;
+
+    let kt1_b58 = String::from_utf8(ticketer.to_vec()).ok()?;
+    ContractKt1Hash::from_b58check(&kt1_b58).ok()
 }
 
 #[cfg(test)]

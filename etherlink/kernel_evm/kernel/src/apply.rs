@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023-2024 PK Lab <contact@pklab.io>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,28 +11,18 @@ use evm::{ExitError, ExitReason, ExitSucceed};
 use evm_execution::account_storage::{
     account_path, EthereumAccount, EthereumAccountStorage,
 };
-use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason};
+use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
 use evm_execution::trace::{TracerConfig, TracerInput};
 use primitive_types::{H160, U256};
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
-use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::IndexableStorage;
-use tezos_smart_rollup::outbox::OutboxQueue;
-use tezos_smart_rollup_encoding::contract::Contract;
-use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
-use tezos_smart_rollup_encoding::michelson::ticket::{FA2_1Ticket, Ticket};
-use tezos_smart_rollup_encoding::michelson::{
-    MichelsonContract, MichelsonOption, MichelsonPair,
-};
-use tezos_smart_rollup_encoding::outbox::OutboxMessage;
-use tezos_smart_rollup_encoding::outbox::OutboxMessageTransaction;
+use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -474,66 +465,6 @@ fn apply_deposit<Host: Runtime>(
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
     RefPath::assert_from(b"/evm/world_state/__outbox_queue");
 
-fn post_withdrawals<Host: Runtime>(
-    host: &mut Host,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
-    withdrawals: &Vec<Withdrawal>,
-    ticketer: &Option<ContractKt1Hash>,
-) -> Result<(), Error> {
-    if withdrawals.is_empty() {
-        return Ok(());
-    };
-
-    let destination = match ticketer {
-        Some(x) => Contract::Originated(x.clone()),
-        None => return Err(Error::InvalidParsing),
-    };
-    let entrypoint = Entrypoint::try_from(String::from("burn"))?;
-
-    for withdrawal in withdrawals {
-        // Wei is 10^18, whereas mutez is 10^6.
-        let amount: U256 =
-            U256::checked_div(withdrawal.amount, U256::from(10).pow(U256::from(12)))
-                // If we reach the unwrap_or it will fail at the next step because
-                // we cannot create a ticket with no amount. But by construction
-                // it should not happen, we do not divide by 0.
-                .unwrap_or(U256::zero());
-
-        let amount = if amount < U256::from(u64::max_value()) {
-            amount.as_u64()
-        } else {
-            // Users can withdraw only mutez, converted to ETH, thus the
-            // maximum value of `amount` is `Int64.max_int` which fit
-            // in a u64.
-            return Err(Error::InvalidConversion);
-        };
-
-        let ticket: FA2_1Ticket = Ticket::new(
-            destination.clone(),
-            MichelsonPair(0.into(), MichelsonOption(None)),
-            amount,
-        )?;
-        let parameters = MichelsonPair::<MichelsonContract, FA2_1Ticket>(
-            MichelsonContract(withdrawal.target.clone()),
-            ticket,
-        );
-
-        let withdrawal = OutboxMessageTransaction {
-            parameters,
-            entrypoint: entrypoint.clone(),
-            destination: destination.clone(),
-        };
-
-        let outbox_message =
-            OutboxMessage::AtomicTransactionBatch(vec![withdrawal].into());
-
-        let len = outbox_queue.queue_message(host, outbox_message)?;
-        log!(host, Debug, "Length of the outbox queue: {}", len);
-    }
-
-    Ok(())
-}
-
 pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub object_info: TransactionObjectInfo,
@@ -566,7 +497,6 @@ pub fn handle_transaction_result<Host: Runtime>(
     accounts_index: &mut IndexableStorage,
     transaction_result: TransactionResult,
     pay_fees: bool,
-    ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
 ) -> Result<ExecutionInfo, anyhow::Error> {
     let TransactionResult {
@@ -587,7 +517,11 @@ pub fn handle_transaction_result<Host: Runtime>(
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
         log!(host, Benchmarking, "reason: {:?}", outcome.reason);
         fee_updates.modify_outcome(outcome);
-        post_withdrawals(host, outbox_queue, &outcome.withdrawals, ticketer)?
+        for message in outcome.withdrawals.drain(..) {
+            let outbox_message: OutboxMessage<RouterInterface> = message;
+            let len = outbox_queue.queue_message(host, outbox_message)?;
+            log!(host, Debug, "Length of the outbox queue: {}", len);
+        }
     }
 
     if pay_fees {
@@ -645,7 +579,6 @@ pub fn apply_transaction<Host: Runtime>(
     accounts_index: &mut IndexableStorage,
     allocated_ticks: u64,
     retriable: bool,
-    ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     trace_input: &Option<TracerInput>,
@@ -695,7 +628,6 @@ pub fn apply_transaction<Host: Runtime>(
                 accounts_index,
                 tx_result,
                 true,
-                ticketer,
                 sequencer_pool_address,
             )?;
             Ok(ExecutionResult::Valid(execution_result))
@@ -713,7 +645,6 @@ pub fn apply_transaction<Host: Runtime>(
                 accounts_index,
                 tx_result,
                 false,
-                ticketer,
                 sequencer_pool_address,
             )?;
             Ok(ExecutionResult::Retriable(execution_result))

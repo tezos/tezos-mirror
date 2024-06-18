@@ -14,6 +14,7 @@
 
 - Add FA deposit structure and helper methods for its parsing and formatting. (!13720)
 - Add ticket table to account for FA deposits. (!12072)
+- Refactor withdrawals handling to keep `OutboxMessage` in the `ExecutionOutcome`. (!13751)
 
 -  Compress h256 hash when encoding. Transaction encoded with `r` or
    `s` hash compressed were impacted. (!13654)

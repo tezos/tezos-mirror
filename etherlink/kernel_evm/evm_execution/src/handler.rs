@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 PK Lab <contact@pklab.io>
 //
 // SPDX-License-Identifier: MIT
 
@@ -37,8 +38,10 @@ use sha3::{Digest, Keccak256};
 use std::cmp::min;
 use std::fmt::Debug;
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
+use tezos_smart_rollup_encoding::michelson::{MichelsonContract, MichelsonPair};
+use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_storage::StorageError;
 
 /// Extends ExitReason with our own errors. It avoids using
@@ -54,6 +57,12 @@ impl From<ExitReason> for ExtendedExitReason {
         Self::Exit(e)
     }
 }
+
+/// Withdrawal interface of the ticketer contract
+pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
+
+/// Outbox message that implements RouterInterface, ready to be encoded and posted
+pub type Withdrawal = OutboxMessage<RouterInterface>;
 
 /// Outcome of making the [EvmHandler] run an Ethereum transaction
 ///
