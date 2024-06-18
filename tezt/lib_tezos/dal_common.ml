@@ -630,6 +630,65 @@ module Helpers = struct
         client
     in
     return commitment_string
+
+  let wait_for_gossipsub_worker_event ~name dal_node lambda =
+    Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
+
+  let check_new_connection_event ~main_node ?other_peer_id ~other_node
+      ~is_trusted () =
+    let ( let*?? ) a b = Option.bind a b in
+    let check_expected expected found =
+      if expected <> found then None else Some ()
+    in
+    let* peer_id =
+      wait_for_gossipsub_worker_event
+        ~name:"new_connection"
+        main_node
+        (fun event ->
+          let*?? peer_id = JSON.(event |-> "peer" |> as_string_opt) in
+          let*?? () =
+            check_expected is_trusted JSON.(event |-> "trusted" |> as_bool)
+          in
+          match other_peer_id with
+          | None ->
+              (* No expected peer id, event is considered valid and its peer id is returned *)
+              Some peer_id
+          | Some other_peer_id ->
+              if other_peer_id = peer_id then Some peer_id
+              else
+                (* A connection was received from an unexpected peer,
+                   discard the event. *)
+                None)
+    in
+    let* other_node_id = Dal_node.read_identity other_node in
+    let () =
+      Check.(peer_id = other_node_id)
+        ~__LOC__
+        Check.string
+        ~error_msg:"Expected a connection from the peer of id %R, got %L."
+    in
+    unit
+
+  let connect_nodes_via_p2p ?(init_config = false) dal_node1 dal_node2 =
+    let* () =
+      if init_config then
+        Dal_node.init_config ~peers:[Dal_node.listen_addr dal_node1] dal_node2
+      else Lwt.return_unit
+    in
+    (* We ensure that [dal_node1] connects to [dal_node2]. *)
+    let conn_ev_in_node1 =
+      check_new_connection_event
+        ~main_node:dal_node1
+        ~other_node:dal_node2
+        ~is_trusted:false
+        ()
+    in
+    let* () = Dal_node.run dal_node2 in
+    Log.info
+      "Node %s started. Waiting for connection with node %s"
+      (Dal_node.name dal_node2)
+      (Dal_node.name dal_node1) ;
+    conn_ev_in_node1
 end
 
 module Check = struct

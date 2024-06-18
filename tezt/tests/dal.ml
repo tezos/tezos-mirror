@@ -3231,43 +3231,6 @@ let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
 
-(** Wait for a connection event between [main_node] and
-    [other_node]. The optional argument [other_peer_id] can be used to
-    ignore the connection events which are not between these two
-    nodes. When this optional argument is given, it must be the peer
-    of [other_node]; this assumption is checked by this function
-    after the reception of the connection event. *)
-let check_new_connection_event ~main_node ?other_peer_id ~other_node ~is_trusted
-    () =
-  let* peer_id =
-    wait_for_gossipsub_worker_event
-      ~name:"new_connection"
-      main_node
-      (fun event ->
-        let*?? peer_id = JSON.(event |-> "peer" |> as_string_opt) in
-        let*?? () =
-          check_expected is_trusted JSON.(event |-> "trusted" |> as_bool)
-        in
-        match other_peer_id with
-        | None ->
-            (* No expected peer id, event is considered valid and its peer id is returned *)
-            Some peer_id
-        | Some other_peer_id ->
-            if other_peer_id = peer_id then Some peer_id
-            else
-              (* A connection was received from an unexpected peer,
-                 discard the event. *)
-              None)
-  in
-  let* other_node_id = Dal_node.read_identity other_node in
-  let () =
-    Check.(peer_id = other_node_id)
-      ~__LOC__
-      Check.string
-      ~error_msg:"Expected a connection from the peer of id %R, got %L."
-  in
-  unit
-
 let check_disconnection_event dal_node ~peer_id =
   wait_for_gossipsub_worker_event
     ~name:"disconnection"
@@ -3519,29 +3482,6 @@ let check_message_notified_to_app_event dal_node ~number_of_shards
       let () = remaining := !remaining - 1 in
       if !remaining = 0 && all_seen () then Some () else None)
 
-(** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
-    [dal_node2] will use [dal_node1] as a bootstrap peer.
-
-    For this to work, [dal_node1] must already be running. *)
-let connect_nodes_via_p2p dal_node1 dal_node2 =
-  let* () =
-    Dal_node.init_config ~peers:[Dal_node.listen_addr dal_node1] dal_node2
-  in
-  (* We ensure that [dal_node1] connects to [dal_node2]. *)
-  let conn_ev_in_node1 =
-    check_new_connection_event
-      ~main_node:dal_node1
-      ~other_node:dal_node2
-      ~is_trusted:false
-      ()
-  in
-  let* () = Dal_node.run dal_node2 in
-  Log.info
-    "Node %s started. Waiting for connection with node %s"
-    (Dal_node.name dal_node2)
-    (Dal_node.name dal_node1) ;
-  conn_ev_in_node1
-
 (** This helper function makes the nodes [dal_node1] and [dal_node2] join the
     topics of the attester [pkh], by calling the RPC for tracking the corresponding profile.
     The second node calls the RPC only after receiving the Subscribe messages
@@ -3652,7 +3592,12 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node _client dal_node1 =
   let dal_node2 = Dal_node.create ~node () in
   (* Connect the nodes *)
-  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+  let* () =
+    Dal_common.Helpers.connect_nodes_via_p2p
+      ~init_config:true
+      dal_node1
+      dal_node2
+  in
   let* peer_id = Dal_node.read_identity dal_node2 in
   (* kill dal_node2 and check "disconnection" event in node1. *)
   let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
@@ -3692,7 +3637,12 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
     dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
   let* dal_node2 = mk_dal_node2 protocol parameters in
 
-  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+  let* () =
+    Dal_common.Helpers.connect_nodes_via_p2p
+      ~init_config:true
+      dal_node1
+      dal_node2
+  in
 
   let num_slots = parameters.Dal.Parameters.number_of_slots in
   let number_of_shards = parameters.Dal.Parameters.cryptobox.number_of_shards in
@@ -3878,7 +3828,12 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
   let* dal_node2 = make_invalid_dal_node protocol parameters in
 
   (* Connect the nodes *)
-  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+  let* () =
+    Dal_common.Helpers.connect_nodes_via_p2p
+      ~init_config:true
+      dal_node1
+      dal_node2
+  in
 
   let num_slots = parameters.number_of_slots in
   let account1 = Constant.bootstrap1 in
@@ -3995,14 +3950,14 @@ let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
   let nodes = dal_node2 :: dal_node3 :: extra_nodes_to_restart in
   let* () = List.map Dal_node.terminate nodes |> Lwt.join in
   let check_conn_event_from_2_to_3 =
-    check_new_connection_event
+    Dal_common.Helpers.check_new_connection_event
       ~main_node:dal_node2
       ~other_node:dal_node3
       ~is_trusted:false
       ()
   in
   let check_conn_event_from_3_to_2 =
-    check_new_connection_event
+    Dal_common.Helpers.check_new_connection_event
       ~main_node:dal_node3
       ~other_node:dal_node2
       ~is_trusted:false
@@ -4095,7 +4050,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
   (* Prepare reconnection events checks between node1 and node2 (resp. 3). *)
   let check_conn_event_from_1_to_2 =
-    check_new_connection_event
+    Dal_common.Helpers.check_new_connection_event
       ~main_node:dal_node1
       ~other_node:dal_node2
       ~is_trusted:false
@@ -4103,7 +4058,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
       ()
   in
   let check_conn_event_from_1_to_3 =
-    check_new_connection_event
+    Dal_common.Helpers.check_new_connection_event
       ~main_node:dal_node1
       ~other_node:dal_node3
       ~is_trusted:false
@@ -4111,7 +4066,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
       ()
   in
   let check_conn_event_from_2_to_3 =
-    check_new_connection_event
+    Dal_common.Helpers.check_new_connection_event
       ~main_node:dal_node2
       ~other_node:dal_node3
       ~is_trusted:false
