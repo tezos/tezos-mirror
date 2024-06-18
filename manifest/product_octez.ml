@@ -407,42 +407,6 @@ let octez_hacl =
     ~deps:[hacl_star; hacl_star_raw]
     ~conflicts:[Conflicts.hacl_x25519]
 
-let _octez_hacl_gen0 =
-  private_exe
-    "gen0"
-    ~path:"src/lib_hacl/gen/"
-    ~opam:"octez-libs"
-    ~with_macos_security_framework:true
-    ~bisect_ppx:No
-    ~modules:["gen0"]
-    ~deps:[compiler_libs_common]
-
-let _octez_hacl_gen =
-  private_exe
-    "gen"
-    ~path:"src/lib_hacl/gen/"
-    ~opam:"octez-libs"
-    ~bisect_ppx:No
-    ~deps:[ctypes_stubs; ctypes; hacl_star_raw; ezjsonm]
-    ~modules:["gen"; "bindings"; "api_json"]
-    ~dune:
-      Dune.
-        [
-          targets_rule
-            ["bindings.ml"]
-            ~deps:[Dune.(H [[S "package"; S "hacl-star-raw"]])]
-            ~action:
-              [
-                S "with-stdout-to";
-                S "%{targets}";
-                [
-                  S "run";
-                  S "./gen0.exe";
-                  S "%{lib:hacl-star-raw:ocamlevercrypt.cma}";
-                ];
-              ];
-        ]
-
 let _octez_hacl_tests =
   tezt
     [

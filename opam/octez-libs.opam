@@ -34,7 +34,6 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "hacl-star" { >= "0.7.1" & < "0.8" }
   "hacl-star-raw"
-  "ctypes" { >= "0.18.0" }
   "bls12-381" { = version }
   "secp256k1-internal" { >= "0.4.0" }
   "bigarray-compat"
@@ -73,6 +72,7 @@ depends: [
   "octez-internal-libs" { = version }
   "conf-rust"
   "integers"
+  "ctypes" { >= "0.18.0" }
   "tezos-sapling-parameters" { >= "1.1.0" }
   "octez-rust-deps" { = version }
   "lwt-watcher" { = "0.2" }
