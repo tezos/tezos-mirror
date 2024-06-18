@@ -117,7 +117,7 @@ pub enum Precondition {
 /// be able to use the `end_xxx_transaction` functions for both contract -create and
 /// -call. In this case, the last element of the triple can be non-empty, and the
 /// address will be `None`.
-type CreateOutcome = (ExitReason, Option<H160>, Vec<u8>);
+pub(crate) type CreateOutcome = (ExitReason, Option<H160>, Vec<u8>);
 
 /// Wrap ethereum errors in the SputnikVM errors
 ///
@@ -587,6 +587,16 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 Ok(())
             }
             None => Err(EthereumError::InconsistentTransactionStack(0, false, false)),
+        }
+    }
+
+    /// Add log to the current transaction layer
+    pub(crate) fn add_log(&mut self, log: Log) -> Result<(), ExitError> {
+        if let Some(top_data) = self.transaction_data.last_mut() {
+            top_data.logs.push(log);
+            Ok(())
+        } else {
+            Err(ExitError::Other(Cow::from("No transaction data for log")))
         }
     }
 
@@ -1077,7 +1087,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// The outcome is encoded as a SputnikVM _Create_ outcome for easy transaction
     /// handling. The new address "field" in the triple is always `None`.
     #[allow(clippy::too_many_arguments)]
-    fn execute_call(
+    pub(crate) fn execute_call(
         &mut self,
         address: H160,
         transfer: Option<Transfer>,
@@ -1233,7 +1243,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         self.end_initial_transaction(result)
     }
 
-    fn get_or_create_account(
+    pub(crate) fn get_or_create_account(
         &self,
         address: H160,
     ) -> Result<EthereumAccount, EthereumError> {
@@ -1245,7 +1255,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_account(
+    pub(crate) fn get_account(
         &self,
         address: H160,
     ) -> Result<Option<EthereumAccount>, StorageError> {
@@ -1375,7 +1385,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// This requires that no other transaction is in progress. If there is a
     /// transaction in progress, then the function returns an error to report
     /// this.
-    fn begin_initial_transaction(
+    pub(crate) fn begin_initial_transaction(
         &mut self,
         is_static: bool,
         gas_limit: Option<u64>,
@@ -1538,7 +1548,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     /// End the initial transaction with either a commit or a rollback. The
     /// outcome depends on the execution result given.
-    fn end_initial_transaction(
+    pub(crate) fn end_initial_transaction(
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Result<ExecutionOutcome, EthereumError> {
@@ -2134,16 +2144,11 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         topics: Vec<H256>,
         data: Vec<u8>,
     ) -> Result<(), ExitError> {
-        if let Some(top_data) = self.transaction_data.last_mut() {
-            top_data.logs.push(Log {
-                address,
-                topics,
-                data,
-            });
-            Ok(())
-        } else {
-            Err(ExitError::Other(Cow::from("No transaction data for log")))
-        }
+        self.add_log(Log {
+            address,
+            topics,
+            data,
+        })
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {

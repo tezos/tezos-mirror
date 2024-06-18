@@ -52,13 +52,21 @@ tezos_data_encoding.workspace = true
 rand = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }
 
+# Enabled when testing feature is on
+tezos-smart-rollup-mock = { workspace = true, optional = true }
+alloy-sol-types = { workspace = true, optional = true }
+alloy-primitives = { workspace = true, optional = true }
+
 [dev-dependencies]
-tezos-smart-rollup-mock.workspace = true
 pretty_assertions.workspace = true
+
+tezos-smart-rollup-mock.workspace = true
+alloy-sol-types.workspace = true
+alloy-primitives.workspace = true
 
 [features]
 default = ["evm_execution"]
-testing = ["rand", "proptest"]
+testing = ["rand", "proptest", "dep:tezos-smart-rollup-mock", "dep:alloy-primitives", "dep:alloy-sol-types"]
 evm_execution = []
 debug = ["tezos-evm-logging/debug"]
 # the `benchmark` and `benchmark-opcodes` feature flags instrument the kernel for profiling

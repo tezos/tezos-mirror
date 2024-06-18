@@ -13,6 +13,7 @@
 ## Internal
 
 - Add FA deposit structure and helper methods for its parsing and formatting. (!13720)
+- Add FA deposit execution methods. (!13773)
 - Add ticket table to account for FA deposits. (!12072)
 - Refactor withdrawals handling to keep `OutboxMessage` in the `ExecutionOutcome`. (!13751)
 

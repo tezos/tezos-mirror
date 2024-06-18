@@ -73,3 +73,7 @@ tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
 rand = { version = "0.8" }
 proptest = { version = "1.0" }
 pretty_assertions = { version = "1.4.0" }
+
+# alloy
+alloy-sol-types = { version = "0.7.6", default-features = false, features = ["json"]}
+alloy-primitives = { version = "0.7.6", default-features = false }
