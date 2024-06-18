@@ -12,6 +12,7 @@ use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::block::L2Block;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
@@ -56,6 +57,24 @@ fn fetch_delayed_transactions<Host: Runtime>(
             "Creating blueprint from timed out delayed transactions of length {}",
             timed_out.len()
         );
+
+        let timestamp = match crate::storage::read_current_block(host) {
+            Result::Ok(L2Block {
+                timestamp: head_timestamp,
+                ..
+            }) => {
+                // Timestamp has to be at least equal or greater than previous timestamp.
+                // If it's not the case, we fallback and take the previous block timestamp.
+                std::cmp::max(timestamp, head_timestamp)
+            }
+            Err(_) => {
+                // If there's no current block, there's no previous
+                // timestamp. So we take whatever is the current
+                // timestamp.
+                timestamp
+            }
+        };
+
         // Create a new blueprint with the timed out transactions
         let blueprint = Blueprint {
             transactions: timed_out,
