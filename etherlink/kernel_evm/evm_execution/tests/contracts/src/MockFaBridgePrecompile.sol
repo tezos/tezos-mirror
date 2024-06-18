@@ -25,9 +25,7 @@ contract MockFaBridgePrecompile {
         address ticketOwner,
         bytes22 receiver,
         uint256 amount,
-        uint256 outboxLevel,
-        uint256 outboxMsgId
-
+        uint256 withdrawalId
     );
 
     function withdraw(

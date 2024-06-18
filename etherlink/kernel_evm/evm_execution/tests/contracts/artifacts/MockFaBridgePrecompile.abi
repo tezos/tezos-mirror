@@ -110,13 +110,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "outboxLevel",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "outboxMsgId",
+        "name": "withdrawalId",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

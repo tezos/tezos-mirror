@@ -52,6 +52,7 @@ use crate::{
 pub mod deposit;
 pub mod error;
 pub mod ticket_table;
+pub mod withdrawal;
 
 #[cfg(test)]
 mod tests;
