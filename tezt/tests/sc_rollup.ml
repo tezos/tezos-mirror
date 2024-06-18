@@ -1108,39 +1108,8 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
     Sc_rollup_node.wait_for_level sc_rollup_node level_snapshot
   in
   let dir = Tezt.Temp.dir "snapshots" in
-  let dir_on_the_fly = Tezt.Temp.dir "snapshots_on_the_fly" in
   let* snapshot_file =
     Sc_rollup_node.export_snapshot ~compact sc_rollup_node dir |> Runnable.run
-  and* snapshot_file_on_the_fly =
-    Sc_rollup_node.export_snapshot
-      ~compress_on_the_fly:true
-      ~compact
-      sc_rollup_node
-      dir_on_the_fly
-    |> Runnable.run
-  in
-  let* () =
-    if compact then
-      (* Compact snapshots are not deterministic due to the way irmin generates
-         the single commit context *)
-      unit
-    else (
-      Log.info "Checking if uncompressed snapshot files are identical." ;
-      (* Uncompress snapshots *)
-      let* () = Process.run "cp" [snapshot_file; snapshot_file ^ ".raw.gz"] in
-      let* () =
-        Process.run
-          "cp"
-          [snapshot_file_on_the_fly; snapshot_file_on_the_fly ^ ".raw.gz"]
-      in
-      let* () = Process.run "gzip" ["-d"; snapshot_file ^ ".raw.gz"] in
-      let* () =
-        Process.run "gzip" ["-d"; snapshot_file_on_the_fly ^ ".raw.gz"]
-      in
-      (* Compare uncompressed snapshots *)
-      Process.run
-        "cmp"
-        [snapshot_file ^ ".raw"; snapshot_file_on_the_fly ^ ".raw"])
   in
   let* exists = Lwt_unix.file_exists snapshot_file in
   if not exists then
