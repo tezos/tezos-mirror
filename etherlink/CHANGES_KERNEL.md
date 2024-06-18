@@ -13,6 +13,9 @@
 - Add FA deposit structure and helper methods for its parsing and formatting. (!13720)
 - Add ticket table to account for FA deposits. (!12072)
 
+-  Compress h256 hash when encoding. Transaction encoded with `r` or
+   `s` hash compressed were impacted. (!13654)
+
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
 ### Features

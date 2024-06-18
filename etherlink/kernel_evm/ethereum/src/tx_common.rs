@@ -1650,4 +1650,14 @@ mod test {
                 .unwrap()
         );
     }
+
+    #[test]
+    fn test_hash_exact() {
+        let tx_encoded = "f86480843b9aca00825cd6946ce4d79d4e77402e1ef3417fdda433aa744c6e1c0180820a959f3df55056959e51b66a515312fd0b851d629f562cb1e1b30d29fc909acb8450a02edac87401057bbe3a6255a253db01e5c5c6b9a597bfdab07d4ceefe08c03af9";
+        let tx_decoded =
+            EthereumTransactionCommon::from_bytes(&hex::decode(tx_encoded).unwrap())
+                .unwrap();
+        let tx_reencoded = hex::encode(tx_decoded.to_bytes());
+        assert_eq!(tx_encoded, tx_reencoded);
+    }
 }
