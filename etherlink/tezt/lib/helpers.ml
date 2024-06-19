@@ -166,25 +166,33 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
   in
   Client.bake_for_and_wait ~keys:[] client
 
-let bake_until ?__LOC__ ?(timeout = 30.) ~bake ~result_f () =
+let bake_until ?__LOC__ ?(timeout_in_blocks = 5) ?(timeout = 30.) ~bake
+    ~result_f () =
   let res = ref None in
-  let rec go () =
+  let rec go counter_block =
     let* opt = result_f () in
     match opt with
     | Some x ->
         res := Some x ;
         unit
     | None ->
-        let* _ = bake () in
-        go ()
+        if counter_block > timeout_in_blocks then
+          Test.fail
+            ?__LOC__
+            "Bake until has baked more than %d blocks but the condition is \
+             still false."
+            timeout_in_blocks
+        else
+          let* _ = bake () in
+          go (counter_block + 1)
   in
-  let* () = Lwt.pick [go (); Lwt_unix.sleep timeout] in
+  let* () = Lwt.pick [go 0; Lwt_unix.sleep timeout] in
   match !res with
   | Some x -> return x
   | None -> Test.fail ?__LOC__ "Bake until failed with a timeout"
 
-let bake_until_sync ?__LOC__ ?timeout ~sc_rollup_node ~proxy ~sequencer ~client
-    () =
+let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
+    ~sequencer ~client () =
   let bake () =
     let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
     unit
@@ -203,7 +211,7 @@ let bake_until_sync ?__LOC__ ?timeout ~sc_rollup_node ~proxy ~sequencer ~client
         else if sequencer_level = proxy_level then return @@ Some ()
         else Lwt.return_none
   in
-  bake_until ?__LOC__ ?timeout ~bake ~result_f ()
+  bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
 
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
