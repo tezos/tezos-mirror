@@ -52,3 +52,14 @@ impl TryFrom<[u8; DAL_PARAMETERS_SIZE]> for RollupDalParameters {
         })
     }
 }
+
+impl From<&RollupDalParameters> for [u8; DAL_PARAMETERS_SIZE] {
+    fn from(value: &RollupDalParameters) -> [u8; DAL_PARAMETERS_SIZE] {
+        let mut data = [0; 4];
+        data[0] = (value.number_of_slots as i64).to_be();
+        data[1] = (value.attestation_lag as i64).to_be();
+        data[2] = (value.slot_size as i64).to_be();
+        data[3] = (value.page_size as i64).to_be();
+        unsafe { core::mem::transmute(data) }
+    }
+}
