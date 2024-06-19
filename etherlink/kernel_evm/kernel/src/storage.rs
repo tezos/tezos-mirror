@@ -152,6 +152,9 @@ const ENABLE_FA_BRIDGE: RefPath =
 // If the flag is set, the kernel consider that this is local evm node execution.
 const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
+const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
+    RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
+
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,
     path: &T,
@@ -1115,6 +1118,12 @@ pub fn evm_node_flag(host: &impl Runtime) -> anyhow::Result<bool> {
     } else {
         Ok(false)
     }
+}
+
+pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result<i64> {
+    let bytes = host.store_read_all(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS)?;
+    let bytes: [u8; 8] = bytes.as_slice().try_into()?;
+    Ok(i64::from_le_bytes(bytes))
 }
 
 #[cfg(test)]

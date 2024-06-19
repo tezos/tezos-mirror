@@ -116,6 +116,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             sequencer,
             enable_dal,
             evm_node_flag: _,
+            max_blueprint_lookahead_in_seconds: _,
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
@@ -179,6 +180,7 @@ mod tests {
                 sequencer,
                 enable_dal,
                 evm_node_flag: false,
+                max_blueprint_lookahead_in_seconds: 100_000i64,
             },
             limits: Limits::default(),
             enable_fa_bridge: false,

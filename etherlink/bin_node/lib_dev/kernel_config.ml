@@ -23,7 +23,8 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?remove_whitelist ~enable_fa_bridge ?enable_dal ~output () =
+    ?max_blueprint_lookahead_in_seconds ?remove_whitelist ~enable_fa_bridge
+    ?enable_dal ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -76,6 +77,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
         sequencer_pool_address
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
+    @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
     @ bootstrap_accounts
     @ make_instr remove_whitelist
     @ make_instr enable_fa_bridge

@@ -252,6 +252,13 @@ fn fetch_delayed_txs<Host: Runtime>(
     ))
 }
 
+// Default value is 5 minutes. The rationale for 5 minutes is that we have
+// only the timestamp from the predecessor block, and we want the rollup to
+// accept blocks even if the chain is impacted by high rounds (e.g. > 10).
+// The predecessor block timestamp can be completely off and we do not
+// wish to refuse such blueprints.
+pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
+
 fn parse_and_validate_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
@@ -456,6 +463,7 @@ mod tests {
                 sequencer,
                 enable_dal,
                 evm_node_flag: false,
+                max_blueprint_lookahead_in_seconds: 100_000i64,
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
