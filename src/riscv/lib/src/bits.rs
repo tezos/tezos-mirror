@@ -159,6 +159,16 @@ impl<const WIDTH: usize> Bits64 for FixedWidthBits<WIDTH> {
     }
 }
 
+/// Get the bitmask formed of `n` ones.
+pub const fn ones(n: u64) -> u64 {
+    // This function should not panic
+    let sh_amt = 64_u64.saturating_sub(n);
+    match n {
+        0 => 0,
+        _ => !0 >> sh_amt,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::bits::u16;

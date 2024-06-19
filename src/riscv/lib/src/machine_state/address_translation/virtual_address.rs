@@ -13,10 +13,10 @@
 
 use super::PAGE_OFFSET_WIDTH;
 use crate::{
-    bits::u64,
+    bits::{ones, u64},
     machine_state::{
         bus::Address,
-        csregisters::{ones, satp::SvLength, CSRRepr},
+        csregisters::{satp::SvLength, CSRRepr},
     },
 };
 

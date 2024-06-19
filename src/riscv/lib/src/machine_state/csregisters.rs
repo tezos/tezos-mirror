@@ -17,7 +17,7 @@ use self::{
 };
 use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
-    bits::{u64, Bits64},
+    bits::{ones, u64, Bits64},
     machine_state::mode::Mode,
     state_backend::{self as backend, Manager, Region},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
@@ -32,16 +32,6 @@ pub enum Privilege {
     Supervisor = 1,
     Hypervisor = 2,
     Machine = 3,
-}
-
-/// Get the bitmask formed of `n` ones.
-pub const fn ones(n: u64) -> u64 {
-    // this function should not panic
-    let sh_amt = 64_u64.saturating_sub(n);
-    match n {
-        0 => 0,
-        _ => !0 >> sh_amt,
-    }
 }
 
 /// CSR index
