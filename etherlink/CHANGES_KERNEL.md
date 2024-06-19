@@ -10,6 +10,8 @@
 
 ## Bug fixes
 
+- Allow `eth_call` to return the contract bytecode on contract creation. (!13830)
+
 ## Internal
 
 - Add FA deposit structure and helper methods for its parsing and formatting. (!13720)

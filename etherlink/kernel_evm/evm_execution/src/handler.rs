@@ -882,6 +882,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         runtime: evm::Runtime,
         creation_result: Result<ExitReason, EthereumError>,
         address: H160,
+        is_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
         match creation_result {
             Ok(sub_context_result @ ExitReason::Succeed(ExitSucceed::Suicided)) => {
@@ -916,9 +917,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     return Ok((ExitReason::Error(err), None, vec![]));
                 }
 
-                self.set_contract_code(address, code_out)?;
+                self.set_contract_code(address, &code_out)?;
 
-                Ok((sub_context_result, Some(address), vec![]))
+                Ok((
+                    sub_context_result,
+                    Some(address),
+                    if is_opcode { vec![] } else { code_out },
+                ))
             }
             Ok(sub_context_result @ ExitReason::Revert(_)) => {
                 // EIP-140: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
@@ -1002,6 +1007,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         value: U256,
         initial_code: Vec<u8>,
         address: H160,
+        is_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
 
@@ -1075,7 +1081,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Precondition::EthereumErr(err) => Err(err),
         };
 
-        self.end_create(runtime, creation_result, address)
+        self.end_create(runtime, creation_result, address, is_opcode)
     }
 
     /// Call a contract
@@ -1238,7 +1244,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         let result =
-            self.execute_create(caller, value.unwrap_or_default(), input, address);
+            self.execute_create(caller, value.unwrap_or_default(), input, address, false);
 
         self.end_initial_transaction(result)
     }
@@ -1339,10 +1345,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn set_contract_code(
         &mut self,
         address: H160,
-        code: Vec<u8>,
+        code: &[u8],
     ) -> Result<(), EthereumError> {
         self.get_or_create_account(address)?
-            .set_code(self.host, &code)
+            .set_code(self.host, code)
             .map_err(EthereumError::from)
     }
 
@@ -2285,6 +2291,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                             value,
                             init_code,
                             contract_address,
+                            true,
                         );
 
                         self.end_inter_transaction(result)
@@ -3073,7 +3080,8 @@ mod test {
 
         handler.begin_initial_transaction(false, None).unwrap();
 
-        let result = handler.execute_create(caller, value, init_code, expected_address);
+        let result =
+            handler.execute_create(caller, value, init_code, expected_address, true);
 
         match result {
             Ok(result) => {
@@ -3143,7 +3151,7 @@ mod test {
         handler.begin_initial_transaction(false, None).unwrap();
 
         let result =
-            handler.execute_create(caller, value, initial_code, contract_address);
+            handler.execute_create(caller, value, initial_code, contract_address, true);
 
         match result {
             Ok(result) => {
@@ -3672,8 +3680,13 @@ mod test {
             .begin_initial_transaction(false, Some(10000))
             .unwrap();
 
-        let result =
-            handler.execute_create(caller, U256::from(100000), code, contract_address);
+        let result = handler.execute_create(
+            caller,
+            U256::from(100000),
+            code,
+            contract_address,
+            true,
+        );
 
         assert_eq!(
             result.unwrap(),
@@ -4334,7 +4347,7 @@ mod test {
             .unwrap();
 
         let result = handler
-            .execute_create(caller, U256::zero(), initial_code.to_vec(), address)
+            .execute_create(caller, U256::zero(), initial_code.to_vec(), address, true)
             .unwrap();
 
         assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
