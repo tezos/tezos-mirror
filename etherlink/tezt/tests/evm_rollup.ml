@@ -5080,6 +5080,48 @@ let test_call_recursive_contract_estimate_gas =
   let* () = check_tx_succeeded ~endpoint ~tx in
   unit
 
+let test_limited_stack_depth =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "recursive"; "stack_depth"]
+    ~title:"Check recursive contract gasLimit is high enough"
+    ~maximum_allowed_ticks:1_000_000_000_000L
+  @@ fun ~protocol:_
+             ~evm_setup:
+               ({endpoint; sc_rollup_node; client; evm_node; _} as evm_setup) ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* recursive_address, _tx = deploy ~contract:recursive ~sender evm_setup in
+  (* 256 is ok. *)
+  let call () =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:recursive.label
+      ~address:recursive_address
+      ~method_call:"call(256)"
+      ~gas:30_000_000
+      ()
+  in
+  let* tx = wait_for_application ~evm_node ~sc_rollup_node ~client call in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  (* 257 is not. *)
+  let call () =
+    Eth_cli.contract_send
+      ~expect_failure:true
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:recursive.label
+      ~address:recursive_address
+      ~method_call:"call(257)"
+      ~gas:30_000_000
+        (* The fee model kicks in because we spend too much ticks in the previous call. *)
+      ~gas_price:2000000000
+      ()
+  in
+  let* tx = wait_for_application ~evm_node ~sc_rollup_node ~client call in
+  let* () = check_tx_failed ~endpoint ~tx in
+  unit
+
 let test_transaction_exhausting_ticks_is_rejected =
   register_both
     ~tags:["evm"; "loop"; "out_of_ticks"; "rejected"]
@@ -6048,6 +6090,7 @@ let register_evm_node ~protocols =
   test_transaction_exhausting_ticks_is_rejected protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
+  test_limited_stack_depth protocols ;
   test_blockhash_opcode protocols ;
   test_revert_is_correctly_propagated protocols ;
   test_block_gas_limit protocols ;

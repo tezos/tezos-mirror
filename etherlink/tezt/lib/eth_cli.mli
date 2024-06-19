@@ -102,6 +102,7 @@ val contract_send :
   method_call:string ->
   ?value:Wei.t ->
   ?gas:int ->
+  ?gas_price:int ->
   unit ->
   string Lwt.t
 
