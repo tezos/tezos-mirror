@@ -188,6 +188,9 @@ module Cli = struct
     (* We want the sequencer to be active by default if etherlink is activated. *)
     Clap.flag ~section ~unset_long:"no-etherlink-sequencer" etherlink
 
+  let etherlink_producers =
+    Clap.default_int ~section ~long:"etherlink-producers" 0
+
   let disconnect =
     let disconnect_typ =
       let parse string =
@@ -222,6 +225,7 @@ type configuration = {
   producer_machine_type : string option;
   etherlink : bool;
   etherlink_sequencer : bool;
+  etherlink_producers : int;
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
   disconnect : (int * int) option;
@@ -1270,6 +1274,7 @@ let configuration =
   let producer_machine_type = Cli.producer_machine_type in
   let etherlink = Cli.etherlink in
   let etherlink_sequencer = Cli.etherlink_sequencer in
+  let etherlink_producers = Cli.etherlink_producers in
   let disconnect = Cli.disconnect in
   {
     stake;
@@ -1280,6 +1285,7 @@ let configuration =
     producer_machine_type;
     etherlink;
     etherlink_sequencer;
+    etherlink_producers;
     disconnect;
   }
 
