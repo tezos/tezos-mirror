@@ -73,7 +73,13 @@ extern crate alloc;
 pub const CHAIN_ID: u32 = 1337;
 
 /// The configuration for the EVM execution.
-pub const CONFIG: Config = Config::shanghai();
+const CONFIG: Config = Config {
+    // The current implementation doesn't support Shanghai stack limit of 256.
+    // We need to set a lower limit until we have switched to a head-based
+    // recursive calls.
+    stack_limit: 256,
+    ..Config::shanghai()
+};
 
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
