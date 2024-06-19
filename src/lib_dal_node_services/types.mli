@@ -336,7 +336,12 @@ end
 module Gossipsub : sig
   (** See {!Tezos_gossipsub.Introspection.connection}. Ideally we should reuse
       that type, but that would require a new dependency to be added. *)
-  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+  type connection = {
+    topics : Topic.t list;
+    direct : bool;
+    outbound : bool;
+    bootstrap : bool;
+  }
 
   val connection_encoding : connection Data_encoding.t
 end

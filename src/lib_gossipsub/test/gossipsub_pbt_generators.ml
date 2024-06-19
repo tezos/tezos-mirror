@@ -150,7 +150,7 @@ struct
     let+ direct = gen_direct
     and+ outbound = gen_outbound
     and+ peer = gen_peer in
-    ({direct; outbound; peer} : GS.add_peer)
+    ({direct; outbound; peer; bootstrap = false} : GS.add_peer)
 
   let remove_peer ~gen_peer =
     let+ peer = gen_peer in

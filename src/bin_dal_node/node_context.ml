@@ -354,6 +354,7 @@ module P2P = struct
                 topics = Gossipsub.Worker.GS.Topic.Set.elements connection.topics;
                 direct = connection.direct;
                 outbound = connection.outbound;
+                bootstrap = connection.bootstrap;
               } )
           :: acc)
         state.connections

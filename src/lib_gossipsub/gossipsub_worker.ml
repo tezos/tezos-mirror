@@ -717,7 +717,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ({gossip_state; _} as state) = function
     | New_connection {peer; direct; trusted; bootstrap} ->
-        GS.add_peer {direct; outbound = trusted; peer} gossip_state
+        GS.add_peer {direct; outbound = trusted; peer; bootstrap} gossip_state
         |> update_gossip_state state
         |> handle_new_connection peer ~bootstrap ~trusted
     | Disconnection {peer} ->
