@@ -352,9 +352,12 @@ module P2P = struct
            ~subscribed:q#subscribed
            ctxt
 
-    let get_connections ctxt () () =
+    let get_connections ?ignore_bootstrap_topics ctxt () () =
       let open Lwt_result_syntax in
-      return @@ Node_context.P2P.Gossipsub.get_connections ctxt
+      return
+      @@ Node_context.P2P.Gossipsub.get_connections
+           ?ignore_bootstrap_topics
+           ctxt
 
     let get_scores ctxt () () =
       let open Lwt_result_syntax in
@@ -429,7 +432,7 @@ let register :
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_connections
-       (P2P.Gossipsub.get_connections ctxt)
+       (P2P.Gossipsub.get_connections ~ignore_bootstrap_topics:true ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_scores
