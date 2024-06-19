@@ -97,8 +97,8 @@ let start ?(scrape_interval = 5) agents =
   let configuration_file = Temp.file "prometheus.yml" in
   let t = {configuration_file; sources; scrape_interval} in
   write_configuration_file t ;
-  let* () =
-    Process.run
+  let process =
+    Process.spawn
       "docker"
       [
         "run";
@@ -120,6 +120,51 @@ let start ?(scrape_interval = 5) agents =
         (* To reload the configuration while prometheus is running.*)
       ]
   in
+  let* status = Process.wait process in
+  let* () =
+    match status with
+    | WEXITED 0 -> Lwt.return_unit
+    | WEXITED 125 ->
+        Log.warn
+          "A prometheus instance is already running. It was not properly \
+           closed last time" ;
+        Lwt.return_unit
+    | _ ->
+        (* Fail if something unexpected happens. *)
+        Process.check process
+  in
+  let rec wait_for_ready () =
+    let process =
+      Process.spawn
+        "curl"
+        [
+          "-s";
+          "-o";
+          "/dev/null";
+          "-w";
+          "%{http_code}";
+          "http://localhost:9090/-/ready";
+        ]
+    in
+    let* status = Process.wait process in
+    match status with
+    | Unix.WEXITED 0 ->
+        let* status = Process.check_and_read_stdout process in
+        if String.trim status = "200" then Lwt.return_unit
+        else (
+          Log.info
+            "Prometheus container is not ready, let's wait 2 seconds and check \
+             again..." ;
+          let* () = Lwt_unix.sleep 2. in
+          wait_for_ready ())
+    | _ ->
+        Log.info
+          "Prometheus container is not ready, let's wait 2 seconds and check \
+           again..." ;
+        let* () = Lwt_unix.sleep 2. in
+        wait_for_ready ()
+  in
+  let* () = wait_for_ready () in
   Lwt.return t
 
 let snapshots_path = "/prometheus" // "data" // "snapshots"
