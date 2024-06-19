@@ -12,11 +12,13 @@ use crate::state::{HostState, NextInput};
 use crate::MockHost;
 use core::{
     cell::RefCell,
+    cmp::min,
     ptr,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::dal_parameters::DAL_PARAMETERS_SIZE;
 use tezos_smart_rollup_host::metadata::METADATA_SIZE;
 use tezos_smart_rollup_host::Error;
 
@@ -35,6 +37,19 @@ impl AsMut<HostState> for MockHost {
     fn as_mut(&mut self) -> &mut HostState {
         self.state.get_mut()
     }
+}
+
+unsafe fn reveal_dal_parameters(
+    host: &MockHost,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let params: [u8; DAL_PARAMETERS_SIZE] =
+        host.state.borrow().get_dal_parameters().into();
+    let len = min(max_bytes, params.len());
+    let slice = from_raw_parts_mut(destination_addr, len);
+    slice.copy_from_slice(&params[..len]);
+    len as i32
 }
 
 unsafe impl SmartRollupCore for MockHost {
@@ -194,13 +209,41 @@ unsafe impl SmartRollupCore for MockHost {
 
     unsafe fn reveal(
         &self,
-        _payload_addr: *const u8,
-        _payload_len: usize,
-        _destination_addr: *mut u8,
-        _max_bytes: usize,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
     ) -> i32 {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6171
-        unimplemented!("The `reveal` host function is not yet mocked.")
+        let payload: &[u8] = from_raw_parts(payload_addr, payload_len);
+        match payload[0] {
+            0 => {
+                // Reveal_raw_data
+                self.reveal_preimage(
+                    payload_addr.add(1),
+                    payload_len.saturating_sub(1),
+                    destination_addr,
+                    max_bytes,
+                )
+            }
+            1 => {
+                // Reveal_metadata
+                self.reveal_metadata(destination_addr, max_bytes)
+            }
+            2 => {
+                // Reveal_dal_page
+                unimplemented!(
+                    "The `reveal` host function is not yet mocked for DAL pages."
+                )
+            }
+            3 => {
+                // Reveal_dal_parameters
+                reveal_dal_parameters(self, destination_addr, max_bytes)
+            }
+            tag => unimplemented!(
+                "The `reveal` host function is not yet mocked for tag {}.",
+                tag
+            ),
+        }
     }
 }
 
