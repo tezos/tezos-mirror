@@ -1216,6 +1216,30 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
+let etherlink_loop etherlink =
+  let open Tezt_etherlink in
+  let rec account_loop i =
+    let wait_for =
+      Evm_node.wait_for_tx_pool_add_transaction etherlink.evm_node
+    in
+    let* _ =
+      let source_private_key = etherlink.accounts.(i).private_key in
+      let to_public_key =
+        etherlink.accounts.((i + 1) mod Array.length etherlink.accounts).address
+      in
+      Eth_cli.transaction_send
+        ~source_private_key
+        ~to_public_key
+        ~value:(Wei.of_eth_int 10)
+        ~endpoint:(Evm_node.endpoint etherlink.evm_node)
+        ()
+    in
+    let* _ = wait_for in
+    account_loop i
+  in
+  Array.mapi (fun i _ -> account_loop i) etherlink.accounts
+  |> Array.to_list |> Lwt.join
+
 let configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
@@ -1292,6 +1316,8 @@ let benchmark () =
           in
           let* t = init ~configuration cloud next_agent in
           let first_protocol_level = 2 in
-          loop t first_protocol_level)
+          let main_loop = loop t first_protocol_level in
+          let etherlink_loop = etherlink_loop t.etherlink in
+          Lwt.join [main_loop; etherlink_loop])
 
 let register () = benchmark ()
