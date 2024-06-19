@@ -72,7 +72,14 @@ let of_repr x = of_mutez @@ Tez_repr.to_mutez x
 let max_tez =
   match Tez.of_mutez Int64.max_int with None -> assert false | Some p -> p
 
-let of_z a = Z.to_int64 a |> Tez.of_mutez_exn
+let of_z a =
+  try Z.to_int64 a |> Tez.of_mutez_exn
+  with Z.Overflow ->
+    Log.info
+      ~color:Log.Color.FG.red
+      "Warning! Conversion from Z to Tez Overflow. Returning max_mutez. Expect \
+       a failure soon." ;
+    Tez.max_mutez
 
 let of_q ~round Q.{num; den} =
   (match round with `Up -> Z.cdiv num den | `Down -> Z.div num den) |> of_z
