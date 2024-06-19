@@ -1009,7 +1009,7 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
         initial_kernel = output;
         preimage_dir = Some preimages_dir;
         private_rpc_port;
-        time_between_blocks = None;
+        time_between_blocks = Some (Time_between_blocks 10.);
         sequencer = etherlink_rollup_operator_key.alias;
         genesis_timestamp = None;
         max_blueprints_lag = None;
