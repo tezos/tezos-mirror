@@ -496,8 +496,9 @@ let make_signers_for_injector operators =
          in
          let strategy =
            match operation_kinds with
-           | [Operation_kind.Add_messages] ->
-               (* For the batcher we delay of 0.5 sec to allow more
+           | [Operation_kind.Add_messages; Publish_dal_commitment]
+           | [Publish_dal_commitment; Add_messages] ->
+               (* For the batcher we delay half a block to allow more
                   operations to get in. *)
                `Delay_block 0.5
            | _ -> `Each_block
