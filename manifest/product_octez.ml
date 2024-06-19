@@ -2335,22 +2335,6 @@ let tezt_cloud =
       ]
     ~release_status:Unreleased
 
-let _tezt_tests_cloud =
-  private_exe
-    "main"
-    ~path:"tezt/tests/cloud"
-    ~opam:"tezt-tests-cloud"
-    ~synopsis:"Tezt tests using Tezt cloud"
-    ~bisect_ppx:No
-    ~deps:
-      [
-        octez_test_helpers |> open_;
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_cloud |> open_;
-      ]
-    ~with_macos_security_framework:true
-
 let octez_p2p_test_common =
   octez_shell_lib
     "p2p_test_common"

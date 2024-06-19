@@ -242,6 +242,12 @@ type producer = {
 
 type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
 
+type etherlink = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_node : Sc_rollup_node.t;
+}
+
 type public_key_hash = string
 
 type commitment = string
@@ -285,6 +291,7 @@ type t = {
   bakers : baker list;
   producers : producer list;
   observers : observer list;
+  etherlink : etherlink;
   parameters : Dal_common.Parameters.t;
   infos : (int, per_level_info) Hashtbl.t;
   metrics : (int, metrics) Hashtbl.t;
@@ -728,6 +735,7 @@ let init_bootstrap cloud (configuration : configuration) agent =
   let* producer_accounts =
     Client.stresstest_gen_keys configuration.dal_node_producer client
   in
+  let* etherlink_rollup_operator_key = Client.stresstest_gen_keys 1 client in
   let* parameter_file =
     let base =
       Either.right (configuration.protocol, Some Protocol.Constants_mainnet)
@@ -741,7 +749,7 @@ let init_bootstrap cloud (configuration : configuration) agent =
     let additional_bootstrap_accounts =
       List.map
         (fun key -> (key, Some 1_000_000_000_000, false))
-        producer_accounts
+        (producer_accounts @ etherlink_rollup_operator_key)
     in
     Protocol.write_parameter_file
       ~bootstrap_accounts
@@ -774,7 +782,11 @@ let init_bootstrap cloud (configuration : configuration) agent =
   let (bootstrap : bootstrap) =
     {node = bootstrap_node; dal_node = dal_bootstrap_node; client}
   in
-  Lwt.return (bootstrap, baker_accounts, producer_accounts)
+  Lwt.return
+    ( bootstrap,
+      baker_accounts,
+      producer_accounts,
+      List.hd etherlink_rollup_operator_key )
 
 let init_baker cloud (configuration : configuration) ~bootstrap_node
     ~dal_bootstrap_node account i agent =
@@ -909,6 +921,74 @@ let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
+let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
+  let open Sc_rollup_helpers in
+  let open Tezt_etherlink in
+  let* node =
+    Node.Agent.init
+      ~name:"etherlink-node"
+      ~arguments:
+        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      agent
+  in
+  let* client = Client.Agent.create ~node agent in
+  let* () =
+    Client.import_secret_key
+      client
+      ~endpoint:(Node node)
+      etherlink_rollup_operator_key.Account.secret_key
+      ~alias:etherlink_rollup_operator_key.Account.alias
+  in
+  let l = Node.get_last_seen_level node in
+  let*! () =
+    Client.reveal
+      client
+      ~endpoint:(Node node)
+      ~src:etherlink_rollup_operator_key.Account.alias
+  in
+  let* _ = Node.wait_for_level node (l + 2) in
+  (* FIXME: Figure out when those lines are necessary. It is probably related to
+     updating some constants. If they are necessary we need to probably first
+     update the docker image with the new kernel and then push it onto the
+     docker image. *)
+  (* let output_config = Temp.file "config.yaml" in
+     let*! () =
+       Tezt_etherlink.Evm_node.make_kernel_installer_config
+         ~output:output_config
+         ()
+     in *)
+  let* sc_rollup_node =
+    Sc_rollup_node.Agent.create
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:etherlink_rollup_operator_key.Account.alias
+      agent
+      Operator
+      node
+  in
+  let preimages_dir =
+    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
+  in
+  let* {output; _} =
+    prepare_installer_kernel ~agent ~preimages_dir Constant.WASM.evm_kernel
+  in
+  let pvm_kind = "wasm_2_0_0" in
+  let l = Node.get_last_seen_level node in
+  let* sc_rollup_address =
+    originate_sc_rollup
+      ~agent
+      ~keys:[]
+      ~kind:pvm_kind
+      ~boot_sector:output
+      ~parameters_ty:Helpers.evm_type
+      ~src:etherlink_rollup_operator_key.alias
+      client
+  in
+  let* _ = Node.wait_for_level node (l + 2) in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+  return {node; client; sc_rollup_node}
+
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
   let* attesters_agents =
@@ -931,7 +1011,10 @@ let init ~(configuration : configuration) cloud next_agent =
       configuration.observer_slot_indices
     |> Lwt.all
   in
-  let* bootstrap, baker_accounts, producer_accounts =
+  let* ( bootstrap,
+         baker_accounts,
+         producer_accounts,
+         etherlink_rollup_operator_key ) =
     init_bootstrap cloud configuration bootstrap_agent
   in
   let* bakers =
@@ -973,6 +1056,14 @@ let init ~(configuration : configuration) cloud next_agent =
           agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
+  let* etherlink_agent = next_agent ~name:"etherlink" in
+  let* etherlink =
+    init_etherlink
+      cloud
+      ~bootstrap_node:bootstrap.node
+      etherlink_rollup_operator_key
+      etherlink_agent
+  in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
   Hashtbl.replace metrics 1 default_metrics ;
@@ -987,6 +1078,7 @@ let init ~(configuration : configuration) cloud next_agent =
       bakers;
       producers;
       observers;
+      etherlink;
       parameters;
       infos;
       metrics;

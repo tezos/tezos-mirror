@@ -7,7 +7,8 @@
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
-  tezt_cloud)
+  tezt_cloud
+  tezt_etherlink)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
