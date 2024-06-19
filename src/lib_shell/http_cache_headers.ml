@@ -7,6 +7,7 @@
 
 type tools = {
   get_estimated_time_to_next_level : unit -> Ptime.span option Lwt.t;
+  get_block_hash : string -> Block_hash.t option Lwt.t;
 }
 
 (** [get_estimated_time_to_next_level get_chain_store] gets the estimated time 
@@ -36,8 +37,22 @@ let get_estimated_time_to_next_level get_chain_store =
         let timespan = Ptime.diff round_end now in
         return timespan
 
+let get_block_hash get_chain_store block_alias =
+  let open Lwt_option_syntax in
+  match Block_services.parse_block block_alias with
+  | Error _ -> Lwt.return_none
+  | Ok block_alias -> (
+      match get_chain_store () with
+      | None -> Lwt.return_none
+      | Some chain_store ->
+          let+ block =
+            Store.Chain.block_of_identifier_opt chain_store block_alias
+          in
+          Store.Block.hash block)
+
 let make_tools get_chain_store =
   {
     get_estimated_time_to_next_level =
       (fun () -> get_estimated_time_to_next_level get_chain_store);
+    get_block_hash = get_block_hash get_chain_store;
   }
