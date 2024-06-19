@@ -100,3 +100,19 @@ val parameters_type :
     returned. *)
 val must_exist :
   Raw_context.t -> Sc_rollup_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [save_commitment_period ctxt previous_commitment_period next_protocol_activation]
+    records that before level [next_protocol_activation], the commitment period
+    to use is [previous_commitment_period]. *)
+val save_commitment_period :
+  Raw_context.t -> int -> Raw_level_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [next_commitment_level ctxt inbox_level] returns the level that the next
+    commitment should target, taking into account the commitment periods of
+    past protocols as well as the current one.
+
+    {b Precondition:} For [next_commitment_level] result to actually be a
+    valid level for a commitment requires that [inbox_level] is a valid level
+    for a commitment as well. *)
+val next_commitment_level :
+  Raw_context.t -> Raw_level_repr.t -> Raw_level_repr.t tzresult Lwt.t

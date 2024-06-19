@@ -279,13 +279,12 @@ let assert_commitment_period ctxt rollup commitment =
   (* Commitments needs to be posted for inbox levels every [commitment_period].
      Therefore, [commitment.inbox_level] must be
      [predecessor_commitment.inbox_level + commitment_period]. *)
-  let sc_rollup_commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
+  let* expected_level =
+    Sc_rollup_storage.next_commitment_level ctxt pred_level
   in
   let* () =
     fail_unless
-      Raw_level_repr.(
-        commitment.inbox_level = add pred_level sc_rollup_commitment_period)
+      Raw_level_repr.(commitment.inbox_level = expected_level)
       Sc_rollup_bad_inbox_level
   in
   return ctxt
@@ -761,11 +760,8 @@ let cement_commitment ctxt rollup =
   let* old_lcc, old_lcc_level, ctxt =
     Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
   in
-  let sc_rollup_commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
-  in
-  let new_lcc_level =
-    Raw_level_repr.add old_lcc_level sc_rollup_commitment_period
+  let* new_lcc_level =
+    Sc_rollup_storage.next_commitment_level ctxt old_lcc_level
   in
   (* Assert conditions to cement are met. *)
   let* ctxt, (new_lcc_commitment, new_lcc_commitment_hash), dangling_commitments

@@ -224,3 +224,51 @@ let must_exist ctxt rollup =
   let open Lwt_result_syntax in
   let* ctxt, exists = Store.Genesis_info.mem ctxt rollup in
   if exists then return ctxt else tzfail (Sc_rollup_does_not_exist rollup)
+
+let get_past_commitment_periods ctxt =
+  let open Lwt_result_syntax in
+  let+ cell = Store.Past_commitment_periods.find ctxt in
+  Option.value ~default:[] cell
+
+let save_commitment_period ctxt previous_commitment_period
+    next_protocol_activation =
+  let open Lwt_result_syntax in
+  let* past_commitments = get_past_commitment_periods ctxt in
+  let*! ctxt =
+    Store.Past_commitment_periods.add
+      ctxt
+      (past_commitments
+      @ [
+          {
+            commitment_period_in_blocks = previous_commitment_period;
+            next_protocol_activation;
+          };
+        ])
+    (* We enforce the fact that the past commitment periods is sorted in
+       ascending order of [next_protocol_activation_level]. *)
+  in
+  return ctxt
+
+let next_commitment_level ctxt inbox_level =
+  let open Lwt_result_syntax in
+  (* This function assumes [past_commitments] is sorted in ascending order of
+     [next_protocol_activation_level]. This invariant is enforced by
+     [save_commitment_period]. *)
+  let+ past_commitments = get_past_commitment_periods ctxt in
+  let candidate_level =
+    List.find_map
+      (fun Sc_rollup_repr.Past_commitment_period.
+             {commitment_period_in_blocks; next_protocol_activation} ->
+        let candidate_level =
+          Raw_level_repr.add inbox_level commitment_period_in_blocks
+        in
+        if Raw_level_repr.(candidate_level <= next_protocol_activation) then
+          Some candidate_level
+        else None)
+      past_commitments
+  in
+  match candidate_level with
+  | Some candidate_level -> candidate_level
+  | None ->
+      Raw_level_repr.(
+        add inbox_level Raw_context.(sc_rollup ctxt).commitment_period_in_blocks)

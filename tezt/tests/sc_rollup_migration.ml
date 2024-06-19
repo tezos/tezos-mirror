@@ -605,6 +605,95 @@ let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+let test_rollup_node_migration_constant_changes ~kind ~migrate_from ~migrate_to
+    =
+  let next_block client rollup_node =
+    let* () = Sc_rollup_helpers.send_messages 1 client in
+    let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
+    unit
+  in
+  let tags = ["constants_changes"] in
+  let description =
+    "node can deal with protocol migration with constant changes"
+  in
+  let commitment_period = 6 in
+  let challenge_window = 6 in
+  let scenario_prior ~sc_rollup:_ ~rollup_node _tezos_node tezos_client =
+    (* Bake enough blocks to compute *and* publish a commitment in the previous
+       protocol. *)
+    let* () =
+      repeat (commitment_period + 4) (fun () ->
+          next_block tezos_client rollup_node)
+    in
+    let* commitment_and_hash =
+      Sc_rollup_node.RPC.call
+        rollup_node
+        (Sc_rollup_rpc.get_global_last_stored_commitment ())
+    in
+    (* Check that the first commitment has been indeed computed by the rollup
+       node. *)
+    Check.(
+      (commitment_and_hash.commitment.inbox_level = 2 + commitment_period) int)
+      ~error_msg:
+        "Unexpected last stored commitment, got %L but was expecting %R" ;
+    unit
+  in
+  let scenario_after ~sc_rollup ~rollup_node tezos_node tezos_client () =
+    (* Fetch the new commitment period, after constants update *)
+    let* {commitment_period_in_blocks = new_commitment_period; _} =
+      Sc_rollup_helpers.get_sc_rollup_constants tezos_client
+    in
+    (* Bake twice commitment periods. This should be enough for the rollup node
+       to compute two more commitments in the next protocol, and to decide to
+       cement the first one. *)
+    let* () =
+      repeat (2 * new_commitment_period) (fun () ->
+          next_block tezos_client rollup_node)
+    in
+    (* We first check the last computed commitment. *)
+    let* commitment_and_hash =
+      Sc_rollup_node.RPC.call
+        rollup_node
+        (Sc_rollup_rpc.get_global_last_stored_commitment ())
+    in
+    Check.(
+      (commitment_and_hash.commitment.inbox_level
+      = 2 + commitment_period + (2 * new_commitment_period))
+        int)
+      ~error_msg:
+        "Unexpected last stored commitment, got %L but was expecting %R" ;
+    (* We bake a few more blocks, to ensure the rollup node indeed injects a
+       cementation operation. *)
+    let* () = repeat 3 (fun () -> next_block tezos_client rollup_node) in
+    (* We check the LCC is indeed at the expected level. *)
+    let* commitment =
+      Node.RPC.call
+        tezos_node
+        RPC.(
+          get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
+            sc_rollup)
+    in
+    Check.(
+      (JSON.(commitment |-> "level" |> as_int)
+      = 2 + commitment_period + new_commitment_period)
+        int)
+      ~error_msg:
+        "Unexpected last cemented commitment, got %L but was expecting %R" ;
+    unit
+  in
+  test_l2_migration_scenario
+    ~with_constant_change:true
+    ~tags
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~description
+    ()
+
 (* Test originate rollup in previous protocol and start node in a different
    protocol. *)
 let test_originate_before_migration ~kind ~migrate_from ~migrate_to =
@@ -950,6 +1039,7 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to ;
   test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to ;
   test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to ;
+  test_rollup_node_migration_constant_changes ~kind ~migrate_from ~migrate_to ;
   test_originate_before_migration ~kind ~migrate_from ~migrate_to ;
   test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 

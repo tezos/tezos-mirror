@@ -1830,6 +1830,18 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_commitment_repr.genesis_info_encoding
       end)
 
+  module Past_commitment_periods =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["past_commitment_periods"]
+      end)
+      (struct
+        type t = Sc_rollup_repr.Past_commitment_period.t list
+
+        let encoding =
+          Data_encoding.(list Sc_rollup_repr.Past_commitment_period.encoding)
+      end)
+
   module Inbox = struct
     include
       Make_single_data_storage (Registered) (Raw_context)
