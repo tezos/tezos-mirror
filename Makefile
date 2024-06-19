@@ -233,10 +233,6 @@ endif
 		@copy-parameters
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
-	@cd $(OCTEZ_BIN_DIR)/; \
-		ln -s octez-smart-rollup-node octez-smart-rollup-node-PtNairob; \
-		ln -s octez-smart-rollup-node octez-smart-rollup-node-Proxford; \
-		ln -s octez-smart-rollup-node octez-smart-rollup-node-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
