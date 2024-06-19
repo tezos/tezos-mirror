@@ -261,6 +261,7 @@ type etherlink_setup = {
 
 type etherlink = {
   operator : etherlink_setup;
+  producers : etherlink_setup list;
   sequencer_active : bool;
   accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
@@ -938,7 +939,8 @@ let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
+let init_etherlink_setup _cloud mode ~bootstrap_node
+    etherlink_rollup_operator_key agent =
   let open Sc_rollup_helpers in
   let open Tezt_etherlink in
   let* node =
@@ -972,8 +974,13 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
     |> List.map (fun account -> account.Eth_account.address)
   in
   let*! () =
+    let sequencer =
+      if Cli.etherlink_sequencer then
+        Some etherlink_rollup_operator_key.public_key
+      else None
+    in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
-      ~sequencer:etherlink_rollup_operator_key.Account.public_key
+      ?sequencer
       ~bootstrap_accounts
       ~output:output_config
       ()
@@ -1035,7 +1042,7 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       }
   in
   let mode =
-    if Cli.etherlink_sequencer then sequencer_mode else Evm_node.Proxy
+    match mode with `Sequencer -> sequencer_mode | `Proxy -> Evm_node.Proxy
   in
   let* evm_node =
     Evm_node.Agent.init
@@ -1044,7 +1051,6 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       (Sc_rollup_node.endpoint sc_rollup_node)
       agent
   in
-  let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
   let operator =
     {
       node;
@@ -1054,7 +1060,26 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       account = etherlink_rollup_operator_key;
     }
   in
-  return {operator; accounts; sequencer_active = Cli.etherlink_sequencer}
+  return operator
+
+let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
+  let mode = if Cli.etherlink_sequencer then `Sequencer else `Proxy in
+  let* operator =
+    init_etherlink_setup
+      _cloud
+      mode
+      ~bootstrap_node
+      etherlink_rollup_operator_key
+      agent
+  in
+  let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
+  return
+    {
+      operator;
+      accounts;
+      sequencer_active = Cli.etherlink_sequencer;
+      producers = [];
+    }
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
