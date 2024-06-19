@@ -519,7 +519,7 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
       Sc_rollup_helpers.get_sc_rollup_constants tezos_client
     in
     let* () =
-      Sc_rollup_helpers.send_messages (new_commitment_period + 4) tezos_client
+      Sc_rollup_helpers.send_messages new_commitment_period tezos_client
     in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let* _l2_block =
@@ -534,6 +534,9 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
     let last_l2_commitment =
       JSON.(l2_head |-> "previous_commitment_hash" |> as_string)
     in
+    (* Bake blocks for commitment inclusion *)
+    let* () = Sc_rollup_helpers.send_messages 4 tezos_client in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     Log.info
       "Checking that last commitment in the new protocol was published on L1" ;
     let* _commitment_on_l1 =
