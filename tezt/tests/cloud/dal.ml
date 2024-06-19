@@ -221,6 +221,7 @@ type configuration = {
   protocol : Protocol.t;
   producer_machine_type : string option;
   etherlink : bool;
+  etherlink_sequencer : bool;
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
   disconnect : (int * int) option;
@@ -1268,6 +1269,7 @@ let configuration =
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
   let etherlink = Cli.etherlink in
+  let etherlink_sequencer = Cli.etherlink_sequencer in
   let disconnect = Cli.disconnect in
   {
     stake;
@@ -1277,6 +1279,7 @@ let configuration =
     protocol;
     producer_machine_type;
     etherlink;
+    etherlink_sequencer;
     disconnect;
   }
 
