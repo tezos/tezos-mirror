@@ -415,4 +415,8 @@ module Agent : sig
     string ->
     Tezt_tezos.Agent.t ->
     t Lwt.t
+
+  val rpc_port : t -> int
+
+  val name : t -> string
 end
