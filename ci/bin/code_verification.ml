@@ -1663,7 +1663,7 @@ let jobs pipeline_type =
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
-      let job_install_python ~__POS__ ~name ~image =
+      let job_install_python ~__POS__ ~name ~image ~project ~branch =
         job
           ~__POS__
           ~name
@@ -1679,26 +1679,46 @@ let jobs pipeline_type =
                ~label:"ci--docs"
                ())
           [
-            "./docs/developer/install-python-debian-ubuntu.sh \
-             ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} \
-             ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+            sf
+              "./docs/developer/install-python-debian-ubuntu.sh %s %s"
+              project
+              branch;
           ]
       in
-      (* The set of python installation test jobs. *)
-      [
-        job_install_python
-          ~__POS__
-          ~name:"oc.install_python_focal"
-          ~image:Images.ubuntu_focal;
-        job_install_python
-          ~__POS__
-          ~name:"oc.install_python_jammy"
-          ~image:Images.ubuntu_jammy;
-        job_install_python
-          ~__POS__
-          ~name:"oc.install_python_bookworm"
-          ~image:Images.debian_bookworm;
-      ]
+      (* The set of python installation test jobs. Since python is
+         today less used, we do the bulk of the tests in scheduled pipelines
+         and we only test debian_bookworm in a merge pipeline *)
+      match pipeline_type with
+      | Schedule_extended_test ->
+          [
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_focal"
+              ~image:Images.ubuntu_focal
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_jammy"
+              ~image:Images.ubuntu_jammy
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_bookworm"
+              ~image:Images.debian_bookworm
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+          ]
+      | Before_merging ->
+          [
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_bookworm"
+              ~image:Images.debian_bookworm
+              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+          ]
     in
     let jobs_documentation : tezos_job list =
       let rules =
