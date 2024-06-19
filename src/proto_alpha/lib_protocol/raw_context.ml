@@ -944,9 +944,10 @@ let update_block_time_related_constants (c : Constants_parametric_repr.t) =
   let blocks_per_commitment = quarter_more c.blocks_per_commitment in
   let nonce_revelation_threshold = quarter_more c.nonce_revelation_threshold in
   let max_operations_time_to_live = 5 * c.max_operations_time_to_live / 4 in
-  let block_time = Int64.to_int (Period_repr.to_seconds minimal_block_delay) in
   let sc_rollup =
-    Constants_parametric_repr.update_sc_rollup_parameter c.sc_rollup ~block_time
+    Constants_parametric_repr.update_sc_rollup_parameter
+      quarter_more
+      c.sc_rollup
   in
   {
     c with

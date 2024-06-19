@@ -45,10 +45,12 @@ let () =
       to_string ~minify:true
       @@ construct Constants.Parametric.Internal_for_tests.sc_rollup_encoding c)
   in
+  let open Lwt_result_syntax in
   (* We do not necessarily need to update this value when the block time
      changes. The goal is to witness the consistency of the “symbolic”
      computations in [Default_parameters] and [Raw_context].. *)
   let block_time = 10 in
+  let quarter_more x = Int32.(div (mul 5l x) 4l) in
   let sc_rollup =
     Default_parameters.Internal_for_tests.make_sc_rollup_parameter
       ~dal_attested_slots_validity_lag:241_920
@@ -56,16 +58,41 @@ let () =
       ~dal_activation_level:Raw_level.root
       block_time
   in
+  (* Check no update *)
   let sc_rollup' =
-    Constants.Parametric.update_sc_rollup_parameter sc_rollup ~block_time
+    Constants.Parametric.Internal_for_tests.update_sc_rollup_parameter
+      Fun.id
+      sc_rollup
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      (fun s1 s2 -> String.equal (to_string s1) (to_string s2))
+      "sc_rollup_parameter update"
+      (fun fmt sc_rollup -> Format.pp_print_string fmt @@ to_string sc_rollup)
+      sc_rollup
+      sc_rollup'
+  in
+  (* Check with update *)
+  let sc_rollup_expected_constants =
+    Default_parameters.Internal_for_tests.make_sc_rollup_parameter
+      ~dal_attested_slots_validity_lag:241_920
+        (* 4 weeks with a 10 secs block time. *)
+      ~dal_activation_level:Raw_level.root
+      8
+  in
+  let sc_rollup_updated_constants =
+    Constants.Parametric.Internal_for_tests.update_sc_rollup_parameter
+      quarter_more
+      sc_rollup
   in
   Assert.equal
     ~loc:__LOC__
     (fun s1 s2 -> String.equal (to_string s1) (to_string s2))
     "sc_rollup_parameter update"
     (fun fmt sc_rollup -> Format.pp_print_string fmt @@ to_string sc_rollup)
-    sc_rollup
-    sc_rollup'
+    sc_rollup_expected_constants
+    sc_rollup_updated_constants
 
 let () =
   register_test ~title:"constants consistency" @@ fun () ->

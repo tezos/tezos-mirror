@@ -246,7 +246,16 @@ type signature = Signature.t
 module Constants = struct
   include Constants_repr
   include Constants_storage
-  module Parametric = Constants_parametric_repr
+
+  module Parametric = struct
+    include Constants_parametric_repr
+
+    module Internal_for_tests = struct
+      include Internal_for_tests
+
+      let update_sc_rollup_parameter = update_sc_rollup_parameter
+    end
+  end
 
   let round_durations ctxt = Raw_context.round_durations ctxt
 
