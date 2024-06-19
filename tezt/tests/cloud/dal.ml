@@ -184,6 +184,10 @@ module Cli = struct
 
   let etherlink = Clap.flag ~section ~set_long:"etherlink" false
 
+  let etherlink_sequencer =
+    (* We want the sequencer to be active by default if etherlink is activated. *)
+    Clap.flag ~section ~unset_long:"no-etherlink-sequencer" etherlink
+
   let disconnect =
     let disconnect_typ =
       let parse string =
@@ -246,6 +250,7 @@ type etherlink = {
   node : Node.t;
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
+  evm_node : Tezt_etherlink.Evm_node.t;
 }
 
 type public_key_hash = string
@@ -947,16 +952,20 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       ~src:etherlink_rollup_operator_key.Account.alias
   in
   let* _ = Node.wait_for_level node (l + 2) in
-  (* FIXME: Figure out when those lines are necessary. It is probably related to
-     updating some constants. If they are necessary we need to probably first
-     update the docker image with the new kernel and then push it onto the
-     docker image. *)
-  (* let output_config = Temp.file "config.yaml" in
-     let*! () =
-       Tezt_etherlink.Evm_node.make_kernel_installer_config
-         ~output:output_config
-         ()
-     in *)
+  (* A configuration is generated locally by the orchestrator. The resulting
+     kernel will be pushed to Etherlink. *)
+  let output_config = Temp.file "config.yaml" in
+  let bootstrap_accounts =
+    Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
+    |> List.map (fun account -> account.Eth_account.address)
+  in
+  let*! () =
+    Tezt_etherlink.Evm_node.make_kernel_installer_config
+      ~sequencer:etherlink_rollup_operator_key.Account.public_key
+      ~bootstrap_accounts
+      ~output:output_config
+      ()
+  in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
       ~base_dir:(Client.base_dir client)
@@ -987,7 +996,38 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  return {node; client; sc_rollup_node}
+  let private_rpc_port = Agent.next_available_port agent |> Option.some in
+  let sequencer_mode =
+    Evm_node.Sequencer
+      {
+        initial_kernel = output;
+        preimage_dir = Some preimages_dir;
+        private_rpc_port;
+        time_between_blocks = None;
+        sequencer = etherlink_rollup_operator_key.alias;
+        genesis_timestamp = None;
+        max_blueprints_lag = None;
+        max_blueprints_ahead = None;
+        max_blueprints_catchup = None;
+        catchup_cooldown = None;
+        max_number_of_chunks = None;
+        wallet_dir = Some (Client.base_dir client);
+        tx_pool_timeout_limit = None;
+        tx_pool_addr_limit = None;
+        tx_pool_tx_per_addr_limit = None;
+      }
+  in
+  let mode =
+    if Cli.etherlink_sequencer then sequencer_mode else Evm_node.Proxy
+  in
+  let* evm_node =
+    Evm_node.Agent.init
+      ~name:"etherlink-evm-node"
+      ~mode
+      (Sc_rollup_node.endpoint sc_rollup_node)
+      agent
+  in
+  return {node; client; sc_rollup_node; evm_node}
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in

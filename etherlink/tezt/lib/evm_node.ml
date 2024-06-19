@@ -417,8 +417,8 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_pool_add_transaction.v0"
   @@ JSON.as_string_opt
 
-let create ?name ?runner ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port endpoint
-    =
+let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
+    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ()
   in
@@ -437,7 +437,7 @@ let create ?name ?runner ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port endpoint
   in
   let evm_node =
     create
-      ~path:(Uses.path Constant.octez_evm_node)
+      ~path
       ~name
       {
         arguments;
@@ -533,6 +533,7 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
   in
   let* () =
     run
+      ?runner:evm_node.persistent_state.runner
       ~event_level:`Debug
       evm_node
       {ready = false}
@@ -547,7 +548,7 @@ let spawn_command evm_node args =
     ~name:evm_node.name
     ~color:evm_node.color
     ?runner:evm_node.persistent_state.runner
-    (Uses.path Constant.octez_evm_node)
+    evm_node.path
   @@ args
 
 let spawn_run ?(extra_arguments = []) evm_node =
@@ -907,7 +908,7 @@ let reset evm_node ~l2_level =
   let args =
     ["reset"; "at"; string_of_int l2_level; "--force"] @ data_dir evm_node
   in
-  let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
+  let process = Process.spawn evm_node.path @@ args in
   Process.check process
 
 let sequencer_upgrade_payload ?client ~public_key ~pool_address
@@ -1036,3 +1037,25 @@ let make_kernel_installer_config ?(mainnet_compat = false)
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
+
+module Agent = struct
+  (* Use for compatibility with `tezt-cloud`. *)
+  let create ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir
+      ?rpc_addr ?mode endpoint agent =
+    let* path = Agent.copy agent ~source:path in
+    let runner = Agent.runner agent in
+    let rpc_port = Agent.next_available_port agent in
+    create ?name ~path ~runner ?data_dir ?rpc_addr ~rpc_port ?mode endpoint
+    |> Lwt.return
+
+  let init ?patch_config ?name ?mode ?data_dir ?rpc_addr rollup_node agent =
+    let* evm_node = create ?name ?mode ?data_dir ?rpc_addr rollup_node agent in
+    let* () = Process.check @@ spawn_init_config evm_node in
+    let* () =
+      match patch_config with
+      | Some patch_config -> Config_file.update evm_node patch_config
+      | None -> unit
+    in
+    let* () = run evm_node in
+    return evm_node
+end
