@@ -148,6 +148,14 @@ impl HostState {
     pub(crate) fn get_dal_parameters(&self) -> &RollupDalParameters {
         &self.dal_parameters
     }
+
+    pub(crate) fn get_dal_slot(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+    ) -> Option<&Vec<u8>> {
+        self.store.0.retrieve_dal_slot(published_level, slot_index)
+    }
 }
 
 #[cfg(test)]

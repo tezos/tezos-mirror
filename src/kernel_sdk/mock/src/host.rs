@@ -13,6 +13,7 @@ use crate::MockHost;
 use core::{
     cell::RefCell,
     cmp::min,
+    mem::size_of,
     ptr,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
@@ -49,6 +50,27 @@ unsafe fn reveal_dal_parameters(
     let len = min(max_bytes, params.len());
     let slice = from_raw_parts_mut(destination_addr, len);
     slice.copy_from_slice(&params[..len]);
+    len as i32
+}
+
+unsafe fn reveal_dal_page(
+    host: &MockHost,
+    published_level: i32,
+    slot_index: u8,
+    page_index: i16,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let state = host.state.borrow();
+    let params = state.get_dal_parameters();
+    let page_size = params.page_size as usize;
+    let len = min(max_bytes, page_size);
+    let start = ((page_index as u64) * params.page_size) as usize;
+    let Some(slot) = state.get_dal_slot(published_level, slot_index) else {
+        return 0;
+    };
+    let slice = from_raw_parts_mut(destination_addr, len);
+    slice.copy_from_slice(&slot[start..start + len]);
     len as i32
 }
 
@@ -215,7 +237,8 @@ unsafe impl SmartRollupCore for MockHost {
         max_bytes: usize,
     ) -> i32 {
         let payload: &[u8] = from_raw_parts(payload_addr, payload_len);
-        match payload[0] {
+        let (tag, payload) = payload.split_at(size_of::<u8>());
+        match tag[0] {
             0 => {
                 // Reveal_raw_data
                 self.reveal_preimage(
@@ -231,8 +254,22 @@ unsafe impl SmartRollupCore for MockHost {
             }
             2 => {
                 // Reveal_dal_page
-                unimplemented!(
-                    "The `reveal` host function is not yet mocked for DAL pages."
+                let (published_level, remaining) = payload.split_at(size_of::<i32>());
+                let (slot_index, remaining) = remaining.split_at(size_of::<u8>());
+                let (page_index, _) = remaining.split_at(size_of::<i16>());
+
+                let published_level =
+                    i32::from_be_bytes(published_level.try_into().unwrap());
+                let slot_index = slot_index[0];
+                let page_index = i16::from_be_bytes(page_index.try_into().unwrap());
+
+                reveal_dal_page(
+                    self,
+                    published_level,
+                    slot_index,
+                    page_index,
+                    destination_addr,
+                    max_bytes,
                 )
             }
             3 => {
