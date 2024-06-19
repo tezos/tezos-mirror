@@ -29,7 +29,7 @@ val agents : t -> Agent.t list
 val get_configuration : t -> Agent.t -> vm_configuration
 
 val push_metric :
-  t -> ?labels:(string * string) list -> name:string -> int -> unit
+  t -> ?labels:(string * string) list -> name:string -> float -> unit
 
 val set_agent_name : t -> Agent.t -> string -> unit Lwt.t
 

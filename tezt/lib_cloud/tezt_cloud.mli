@@ -29,7 +29,7 @@ module Cloud : sig
         Prometheus. [labels] can be used to categorised the metric (each set of
         label define a single curve). *)
   val push_metric :
-    t -> ?labels:(string * string) list -> name:string -> int -> unit
+    t -> ?labels:(string * string) list -> name:string -> float -> unit
 
   (** [agents t] returns the list of agents deployed. *)
   val agents : t -> Agent.t list

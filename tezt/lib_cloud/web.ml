@@ -115,7 +115,7 @@ let push_metric =
     in
     let str =
       Format.asprintf
-        "%s %s %d %d"
+        "%s %s %f %d"
         name
         labels_str
         value
