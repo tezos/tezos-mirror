@@ -384,37 +384,37 @@ let push_metrics t
            t.cloud
            ~labels:[("attester", name)]
            ~name:"tezt_attested_ratio_per_baker"
-           (int_of_float value)) ;
+           value) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "published")]
-    (int_of_float ratio_published_commitments) ;
+    ratio_published_commitments ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "attested")]
-    (int_of_float ratio_attested_commitments) ;
+    ratio_attested_commitments ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments_ratio"
     ~labels:[("kind", "published_last_level")]
-    (int_of_float ratio_published_commitments_last_level) ;
+    ratio_published_commitments_last_level ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments"
     ~labels:[("kind", "expected")]
-    expected_published_commitments ;
+    (float_of_int expected_published_commitments) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments"
     ~labels:[("kind", "published")]
-    total_published_commitments ;
+    (float_of_int total_published_commitments) ;
   Cloud.push_metric
     t.cloud
     ~name:"tezt_commitments"
     ~labels:[("kind", "attested")]
-    total_attested_commitments
+    (float_of_int total_attested_commitments)
 
 let published_level_of_attested_level t level =
   level - t.parameters.attestation_lag
