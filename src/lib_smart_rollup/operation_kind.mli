@@ -17,6 +17,7 @@ type t =
   | Refute
   | Recover
   | Execute_outbox_message
+  | Publish_dal_commitment
 
 (** List of possible operations kind for operator specialization. *)
 val all : t list

@@ -17,6 +17,7 @@ type t =
   | Refute
   | Recover
   | Execute_outbox_message
+  | Publish_dal_commitment
 
 let all =
   [
@@ -27,6 +28,7 @@ let all =
     Refute;
     Recover;
     Execute_outbox_message;
+    Publish_dal_commitment;
   ]
 
 module Map = Map.Make (struct
@@ -43,6 +45,7 @@ let to_string = function
   | Refute -> "refute"
   | Recover -> "recover"
   | Execute_outbox_message -> "execute_outbox_message"
+  | Publish_dal_commitment -> "publish_dal_commitment"
 
 let of_string = function
   | "publish" -> Some Publish
@@ -52,6 +55,7 @@ let of_string = function
   | "refute" -> Some Refute
   | "recover" -> Some Recover
   | "execute_outbox_message" -> Some Execute_outbox_message
+  | "publish_dal_commitment" -> Some Publish_dal_commitment
   | _ -> None
 
 let of_string_exn s =

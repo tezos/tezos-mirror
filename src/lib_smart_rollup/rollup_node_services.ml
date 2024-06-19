@@ -777,6 +777,22 @@ module Local = struct
       ~output:Encodings.message_status_output
       (path / "batcher" / "queue" /: Arg.l2_message_id)
 
+  let dal_injection =
+    let input_encoding =
+      Data_encoding.(
+        obj2
+          (req "slot_content" Data_encoding.Variable.string)
+          (req "slot_index" uint8))
+    in
+    Tezos_rpc.Service.post_service
+      ~description:"Inject the given slot in the DAL queue"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def "dal_slot" ~description:"Slot to inject" input_encoding)
+      ~output:Data_encoding.unit
+      (path / "dal" / "injection")
+
   let synchronized =
     Tezos_rpc.Service.get_service
       ~description:

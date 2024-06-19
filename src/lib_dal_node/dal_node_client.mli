@@ -51,3 +51,10 @@ val get_slot_page_proof :
   Tezos_dal_node_services.Types.slot_id ->
   int ->
   Cryptobox.page_proof tzresult Lwt.t
+
+(** [post_slot cctxt slot_data] posts the given data as a slot to the DAL node,
+    and returns the corresponding commitment hash alongside its proof. *)
+val post_slot :
+  cctxt ->
+  string ->
+  (Cryptobox.commitment * Cryptobox.commitment_proof) tzresult Lwt.t

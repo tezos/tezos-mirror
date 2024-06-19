@@ -51,6 +51,7 @@ let start_workers (plugin : (module Protocol_plugin_sig.S))
   let open Lwt_result_syntax in
   let* () = Publisher.init node_ctxt in
   let* () = Batcher.init plugin node_ctxt in
+  let* () = Dal_injection_queue.init node_ctxt in
   let* () = Refutation_coordinator.init node_ctxt in
   return_unit
 
@@ -495,8 +496,9 @@ let make_signers_for_injector operators =
          in
          let strategy =
            match operation_kinds with
-           | [Operation_kind.Add_messages] ->
-               (* For the batcher we delay of 0.5 sec to allow more
+           | [Operation_kind.Add_messages; Publish_dal_commitment]
+           | [Publish_dal_commitment; Add_messages] ->
+               (* For the batcher we delay half a block to allow more
                   operations to get in. *)
                `Delay_block 0.5
            | _ -> `Each_block
