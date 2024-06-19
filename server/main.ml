@@ -204,34 +204,40 @@ let get_stats ~logger db_pool =
       "SELECT level, round, timestamp FROM blocks ORDER BY level DESC, round \
        DESC LIMIT 1"
   in
+  let version_encoding =
+    Data_encoding.(
+      obj4
+        (req "teztale_version" string)
+        (req "teztale_commit_ref" string)
+        (req "tezos_branch" string)
+        (req "tezos_commit_ref" string))
+  in
+  let highest_block_encoding =
+    Data_encoding.(
+      obj3 (req "level" int32) (req "round" int32) (req "timestamp" string))
+  in
+  let version =
+    Teztale_lib.Version.
+      (teztale_version, teztale_commit_ref, tezos_branch, tezos_commit_ref)
+  in
   with_caqti_error
     ~logger
     (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
        db_pool)
-    (function
-      | Some (level, round, timestamp) ->
-          reply_public_json
-            Data_encoding.(
-              obj5
-                (req
-                   "highest_block"
-                   (obj3
-                      (req "level" int32)
-                      (req "round" int32)
-                      (req "timestamp" string)))
-                (req "teztale_version" string)
-                (req "teztale_commit_ref" string)
-                (req "tezos_branch" string)
-                (req "tezos_commit_ref" string))
-            ( (level, round, Tezos_base.Time.Protocol.to_notation timestamp),
-              Teztale_lib.Version.teztale_version,
-              Teztale_lib.Version.teztale_commit_ref,
-              Teztale_lib.Version.tezos_branch,
-              Teztale_lib.Version.tezos_commit_ref )
-      | None ->
-          let body = "No registered block yet." in
-          Cohttp_lwt_unix.Server.respond_error ~body ())
+    (fun highest_block ->
+      let highest_block =
+        match highest_block with
+        | Some (level, round, timestamp) ->
+            Some (level, round, Tezos_base.Time.Protocol.to_notation timestamp)
+        | None -> None
+      in
+      reply_public_json
+        Data_encoding.(
+          obj2
+            (opt "highest_block" highest_block_encoding)
+            (req "version" version_encoding))
+        (highest_block, version))
 
 let get_head ~logger conf db_pool =
   let query =
