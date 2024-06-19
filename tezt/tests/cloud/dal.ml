@@ -246,11 +246,17 @@ type producer = {
 
 type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
 
-type etherlink = {
+type etherlink_setup = {
   node : Node.t;
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
   evm_node : Tezt_etherlink.Evm_node.t;
+  account : Account.key;
+}
+
+type etherlink = {
+  operator : etherlink_setup;
+  sequencer_active : bool;
   accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
@@ -1034,7 +1040,16 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       agent
   in
   let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
-  return {node; client; sc_rollup_node; evm_node; accounts}
+  let operator =
+    {
+      node;
+      client;
+      sc_rollup_node;
+      evm_node;
+      account = etherlink_rollup_operator_key;
+    }
+  in
+  return {operator; accounts; sequencer_active = Cli.etherlink_sequencer}
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
@@ -1225,7 +1240,7 @@ let etherlink_loop etherlink =
   let open Tezt_etherlink in
   let rec account_loop i =
     let wait_for =
-      Evm_node.wait_for_tx_pool_add_transaction etherlink.evm_node
+      Evm_node.wait_for_tx_pool_add_transaction etherlink.operator.evm_node
     in
     let* _ =
       let source_private_key = etherlink.accounts.(i).private_key in
@@ -1236,7 +1251,7 @@ let etherlink_loop etherlink =
         ~source_private_key
         ~to_public_key
         ~value:(Wei.of_eth_int 10)
-        ~endpoint:(Evm_node.endpoint etherlink.evm_node)
+        ~endpoint:(Evm_node.endpoint etherlink.operator.evm_node)
         ()
     in
     let* _ = wait_for in
