@@ -2505,7 +2505,6 @@ oc.install_bin_ubuntu_focal:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2524,7 +2523,6 @@ oc.install_bin_ubuntu_jammy:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2543,7 +2541,6 @@ oc.install_bin_rc_ubuntu_focal:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2562,7 +2559,6 @@ oc.install_bin_rc_ubuntu_jammy:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2581,7 +2577,6 @@ oc.install_bin_debian_bookworm:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2600,7 +2595,6 @@ oc.install_bin_rc_debian_bookworm:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
     - docs/introduction/install*.sh
     when: on_success
   - when: manual
@@ -2629,58 +2623,14 @@ oc.install_opam_jammy:
   variables:
     OPAMJOBS: "4"
 
-oc.compile_release_sources_bullseye:
-  image: ocaml/opam:debian-11
+oc.compile_sources_doc_bookworm:
+  image: ocaml/opam:debian-12
   stage: test
   tags:
   - gcp
   rules:
   - changes:
-    - docs/introduction/compile*.sh
-    - docs/introduction/install*.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  script:
-  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
-  variables:
-    CARGO_HOME: /home/opam/.cargo
-    CARGO_NET_OFFLINE: "false"
-
-oc.compile_sources_bullseye:
-  image: ocaml/opam:debian-11
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - docs/introduction/compile*.sh
-    - docs/introduction/install*.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  script:
-  - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-  variables:
-    CARGO_HOME: /home/opam/.cargo
-    CARGO_NET_OFFLINE: "false"
-
-oc.compile_sources_mantic:
-  image: ocaml/opam:ubuntu-23.10
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - docs/introduction/compile*.sh
-    - docs/introduction/install*.sh
+    - docs/introduction/compile-sources.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -3246,48 +3196,8 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
-oc.install_python_focal:
-  image: public.ecr.aws/lts/ubuntu:20.04_stable
-  stage: doc
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - docs/developer/install-python-debian-ubuntu.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-
-oc.install_python_jammy:
-  image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: doc
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - docs/developer/install-python-debian-ubuntu.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-
-oc.install_python_bullseye:
-  image: debian:bullseye
+oc.install_python_bookworm:
+  image: debian:bookworm
   stage: doc
   tags:
   - gcp

@@ -2267,8 +2267,8 @@ oc.install_opam_jammy:
   variables:
     OPAMJOBS: "4"
 
-oc.compile_release_sources_bullseye:
-  image: ocaml/opam:debian-11
+oc.compile_sources_doc_bookworm:
+  image: ocaml/opam:debian-12
   stage: test
   tags:
   - gcp
@@ -2281,22 +2281,7 @@ oc.compile_release_sources_bullseye:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
 
-oc.compile_sources_bullseye:
-  image: ocaml/opam:debian-11
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies: []
-  script:
-  - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-  variables:
-    CARGO_HOME: /home/opam/.cargo
-    CARGO_NET_OFFLINE: "false"
-
-oc.compile_sources_mantic:
+oc.compile_sources_doc_mantic:
   image: ocaml/opam:ubuntu-23.10
   stage: test
   tags:
@@ -2305,8 +2290,7 @@ oc.compile_sources_mantic:
   - when: always
   dependencies: []
   script:
-  - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
@@ -2718,8 +2702,7 @@ oc.install_python_focal:
   - when: always
   dependencies: []
   script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
 
 oc.install_python_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
@@ -2730,11 +2713,10 @@ oc.install_python_jammy:
   - when: always
   dependencies: []
   script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
 
-oc.install_python_bullseye:
-  image: debian:bullseye
+oc.install_python_bookworm:
+  image: debian:bookworm
   stage: doc
   tags:
   - gcp
@@ -2742,8 +2724,7 @@ oc.install_python_bullseye:
   - when: always
   dependencies: []
   script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}

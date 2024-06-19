@@ -1191,12 +1191,17 @@ let jobs pipeline_type =
     in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
-      let changeset_install_jobs =
-        Changeset.make
-          ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
-      in
       let install_octez_rules =
-        make_rules ~changes:changeset_install_jobs ~manual:Yes ()
+        make_rules
+          ~changes:(Changeset.make ["docs/introduction/install*.sh"])
+          ~manual:Yes
+          ()
+      in
+      let compile_octez_rules =
+        make_rules
+          ~changes:(Changeset.make ["docs/introduction/compile-sources.sh"])
+          ~manual:Yes
+          ()
       in
       (* Test installation of the current deb binary packages. *)
       let job_install_bin ~__POS__ ~name
@@ -1245,7 +1250,7 @@ let jobs pipeline_type =
           ~name
           ~image
           ~dependencies:dependencies_needs_start
-          ~rules:install_octez_rules
+          ~rules:compile_octez_rules
           ~stage:Stages.test
             (* This job uses a CARGO_HOME different from
                {!Common.cargo_home}. That CARGO_HOME used is outside the
@@ -1285,27 +1290,39 @@ let jobs pipeline_type =
           Debian_bookworm;
         (* Test installing through opam *)
         job_install_opam_jammy;
-        (* Test compiling the [latest-release] branch on Bullseye *)
-        job_compile_sources
-          ~__POS__
-          ~name:"oc.compile_release_sources_bullseye"
-          ~image:Images.opam_debian_bullseye
-          ~project:"tezos/tezos"
-          ~branch:"latest-release";
-        (* Test compiling the [master] branch on Bullseye *)
-        job_compile_sources
-          ~__POS__
-          ~name:"oc.compile_sources_bullseye"
-          ~image:Images.opam_debian_bullseye
-          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
-        job_compile_sources
-          ~__POS__
-          ~name:"oc.compile_sources_mantic"
-          ~image:Images.opam_ubuntu_mantic
-          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
       ]
+      @
+      match pipeline_type with
+      (* These tests make sure that the compilation instructions
+         in master are still valid for the latest-release branch *)
+      | Schedule_extended_test ->
+          [
+            job_compile_sources
+              ~__POS__
+              ~name:"oc.compile_sources_doc_bookworm"
+              ~image:Images.opam_debian_bookworm
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+            job_compile_sources
+              ~__POS__
+              ~name:"oc.compile_sources_doc_mantic"
+              ~image:Images.opam_ubuntu_mantic
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+          ]
+          (* Test compiling the [master] branch on Bookworm, to make sure
+             that the compilation instructions in this branch are still
+             valid.
+          *)
+      | _ ->
+          [
+            job_compile_sources
+              ~__POS__
+              ~name:"oc.compile_sources_doc_bookworm"
+              ~image:Images.opam_debian_bookworm
+              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+          ]
     in
     (* Tezt jobs.
 
@@ -1646,7 +1663,7 @@ let jobs pipeline_type =
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
-      let job_install_python ~__POS__ ~name ~image =
+      let job_install_python ~__POS__ ~name ~image ~project ~branch =
         job
           ~__POS__
           ~name
@@ -1662,26 +1679,46 @@ let jobs pipeline_type =
                ~label:"ci--docs"
                ())
           [
-            "./docs/developer/install-python-debian-ubuntu.sh \
-             ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} \
-             ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+            sf
+              "./docs/developer/install-python-debian-ubuntu.sh %s %s"
+              project
+              branch;
           ]
       in
-      (* The set of python installation test jobs. *)
-      [
-        job_install_python
-          ~__POS__
-          ~name:"oc.install_python_focal"
-          ~image:Images.ubuntu_focal;
-        job_install_python
-          ~__POS__
-          ~name:"oc.install_python_jammy"
-          ~image:Images.ubuntu_jammy;
-        job_install_python
-          ~__POS__
-          ~name:"oc.install_python_bullseye"
-          ~image:Images.debian_bullseye;
-      ]
+      (* The set of python installation test jobs. Since python is
+         today less used, we do the bulk of the tests in scheduled pipelines
+         and we only test debian_bookworm in a merge pipeline *)
+      match pipeline_type with
+      | Schedule_extended_test ->
+          [
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_focal"
+              ~image:Images.ubuntu_focal
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_jammy"
+              ~image:Images.ubuntu_jammy
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_bookworm"
+              ~image:Images.debian_bookworm
+              ~project:"tezos/tezos"
+              ~branch:"latest-release";
+          ]
+      | Before_merging ->
+          [
+            job_install_python
+              ~__POS__
+              ~name:"oc.install_python_bookworm"
+              ~image:Images.debian_bookworm
+              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+          ]
     in
     let jobs_documentation : tezos_job list =
       let rules =
