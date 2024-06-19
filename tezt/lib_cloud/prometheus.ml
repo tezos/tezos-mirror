@@ -97,8 +97,8 @@ let start ?(scrape_interval = 5) agents =
   let configuration_file = Temp.file "prometheus.yml" in
   let t = {configuration_file; sources; scrape_interval} in
   write_configuration_file t ;
-  let* () =
-    Process.run
+  let process =
+    Process.spawn
       "docker"
       [
         "run";
@@ -119,6 +119,19 @@ let start ?(scrape_interval = 5) agents =
         "--web.enable-lifecycle";
         (* To reload the configuration while prometheus is running.*)
       ]
+  in
+  let* status = Process.wait process in
+  let* () =
+    match status with
+    | WEXITED 0 -> Lwt.return_unit
+    | WEXITED 125 ->
+        Log.warn
+          "A prometheus instance is already running. It was not properly \
+           closed last time" ;
+        Lwt.return_unit
+    | _ ->
+        (* Fail if something unexpected happens. *)
+        Process.check process
   in
   let rec wait_for_ready () =
     let process =
