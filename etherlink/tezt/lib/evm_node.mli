@@ -385,7 +385,6 @@ module Agent : sig
     ?path:string ->
     ?name:string ->
     ?data_dir:string ->
-    ?rpc_addr:string ->
     ?mode:mode ->
     string ->
     Tezt_tezos.Agent.t ->
@@ -396,7 +395,6 @@ module Agent : sig
     ?name:string ->
     ?mode:mode ->
     ?data_dir:string ->
-    ?rpc_addr:string ->
     string ->
     Tezt_tezos.Agent.t ->
     t Lwt.t
