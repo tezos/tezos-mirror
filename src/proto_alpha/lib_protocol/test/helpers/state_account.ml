@@ -397,6 +397,13 @@ let compute_future_frozen_rights block account_map =
               CycleMap.find (Block.current_cycle block) acc.frozen_rights
               |> Option.value ~default:Tez.zero
             in
+            let current_rights_state =
+              if
+                Tez.(
+                  current_rights_state < block.constants.minimal_frozen_stake)
+              then Tez.zero
+              else current_rights_state
+            in
             let* current_rights_rpc =
               Context.Delegate.initial_frozen_deposits (B block) acc.pkh
             in
