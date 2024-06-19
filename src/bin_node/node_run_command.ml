@@ -675,11 +675,13 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
           let*! () = Event.(emit enable_http_cache_headers_for_local ()) in
 
           let http_cache_headers_middleware =
-            let Http_cache_headers.{get_estimated_time_to_next_level} =
+            let Http_cache_headers.
+                  {get_estimated_time_to_next_level; get_block_hash} =
               Node.http_cache_header_tools node
             in
             RPC_middleware.Http_cache_headers.make
               ~get_estimated_time_to_next_level
+              ~get_block_hash
           in
           return_some http_cache_headers_middleware
         else return_none
