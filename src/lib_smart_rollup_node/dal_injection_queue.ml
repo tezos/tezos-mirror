@@ -5,6 +5,18 @@
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
+module Name = struct
+  (* We only have a single batcher in the node *)
+  type t = unit
+
+  let encoding = Data_encoding.unit
+
+  let base = ["dal-injection"; "worker"]
+
+  let pp _ _ = ()
+
+  let equal () () = true
+end
 
 module Dal_worker_types = struct
   module Request = struct
@@ -44,20 +56,65 @@ end
 
 open Dal_worker_types
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = "smart_rollup_node" :: Name.base
+
+  let injected =
+    declare_3
+      ~section
+      ~name:"injected"
+      ~msg:
+        "Injected a DAL slot {slot_commitment} at index {slot_index} with hash \
+         {operation_hash}"
+      ~level:Info
+      ~pp1:Tezos_crypto_dal.Cryptobox.Commitment.pp
+      ~pp3:Injector.Inj_operation.Id.pp
+      ("slot_commitment", Tezos_crypto_dal.Cryptobox.Commitment.encoding)
+      ("slot_index", Data_encoding.uint8)
+      ("operation_hash", Injector.Inj_operation.Id.encoding)
+
+  let request_failed =
+    declare_3
+      ~section
+      ~name:"request_failed"
+      ~msg:"Request {request} failed ({worker_status}): {errors}"
+      ~level:Warning
+      ("request", Request.encoding)
+      ~pp1:Request.pp
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp2:Worker_types.pp_status
+      ("errors", Error_monad.trace_encoding)
+      ~pp3:Error_monad.pp_print_trace
+
+  let request_completed =
+    declare_2
+      ~section
+      ~name:"request_completed"
+      ~msg:"{request} {worker_status}"
+      ~level:Debug
+      ("request", Request.encoding)
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp1:Request.pp
+      ~pp2:Worker_types.pp_status
+end
+
 type state = {node_ctxt : Node_context.ro}
 
 let inject_slot state ~slot_content ~slot_index =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
-  let* operation =
+  let* commitment, operation =
     match dal_cctxt with
     | Some dal_cctxt ->
         let* commitment, commitment_proof =
           Dal_node_client.post_slot dal_cctxt slot_content
         in
         return
-        @@ L1_operation.Publish_dal_commitment
-             {slot_index; commitment; commitment_proof}
+          ( commitment,
+            L1_operation.Publish_dal_commitment
+              {slot_index; commitment; commitment_proof} )
     | None ->
         (* This should not be reachable, as we tested that some [dal_cctxt] is set
            at startup before launching the worker. *)
@@ -68,15 +125,15 @@ let inject_slot state ~slot_content ~slot_index =
       state.node_ctxt.config.mode
       operation
   in
-  let+ l1_hash =
+  let* l1_hash =
     match l1_hash with
     | Some l1_hash -> return l1_hash
     | None ->
         let op = Injector.Inj_operation.make operation in
         return op.id
   in
-  ignore l1_hash ;
-  ()
+  let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
+  return_unit
 
 let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -96,19 +153,6 @@ module Types = struct
   type nonrec state = state
 
   type parameters = {node_ctxt : Node_context.ro}
-end
-
-module Name = struct
-  (* We only have a single DAL worker in the node *)
-  type t = unit
-
-  let encoding = Data_encoding.unit
-
-  let base = ["dal-injection"; "worker"]
-
-  let pp _ _ = ()
-
-  let equal () () = true
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -135,15 +179,18 @@ module Handlers = struct
     let state = init_dal_worker_state node_ctxt in
     return state
 
-  let on_error (type a b) _w _st (r : (a, b) Request.t) (errs : b) :
+  let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let _request_view = Request.view r in
-    let emit_and_return_errors _errs = return_unit in
-    match r with Request.Register _ -> emit_and_return_errors errs
+    match r with
+    | Request.Register _ ->
+        let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
+        return_unit
 
-  let on_completion _w r _ _st =
-    match Request.view r with Request.View (Register _) -> Lwt.return_unit
+  let on_completion _w r _ st =
+    match Request.view r with
+    | Request.View (Register _) ->
+        Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
 
