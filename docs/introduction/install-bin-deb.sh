@@ -13,6 +13,7 @@ fi
 # If it's a protected branch the value of $bucket will
 # be set accordingly but the CI.
 bucket="$GCP_LINUX_PACKAGES_BUCKET"
+protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 
 # This logic must be kept in sync with the script in
 # ./scripts/ci/create_debian_repo.sh
@@ -70,5 +71,5 @@ sudo apt-get install -y octez-baker
 # [test executables]
 octez-client --version
 octez-node --version
-octez-baker-Proxford --version
-octez-accuser-Proxford --version
+"octez-baker-$protocol" --version
+"octez-accuser-$protocol" --version
