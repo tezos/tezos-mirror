@@ -87,26 +87,24 @@ let binary_search (cond : 'a -> bool) (no_satisfying_value : 'a -> 'a -> bool)
     ~(first : 'a) ~(last : 'a) =
   let open Lwt_result_syntax in
   let rec search ~first ~last acc =
-    let first_level = to_level first in
-    let last_level = to_level last in
-    if first_level >= last_level then
-      (* search ended *)
-      if cond last then return (last :: acc) else return acc
-    else if Int32.succ first_level = last_level then
-      (* search ended as well *)
-      let acc = if cond last then last :: acc else acc in
-      return @@ if cond first then first :: acc else acc
+    if no_satisfying_value first last then return acc
     else
-      let mid_level =
-        Int32.(add first_level (div (sub last_level first_level) 2l))
-      in
-      let* mid = from_level mid_level in
-      let* acc =
-        if no_satisfying_value first mid then return acc
-        else search ~first ~last:mid acc
-      in
-      if no_satisfying_value mid last then return acc
-      else search ~first:mid ~last acc
+      let first_level = to_level first in
+      let last_level = to_level last in
+      if first_level >= last_level then
+        (* search ended *)
+        if cond last then return (last :: acc) else return acc
+      else if Int32.succ first_level = last_level then
+        (* search ended as well *)
+        let acc = if cond last then last :: acc else acc in
+        return @@ if cond first then first :: acc else acc
+      else
+        let mid_level =
+          Int32.(add first_level (div (sub last_level first_level) 2l))
+        in
+        let* mid = from_level mid_level in
+        let* acc = search ~first ~last:mid acc in
+        search ~first:mid ~last acc
   in
   search ~first ~last []
 
@@ -121,16 +119,12 @@ type level_with_protos = {
   protocols : Chain_services.Blocks.protocols;
 }
 
-(* This function performs a binary search between [first_level] and [last_level]
-   to search for migration levels. [first_protocols] and [last_protocols]
-   represent the 'protocols' metadata field of the blocks at these levels. *)
-let find_migration_levels cctxt ~first_level ~first_protocols ~last_level
-    ~last_protocols =
-  let first = {level = first_level; protocols = first_protocols} in
-  let last = {level = last_level; protocols = last_protocols} in
+(* Return the smallest levels between [first_level] and [last_level] for which a
+   different plugin should be added. *)
+let find_first_levels cctxt ~first_level ~last_level =
+  let open Lwt_result_syntax in
   let to_level {level; _} = level in
   let from_level level =
-    let open Lwt_result_syntax in
     let* protocols =
       Chain_services.Blocks.protocols cctxt ~block:(`Level level) ()
     in
@@ -142,46 +136,34 @@ let find_migration_levels cctxt ~first_level ~first_protocols ~last_level
     let last_proto = last.protocols.Chain_services.Blocks.next_protocol in
     Protocol_hash.equal first_proto last_proto
   in
-  binary_search cond no_satisfying_value to_level from_level ~first ~last
+  let* first = from_level first_level in
+  let* last = from_level last_level in
+  (* Performs a binary search between [first_working_level] and [last_level]
+     to search for migration levels. *)
+  let* migration_levels =
+    binary_search cond no_satisfying_value to_level from_level ~first ~last
+  in
+  let sorted_levels =
+    List.sort
+      (fun {level = level1; _} {level = level2; _} ->
+        Int32.compare level1 level2)
+      migration_levels
+  in
+  (* We need to add the plugin for [first_level] even if it's not a migration
+     level. *)
+  match sorted_levels with
+  | [] -> return [first]
+  | {level; _} :: _ when first.level <> level -> return (first :: sorted_levels)
+  | _ -> return sorted_levels
 
 let initial_plugins cctxt ~first_level ~last_level =
   let open Lwt_result_syntax in
-  let* first_protocols =
-    Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
-  in
-  let* proto_plugins =
-    add_plugin_for_level cctxt Plugins.empty first_protocols ~level:first_level
-  in
-  let* last_protocols =
-    Chain_services.Blocks.protocols cctxt ~block:(`Level last_level) ()
-  in
-  if
-    Protocol_hash.equal
-      first_protocols.next_protocol
-      last_protocols.next_protocol
-  then (* There's no migration in between, we're done. *)
-    return proto_plugins
-  else
-    let first_level = Int32.succ first_level in
-    let* first_protocols =
-      Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
-    in
-    (* There was at least one migration in between; we search the migration
-       levels and then we add the corresponding plugins. We perform a binary
-       search from [last_level] to [first_level]. *)
-    let* migration_levels =
-      find_migration_levels
-        cctxt
-        ~first_level
-        ~first_protocols
-        ~last_level
-        ~last_protocols
-    in
-    List.fold_left_es
-      (fun plugins {level; protocols} ->
-        add_plugin_for_level cctxt plugins protocols ~level)
-      proto_plugins
-      migration_levels
+  let* first_levels = find_first_levels cctxt ~first_level ~last_level in
+  List.fold_left_es
+    (fun plugins {level; protocols} ->
+      add_plugin_for_level cctxt plugins protocols ~level)
+    Plugins.empty
+    first_levels
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
