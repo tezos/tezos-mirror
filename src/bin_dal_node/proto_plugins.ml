@@ -59,13 +59,20 @@ let resolve_plugin_by_hash proto_hash =
 let resolve_plugin_for_level cctxt ~level =
   let open Lwt_result_syntax in
   let* protocols =
-    Tezos_shell_services.Chain_services.Blocks.protocols
-      cctxt
-      ~block:(`Level level)
-      ()
+    Chain_services.Blocks.protocols cctxt ~block:(`Level level) ()
   in
   let proto_hash = protocols.next_protocol in
   resolve_plugin_by_hash proto_hash
+
+let add_plugin_for_level cctxt plugins
+    (protocols : Chain_services.Blocks.protocols) ~level =
+  let open Lwt_result_syntax in
+  let* plugin = resolve_plugin_by_hash protocols.next_protocol in
+  let+ header =
+    Shell_services.Blocks.Header.shell_header cctxt ~block:(`Level level) ()
+  in
+  let proto_level = header.proto_level in
+  Plugins.add plugins ~first_level:level ~proto_level plugin
 
 (* This function performs a (kind of) binary search to search for all values
    that satisfy the given condition [cond] on values. There is bijection between
@@ -139,16 +146,11 @@ let find_migration_levels cctxt ~first_level ~first_protocols ~last_level
 
 let initial_plugins cctxt ~first_level ~last_level =
   let open Lwt_result_syntax in
-  let block = `Level first_level in
   let* first_protocols =
-    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
+    Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
   in
-  let first_proto = first_protocols.next_protocol in
-  let* plugin = resolve_plugin_by_hash first_proto in
-  let* header = Shell_services.Blocks.Header.shell_header cctxt ~block () in
-  let proto_level = header.proto_level in
-  let proto_plugins =
-    Plugins.add Plugins.empty ~first_level ~proto_level plugin
+  let* proto_plugins =
+    add_plugin_for_level cctxt Plugins.empty first_protocols ~level:first_level
   in
   let* last_protocols =
     Chain_services.Blocks.protocols cctxt ~block:(`Level last_level) ()
@@ -177,15 +179,7 @@ let initial_plugins cctxt ~first_level ~last_level =
     in
     List.fold_left_es
       (fun plugins {level; protocols} ->
-        let* plugin = resolve_plugin_by_hash protocols.next_protocol in
-        let* header =
-          Shell_services.Blocks.Header.shell_header
-            cctxt
-            ~block:(`Level level)
-            ()
-        in
-        let proto_level = header.proto_level in
-        Plugins.add plugins ~first_level:level ~proto_level plugin |> return)
+        add_plugin_for_level cctxt plugins protocols ~level)
       proto_plugins
       migration_levels
 
