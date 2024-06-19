@@ -23,6 +23,107 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Version = struct
+  type t = int
+
+  let make v = v
+
+  let equal = Int.equal
+
+  let pp = Format.pp_print_int
+
+  let encoding =
+    let open Data_encoding in
+    obj1 (req "version" int31)
+
+  let version_file_name = "version.json"
+
+  let version_file_path ~base_dir = Filename.concat base_dir version_file_name
+
+  (* Version history:
+     - 0: came with octez release v20; used Irmin for storing slots
+     - 1: removed Irmin dependency; added slot and status stores; changed layout of shard
+       store by indexing on slot ids instead of commitments *)
+  let current_version = 1
+
+  type error += Could_not_read_data_dir_version of string
+
+  type error += Could_not_write_version_file of string
+
+  type error += Invalid_data_dir_version of {actual : t; expected : t}
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.could_not_read_data_dir_version"
+      ~title:"Could not read data directory version file"
+      ~description:"Data directory version file is absent or invalid."
+      Data_encoding.(obj1 (req "version_path" string))
+      ~pp:(fun ppf path ->
+        Format.fprintf
+          ppf
+          "Tried to read version file at '%s', but the file could not be found \
+           or parsed."
+          path)
+      (function Could_not_read_data_dir_version path -> Some path | _ -> None)
+      (fun path -> Could_not_read_data_dir_version path) ;
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.could_not_write_version_file"
+      ~title:"Could not write version file"
+      ~description:"Version file cannot be written."
+      Data_encoding.(obj1 (req "file_path" string))
+      ~pp:(fun ppf file_path ->
+        Format.fprintf
+          ppf
+          "Tried to write version file at '%s', but the file could not be \
+           written."
+          file_path)
+      (function
+        | Could_not_write_version_file file_path -> Some file_path | _ -> None)
+      (fun file_path -> Could_not_write_version_file file_path) ;
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.invalid_version"
+      ~title:"Invalid store version"
+      ~description:"The store's version was not the one that was expected"
+      ~pp:(fun ppf (actual, expected) ->
+        Format.fprintf
+          ppf
+          "Invalid store version '%a' (expected '%a'). Your store is %s"
+          pp
+          actual
+          pp
+          expected
+          (if actual < expected then
+             "incompatible and cannot be automatically upgraded."
+           else "too recent for this version of the DAL node's store."))
+      Data_encoding.(
+        obj2 (req "actual_version" encoding) (req "expected_version" encoding))
+      (function
+        | Invalid_data_dir_version {actual; expected} -> Some (actual, expected)
+        | _ -> None)
+      (fun (actual, expected) -> Invalid_data_dir_version {actual; expected})
+
+  let read_version_file ~file_path =
+    let open Lwt_result_syntax in
+    let* json =
+      trace
+        (Could_not_read_data_dir_version file_path)
+        (Lwt_utils_unix.Json.read_file file_path)
+    in
+    Lwt.catch
+      (fun () -> Data_encoding.Json.destruct encoding json |> return)
+      (fun _ -> tzfail (Could_not_read_data_dir_version file_path))
+
+  let _write_version_file ~base_dir =
+    let version_file = version_file_path ~base_dir in
+    Lwt_utils_unix.Json.write_file
+      version_file
+      (Data_encoding.Json.construct encoding current_version)
+    |> trace (Could_not_write_version_file version_file)
+end
+
 module KVS = Key_value_store
 
 module Stores_dirs = struct
@@ -356,11 +457,45 @@ let cache_entry node_store commitment slot shares shard_proofs =
     commitment
     (slot, shares, shard_proofs)
 
+(* Returns [upgradable old_version new_version] returns an upgrade function if
+   the store is upgradable from [old_version] to [new_version]. Otherwise it
+   returns [None]. *)
+let upgradable _old_version _new_version :
+    (base_dir:string -> unit tzresult Lwt.t) option =
+  None
+
+(* Checks the version of the store with the respect to the current
+   version. Returns [None] if the store does not need an upgrade and [Some
+   upgrade] if the store is upgradable, where [upgrade] is a function that can
+   be used to upgrade the store. It returns an error if the version is
+   incompatible with the current one. *)
+let check_version_and_may_upgrade base_dir =
+  let open Lwt_result_syntax in
+  let file_path = Version.version_file_path ~base_dir in
+  let*! exists = Lwt_unix.file_exists file_path in
+  let* version =
+    if exists then Version.read_version_file ~file_path
+    else
+      (* In the absence of a version file, we use an heuristic to determine the
+         version. *)
+      let*! exists = Lwt_unix.file_exists (Filename.concat base_dir "index") in
+      return @@ if exists then Version.make 0 else Version.make 1
+  in
+  if Version.(equal version current_version) then return_unit
+  else
+    match upgradable version Version.current_version with
+    | Some upgrade -> upgrade ~base_dir
+    | None ->
+        tzfail
+          (Version.Invalid_data_dir_version
+             {actual = version; expected = Version.current_version})
+
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
+  let* () = check_version_and_may_upgrade base_dir in
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
