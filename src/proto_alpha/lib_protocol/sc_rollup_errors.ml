@@ -49,7 +49,11 @@ type error +=
   | (* `Temporary *)
       Sc_rollup_unknown_commitment of
       Sc_rollup_commitment_repr.Hash.t
-  | (* `Temporary *) Sc_rollup_bad_inbox_level
+  | (* `Temporary *)
+      Sc_rollup_bad_inbox_level of {
+      expected : Raw_level_repr.t;
+      provided : Raw_level_repr.t;
+    }
   | (* `Temporary *) Sc_rollup_game_already_started
   | (* `Temporary *)
       Sc_rollup_max_number_of_parallel_games_reached of
@@ -426,10 +430,24 @@ let () =
     ~id:"smart_rollup_bad_inbox_level"
     ~title:"Committing to a bad inbox level"
     ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.empty
-    (function Sc_rollup_bad_inbox_level -> Some () | _ -> None)
-    (fun () -> Sc_rollup_bad_inbox_level) ;
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "%s (expected %a, got %a)"
+        description
+        Raw_level_repr.pp
+        expected
+        Raw_level_repr.pp
+        provided)
+    Data_encoding.(
+      obj2
+        (req "expected" Raw_level_repr.encoding)
+        (req "provided" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_bad_inbox_level {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) -> Sc_rollup_bad_inbox_level {expected; provided}) ;
   let description = "Invalid rollup outbox message index" in
   register_error_kind
     `Temporary
