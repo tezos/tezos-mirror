@@ -174,8 +174,21 @@ let enc_artifacts : artifacts -> value =
     ]
 
 let enc_cache : cache -> value =
- fun {key = k; paths} ->
-  obj_flatten [key "key" string k; key "paths" strings paths]
+ fun {key = k; paths; policy} ->
+  obj_flatten
+    [
+      key "key" string k;
+      key "paths" strings paths;
+      key
+        "policy"
+        (fun policy ->
+          `String
+            (match policy with
+            | Pull -> "pull"
+            | Push -> "push"
+            | Pull_push -> "pull-push"))
+        policy;
+    ]
 
 let enc_service ({name} : service) : value = `String name
 

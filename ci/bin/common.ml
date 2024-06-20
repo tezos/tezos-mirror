@@ -273,7 +273,7 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
        @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
        @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
        @ opt_var "SCCACHE_LOG" Fun.id log)
-  |> append_cache {key; paths = [path]}
+  |> append_cache (cache ~key [path])
   (* Starts sccache and sets [RUSTC_WRAPPER] *)
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
   |> append_after_script ["sccache --stop-server || true"]
@@ -294,12 +294,45 @@ let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
 let enable_cargo_cache job =
   job
   |> append_cache
-       {
-         key = ("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug));
-         paths = [cargo_home // "registry/cache"];
-       }
+       (cache
+          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [cargo_home // "registry/cache"])
   (* Allow Cargo to access the network *)
   |> enable_networked_cargo
+
+(** Add variable enabling dune cache.
+
+    This function can be applied to jobs that run dune.
+
+    - [key] and [path] configure the key under which the cache is
+    stored, and the path that will be cached. By default, the [key]
+    contains the name of the job, thus scoping the cache to all
+    instances of that job. By default, [path] is the folder
+    ["$CI_PROJECT_DIR/_dune_cache"], and this function also sets the
+    environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
+    there.
+
+    - [copy_mode], if [true] (default is [false]) sets
+    {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
+    Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
+    used, which is typically more performant but requires that the
+    build and cache folder be on the same volume. *)
+let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
+    ?(copy_mode = false) ?policy job =
+  let key =
+    Option.value
+      ~default:
+        ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  job
+  |> append_variables
+       [
+         ("DUNE_CACHE", "enabled");
+         ("DUNE_CACHE_STORAGE_MODE", if copy_mode then "copy" else "hardlink");
+         ("DUNE_CACHE_ROOT", path);
+       ]
+  |> append_cache (cache ?policy ~key [path])
 
 (** {2 Changesets} *)
 

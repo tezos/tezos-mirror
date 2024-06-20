@@ -154,6 +154,7 @@ nix:
     key: nix-store
     paths:
     - /nix/store
+    policy: pull-push
   before_script:
   - mkdir -p ~/.config/nix
   - echo 'extra-experimental-features = flakes nix-command' > ~/.config/nix/nix.conf
@@ -180,9 +181,11 @@ oc.build_arm64-released:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -224,9 +227,11 @@ oc.build_arm64-exp-dev-extra:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -282,9 +287,11 @@ oc.build:static-x86_64-linux-binaries:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -330,9 +337,11 @@ oc.build_x86_64-released:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -387,9 +396,15 @@ oc.build_x86_64-exp-dev-extra:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -407,6 +422,9 @@ oc.build_x86_64-exp-dev-extra:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -442,9 +460,11 @@ ocaml-check:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -487,9 +507,11 @@ oc.build_kernels:
   - key: kernels-sccache
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -592,9 +614,11 @@ build_octez_source:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -697,9 +721,11 @@ opam:all_6:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -778,9 +804,11 @@ opam:exec_6:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -850,9 +878,11 @@ opam:all_2:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -935,9 +965,11 @@ opam:all_1:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1006,9 +1038,11 @@ opam:all_3:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1089,9 +1123,11 @@ opam:exec_4:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1160,9 +1196,11 @@ opam:all_4:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1242,9 +1280,11 @@ opam:exec_1:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1326,9 +1366,11 @@ opam:all_5:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1411,9 +1453,11 @@ opam:all_7:
   - key: opam-sccache
     paths:
     - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1477,9 +1521,11 @@ kaitai_checks:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1547,9 +1593,11 @@ oc.check_lift_limits_patch:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1701,9 +1749,11 @@ oc.integration:compiler-rejections:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1773,9 +1823,15 @@ oc.script:snapshot_alpha_and_link:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1788,6 +1844,9 @@ oc.script:snapshot_alpha_and_link:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1895,9 +1954,11 @@ test_kernels:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1934,9 +1995,11 @@ test_etherlink_kernel:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1972,9 +2035,11 @@ test_etherlink_firehose:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -2006,9 +2071,11 @@ check_riscv_kernels:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -2043,9 +2110,11 @@ test_riscv_kernels:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -2082,9 +2151,11 @@ test_evm_compatibility:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -2129,9 +2200,15 @@ oc.unit:non-proto-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2146,6 +2223,9 @@ oc.unit:non-proto-x86_64:
     MAKE_TARGETS: test-nonproto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -2188,9 +2268,15 @@ oc.unit:other-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2205,6 +2291,9 @@ oc.unit:other-x86_64:
     MAKE_TARGETS: test-other-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -2247,9 +2336,15 @@ oc.unit:proto-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2264,6 +2359,9 @@ oc.unit:proto-x86_64:
     MAKE_TARGETS: test-proto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -2306,9 +2404,11 @@ oc.unit:non-proto-arm64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2395,9 +2495,11 @@ oc.unit:protocol_compiles:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -3246,9 +3348,11 @@ documentation:odoc:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3296,9 +3400,11 @@ documentation:manuals:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3347,9 +3453,11 @@ documentation:docgen:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
   before_script:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh

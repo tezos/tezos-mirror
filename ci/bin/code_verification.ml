@@ -475,7 +475,7 @@ let jobs pipeline_type =
              ~/.config/nix/nix.conf";
           ]
         ["nix run .#ci-check-version-sh-lock"]
-        ~cache:[{key = "nix-store"; paths = ["/nix/store"]}]
+        ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
     let job_docker_hadolint =
       job
@@ -519,6 +519,9 @@ let jobs pipeline_type =
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
      executables, as well as the tezt test suite used by the subsequent
      'tezt' jobs and TPS evaluation tool. *)
+  let build_cache_key =
+    "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
+  in
   let job_build_x86_64_exp_dev_extra =
     job_build_dynamic_binaries
       ~__POS__
@@ -527,7 +530,9 @@ let jobs pipeline_type =
       ~release:false
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
+    |> enable_dune_cache ~key:build_cache_key ~policy:Push
   in
+
   let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
     job_build_arm64_release ~rules:build_arm_rules ()
@@ -942,28 +947,34 @@ let jobs pipeline_type =
                 Some (Vector n) )
           | None -> (variables, None)
         in
-        job
-          ?timeout
-          ?parallel
-          ~__POS__
-          ~retry:2
-          ~name
-          ~stage:Stages.test
-          ~image
-          ~arch
-          ~dependencies
-          ~rules
-          ~variables
-          ~artifacts:
-            (artifacts
-               ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
-               ["test_results"]
-               ~reports:(reports ~junit:"test_results/*.xml" ())
-               ~expire_in:(Duration (Days 1))
-               ~when_:Always)
-          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-          script
-        |> enable_cargo_cache |> enable_sccache
+        let job =
+          job
+            ?timeout
+            ?parallel
+            ~__POS__
+            ~retry:2
+            ~name
+            ~stage:Stages.test
+            ~image
+            ~arch
+            ~dependencies
+            ~rules
+            ~variables
+            ~artifacts:
+              (artifacts
+                 ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
+                 ["test_results"]
+                 ~reports:(reports ~junit:"test_results/*.xml" ())
+                 ~expire_in:(Duration (Days 1))
+                 ~when_:Always)
+            ~before_script:
+              (before_script ~source_version:true ~eval_opam:true [])
+            script
+          |> enable_cargo_cache |> enable_sccache
+        in
+        if arch = Amd64 then
+          enable_dune_cache ~key:build_cache_key ~policy:Pull job
+        else job
       in
       let oc_unit_non_proto_x86_64 =
         job_unit_test
@@ -1130,6 +1141,7 @@ let jobs pipeline_type =
              [])
         ["./scripts/ci/script:snapshot_alpha_and_link.sh"]
       |> enable_cargo_cache |> enable_sccache
+      |> enable_dune_cache ~key:build_cache_key ~policy:Pull
     in
     let job_oc_script_test_release_versions : tezos_job =
       job

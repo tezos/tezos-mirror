@@ -95,7 +95,18 @@ type artifacts = {
 
 type default = {image : image option; interruptible : bool option}
 
-type cache = {key : string; paths : string list}
+(** Policy for caches.
+
+    - A [Pull_push] cache is pulled at the start of a job's execution and pushed at its termination. This is the default.
+    - A [Push] cache is not pulled at the start of a job's execution, but is pushed at its termination,
+    - A [Pull] cache is pulled at the start of a job's execution, but is not pushed at its termination.
+
+    That is, a jobs with [Pull_push] cache produce and consume
+    caches. Jobs with [Push] caches only produce the caches. Jobs with
+    [Pull] caches only consumes them. *)
+type cache_policy = Pull_push | Push | Pull
+
+type cache = {key : string; paths : string list; policy : cache_policy}
 
 type service = {name : string}
 

@@ -84,3 +84,5 @@ let reports ?dotenv ?junit ?coverage_report () =
         "Attempted to register a empty [reports] -- this doesn't make any sense"
   | _ -> ()) ;
   {dotenv; junit; coverage_report}
+
+let cache ?(policy = Pull_push) ~key paths = {key; paths; policy}
