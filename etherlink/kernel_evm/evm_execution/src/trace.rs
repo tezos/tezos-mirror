@@ -5,12 +5,16 @@
 
 use primitive_types::{H160, H256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
-use tezos_ethereum::rlp_helpers::{
-    append_option_canonical, append_u16_le, append_u64_le, check_list, decode_field, next,
-};
 #[cfg(test)]
 use tezos_ethereum::rlp_helpers::{
     decode_field_u16_le, decode_field_u64_le, decode_list, decode_option_canonical,
+};
+use tezos_ethereum::{
+    rlp_helpers::{
+        append_option_canonical, append_u16_le, append_u64_le, check_list, decode_field,
+        decode_option, next,
+    },
+    transaction::TransactionHash,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -21,9 +25,32 @@ pub struct TracerConfig {
     pub disable_storage: bool,
 }
 
+pub fn get_tracer_config(
+    current_transaction_hash: Option<TransactionHash>,
+    trace_input: &Option<TracerInput>,
+) -> Option<TracerConfig> {
+    if let Some(TracerInput {
+        transaction_hash,
+        config,
+    }) = trace_input
+    {
+        match (current_transaction_hash, transaction_hash) {
+            (Some(current_transaction_hash), Some(transaction_hash))
+                if transaction_hash.0 == current_transaction_hash =>
+            {
+                Some(*config)
+            }
+            (None, None) | (Some(_), None) => Some(*config),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct TracerInput {
-    pub transaction_hash: H256,
+    pub transaction_hash: Option<H256>,
     pub config: TracerConfig,
 }
 
@@ -32,7 +59,8 @@ impl Decodable for TracerInput {
         check_list(decoder, 5)?;
 
         let mut it = decoder.iter();
-        let transaction_hash = decode_field(&next(&mut it)?, "transaction_hash")?;
+
+        let transaction_hash = decode_option(&next(&mut it)?, "transaction_hash")?;
         let enable_memory = decode_field(&next(&mut it)?, "enable_memory")?;
         let enable_return_data = decode_field(&next(&mut it)?, "enable_return_data")?;
         let disable_stack = decode_field(&next(&mut it)?, "disable_stack")?;

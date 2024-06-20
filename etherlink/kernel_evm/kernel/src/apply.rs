@@ -16,7 +16,7 @@ use evm_execution::fa_bridge::execute_fa_deposit;
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
-use evm_execution::trace::{TracerConfig, TracerInput};
+use evm_execution::trace::{get_tracer_config, TracerConfig, TracerInput};
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
@@ -580,25 +580,6 @@ pub fn handle_transaction_result<Host: Runtime>(
     })
 }
 
-fn get_tracer_config(
-    current_transaction_hash: TransactionHash,
-    trace_input: &Option<TracerInput>,
-) -> Option<TracerConfig> {
-    if let Some(TracerInput {
-        transaction_hash,
-        config,
-    }) = trace_input
-    {
-        if transaction_hash.0 == current_transaction_hash {
-            Some(*config)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
@@ -616,7 +597,7 @@ pub fn apply_transaction<Host: Runtime>(
     trace_input: &Option<TracerInput>,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
     let current_transaction_hash = transaction.tx_hash;
-    let tracer_config = get_tracer_config(current_transaction_hash, trace_input);
+    let tracer_config = get_tracer_config(Some(current_transaction_hash), trace_input);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
