@@ -32,6 +32,8 @@ let pp_int32 fmt n = Format.fprintf fmt "%ld" n
 
 let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
 
+let waiting_color = Internal_event.Magenta
+
 module State_transitions = struct
   include Internal_event.Simple
 
@@ -422,6 +424,7 @@ module Scheduling = struct
   let waiting_for_new_head =
     declare_0
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_for_new_head"
       ~level:Info
       ~msg:"no possible timeout, waiting for a new head to arrive..."
@@ -468,6 +471,7 @@ module Scheduling = struct
   let waiting_end_of_round =
     declare_3
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_end_of_round"
       ~level:Info
       ~msg:"waiting {timespan} until end of round {round} at {timestamp}"
@@ -481,6 +485,7 @@ module Scheduling = struct
   let waiting_delayed_end_of_round =
     declare_4
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_delayed_end_of_round"
       ~level:Info
       ~msg:
@@ -498,6 +503,7 @@ module Scheduling = struct
   let waiting_time_to_bake =
     declare_2
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_time_to_bake"
       ~level:Info
       ~msg:"waiting {timespan} until it's time to bake at {timestamp}"
@@ -544,6 +550,7 @@ module Scheduling = struct
   let waiting_to_forge_block =
     declare_2
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_to_forge_block"
       ~level:Info
       ~msg:"waiting {timespan} until it's time to forge block at {timestamp}"
@@ -588,6 +595,18 @@ module Lib = struct
              | Attestation -> Format.fprintf fmt "attest")
       ("proposal", Baking_state.proposal_encoding)
       ~pp2:Baking_state.pp_proposal
+
+  let waiting_block_timestamp =
+    declare_2
+      ~section
+      ~alternative_color:waiting_color
+      ~name:"waiting_block_timestamp"
+      ~level:Notice
+      ~msg:"Waiting {diff_time} until block timestamp {timestamp}"
+      ("timestamp", Time.Protocol.encoding)
+      ("diff_time", Time.System.Span.encoding)
+      ~pp1:Time.Protocol.pp_hum
+      ~pp2:Time.System.Span.pp_hum
 end
 
 module Actions = struct
