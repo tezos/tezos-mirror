@@ -127,7 +127,6 @@ unsafe impl SmartRollupCore for EvalHost {
         self.host.reveal_metadata(destination_addr, max_bytes)
     }
 
-    #[cfg(feature = "proto-alpha")]
     unsafe fn reveal(
         &self,
         _payload_addr: *const u8,

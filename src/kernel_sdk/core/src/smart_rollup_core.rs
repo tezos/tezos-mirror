@@ -135,7 +135,6 @@ extern "C" {
     /// `payload_len` is the same as the one used by the Tezos protocol.
     ///
     /// Returns the size of the data loaded in memory.
-    #[cfg(feature = "proto-alpha")]
     pub fn reveal(
         payload_addr: *const u8,
         payload_len: usize,
@@ -324,7 +323,6 @@ pub unsafe trait SmartRollupCore {
     /// - `payload_len` must be the length of the slice.
     /// - `destination_addr `must point to a mutable slice of bytes with
     ///   `capacity >= max_bytes`.
-    #[cfg(feature = "proto-alpha")]
     unsafe fn reveal(
         &self,
         payload_addr: *const u8,
@@ -497,7 +495,6 @@ mod riscv64_hermit {
         unimplemented!()
     }
 
-    #[cfg(feature = "proto-alpha")]
     pub unsafe fn reveal(
         _payload_addr: *const u8,
         _payload_len: usize,

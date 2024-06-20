@@ -7,7 +7,6 @@
 
 use crate::internal_storage::{ExtendedRuntime, InternalRuntime};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-#[cfg(feature = "proto-alpha")]
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -185,7 +184,6 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
         self.host.reveal_metadata()
     }
 
-    #[cfg(all(feature = "alloc", feature = "proto-alpha"))]
     fn reveal_dal_page(
         &self,
         published_level: i32,
@@ -197,7 +195,6 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
             .reveal_dal_page(published_level, slot_index, page_index, destination)
     }
 
-    #[cfg(feature = "proto-alpha")]
     fn reveal_dal_parameters(&self) -> RollupDalParameters {
         self.host.reveal_dal_parameters()
     }

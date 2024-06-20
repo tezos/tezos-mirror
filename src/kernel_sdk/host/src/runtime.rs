@@ -12,7 +12,6 @@
 use alloc::vec::Vec;
 use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
 
-#[cfg(feature = "proto-alpha")]
 use crate::dal_parameters::RollupDalParameters;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
@@ -21,7 +20,6 @@ use crate::metadata::RollupMetadata;
 use crate::path::{Path, RefPath};
 #[cfg(not(feature = "alloc"))]
 use crate::path::{Path, RefPath};
-#[cfg(feature = "proto-alpha")]
 use crate::DAL_PARAMETERS_SIZE;
 use crate::{Error, METADATA_SIZE};
 #[cfg(feature = "alloc")]
@@ -191,7 +189,7 @@ pub trait Runtime {
     ) -> Result<usize, RuntimeError>;
 
     /// Reveal a DAL page.
-    #[cfg(all(feature = "alloc", feature = "proto-alpha"))]
+    #[cfg(feature = "alloc")]
     fn reveal_dal_page(
         &self,
         published_level: i32,
@@ -201,7 +199,6 @@ pub trait Runtime {
     ) -> Result<usize, RuntimeError>;
 
     /// Reveal the DAL parameters.
-    #[cfg(feature = "proto-alpha")]
     fn reveal_dal_parameters(&self) -> RollupDalParameters;
 
     /// Return the size of value stored at `path`
@@ -598,7 +595,7 @@ where
         RollupMetadata::from(destination)
     }
 
-    #[cfg(all(feature = "alloc", feature = "proto-alpha"))]
+    #[cfg(feature = "alloc")]
     fn reveal_dal_page(
         &self,
         published_level: i32,
@@ -631,7 +628,6 @@ where
         }
     }
 
-    #[cfg(feature = "proto-alpha")]
     fn reveal_dal_parameters(&self) -> RollupDalParameters {
         let mut destination = [0u8; DAL_PARAMETERS_SIZE];
         // This will match the encoding declared for revealing DAL parameters in the Tezos protocol.
@@ -754,7 +750,6 @@ fn check_path_exists<T: Path>(
 #[cfg(test)]
 mod tests {
     use super::{Runtime, RuntimeError, PREIMAGE_HASH_SIZE};
-    #[cfg(feature = "proto-alpha")]
     use crate::{dal_parameters::RollupDalParameters, DAL_PARAMETERS_SIZE};
     use crate::{
         input::Message,
@@ -1345,7 +1340,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn reveal_dal_parameters_ok() {
         // Arrange
         let expected_dal_parameters = RollupDalParameters {

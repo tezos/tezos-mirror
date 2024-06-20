@@ -86,7 +86,6 @@ pub mod types {
     pub use tezos_smart_rollup_host::input::Message;
     pub use tezos_smart_rollup_host::metadata::RollupMetadata;
 
-    #[cfg(feature = "proto-alpha")]
     pub use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 }
 
