@@ -56,8 +56,8 @@ DESCRIPTION
     https://hub.docker.com/r/tezos/tezos.
 
     The build uses following images from the CI image suite:
-     - CI_IMAGE_NAME/runtime-dependencies:CI_IMAGE_VERSION
-     - CI_IMAGE_NAME/runtime-build-dependencies:CI_IMAGE_VERSION
+     - CI_IMAGE_NAME/runtime:CI_IMAGE_VERSION
+     - CI_IMAGE_NAME/build:CI_IMAGE_VERSION
     The CI images are defined in images/ci,
     and by default, CI_IMAGE_NAME refers to the images build from
     directory in the tezos/tezos CI. CI_IMAGE_VERSION is set using
@@ -238,7 +238,7 @@ for executable in $executables; do
   echo "- $executable"
 done
 
-image_test="$ci_image_name/runtime-prebuild-dependencies:$ci_image_version"
+image_test="${ci_image_name}/build:${ci_image_version}"
 if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
   echo "CI image $image_test does not exist locally, attempt pull."
   # This pull is just to check whether the image exists
@@ -260,7 +260,7 @@ docker build \
   --target "$docker_target" \
   --cache-from "$build_image_name:$image_version" \
   --build-arg "BASE_IMAGE=$ci_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies:$ci_image_version" \
+  --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
@@ -278,8 +278,8 @@ for variant in $variants; do
       --network host \
       -t "${image_name}debug:$image_version" \
       --build-arg "BASE_IMAGE=$ci_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -294,8 +294,8 @@ for variant in $variants; do
       --network host \
       -t "${image_name}bare:$image_version" \
       --build-arg "BASE_IMAGE=$ci_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -310,8 +310,8 @@ for variant in $variants; do
       --network host \
       -t "${image_name%?}:$image_version" \
       --build-arg "BASE_IMAGE=$ci_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
+      --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \

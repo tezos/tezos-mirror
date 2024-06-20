@@ -49,7 +49,7 @@ docker build \
   --target "$docker_target" \
   --cache-from "$build_image_name:$image_version" \
   --build-arg "BASE_IMAGE=$ci_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies:$ci_image_version" \
+  --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
@@ -70,8 +70,8 @@ docker build \
   -t "${image_name}bare:$image_version" \
   -f "$dockerfile_aux" \
   --build-arg "BASE_IMAGE=$ci_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-dependencies:$ci_image_version" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies:$ci_image_version" \
+  --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
+  --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
   --build-arg "BUILD_IMAGE=${build_image_name}" \
   --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
