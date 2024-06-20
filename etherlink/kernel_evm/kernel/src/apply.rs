@@ -20,7 +20,7 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{log, Level};
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
@@ -223,13 +223,21 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     if transaction.chain_id.is_some()
         && Some(block_constant.chain_id) != transaction.chain_id
     {
-        log!(host, Benchmarking, "Transaction status: ERROR_CHAINID");
+        log!(
+            host,
+            Level::Benchmarking,
+            "Transaction status: ERROR_CHAINID"
+        );
         return Ok(Validity::InvalidChainId);
     }
 
     // ensure that the user was willing to at least pay the base fee
     if transaction.max_fee_per_gas < block_constant.base_fee_per_gas() {
-        log!(host, Benchmarking, "Transaction status: ERROR_MAX_BASE_FEE");
+        log!(
+            host,
+            Level::Benchmarking,
+            "Transaction status: ERROR_MAX_BASE_FEE"
+        );
         return Ok(Validity::InvalidMaxBaseFee);
     }
 
@@ -237,7 +245,11 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let caller = match transaction.caller() {
         Ok(caller) => caller,
         Err(_err) => {
-            log!(host, Benchmarking, "Transaction status: ERROR_SIGNATURE.");
+            log!(
+                host,
+                Level::Benchmarking,
+                "Transaction status: ERROR_SIGNATURE."
+            );
             // Transaction with undefined caller are ignored, i.e. the caller
             // could not be derived from the signature.
             return Ok(Validity::InvalidSignature);
@@ -257,7 +269,11 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
     // The transaction nonce is valid.
     if nonce != transaction.nonce {
-        log!(host, Benchmarking, "Transaction status: ERROR_NONCE.");
+        log!(
+            host,
+            Level::Benchmarking,
+            "Transaction status: ERROR_NONCE."
+        );
         return Ok(Validity::InvalidNonce);
     };
 
@@ -268,20 +284,24 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
 
     if balance < cost || balance < max_fee {
-        log!(host, Benchmarking, "Transaction status: ERROR_PRE_PAY.");
+        log!(
+            host,
+            Level::Benchmarking,
+            "Transaction status: ERROR_PRE_PAY."
+        );
         return Ok(Validity::InvalidPrePay);
     }
 
     // The sender does not have code, see EIP3607.
     if code_exists {
-        log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
+        log!(host, Level::Benchmarking, "Transaction status: ERROR_CODE.");
         return Ok(Validity::InvalidCode);
     }
 
     // check that enough gas is provided to cover fees
     let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees, is_delayed)
     else {
-        log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
+        log!(host, Level::Benchmarking, "Transaction status: ERROR_GAS_FEE.");
          return Ok(Validity::InvalidNotEnoughGasForFees)
     };
 
@@ -289,7 +309,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     if gas_limit > limits.maximum_gas_limit {
         log!(
             host,
-            Benchmarking,
+            Level::Benchmarking,
             "Transaction status: ERROR_GAS_LIMIT_TOO_HIGH"
         );
         return Ok(Validity::InvalidGasLimitTooHigh);
@@ -310,11 +330,11 @@ pub struct TransactionResult {
 /// such a scenario
 fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &Vec<u8>) {
     if to.is_none() {
-        log!(host, Benchmarking, "Transaction type: CREATE");
+        log!(host, Level::Benchmarking, "Transaction type: CREATE");
     } else if data.is_empty() {
-        log!(host, Benchmarking, "Transaction type: TRANSFER");
+        log!(host, Level::Benchmarking, "Transaction type: TRANSFER");
     } else {
-        log!(host, Benchmarking, "Transaction type: CALL");
+        log!(host, Level::Benchmarking, "Transaction type: CALL");
     }
 }
 
@@ -343,7 +363,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     )? {
         Validity::Valid(caller, gas_limit) => (caller, gas_limit),
         _reason => {
-            log!(host, Benchmarking, "Transaction type: INVALID");
+            log!(host, Level::Benchmarking, "Transaction type: INVALID");
             return Ok(ExecutionResult::Invalid);
         }
     };
@@ -384,7 +404,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         Some(execution_outcome) => {
             log!(
                 host,
-                Benchmarking,
+                Level::Benchmarking,
                 "Transaction status: OK_{}.",
                 execution_outcome.is_success
             );
@@ -395,7 +415,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             )
         }
         None => {
-            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
+            log!(host, Level::Benchmarking, "Transaction status: OK_UNKNOWN.");
             (U256::zero(), 0, false)
         }
     };
@@ -513,14 +533,24 @@ pub fn handle_transaction_result<Host: Runtime>(
         .fee_updates(&block_constants.block_fees, gas_used);
 
     if let Some(outcome) = &mut execution_outcome {
-        log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
-        log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
-        log!(host, Benchmarking, "reason: {:?}", outcome.reason);
+        log!(
+            host,
+            Level::Debug,
+            "Transaction executed, outcome: {:?}",
+            outcome
+        );
+        log!(
+            host,
+            Level::Benchmarking,
+            "gas_used: {:?}",
+            outcome.gas_used
+        );
+        log!(host, Level::Benchmarking, "reason: {:?}", outcome.reason);
         fee_updates.modify_outcome(outcome);
         for message in outcome.withdrawals.drain(..) {
             let outbox_message: OutboxMessage<RouterInterface> = message;
             let len = outbox_queue.queue_message(host, outbox_message)?;
-            log!(host, Debug, "Length of the outbox queue: {}", len);
+            log!(host, Level::Debug, "Length of the outbox queue: {}", len);
         }
     }
 
@@ -611,7 +641,7 @@ pub fn apply_transaction<Host: Runtime>(
             tracer_config,
         )?,
         TransactionContent::Deposit(deposit) => {
-            log!(host, Benchmarking, "Transaction type: DEPOSIT");
+            log!(host, Level::Benchmarking, "Transaction type: DEPOSIT");
             apply_deposit(host, evm_account_storage, deposit)?
         }
     };
