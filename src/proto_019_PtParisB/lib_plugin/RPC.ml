@@ -4369,6 +4369,12 @@ module Delegates = struct
 end
 
 module Staking = struct
+  let context_path :
+      ( Tezos_protocol_environment__Environment_context.rpc_context,
+        Tezos_protocol_environment__Environment_context.rpc_context )
+      Resto.Path.t =
+    RPC_path.(open_root / "context")
+
   let path =
     RPC_path.(
       open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
@@ -4400,6 +4406,20 @@ module Staking = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.bool
         RPC_path.(path / "is_forbidden")
+
+    let total_staked =
+      RPC_service.get_service
+        ~description:
+          "Returns the amount of staked tez by delegates, delegators or \
+           overstaked."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            obj3
+              (req "delegates" Tez_repr.encoding)
+              (req "delegators" Tez_repr.encoding)
+              (req "overstaked" Tez_repr.encoding))
+        RPC_path.(context_path / "total_currently_staked")
   end
 
   let contract_stake ctxt ~delegator_contract ~delegate =
@@ -4425,7 +4445,44 @@ module Staking = struct
     let open Lwt_result_syntax in
     return @@ Delegate.is_forbidden_delegate ctxt pkh
 
+  let currently_staked ctxt =
+    let open Lwt_result_syntax in
+    let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+    Stake_storage.fold_on_active_delegates_with_minimal_stake_es
+      ctxt
+      ~order:`Undefined
+      ~init:(Tez_repr.zero, Tez_repr.zero, Tez_repr.zero)
+      ~f:(fun delegate (own, delegated, overstaked) ->
+        let* full_staking_balance =
+          Stake_storage.get_full_staking_balance ctxt delegate
+        in
+        let delegate_own =
+          Full_staking_balance_repr.own_frozen full_staking_balance
+        in
+        let delegate_delegated =
+          Full_staking_balance_repr.staked_frozen full_staking_balance
+        in
+        let* limits = Delegate_staking_parameters.of_delegate ctxt delegate in
+        let allowed =
+          Full_staking_balance_repr.allowed_staked_frozen
+            ~adaptive_issuance_global_limit_of_staking_over_baking:5
+            ~delegate_limit_of_staking_over_baking_millionth:
+              limits.limit_of_staking_over_baking_millionth
+            full_staking_balance
+        in
+        let*? own = Tez_repr.(own +? delegate_own) in
+        let*? delegated =
+          Tez_repr.(delegated +? min delegate_delegated allowed)
+        in
+        let*? delegate_overstaked =
+          Tez_repr.(max delegate_delegated allowed -? allowed)
+        in
+        let*? overstaked = Tez_repr.(overstaked +? delegate_overstaked) in
+        return (own, delegated, overstaked))
+
   let register () =
+    Registration.register0 ~chunked:false S.total_staked (fun ctxt () () ->
+        currently_staked ctxt) ;
     Registration.register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
         check_is_forbidden ctxt pkh) ;
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
