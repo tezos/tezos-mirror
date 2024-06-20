@@ -12,6 +12,7 @@ license = "MIT"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+tezos-smart-rollup.workspace = true
 tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-debug.workspace = true

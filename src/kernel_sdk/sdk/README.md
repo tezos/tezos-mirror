@@ -97,10 +97,8 @@ This kernel will run once per inbox level.
 
 ```rust
 use tezos_smart_rollup::prelude::*;
-use tezos_smart_rollup::kernel_entry;
 
-kernel_entry!(hello_kernel);
-
+#[entrypoint::main]
 fn hello_kernel(host: &mut impl Runtime) {
   debug_msg!(host, "Hello, kernel!\n");
 }

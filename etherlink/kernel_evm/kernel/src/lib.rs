@@ -30,13 +30,13 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
     OutboxMessage, OutboxMessageWhitelistUpdate, OUTBOX_QUEUE,
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 mod apply;
@@ -292,6 +292,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[entrypoint::main]
 pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
@@ -335,8 +336,6 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         }
     }
 }
-
-kernel_entry!(kernel_loop);
 
 #[cfg(test)]
 mod tests {
