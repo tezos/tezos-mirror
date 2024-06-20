@@ -313,6 +313,17 @@ module All_sinks = struct
       (function Activation_error reason -> Some reason | _ -> None)
       (fun reason -> Activation_error reason)
 
+  let handle def section v =
+    let handle (type a) sink definition =
+      let open Lwt_result_syntax in
+      let module S = (val definition : SINK with type t = a) in
+      if S.should_handle ?section sink def then S.handle ?section sink def v
+      else return_unit
+    in
+    List.iter_es
+      (function Active {sink; definition; _} -> handle sink definition)
+      !active
+
   let activate uri =
     let open Lwt_result_syntax in
     match Uri.scheme uri with
@@ -359,17 +370,6 @@ module All_sinks = struct
         to_close_list
     in
     Result_syntax.tzjoin close_results
-
-  let handle def section v =
-    let handle (type a) sink definition =
-      let open Lwt_result_syntax in
-      let module S = (val definition : SINK with type t = a) in
-      if S.should_handle ?section sink def then S.handle ?section sink def v
-      else return_unit
-    in
-    List.iter_es
-      (function Active {sink; definition; _} -> handle sink definition)
-      !active
 
   let pp_state fmt () =
     let open Format in
