@@ -1297,4 +1297,13 @@ let commands =
     Smart_contracts.originate_command;
   ]
 
-let commands _network () = commands
+let commands network () =
+  (* Stresstest should not be used on mainnet. If the client is running with
+     the yes-crypto activated, operations won't be considered valid and should
+     not endanger the network nor the users funds. *)
+  match Sys.getenv_opt Tezos_crypto.Helpers.yes_crypto_environment_variable with
+  | Some _ -> commands
+  | None -> (
+      match network with
+      | Some `Mainnet -> []
+      | Some `Testnet | None -> commands)
