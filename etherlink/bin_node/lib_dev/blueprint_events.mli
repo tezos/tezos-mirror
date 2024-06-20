@@ -25,9 +25,9 @@ val blueprint_applied : Z.t * Ethereum_types.block_hash -> unit Lwt.t
     [level] has been forwarded to a rollup node  *)
 val blueprint_injected : Z.t -> unit Lwt.t
 
-(** [blueprint_injection_failed level] advertizes that a blueprint could not be
-    injected for level [level]. *)
-val blueprint_injection_failed : Z.t -> unit Lwt.t
+(** [blueprint_injection_failed level trace] advertizes that a blueprint could
+    not be injected for level [level]. *)
+val blueprint_injection_failed : Z.t -> tztrace -> unit Lwt.t
 
 (** [invalid_blueprint_produced level] advertizes that the sequencer has tried
     to produce a blueprint which does not result in the publication of a new
