@@ -83,3 +83,47 @@ For example::
 
    The version 4 for RPC GET chains/main/mempool/pending_operations
    is deprecated and may be removed in the next major release of Octez.
+
+Moreover, the following deprecation policy is applied.
+
+Deprecation Policy
+~~~~~~~~~~~~~~~~~~
+
+As part of our ongoing efforts to improve and streamline our services,
+we have established a deprecation policy for RPC endpoints.
+
+Deprecation: RPC endpoints can be marked as ``DEPRECATED``, which serves as a
+fair warning that these endpoints will soon be turned off. Developers are
+actively encouraged to upgrade their code to use alternative endpoints at this stage.
+
+Sunset: The sunset of an RPC endpoint indicates that it is no longer
+available and supported. This can occur no earlier than ``6`` months
+after the version in which the endpoint was deprecated. For example,
+an RPC endpoint marked as deprecated in January (such as in Octez
+version ``19.x``) could be removed no earlier than July (that could
+correspond to an Octez version ``21.x`` -- depending on the release
+pace).
+
+The ``DEPRECATED`` flag is visible in the RPC endpoint description in the
+:doc:`RPC reference <../shell/rpc>`.
+
+Deprecated RPCs that have passed the sunset date will be deleted. The deleted
+RPCs will be advertised as :doc:`breaking changes <../introduction/breaking_changes>`
+and in the changelog of Octez versions.
+
+Sunset Dates
+""""""""""""
+
+Currently, the following RPCs are subject to the deprecation policy.
+
+`/monitor/commit_hash <../shell/rpc.html#get-monitor-commit-hash>`__
+
+- Deprecated: v8.0, January 2021
+- Planned Sunset: v21.0 (not before Q3 2024)
+- Comment: Use `/version <../shell/rpc.html#get-version>`__ instead.
+
+`/chains/<chain_id>/checkpoint <../shell/rpc.html#get-chains-chain-id-checkpoint>`__
+
+- Deprecated: v12.0, February 2022
+- Planned Sunset: v21.0 (not before Q3 2024)
+- Comment: Use `/levels/checkpoint <../shell/rpc.html#get-chains-chain-id-levels-checkpoint>`__, `/levels/caboose <../shell/rpc.html#get-chains-chain-id-levels-caboose>`__, `/levels/savepoint <../shell/rpc.html#get-chains-chain-id-levels-savepoint>`__, or `/config/history_mode <../shell/rpc.html#get-config-history-mode>`__ instead to obtain the current checkpoint for this chain.
