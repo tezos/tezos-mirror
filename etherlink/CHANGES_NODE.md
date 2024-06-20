@@ -9,6 +9,7 @@
 - Metrics register the number of calls to each RPC method, e.g. `eth_blockNumber`.
   (!13786)
 - Spinner for `init from rollup node` command. (!13801)
+- Log the errors trace when blueprint injection fails. (!13859)
 
 ### Bug fixes
 

@@ -110,11 +110,11 @@ module Worker = struct
     let*! () =
       match res with
       | Ok _ -> Blueprint_events.blueprint_injected level
-      | Error _ ->
+      | Error trace ->
           (* We have failed to inject the blueprint. This is probably
              the sign that the rollup node is down. It will be injected again
              once the rollup node lag increases to [max_blueprints_lag]. *)
-          Blueprint_events.blueprint_injection_failed level
+          Blueprint_events.blueprint_injection_failed level trace
     in
     match rollup_is_lagging_behind self with
     | No_lag | Needs_republish -> return_unit

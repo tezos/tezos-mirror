@@ -45,12 +45,14 @@ let blueprint_injection =
     ("level", Data_encoding.n)
 
 let blueprint_injection_failure =
-  declare_1
+  declare_2
     ~section
     ~name:"blueprint_injection_failure"
-    ~msg:"Injecting a blueprint for level {level} failed"
+    ~msg:"Injecting a blueprint for level {level} failed with {trace}"
+    ~pp2:Error_monad.pp_print_trace
     ~level:Error
     ("level", Data_encoding.n)
+    ("trace", Error_monad.trace_encoding)
 
 let blueprint_catchup =
   declare_2
@@ -105,7 +107,8 @@ let publisher_shutdown () = emit publisher_shutdown ()
 
 let blueprint_injected level = emit blueprint_injection level
 
-let blueprint_injection_failed level = emit blueprint_injection_failure level
+let blueprint_injection_failed level trace =
+  emit blueprint_injection_failure (level, trace)
 
 let blueprint_applied (level, hash) = emit blueprint_application (level, hash)
 
