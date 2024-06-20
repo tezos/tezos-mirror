@@ -1880,6 +1880,42 @@ let test_eth_call_nullable_recipient =
   let _result = call_result |> Evm_node.extract_result in
   unit
 
+let test_eth_call_contract_create =
+  (* See https://github.com/safe-global/safe-singleton-factory/issues/545 *)
+  register_both
+    ~tags:["evm"; "eth_call"; "contract_create"]
+    ~title:"Check eth_call with contract creation"
+    ~kernels:[Latest]
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        evm_node
+        {
+          method_ = "eth_call";
+          parameters =
+            `A
+              [
+                `O
+                  [
+                    ( "data",
+                      `String
+                        "0x604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3"
+                    );
+                  ];
+                `String "latest";
+              ];
+        })
+  in
+  let call_result = Evm_node.extract_result call_result |> JSON.as_string in
+  Check.(
+    (call_result
+   = "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3"
+    )
+      string)
+    ~error_msg:"test" ;
+  unit
+
 let test_inject_100_transactions =
   register_proxy
     ~tags:["evm"; "bigger_blocks"]
@@ -5946,6 +5982,7 @@ let register_evm_node ~protocols =
   test_full_blocks protocols ;
   test_latest_block protocols ;
   test_eth_call_nullable_recipient protocols ;
+  test_eth_call_contract_create protocols ;
   test_l2_deploy_simple_storage protocols ;
   test_l2_call_simple_storage protocols ;
   test_l2_deploy_erc20 protocols ;
