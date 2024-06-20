@@ -156,6 +156,15 @@ For such reasons:
 
 Thus, you may choose your own formatting style, while tolerating different styles from other contributors.
 
+Images
+------
+
+When including images in the documentation:
+
+- commit under Git an image format which can be displayed by Gitlab's "View file" feature, such as ``png`` or ``jpeg``, to ease reviewing;
+- preferably, also commit a source form of the image that can be maintained, explaining which tool to use if necessary (in a local Readme file, see :src:`docs/images/README.md` as an example);
+- image files are usually placed next to the pages where they are used; as an exception, images to be used in several pages from different directories, or in toplevel page such as ``index.rst``, should be placed under :src:`docs/images/`.
+
 
 Writing executable documentation
 --------------------------------
