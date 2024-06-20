@@ -1130,5 +1130,4 @@ let generate_random_transactions =
 
 let commands = [generate_random_transactions]
 
-let commands network () =
-  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands
+let commands _network () = commands

@@ -1925,5 +1925,4 @@ let commands =
     fund_accounts_from_source;
   ]
 
-let commands network () =
-  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands
+let commands _network () = commands
