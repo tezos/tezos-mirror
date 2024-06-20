@@ -27,11 +27,12 @@ if [ -z "$1" ]; then
   exit 0
 fi
 
+WORKING_DIR=$(pwd)
+
 if git cat-file commit "$1" > /dev/null; then
   PATCH_NAME=$1
   PATCH="git format-patch  --stdout  $PATCH_NAME~1..$PATCH_NAME | patch -p3"
 else
-  WORKING_DIR=$(pwd)
   PATCH_NAME="$WORKING_DIR/$1"
   # Patch file, with absolute path
   PATCH="patch -p3 < $PATCH_NAME"
