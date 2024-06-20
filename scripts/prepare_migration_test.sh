@@ -62,12 +62,6 @@ generate_identities() {
   ./octez-node identity generate --data-dir "$f_context_dir"
 }
 
-patch_yes_node() {
-  echo "
-Patching the code to obtain a yes-node."
-  patch -p1 < ./scripts/yes-node.patch
-}
-
 create_yes_wallet() {
   yes_wallet="$tmp_dir/yes-wallet"
   if [ -d "$yes_wallet" ]; then
@@ -218,8 +212,6 @@ commands above (the script needs not to be run again)."
 
 else # \$mig_level > 28082
 
-  patch_yes_node
-
   make
 
   if [ -n "$snapshot_path" ] && [ -f "$snapshot_path" ]; then
@@ -239,10 +231,10 @@ $ ./octez-node identity generate --data-dir <new/context/dir>"
   echo "
 Use the following commands to start the node with the imported context:
 $ test_directory=\$(mktemp -d -t \"${context_dir##*/}-XXXX\") && cp -r \"$context_dir/.\" \"\$test_directory\"
-$ ./octez-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &
+$ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &
 
 Then bake blocks until the chain reaches level $mig_level with:
-$ ./octez-client -d $yes_wallet bake for --minimal-timestamp
+$ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d $yes_wallet bake for --minimal-timestamp
 
 In order to re-run the migration test, kill the node and delete spurious fil
 by using:
