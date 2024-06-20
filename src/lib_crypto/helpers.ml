@@ -307,3 +307,30 @@ struct
     let encoding = encoding
   end)
 end
+
+(** This variable is used to enable yes-cryptography at runtime.
+
+  With yes-cryptography activated, signatures are faked and always considered
+  valid.
+
+  This can put your software at risk of being
+  - considered faulty/malicious if it fake signs,
+  - exploited by attackers if it fake-checks signatures.
+
+  This should be used for testing purposes only and/or with extreme care.*)
+let yes_crypto_environment_variable =
+  "TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING"
+
+type yes_crypto_kind = Fast | Yes | No
+
+let yes_crypto_kind =
+  match Sys.getenv_opt yes_crypto_environment_variable with
+  | None -> No
+  | Some x -> (
+      match String.lowercase_ascii x with
+      | "yes" | "y" -> Yes
+      | "fast" -> Fast
+      | _ -> No)
+
+let is_yes_crypto_enabled =
+  match yes_crypto_kind with Yes | Fast -> true | No -> false
