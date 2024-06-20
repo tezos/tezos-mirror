@@ -436,8 +436,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover variant
-    scenario =
+    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover
+    ?attestation_threshold variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -469,6 +469,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?activation_timestamp
         ?smart_rollup_timeout_period_in_blocks
         ?prover
+        ?attestation_threshold
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
