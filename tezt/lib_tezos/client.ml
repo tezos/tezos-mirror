@@ -1123,10 +1123,11 @@ let spawn_bls_import_secret_key ?hooks ?(force = false)
 let bls_import_secret_key ?hooks ?force key sc_client =
   spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
 
-let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
-    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
+let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
+    ?fee ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
     ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
+    ?env
     ?log_output
     ?endpoint
     ?hooks

@@ -103,6 +103,7 @@ type argument =
   | Disable_context_pruning  (** [--disable_context-pruning] *)
   | Storage_maintenance_delay of string  (** [--storage-maintenance-delay]*)
   | Force_history_mode_switch  (** [--force-history-mode-switch] *)
+  | Allow_yes_crypto  (** [--allow-yes-crypto] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -479,6 +480,7 @@ val spawn_reconstruct : t -> Process.t
     for a more precise semantic.
  *)
 val run :
+  ?env:string String_map.t ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?on_terminate:(Unix.process_status -> unit) ->
   ?event_level:Daemon.Level.default_level ->

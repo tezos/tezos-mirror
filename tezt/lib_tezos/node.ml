@@ -45,6 +45,7 @@ type argument =
   | Disable_context_pruning
   | Storage_maintenance_delay of string
   | Force_history_mode_switch
+  | Allow_yes_crypto
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -82,6 +83,7 @@ let make_argument = function
   | Disable_context_pruning -> ["--disable-context-pruning"]
   | Storage_maintenance_delay x -> ["--storage-maintenance-delay"; x]
   | Force_history_mode_switch -> ["--force-history-mode-switch"]
+  | Allow_yes_crypto -> ["--allow-yes-crypto"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -108,7 +110,8 @@ let is_redundant = function
   | Enable_http_cache_headers, Enable_http_cache_headers
   | Disable_context_pruning, Disable_context_pruning
   | Storage_maintenance_delay _, Storage_maintenance_delay _
-  | Force_history_mode_switch, Force_history_mode_switch ->
+  | Force_history_mode_switch, Force_history_mode_switch
+  | Allow_yes_crypto, Allow_yes_crypto ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -137,7 +140,8 @@ let is_redundant = function
   | Enable_http_cache_headers, _
   | Disable_context_pruning, _
   | Storage_maintenance_delay _, _
-  | Force_history_mode_switch, _ ->
+  | Force_history_mode_switch, _
+  | Allow_yes_crypto, _ ->
       false
 
 (* Some arguments should not be written in the config file by [Node.init]
@@ -920,7 +924,7 @@ let runlike_command_arguments node command arguments =
   :: string_of_int node.persistent_state.max_active_rpc_connections
   :: command_args
 
-let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
+let do_runlike_command ?env ?(on_terminate = fun _ -> ()) ?event_level
     ?event_sections_levels node arguments =
   (match node.status with
   | Not_running -> ()
@@ -940,6 +944,7 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     unit
   in
   run
+    ?env
     ?runner:node.persistent_state.runner
     ?event_level
     ?event_sections_levels
@@ -948,8 +953,8 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     arguments
     ~on_terminate
 
-let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
-    arguments =
+let run ?env ?patch_config ?on_terminate ?event_level ?event_sections_levels
+    node arguments =
   let* () =
     match patch_config with
     | None -> Lwt.return_unit
@@ -975,6 +980,7 @@ let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
     runlike_command_arguments node "run" args
   in
   do_runlike_command
+    ?env
     ?on_terminate
     ?event_level
     ?event_sections_levels
