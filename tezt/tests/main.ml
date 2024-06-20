@@ -224,7 +224,8 @@ let register_protocol_tests_that_use_supports_correctly () =
   Dac.register ~protocols ;
   Timelock.register ~protocols ;
   Tzt_regression.register ~protocols ;
-  Dal.register ~protocols
+  Dal.register ~protocols ;
+  Yes_crypto.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
