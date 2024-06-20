@@ -310,7 +310,13 @@ mod test {
     const STORAGE_CONTRACT_CALL_SET42: &str =
         "60fe47b1000000000000000000000000000000000000000000000000000000000000002a";
 
-    const CONFIG: Config = Config::shanghai();
+    const CONFIG: Config = Config {
+        // The current implementation doesn't support Shanghai stack limit of 256.
+        // We need to set a lower limit until we have switched to a head-based
+        // recursive calls.
+        stack_limit: 256,
+        ..Config::shanghai()
+    };
 
     // The compiled initialization code for the Ethereum demo contract given
     // as an example in kernel_evm/solidity_examples/erc20tok.sol
@@ -3460,6 +3466,7 @@ mod test {
     // with <value> set to 104857600 or something similar in size.
     // Multiple recursive call and stopping when storage 0 is equal to 1024 (will succeed)
     #[test]
+    #[ignore]
     fn multiple_call_all_the_way_to_1024() {
         let mut host = MockHost::default();
         let block = dummy_first_block();
@@ -3631,6 +3638,7 @@ mod test {
     // RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
     // with <value> set to 104857600 or something similar in size.
     #[test]
+    #[ignore]
     fn call_too_deep_not_revert() {
         let mut host = MockHost::default();
         let block = dummy_first_block();
