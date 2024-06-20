@@ -18,15 +18,15 @@ module Parameters = struct
 
   type session_state = {mutable ready : bool}
 
-  let base_default_name = "evm_node"
+  let base_default_name = "dsn_node"
 
-  let default_colors = Log.Color.[|FG.green; FG.yellow; FG.cyan; FG.magenta|]
+  let default_colors = Log.Color.[|FG.red; FG.blue; FG.yellow; FG.green|]
 end
 
 include Daemon.Make (Parameters)
 
-let bundler ?runner ?(rpc_addr = Constant.default_host) ?(rpc_port = 3000)
-    ~endpoint () =
+let bundler ?runner ?(rpc_addr = Constant.default_host)
+    ?(rpc_port = Port.fresh ()) ~endpoint () =
   let server_addr = Format.asprintf "%s:%d" rpc_addr rpc_port in
   let arguments =
     ["bundler"; "--rpc-address"; server_addr; "--sequencer-url"; endpoint]
@@ -40,8 +40,8 @@ let bundler ?runner ?(rpc_addr = Constant.default_host) ?(rpc_port = 3000)
   in
   bundler
 
-let sequencer ?runner ?(rpc_addr = Constant.default_host) ?(rpc_port = 5303) ()
-    =
+let sequencer ?runner ?(rpc_addr = Constant.default_host)
+    ?(rpc_port = Port.fresh ()) () =
   let server_addr = Format.asprintf "%s:%d" rpc_addr rpc_port in
   let arguments = ["sequencer"; "--rpc-address"; server_addr] in
   let persistent_state =
