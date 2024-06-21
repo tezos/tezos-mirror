@@ -2101,10 +2101,6 @@ module Manager = struct
         Dal_apply.validate_publish_commitment vi.ctxt slot_header
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         assert_zk_rollup_feature_enabled vi
-    | Host _ ->
-        error_unless
-          (Constants.sponsored_operations_enable vi.ctxt)
-          Sponsored_transaction_feature_disabled
 
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) ~consume_gas_for_sig_check

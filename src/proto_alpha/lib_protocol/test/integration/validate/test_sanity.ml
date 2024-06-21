@@ -73,8 +73,7 @@ let ensure_kind infos kind =
           | Sc_rollup_add_messages _ | Sc_rollup_refute _ | Sc_rollup_timeout _
           | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
           | Dal_publish_commitment _ | Zk_rollup_origination _
-          | Zk_rollup_publish _ | Zk_rollup_update _
-          | Host _ (* TODO: https://gitlab.com/tezos/tezos/-/issues/7139 *) ),
+          | Zk_rollup_publish _ | Zk_rollup_update _ ),
           _ ) ->
           assert false)
   | Single _ -> assert false

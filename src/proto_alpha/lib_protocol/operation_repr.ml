@@ -110,8 +110,6 @@ module Kind = struct
 
   type zk_rollup_update = Zk_rollup_update_kind
 
-  type host = Host_kind
-
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -136,7 +134,6 @@ module Kind = struct
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
     | Zk_rollup_update_manager_kind : zk_rollup_update manager
-    | Host_manager_kind : host manager
 end
 
 type 'a consensus_operation_type =
@@ -402,11 +399,6 @@ and _ manager_operation =
       update : Zk_rollup_update_repr.t;
     }
       -> Kind.zk_rollup_update manager_operation
-  | Host : {
-      guest : Signature.Public_key_hash.t;
-      guest_signature : Signature.t;
-    }
-      -> Kind.host manager_operation
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function
@@ -432,7 +424,6 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Zk_rollup_origination _ -> Kind.Zk_rollup_origination_manager_kind
   | Zk_rollup_publish _ -> Kind.Zk_rollup_publish_manager_kind
   | Zk_rollup_update _ -> Kind.Zk_rollup_update_manager_kind
-  | Host _ -> Kind.Host_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -554,8 +545,6 @@ let zk_rollup_operation_create_tag = zk_rollup_operation_tag_offset + 0
 let zk_rollup_operation_publish_tag = zk_rollup_operation_tag_offset + 1
 
 let zk_rollup_operation_update_tag = zk_rollup_operation_tag_offset + 2
-
-let host_tag = 115
 
 module Encoding = struct
   open Data_encoding
@@ -1003,22 +992,6 @@ module Encoding = struct
           inj =
             (fun (sc_rollup, staker) ->
               Sc_rollup_recover_bond {sc_rollup; staker});
-        }
-
-    let host_case =
-      MCase
-        {
-          tag = host_tag;
-          name = "host";
-          encoding =
-            obj2
-              (req "guest" Signature.Public_key_hash.encoding)
-              (req "guest_signature" (dynamic_size Signature.encoding));
-          select = (function Manager (Host _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Host {guest; guest_signature} -> (guest, guest_signature));
-          inj = (fun (guest, guest_signature) -> Host {guest; guest_signature});
         }
   end
 
@@ -1607,8 +1580,6 @@ module Encoding = struct
   let update_consensus_key_case =
     make_manager_case 114 Manager_operations.update_consensus_key_case
 
-  let host_case = make_manager_case host_tag Manager_operations.host_case
-
   let transfer_ticket_case =
     make_manager_case
       transfer_ticket_tag
@@ -1707,7 +1678,6 @@ module Encoding = struct
       PCase zk_rollup_origination_case;
       PCase zk_rollup_publish_case;
       PCase zk_rollup_update_case;
-      PCase host_case;
     ]
 
   let contents_cases =
@@ -2185,8 +2155,6 @@ let equal_manager_operation_kind :
   | Zk_rollup_publish _, _ -> None
   | Zk_rollup_update _, Zk_rollup_update _ -> Some Eq
   | Zk_rollup_update _, _ -> None
-  | Host _, Host _ -> Some Eq
-  | Host _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

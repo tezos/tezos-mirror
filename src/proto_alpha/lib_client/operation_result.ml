@@ -356,14 +356,6 @@ let pp_manager_operation_content (type kind) source ppf
       Format.fprintf ppf "Epoxy publish:@,From: %a" Contract.pp source
   | Zk_rollup_update _ ->
       Format.fprintf ppf "Epoxy update:@,From: %a" Contract.pp source
-  | Host {guest; _} ->
-      Format.fprintf
-        ppf
-        "Host:@,From: %a@,Guest: %a"
-        Contract.pp
-        source
-        Signature.Public_key_hash.pp
-        guest
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -817,9 +809,6 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_balance_updates ppf balance_updates
   in
-  let pp_host_result (Host_result {consumed_gas}) =
-    pp_consumed_gas ppf consumed_gas
-  in
 
   let manager_operation_name (type kind)
       (result : kind successful_manager_operation_result) =
@@ -847,7 +836,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Zk_rollup_origination_result _ -> "epoxy originate"
     | Zk_rollup_publish_result _ -> "epoxy publish"
     | Zk_rollup_update_result _ -> "epoxy update"
-    | Host_result _ -> "host"
   in
   let pp_manager_operation_contents_result (type kind) ppf
       (result : kind successful_manager_operation_result) =
@@ -882,7 +870,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Zk_rollup_origination_result _ as op -> pp_zk_rollup_origination_result op
     | Zk_rollup_publish_result _ as op -> pp_zk_rollup_publish_result op
     | Zk_rollup_update_result _ as op -> pp_zk_rollup_update_result op
-    | Host_result _ as op -> pp_host_result op
   in
   pp_operation_result
     ~operation_name:manager_operation_name

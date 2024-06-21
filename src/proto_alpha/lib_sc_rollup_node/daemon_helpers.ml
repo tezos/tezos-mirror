@@ -294,8 +294,7 @@ let process_l1_operation (type kind) ~catching_up node_ctxt
     | Reveal _ | Transaction _ | Origination _ | Delegation _
     | Update_consensus_key _ | Register_global_constant _ | Set_deposits_limit _
     | Increase_paid_storage _ | Transfer_ticket _ | Sc_rollup_originate _
-    | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _
-    | Host _ ->
+    | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         false
   in
   (* Only look at operations that are for the node's rollup *)
