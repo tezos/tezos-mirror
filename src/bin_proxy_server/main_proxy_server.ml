@@ -75,9 +75,7 @@ let log_requests =
   Arg.(value & flag & info ["l"; "log-requests"] ~docv ~doc)
 
 let rpc_addr : string option Term.t =
-  let doc =
-    "The TCP socket at which this RPC server instance can be reached."
-  in
+  let doc = "The URL at which this RPC server instance can be reached." in
   let docv = "RPC_ADDR" in
   Arg.(value & opt (some string) None & info ["rpc-addr"] ~docv ~doc)
 
