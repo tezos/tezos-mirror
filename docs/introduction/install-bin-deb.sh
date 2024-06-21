@@ -2,18 +2,53 @@
 
 distribution=$1
 release=$2
-rc=$3
 
-# this is the default bucket using for testing
-bucket="tezos-linux-repo"
-if [ "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
-  # this is the release bucket used only on
-  # protected release branches
-  bucket="tezos-linux-protected-repo"
+# check if it's a real or a fake release or we are testing
+# the packages in a branch
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+  # shellcheck source=./scripts/ci/octez-release.sh
+  . ./scripts/ci/octez-release.sh
 fi
 
-if [ "$rc" = "rc" ]; then
-  distribution="RC/$distribution"
+# If it's a protected branch the value of $bucket will
+# be set accordingly but the CI.
+bucket="$GCP_LINUX_PACKAGES_BUCKET"
+protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
+
+# This logic must be kept in sync with the script in
+# ./scripts/ci/create_debian_repo.sh
+
+# if it's a release tag, then it can be a RC release
+# or a final release. This can be on a protected branch or not.
+if [ -n "${gitlab_release_no_v:-}" ]; then
+  # It a release tag, this can be either final or release
+  # candidate
+  if [ -n "${gitlab_release_rc_version}" ]; then
+    # Release candidate
+    distribution="RC/$distribution"
+  fi
+  # else we just that $distribution as it is
+else
+  # Not a release tag. This is strictly for testing.
+  if [ "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
+    # this is not a release, but it's a protected branch.
+    # We allow this only for the master branch.
+    if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
+      distribution="master/$distribution"
+    else
+      echo "Cannot test for a protected branch that \
+        is not associated with a release tag or it's master"
+      exit 1
+    fi
+  else
+    # Not a release, not a protected branch
+    if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
+      echo "Cannot test a repository for a branch named 'RC'"
+      exit 1
+    else
+      distribution="$CI_COMMIT_REF_NAME/$distribution"
+    fi
+  fi
 fi
 
 set -e
@@ -36,5 +71,5 @@ sudo apt-get install -y octez-baker
 # [test executables]
 octez-client --version
 octez-node --version
-octez-baker-Proxford --version
-octez-accuser-Proxford --version
+"octez-baker-$protocol" --version
+"octez-accuser-$protocol" --version

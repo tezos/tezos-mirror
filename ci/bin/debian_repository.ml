@@ -8,7 +8,7 @@
 (* This module defines the jobs of the [debian_repository] child
    pipeline.
 
-   This pipeline builds the post-v19.1 Debian (and Ubuntu)
+   This pipeline builds the current and next Debian (and Ubuntu)
    packages. *)
 
 open Gitlab_ci.Types
@@ -33,6 +33,28 @@ let debian_package_release_matrix =
 let ubuntu_package_release_matrix =
   [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
+(* Push .deb artifacts to storagecloud apt repository. *)
+let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+    ?dependencies ?(archs = [Amd64]) ~image script : tezos_job =
+  let variables =
+    [
+      ( "ARCHITECTURES",
+        String.concat " " (List.map Tezos_ci.arch_to_string_alt archs) );
+      ("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg");
+    ]
+  in
+  job
+    ?rules
+    ?dependencies
+    ~__POS__
+    ~stage
+    ~name
+    ~image
+    ~before_script:
+      (before_script ~source_version:true ["./scripts/ci/prepare-apt-repo.sh"])
+    ~variables
+    script
+
 let jobs =
   let variables add =
     ("DEP_IMAGE", "registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE")
@@ -43,7 +65,7 @@ let jobs =
     job_docker_authenticated
       ~__POS__
       ~name
-      ~stage:Stages.build
+      ~stage:Stages.images
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -63,12 +85,13 @@ let jobs =
       ~distribution:"ubuntu"
       ~matrix:ubuntu_package_release_matrix
   in
-  let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution =
+  let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution
+      ~script =
     job
       ~__POS__
       ~name
       ~image:build_debian_packages_image
-      ~stage:Stages.packaging
+      ~stage:Stages.build
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -88,15 +111,38 @@ let jobs =
            {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
            for more info. *)
         "export CARGO_NET_OFFLINE=false";
-        "./scripts/ci/build-debian-packages.sh";
+        script;
       ]
   in
+
+  (* These jobs build the current packages in a matrix using the
+     build dependencies images *)
+  let job_build_debian_package_current : tezos_job =
+    make_job_build_debian_packages
+      ~__POS__
+      ~name:"oc.build-debian-current"
+      ~distribution:"debian"
+      ~matrix:debian_package_release_matrix
+      ~script:"./scripts/ci/build-debian-packages_current.sh"
+  in
+  let job_build_ubuntu_package_current : tezos_job =
+    make_job_build_debian_packages
+      ~__POS__
+      ~name:"oc.build-ubuntu-current"
+      ~distribution:"ubuntu"
+      ~matrix:ubuntu_package_release_matrix
+      ~script:"./scripts/ci/build-debian-packages_current.sh"
+  in
+
+  (* These jobs build the next packages in a matrix using the
+     build dependencies images *)
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
       ~matrix:debian_package_release_matrix
+      ~script:"./scripts/ci/build-debian-packages.sh"
   in
   let job_build_ubuntu_package : tezos_job =
     make_job_build_debian_packages
@@ -104,10 +150,69 @@ let jobs =
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
       ~matrix:ubuntu_package_release_matrix
+      ~script:"./scripts/ci/build-debian-packages.sh"
+  in
+
+  (* These create the apt repository for the current packages *)
+  let job_apt_repo_debian_current =
+    job_apt_repo
+      ~__POS__
+      ~name:"apt_repo_debian_current"
+      ~dependencies:(Dependent [Artifacts job_build_debian_package_current])
+      ~image:Images.debian_bookworm
+      ["./scripts/ci/create_debian_repo.sh debian bookworm"]
+  in
+  let job_apt_repo_ubuntu_current =
+    job_apt_repo
+      ~__POS__
+      ~name:"apt_repo_ubuntu_current"
+      ~dependencies:(Dependent [Artifacts job_build_ubuntu_package_current])
+      ~image:Images.ubuntu_focal
+      ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
+  in
+
+  (* These test the installability of the current packages *)
+  let test_current_packages_jobs =
+    let job_install_bin ~__POS__ ~name ~dependencies ~image ?allow_failure
+        script =
+      job
+        ?allow_failure
+        ~__POS__
+        ~name
+        ~image
+        ~dependencies
+        ~stage:Stages.publishing_tests
+        script
+    in
+    [
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubuntu_focal"
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
+        ~image:Images.ubuntu_focal
+        ["./docs/introduction/install-bin-deb.sh ubuntu focal"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubuntu_jammy"
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
+        ~image:Images.ubuntu_jammy
+        ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_debian_bookworm"
+        ~dependencies:(Dependent [Job job_apt_repo_debian_current])
+        ~image:Images.debian_bookworm
+        ["./docs/introduction/install-bin-deb.sh debian bookworm"];
+    ]
   in
   [
     job_docker_build_debian_dependencies;
     job_docker_build_ubuntu_dependencies;
     job_build_debian_package;
     job_build_ubuntu_package;
+    job_build_debian_package_current;
+    job_build_ubuntu_package_current;
+    job_apt_repo_debian_current;
+    job_apt_repo_ubuntu_current;
   ]
+  @ test_current_packages_jobs

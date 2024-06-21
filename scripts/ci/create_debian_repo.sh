@@ -3,7 +3,8 @@
 set -eu
 
 # Create the APT repository for debian packages and sign it using
-# the private key available as ENV variable.
+# the private key available as ENV variable for production repository
+# and using the file test_repo_private.key for test repositories.
 
 # uses :
 # - scripts/packaging/Release.conf for release metadata
@@ -13,6 +14,8 @@ set -eu
 # - ARCHITECTURES
 # - GPG_PASSPHRASE
 # - GPG_KEY_ID
+# - GPG_PRIVATE_KEY
+# - GCP_LINUX_PACKAGES_BUCKET
 
 if [ $# -lt 2 ]; then
   cat << EOF
@@ -29,9 +32,6 @@ EOF
   exit 1
 fi
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. ./scripts/ci/octez-release.sh
-
 ARCHITECTURES=${ARCHITECTURES:-"amd64"}
 
 # The linux distribution for which we are creating the apt repository
@@ -43,15 +43,24 @@ shift
 # E.g. 'jammy focal', 'bookworm'
 RELEASES=$*
 
-# make available the private key for signing the release file
-echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
-
+# If it's a protected branch the value of $bucket will
+# be set accordingly but the CI.
 BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
 oldPWD=$PWD
 
+# check if it's a real or a test release or we are testing
+# the packages in a branch
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+  # shellcheck source=./scripts/ci/octez-release.sh
+  . ./scripts/ci/octez-release.sh
+fi
+
+#This logic must be kept in sync with the installation tests scripts in
+# docs/introduction/install-bin-deb.sh
+
 # if it's a release tag, then it can be a RC release or a final release
-if [ -n "${gitlab_release_no_v}" ]; then
+if [ -n "${gitlab_release_no_v:-}" ]; then
   # It a release tag, this can be either a real or test release
   if [ -n "${gitlab_release_rc_version}" ]; then
     # Release candidate
@@ -62,14 +71,21 @@ if [ -n "${gitlab_release_no_v}" ]; then
   fi
 else
   # Not a release tag. This is strictly for testing
-  if [ ! "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
+  # We embed these keys here for testing only.
+  GPG_KEY_ID="CFC482F3CD08D36D"
+  GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
+  GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
+  if [ "$CI_COMMIT_REF_PROTECTED" = "false" ]; then
     if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
       echo "Cannot create a repository for a branch named 'RC'"
       exit 1
     else
+      # Branch is not protected, this is for testing ordinary MRs
       TARGETDIR="public/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
     fi
   else
+    # For protected branches that are not release, we allow
+    # a repository only for master.
     if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
       TARGETDIR="public/master/$DISTRIBUTION"
     else
@@ -79,6 +95,8 @@ else
     fi
   fi
 fi
+
+echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
 
 mkdir -p "$TARGETDIR/dists"
 
@@ -118,6 +136,7 @@ for architecture in $ARCHITECTURES; do # amd64, arm64 ...
       gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
         -u "$GPG_KEY_ID" --clearsign \
         -o "dists/${release}/InRelease" "dists/${release}/Release"
+    cd -
   done
   # back to base
   cd "$oldPWD"

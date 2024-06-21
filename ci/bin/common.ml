@@ -47,6 +47,10 @@ module Stages = struct
 
   let packaging = Stage.register "packaging"
 
+  let publishing = Stage.register "publishing"
+
+  let publishing_tests = Stage.register "publishing_tests"
+
   let doc = Stage.register "doc"
 
   let prepare_release = Stage.register "prepare_release"

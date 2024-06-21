@@ -1203,43 +1203,11 @@ let jobs pipeline_type =
     in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
-      let install_octez_rules =
-        make_rules
-          ~changes:(Changeset.make ["docs/introduction/install*.sh"])
-          ~manual:Yes
-          ()
-      in
       let compile_octez_rules =
         make_rules
           ~changes:(Changeset.make ["docs/introduction/compile-sources.sh"])
           ~manual:Yes
           ()
-      in
-      (* Test installation of the current deb binary packages. *)
-      let job_install_bin ~__POS__ ~name
-          ?(allow_failure : Gitlab_ci.Types.allow_failure_job = Yes)
-          ?(rc = false) distribution =
-        let script =
-          match distribution with
-          | Ubuntu_focal ->
-              sf "./docs/introduction/install-bin-deb.sh ubuntu focal"
-              ^ if rc then " rc" else ""
-          | Ubuntu_jammy ->
-              sf "./docs/introduction/install-bin-deb.sh ubuntu jammy"
-              ^ if rc then " rc" else ""
-          | Debian_bookworm ->
-              sf "./docs/introduction/install-bin-deb.sh debian bookworm"
-              ^ if rc then " rc" else ""
-        in
-        job
-          ~allow_failure
-          ~__POS__
-          ~name
-          ~image:(image_of_distribution distribution)
-          ~dependencies:dependencies_needs_start
-          ~rules:install_octez_rules
-          ~stage:Stages.test
-          [script]
       in
       let job_install_opam_jammy : tezos_job =
         job
@@ -1271,38 +1239,7 @@ let jobs pipeline_type =
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
         |> enable_networked_cargo
       in
-      [
-        (* Test installing binary / binary RC distributions in all distributions. *)
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_ubuntu_focal"
-          Ubuntu_focal;
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_ubuntu_jammy"
-          Ubuntu_jammy;
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_rc_ubuntu_focal"
-          ~rc:true
-          Ubuntu_focal;
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_rc_ubuntu_jammy"
-          ~rc:true
-          Ubuntu_jammy;
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_debian_bookworm"
-          Debian_bookworm;
-        job_install_bin
-          ~__POS__
-          ~name:"oc.install_bin_rc_debian_bookworm"
-          ~rc:true
-          Debian_bookworm;
-        (* Test installing through opam *)
-        job_install_opam_jammy;
-      ]
+      [(* Test installing through opam *) job_install_opam_jammy]
       @
       match pipeline_type with
       (* These tests make sure that the compilation instructions
