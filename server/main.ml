@@ -239,19 +239,25 @@ let get_stats ~logger db_pool =
             (req "version" version_encoding))
         (highest_block, version))
 
-let get_available_data ~logger ~conf db_pool =
-  let select_available_data_request =
-    Caqti_request.Infix.(Caqti_type.unit ->* Caqti_type.(t2 int32 int32))
-      "SELECT level, round FROM blocks"
+let get_missing_data ~logger ~conf db_pool =
+  let select_missing_data_request =
+    Caqti_request.Infix.(
+      Caqti_type.unit ->* Caqti_type.(t3 int32 int32 string))
+      "SELECT\n\
+      \  missing_blocks.level,\n\
+      \  missing_blocks.round,\n\
+      \  delegates.address\n\
+       FROM missing_blocks\n\
+       JOIN delegates ON delegates.id = missing_blocks.baker"
   in
   with_caqti_error
     ~logger
     (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
-         maybe_with_metrics conf "select_available_data" @@ fun () ->
-         Db.fold select_available_data_request List.cons () [])
+         maybe_with_metrics conf "select_missing_data" @@ fun () ->
+         Db.fold select_missing_data_request List.cons () [])
        db_pool)
-    (fun list -> reply_public_json Data_encoding.(list (tup2 int32 int32)) list)
+    (fun list -> reply_public_json Data_encoding.(list (tup3 int32 int32 string)) list)
 
 let get_head ~logger conf db_pool =
   let query =
@@ -962,8 +968,8 @@ let import_callback ~logger conf db_pool g data =
       Get the list of allowed archivers
   - /stats.json
       Get the highest level, its highest round, and corresponding timestamp.
-  - /available.json
-      Get the list of (level, round) available in database.
+  - /missing.json
+      Get the list of (level, round, baker).
   - /head.json
       Get the highest level recorded in database.
   - /metrics
@@ -1106,9 +1112,9 @@ let routes :
     ( Re.str "/stats.json",
       fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_stats ~logger db_pool );
-    ( Re.str "/available.json",
+    ( Re.str "/missing.json",
       fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
-        get_available_data ~logger ~conf db_pool );
+        get_missing_data ~logger ~conf db_pool );
     ( Re.str "/head.json",
       fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_head conf ~logger db_pool );
