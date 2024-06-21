@@ -7,10 +7,10 @@ mod sbi;
 
 use crate::{
     machine_state::{self, bus::main_memory, StepManyResult},
-    state_backend,
+    state_backend::{self, CellRead, CellWrite, EnumCell, EnumCellLayout},
     traps::EnvironException,
 };
-use sbi::{PvmSbiFatalError, PvmSbiLayout, PvmSbiState};
+use sbi::PvmSbiFatalError;
 use std::{
     io::{stdout, Write},
     ops::RangeBounds,
@@ -46,7 +46,7 @@ impl<'a> Default for PvmHooks<'a> {
 pub type PvmLayout<ML> = (
     state_backend::Atom<u64>,
     machine_state::MachineStateLayout<ML>,
-    PvmSbiLayout,
+    EnumCellLayout<u8>,
 );
 
 /// PVM status
@@ -94,9 +94,7 @@ const INITIAL_VERSION: u64 = 0;
 pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> {
     version: state_backend::Cell<u64, M>,
     pub(crate) machine_state: machine_state::MachineState<ML, M>,
-
-    /// Execution environment state
-    sbi_state: PvmSbiState<M>,
+    status: EnumCell<PvmStatus, u8, M>,
 }
 
 impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
@@ -108,7 +106,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
-            sbi_state: PvmSbiState::<M>::bind(space.2),
+            status: EnumCell::bind(space.2),
         }
     }
 
@@ -116,7 +114,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     pub fn reset(&mut self) {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
-        self.sbi_state.reset();
+        self.status.reset();
     }
 
     /// Handle an exception using the defined Execution Environment.
@@ -125,14 +123,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         hooks: &mut PvmHooks<'_>,
         exception: EnvironException,
     ) -> Result<bool, PvmSbiFatalError> {
-        match exception {
-            EnvironException::EnvCallFromUMode
-            | EnvironException::EnvCallFromSMode
-            | EnvironException::EnvCallFromMMode => {
-                self.sbi_state
-                    .handle_call(&mut self.machine_state, hooks, exception)
-            }
-        }
+        sbi::handle_call(&mut self.status, &mut self.machine_state, hooks, exception)
     }
 
     /// Perform one evaluation step.
@@ -176,38 +167,47 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     {
         self.machine_state
             .step_range_handle(step_bounds, should_continue, |machine_state, exc| {
-                self.sbi_state
-                    .handle_call(machine_state, hooks, exc)
-                    .map_err(|err| EvalError {
+                sbi::handle_call(&mut self.status, machine_state, hooks, exc).map_err(|err| {
+                    EvalError {
                         cause: exc,
                         error: err,
-                    })
+                    }
+                })
             })
     }
 
     /// Respond to a request for input with no input. Returns `false` in case the
     /// machine wasn't expecting any input, otherwise returns `true`.
     pub fn provide_no_input(&mut self) -> bool {
-        self.sbi_state.provide_no_input(&mut self.machine_state)
+        sbi::provide_no_input(&mut self.status, &mut self.machine_state)
     }
 
     /// Provide input. Returns `false` if the machine state is not expecting
     /// input.
     pub fn provide_input(&mut self, level: u64, counter: u64, payload: &[u8]) -> bool {
-        self.sbi_state
-            .provide_input(&mut self.machine_state, level, counter, payload)
+        sbi::provide_input(
+            &mut self.status,
+            &mut self.machine_state,
+            level,
+            counter,
+            payload,
+        )
     }
 
     /// Provide metadata in response to a metadata request. Returns `false`
     /// if the machine is not expecting metadata.
     pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u64) -> bool {
-        self.sbi_state
-            .provide_metadata(&mut self.machine_state, rollup_address, origination_level)
+        sbi::provide_metadata(
+            &mut self.status,
+            &mut self.machine_state,
+            rollup_address,
+            origination_level,
+        )
     }
 
     /// Get the current machine status.
     pub fn status(&self) -> PvmStatus {
-        self.sbi_state.status()
+        self.status.read_default()
     }
 }
 

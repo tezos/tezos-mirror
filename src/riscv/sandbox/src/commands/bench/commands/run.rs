@@ -17,6 +17,7 @@ use octez_riscv::{
         AccessType,
     },
     parser::{instruction::Instr, parse},
+    state_backend::CellRead,
     stepper::{
         test::{TestStepper, TestStepperResult},
         Stepper,

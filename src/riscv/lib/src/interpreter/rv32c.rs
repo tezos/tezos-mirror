@@ -274,6 +274,7 @@ mod tests {
         machine_state::{
             bus::main_memory::tests::T1K, registers::a4, MachineState, MachineStateLayout,
         },
+        state_backend::{CellRead, CellWrite},
     };
     use proptest::{prelude::*, prop_assert_eq, proptest};
 
