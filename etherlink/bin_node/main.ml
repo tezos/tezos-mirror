@@ -487,6 +487,17 @@ let restricted_rpcs_arg =
     ~placeholder:"debug_trace*"
     Params.string
 
+let dal_slots_arg =
+  Tezos_clic.arg
+    ~long:"dal-slots"
+    ~doc:
+      "The DAL slots indices on which the sequencer is allowed to send \
+       blueprints."
+    ~placeholder:"slot indices"
+    (Tezos_clic.parameter (fun _ctxt s ->
+         s |> String.split ',' |> List.map int_of_string
+         |> Lwt_result_syntax.return))
+
 let common_config_args =
   Tezos_clic.args16
     data_dir_arg
@@ -650,7 +661,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
-    ?restricted_rpcs ?kernel () =
+    ?restricted_rpcs ?kernel ?dal_slots () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -685,6 +696,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ?log_filter_max_nb_logs
       ?log_filter_chunk_size
       ?restricted_rpcs
+      ?dal_slots
       ()
   in
   let*! () =
@@ -726,7 +738,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
-    ?sequencer_sidecar_endpoint () =
+    ?sequencer_sidecar_endpoint ?dal_slots () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -762,6 +774,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ?log_filter_chunk_size
       ?sequencer_sidecar_endpoint
       ?restricted_rpcs
+      ?dal_slots
       ()
   in
   let*! () =
@@ -803,7 +816,7 @@ let sequencer_command =
        sequencer` command."
     (merge_options
        common_config_args
-       (args13
+       (args14
           initial_kernel_arg
           private_rpc_port_arg
           preimages_arg
@@ -816,7 +829,8 @@ let sequencer_command =
           catchup_cooldown_arg
           max_number_of_chunks_arg
           wallet_dir_arg
-          (Client_config.password_filename_arg ())))
+          (Client_config.password_filename_arg ())
+          dal_slots_arg))
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -854,7 +868,8 @@ let sequencer_command =
              catchup_cooldown,
              max_number_of_chunks,
              wallet_dir,
-             password_filename ) )
+             password_filename,
+             dal_slots ) )
          rollup_node_endpoint
          sequencer_str
          () ->
@@ -896,6 +911,7 @@ let sequencer_command =
         ?genesis_timestamp
         ?restricted_rpcs
         ?kernel
+        ?dal_slots
         ())
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
@@ -926,6 +942,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?log_filter_max_nb_logs
       ?log_filter_max_nb_blocks
       ?restricted_rpcs
+      ?dal_slots:None
       ()
   in
   let*! () =
@@ -1412,7 +1429,7 @@ If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args15
+       (args16
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1433,7 +1450,8 @@ mode.|}
              ~long:"force"
              ~short:'f'
              ~doc:"Overwrites the configuration file when it exists."
-             ())))
+             ())
+          dal_slots_arg))
     (prefixes ["init"; "config"] @@ stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1465,7 +1483,8 @@ mode.|}
              threshold_encryption_bundler_endpoint,
              sequencer_sidecar_endpoint,
              wallet_dir,
-             force ) )
+             force,
+             dal_slots ) )
          () ->
       let* sequencer_key =
         Option.map_es
@@ -1504,6 +1523,7 @@ mode.|}
           ?catchup_cooldown
           ?restricted_rpcs
           ~verbose
+          ?dal_slots
           ()
       in
       Configuration.save ~force ~data_dir config)
@@ -1674,7 +1694,7 @@ let proxy_simple_command =
         ())
 
 let sequencer_config_args =
-  Tezos_clic.args14
+  Tezos_clic.args15
     preimages_arg
     preimages_endpoint_arg
     time_between_blocks_arg
@@ -1689,6 +1709,7 @@ let sequencer_config_args =
     initial_kernel_arg
     wallet_dir_arg
     (Client_config.password_filename_arg ())
+    dal_slots_arg
 
 let sequencer_simple_command =
   let open Tezos_clic in
@@ -1725,7 +1746,8 @@ let sequencer_simple_command =
              genesis_timestamp,
              kernel,
              wallet_dir,
-             password_filename ) )
+             password_filename,
+             dal_slots ) )
          () ->
       start_sequencer
         ?password_filename
@@ -1757,10 +1779,11 @@ let sequencer_simple_command =
         ?genesis_timestamp
         ?restricted_rpcs
         ?kernel
+        ?dal_slots
         ())
 
 let threshold_encryption_sequencer_config_args =
-  Tezos_clic.args15
+  Tezos_clic.args16
     preimages_arg
     preimages_endpoint_arg
     time_between_blocks_arg
@@ -1776,6 +1799,7 @@ let threshold_encryption_sequencer_config_args =
     wallet_dir_arg
     sequencer_sidecar_endpoint_arg
     (Client_config.password_filename_arg ())
+    dal_slots_arg
 
 let threshold_encryption_sequencer_command =
   let open Tezos_clic in
@@ -1815,7 +1839,8 @@ let threshold_encryption_sequencer_command =
              kernel,
              wallet_dir,
              sequencer_sidecar_endpoint,
-             password_filename ) )
+             password_filename,
+             dal_slots ) )
          () ->
       start_threshold_encryption_sequencer
         ?password_filename
@@ -1848,6 +1873,7 @@ let threshold_encryption_sequencer_command =
         ?sequencer_sidecar_endpoint
         ?restricted_rpcs
         ?kernel
+        ?dal_slots
         ())
 
 let observer_run_args =
