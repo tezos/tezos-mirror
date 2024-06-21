@@ -1055,9 +1055,53 @@ pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> R
     check_fs_access(csr, fs)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PossibleInterruptsCache {
+    // key: current mode
+    mode: Option<Mode>,
+
+    // value: possible interrupts
+    possible_interrupts: CSRRepr,
+    // TODO: @AC https://app.asana.com/0/1206655199123740/1207617988249893/f
+    // extend this cache to include MIP.
+}
+
+impl Default for PossibleInterruptsCache {
+    fn default() -> Self {
+        Self::INVALID_PI_CACHE
+    }
+}
+
+impl PossibleInterruptsCache {
+    const INVALID_PI_CACHE: Self = Self {
+        mode: None,
+        possible_interrupts: 0,
+    };
+
+    /// Update the cache with the current mode and possible interrupts
+    pub fn update(&mut self, current_mode: Mode, possible_interrupts: CSRRepr) {
+        self.possible_interrupts = possible_interrupts;
+        self.mode = Some(current_mode);
+    }
+
+    /// Return [`Some()`] if for the given parameters the cache is hit.
+    pub fn get(&self, mode: Mode) -> Option<CSRRepr> {
+        match self.mode {
+            Some(m) if m == mode => Some(self.possible_interrupts),
+            _ => None,
+        }
+    }
+
+    /// Invalidate the cache, used when mstatus changes
+    pub fn invalidate_cache(&mut self) {
+        *self = Self::INVALID_PI_CACHE;
+    }
+}
+
 /// CSRs
 pub struct CSRegisters<M: backend::Manager> {
     registers: M::Region<CSRRepr, 4096>,
+    possible_interrupts_cache: PossibleInterruptsCache,
 }
 
 impl<M: backend::Manager> CSRegisters<M> {
@@ -1154,6 +1198,9 @@ impl<M: backend::Manager> CSRegisters<M> {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let (reg, value) = self.transform_write(reg, value);
             self.registers.write(reg as usize, value);
+            if reg == CSRegister::mstatus {
+                self.possible_interrupts_cache.invalidate_cache();
+            }
         }
     }
 
@@ -1209,7 +1256,7 @@ impl<M: backend::Manager> CSRegisters<M> {
     }
 
     /// Get a mask of possible interrupts when in `current_mode`.
-    pub fn possible_interrupts(&self, current_mode: Mode) -> CSRRepr {
+    pub fn possible_interrupts(&mut self, current_mode: Mode) -> CSRRepr {
         // 3.1.6.1 Privilege and Global Interrupt-Enable Stack in mstatus register
         // "When a hart is executing in privilege mode x, interrupts are globally enabled when
         // xIE=1 and globally disabled when xIE=0.
@@ -1220,24 +1267,30 @@ impl<M: backend::Manager> CSRegisters<M> {
         // regardless of the setting of the global yIE
         // bit for the higher-privilege mode."
 
-        match current_mode {
-            Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
-            Mode::Supervisor => {
-                let mstatus: MStatus = self.read(CSRegister::mstatus);
-                let ie_supervisor = match mstatus.sie() {
-                    true => self.read(CSRegister::sie),
-                    false => 0,
-                };
+        if let Some(result) = self.possible_interrupts_cache.get(current_mode) {
+            result
+        } else {
+            let result = match current_mode {
+                Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
+                Mode::Supervisor => {
+                    let mstatus: MStatus = self.read(CSRegister::mstatus);
+                    let ie_supervisor = match mstatus.sie() {
+                        true => self.read(CSRegister::sie),
+                        false => 0,
+                    };
 
-                ie_supervisor | Interrupt::MACHINE_BIT_MASK
-            }
-            Mode::Machine => {
-                let mstatus: MStatus = self.read(CSRegister::mstatus);
-                match mstatus.mie() {
-                    true => self.read(CSRegister::mie),
-                    false => 0,
+                    ie_supervisor | Interrupt::MACHINE_BIT_MASK
                 }
-            }
+                Mode::Machine => {
+                    let mstatus: MStatus = self.read(CSRegister::mstatus);
+                    match mstatus.mie() {
+                        true => self.read(CSRegister::mie),
+                        false => 0,
+                    }
+                }
+            };
+            self.possible_interrupts_cache.update(current_mode, result);
+            result
         }
     }
 
@@ -1315,7 +1368,10 @@ pub type CSRegistersLayout = backend::Array<CSRRepr, 4096>;
 impl<M: backend::Manager> CSRegisters<M> {
     /// Bind the CSR state to the allocated space.
     pub fn bind(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
-        Self { registers: space }
+        Self {
+            registers: space,
+            possible_interrupts_cache: PossibleInterruptsCache::default(),
+        }
     }
 
     /// Reset the control and state registers.
