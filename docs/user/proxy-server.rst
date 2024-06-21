@@ -255,7 +255,7 @@ Requests that are not readonly can only be handled by a full node. However, the 
 by the proxy server, it will redirect it to the node, which
 will then handle the request.
 
-This can be viewed in the proxy-server log, as demonstrated :ref:`above <redirected_requests>`.
+This can be viewed in the proxy server log, as demonstrated :ref:`above <redirected_requests>`.
 
 Clearly, making such requests to the proxy server does not decrease the load of
 the node. However, it does allow the
@@ -282,6 +282,11 @@ More generally, we recommend to automatically
 restart proxy servers that have a high ratio of failures.
 Restarting a proxy server is always fine; they can be thrown away at any
 moment.
+
+.. warning::
+
+   The proxy is a pure proxy, in that it does not do any security filtering of RPC requests.
+   Thus, if you put a proxy in front of a local node not restricting local RPCs and expose this proxy to the public, you potentially introduce a DoS vulnerability.
 
 Heuristics
 ~~~~~~~~~~
