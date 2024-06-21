@@ -30,13 +30,28 @@ impl std::fmt::Display for Level {
 #[macro_export]
 macro_rules! log {
     ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {
-        {
-            // Display `Debug` level only if the feature flag is actived
-            if ($level != $crate::Level::Debug && $level != $crate::Level::Benchmarking)
-                || ($level == $crate::Level::Debug && cfg!(feature = "debug"))
-                || ($level == $crate::Level::Benchmarking && cfg!(feature = "benchmark")) {
+        match $level {
+            $crate::Level::Debug => {
+                #[cfg(not(feature = "debug"))]
+                {}
+                #[cfg(feature = "debug")]
+                {
                     let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
                     $crate::debug_str!($host, &msg);
+                }
+            }
+            $crate::Level::Benchmarking => {
+                #[cfg(not(feature = "benchmark"))]
+                {}
+                #[cfg(feature = "benchmark")]
+                {
+                    let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
+                    $crate::debug_str!($host, &msg);
+                }
+            }
+            $crate::Level::Info | $crate::Level::Error | $crate::Level::Fatal => {
+                let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
+                $crate::debug_str!($host, &msg);
             }
         }
     };
