@@ -10,7 +10,7 @@ use evm::{Context, Transfer};
 use evm::{ExitReason, ExitSucceed};
 use host::runtime::Runtime;
 use tezos_evm_logging::log;
-use tezos_evm_logging::Level::Debug;
+use tezos_evm_logging::Level;
 
 // Implementation of 0x02 precompiled (identity)
 pub fn identity_precompile<Host: Runtime>(
@@ -20,7 +20,11 @@ pub fn identity_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Debug, "Calling identity precompile");
+    log!(
+        handler.borrow_host(),
+        Level::Debug,
+        "Calling identity precompile"
+    );
     let estimated_ticks =
         fail_if_too_much!(tick_model::ticks_of_identity(input.len())?, handler);
 

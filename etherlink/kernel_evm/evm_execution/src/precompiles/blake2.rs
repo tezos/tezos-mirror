@@ -14,7 +14,7 @@ use evm::{executor::stack::PrecompileFailure, ExitError};
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
 use host::runtime::Runtime;
 use tezos_evm_logging::log;
-use tezos_evm_logging::Level::{Debug, Info};
+use tezos_evm_logging::Level;
 
 /// The precomputed values for BLAKE2b [from the spec](https://tools.ietf.org/html/rfc7693#section-2.7)
 /// There are 10 16-byte arrays - one for each round
@@ -116,7 +116,11 @@ fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Debug, "Calling blake2f precompile");
+    log!(
+        handler.borrow_host(),
+        Level::Debug,
+        "Calling blake2f precompile"
+    );
 
     // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
     if input.len() != 213 {
@@ -135,7 +139,7 @@ fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     if let Err(err) = handler.record_cost(cost) {
         log!(
             handler.borrow_host(),
-            Info,
+            Level::Info,
             "Couldn't record the cost of blake2f {:?}",
             err
         );
@@ -148,7 +152,7 @@ fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     }
     log!(
         handler.borrow_host(),
-        Debug,
+        Level::Debug,
         "Input is {:?}",
         hex::encode(input)
     );
@@ -181,7 +185,7 @@ fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     }
     log!(
         handler.borrow_host(),
-        Debug,
+        Level::Debug,
         "Output is {:?}",
         hex::encode(output)
     );
