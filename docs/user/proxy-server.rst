@@ -10,7 +10,7 @@ things:
 * Regular HTTP proxies, as proxy servers are meant to be deployed
   in front of a node, to lower the node's load.
 
-Even though the proxy server only serves a subset of the RPCs a full node can serve (detailed :ref:`below <what_the_proxy_server_serves>`), it can transparently act as a replacement for a full node, by redirecting to the node the HTTP requests that it cannot handle itself, as described :ref:`below <unsupported_rpcs>`.
+Even though the proxy server only serves a subset of the RPCs a full node can serve (detailed :ref:`below <what_the_proxy_server_serves>`), it can transparently act as a replacement for a full node, by redirecting to the node the RPC requests that it cannot handle itself, as described :ref:`below <unsupported_rpcs>`.
 
 Launching a proxy server
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -111,6 +111,8 @@ In the proxy server's terminal, you should see this output (tree sizes may vary)
     Apr 21 11:10:07.478 - proxy_getter: Cache miss: (contracts/index)
     Apr 21 11:10:07.478 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
     Apr 21 11:10:07.479 - proxy_rpc: received tree of size 115
+
+.. _redirected_requests:
 
 Lines of the form ``proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/...``
 show requests that the proxy server sends to the node to obtain data.
@@ -250,21 +252,10 @@ Unsupported RPCs
 ~~~~~~~~~~~~~~~~
 
 Requests that are not readonly can only be handled by a full node. However, the proxy server accepts any RPC: if the RPC is not supported
-by the proxy server, it will redirect clients to the appropriate endpoint on the
-underlying node using an HTTP redirect (``301 Moved Permanently``), and the node
+by the proxy server, it will redirect it to the node, which
 will then handle the request.
 
-This can be easily demonstrated with a simple test: start a proxy server, and
-make a request to it with ``curl -vL <proxy server endpoint>/<any node-only RPC>``.
-For example::
-
-    curl -vL http://127.0.0.1:18732/chains/main/blocks/head/header
-
-The output
-from ``curl`` will show that the proxy server asks curl to follow a redirect to
-the node's endpoint, which it will do because of the ``-L`` flag, and
-then it is finally responded to by the node. Any RPC that can be handled by the
-proxy server itself will of course not show this behaviour.
+This can be viewed in the proxy server log, as demonstrated :ref:`above <redirected_requests>`.
 
 Clearly, making such requests to the proxy server does not decrease the load of
 the node. However, it does allow the
@@ -291,6 +282,11 @@ More generally, we recommend to automatically
 restart proxy servers that have a high ratio of failures.
 Restarting a proxy server is always fine; they can be thrown away at any
 moment.
+
+.. warning::
+
+   The proxy is a pure proxy, in that it does not do any security filtering of RPC requests.
+   Thus, if you put a proxy in front of a local node not restricting local RPCs and expose this proxy to the public, you potentially introduce a DoS vulnerability.
 
 Heuristics
 ~~~~~~~~~~

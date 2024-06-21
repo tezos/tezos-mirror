@@ -527,9 +527,7 @@ module Term = struct
       & info ~docs ~doc ~docv:"NUM" ["peer-table-size"])
 
   let listen_addr =
-    let doc =
-      "The TCP address and port at which this instance can be reached."
-    in
+    let doc = "The URL at which this instance can be reached." in
     Arg.(
       value
       & opt (some string) None
@@ -655,18 +653,17 @@ module Term = struct
 
   let rpc_listen_addrs =
     let doc =
-      "The TCP socket address at which this RPC server instance can be \
-       reached. Note that: as a local RPC server is handled by the node \
-       itself, calling computational intensive RPCs can affect the \
-       performances of the node."
+      "The URL at which this RPC server instance can be reached. Note that: as \
+       a local RPC server is handled by the node itself, calling computational \
+       intensive RPCs can affect the performances of the node."
     in
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let external_rpc_listen_addrs =
     let doc =
-      "The TCP socket address at which this external RPC server instance can \
-       be reached. Warning: this feature is unstable -- use it with care."
+      "The URL at which this external RPC server instance can be reached. \
+       Warning: this feature is unstable -- use it with care."
     in
     Arg.(
       value & opt_all string []
