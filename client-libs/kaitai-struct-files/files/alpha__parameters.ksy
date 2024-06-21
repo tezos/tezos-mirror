@@ -614,6 +614,3 @@ seq:
 - id: direct_ticket_spending_enable
   type: u1
   enum: bool
-- id: sponsored_operations_enable
-  type: u1
-  enum: bool
