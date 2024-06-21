@@ -263,11 +263,11 @@ let get_missing_data ~logger ~conf db_pool =
       \  delegates.address,\n\
       \  EXISTS (\n\
       \   SELECT 1 FROM blocks\n\
-      \     ON blocks.level = missing_blocks.level\n\
-      \     AND blocks.round = missing_blocks.round\n\
       \   LEFT JOIN blocks_reception\n\
       \     ON blocks_reception.block = blocks.id\n\
-      \   WHERE blocks_reception.id IS NOT NULL\n\
+      \   WHERE blocks.level = missing_blocks.level\n\
+      \   AND blocks.round = missing_blocks.round\n\
+      \   AND blocks_reception.id IS NOT NULL\n\
       \  )\n\
       \  FROM missing_blocks\n\
       \  JOIN delegates ON delegates.id = missing_blocks.baker"
