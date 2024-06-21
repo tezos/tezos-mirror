@@ -242,13 +242,21 @@ let get_stats ~logger db_pool =
 let get_missing_data ~logger ~conf db_pool =
   let select_missing_data_request =
     Caqti_request.Infix.(
-      Caqti_type.unit ->* Caqti_type.(t3 int32 int32 string))
+      Caqti_type.unit ->* Caqti_type.(t4 int32 int32 string bool))
       "SELECT\n\
       \  missing_blocks.level,\n\
       \  missing_blocks.round,\n\
-      \  delegates.address\n\
-       FROM missing_blocks\n\
-       JOIN delegates ON delegates.id = missing_blocks.baker"
+      \  delegates.address,\n\
+      \  EXISTS (\n\
+      \   SELECT 1 FROM blocks\n\
+      \     ON blocks.level = missing_blocks.level\n\
+      \     AND blocks.round = missing_blocks.round\n\
+      \   LEFT JOIN blocks_reception\n\
+      \     ON blocks_reception.block = blocks.id\n\
+      \   WHERE blocks_reception.id IS NOT NULL\n\
+      \  )\n\
+      \  FROM missing_blocks\n\
+      \  JOIN delegates ON delegates.id = missing_blocks.baker"
   in
   with_caqti_error
     ~logger
@@ -257,7 +265,8 @@ let get_missing_data ~logger ~conf db_pool =
          maybe_with_metrics conf "select_missing_data" @@ fun () ->
          Db.fold select_missing_data_request List.cons () [])
        db_pool)
-    (fun list -> reply_public_json Data_encoding.(list (tup3 int32 int32 string)) list)
+    (fun list ->
+      reply_public_json Data_encoding.(list (tup4 int32 int32 string bool)) list)
 
 let get_head ~logger conf db_pool =
   let query =
