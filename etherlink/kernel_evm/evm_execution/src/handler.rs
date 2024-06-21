@@ -38,7 +38,7 @@ use sha3::{Digest, Keccak256};
 use std::cmp::min;
 use std::fmt::Debug;
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{log, Level};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
 use tezos_smart_rollup_encoding::michelson::{MichelsonContract, MichelsonPair};
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
@@ -518,8 +518,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Check if address is hot
     fn is_address_hot(&self, address: H160) -> Result<bool, ExitError> {
         let Some(layer) = self.transaction_data.last() else {
-            return Err(ExitError::Other(Cow::from("Invalid transaction data stack for is_address_hot")))
-        };
+                return Err(ExitError::Other(Cow::from("Invalid transaction data stack for is_address_hot")))
+            };
 
         Ok(layer.accessed_storage_keys.contains_address(address))
     }
@@ -618,7 +618,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "{caller:?} pays {amount:?} for transaction"
         );
 
@@ -642,7 +642,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "{caller:?} refunded {amount:?} for transaction"
         );
 
@@ -804,7 +804,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<TransferExitReason, EthereumError> {
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "Executing a transfer from {} to {} of {}",
             from,
             to,
@@ -825,7 +825,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             } else {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "Failed transfer due to insufficient funds, value: {:?}, from: {:?}, to: {:?}",
                     value,
                     from_account,
@@ -835,12 +835,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 Ok(TransferExitReason::OutOfFund)
             }
         } else {
-            log!(
-                self.host,
-                Level::Debug,
-                "'from' account {:?} is empty",
-                from
-            );
+            log!(self.host, Debug, "'from' account {:?} is empty", from);
             // Accounts of zero balance by default, so this must be
             // an underflow.
             Ok(TransferExitReason::OutOfFund)
@@ -866,7 +861,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             if !enough_balance {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "Insufficient funds, balance of {:?} is {:?} but needs at least {:?}",
                     from,
                     balance,
@@ -875,12 +870,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }
             Ok(enough_balance)
         } else {
-            log!(
-                self.host,
-                Level::Debug,
-                "'from' account {:?} is empty",
-                from
-            );
+            log!(self.host, Debug, "'from' account {:?} is empty", from);
             // Accounts of zero balance by default, so this must be
             // an underflow.
             Ok(false)
@@ -989,7 +979,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 Ok(true) => {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Failed to create contract at {:?}. Address is non-empty",
                         address
                     );
@@ -1019,7 +1009,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
         is_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
-        log!(self.host, Level::Debug, "Executing a contract create");
+        log!(self.host, Debug, "Executing a contract create");
 
         // We check that the maximum allowed init code size as specified by EIP-3860
         // can not be reached.
@@ -1046,7 +1036,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if self.record_cost(extra_cost).is_err() {
             log!(
                 self.host,
-                Level::Debug,
+                Debug,
                 "Not enought gas for call. Required at least: {:?} for the init code size extra cost.",
                 extra_cost
             );
@@ -1113,7 +1103,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let stack_depth = self.stack_depth();
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "Executing contract call on contract {} at depth: {}",
             address,
             stack_depth
@@ -1284,7 +1274,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         } else {
             log!(
                 self.host,
-                Level::Debug,
+                Debug,
                 "Failed to get account path for EVM handler get_account"
             );
             Ok(None)
@@ -1303,7 +1293,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         } else {
             log!(
                 self.host,
-                Level::Debug,
+                Debug,
                 "Failed to get account path for EVM handler get_original_account"
             );
             Ok(None)
@@ -1322,7 +1312,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Err(err) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "Failed to increment nonce for account {:?}",
                     address
                 );
@@ -1343,7 +1333,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Err(err) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "Failed to decrement nonce for account {:?}",
                     address
                 );
@@ -1381,12 +1371,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// contract selfdestruct completion, ie, when contract selfdestructs takes final
     /// effect.
     fn delete_contract(&mut self, address: H160) -> Result<(), EthereumError> {
-        log!(
-            self.host,
-            Level::Debug,
-            "Deleting contract at {:?}",
-            address
-        );
+        log!(self.host, Debug, "Deleting contract at {:?}", address);
 
         self.evm_account_storage
             .delete(
@@ -1412,12 +1397,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
     ) -> Result<(), EthereumError> {
         let number_of_tx_layer = self.evm_account_storage.stack_depth();
-        log!(self.host, Level::Debug, "Begin initial transaction");
+        log!(self.host, Debug, "Begin initial transaction");
 
         if number_of_tx_layer > 0 {
             log!(
                 self.host,
-                Level::Debug,
+                Debug,
                 "Initial transaction when there is already {} transaction",
                 number_of_tx_layer
             );
@@ -1453,12 +1438,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         reason: ExitReason,
     ) -> Result<ExecutionOutcome, EthereumError> {
         let number_of_tx_layer = self.evm_account_storage.stack_depth();
-        log!(self.host, Level::Debug, "Committing initial transaction");
+        log!(self.host, Debug, "Committing initial transaction");
 
         if number_of_tx_layer != 1 {
             log!(
                 self.host,
-                Level::Debug,
+                Debug,
                 "Committing initial transaction, but there are {:?} transactions",
                 number_of_tx_layer
             );
@@ -1484,7 +1469,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 if self.delete_contract(*address).is_err() {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Failed to remove deleted address {:?}",
                         address
                     );
@@ -1523,16 +1508,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         reason: ExtendedExitReason,
     ) -> Result<ExecutionOutcome, EthereumError> {
         let number_of_tx_layer = self.evm_account_storage.stack_depth();
-        log!(
-            self.host,
-            Level::Debug,
-            "Rolling back the initial transaction"
-        );
+        log!(self.host, Debug, "Rolling back the initial transaction");
 
         if number_of_tx_layer != 1 {
             log!(
                 self.host,
-                Level::Debug,
+                Debug,
                 "Rolling back initial transaction, but there are {:?} in progress",
                 number_of_tx_layer
             );
@@ -1581,7 +1562,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Ok((ExitReason::Succeed(r), new_address, result)) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "The initial transaction ended with success: {:?}",
                     r
                 );
@@ -1600,7 +1581,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Ok((ExitReason::Error(error), _, _)) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "The initial transaction ended with an error: {:?}",
                     error
                 );
@@ -1617,7 +1598,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Ok((ExitReason::Fatal(fatal_error), _, _)) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "The initial transaction ended with a fatal error: {:?}",
                     fatal_error
                 );
@@ -1630,7 +1611,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Err(EthereumError::OutOfTicks) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "The initial transaction exhausted the allocated ticks."
                 );
 
@@ -1639,7 +1620,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Err(err) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "The initial transaction ended with an Ethereum error: {:?}",
                     err
                 );
@@ -1662,7 +1643,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let number_of_tx_layer = self.evm_account_storage.stack_depth();
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "Begin transaction from {} at transaction depth: {}",
             self.origin(),
             self.stack_depth()
@@ -1704,7 +1685,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "Commit transaction at transaction depth: {}",
             self.stack_depth()
         );
@@ -1766,7 +1747,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         log!(
             self.host,
-            Level::Debug,
+            Debug,
             "Rollback transaction at transaction depth: {}",
             self.stack_depth()
         );
@@ -1792,7 +1773,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if let Err(err) = handler.rollback_inter_transaction(refund_gas) {
             log!(
                 handler.host,
-                Level::Debug,
+                Debug,
                 "Rolling back reverted transaction caused an error: {:?}",
                 err
             );
@@ -1818,7 +1799,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 ExitReason::Succeed(_) => {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Intermediate transaction ended with: {:?}",
                         exit_reason
                     );
@@ -1826,7 +1807,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     if let Err(err) = self.commit_inter_transaction() {
                         log!(
                             self.host,
-                            Level::Debug,
+                            Debug,
                             "Committing intermediate transaction caused an error: {:?}",
                             err
                         );
@@ -1839,7 +1820,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 ExitReason::Revert(_) => {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Intermediate transaction reverted with: {:?}",
                         exit_reason
                     );
@@ -1853,7 +1834,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 ExitReason::Error(_) => {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Intermediate transaction produced the following error: {:?}",
                         exit_reason
                     );
@@ -1876,7 +1857,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Intermediate transaction produced the following error: {:?}",
                         create_contract_limit
                     );
@@ -1894,7 +1875,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 ExitReason::Fatal(_) => {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Intermediate transaction produced the following fatal error: {:?}",
                         exit_reason
                     );
@@ -1912,7 +1893,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "Intermediate precompiled call ended with failure: {:?}",
                     failure_reason
                 );
@@ -1920,7 +1901,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 if let Err(err) = self.rollback_inter_transaction(false) {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Rolling back reverted transaction caused an error: {:?}",
                         err
                     );
@@ -1938,7 +1919,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Err(err) => {
                 log!(
                     self.host,
-                    Level::Debug,
+                    Debug,
                     "Intermediate transaction ended in error: {:?}",
                     err
                 );
@@ -1946,7 +1927,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 if let Err(err) = self.rollback_inter_transaction(false) {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Rolling back reverted transaction caused an error: {:?}",
                         err
                     );
@@ -2200,7 +2181,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 })?;
             Ok(())
         } else {
-            log!(self.host, Level::Debug, "Contract already marked to delete");
+            log!(self.host, Debug, "Contract already marked to delete");
             Ok(())
         }
     }
@@ -2274,7 +2255,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 if let Err(err) = self.increment_nonce(caller) {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Failed to increment nonce of {:?}",
                         caller
                     );
@@ -2291,7 +2272,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 if let Err(err) = self.record_cost(gas_limit.unwrap_or_default()) {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Not enough gas for create. Required at least: {:?}",
                         gas_limit
                     );
@@ -2318,7 +2299,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     Err(err) => {
                         log!(
                             self.host,
-                            Level::Debug,
+                            Debug,
                             "Intermediate transaction failed, reason: {:?}",
                             err
                         );
@@ -2361,7 +2342,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 if let Err(err) = self.record_cost(gas_limit.unwrap_or_default()) {
                     log!(
                         self.host,
-                        Level::Debug,
+                        Debug,
                         "Not enough gas for call. Required at least: {:?}",
                         gas_limit
                     );
@@ -2389,12 +2370,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
                 match self.end_inter_transaction(result) {
                     Capture::Exit((reason, _, value)) => {
-                        log!(
-                            self.host,
-                            Level::Debug,
-                            "Call ended with reason: {:?}",
-                            reason
-                        );
+                        log!(self.host, Debug, "Call ended with reason: {:?}", reason);
                         Capture::Exit((reason, value))
                     }
                     Capture::Trap(x) => Capture::Trap(x),
@@ -3120,7 +3096,7 @@ mod test {
                     H256::from_str(
                         "000000000000000000000000000000000000000000000000000000000000002a"
                     )
-                        .unwrap()
+                    .unwrap()
                 );
                 assert_eq!(handler.gas_used(), 0);
             }
