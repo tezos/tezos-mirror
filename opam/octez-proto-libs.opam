@@ -15,8 +15,8 @@ depends: [
   "bls12-381" { = version }
   "zarith" { >= "1.13" & < "1.14" }
   "class_group_vdf" { >= "0.0.4" }
-  "aches" { >= "1.0.0" }
-  "aches-lwt" { >= "1.0.0" }
+  "aches" { >= "1.1.0" }
+  "aches-lwt" { >= "1.1.0" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "octez-alcotezt" { with-test & = version }
   "qcheck-alcotest" { with-test & >= "0.20" }

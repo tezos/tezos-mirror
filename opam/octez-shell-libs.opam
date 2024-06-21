@@ -13,8 +13,8 @@ depends: [
   "octez-libs" { = version }
   "lwt-watcher" { = "0.2" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
-  "ringo" { >= "1.0.0" }
-  "aches" { >= "1.0.0" }
+  "ringo" { >= "1.1.0" }
+  "aches" { >= "1.1.0" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" { with-test & = version }
   "octez-alcotezt" { with-test & = version }
@@ -23,7 +23,7 @@ depends: [
   "octez-protocol-compiler" { = version }
   "lwt-exit"
   "octez-version" { = version }
-  "aches-lwt" { >= "1.0.0" }
+  "aches-lwt" { >= "1.1.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
   "camlzip" { >= "1.12" & < "1.13" }
   "tar"

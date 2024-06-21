@@ -21,8 +21,8 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
   "octez-internal-libs" { = version }
-  "aches" { >= "1.0.0" }
-  "aches-lwt" { >= "1.0.0" }
+  "aches" { >= "1.1.0" }
+  "aches-lwt" { >= "1.1.0" }
   "octez-injector" { = version }
   "octez-smart-rollup-node-lib" { = version }
   "octez-riscv-pvm" { = version }
