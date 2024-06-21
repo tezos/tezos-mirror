@@ -122,7 +122,10 @@ where
     ///
     /// Section 5.2.1: It is always legal to over-fence.
     #[inline(always)]
-    pub fn sfence_vma(&self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
+    pub fn sfence_vma(&mut self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
+        // fencing all memory loads / stores, this invalidates the TLB cache
+        self.translation_cache.invalidate();
+
         let mode = self.hart.mode.read_default();
         let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
         let tvm = mstatus.tvm();
