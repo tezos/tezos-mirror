@@ -126,7 +126,7 @@ module Cli = struct
       ~section
       ~long:"producers"
       ~description:"Specify the number of DAL producers for this test"
-      1
+      0
 
   let producer_machine_type =
     Clap.optional_string
@@ -251,6 +251,7 @@ type etherlink = {
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
   evm_node : Tezt_etherlink.Evm_node.t;
+  accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
 type public_key_hash = string
@@ -977,8 +978,13 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
   let preimages_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
+  let* remote_output_config = Agent.copy agent ~source:output_config in
   let* {output; _} =
-    prepare_installer_kernel ~agent ~preimages_dir Constant.WASM.evm_kernel
+    prepare_installer_kernel
+      ~config:(`Path remote_output_config)
+      ~agent
+      ~preimages_dir
+      Constant.WASM.evm_kernel
   in
   let pvm_kind = "wasm_2_0_0" in
   let l = Node.get_last_seen_level node in
@@ -1003,7 +1009,7 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
         initial_kernel = output;
         preimage_dir = Some preimages_dir;
         private_rpc_port;
-        time_between_blocks = None;
+        time_between_blocks = Some (Time_between_blocks 10.);
         sequencer = etherlink_rollup_operator_key.alias;
         genesis_timestamp = None;
         max_blueprints_lag = None;
@@ -1027,7 +1033,8 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       (Sc_rollup_node.endpoint sc_rollup_node)
       agent
   in
-  return {node; client; sc_rollup_node; evm_node}
+  let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
+  return {node; client; sc_rollup_node; evm_node; accounts}
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
@@ -1209,6 +1216,30 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
+let etherlink_loop etherlink =
+  let open Tezt_etherlink in
+  let rec account_loop i =
+    let wait_for =
+      Evm_node.wait_for_tx_pool_add_transaction etherlink.evm_node
+    in
+    let* _ =
+      let source_private_key = etherlink.accounts.(i).private_key in
+      let to_public_key =
+        etherlink.accounts.((i + 1) mod Array.length etherlink.accounts).address
+      in
+      Eth_cli.transaction_send
+        ~source_private_key
+        ~to_public_key
+        ~value:(Wei.of_eth_int 10)
+        ~endpoint:(Evm_node.endpoint etherlink.evm_node)
+        ()
+    in
+    let* _ = wait_for in
+    account_loop i
+  in
+  Array.mapi (fun i _ -> account_loop i) etherlink.accounts
+  |> Array.to_list |> Lwt.join
+
 let configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
@@ -1285,6 +1316,8 @@ let benchmark () =
           in
           let* t = init ~configuration cloud next_agent in
           let first_protocol_level = 2 in
-          loop t first_protocol_level)
+          let main_loop = loop t first_protocol_level in
+          let etherlink_loop = etherlink_loop t.etherlink in
+          Lwt.join [main_loop; etherlink_loop])
 
 let register () = benchmark ()

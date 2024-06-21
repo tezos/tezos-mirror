@@ -766,15 +766,20 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
 
 let endpoint ?(private_ = false) (evm_node : t) =
   let addr, port, path =
+    let host =
+      match evm_node.persistent_state.runner with
+      | None -> Constant.default_host
+      | Some runner -> Runner.address (Some runner)
+    in
     if private_ then
       match evm_node.persistent_state.mode with
       | Sequencer {private_rpc_port = Some private_rpc_port; _} ->
-          (Constant.default_host, private_rpc_port, "/private")
+          (host, private_rpc_port, "/private")
       | Sequencer {private_rpc_port = None; _} ->
           Test.fail "Sequencer doesn't have a private RPC server"
       | Threshold_encryption_sequencer
           {private_rpc_port = Some private_rpc_port; _} ->
-          (Constant.default_host, private_rpc_port, "/private")
+          (host, private_rpc_port, "/private")
       | Threshold_encryption_sequencer {private_rpc_port = None; _} ->
           Test.fail
             "Threshold encryption sequencer doesn't have a private RPC server"
@@ -1040,16 +1045,17 @@ let make_kernel_installer_config ?(mainnet_compat = false)
 
 module Agent = struct
   (* Use for compatibility with `tezt-cloud`. *)
-  let create ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir
-      ?rpc_addr ?mode endpoint agent =
+  let create ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ?mode
+      endpoint agent =
     let* path = Agent.copy agent ~source:path in
     let runner = Agent.runner agent in
+    let rpc_addr = "0.0.0.0" in
     let rpc_port = Agent.next_available_port agent in
-    create ?name ~path ~runner ?data_dir ?rpc_addr ~rpc_port ?mode endpoint
+    create ?name ~path ~runner ?data_dir ~rpc_addr ~rpc_port ?mode endpoint
     |> Lwt.return
 
-  let init ?patch_config ?name ?mode ?data_dir ?rpc_addr rollup_node agent =
-    let* evm_node = create ?name ?mode ?data_dir ?rpc_addr rollup_node agent in
+  let init ?patch_config ?name ?mode ?data_dir rollup_node agent =
+    let* evm_node = create ?name ?mode ?data_dir rollup_node agent in
     let* () = Process.check @@ spawn_init_config evm_node in
     let* () =
       match patch_config with
