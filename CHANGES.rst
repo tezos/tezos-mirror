@@ -79,6 +79,10 @@ Node
   ``/config/history_mode`` instead to obtain the current checkpoint
   for this chain. (MR :gl:`!13880`)
 
+- **Breaking change** Decommissioned deprecated
+  ``/monitor/commit_hash`` RPC endpoint. Use ``/version`` instead. (MR
+  :gl:`!13879`)
+
 Client
 ------
 
