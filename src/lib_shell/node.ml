@@ -356,7 +356,7 @@ let http_cache_header_tools node =
   let chain_store = Store.main_chain_store store in
   Http_cache_headers.make_tools chain_store
 
-let build_rpc_directory ~node_version ~commit_info node =
+let build_rpc_directory ~node_version node =
   let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
@@ -368,7 +368,6 @@ let build_rpc_directory ~node_version ~commit_info node =
        node.store) ;
   merge
     (Monitor_directory.build_rpc_directory
-       ~commit_info
        node.validator
        node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
