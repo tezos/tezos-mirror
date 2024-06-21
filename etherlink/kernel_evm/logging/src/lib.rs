@@ -26,34 +26,18 @@ impl std::fmt::Display for Level {
     }
 }
 
-#[cfg(all(feature = "alloc", any(feature = "debug", feature = "benchmark")))]
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {
     ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {
         {
-            let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
-            $crate::debug_str!($host, &msg);
-        }
-    };
-}
-
-#[cfg(all(feature = "alloc", not(feature = "debug"), not(feature = "benchmark")))]
-#[macro_export]
-macro_rules! log {
-    ($host: expr, Debug, $fmt: expr $(, $arg:expr)*)  => {
-        let _ = $host;
-        let _ = $fmt;
-        $(let _ = $arg;)*
-    };
-    ($host: expr, Benchmarking, $fmt: expr $(, $arg:expr)*)  => {
-        let _ = $host;
-        let _ = $fmt;
-        $(let _ = $arg;)*
-    };
-    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {
-        {
-            let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
-            $crate::debug_str!($host, &msg);
+            // Display `Debug` level only if the feature flag is actived
+            if ($level != $crate::Level::Debug && $level != $crate::Level::Benchmarking)
+                || ($level == $crate::Level::Debug && cfg!(feature = "debug"))
+                || ($level == $crate::Level::Benchmarking && cfg!(feature = "benchmark")) {
+                    let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
+                    $crate::debug_str!($host, &msg);
+            }
         }
     };
 }

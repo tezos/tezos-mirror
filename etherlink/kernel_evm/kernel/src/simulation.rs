@@ -32,7 +32,7 @@ use tezos_ethereum::rlp_helpers::{
 };
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_evm_logging::{log, Level};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
@@ -629,7 +629,7 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
 ) -> Result<(), anyhow::Error> {
-    log!(host, Level::Debug, "Starting simulation mode ");
+    log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {

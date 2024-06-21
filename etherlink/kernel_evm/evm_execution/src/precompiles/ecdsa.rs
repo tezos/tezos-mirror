@@ -14,7 +14,7 @@ use sha2::Digest;
 use sha3::Keccak256;
 use std::cmp::min;
 use tezos_evm_logging::log;
-use tezos_evm_logging::Level;
+use tezos_evm_logging::Level::{Debug, Info};
 
 macro_rules! unwrap_ecrecover {
     ($expr : expr) => {
@@ -59,11 +59,7 @@ pub fn ecrecover_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(
-        handler.borrow_host(),
-        Level::Debug,
-        "Calling ecrecover precompile"
-    );
+    log!(handler.borrow_host(), Debug, "Calling ecrecover precompile");
 
     // check that enough resources to execute (gas / ticks) are available
     let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_ecrecover(), handler);
@@ -71,7 +67,7 @@ pub fn ecrecover_precompile<Host: Runtime>(
     if let Err(err) = handler.record_cost(cost) {
         log!(
             handler.borrow_host(),
-            Level::Info,
+            Info,
             "Couldn't record the cost of ecrecover {:?}",
             err
         );
@@ -85,7 +81,7 @@ pub fn ecrecover_precompile<Host: Runtime>(
 
     log!(
         handler.borrow_host(),
-        Level::Debug,
+        Debug,
         "Input is {:?}",
         hex::encode(input)
     );
@@ -109,7 +105,7 @@ pub fn ecrecover_precompile<Host: Runtime>(
 
     log!(
         handler.borrow_host(),
-        Level::Debug,
+        Debug,
         "Output is {:?}",
         hex::encode(hash)
     );

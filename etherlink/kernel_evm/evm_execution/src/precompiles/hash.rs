@@ -11,7 +11,7 @@ use host::runtime::Runtime;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use tezos_evm_logging::log;
-use tezos_evm_logging::Level;
+use tezos_evm_logging::Level::Debug;
 
 // Implementation of 0x03 precompiled (sha256)
 pub fn sha256_precompile<Host: Runtime>(
@@ -21,11 +21,7 @@ pub fn sha256_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(
-        handler.borrow_host(),
-        Level::Debug,
-        "Calling sha2-256 precompile"
-    );
+    log!(handler.borrow_host(), Debug, "Calling sha2-256 precompile");
     let estimated_ticks =
         fail_if_too_much!(tick_model::ticks_of_sha256(input.len())?, handler);
 
@@ -62,7 +58,7 @@ pub fn ripemd160_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(
         handler.borrow_host(),
-        Level::Debug,
+        Debug,
         "Calling ripemd-160 precompile"
     );
     let estimated_ticks =
