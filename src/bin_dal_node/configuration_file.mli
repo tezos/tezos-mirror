@@ -57,6 +57,7 @@ type t = {
   profile : Profile_manager.t;
       (** The profiles determining the topics of interest. *)
   history_mode : history_mode;
+  version : int;  (** The version of the configuration. *)
 }
 
 (** [default] is the default configuration. *)

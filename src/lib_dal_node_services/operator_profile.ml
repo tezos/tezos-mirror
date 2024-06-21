@@ -95,3 +95,82 @@ let encoding =
        (req "producers" (list int31))
        (req "observers" (list int31))
        (req "attesters" (list Signature.Public_key_hash.encoding)))
+
+(* The version used by the v20 release. *)
+module Legacy = struct
+  type profile =
+    | Attester of Tezos_crypto.Signature.public_key_hash
+    | Producer of {slot_index : int}
+    | Observer of {slot_index : int}
+
+  let profile_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Attester with pkh"
+          (Tag 0)
+          (obj2
+             (req "kind" (constant "attester"))
+             (req
+                "public_key_hash"
+                Tezos_crypto.Signature.Public_key_hash.encoding))
+          (function Attester attest -> Some ((), attest) | _ -> None)
+          (function (), attest -> Attester attest);
+        case
+          ~title:"Slot producer"
+          (Tag 1)
+          (obj2 (req "kind" (constant "producer")) (req "slot_index" int31))
+          (function
+            | Producer {slot_index} -> Some ((), slot_index) | _ -> None)
+          (function (), slot_index -> Producer {slot_index});
+        case
+          ~title:"observer"
+          (Tag 2)
+          (obj2 (req "kind" (constant "observer")) (req "slot_index" int31))
+          (function
+            | Observer {slot_index} -> Some ((), slot_index) | _ -> None)
+          (function (), slot_index -> Observer {slot_index});
+      ]
+
+  let encoding = Data_encoding.list profile_encoding
+end
+
+let from_legacy profile_list =
+  let attesters =
+    List.filter_map
+      (function Legacy.Attester pkh -> Some pkh | _ -> None)
+      profile_list
+  in
+  let producers =
+    List.filter_map
+      (function Legacy.Producer {slot_index} -> Some slot_index | _ -> None)
+      profile_list
+  in
+  let observers =
+    List.filter_map
+      (function Legacy.Observer {slot_index} -> Some slot_index | _ -> None)
+      profile_list
+  in
+  make ~attesters ~producers ~observers ()
+
+(* This encoding is used to be able to read the legacy config files (coming with
+   the octez release v20). Once v21 is released this is normally not needed
+   anymore and can be deleted, together with the [Legacy] module. *)
+let encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"operator_profile_encoding"
+        Json_only
+        encoding
+        (fun v -> Some v)
+        (fun v -> v);
+      case
+        ~title:"legacy_operator_profile_encoding"
+        Json_only
+        (conv (fun _ -> assert false) from_legacy Legacy.encoding)
+        (fun _ -> None)
+        (fun v -> v);
+    ]
