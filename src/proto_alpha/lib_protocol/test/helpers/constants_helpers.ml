@@ -191,7 +191,4 @@ module Set = struct
           c
     end
   end
-
-  let sponsored_operations_enable sponsored_operations_enable (c : t) =
-    {c with sponsored_operations_enable}
 end
