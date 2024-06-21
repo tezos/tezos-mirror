@@ -376,6 +376,7 @@ val make_kernel_installer_config :
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
   ?enable_fa_bridge:bool ->
+  ?enable_dal:bool ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t

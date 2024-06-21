@@ -437,8 +437,7 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_mock::MockHost;
 
-    #[test]
-    fn test_invalid_sequencer_blueprint_is_removed() {
+    fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockHost::default();
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
@@ -455,6 +454,7 @@ mod tests {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
+                enable_dal,
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
@@ -582,5 +582,15 @@ mod tests {
         // The blueprint 0 should have been removed
         let exists = host.store_has(&blueprint_path).unwrap().is_some();
         assert!(!exists)
+    }
+
+    #[test]
+    fn test_invalid_sequencer_blueprint_is_removed_without_dal() {
+        test_invalid_sequencer_blueprint_is_removed(false)
+    }
+
+    #[test]
+    fn test_invalid_sequencer_blueprint_is_removed_with_dal() {
+        test_invalid_sequencer_blueprint_is_removed(true)
     }
 }

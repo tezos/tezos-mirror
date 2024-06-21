@@ -1,7 +1,7 @@
 use crate::{
     delayed_inbox::DelayedInbox,
     storage::{
-        is_enable_fa_bridge, read_admin, read_delayed_transaction_bridge,
+        enable_dal, is_enable_fa_bridge, read_admin, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
         read_sequencer_governance, sequencer,
@@ -20,6 +20,7 @@ pub enum ConfigurationMode {
         delayed_bridge: ContractKt1Hash,
         delayed_inbox: Box<DelayedInbox>,
         sequencer: PublicKey,
+        enable_dal: bool,
     },
 }
 
@@ -31,10 +32,11 @@ impl std::fmt::Display for ConfigurationMode {
                 delayed_bridge,
                 delayed_inbox: _, // Ignoring delayed_inbox
                 sequencer,
+                enable_dal,
             } => write!(
                 f,
-                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
-                delayed_bridge, sequencer
+                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?}, enable_dal: {:?} }}",
+                delayed_bridge, sequencer, enable_dal
             ),
         }
     }
@@ -174,6 +176,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
+    let enable_dal = enable_dal(host).unwrap_or(false);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -192,6 +195,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                         delayed_bridge,
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
+                        enable_dal,
                     },
                     limits,
                     enable_fa_bridge,

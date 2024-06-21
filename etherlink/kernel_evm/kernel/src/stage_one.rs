@@ -76,6 +76,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
+    _enable_dal: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
         host,
@@ -113,6 +114,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_bridge,
             delayed_inbox,
             sequencer,
+            enable_dal,
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
@@ -120,6 +122,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_bridge.clone(),
             delayed_inbox,
             sequencer.clone(),
+            *enable_dal,
         ),
         ConfigurationMode::Proxy => {
             fetch_proxy_blueprints(host, smart_rollup_address, &config.tezos_contracts)
@@ -150,7 +153,7 @@ mod tests {
 
     use super::*;
 
-    fn dummy_sequencer_config() -> Configuration {
+    fn dummy_sequencer_config(enable_dal: bool) -> Configuration {
         let mut host = MockHost::default();
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
@@ -173,6 +176,7 @@ mod tests {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
+                enable_dal,
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
@@ -284,11 +288,10 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_sequencer_reject_proxy_transactions() {
+    fn test_sequencer_reject_proxy_transactions(enable_dal: bool) {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -301,12 +304,21 @@ mod tests {
     }
 
     #[test]
-    fn test_sequencer_reject_proxy_chunked_transactions() {
+    fn test_sequencer_reject_proxy_transactions_without_dal() {
+        test_sequencer_reject_proxy_transactions(false)
+    }
+
+    #[test]
+    fn test_sequencer_reject_proxy_transactions_with_dal() {
+        test_sequencer_reject_proxy_transactions(true)
+    }
+
+    fn test_sequencer_reject_proxy_chunked_transactions(enable_dal: bool) {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
         host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
         host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -319,12 +331,21 @@ mod tests {
     }
 
     #[test]
-    fn test_parsing_valid_sequencer_chunk() {
+    fn test_sequencer_reject_proxy_chunked_transactions_without_dal() {
+        test_sequencer_reject_proxy_chunked_transactions(false)
+    }
+
+    #[test]
+    fn test_sequencer_reject_proxy_chunked_transactions_with_dal() {
+        test_sequencer_reject_proxy_chunked_transactions(true)
+    }
+
+    fn test_parsing_valid_sequencer_chunk(enable_dal: bool) {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
@@ -339,12 +360,21 @@ mod tests {
     }
 
     #[test]
-    fn test_parsing_invalid_sequencer_chunk() {
+    fn test_parsing_valid_sequencer_chunk_without_dal() {
+        test_parsing_valid_sequencer_chunk(false)
+    }
+
+    #[test]
+    fn test_parsing_valid_sequencer_chunk_with_dal() {
+        test_parsing_valid_sequencer_chunk(true)
+    }
+
+    fn test_parsing_invalid_sequencer_chunk(enable_dal: bool) {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -357,12 +387,21 @@ mod tests {
     }
 
     #[test]
-    fn test_proxy_rejects_sequencer_chunk() {
+    fn test_parsing_invalid_sequencer_chunk_without_dal() {
+        test_parsing_invalid_sequencer_chunk(false)
+    }
+
+    #[test]
+    fn test_parsing_invalid_sequencer_chunk_with_dal() {
+        test_parsing_invalid_sequencer_chunk(true)
+    }
+
+    fn test_proxy_rejects_sequencer_chunk(enable_dal: bool) {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
 
         match read_proxy_inbox(&mut host, DEFAULT_SR_ADDRESS, &conf.tezos_contracts)
             .unwrap()
@@ -387,9 +426,18 @@ mod tests {
     }
 
     #[test]
-    fn test_parsing_delayed_inbox() {
+    fn test_proxy_rejects_sequencer_chunk_without_dal() {
+        test_proxy_rejects_sequencer_chunk(false)
+    }
+
+    #[test]
+    fn test_proxy_rejects_sequencer_chunk_with_dal() {
+        test_proxy_rejects_sequencer_chunk(true)
+    }
+
+    fn test_parsing_delayed_inbox(enable_dal: bool) {
         let mut host = MockHost::default();
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         let metadata = TransferMetadata::new(
             delayed_bridge(&conf),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
@@ -411,9 +459,18 @@ mod tests {
     }
 
     #[test]
-    fn test_parsing_l1_contract_inbox() {
+    fn test_parsing_delayed_inbox_without_dal() {
+        test_parsing_delayed_inbox(false)
+    }
+
+    #[test]
+    fn test_parsing_delayed_inbox_with_dal() {
+        test_parsing_delayed_inbox(true)
+    }
+
+    fn test_parsing_l1_contract_inbox(enable_dal: bool) {
         let mut host = MockHost::default();
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
@@ -432,6 +489,16 @@ mod tests {
         if !delayed_inbox_is_empty(&conf, &mut host) {
             panic!("The delayed inbox should be empty, as it comes from the wrong delayed bridge")
         }
+    }
+
+    #[test]
+    fn test_parsing_l1_contract_inbox_without_dal() {
+        test_parsing_l1_contract_inbox(false)
+    }
+
+    #[test]
+    fn test_parsing_l1_contract_inbox_with_dal() {
+        test_parsing_l1_contract_inbox(true)
     }
 
     #[test]
@@ -511,10 +578,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_deposit_in_sequencer_mode() {
+    fn test_deposit_in_sequencer_mode(enable_dal: bool) {
         let mut host = MockHost::default();
-        let mut conf = dummy_sequencer_config();
+        let mut conf = dummy_sequencer_config(enable_dal);
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
@@ -536,5 +602,15 @@ mod tests {
         if delayed_inbox_is_empty(&conf, &mut host) {
             panic!("The delayed inbox shouldn't be empty")
         }
+    }
+
+    #[test]
+    fn test_deposit_in_sequencer_mode_without_dal() {
+        test_deposit_in_sequencer_mode(false)
+    }
+
+    #[test]
+    fn test_deposit_in_sequencer_mode_with_dal() {
+        test_deposit_in_sequencer_mode(true)
     }
 }

@@ -290,7 +290,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
-    ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks protocol =
+    ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks ?enable_dal
+    protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -352,6 +353,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
                sequencer_governance))
         ?maximum_allowed_ticks
         ~output:output_config
+        ?enable_dal
         ()
     in
     match additional_config with
@@ -443,7 +445,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
 let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
-    ?rollup_operator_key ?maximum_allowed_ticks ~setup_mode f protocols =
+    ?rollup_operator_key ?maximum_allowed_ticks ~setup_mode ~enable_dal f
+    protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -463,9 +466,17 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
       in
       Protocol.register_test
         ~__FILE__
-        ~tags:(kernel_tag :: extra_tag :: tags)
+        ~tags:
+          ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
+          @ (kernel_tag :: extra_tag :: tags))
         ~uses
-        ~title:(sf "%s (%s, %s)" title extra_tag kernel_tag)
+        ~title:
+          (sf
+             "%s (%s, %s, %s)"
+             title
+             extra_tag
+             kernel_tag
+             (if enable_dal then "with dal" else "without dal"))
         ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
         (fun protocol ->
           let* evm_setup =
@@ -482,35 +493,46 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?maximum_allowed_ticks
               ~admin
               ~setup_mode
+              ~enable_dal
               protocol
           in
           f ~protocol ~evm_setup)
         protocols)
     kernels
 
-let register_proxy ~title ~tags ?kernels ?additional_uses ?admin
-    ?commitment_period ?challenge_window ?bootstrap_accounts
-    ?minimum_base_fee_per_gas ?maximum_allowed_ticks f protocols =
-  register_test
-    ~title
-    ~tags
-    ?kernels
-    ?additional_uses
-    ?admin
-    ?commitment_period
-    ?challenge_window
-    ?bootstrap_accounts
-    ?minimum_base_fee_per_gas
-    ?maximum_allowed_ticks
-    f
-    protocols
-    ~setup_mode:Setup_proxy
+let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
+    ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
+    ?maximum_allowed_ticks f protocols =
+  let register ~enable_dal : unit =
+    register_test
+      ~title
+      ~tags
+      ?kernels
+      ?additional_uses
+      ?additional_config
+      ?admin
+      ?commitment_period
+      ?challenge_window
+      ?bootstrap_accounts
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ?whitelist
+      ?rollup_operator_key
+      ?maximum_allowed_ticks
+      f
+      protocols
+      ~enable_dal
+      ~setup_mode:Setup_proxy
+  in
+  register ~enable_dal:false ;
+  register ~enable_dal:true
 
 let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks f protocols =
-  let register =
+  let register ~enable_dal : unit =
     register_test
       ~title
       ~tags
@@ -528,38 +550,52 @@ let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
       ?maximum_allowed_ticks
       f
       protocols
+      ~enable_dal
+      ~setup_mode:
+        (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
   in
-  register
-    ~setup_mode:
-      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
+  register ~enable_dal:false ;
+  register ~enable_dal:true
 
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks f protocols =
-  let register =
-    register_test
-      ~title
-      ~tags
-      ?kernels
-      ?additional_uses
-      ?additional_config
-      ?admin
-      ?commitment_period
-      ?challenge_window
-      ?bootstrap_accounts
-      ?da_fee_per_byte
-      ?minimum_base_fee_per_gas
-      ?whitelist
-      ?rollup_operator_key
-      ?maximum_allowed_ticks
-      f
-      protocols
-  in
-  register ~setup_mode:Setup_proxy ;
-  register
-    ~setup_mode:
-      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
+    ?rollup_operator_key ?maximum_allowed_ticks f protocols : unit =
+  register_proxy
+    ~title
+    ~tags
+    ?kernels
+    ?additional_uses
+    ?additional_config
+    ?admin
+    ?commitment_period
+    ?challenge_window
+    ?bootstrap_accounts
+    ?da_fee_per_byte
+    ?minimum_base_fee_per_gas
+    ?whitelist
+    ?rollup_operator_key
+    ?maximum_allowed_ticks
+    f
+    protocols ;
+  register_sequencer
+    ~title
+    ~tags
+    ?kernels
+    ?additional_uses
+    ?additional_config
+    ?admin
+    ?commitment_period
+    ?challenge_window
+    ?bootstrap_accounts
+    ?da_fee_per_byte
+    ?minimum_base_fee_per_gas
+    ?time_between_blocks
+    ?whitelist
+    ?rollup_operator_key
+    ?maximum_allowed_ticks
+    f
+    protocols
 
 let deploy ~contract ~sender full_evm_setup =
   let {client; sc_rollup_node; evm_node; _} = full_evm_setup in
