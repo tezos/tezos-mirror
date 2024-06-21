@@ -16,12 +16,12 @@ its associated protocol-specific executable binaries (baker, accuser, etc).
 ParisB 2 was included in v20.0 as a *User-Activated Protocol Override* (UAPO).
 This meant that nodes running v20.0 activated ParisB 2,
 ``PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ`` instead of
-the original ParisB proposal before block `#5,726,209 <https://tzkt.io/5726209>`__.
+the original ParisB proposal before level `#5,726,209 <https://tzkt.io/5726209>`__.
 
 Additional issues were discovered after the activation of ParisB 2, including a critical liveness issue with Smart Rollups.
 These issues are solved in the bug-fix protocol upgrade ParisC included in Octez v20.1.
 ParisC is included in v20.1 as a *User-Activated Upgrade* (UAU).
-This means that nodes running v20.1 will automatically activate ParisC at the end of cycle 749, just before `#5,898,24 <https://tzkt.io/5898241>`_.
+This means that nodes running v20.1 will automatically activate ParisC at the end of cycle 749, just before `#5,898,241 <https://tzkt.io/5898241>`_.
 
 Octez v20.1 also includes minor fixes to Smart Rollup nodes addressing issues observed after the activation of Paris. More precisely, the Smart Rollup nodes released with Octez v20 and earlier keep using the constants of the previous protocol even after the activation of a new one. This means that at activation of ParisB Smart Rollup nodes did not use the correct commitment period to compute and publish commitments. To fix that, in Octez v20.1, the Smart Rollup node:
 
@@ -40,9 +40,10 @@ Some deprecated RPCs have been removed. Please check `the changelog <../CHANGES.
 
 The RPC ``/health/ready`` has been introduced to get the status of the RPC server.
 
-Starting from Octez v20, we strongly advise nodes and bakers operators to synchronise their clocks using NTP as issued in `the node section of getting started <https://tezos.gitlab.io/introduction/howtouse.html#node>`__
+Starting from Octez v20, we strongly advise nodes and bakers operators to synchronise their clocks using NTP as issued in `the node section of getting started <https://tezos.gitlab.io/introduction/howtouse.html#node>`__.
 
 Regarding the minimal hardware, we advise nodes and bakers operators to run on at least the following hardware requierements:
+
 - 3 cores, 2 needed by the node and 1 needed by the baker (arm64 or amd64/x86-64)
 - 8GB of RAM + 8GB of swap or 16GB of RAM
 - 100GB SSD storage (or similar I/O performance)
