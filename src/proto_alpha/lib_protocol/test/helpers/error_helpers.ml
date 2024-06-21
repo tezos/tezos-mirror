@@ -25,9 +25,9 @@ let check_error_constructor_name ~loc ~expected errs =
 
 (** Identifies the [Inconsistent_sources] error. *)
 let check_inconsistent_sources ~first_source ~source = function
-  | [Inconsistent_sources {fee_payer; source = s}] ->
+  | [Inconsistent_sources {expected_source; source = s}] ->
       Signature.Public_key_hash.(
-        fee_payer = Account.pkh_of_contract_exn first_source
+        expected_source = Account.pkh_of_contract_exn first_source
         && s = Account.pkh_of_contract_exn source)
   | _ -> false
 

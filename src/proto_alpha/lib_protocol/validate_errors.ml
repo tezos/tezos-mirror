@@ -1093,7 +1093,7 @@ module Manager = struct
         conflict : operation_conflict;
       }
     | Inconsistent_sources of {
-        fee_payer : public_key_hash;
+        expected_source : public_key_hash;
         source : public_key_hash;
       }
     | Inconsistent_counters of {
@@ -1145,32 +1145,25 @@ module Manager = struct
       ~id:"validate.operation.inconsistent_sources"
       ~title:"Inconsistent sources in operation batch"
       ~description:
-        "Unexpected source encountered in a non-guest operation of a batch."
-      ~pp:(fun ppf (first_source, source) ->
-        Format.fprintf
-          ppf
-          "Unexpected source encountered in a non-guest operation. Expected %a \
-           (the source of the very first operation in the batch, who is the \
-           fee payer, a.k.a. the sponsor), but got %a."
-          Signature.Public_key_hash.pp
-          first_source
-          Signature.Public_key_hash.pp
-          source)
+        "Inconsistent sources in operation batch. All operations in a batch \
+         must have the same source."
       Data_encoding.(
         obj2
           (req "first_source" Signature.Public_key_hash.encoding)
           (req "unexpected_source" Signature.Public_key_hash.encoding))
       (function
-        | Inconsistent_sources {fee_payer; source} -> Some (fee_payer, source)
+        | Inconsistent_sources {expected_source; source} ->
+            Some (expected_source, source)
         | _ -> None)
-      (fun (fee_payer, source) -> Inconsistent_sources {fee_payer; source}) ;
+      (fun (expected_source, source) ->
+        Inconsistent_sources {expected_source; source}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.inconsistent_counters"
       ~title:"Inconsistent counters in operation"
       ~description:
-        "Inconsistent counters in operation batch. Counters for the same \
-         source must be consecutive."
+        "Inconsistent counters in operation batch. Counters must be increasing \
+         and consecutive."
       ~pp:(fun ppf (source, previous_counter, counter) ->
         Format.fprintf
           ppf

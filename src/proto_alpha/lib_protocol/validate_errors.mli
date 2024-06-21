@@ -184,7 +184,7 @@ module Manager : sig
         conflict : operation_conflict;
       }
     | Inconsistent_sources of {
-        fee_payer : public_key_hash;
+        expected_source : public_key_hash;
         source : public_key_hash;
       }
     | Inconsistent_counters of {
