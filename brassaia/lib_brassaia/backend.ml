@@ -41,7 +41,6 @@ module type S = sig
       with type hash = Hash.t
        and type Val.contents_key = Contents.key
        and module Path = Schema.Path
-       and module Metadata = Schema.Metadata
 
   (** A node abstraction that is portable from different repos. Similar to
       [Node.Val]. *)
@@ -49,7 +48,6 @@ module type S = sig
     Node_portable
       with type node := Node.value
        and type hash := Hash.t
-       and type metadata := Schema.Metadata.t
        and type step := Schema.Path.step
 
   (** A commit store. *)

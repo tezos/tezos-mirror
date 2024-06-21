@@ -49,7 +49,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   open Encoding
 
   module Store = struct
-    module Maker = Brassaia_pack_mem.Maker (Conf)
+    module Maker = Brassaia_pack_mem.Maker (Encoding.Conf)
     include Maker.Make (Schema)
     module Schema = Tezos_context_encoding.Context.Schema
   end

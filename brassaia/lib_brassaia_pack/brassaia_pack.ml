@@ -23,7 +23,6 @@ module Indexable = Indexable
 module Atomic_write = Atomic_write
 module Hash = Brassaia.Hash.BLAKE2B
 module Path = Brassaia.Path.String_list
-module Metadata = Brassaia.Metadata.None
 module Version = Version
 module Conf = Conf
 module Stats = Stats

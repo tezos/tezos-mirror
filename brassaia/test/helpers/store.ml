@@ -74,7 +74,7 @@ module Make (S : Generic_key) = struct
     in
     may repo heads hook
 
-  let contents c = S.Tree.init (`Contents (c, S.Metadata.default))
+  let contents c = S.Tree.init (`Contents (c, ()))
 
   let test_contents x () =
     let test repo =
@@ -483,7 +483,7 @@ module Make (S : Generic_key) = struct
             Lwt_list.fold_left_s
               (fun t (k, v) ->
                 let* v = with_contents repo (fun t -> B.Contents.add t v) in
-                Graph.add g t k (`Contents (v, S.Metadata.default)))
+                Graph.add g t k (`Contents (v, ())))
               empty bindings)
       in
       let tree bindings =
@@ -1108,7 +1108,7 @@ module Make (S : Generic_key) = struct
 
   let pp_depth = Brassaia.Type.pp S.Tree.depth_t
   let pp_key = Brassaia.Type.pp S.Path.t
-  let contents_t = T.pair S.contents_t S.metadata_t
+  let contents_t = T.pair S.contents_t Repr.unit
   let diff_t = T.(pair S.path_t (Brassaia.Diff.t contents_t))
   let check_diffs = checks diff_t
   let check_ls = checks T.(pair S.step_t S.tree_t)
@@ -1209,13 +1209,13 @@ module Make (S : Generic_key) = struct
         node;
 
       (* Testing [Tree.diff] *)
-      let contents_t = T.pair S.contents_t S.metadata_t in
+      let contents_t = T.pair S.contents_t Repr.unit in
       let diff = T.(pair S.path_t (Brassaia.Diff.t contents_t)) in
       let check_diffs = checks diff in
       let check_val = check T.(option contents_t) in
       let check_ls = checks T.(pair S.step_t S.tree_t) in
-      let normal c = Some (c, S.Metadata.default) in
-      let d0 = S.Metadata.default in
+      let normal c = Some (c, ()) in
+      let d0 = () in
       let v0 = S.Tree.empty () in
       let v1 = S.Tree.empty () in
       let v2 = S.Tree.empty () in
@@ -1261,7 +1261,7 @@ module Make (S : Generic_key) = struct
 
       (* Testing paginated lists *)
       let tree =
-        let c ?(info = S.Metadata.default) blob = `Contents (blob, info) in
+        let c ?(info = ()) blob = `Contents (blob, info) in
         S.Tree.of_concrete
           (`Tree
             [
@@ -1683,12 +1683,9 @@ module Make (S : Generic_key) = struct
 
       (* check env sharing *)
       let tree () =
-        S.Tree.of_concrete
-          (`Tree [ ("foo", `Contents ("bar", S.Metadata.default)) ])
+        S.Tree.of_concrete (`Tree [ ("foo", `Contents ("bar", ())) ])
       in
-      let contents () =
-        S.Tree.of_concrete (`Contents ("bar", S.Metadata.default))
-      in
+      let contents () = S.Tree.of_concrete (`Contents ("bar", ())) in
       let check_env_empty msg t b =
         let env = S.Tree.Private.get_env t in
         Alcotest.(check bool) msg b (S.Tree.Private.Env.is_empty env)
@@ -1767,8 +1764,8 @@ module Make (S : Generic_key) = struct
           Blinded_node wrong_hash;
           Node [];
           Inode { length = 1024; proofs = [] };
-          Blinded_contents (wrong_hash, S.Metadata.default);
-          Contents ("yo", S.Metadata.default);
+          Blinded_contents (wrong_hash, ());
+          Contents ("yo", ());
         ]
       in
       let* () =
@@ -2333,10 +2330,7 @@ module Make (S : Generic_key) = struct
       let* node_3 =
         let+ contents_foo = contents "foo" in
         S.Backend.Node.Val.of_list
-          [
-            ("foo", `Contents (contents_foo, S.Metadata.default));
-            ("bar", `Node bar_k);
-          ]
+          [ ("foo", `Contents (contents_foo, ())); ("bar", `Node bar_k) ]
       in
       let tree_3 = S.Tree.of_node (S.of_backend_node repo node_3) in
       let* _ =

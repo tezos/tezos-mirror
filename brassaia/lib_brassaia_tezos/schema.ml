@@ -15,7 +15,6 @@
  *)
 
 module Path = Brassaia.Path.String_list
-module Metadata = Brassaia.Metadata.None
 module Branch = Brassaia.Branch.String
 
 module Hash : Brassaia.Hash.S = struct
@@ -67,8 +66,7 @@ module Node
     (Node_key : Brassaia.Key.S with type hash = Hash.t) =
 struct
   module M =
-    Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata) (Contents_key)
-      (Node_key)
+    Brassaia.Node.Generic_key.Make (Hash) (Path) (Contents_key) (Node_key)
 
   (* [V1] is only used to compute preimage hashes. [assert false]
      statements should be unreachable.*)
@@ -86,6 +84,11 @@ struct
        be the case for all filenames ever produced by Brassaia 1.4. *)
     let step_t = Brassaia.Type.string
 
+    let hash_of_entry (_, t) =
+      match t with
+      | `Node h -> Node_key.to_hash h
+      | `Contents (h, ()) -> Contents_key.to_hash h
+
     let metadata_t =
       let some = "\255\000\000\000\000\000\000\000" in
       let none = "\000\000\000\000\000\000\000\000" in
@@ -94,12 +97,7 @@ struct
         (function Some _ -> some | None -> none)
 
     let metadata_of_entry (_, t) =
-      match t with `Node _ -> None | `Contents (_, m) -> Some m
-
-    let hash_of_entry (_, t) =
-      match t with
-      | `Node h -> Node_key.to_hash h
-      | `Contents (h, _) -> Contents_key.to_hash h
+      match t with `Node _ -> None | `Contents _ -> Some ()
 
     (* Brassaia 1.4 uses int64 to store list lengths *)
     let entry_t : entry Brassaia.Type.t =

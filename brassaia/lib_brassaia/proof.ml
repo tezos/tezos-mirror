@@ -22,15 +22,13 @@ module Make
     (H : Type.S)
     (S : sig
       type step [@@deriving brassaia]
-    end)
-    (M : Type.S) =
+    end) =
 struct
   type contents = C.t [@@deriving brassaia]
   type hash = H.t [@@deriving brassaia]
   type step = S.step [@@deriving brassaia]
-  type metadata = M.t [@@deriving brassaia]
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
+  type kinded_hash = [ `Contents of hash * unit | `Node of hash ]
   [@@deriving brassaia]
 
   type 'a inode = { length : int; proofs : (int * 'a) list }
@@ -40,8 +38,8 @@ struct
   [@@deriving brassaia]
 
   type tree =
-    | Contents of contents * metadata
-    | Blinded_contents of hash * metadata
+    | Contents of contents * unit
+    | Blinded_contents of hash * unit
     | Node of (step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
@@ -102,8 +100,7 @@ module Env
     (P : S
            with type contents := B.Contents.Val.t
             and type hash := B.Hash.t
-            and type step := B.Node.Val.step
-            and type metadata := B.Node.Val.metadata) =
+            and type step := B.Node.Val.step) =
 struct
   module H = B.Hash
 
@@ -345,8 +342,8 @@ struct
         let l =
           List.map
             (function
-              | step, `Contents (k, m) ->
-                  (step, `Contents (B.Contents.Key.to_hash k, m))
+              | step, `Contents (k, ()) ->
+                  (step, `Contents (B.Contents.Key.to_hash k, ()))
               | step, `Node k -> (step, `Node (B.Node.Key.to_hash k)))
             l
         in

@@ -40,7 +40,6 @@ module Atomic_write : Brassaia.Atomic_write.Maker
 module KV :
   Brassaia.KV_maker
     with type endpoint = unit
-     and type metadata = unit
      and type info = Brassaia.Info.default
 
 include Brassaia.Maker with type endpoint = unit

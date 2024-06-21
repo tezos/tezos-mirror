@@ -217,7 +217,7 @@ module type S = sig
   (** {1 Snapshots} *)
 
   module Snapshot : sig
-    type kinded_hash = Contents of hash * metadata | Node of hash
+    type kinded_hash = Contents of hash * unit | Node of hash
     [@@deriving brassaia]
 
     type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
@@ -341,7 +341,6 @@ module type Maker = sig
        TODO: extract these extensions as a separate functor argument instead. *)
       with type Schema.Hash.t = Schema.Hash.t
        and type Schema.Branch.t = Schema.Branch.t
-       and type Schema.Metadata.t = Schema.Metadata.t
        and type Schema.Path.t = Schema.Path.t
        and type Schema.Path.step = Schema.Path.step
        and type Schema.Contents.t = Schema.Contents.t
@@ -361,12 +360,9 @@ module type KV = sig
 
   include Pack_key.Store_spec
 
-  type metadata = Brassaia.Metadata.None.t
-
   module Make (C : Brassaia.Contents.S) :
     S
       with module Schema.Contents = C
-       and type Schema.Metadata.t = metadata
        and type Backend.Remote.endpoint = endpoint
        and type Schema.Hash.t = hash
        and type contents_key = (hash, C.t) contents_key

@@ -26,7 +26,6 @@ module Make_persistent
     (Inter : Internal
                with type hash = H.t
                 and type key = H.t Pack_key.t
-                and type Snapshot.metadata = Node.metadata
                 and type Val.step = Node.step)
     (Pack : Pack_store.S
               with type hash = H.t

@@ -25,7 +25,6 @@ module Maker (Config : Conf.S) = struct
   module Make (Schema : Brassaia.Schema.Extended) = struct
     open struct
       module P = Schema.Path
-      module M = Schema.Metadata
       module C = Schema.Contents
       module B = Schema.Branch
     end
@@ -69,8 +68,7 @@ module Maker (Config : Conf.S) = struct
           include Inode.Make_persistent (H) (Value) (Inter) (Pack')
         end
 
-        include
-          Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (M) (P)
+        include Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (P)
       end
 
       module Node_portable = Node.CA.Val.Portable
