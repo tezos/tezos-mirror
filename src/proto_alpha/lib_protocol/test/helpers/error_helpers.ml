@@ -68,30 +68,10 @@ let expect_inconsistent_counters_int ~loc ~source ~previous_counter ~counter
 
 (** To be used as the [expect_failure] argument of
     {!Incremental.add_operation} when expecting the
-    [Guest_operation_wrong_source] error. *)
-let expect_guest_operation_wrong_source ~loc ~guest ~unexpected_source errs =
-  Assert.expect_error ~loc errs (function
-      | [Guest_operation_wrong_source {guest = g; source}] ->
-          Signature.Public_key_hash.(
-            g = Account.pkh_of_contract_exn guest
-            && source = Account.pkh_of_contract_exn unexpected_source)
-      | _ -> false)
-
-(** To be used as the [expect_failure] argument of
-    {!Incremental.add_operation} when expecting the
     [Incorrect_reveal_position] error. *)
 let expect_incorrect_reveal_position ~loc errs =
   Assert.expect_error ~loc errs (function
       | [Incorrect_reveal_position] -> true
-      | _ -> false)
-
-(** To be used as the [expect_failure] argument of
-    {!Incremental.add_operation} when expecting the
-    [Guest_incorrect_reveal_position] error. *)
-let expect_guest_incorrect_reveal_position ~loc ~guest errs =
-  Assert.expect_error ~loc errs (function
-      | [Guest_incorrect_reveal_position {guest = g}] ->
-          Signature.Public_key_hash.(g = Account.pkh_of_contract_exn guest)
       | _ -> false)
 
 let expect_forbidden_delegate ~loc ~delegate errs =
