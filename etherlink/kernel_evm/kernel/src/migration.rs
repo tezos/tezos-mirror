@@ -5,12 +5,17 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::Error;
-use crate::error::UpgradeProcessError::Fallback;
+use crate::error::UpgradeProcessError;
 use crate::storage::{
-    read_chain_id, read_storage_version, store_storage_version, STORAGE_VERSION,
+    read_chain_id, read_storage_version, store_storage_version, StorageVersion,
+    STORAGE_VERSION,
 };
+use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
+use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
+#[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
     None,
     InProgress,
@@ -34,11 +39,31 @@ fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeErro
     }
 }
 
+fn migrate_to<Host: Runtime>(
+    host: &mut Host,
+    version: StorageVersion,
+) -> anyhow::Result<MigrationStatus> {
+    log!(host, Info, "Migrating to {:?}", version);
+    match version {
+        StorageVersion::V11 => anyhow::bail!(Error::UpgradeError(
+            UpgradeProcessError::InternalUpgrade("V11 has no predecessor"),
+        )),
+        StorageVersion::V12 => {
+            let legacy_ticketer_path = RefPath::assert_from(b"/evm/ticketer");
+            if host.store_has(&legacy_ticketer_path)?.is_some() {
+                host.store_move(&legacy_ticketer_path, &NATIVE_TOKEN_TICKETER_PATH)?;
+            }
+
+            Ok(MigrationStatus::Done)
+        }
+    }
+}
+
 // The workflow for migration is the following:
 //
-// - bump `storage::STORAGE_VERSION` by one
-// - fill the scope inside the conditional in `storage_migration` with all the
-//   needed migration functions
+// - add a new variant to `storage::StorageVersion`, update `STORAGE_VERSION`
+//   accordingly.
+// - update `migrate_to` pattern matching  with all the needed migration functions
 // - compile the kernel and run all the E2E migration tests to make sure all the
 //   data is still available from the EVM proxy-node.
 //
@@ -53,19 +78,26 @@ fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeErro
 // /!\
 //
 fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> {
-    let current_version = read_storage_version(host)?;
-    if STORAGE_VERSION == current_version + 1 {
-        // MIGRATION CODE - START
-        // MIGRATION CODE - END
-        store_storage_version(host, STORAGE_VERSION)?;
-        return Ok(MigrationStatus::Done);
+    match read_storage_version(host)?.next() {
+        Some(next_version) if next_version == STORAGE_VERSION => {
+            let status = migrate_to(host, STORAGE_VERSION)?;
+
+            // Record the migration was applied. Even if the migration for `next_version` returns
+            // `None`, we consider it done. A good use case for `None` is for instance for a
+            // migration that does not apply to the current network.
+            if status != MigrationStatus::InProgress {
+                store_storage_version(host, STORAGE_VERSION)?;
+            }
+
+            Ok(status)
+        }
+        Some(_) | None => Ok(MigrationStatus::None),
     }
-    Ok(MigrationStatus::None)
 }
 
 pub fn storage_migration<Host: Runtime>(
     host: &mut Host,
 ) -> Result<MigrationStatus, Error> {
     let migration_result = migration(host);
-    migration_result.map_err(|_| Error::UpgradeError(Fallback))
+    migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
 }

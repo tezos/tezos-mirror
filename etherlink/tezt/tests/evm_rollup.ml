@@ -3123,59 +3123,67 @@ let test_mainnet_ghostnet_kernel_migration =
     ~scenario_after
     protocol
 
-let test_ghostnet_latest_kernel_migration =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "migration"; "upgrade"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_evm_kernel;
-      ])
-    ~title:
-      "Ensures EVM kernel's upgrade succeeds with potential migration(s) \
-       (ghostnet -> latest)."
-  @@ fun protocol ->
-  let sender, receiver =
-    (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
-  in
+let test_latest_kernel_migration protocols =
+  let latest_kernel_migration ~from =
+    let from_tag, from_use = Kernel.to_uses_and_tags from in
+    Protocol.register_test
+      ~__FILE__
+      ~tags:["evm"; "migration"; "upgrade"; from_tag]
+      ~uses:(fun _protocol ->
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.octez_evm_node;
+          Constant.smart_rollup_installer;
+          Constant.WASM.evm_kernel;
+          from_use;
+        ])
+      ~title:
+        Format.(
+          sprintf
+            "Ensures EVM kernel's upgrade succeeds with potential migration(s) \
+             (%s -> latest)."
+            from_tag)
+    @@ fun protocol ->
+    let sender, receiver =
+      (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
+    in
 
-  let scenario_prior ~evm_setup =
-    let* transfer_result =
-      make_transfer
-        ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
-        ~sender
-        ~receiver
+    let scenario_prior ~evm_setup =
+      let* transfer_result =
+        make_transfer
+          ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
+          ~sender
+          ~receiver
+          evm_setup
+      in
+      let*@ block_result = latest_block evm_setup.evm_node in
+      let* config_result = config_setup evm_setup in
+      return {transfer_result; block_result; config_result}
+    in
+    let scenario_after ~evm_setup ~sanity_check =
+      let* () =
+        ensure_transfer_result_integrity
+          ~sender
+          ~receiver
+          ~transfer_result:sanity_check.transfer_result
+          evm_setup
+      in
+      let* () =
+        ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
+      in
+      ensure_config_setup_integrity
+        ~config_result:sanity_check.config_result
         evm_setup
     in
-    let*@ block_result = latest_block evm_setup.evm_node in
-    let* config_result = config_setup evm_setup in
-    return {transfer_result; block_result; config_result}
+    gen_kernel_migration_test
+      ~from
+      ~to_:Latest
+      ~scenario_prior
+      ~scenario_after
+      protocol
   in
-  let scenario_after ~evm_setup ~sanity_check =
-    let* () =
-      ensure_transfer_result_integrity
-        ~sender
-        ~receiver
-        ~transfer_result:sanity_check.transfer_result
-        evm_setup
-    in
-    let* () =
-      ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
-    in
-    ensure_config_setup_integrity
-      ~config_result:sanity_check.config_result
-      evm_setup
-  in
-  gen_kernel_migration_test
-    ~from:Ghostnet
-    ~to_:Latest
-    ~scenario_prior
-    ~scenario_after
-    protocol
+  latest_kernel_migration ~from:Ghostnet protocols ;
+  latest_kernel_migration ~from:Mainnet protocols
 
 let test_cannot_prepayed_leads_to_no_inclusion =
   register_both
@@ -3627,7 +3635,7 @@ let test_kernel_root_hash_after_upgrade =
   unit
 
 let register_evm_migration ~protocols =
-  test_ghostnet_latest_kernel_migration protocols ;
+  test_latest_kernel_migration protocols ;
   test_mainnet_ghostnet_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
