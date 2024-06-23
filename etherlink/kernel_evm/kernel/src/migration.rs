@@ -8,7 +8,6 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError;
 use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, StorageVersion,
-    STORAGE_VERSION,
 };
 use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
 use tezos_evm_logging::{log, Level::*};
@@ -79,19 +78,21 @@ fn migrate_to<Host: Runtime>(
 //
 fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> {
     match read_storage_version(host)?.next() {
-        Some(next_version) if next_version == STORAGE_VERSION => {
-            let status = migrate_to(host, STORAGE_VERSION)?;
+        Some(next_version) => {
+            let status = migrate_to(host, next_version)?;
 
             // Record the migration was applied. Even if the migration for `next_version` returns
             // `None`, we consider it done. A good use case for `None` is for instance for a
             // migration that does not apply to the current network.
             if status != MigrationStatus::InProgress {
-                store_storage_version(host, STORAGE_VERSION)?;
+                store_storage_version(host, next_version)?;
+                // `InProgress` so that we reboot and try apply the next migration, if any.
+                return Ok(MigrationStatus::InProgress);
             }
 
             Ok(status)
         }
-        Some(_) | None => Ok(MigrationStatus::None),
+        None => Ok(MigrationStatus::None),
     }
 }
 
