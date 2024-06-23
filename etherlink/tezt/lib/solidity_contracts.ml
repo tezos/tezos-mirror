@@ -14,30 +14,84 @@ type contract = {label : string; abi : string; bin : string}
 
 let solidity_contracts_path = "etherlink/kernel_evm/solidity_examples"
 
-let compile_contract ~source ~label ~contract ~evm_version =
-  let output_dir = Tezt.Temp.dir "contracts" in
-  let* () =
-    Tezt.Process.run
-      "npx"
-      [
-        "--yes";
-        "solc";
-        "--evm-version";
-        evm_version;
-        "-o";
-        output_dir ^ "/" ^ evm_version;
-        "--optimize";
-        "--bin";
-        "--abi";
-        source;
-      ]
-  in
-  return
-    {
-      label;
-      abi = Filename.concat output_dir (evm_version ^ "/" ^ contract ^ ".abi");
-      bin = Filename.concat output_dir (evm_version ^ "/" ^ contract ^ ".bin");
+module JSON = Tezt.JSON
+
+let generate_json_string ~label ~contract ~path ~evm_version =
+  let contents = Tezt.Base.read_file path in
+  Printf.sprintf
+    {|
+{
+  "language": "Solidity",
+  "sources": {
+    "%s": {
+      "content": %S
     }
+  },
+  "settings": {
+    "evmVersion": "%s",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "%s": [
+          "abi",
+          "evm.bytecode.object"
+        ]
+      }
+    }
+  }
+}
+    |}
+    label
+    contents
+    evm_version
+    contract
+
+let compile_contract ~source ~label ~contract ~evm_version =
+  (* Construct the JSON input for solc *)
+  let input_json =
+    generate_json_string ~label ~contract ~path:source ~evm_version
+  in
+  let command = "npx" in
+  let args = ["--yes"; "solc"; "--standard-json"] in
+
+  (* Spawn the process with the JSON input as stdin *)
+  let* process, stdin_channel =
+    Lwt.return (Tezt.Process.spawn_with_stdin command args)
+  in
+
+  (* Write the JSON input to the stdin of the process *)
+  let* () = Lwt_io.write stdin_channel input_json in
+  let* () = Lwt_io.close stdin_channel in
+
+  (* Read the stdout of the process *)
+  let* result = Tezt.Process.check_and_read_stdout process in
+
+  (* If using solcjs, then some extra logs might appear
+     These logs begin with whitespaces and are followed by >>>
+     We define a regular expression to match these lines starting
+     and then delete them *)
+  let re = Re.(compile (seq [bos; rep space; str ">>>"])) in
+  let lines = String.split_on_char '\n' result in
+  let lines = List.filter (fun line -> not (Re.execp re line)) lines in
+  let result = String.concat "\n" lines in
+
+  let json = JSON.parse ~origin:"solc" result in
+
+  let abi = JSON.(json |-> "contracts" |-> label |-> contract |-> "abi") in
+  let bin =
+    JSON.(
+      json |-> "contracts" |-> label |-> contract |-> "evm" |-> "bytecode"
+      |-> "object" |> as_string)
+  in
+
+  let abi_file = Tezt.Temp.file (label ^ ".abi") in
+  let bin_file = Tezt.Temp.file (label ^ ".bin") in
+  JSON.encode_to_file abi_file abi ;
+  Tezt.Base.write_file bin_file ~contents:bin ;
+  return {label; abi = abi_file; bin = bin_file}
 
 (** The info for the "storage.sol" contract.
     See [etherlink/tezt/tests/evm_kernel_inputs/storage.*] *)
