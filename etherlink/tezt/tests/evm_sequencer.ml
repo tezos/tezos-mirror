@@ -4309,12 +4309,13 @@ let test_trace_transaction_call =
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
 
   (* deploy contract *)
   let* () =
     Eth_cli.add_abi
-      ~label:Solidity_contracts.simple_storage.label
-      ~abi:Solidity_contracts.simple_storage.abi
+      ~label:simple_storage_resolved.label
+      ~abi:simple_storage_resolved.abi
       ()
   in
   let* contract_address, _tx_deployment =
@@ -4323,8 +4324,8 @@ let test_trace_transaction_call =
         Eth_cli.deploy
           ~source_private_key:sender.Eth_account.private_key
           ~endpoint
-          ~abi:Solidity_contracts.simple_storage.label
-          ~bin:Solidity_contracts.simple_storage.bin)
+          ~abi:simple_storage_resolved.label
+          ~bin:simple_storage_resolved.bin)
       sequencer
   in
   (* Block few levels to ensure we are replaying on an old block. *)
@@ -4343,7 +4344,7 @@ let test_trace_transaction_call =
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
-         ~abi_label:Solidity_contracts.simple_storage.label
+         ~abi_label:simple_storage_resolved.label
          ~address:contract_address
          ~method_call:(Format.sprintf "set(%d)" value_in_storage))
       sequencer
@@ -4381,7 +4382,7 @@ let test_trace_transaction_call =
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
-         ~abi_label:Solidity_contracts.simple_storage.label
+         ~abi_label:simple_storage_resolved.label
          ~address:contract_address
          ~method_call:"get()")
       sequencer
@@ -4503,12 +4504,13 @@ let test_trace_call =
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
 
   (* deploy contract *)
   let* () =
     Eth_cli.add_abi
-      ~label:Solidity_contracts.simple_storage.label
-      ~abi:Solidity_contracts.simple_storage.abi
+      ~label:simple_storage_resolved.label
+      ~abi:simple_storage_resolved.abi
       ()
   in
   let* contract_address, _tx_deployment =
@@ -4517,8 +4519,8 @@ let test_trace_call =
         Eth_cli.deploy
           ~source_private_key:sender.Eth_account.private_key
           ~endpoint
-          ~abi:Solidity_contracts.simple_storage.label
-          ~bin:Solidity_contracts.simple_storage.bin)
+          ~abi:simple_storage_resolved.label
+          ~bin:simple_storage_resolved.bin)
       sequencer
   in
   let* () =
@@ -4532,7 +4534,7 @@ let test_trace_call =
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
-         ~abi_label:Solidity_contracts.simple_storage.label
+         ~abi_label:simple_storage_resolved.label
          ~address:contract_address
          ~method_call:(Format.sprintf "set(%d)" value_in_storage))
       sequencer
@@ -4544,7 +4546,7 @@ let test_trace_call =
 
   let* abi_string =
     Eth_cli.encode_method
-      ~abi_label:Solidity_contracts.simple_storage.label
+      ~abi_label:simple_storage_resolved.label
       ~method_:"get()"
   in
 

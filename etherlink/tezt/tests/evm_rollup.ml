@@ -1111,27 +1111,29 @@ let test_consistent_block_hashes =
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   register_proxy
-    ~tags:["evm"; "l2_deploy"]
+    ~tags:["evm"; "l2_deploy"; "simple_storage"]
     ~title:"Check L2 contract deployment"
   @@ fun ~protocol:_ ~evm_setup ->
+  let* simple_storage_resolved = simple_storage () in
   deploy_with_base_checks
     {
-      contract = simple_storage;
+      contract = simple_storage_resolved;
       expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
       (* The same deployment has been reproduced on the Sepolia testnet, resulting
          on this specific code. *)
       expected_code =
-        "0x608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033";
+        "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80634e70b1dc14604157806360fe47b114605b5780636d4ce63c14606d575b600080fd5b604960005481565b60405190815260200160405180910390f35b606b60663660046074565b600055565b005b6000546049565b600060208284031215608557600080fd5b503591905056fea2646970667358221220c8bccd31314e5f73f97adfeb24c3a1836e3b134cdee11da72c6b9608ee0bad5464736f6c634300081a0033";
     }
     evm_setup
 
 let send_call_set_storage_simple contract_address sender n
     {sc_rollup_node; client; endpoint; evm_node; _} =
+  let* simple_storage_resolved = simple_storage () in
   let call_set (sender : Eth_account.t) n =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:simple_storage.label
+      ~abi_label:simple_storage_resolved.label
       ~address:contract_address
       ~method_call:(Printf.sprintf "set(%d)" n)
   in
@@ -1141,15 +1143,18 @@ let send_call_set_storage_simple contract_address sender n
     and that the call can modify the storage.  *)
 let test_l2_call_simple_storage =
   register_proxy
-    ~tags:["evm"; "l2_deploy"; "l2_call"]
+    ~tags:["evm"; "l2_deploy"; "l2_call"; "simple_storage"]
     ~title:"Check L2 contract call"
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* simple_storage_resolved = simple_storage () in
 
   (* deploy contract *)
-  let* address, _tx = deploy ~contract:simple_storage ~sender evm_setup in
+  let* address, _tx =
+    deploy ~contract:simple_storage_resolved ~sender evm_setup
+  in
 
   (* set 42 *)
   let* tx = send_call_set_storage_simple address sender 42 evm_setup in
@@ -2076,7 +2081,7 @@ let test_eth_call_large =
     check_eth_call evm_setup eth_call "0x"
   in
   let title = "eth_call with a large amount of data" in
-  let tags = ["evm"; "eth_call"; "simulate"; "large"] in
+  let tags = ["evm"; "eth_call"; "simulate"; "large"; "simple_storage"] in
   register_both ~title ~tags test_f
 
 let test_eth_call_input =
@@ -2098,20 +2103,22 @@ let test_eth_call_input =
 let test_estimate_gas =
   let test_f ~protocol:_ ~evm_setup =
     (* large request *)
-    let data = read_file simple_storage.bin in
+    let* simple_storage_resolved = simple_storage () in
+    let data = read_file simple_storage_resolved.bin in
     let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
 
     check_estimate_gas evm_setup eth_call 23423L
   in
 
   let title = "eth_estimateGas for contract creation" in
-  let tags = ["evm"; "eth_estimategas"; "simulate"] in
+  let tags = ["evm"; "eth_estimategas"; "simulate"; "simple_storage"] in
   register_both ~title ~tags test_f
 
 let test_estimate_gas_additionnal_field =
   let test_f ~protocol:_ ~evm_setup =
     (* large request *)
-    let data = read_file simple_storage.bin in
+    let* simple_storage_resolved = simple_storage () in
+    let data = read_file simple_storage_resolved.bin in
     let eth_call =
       [
         ( "from",
@@ -2127,15 +2134,20 @@ let test_estimate_gas_additionnal_field =
     check_estimate_gas evm_setup eth_call 23423L
   in
   let title = "eth_estimateGas allows additional fields" in
-  let tags = ["evm"; "eth_estimategas"; "simulate"; "remix"] in
+  let tags =
+    ["evm"; "eth_estimategas"; "simulate"; "remix"; "simple_storage"]
+  in
   register_both ~title ~tags test_f
 
 let test_eth_call_storage_contract =
   let test_f ~protocol:_ ~evm_setup:({evm_node; endpoint; _} as evm_setup) =
     let sender = Eth_account.bootstrap_accounts.(0) in
+    let* simple_storage_resolved = simple_storage () in
 
     (* deploy contract *)
-    let* address, tx = deploy ~contract:simple_storage ~sender evm_setup in
+    let* address, tx =
+      deploy ~contract:simple_storage_resolved ~sender evm_setup
+    in
     let* () = check_tx_succeeded ~endpoint ~tx in
     Check.(
       (String.lowercase_ascii address
@@ -2192,7 +2204,7 @@ let test_eth_call_storage_contract =
     unit
   in
   let title = "Call a view" in
-  let tags = ["evm"; "eth_call"; "simulate"] in
+  let tags = ["evm"; "eth_call"; "simulate"; "simple_storage"] in
   register_both ~title ~tags test_f
 
 let test_eth_call_storage_contract_eth_cli =
@@ -2214,8 +2226,12 @@ let test_eth_call_storage_contract_eth_cli =
 
     let sender = Eth_account.bootstrap_accounts.(0) in
 
+    let* simple_storage_resolved = simple_storage () in
+
     (* deploy contract send send 42 *)
-    let* address, _tx = deploy ~contract:simple_storage ~sender evm_setup in
+    let* address, _tx =
+      deploy ~contract:simple_storage_resolved ~sender evm_setup
+    in
     let* tx = send_call_set_storage_simple address sender 42 evm_setup in
     let* () = check_tx_succeeded ~endpoint ~tx in
 
@@ -2223,7 +2239,7 @@ let test_eth_call_storage_contract_eth_cli =
     let call_num =
       Eth_cli.contract_call
         ~endpoint
-        ~abi_label:simple_storage.label
+        ~abi_label:simple_storage_resolved.label
         ~address
         ~method_call:"num()"
     in
@@ -2236,7 +2252,7 @@ let test_eth_call_storage_contract_eth_cli =
     unit
   in
   let title = "Call a view through an ethereum client" in
-  let tags = ["evm"; "eth_call"; "simulate"] in
+  let tags = ["evm"; "eth_call"; "simulate"; "simple_storage"] in
 
   register_both ~title ~tags test_f
 
@@ -2955,13 +2971,18 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by ~evm_setup =
     hashes
 
 let test_rpc_getCode =
-  register_both ~tags:["evm"; "rpc"; "get_code"] ~title:"RPC method eth_getCode"
+  register_both
+    ~tags:["evm"; "rpc"; "get_code"; "simple_storage"]
+    ~title:"RPC method eth_getCode"
   @@ fun ~protocol:_ ~evm_setup ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* address, _ = deploy ~contract:simple_storage ~sender evm_setup in
+  let* simple_storage_resolved = simple_storage () in
+  let* address, _ =
+    deploy ~contract:simple_storage_resolved ~sender evm_setup
+  in
   let*@ code = Rpc.get_code ~address evm_setup.evm_node in
   let expected_code =
-    "0x608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033"
+    "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80634e70b1dc14604157806360fe47b114605b5780636d4ce63c14606d575b600080fd5b604960005481565b60405190815260200160405180910390f35b606b60663660046074565b600055565b005b6000546049565b600060208284031215608557600080fd5b503591905056fea2646970667358221220c8bccd31314e5f73f97adfeb24c3a1836e3b134cdee11da72c6b9608ee0bad5464736f6c634300081a0033"
   in
   Check.((code = expected_code) string)
     ~error_msg:"Expected code is %R, but got %L" ;
@@ -4513,7 +4534,7 @@ let test_l2_create_collision =
 
 let test_l2_intermediate_OOG_call =
   register_both
-    ~tags:["evm"; "out_of_gas"; "call"]
+    ~tags:["evm"; "out_of_gas"; "call"; "simple_storage"]
     ~title:
       "Check that an L2 call to a smart contract with an intermediate call \
        that runs out of gas still succeeds."
@@ -4522,8 +4543,9 @@ let test_l2_intermediate_OOG_call =
   let* oog_call_resolved = oog_call () in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* simple_storage_resolved = simple_storage () in
   let* random_contract_address, _tx =
-    deploy ~contract:simple_storage ~sender evm_setup
+    deploy ~contract:simple_storage_resolved ~sender evm_setup
   in
   let* oog_call_address, _tx =
     deploy ~contract:oog_call_resolved ~sender evm_setup
