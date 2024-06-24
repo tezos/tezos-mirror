@@ -217,6 +217,9 @@ val init :
   string ->
   t Lwt.t
 
+(** Get the RPC port given as [--rpc-port] to a node. *)
+val rpc_port : t -> int
+
 (** [spawn_run ?extra_arguments evm_node] same as {!run} but spawns a
     process. *)
 val spawn_run : ?extra_arguments:string list -> t -> Process.t

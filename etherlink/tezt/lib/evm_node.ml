@@ -462,6 +462,8 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
 
 let name evm_node = evm_node.name
 
+let rpc_port evm_node = evm_node.persistent_state.rpc_port
+
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
 (* assume a valid config for the given command and uses new latest run
