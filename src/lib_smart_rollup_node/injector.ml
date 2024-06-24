@@ -32,6 +32,8 @@ type state = {
   delay_increment_per_round : int64;
 }
 
+let registry = Prometheus.CollectorRegistry.create ()
+
 module Parameters :
   PARAMETERS
     with type state = state
@@ -151,6 +153,8 @@ module Parameters :
     | Never_included ->
         (* Forget operations that are never included *)
         return Forget
+
+  let metrics_registry = registry
 end
 
 include Injector_functor.Make (Parameters)

@@ -618,6 +618,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       ~signers
       ~retention_period:configuration.injector.retention_period
       ~allowed_attempts:configuration.injector.attempts
+      ~collect_metrics:(Option.is_some state.configuration.metrics_addr)
   in
   let* () = start_workers plugin node_ctxt in
   Lwt.dont_wait

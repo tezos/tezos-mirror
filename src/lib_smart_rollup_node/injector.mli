@@ -31,6 +31,8 @@ type state = {
   delay_increment_per_round : int64;
 }
 
+val registry : Prometheus.CollectorRegistry.t
+
 include
   Injector_sigs.S
     with type state := state
