@@ -887,7 +887,15 @@ let test_resilient_to_rollup_node_disconnect =
 
   (* Go through several cooldown periods to let the sequencer sends the rest of
      the blueprints. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () =
+    bake_until_sync
+      ~timeout_in_blocks:(catchup_cooldown * 3)
+      ~sc_rollup_node
+      ~client
+      ~sequencer
+      ~proxy
+      ()
+  in
 
   (* Check the consistency again *)
   check_head_consistency
