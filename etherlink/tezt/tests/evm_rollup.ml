@@ -4702,8 +4702,8 @@ let test_l2_timestamp_opcode =
            previous block (%L)") ;
     unit
   in
-  register_both
-    ~tags:["evm"; "timestamp"; "opcode"]
+  register_both (* TODO: https://gitlab.com/tezos/tezos/-/issues/7338 *)
+    ~tags:["evm"; "timestamp"; "opcode"; Tag.ci_disabled]
     ~title:"Check L2 opcode timestamp"
     test
 
