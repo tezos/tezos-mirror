@@ -246,10 +246,19 @@ impl Evaluation {
         let block_fees = retrieve_block_fees(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
 
-        let current_constants = match storage::read_current_block(host) {
-            Ok(block) => {
-                block.constants(chain_id, block_fees, crate::block::GAS_LIMIT, coinbase)
-            }
+        let constants = match storage::read_current_block(host) {
+            Ok(block) => BlockConstants {
+                number: block.number + 1,
+                coinbase,
+                // TODO: https://gitlab.com/tezos/tezos/-/issues/7338
+                // The timestamp is incorrect in simulation. The simulation
+                // caller should provide a view of the real timestamp.
+                timestamp: U256::from(block.timestamp.as_u64()),
+                gas_limit: crate::block::GAS_LIMIT,
+                block_fees,
+                chain_id,
+                prevrandao: None,
+            },
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
@@ -284,7 +293,7 @@ impl Evaluation {
 
         match run_transaction(
             host,
-            &current_constants,
+            &constants,
             &mut evm_account_storage,
             &precompiles,
             CONFIG,
@@ -387,7 +396,17 @@ impl TxValidation {
 
         let current_constants = match storage::read_current_block(host) {
             Ok(block) => {
-                block.constants(chain_id, block_fees, crate::block::GAS_LIMIT, coinbase)
+                BlockConstants {
+                    number: block.number + 1,
+                    coinbase,
+                    // The timetamp is incorrect in simulation. The simulation
+                    // caller should provide a view of the real timestamp.
+                    timestamp: U256::from(block.timestamp.as_u64()),
+                    gas_limit: crate::block::GAS_LIMIT,
+                    block_fees,
+                    chain_id,
+                    prevrandao: None,
+                }
             }
             Err(_) => {
                 let timestamp = current_timestamp(host);

@@ -16,10 +16,10 @@ use crate::internal_storage::InternalRuntime;
 use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::storage;
 use crate::storage::init_account_index;
+use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
-use crate::{current_timestamp, upgrade};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
@@ -194,7 +194,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
-    current_constants: &mut BlockConstants,
+    block_fees: &mut BlockFees,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
@@ -212,11 +212,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 }
             }
             let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
-            crate::gas_price::store_new_base_fee_per_gas(
-                host,
-                gas_price,
-                &mut current_constants.block_fees,
-            )?;
+            crate::gas_price::store_new_base_fee_per_gas(host, gas_price, block_fees)?;
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
@@ -241,7 +237,6 @@ fn compute_bip<Host: KernelRuntime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
-    current_constants: &mut BlockConstants,
     current_block_number: &mut U256,
     current_block_parent_hash: &mut H256,
     precompiles: &PrecompileBTreeMap<Host>,
@@ -252,12 +247,17 @@ fn compute_bip<Host: KernelRuntime>(
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     trace_input: &Option<TracerInput>,
+    chain_id: U256,
+    block_fees: &BlockFees,
+    coinbase: H160,
 ) -> anyhow::Result<ComputationResult> {
+    let constants: BlockConstants =
+        block_in_progress.constants(chain_id, block_fees, GAS_LIMIT, coinbase);
     let result = compute(
         host,
         outbox_queue,
         &mut block_in_progress,
-        current_constants,
+        &constants,
         precompiles,
         evm_account_storage,
         accounts_index,
@@ -282,16 +282,10 @@ fn compute_bip<Host: KernelRuntime>(
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
-                .finalize_and_store(host, current_constants)
+                .finalize_and_store(host, &constants)
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
             *current_block_parent_hash = new_block.hash;
-            *current_constants = new_block.constants(
-                current_constants.chain_id,
-                current_constants.block_fees,
-                GAS_LIMIT,
-                current_constants.coinbase,
-            );
 
             *first_block_of_reboot = false;
         }
@@ -354,7 +348,7 @@ const AT_MOST_ONE_BLOCK: RefPath = RefPath::assert_from(b"/__at_most_one_block")
 pub fn produce<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
-    block_fees: BlockFees,
+    mut block_fees: BlockFees,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     trace_input: Option<TracerInput>,
@@ -365,24 +359,10 @@ pub fn produce<Host: Runtime>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
+    let (mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
-            Ok(block) => (
-                block.constants(chain_id, block_fees, GAS_LIMIT, coinbase),
-                block.number + 1,
-                block.hash,
-            ),
-            Err(_) => {
-                let timestamp = current_timestamp(host);
-                let timestamp = U256::from(timestamp.as_u64());
-                (
-                    BlockConstants::first_block(
-                        timestamp, chain_id, block_fees, GAS_LIMIT, coinbase,
-                    ),
-                    U256::zero(),
-                    GENESIS_PARENT_HASH,
-                )
-            }
+            Ok(block) => (block.number + 1, block.hash),
+            Err(_) => (U256::zero(), GENESIS_PARENT_HASH),
         };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
@@ -412,7 +392,6 @@ pub fn produce<Host: Runtime>(
                 &mut safe_host,
                 &outbox_queue,
                 block_in_progress,
-                &mut current_constants,
                 &mut current_block_number,
                 &mut current_block_parent_hash,
                 &precompiles,
@@ -423,6 +402,9 @@ pub fn produce<Host: Runtime>(
                 sequencer_pool_address,
                 &config.limits,
                 &trace_input,
+                chain_id,
+                &block_fees,
+                coinbase,
             ) {
                 Ok(ComputationResult::Finished) => {
                     promote_block(
@@ -464,7 +446,7 @@ pub fn produce<Host: Runtime>(
             safe_host.host,
             current_block_number,
             current_block_parent_hash,
-            &mut current_constants,
+            &mut block_fees,
             &tick_counter,
             config,
             &kernel_upgrade,
@@ -490,7 +472,6 @@ pub fn produce<Host: Runtime>(
             &mut safe_host,
             &outbox_queue,
             *block_in_progress,
-            &mut current_constants,
             &mut current_block_number,
             &mut current_block_parent_hash,
             &precompiles,
@@ -501,6 +482,9 @@ pub fn produce<Host: Runtime>(
             sequencer_pool_address,
             &config.limits,
             &trace_input,
+            chain_id,
+            &block_fees,
+            coinbase,
         ) {
             Ok(ComputationResult::Finished) => {
                 promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?;
@@ -543,6 +527,7 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::current_timestamp;
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
