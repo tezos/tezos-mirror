@@ -87,6 +87,29 @@ module Inbox : sig
   val set_total_time : Ptime.span -> unit
 end
 
+module Batcher : sig
+  (** Set the time to retrieve the batches *)
+  val set_get_time : Ptime.span -> unit
+
+  (** Set the time to inject the batches *)
+  val set_inject_time : Ptime.span -> unit
+
+  (** Set the number of messages in the queue *)
+  val set_messages_queue_size : int -> unit
+
+  (** Set the number of messages batched *)
+  val set_messages_size : int -> unit
+
+  (** Set the number of batches sent *)
+  val set_batches_size : int -> unit
+
+  (** Set the level of the last batch *)
+  val set_last_batch_level : int32 -> unit
+
+  (** Set the time of the last batch *)
+  val set_last_batch_time : Ptime.t -> unit
+end
+
 module GC : sig
   (** Set the time to process a GC *)
   val set_process_time : Ptime.span -> unit

@@ -295,3 +295,35 @@ module GC = struct
       "gc_oldest_available_level"
       Int32.to_float
 end
+
+module Batcher = struct
+  let set_get_time =
+    set_gauge "Time to fetch batches" "batcher_get_time" Ptime.Span.to_float_s
+
+  let set_inject_time =
+    set_gauge
+      "Time to inject batches"
+      "batcher_inject_time"
+      Ptime.Span.to_float_s
+
+  let set_messages_queue_size =
+    set_gauge
+      "Batcher message queue size"
+      "batcher_message_queue_size"
+      Int.to_float
+
+  let set_messages_size =
+    set_gauge
+      "Batcher messages size in batches"
+      "batcher_messages_size"
+      Int.to_float
+
+  let set_batches_size =
+    set_gauge "Batcher batches sent" "batcher_batches_size" Int.to_float
+
+  let set_last_batch_level =
+    set_gauge "Last batch level" "batcher_last_batch_level" Int32.to_float
+
+  let set_last_batch_time =
+    set_gauge "Last batch time" "batcher_last_batch_time" Ptime.to_float_s
+end
