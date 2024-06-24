@@ -15,6 +15,9 @@
   the expected limit of 1024 on Shanghai. (!13850)
 - The simulation now caps the gas limit for execution at the maximum allowed
   per transaction (30 million gas at most). (!13729)
+- `block.number` and `block.timestamp` now return respectively the current
+  number and timetamp of the processed block, instead of the last produced one.
+  (!13901)
 
 ## Internal
 
