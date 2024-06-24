@@ -24,4 +24,10 @@
 
 open Error_monad
 
+type sysname = Linux | Darwin | Unknown of string
+
+(** [uname ()] returns the kernel name of the current system. *)
+val uname : unit -> (sysname, error) result Lwt.t
+
+(** [memory_stats ()] returns the memory statistics of the current process. *)
 val memory_stats : unit -> (Memory.mem_stats, error) result Lwt.t

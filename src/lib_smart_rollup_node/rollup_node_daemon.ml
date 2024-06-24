@@ -519,6 +519,15 @@ let make_signers_for_injector operators =
          in
          (operators, strategy, operation_kinds))
 
+let performance_metrics state =
+  let open Lwt_syntax in
+  let rec collect () =
+    let* () = Metrics.Performance.set_stats state.node_ctxt.data_dir in
+    let* () = Lwt_unix.sleep 10. in
+    collect ()
+  in
+  Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
+
 let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
   let fatal_error_exit e =
@@ -591,6 +600,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
   let* gc_info = Node_context.get_gc_levels node_ctxt in
   Metrics.GC.set_oldest_available_level gc_info.first_available_level ;
+  performance_metrics state ;
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->

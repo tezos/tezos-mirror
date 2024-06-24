@@ -117,3 +117,14 @@ module GC : sig
   (** Set the oldest available level after a GC *)
   val set_oldest_available_level : int32 -> unit
 end
+
+module Performance : sig
+  (** Set memory and cpu statistics *)
+  val set_memory_cpu_stats : unit -> unit Lwt.t
+
+  (** Set disk usage statistics *)
+  val set_disk_usage_stats : string -> unit Lwt.t
+
+  (** Set all statistics *)
+  val set_stats : string -> unit Lwt.t
+end
