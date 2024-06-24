@@ -5377,6 +5377,92 @@ let test_blockhash_opcode =
        the BLOCKHASH opcode, got %L, but %R was expected." ;
   unit
 
+let test_block_constants_opcode =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "block"; "opcode"; "constants"]
+    ~title:"Check block constants in opcode"
+  @@ fun ~protocol:_
+             ~evm_setup:
+               ({evm_node; sc_rollup_node; client; endpoint; _} as evm_setup) ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* Deploy the contracts with the block constants. *)
+  let contract = block_constants in
+  let* address, tx = deploy ~contract ~sender evm_setup in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  (* Set the block number in the contract's storage. *)
+  let set_block_number =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:contract.label
+      ~address
+      ~method_call:"set_block_number()"
+  in
+  let* set_block_number_tx =
+    wait_for_application ~evm_node ~sc_rollup_node ~client set_block_number
+  in
+  (* Check that `block.number` was the block number the transaction
+     was included in. *)
+  let*@! set_block_number_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:set_block_number_tx evm_node
+  in
+  let* storage_block_number =
+    let* storage_block_number =
+      Eth_cli.contract_call
+        ~endpoint
+        ~abi_label:contract.label
+        ~address
+        ~method_call:"view_stored_block_number()"
+        ()
+    in
+    return (Int32.of_string @@ String.trim storage_block_number)
+  in
+  Check.(
+    (set_block_number_receipt.blockNumber = storage_block_number)
+      int32
+      ~error_msg:
+        "Expected same block number, receipt is %L and block.number is %R") ;
+  (* Set the block timestamp in the contract's storage. *)
+  let set_block_timestamp =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:contract.label
+      ~address
+      ~method_call:"set_block_timestamp()"
+  in
+  let* set_block_timestamp_tx =
+    wait_for_application ~evm_node ~sc_rollup_node ~client set_block_timestamp
+  in
+  (* Check that `block.timestamp` was the block timestamp the transaction
+     was included in. *)
+  let*@! set_block_timestamp_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:set_block_timestamp_tx evm_node
+  in
+  let*@ block_timestamp =
+    Rpc.get_block_by_number
+      ~block:(Int32.to_string set_block_timestamp_receipt.blockNumber)
+      evm_node
+  in
+  let* storage_block_timestamp =
+    let* storage_block_timestamp =
+      Eth_cli.contract_call
+        ~endpoint
+        ~abi_label:contract.label
+        ~address
+        ~method_call:"view_stored_block_timestamp()"
+        ()
+    in
+    return (Int32.of_string @@ String.trim storage_block_timestamp)
+  in
+  Check.(
+    (block_timestamp.timestamp = storage_block_timestamp)
+      int32
+      ~error_msg:
+        "Expected same block timestamp, block is %L and block.timestamp is %R") ;
+  unit
+
 let test_revert_is_correctly_propagated =
   register_both
     ~tags:["evm"; "revert"]
@@ -6164,6 +6250,7 @@ let register_evm_node ~protocols =
   test_limited_stack_depth protocols ;
   test_check_estimate_gas_do_not_timeout protocols ;
   test_blockhash_opcode protocols ;
+  test_block_constants_opcode protocols ;
   test_revert_is_correctly_propagated protocols ;
   test_block_gas_limit protocols ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
