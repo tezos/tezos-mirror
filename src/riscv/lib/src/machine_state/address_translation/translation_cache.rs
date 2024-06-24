@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::machine_state::{
-    bus::Address,
-    csregisters::{ones, CSRRepr},
-    mode::Mode,
+use crate::{
+    bits::ones,
+    machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
 };
 
 const OFFSET_MASK: u64 = ones(PAGE_OFFSET_WIDTH as u64);

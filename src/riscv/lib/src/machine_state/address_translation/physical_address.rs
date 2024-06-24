@@ -12,12 +12,10 @@
 #![allow(non_snake_case)]
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::machine_state::{
-    bus::Address,
-    csregisters::{ones, satp::SvLength},
+use crate::{
+    bits::{ones, u64},
+    machine_state::{bus::Address, csregisters::satp::SvLength},
 };
-use std::ops::RangeInclusive;
-use twiddle::Twiddle;
 
 /// Obtain `PPN[index]` from a PPN field specified by `sv_length` Standard.
 ///
@@ -25,23 +23,19 @@ use twiddle::Twiddle;
 /// (i.e., the PPN field starts at bit 0).
 ///
 /// Example: `raw_range_PPN[0] = 8..=0`. This is because [`Twiddle`] expects the range in reverse
-pub(super) fn get_raw_ppn_i_range(
-    sv_length: &SvLength,
-    index: usize,
-) -> Option<RangeInclusive<usize>> {
+pub(super) fn get_raw_ppn_i_range(sv_length: &SvLength, index: usize) -> Option<(usize, usize)> {
     use SvLength::*;
     let bit_range = match (index, sv_length) {
-        (0, Sv39 | Sv48 | Sv57) => 0..=8,
-        (1, Sv39 | Sv48 | Sv57) => 9..=17,
-        (2, Sv39) => 18..=43,
-        (2, Sv48 | Sv57) => 18..=26,
-        (3, Sv48) => 27..=43,
-        (3, Sv57) => 27..=35,
-        (4, Sv57) => 36..=43,
+        (0, Sv39 | Sv48 | Sv57) => (8, 0),
+        (1, Sv39 | Sv48 | Sv57) => (17, 9),
+        (2, Sv39) => (43, 18),
+        (2, Sv48 | Sv57) => (26, 18),
+        (3, Sv48) => (43, 27),
+        (3, Sv57) => (35, 27),
+        (4, Sv57) => (43, 36),
         _ => return None,
     };
-
-    Some(*bit_range.end()..=*bit_range.start())
+    Some(bit_range)
 }
 
 // Get the page offset of a physical address.
@@ -58,12 +52,11 @@ pub fn set_page_offset(addr: u64, page_offset: u64) -> u64 {
 /// Get `p_addr.PPN[index]` from a physical address specified by `sv_length` Standard.
 pub fn get_ppn_idx(p_addr: Address, sv_length: &SvLength, index: usize) -> Option<Address> {
     let bit_range = get_raw_ppn_i_range(sv_length, index)?;
-    let (start, end) = (
-        bit_range.start() + PAGE_OFFSET_WIDTH,
-        bit_range.end() + PAGE_OFFSET_WIDTH,
-    );
-
-    Some(p_addr.bits(start..=end))
+    Some(u64::bits_subset(
+        p_addr,
+        bit_range.0 + PAGE_OFFSET_WIDTH,
+        bit_range.1 + PAGE_OFFSET_WIDTH,
+    ))
 }
 
 /// Set `p_addr.PPN[index] = ppn_value` specified by `sv_length` Standard.
@@ -74,12 +67,12 @@ pub fn set_ppn_idx(
     ppn_value: Address,
 ) -> Option<Address> {
     let bit_range = get_raw_ppn_i_range(sv_length, index)?;
-    let (start, end) = (
-        bit_range.start() + PAGE_OFFSET_WIDTH,
-        bit_range.end() + PAGE_OFFSET_WIDTH,
-    );
-
-    Some(p_addr.replace(start..=end, ppn_value))
+    Some(u64::replace_subset(
+        p_addr,
+        bit_range.0 + PAGE_OFFSET_WIDTH,
+        bit_range.1 + PAGE_OFFSET_WIDTH,
+        ppn_value,
+    ))
 }
 
 #[cfg(test)]

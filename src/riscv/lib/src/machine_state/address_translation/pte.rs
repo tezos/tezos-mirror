@@ -13,11 +13,10 @@
 
 use super::physical_address;
 use crate::{
-    bits::{Bits64, ConstantBits},
+    bits::{ones, u64, Bits64, ConstantBits},
     csr,
-    machine_state::csregisters::{ones, satp::SvLength, CSRRepr},
+    machine_state::csregisters::{satp::SvLength, CSRRepr},
 };
-use twiddle::Twiddle;
 
 /// Structure representing the raw bits of a PPN field.
 ///
@@ -30,8 +29,8 @@ pub struct PPNField {
 impl PPNField {
     /// Obtain `PPN[index]` from a PPN field of a page table entry.
     pub fn ppn_i(&self, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
-        let bit_range = physical_address::get_raw_ppn_i_range(sv_length, index)?;
-        Some(self.raw_bits.bits(bit_range))
+        let (start, end) = physical_address::get_raw_ppn_i_range(sv_length, index)?;
+        Some(u64::bits_subset(self.raw_bits, start, end))
     }
 }
 

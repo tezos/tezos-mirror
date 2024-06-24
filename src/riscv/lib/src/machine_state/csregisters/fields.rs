@@ -89,21 +89,21 @@ macro_rules! csr_fields {
                 #[inline(always)]
                 pub fn [<$name:lower>](self) -> $type {
                     let offset = <$type as $crate::bits::Bits64>::WIDTH.saturating_sub(1);
-                    let bits = twiddle::Twiddle::bits(self.0, ($accum + offset)..=($accum));
+                    let bits = $crate::bits::u64::bits_subset(self.0, ($accum + offset), ($accum));
                     <$type as $crate::bits::Bits64>::from_bits(bits)
                 }
 
                 #[inline(always)]
                 pub fn [<with_ $name:lower>](self, value: $type) -> Self {
                     let offset = <$type as $crate::bits::Bits64>::WIDTH.saturating_sub(1);
-                    let new_self = twiddle::Twiddle::replace(self.0, ($accum + offset)..=($accum), $crate::bits::Bits64::to_bits(&value));
+                    let new_self = $crate::bits::u64::replace_subset(self.0, ($accum + offset), ($accum), $crate::bits::Bits64::to_bits(&value));
                     $group(new_self)
                 }
 
                 #[inline(always)]
                 pub fn [<set_ $name:lower>](&mut self, value: $type) -> &mut Self {
                     let offset = <$type as $crate::bits::Bits64>::WIDTH.saturating_sub(1);
-                    self.0 = twiddle::Twiddle::replace(self.0, ($accum + offset)..=($accum), $crate::bits::Bits64::to_bits(&value));
+                    self.0 = $crate::bits::u64::replace_subset(self.0, ($accum + offset), ($accum), $crate::bits::Bits64::to_bits(&value));
                     self
                 }
             }

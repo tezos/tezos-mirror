@@ -17,14 +17,13 @@ use self::{
 };
 use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
-    bits::Bits64,
+    bits::{ones, u64, Bits64},
     machine_state::mode::Mode,
     state_backend::{self as backend, Manager, Region},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
 };
 use num_enum::TryFromPrimitive;
 use strum::IntoEnumIterator;
-use twiddle::Twiddle;
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,16 +32,6 @@ pub enum Privilege {
     Supervisor = 1,
     Hypervisor = 2,
     Machine = 3,
-}
-
-/// Get the bitmask formed of `n` ones.
-pub const fn ones(n: u64) -> u64 {
-    // this function should not panic
-    let sh_amt = 64_u64.saturating_sub(n);
-    match n {
-        0 => 0,
-        _ => !0 >> sh_amt,
-    }
 }
 
 /// CSR index
@@ -1297,7 +1286,7 @@ impl<M: backend::Manager> CSRegisters<M> {
             };
             let deleg_val: CSRRepr = self.read(deleg);
 
-            match deleg_val.bit(trap_source.exception_code() as usize) {
+            match u64::bit(deleg_val, trap_source.exception_code() as usize) {
                 true => TrapMode::Supervisor,
                 false => TrapMode::Machine,
             }
