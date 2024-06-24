@@ -221,8 +221,12 @@ let rpc_host node = node.persistent_state.rpc_host
 
 let rpc_port node = node.persistent_state.rpc_port
 
-let rpc_endpoint node =
-  sf "%s://%s:%d" (rpc_scheme node) (rpc_host node) (rpc_port node)
+let rpc_endpoint ?(local = false) node =
+  let host =
+    if local then Constant.default_host
+    else Runner.address node.persistent_state.runner
+  in
+  sf "%s://%s:%d" (rpc_scheme node) host (rpc_port node)
 
 let metrics_port node = node.persistent_state.metrics_port
 
@@ -863,8 +867,9 @@ let runlike_command_arguments node command arguments =
             node.persistent_state.metrics_addr
           ^ ":" )
     | Some _ ->
+        let any_addr = Unix.(string_of_inet_addr inet_addr_any) ^ ":" in
         (* FIXME spawn an ssh tunnel in case of remote host *)
-        ("0.0.0.0:", "0.0.0.0:", "0.0.0.0:")
+        (any_addr, any_addr, any_addr)
   in
   let arguments =
     List.fold_left

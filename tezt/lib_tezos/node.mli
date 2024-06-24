@@ -261,7 +261,7 @@ val rpc_port : t -> int
 
     These are composed of the node's [--rpc-tls], [--rpc-addr]
     and [--rpc-port] arguments. *)
-val rpc_endpoint : t -> string
+val rpc_endpoint : ?local:bool -> t -> string
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
