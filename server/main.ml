@@ -256,7 +256,8 @@ let get_available_data ~logger ~conf db_pool =
 let get_missing_data ~logger ~conf db_pool =
   let select_missing_data_request =
     Caqti_request.Infix.(
-      Caqti_type.unit ->* Caqti_type.(t4 int32 int32 string bool))
+      Caqti_type.unit
+      ->* Caqti_type.(t4 int32 int32 Sql_requests.Type.public_key_hash bool))
       "SELECT\n\
       \  missing_blocks.level,\n\
       \  missing_blocks.round,\n\
@@ -280,7 +281,15 @@ let get_missing_data ~logger ~conf db_pool =
          Db.fold select_missing_data_request List.cons () [])
        db_pool)
     (fun list ->
-      reply_public_json Data_encoding.(list (tup4 int32 int32 string bool)) list)
+      reply_public_json
+        Data_encoding.(
+          list
+            (tup4
+               int32
+               int32
+               Tezos_crypto.Signature.Public_key_hash.encoding
+               bool))
+        list)
 
 let get_head ~logger conf db_pool =
   let query =
