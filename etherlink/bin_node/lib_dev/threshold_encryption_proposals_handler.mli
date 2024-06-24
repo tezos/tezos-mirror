@@ -34,12 +34,7 @@
     next pending proposal in the queue (if any). *)
 
 type parameters = {
-  cctxt : Client_context.wallet;
-      (** The wallet containing the sequencer account. *)
-  smart_rollup_address : string;  (** The address of the smart rollup node. *)
   sidecar_endpoint : Uri.t;  (** The Uri of the Dsn node sequencer sicecar. *)
-  sequencer_key : Client_keys.sk_uri;
-      (** The secret key Uir of the sequencer account. *)
   maximum_number_of_chunks : int;
       (** The maximum number of chunks a blueprint can be split into. *)
   keep_alive : bool;

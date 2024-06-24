@@ -6,10 +6,7 @@
 (*****************************************************************************)
 
 type parameters = {
-  cctxt : Client_context.wallet;
-  smart_rollup_address : string;
   sidecar_endpoint : Uri.t;
-  sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
   keep_alive : bool;
   notify_no_preblock : unit -> unit;
@@ -19,10 +16,7 @@ module Types = struct
   type nonrec parameters = parameters
 
   type state = {
-    cctxt : Client_context.wallet;
-    smart_rollup_address : string;
     sidecar_endpoint : Uri.t;
-    sequencer_key : Client_keys.sk_uri;
     preblocks_stream : Threshold_encryption_types.preblock Lwt_stream.t;
     maximum_number_of_chunks : int;
     keep_alive : bool;
@@ -309,9 +303,6 @@ module Handlers = struct
 
   let on_launch _w ()
       ({
-         sequencer_key;
-         cctxt;
-         smart_rollup_address;
          sidecar_endpoint;
          keep_alive;
          maximum_number_of_chunks;
@@ -325,9 +316,6 @@ module Handlers = struct
     let state =
       Types.
         {
-          sequencer_key;
-          cctxt;
-          smart_rollup_address;
           sidecar_endpoint;
           preblocks_stream;
           maximum_number_of_chunks;
