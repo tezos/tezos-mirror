@@ -510,7 +510,7 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
         ~threshold_encryption:true
         ~title:(sf "%s (te_sequencer, %s)" title kernel_tag)
         ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags))
-    [Latest]
+    kernels
 
 let register_upgrade_both ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
