@@ -128,6 +128,9 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* inbox_hash, inbox, inbox_witness, messages =
     Plugin.Inbox.process_head node_ctxt ~predecessor head
   in
+  Metrics.wrap (fun () ->
+      Metrics.Inbox.set_messages messages ~is_internal:(fun s ->
+          String.length s > 0 && s.[0] = '\000')) ;
   let* () =
     when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
     Plugin.Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
@@ -637,7 +640,6 @@ module Internal_for_tests = struct
         node_ctxt
         ~is_first_block
         ~predecessor
-        head
         messages
     in
     let* ctxt, _num_messages, num_ticks, initial_tick =

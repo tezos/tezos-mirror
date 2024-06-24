@@ -92,14 +92,12 @@ module type INBOX = sig
 
   module Internal_for_tests : sig
     (** Only for tests. [process_messages node_ctxt ~is_first_block ~predecessor
-        head messages] reconstructs the inbox on disk for the [messages] as if
-        they appeared in [head]. See {!val:process_head} for the return
-        values. *)
+        messages] reconstructs the inbox on disk for the [messages]. See
+        {!val:process_head} for the return values. *)
     val process_messages :
       Node_context.rw ->
       is_first_block:bool ->
       predecessor:Layer1.header ->
-      Layer1.header ->
       string list ->
       (Octez_smart_rollup.Inbox.Hash.t
       * Octez_smart_rollup.Inbox.t

@@ -26,6 +26,12 @@
 (** The collector registry for the rollup node metrics. *)
 val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
 
+(** Wrap a function to be processed if a metrics address is set up in the configuration. *)
+val wrap : (unit -> unit) -> unit
+
+val wrap_lwt :
+  (unit -> (unit, 'error) result Lwt.t) -> (unit, 'error) result Lwt.t
+
 (** [metrics_server metrics_addr] runs a server for the rollup metrics on [metrics_addr].
     The metrics are accessible thanks to a [/metrics] request. *)
 val metrics_serve : string option -> (unit, tztrace) result Lwt.t
@@ -48,18 +54,9 @@ end
 
 (** The metrics related to Inboxes *)
 module Inbox : sig
-  (** The type of an inbox metrics *)
-  type t = {head_inbox_level : Prometheus.Gauge.t}
+  (** Set the level of the head *)
+  val set_head_level : int32 -> unit
 
-  (** The stats for the inboxes *)
-  module Stats : sig
-    (** Set the number of messages from the head *)
-    val set : is_internal:('a -> bool) -> 'a list -> unit
-  end
-
-  (** Set the time the rollup node used to process the head *)
-  val set_process_time : Ptime.Span.t -> unit
-
-  (** The inboxes metrics *)
-  val metrics : t
+  (** Set the number of messages from the head *)
+  val set_messages : is_internal:('a -> bool) -> 'a list -> unit
 end

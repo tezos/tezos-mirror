@@ -285,6 +285,7 @@ let set_l2_head node_ctxt (head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
   let+ () = Store.L2_head.write node_ctxt.store.l2_head head in
   notify_processed_tezos_level node_ctxt head.header.level ;
+  Metrics.wrap (fun () -> Metrics.Inbox.set_head_level head.header.level) ;
   Lwt_watcher.notify node_ctxt.global_block_watcher head
 
 let is_processed {store; _} head = Store.L2_blocks.mem store.l2_blocks head

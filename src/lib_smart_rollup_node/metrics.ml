@@ -38,25 +38,16 @@ let v_labels_counter =
 (** Registers a gauge in [sc_rollup_node_registry] *)
 let v_gauge = Gauge.v ~registry:sc_rollup_node_registry ~namespace ~subsystem
 
-(** Creates a metric with a given [collector] *)
-let metric ~help ~name collector =
-  let info =
-    {
-      MetricInfo.name =
-        MetricName.v (String.concat "_" [namespace; subsystem; name]);
-      help;
-      metric_type = Gauge;
-      label_names = [];
-    }
-  in
-  let collect () =
-    LabelSetMap.singleton [] [Prometheus.Sample_set.sample (collector ())]
-  in
-  (info, collect)
+let set_gauge help name f =
+  let m = v_gauge ~help name in
+  fun x -> Gauge.set m @@ f x
 
-(** Registers a metric defined with [info] associated to its [collector] *)
-let add_metric (info, collector) =
-  CollectorRegistry.(register sc_rollup_node_registry) info collector
+let process_metrics = ref false
+
+let wrap f = if !process_metrics then f ()
+
+let wrap_lwt f =
+  if !process_metrics then f () else Lwt_result_syntax.return_unit
 
 module Cohttp (Server : Cohttp_lwt.S.Server) = struct
   let callback _conn req _body =
@@ -169,73 +160,28 @@ module Info = struct
 end
 
 module Inbox = struct
-  type t = {head_inbox_level : Gauge.t}
+  let set_head_level =
+    set_gauge "Level of last inbox" "inbox_level" Int32.to_float
 
-  module Stats = struct
-    let internal_messages_number = ref 0.
-
-    let external_messages_number = ref 0.
-
-    let zero () =
-      internal_messages_number := 0. ;
-      external_messages_number := 0.
-
-    let set ~is_internal l =
-      zero () ;
-      List.iter
-        (fun x ->
-          let r =
-            if is_internal x then internal_messages_number
-            else external_messages_number
-          in
-          r := !r +. 1.)
-        l
-  end
-
-  let head_process_time =
+  let internal_messages_number =
     v_gauge
-      ~help:"The time the rollup node spent processing the head"
-      "head_inbox_process_time"
+      ~help:"Number of internal messages in inbox"
+      "inbox_internal_messages_number"
 
-  module Head_process_time_histogram = Histogram (struct
-    (* These values define the 20 buckets of the histogram. The buckets deal
-       with the time intervals [0.01 * i, 0.01 * (i + 1)) for i = 0,..., 20-1,
-       so that we cover the range 0-200 ms for the inbox head processing time.
-       The last bucket (i = 20) covers the range 200 ms-Infinity. *)
-    let spec = Histogram_spec.of_linear 0. 0.01 20
-  end)
+  let external_messages_number =
+    v_gauge
+      ~help:"Number of external messages in inbox"
+      "inbox_external_messages_number"
 
-  let head_process_time_histogram =
-    Head_process_time_histogram.v
-      ~registry:sc_rollup_node_registry
-      ~namespace
-      ~subsystem
-      ~help:"The time the rollup node spent processing the head"
-      "head_inbox_process_time_histogram"
-
-  let set_process_time pt =
-    let pt = Ptime.Span.to_float_s pt in
-    Prometheus.Gauge.set head_process_time pt ;
-    Head_process_time_histogram.observe head_process_time_histogram pt
-
-  let metrics =
-    let head_inbox_level =
-      v_gauge ~help:"The level of the last inbox" "head_inbox_level"
+  let set_messages ~is_internal l =
+    let internal, external_ =
+      List.fold_left
+        (fun (internal, external_) x ->
+          if is_internal x then (internal +. 1., external_)
+          else (internal, external_ +. 1.))
+        (0., 0.)
+        l
     in
-    let head_internal_messages_number =
-      metric
-        ~help:"The number of internal messages in head's inbox"
-        ~name:"head_inbox_internal_messages_number"
-        (fun () -> !Stats.internal_messages_number)
-    in
-    let head_external_messages_number =
-      metric
-        ~help:"The number of external messages in head's inbox"
-        ~name:"head_inbox_external_messages_number"
-        (fun () -> !Stats.external_messages_number)
-    in
-    List.iter
-      add_metric
-      [head_internal_messages_number; head_external_messages_number] ;
-    {head_inbox_level}
+    Gauge.set internal_messages_number internal ;
+    Gauge.set external_messages_number external_
 end
