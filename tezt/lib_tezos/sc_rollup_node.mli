@@ -180,6 +180,9 @@ val rpc_host : t -> string
 val rpc_port : t -> int
 
 (** Return the endpoint of the sc node, i.e., http://rpc_host:rpc_port. *)
+val rpc_endpoint : ?local:bool -> t -> string
+
+(** An alias for [rpc_endpoint] *)
 val endpoint : t -> string
 
 (** Get the data-dir of an sc node. *)

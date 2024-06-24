@@ -285,8 +285,14 @@ let metrics node =
       node.persistent_state.metrics_addr,
     node.persistent_state.metrics_port )
 
-let endpoint sc_node =
-  Printf.sprintf "http://%s:%d" (rpc_host sc_node) (rpc_port sc_node)
+let rpc_endpoint ?(local = false) node =
+  let host =
+    if local then Constant.default_host
+    else Runner.address node.persistent_state.runner
+  in
+  Printf.sprintf "http://%s:%d" host (rpc_port node)
+
+let endpoint node = rpc_endpoint node
 
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
@@ -333,10 +339,15 @@ let runlike_argument rollup_node =
     | None -> metrics_addr ^ ":" ^ string_of_int metrics_port
     | Some _ -> "0.0.0.0:" ^ string_of_int metrics_port
   in
+  let rpc_host =
+    match rollup_node.persistent_state.runner with
+    | None -> rpc_host rollup_node
+    | Some _ -> Unix.(string_of_inet_addr inet_addr_any)
+  in
   [
     Data_dir (data_dir rollup_node);
     Metrics_addr metrics_arg;
-    Rpc_addr (rpc_host rollup_node);
+    Rpc_addr rpc_host;
     Rpc_port (rpc_port rollup_node);
     History_mode rollup_node_state.history_mode;
     Gc_frequency rollup_node_state.gc_frequency;
