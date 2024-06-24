@@ -125,10 +125,13 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
+  let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
     Plugin.Inbox.process_head node_ctxt ~predecessor head
   in
+  let fetch_timestamp = Time.System.now () in
   Metrics.wrap (fun () ->
+      Metrics.Inbox.set_fetch_time @@ Ptime.diff fetch_timestamp start_timestamp ;
       Metrics.Inbox.set_messages messages ~is_internal:(fun s ->
           String.length s > 0 && s.[0] = '\000')) ;
   let* () =
@@ -194,6 +197,10 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       Int32.(sub head.level (of_int node_ctxt.block_finality_time))
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
+  let end_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Inbox.set_process_time @@ Ptime.diff end_timestamp fetch_timestamp ;
+      Metrics.Inbox.set_total_time @@ Ptime.diff end_timestamp start_timestamp) ;
   return l2_block
 
 let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
@@ -231,6 +238,10 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
   match done_ with
   | `Nothing -> return_unit
   | `Already_processed l2_block ->
+      Metrics.wrap (fun () ->
+          Metrics.Inbox.set_fetch_time Ptime.Span.zero ;
+          Metrics.Inbox.set_process_time Ptime.Span.zero ;
+          Metrics.Inbox.set_total_time Ptime.Span.zero) ;
       if recurse_pred then
         (* We are calling update_l2_chain recursively to ensure we have handled
            the predecessor. In this case, we don't update the head or notify the
@@ -241,7 +252,6 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
-      Metrics.Inbox.set_process_time process_time ;
       let*! () =
         Daemon_event.new_head_processed head.hash head.level process_time
       in

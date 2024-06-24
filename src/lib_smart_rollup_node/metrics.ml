@@ -184,4 +184,22 @@ module Inbox = struct
     in
     Gauge.set internal_messages_number internal ;
     Gauge.set external_messages_number external_
+
+  let set_process_time =
+    set_gauge
+      "The time the rollup node spent processing the head"
+      "inbox_process_time"
+      Ptime.Span.to_float_s
+
+  let set_fetch_time =
+    set_gauge
+      "The time the rollup node spent fetching the inbox"
+      "inbox_fetch_time"
+      Ptime.Span.to_float_s
+
+  let set_total_time =
+    set_gauge
+      "The total time the rollup node spent handling the inbox"
+      "inbox_total_time"
+      Ptime.Span.to_float_s
 end

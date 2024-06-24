@@ -59,4 +59,13 @@ module Inbox : sig
 
   (** Set the number of messages from the head *)
   val set_messages : is_internal:('a -> bool) -> 'a list -> unit
+
+  (** Set the time the rollup node used to process the inbox *)
+  val set_process_time : Ptime.span -> unit
+
+  (** Set the time the rollup node used to fetch the inbox *)
+  val set_fetch_time : Ptime.span -> unit
+
+  (** Set the time the rollup node used to handle the inbox *)
+  val set_total_time : Ptime.span -> unit
 end
