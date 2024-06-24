@@ -427,7 +427,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     match mode with
     | Proxy -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
-    | Threshold_encryption_sequencer _ -> "te_sequencer" ^ fresh_name ()
+    | Threshold_encryption_sequencer _ -> "te_sequencer_" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
     | Threshold_encryption_observer _ ->
         "threshold_encryption_observer_" ^ fresh_name ()
