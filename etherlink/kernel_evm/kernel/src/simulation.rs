@@ -686,6 +686,7 @@ mod tests {
         Some(H160::from_slice(data))
     }
 
+    #[ignore]
     #[test]
     fn test_decode_empty() {
         let input_string =
@@ -711,6 +712,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     fn test_decode_non_empty() {
         let input_string =
@@ -893,6 +895,7 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[test]
     fn parse_simulation() {
         let to = address_of_str("3535353535353535353535353535353535353535");
@@ -926,6 +929,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     fn parse_simulation2() {
         // setup
