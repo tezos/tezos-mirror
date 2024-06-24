@@ -46,6 +46,7 @@ let replace_variables string =
       ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
       ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
+      ("id\\w{28}\\b", "[PEER]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
       (* Ports are non-deterministic when using -j. *)
       ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
