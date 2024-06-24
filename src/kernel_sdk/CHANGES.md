@@ -18,6 +18,9 @@
 - Add `entrypoint::main` procedural macro to mark the kernel entrypoint function.
 - Add `extra` feature flag, for functionalility not-expected to be used by kernels directly.
 - Remove the `proto-alpha` flag restriction on DAL host functions.
+- Refactor `OutboxMessage` to `OutboxMessageFull` enabling different atomic batch backends that implement `AtomicBatch` trait.
+- Add `AtomicBatch2` ... `AtomicBatch5` structs implementing `AtomicBatch` and constructed from tuples 
+  of `OutboxMessageTransaction` with potentially different parameter types.
 
 ### Installer client/kernel
 
