@@ -259,8 +259,10 @@ val rpc_port : t -> int
 
 (** Get the node's RPC endpoint URI.
 
-    These are composed of the node's [--rpc-tls], [--rpc-addr]
-    and [--rpc-port] arguments. *)
+    These are composed of the node's [--rpc-tls], [--rpc-addr] and
+    [--rpc-port] arguments. If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument). *)
 val rpc_endpoint : ?local:bool -> t -> string
 
 (** Get the data-dir of a node. *)

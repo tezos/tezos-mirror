@@ -179,7 +179,12 @@ val rpc_host : t -> string
 (** Get the RPC port given as [--rpc-addr] to an sc node. *)
 val rpc_port : t -> int
 
-(** Return the endpoint of the sc node, i.e., http://rpc_host:rpc_port. *)
+(** Return the endpoint of the sc node, i.e., http://rpc_host:rpc_port.
+
+    If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument).
+*)
 val rpc_endpoint : ?local:bool -> t -> string
 
 (** An alias for [rpc_endpoint] *)
