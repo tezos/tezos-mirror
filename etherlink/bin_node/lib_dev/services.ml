@@ -234,6 +234,21 @@ let get_fee_history block_count block_parameter config
   in
   get_fee_history_aux block_count block_parameter init_acc
 
+let process_trace_result trace =
+  match trace with
+  | Ok trace -> rpc_ok trace
+  | Error (Tracer_types.Not_supported :: _) ->
+      rpc_error (Rpc_errors.method_not_supported Trace_transaction.method_)
+  | Error (Tracer_types.Transaction_not_found hash :: _) ->
+      rpc_error (Rpc_errors.trace_transaction_not_found hash)
+  | Error (Tracer_types.Block_not_found number :: _) ->
+      rpc_error (Rpc_errors.trace_block_not_found number)
+  | Error (Tracer_types.Trace_not_found :: _) ->
+      rpc_error Rpc_errors.trace_not_found
+  | Error e ->
+      let msg = Format.asprintf "%a" pp_print_trace e in
+      rpc_error (Rpc_errors.internal_error msg)
+
 let dispatch_request (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -537,20 +552,7 @@ let dispatch_request (config : Configuration.t)
         | Trace_transaction.Method ->
             let f ((hash, config) : Tracer_types.input) =
               let*! trace = Backend_rpc.trace_transaction hash config in
-              match trace with
-              | Ok trace -> rpc_ok trace
-              | Error (Tracer_types.Not_supported :: _) ->
-                  rpc_error
-                    (Rpc_errors.method_not_supported Trace_transaction.method_)
-              | Error (Tracer_types.Transaction_not_found hash :: _) ->
-                  rpc_error (Rpc_errors.trace_transaction_not_found hash)
-              | Error (Tracer_types.Block_not_found number :: _) ->
-                  rpc_error (Rpc_errors.trace_block_not_found number)
-              | Error (Tracer_types.Trace_not_found :: _) ->
-                  rpc_error Rpc_errors.trace_not_found
-              | Error e ->
-                  let msg = Format.asprintf "%a" pp_print_trace e in
-                  rpc_error (Rpc_errors.internal_error msg)
+              process_trace_result trace
             in
             build_with_input ~f module_ parameters
         | Eth_fee_history.Method ->
@@ -577,6 +579,12 @@ let dispatch_request (config : Configuration.t)
               rpc_ok coinbase
             in
             build ~f module_ parameters
+        | Trace_call.Method ->
+            let f (((call, block), config) : Tracer_types.call_input) =
+              let*! trace = Tracer.trace_call ~call ~block ~config in
+              process_trace_result trace
+            in
+            build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in

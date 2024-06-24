@@ -11,6 +11,12 @@ module type Backend = sig
     transaction_hash:Ethereum_types.hash ->
     config:Tracer_types.config ->
     Tracer_types.output tzresult Lwt.t
+
+  val trace_call :
+    call:Ethereum_types.call ->
+    block:Ethereum_types.Block_parameter.extended ->
+    config:Tracer_types.config ->
+    Tracer_types.output tzresult Lwt.t
 end
 
 module Make (Storage : sig
@@ -30,4 +36,6 @@ struct
           ~block_number:blockNumber
           ~transaction_hash
           ~config
+
+  let trace_call call block config = Tracer.trace_call ~call ~block ~config
 end

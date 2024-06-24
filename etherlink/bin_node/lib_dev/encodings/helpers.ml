@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let encoding_with_optional_second_param encoding second_param_encoding
+let encoding_with_optional_last_param encoding second_param_encoding
     default_second_param =
   let open Data_encoding in
   let encoding = if is_tup encoding then encoding else tup1 encoding in

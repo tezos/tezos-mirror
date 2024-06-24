@@ -62,7 +62,7 @@ let rlp_encode ({call; with_da_fees} : estimate_gas_input) =
        ]
       @
       match with_da_fees with
-      | Some with_da_fees -> [Tracer_types.bool_encoding with_da_fees]
+      | Some with_da_fees -> [Ethereum_types.bool_to_rlp_bytes with_da_fees]
       | None -> [])
   in
 

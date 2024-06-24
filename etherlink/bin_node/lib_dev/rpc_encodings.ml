@@ -137,13 +137,13 @@ module type METHOD = sig
 end
 
 let encoding_with_optional_extended_block_param encoding =
-  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_second_param
+  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_last_param
     encoding
     Ethereum_types.Block_parameter.extended_encoding
     Ethereum_types.Block_parameter.(Block_parameter Latest)
 
 let encoding_with_optional_block_param encoding =
-  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_second_param
+  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_last_param
     encoding
     Ethereum_types.Block_parameter.encoding
     Ethereum_types.Block_parameter.Latest
@@ -720,6 +720,20 @@ module Trace_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Trace_call = struct
+  type input = Tracer_types.call_input
+
+  type output = Tracer_types.output
+
+  let input_encoding = Tracer_types.call_input_encoding
+
+  let output_encoding = Tracer_types.output_encoding
+
+  let method_ = "debug_traceCall"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -802,6 +816,7 @@ let supported_methods : (module METHOD) list =
     (module Trace_transaction);
     (module Eth_fee_history);
     (module Coinbase);
+    (module Trace_call);
   ]
 
 let unsupported_methods : string list =
