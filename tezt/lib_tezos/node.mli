@@ -99,6 +99,7 @@ type argument =
   | RPC_additional_addr of string  (** [--rpc-addr] *)
   | RPC_additional_addr_external of string  (** [--external-rpc-addr] *)
   | Max_active_rpc_connections of int  (** [--max-active-rpc-connections] *)
+  | Enable_http_cache_headers  (** [--enable-http-cache-headers] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 

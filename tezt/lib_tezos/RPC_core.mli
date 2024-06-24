@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,6 +34,8 @@ type data = Data of JSON.u | File of string
 
 (** Convert verb to string. *)
 val show_verb : verb -> string
+
+module HeaderMap : module type of Map.Make (String)
 
 (** RPC descriptions.
 
@@ -89,6 +92,7 @@ val decode : 'result t -> JSON.t -> 'result
 type 'a response = {
   body : 'a;  (** Response body. *)
   code : int;  (** Status code (e.g. 200 for OK, 404 for Not Found). *)
+  headers : string HeaderMap.t;  (** Response headers *)
 }
 
 (** [check_string_response ?body_rex ~code response] verifies that the given
