@@ -79,7 +79,7 @@ val rpc_port : t -> int
 
 (** Return the endpoint of the DAL node's RPC server, i.e.,
     http://rpc_host:rpc_port. *)
-val rpc_endpoint : t -> string
+val rpc_endpoint : ?local:bool -> t -> string
 
 (** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
 val listen_addr : t -> string

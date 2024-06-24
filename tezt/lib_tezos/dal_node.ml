@@ -68,8 +68,12 @@ let rpc_host dal_node = dal_node.persistent_state.rpc_host
 
 let rpc_port dal_node = dal_node.persistent_state.rpc_port
 
-let rpc_endpoint dal_node =
-  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
+let rpc_endpoint ?(local = false) node =
+  let host =
+    if local then Constant.default_host
+    else Runner.address node.persistent_state.runner
+  in
+  Printf.sprintf "http://%s:%d" host (rpc_port node)
 
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
@@ -299,11 +303,16 @@ let make_arguments node =
   let l1_endpoint =
     Client.as_foreign_endpoint node.persistent_state.l1_node_endpoint
   in
+  let rpc_host =
+    match node.persistent_state.runner with
+    | Some _ -> Unix.(string_of_inet_addr inet_addr_any)
+    | None -> rpc_host node
+  in
   [
     "--endpoint";
     Endpoint.as_string l1_endpoint;
     "--rpc-addr";
-    Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
+    Format.asprintf "%s:%d" rpc_host (rpc_port node);
     "--net-addr";
     listen_addr node;
     "--metrics-addr";
@@ -372,22 +381,12 @@ module Agent = struct
       ?name ~node agent =
     let* path = Agent.copy agent ~source:path in
     let runner = Agent.runner agent in
-    let rpc_host = "0.0.0.0" in
     let rpc_port = Agent.next_available_port agent in
     let net_port = Agent.next_available_port agent in
     let metrics_port = Agent.next_available_port agent in
     let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
     let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
-    create
-      ?name
-      ~path
-      ~runner
-      ~rpc_host
-      ~rpc_port
-      ~metrics_addr
-      ~listen_addr
-      ~node
-      ()
+    create ?name ~path ~runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
     |> Lwt.return
 end
 
