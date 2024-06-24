@@ -45,11 +45,16 @@ module Info : sig
   (** Initializes the metric for rollup info
       with a the given arguments as label values *)
   val init_rollup_node_info :
-    id:Tezos_crypto.Hashed.Smart_rollup_address.t ->
-    mode:Configuration.mode ->
+    Configuration.t ->
     genesis_level:int32 ->
+    genesis_hash:Commitment.Hash.t ->
     pvm_kind:string ->
+    history_mode:Configuration.history_mode ->
     unit
+
+  (** Set the protocol specific information for the current protocol *)
+  val set_proto_info :
+    Protocol_hash.t -> Rollup_constants.protocol_constants -> unit
 end
 
 (** The metrics related to Inboxes *)

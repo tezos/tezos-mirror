@@ -86,6 +86,7 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   in
   state.plugin <- new_plugin ;
   Reference.set state.node_ctxt.current_protocol new_protocol ;
+  Metrics.Info.set_proto_info new_protocol.hash constants ;
   let*! () =
     Daemon_event.switched_protocol
       new_protocol.hash
@@ -580,11 +581,14 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
+  let* history_mode = Node_context.get_history_mode node_ctxt in
   Metrics.Info.init_rollup_node_info
-    ~id:configuration.sc_rollup_address
-    ~mode:configuration.mode
+    configuration
     ~genesis_level:node_ctxt.genesis_info.level
-    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
+    ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
+    ~history_mode ;
+  Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->

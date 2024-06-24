@@ -35,6 +35,9 @@ let subsystem = "sc_rollup_node"
 let v_labels_counter =
   Counter.v_labels ~registry:sc_rollup_node_registry ~namespace ~subsystem
 
+let v_label_counter =
+  Counter.v_label ~registry:sc_rollup_node_registry ~namespace ~subsystem
+
 (** Registers a gauge in [sc_rollup_node_registry] *)
 let v_gauge = Gauge.v ~registry:sc_rollup_node_registry ~namespace ~subsystem
 
@@ -109,7 +112,6 @@ let pp_label_names fmt =
     fmt
 
 let print_csv_metrics ppf metrics =
-  let open Prometheus in
   Format.fprintf ppf "@[<v>Name,Type,Description,Labels" ;
   List.iter
     (fun (v, _) ->
@@ -122,7 +124,7 @@ let print_csv_metrics ppf metrics =
         v.MetricInfo.help
         pp_label_names
         v.MetricInfo.label_names)
-    (Prometheus.MetricFamilyMap.to_list metrics) ;
+    (MetricFamilyMap.to_list metrics) ;
   Format.fprintf ppf "@]@."
 
 module Info = struct
@@ -138,15 +140,73 @@ module Info = struct
     let help = "Rollup node info" in
     v_labels_counter
       ~help
-      ~label_names:["rollup_address"; "mode"; "genesis_level"; "pvm_kind"]
+      ~label_names:
+        [
+          "rollup_address";
+          "mode";
+          "genesis_level";
+          "genesis_hash";
+          "pvm_kind";
+          "history_mode";
+        ]
       "rollup_node_info"
 
-  let init_rollup_node_info ~id ~mode ~genesis_level ~pvm_kind =
-    let id = Tezos_crypto.Hashed.Smart_rollup_address.to_b58check id in
-    let mode = Configuration.string_of_mode mode in
+  let protocol_label =
+    let help = "Rollup node current protocol" in
+    v_label_counter ~help ~label_name:"protocol" "protocol"
+
+  let init_rollup_node_info (configuration : Configuration.t) ~genesis_level
+      ~genesis_hash ~pvm_kind ~history_mode =
+    process_metrics := configuration.metrics_addr <> None ;
+    let addr =
+      Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+        configuration.sc_rollup_address
+    in
+    let mode = Configuration.string_of_mode configuration.mode in
     let genesis_level = Int32.to_string genesis_level in
+    let genesis_hash = Commitment.Hash.to_b58check genesis_hash in
+    let history_mode = Configuration.string_of_history_mode history_mode in
     ignore
-    @@ Counter.labels rollup_node_info [id; mode; genesis_level; pvm_kind] ;
+    @@ Counter.labels
+         rollup_node_info
+         [addr; mode; genesis_level; genesis_hash; pvm_kind; history_mode] ;
+    ()
+
+  let () =
+    let version = Version.to_string Current_git_info.octez_version in
+    let commit_hash = Current_git_info.commit_hash in
+    let commit_date = Current_git_info.committer_date in
+    let _ =
+      Counter.labels node_general_info [version; commit_hash; commit_date]
+    in
+    ()
+
+  let set_commitment_period =
+    set_gauge "Current commitment period" "commitment_period" float_of_int
+
+  let set_challenge_window =
+    set_gauge "Current challenge window" "challenge_window" float_of_int
+
+  let set_dal_enabled =
+    set_gauge "DAL enabled in protocol" "dal_enabled" (function
+        | true -> 1.
+        | false -> 0.)
+
+  let set_dal_attestation_lag =
+    set_gauge "DAL attestation lag" "dal_attestation_lag" float_of_int
+
+  let set_dal_number_of_slots =
+    set_gauge "DAL number of slots" "dal_number_of_slots" float_of_int
+
+  let set_proto_info protocol (constants : Rollup_constants.protocol_constants)
+      =
+    let proto = Protocol_hash.to_b58check protocol in
+    ignore (protocol_label proto) ;
+    set_commitment_period constants.sc_rollup.commitment_period_in_blocks ;
+    set_challenge_window constants.sc_rollup.challenge_window_in_blocks ;
+    set_dal_enabled constants.dal.feature_enable ;
+    set_dal_attestation_lag constants.dal.attestation_lag ;
+    set_dal_number_of_slots constants.dal.number_of_slots ;
     ()
 
   let () =
