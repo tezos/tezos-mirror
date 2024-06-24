@@ -86,3 +86,11 @@ module Inbox : sig
   (** Set the time the rollup node used to handle the inbox *)
   val set_total_time : Ptime.span -> unit
 end
+
+module GC : sig
+  (** Set the time to process a GC *)
+  val set_process_time : Ptime.span -> unit
+
+  (** Set the oldest available level after a GC *)
+  val set_oldest_available_level : int32 -> unit
+end

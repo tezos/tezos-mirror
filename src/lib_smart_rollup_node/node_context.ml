@@ -1027,11 +1027,14 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
             Block_hash.pp
             hash
       | Some {context; _} ->
+          let start_timestamp = Time.System.now () in
           let* gc_lockfile =
             Utils.lock (gc_lockfile_path ~data_dir:node_ctxt.data_dir)
           in
           let*! () = Event.calling_gc ~gc_level ~head_level:level in
           let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+          Metrics.wrap (fun () ->
+              Metrics.GC.set_oldest_available_level gc_level) ;
           (* Start both node and context gc asynchronously *)
           let*! () = Context.gc node_ctxt.context context in
           let* () = Store.gc node_ctxt.store ~level:gc_level in
@@ -1039,6 +1042,10 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
             let open Lwt_syntax in
             let* () = Context.wait_gc_completion node_ctxt.context
             and* () = Store.wait_gc_completion node_ctxt.store in
+            Metrics.wrap (fun () ->
+                let stop_timestamp = Time.System.now () in
+                Metrics.GC.set_process_time
+                @@ Ptime.diff stop_timestamp start_timestamp) ;
             let* () = Event.gc_finished ~gc_level ~head_level:level in
             Utils.unlock gc_lockfile
           in

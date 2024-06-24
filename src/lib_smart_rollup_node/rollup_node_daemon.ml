@@ -589,6 +589,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
     ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
     ~history_mode ;
   Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
+  let* gc_info = Node_context.get_gc_levels node_ctxt in
+  Metrics.GC.set_oldest_available_level gc_info.first_available_level ;
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->

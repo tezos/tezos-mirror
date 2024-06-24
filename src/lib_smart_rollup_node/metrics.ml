@@ -284,3 +284,14 @@ module Inbox = struct
       "inbox_total_time"
       Ptime.Span.to_float_s
 end
+
+module GC = struct
+  let set_process_time =
+    set_gauge "GC processing time" "gc_process_time" Ptime.Span.to_float_s
+
+  let set_oldest_available_level =
+    set_gauge
+      "Oldest Available Level after GC"
+      "gc_oldest_available_level"
+      Int32.to_float
+end
