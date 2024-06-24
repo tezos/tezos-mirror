@@ -282,6 +282,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
              bundler_node_endpoint = Dsn_node.endpoint bundler;
+             time_between_blocks;
            })
     else
       return

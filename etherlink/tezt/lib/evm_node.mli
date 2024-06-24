@@ -48,6 +48,7 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
       bundler_node_endpoint : string;
+      time_between_blocks : time_between_blocks option;
     }
   | Sequencer of {
       initial_kernel : string;
