@@ -52,6 +52,18 @@ module Info : sig
     history_mode:Configuration.history_mode ->
     unit
 
+  (** Set the last cemented commitment level available locally *)
+  val set_lcc_level_local : int32 -> unit
+
+  (** Set the last cemented commitment level seen on the network *)
+  val set_lcc_level_l1 : int32 -> unit
+
+  (** Set the last published commitment level available locally *)
+  val set_lpc_level_local : int32 -> unit
+
+  (** Set the last published commitment level seen on the network *)
+  val set_lpc_level_l1 : int32 -> unit
+
   (** Set the protocol specific information for the current protocol *)
   val set_proto_info :
     Protocol_hash.t -> Rollup_constants.protocol_constants -> unit

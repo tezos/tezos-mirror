@@ -181,6 +181,27 @@ module Info = struct
     in
     ()
 
+  let set_lcc_level_l1 =
+    set_gauge
+      "Last cemented commitment level on L1"
+      "lcc_level_l1"
+      Int32.to_float
+
+  let set_lcc_level_local =
+    set_gauge
+      "Last cemented commitment level locally"
+      "lcc_level_local"
+      Int32.to_float
+
+  let set_lpc_level_l1 =
+    set_gauge "Last published commitment on L1" "lpc_level_l1" Int32.to_float
+
+  let set_lpc_level_local =
+    set_gauge
+      "Last published commitment by operator"
+      "lpc_level_local"
+      Int32.to_float
+
   let set_commitment_period =
     set_gauge "Current commitment period" "commitment_period" float_of_int
 

@@ -786,6 +786,10 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       cctxt
       configuration.sc_rollup_address
   in
+  Metrics.Info.set_lcc_level_l1 lcc.level ;
+  Option.iter
+    (fun Commitment.{inbox_level = l; _} -> Metrics.Info.set_lpc_level_l1 l)
+    lpc ;
   let current_protocol =
     {
       Node_context.hash = protocol;

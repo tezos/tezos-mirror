@@ -584,7 +584,10 @@ let set_lcc node_ctxt lcc =
   let open Lwt_result_syntax in
   let lcc_l1 = Reference.get node_ctxt.lcc in
   let* () = Store.Lcc.write node_ctxt.store.lcc lcc in
-  if lcc.level > lcc_l1.level then Reference.set node_ctxt.lcc lcc ;
+  Metrics.Info.set_lcc_level_local lcc.level ;
+  if lcc.level > lcc_l1.level then (
+    Reference.set node_ctxt.lcc lcc ;
+    Metrics.Info.set_lcc_level_l1 lcc.level) ;
   let*! () =
     Commitment_event.last_cemented_commitment_updated lcc.commitment lcc.level
   in
@@ -616,6 +619,8 @@ let register_published_commitment node_ctxt commitment ~first_published_at_level
         {first_published_at_level; published_at_level}
     else return_unit
   in
+  if published_by_us then Metrics.Info.set_lpc_level_local level
+  else Metrics.Info.set_lpc_level_l1 level ;
   when_ published_by_us @@ fun () ->
   let* () = Store.Lpc.write node_ctxt.store.lpc commitment in
   let update_lpc_ref =
