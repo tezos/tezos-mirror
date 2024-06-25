@@ -314,11 +314,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* () =
     Threshold_encryption_proposals_handler.start
       {
-        cctxt;
-        smart_rollup_address;
-        sequencer_key = threshold_encryption_sequencer_config.sequencer;
-        sidecar_endpoint =
-          threshold_encryption_sequencer_config.sidecar_endpoint;
+        sidecar_endpoint = threshold_encryption_sequencer_config.sidecar_endpoint;
         keep_alive = configuration.keep_alive;
         maximum_number_of_chunks =
           threshold_encryption_sequencer_config.max_number_of_chunks;
