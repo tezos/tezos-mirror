@@ -9,7 +9,7 @@ type parameters = {
   sidecar_endpoint : Uri.t;
   maximum_number_of_chunks : int;
   keep_alive : bool;
-  notify_no_preblock : unit -> unit;
+  time_between_blocks : Configuration.time_between_blocks;
 }
 
 module Types = struct
@@ -17,12 +17,11 @@ module Types = struct
 
   type state = {
     sidecar_endpoint : Uri.t;
-    preblocks_stream : Threshold_encryption_types.preblock Lwt_stream.t;
     maximum_number_of_chunks : int;
     keep_alive : bool;
-    (* TODO: Make this fields mutable and avoid passing the reference around. *)
-    pending_proposals : (Time.Protocol.t * bool) Queue.t;
-    notify_no_preblock : unit -> unit;
+    time_between_blocks : Configuration.time_between_blocks;
+    mutable locked : bool;
+    mutable last_proposed_timestamp : Time.Protocol.t option;
   }
 end
 
@@ -47,12 +46,10 @@ module Name = struct
   let equal () () = true
 end
 
-type proposal_request = {timestamp : Time.Protocol.t; force : bool}
-
 module Request = struct
   type ('a, 'b) t =
-    | Add_proposal_request : proposal_request -> (unit, tztrace) t
-    | Notify_proposal_processed : unit -> (Time.Protocol.t, tztrace) t
+    | Submit_next_proposal : Time.Protocol.t -> (unit, tztrace) t
+    | Unlock_next_proposal : (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -64,30 +61,39 @@ module Request = struct
       [
         case
           (Tag 0)
-          ~title:"Add_proposal_request"
-          (obj3
-             (req "request" (constant "add_proposal_request"))
-             (req "timestamp" Time.Protocol.encoding)
-             (req "force" bool))
+          ~title:"Submit_next_proposal"
+          (obj2
+             (req "request" (constant "submit_next_proposal"))
+             (req "timestamp" Time.Protocol.encoding))
           (function
-            | View (Add_proposal_request {timestamp; force}) ->
-                Some ((), timestamp, force)
+            | View (Submit_next_proposal timestamp) -> Some ((), timestamp)
             | View _ -> None)
-          (fun ((), timestamp, force) ->
-            View (Add_proposal_request {timestamp; force}));
+          (fun ((), timestamp) -> View (Submit_next_proposal timestamp));
         case
           (Tag 1)
-          ~title:"Notify_proposal_processed"
-          (obj1 (req "request" (constant "notify_proposal_processed")))
-          (function
-            | View (Notify_proposal_processed ()) -> Some () | View _ -> None)
-          (fun () -> View (Notify_proposal_processed ()));
+          ~title:"unlock_next_proposal"
+          (obj1 (req "request" (constant "Unlock_next_proposal")))
+          (function View Unlock_next_proposal -> Some () | View _ -> None)
+          (fun () -> View Unlock_next_proposal);
       ]
 
   let pp _ppf (View _) = ()
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
+
+type error += Threshold_encryption_proposals_handler_terminated
+
+let handle_request_error rq =
+  let open Lwt_syntax in
+  let* rq in
+  match rq with
+  | Ok res -> return_ok res
+  | Error (Worker.Request_error errs) -> Lwt.return_error errs
+  | Error (Closed None) ->
+      Lwt.return_error [Threshold_encryption_proposals_handler_terminated]
+  | Error (Closed (Some errs)) -> Lwt.return_error errs
+  | Error (Any exn) -> Lwt.return_error [Exn exn]
 
 type worker = Worker.infinite Worker.queue Worker.t
 
@@ -152,6 +158,16 @@ let take_delayed_transactions maximum_number_of_chunks =
   in
   return (delayed_transactions, remaining_cumulative_size)
 
+let force_new_proposal (state : Types.state) timestamp =
+  match state.time_between_blocks with
+  | Time_between_blocks time_between_blocks -> (
+      match state.last_proposed_timestamp with
+      | Some last_proposed_timestamp ->
+          let diff = Time.Protocol.(diff timestamp last_proposed_timestamp) in
+          diff >= Int64.of_float time_between_blocks
+      | None -> true)
+  | Nothing -> true
+
 (* This function should be called only when pending_proposals is not empty,
    otherwise it raises an exception.
    It peeks the least recent pending_proposals, builds a proposal out of it,
@@ -159,20 +175,24 @@ let take_delayed_transactions maximum_number_of_chunks =
    the queue until the corresponding preblock has been received from the
    sequencer sidecar, and the blueprint originated from it is not applied on
    top of the EVM state. *)
-let make_and_submit_proposal_exn ~maximum_number_of_chunks ~keep_alive
-    ~sidecar_endpoint ~notify_no_preblock pending_proposals =
+let submit_proposal (state : Types.state) timestamp =
   let open Lwt_result_syntax in
-  let timestamp, force = Queue.peek pending_proposals in
-  let* is_locked = Tx_pool.is_locked () in
-  if is_locked then
+  let* tx_pool_is_locked = Tx_pool.is_locked () in
+  if tx_pool_is_locked then
     (* In this case the proposal will not make it into a preblock. We can
        notify the preblock monitor that no proposal will be produced. *)
     let*! () = Block_producer_events.production_locked () in
-    let () = notify_no_preblock () in
-    return ()
+    return_unit
+  else if state.locked then
+    (* In this case the proposal will not make it into a preblock. We can
+       notify the preblock monitor that no proposal will be produced. *)
+    let*! () =
+      Threshold_encryption_proposals_handler_events.proposal_is_locked ()
+    in
+    return_unit
   else
     let* delayed_transactions, remaining_cumulative_size =
-      take_delayed_transactions maximum_number_of_chunks
+      take_delayed_transactions state.maximum_number_of_chunks
     in
     let* transactions =
       (* Low key optimization to avoid even checking the txpool if there is not
@@ -184,7 +204,7 @@ let make_and_submit_proposal_exn ~maximum_number_of_chunks ~keep_alive
           ~maximum_cumulative_size:remaining_cumulative_size
     in
     let n = List.length transactions + List.length delayed_transactions in
-    if force || n > 0 then
+    if force_new_proposal state timestamp || n > 0 then (
       let*! head_info = Evm_context.head_info () in
       let transactions =
         List.map
@@ -206,88 +226,16 @@ let make_and_submit_proposal_exn ~maximum_number_of_chunks ~keep_alive
          Handle reconnections, timeouts and stream closed on server side. *)
       let* () =
         Threshold_encryption_services.submit_proposal
-          ~keep_alive
-          ~sidecar_endpoint
+          ~keep_alive:state.keep_alive
+          ~sidecar_endpoint:state.sidecar_endpoint
           proposal
       in
-      return ()
-    else
-      (* In this case the proposal will not make it into a preblock. We can
-         notify the preblock monitor that a preblock will not be produced. *)
-      let () = notify_no_preblock () in
-      return ()
+      state.last_proposed_timestamp <- Some timestamp ;
+      state.Types.locked <- true ;
+      return_unit)
+    else return_unit
 
-let add_proposal_request ~timestamp ~force state =
-  let Types.
-        {
-          sidecar_endpoint;
-          maximum_number_of_chunks;
-          keep_alive;
-          notify_no_preblock;
-          pending_proposals;
-          _;
-        } =
-    state
-  in
-  let open Lwt_result_syntax in
-  (* If there are no pending proposals, we can trigger the proposal submission. *)
-  let should_submit_proposal = Queue.is_empty pending_proposals in
-  let () = Queue.add (timestamp, force) pending_proposals in
-
-  (* If this is the only pending proposal, we are not waiting for a
-     preblock to be received and the corresponding blueprint to
-     be applied. In this case, it is safe to pull transactions from the
-     Tx_pool and submit the proposal. Otherwise, we return and defer the
-     submission  of the proposal until as many blueprints as pending proposals have
-     been applied. *)
-  (* It would be more convenient for the worker to send a message to itself.
-     Check if that is possible. *)
-  if should_submit_proposal then
-    (* It is safe to call `make_and_submit_proposal_exn`, since we have
-       just added a proposal request to the pending proposals. *)
-    make_and_submit_proposal_exn
-      ~sidecar_endpoint
-      ~maximum_number_of_chunks
-      ~keep_alive
-      ~notify_no_preblock
-      pending_proposals
-  else return ()
-
-let notify_proposal_processed state =
-  let Types.
-        {
-          sidecar_endpoint;
-          maximum_number_of_chunks;
-          keep_alive;
-          notify_no_preblock;
-          pending_proposals;
-          _;
-        } =
-    state
-  in
-  (* This function is executed once the EVM node has finished processing a
-     proposal, either by applying the latest proposal, or if it determined
-     that a proposal did not produce a preblock. *)
-  let open Lwt_result_syntax in
-  let*! () =
-    Threshold_encryption_proposals_handler_events.proposal_processed ()
-  in
-  let timestamp, _force = Queue.take pending_proposals in
-  (* If the proposal queue is not empty, the blueprint_producer can start
-     publishing the next proposal. *)
-  let* () =
-    if not @@ Queue.is_empty pending_proposals then
-      (* The queue pending_proposals is not empty, it is safe to call
-         `make_and_submit_proposal_exn`. *)
-      make_and_submit_proposal_exn
-        ~sidecar_endpoint
-        ~maximum_number_of_chunks
-        ~keep_alive
-        ~notify_no_preblock
-        pending_proposals
-    else return ()
-  in
-  return timestamp
+let unlock_next_proposal state = state.Types.locked <- false
 
 module Handlers = struct
   type self = worker
@@ -297,12 +245,15 @@ module Handlers = struct
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun w request ->
+    let open Lwt_result_syntax in
     let state = Worker.state w in
     match request with
-    | Request.Add_proposal_request {timestamp; force} ->
-        protect @@ fun () -> add_proposal_request ~timestamp ~force state
-    | Request.Notify_proposal_processed () ->
-        protect @@ fun () -> notify_proposal_processed state
+    | Request.Unlock_next_proposal ->
+        protect @@ fun () ->
+        let () = unlock_next_proposal state in
+        return_unit
+    | Request.Submit_next_proposal proposal ->
+        protect @@ fun () -> submit_proposal state proposal
 
   type launch_error = error trace
 
@@ -311,22 +262,19 @@ module Handlers = struct
          sidecar_endpoint;
          keep_alive;
          maximum_number_of_chunks;
-         notify_no_preblock;
+         time_between_blocks;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
-    let* preblocks_stream =
-      Threshold_encryption_services.monitor_preblocks ~sidecar_endpoint ()
-    in
     let state =
       Types.
         {
           sidecar_endpoint;
-          preblocks_stream;
           maximum_number_of_chunks;
           keep_alive;
-          pending_proposals = Queue.create ();
-          notify_no_preblock;
+          locked = false;
+          time_between_blocks;
+          last_proposed_timestamp = None;
         }
     in
     return state
@@ -348,8 +296,6 @@ let worker_promise, worker_waker = Lwt.task ()
 
 type error += No_threshold_encryption_proposals_handler
 
-type error += Threshold_encryption_proposals_handler_terminated
-
 let worker =
   lazy
     (match Lwt.state worker_promise with
@@ -357,17 +303,6 @@ let worker =
     | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
     | Lwt.Sleep ->
         Error (TzTrace.make No_threshold_encryption_proposals_handler))
-
-let handle_request_error rq =
-  let open Lwt_syntax in
-  let* rq in
-  match rq with
-  | Ok res -> return_ok res
-  | Error (Worker.Request_error errs) -> Lwt.return_error errs
-  | Error (Closed None) ->
-      Lwt.return_error [Threshold_encryption_proposals_handler_terminated]
-  | Error (Closed (Some errs)) -> Lwt.return_error errs
-  | Error (Any exn) -> Lwt.return_error [Exn exn]
 
 let start parameters =
   let open Lwt_result_syntax in
@@ -384,18 +319,16 @@ let shutdown () =
       let* () = Block_producer_events.shutdown () in
       Worker.shutdown w
 
-let add_proposal_request {timestamp; force} =
+let submit_next_proposal proposal =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Add_proposal_request {timestamp; force})
+    (Request.Submit_next_proposal proposal)
   |> handle_request_error
 
-let notify_proposal_processed () =
+let unlock_next_proposal () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    worker
-    (Request.Notify_proposal_processed ())
+  Worker.Queue.push_request_and_wait worker Request.Unlock_next_proposal
   |> handle_request_error
