@@ -1542,7 +1542,8 @@ let test_init_from_rollup_node_data_dir =
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
     ~history_mode:Archive
-  @@ fun {sc_rollup_node; sequencer; proxy; client; boot_sector; _} _protocol ->
+  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; boot_sector; _}
+             _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -1550,7 +1551,8 @@ let test_init_from_rollup_node_data_dir =
         unit)
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
-  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate sequencer
+  and* () = Evm_node.terminate observer in
   let evm_node' =
     Evm_node.create
       ~mode:(Evm_node.mode sequencer)
