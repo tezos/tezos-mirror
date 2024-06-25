@@ -274,7 +274,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             if let Some(phys_addr) = self.translation_cache.try_translate(mode, satp, virt_addr) {
                 phys_addr
             } else {
-                let phys_addr = self.translate(virt_addr, AccessType::Instruction)?;
+                let phys_addr =
+                    self.translate_with_prefetch(mode, satp, virt_addr, AccessType::Instruction)?;
 
                 self.translation_cache
                     .update_cache(mode, satp, virt_addr, phys_addr);
