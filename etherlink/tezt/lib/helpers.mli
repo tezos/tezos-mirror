@@ -188,3 +188,6 @@ val send_n_transactions :
   (Evm_node.request list * Transaction.transaction_receipt * string list) Lwt.t
 
 val default_bootstrap_account_balance : Wei.t
+
+(** Returns the timestamp of the L1 head block. *)
+val l1_timestamp : Client.t -> Tezos_base.Time.Protocol.t Lwt.t

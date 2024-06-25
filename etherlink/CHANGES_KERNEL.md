@@ -22,6 +22,8 @@
 - `block.number` and `block.timestamp` now return respectively the current
   number and timetamp of the processed block, instead of the last produced one.
   (!13901)
+- Forced blueprints (in case of delayed inbox timeout) always use a timestamp
+  equal or greater than the predecessor. (!13832)
 
 ## Internal
 

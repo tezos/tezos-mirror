@@ -289,3 +289,10 @@ let send_n_transactions ~sc_rollup_node ~client ~evm_node ?wait_for_blocks txs =
   return (requests, receipt, hashes)
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
+
+let l1_timestamp client =
+  let* l1_header = Client.RPC.call client @@ RPC.get_chain_block_header () in
+  return
+    JSON.(
+      l1_header |-> "timestamp" |> as_string
+      |> Tezos_base.Time.Protocol.of_notation_exn)
