@@ -279,7 +279,6 @@ behavior. Notable changes however are as follows:
 * At the end of a cycle ``c``, the following actions happen:
 
   - the distribution of attesting rewards,
-  - the adjustment of stake balances,
   - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution.
 
 
@@ -346,12 +345,12 @@ where:
 - ``bonus_ratio`` to ``1 / 3``.
 
 Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 2.67`` tez,
-(maximum) ``bonus = 2.67`` tez, and ``attesting_rewards = 5.33`` tez.
+(maximum) ``bonus = 2.67`` tez, and ``attesting_reward = 5.33`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional attestations included in a block). The rewards per
-attestation slot are ``attesting_rewards / CONSENSUS_COMMITTEE_SIZE``.
+attestation slot are ``attesting_reward / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
 ``2.67 / (7000 / 3) = 0.001143`` tez and an attesting
 rewards per slot of ``5.33 / 7000 = 0.000761`` tez.
@@ -363,11 +362,12 @@ the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
 Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
-that B only included attestations corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
-maximum 2333 extra attestations it could have theoretically included.) Finally, consider some
+that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
+maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose active stake at some cycle is 1% of the total stake. Note that
-his expected number of validator slots for that cycle is ``1/100 * 30720 * 7000 =
-2,150,400`` slots. Assume also that the attesting power of C's attestations
+his expected number of validator slots for that cycle is
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 30720 * 7000 = 2,150,400``
+slots. Assume also that the attesting power of C's attestations
 included during that cycle has been ``1,987,456`` slots. Given that this number is
 bigger than the minimum required (``2,150,400 * 2 / 3``), it receives an attesting
 reward of ``2,150,400 * 0.000761 = 1636.4544`` tez for that cycle.
@@ -472,12 +472,12 @@ Consensus related protocol parameters
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
      - 8s
+   * - ``BLOCKS_PER_CYCLE``
+     - 30720
    * - ``DELAY_INCREMENT_PER_ROUND``
-     - 5s
+     - 4s
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
-   * - ``FROZEN_DEPOSITS_PERCENTAGE``
-     - 10
    * - ``MAX_SLASHING_PERIOD``
      - 2 cycles
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
