@@ -2077,6 +2077,9 @@ let test_observer_timeout_when_necessary =
     | Observer conf ->
         Evm_node.Observer
           {conf with time_between_blocks = Some (Time_between_blocks 3.)}
+    | Threshold_encryption_observer conf ->
+        Evm_node.Threshold_encryption_observer
+          {conf with time_between_blocks = Some (Time_between_blocks 3.)}
     | _ -> Test.fail "Should be an observer"
   in
 
