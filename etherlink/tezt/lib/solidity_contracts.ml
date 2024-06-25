@@ -245,3 +245,12 @@ let coinbase =
     abi = kernel_inputs_path ^ "/coinbase.abi";
     bin = kernel_inputs_path ^ "/coinbase.bin";
   }
+
+(** The info for the "block_constants.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/block_constants.sol] *)
+let block_constants =
+  {
+    label = "blocks_constants";
+    abi = kernel_inputs_path ^ "/block_constants.abi";
+    bin = kernel_inputs_path ^ "/block_constants.bin";
+  }

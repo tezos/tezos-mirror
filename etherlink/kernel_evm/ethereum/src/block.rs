@@ -190,25 +190,6 @@ impl L2Block {
         }
     }
 
-    pub fn constants(
-        &self,
-        chain_id: U256,
-        block_fees: BlockFees,
-        gas_limit: u64,
-        coinbase: H160,
-    ) -> BlockConstants {
-        let timestamp = U256::from(self.timestamp.as_u64());
-        BlockConstants {
-            number: self.number,
-            coinbase,
-            timestamp,
-            gas_limit,
-            block_fees,
-            chain_id,
-            prevrandao: None,
-        }
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn hash(
         parent_hash: H256,

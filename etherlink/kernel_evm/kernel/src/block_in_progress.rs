@@ -16,10 +16,10 @@ use crate::storage::{EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS};
 use crate::tick_model;
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
-use tezos_ethereum::block::{BlockConstants, L2Block};
+use tezos_ethereum::block::{BlockConstants, BlockFees, L2Block};
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
@@ -190,6 +190,27 @@ impl BlockInProgress {
             0u64,
             Timestamp::from(0i64),
         )
+    }
+
+    /// Derive `BlockConstants` based on current block in progress.
+    /// Number and timestamp are taken from `self`.
+    pub fn constants(
+        &self,
+        chain_id: U256,
+        block_fees: &BlockFees,
+        gas_limit: u64,
+        coinbase: H160,
+    ) -> BlockConstants {
+        let timestamp = U256::from(self.timestamp.as_u64());
+        BlockConstants {
+            number: self.number,
+            coinbase,
+            timestamp,
+            gas_limit,
+            block_fees: *block_fees,
+            chain_id,
+            prevrandao: None,
+        }
     }
 
     pub fn from_blueprint(
