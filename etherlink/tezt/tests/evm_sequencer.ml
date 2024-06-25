@@ -240,10 +240,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   in
   let* sequencer_mode =
     if threshold_encryption then
-      let sequencer_sidecar_port = Some (Port.fresh ()) in
-      let sequencer_sidecar =
-        Dsn_node.sequencer ?rpc_port:sequencer_sidecar_port ()
-      in
+      let sequencer_sidecar = Dsn_node.sequencer () in
       let* () = Dsn_node.start sequencer_sidecar in
       return
       @@ Evm_node.Threshold_encryption_sequencer
