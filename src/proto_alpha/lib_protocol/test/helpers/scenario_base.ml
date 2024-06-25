@@ -223,6 +223,7 @@ let check_balance_field ?(loc = __LOC__) src_name field amount :
   let open Lwt_result_syntax in
   let check = Assert.equal_tez ~loc amount in
   let check' a = check (Partial_tez.to_tez ~round:`Down a) in
+  let check_z = Assert.equal_z ~loc (Z.of_int64 (Tez.to_mutez amount)) in
   exec_unit (fun (block, state) ->
       let src = State.find_account src_name state in
       let src_balance, src_total =
@@ -251,6 +252,9 @@ let check_balance_field ?(loc = __LOC__) src_name field amount :
         | `Total ->
             let* () = check rpc_total in
             check src_total
+        | `Pseudotokens ->
+            let* () = check_z rpc_balance.staking_delegator_numerator_b in
+            check_z src_balance.staking_delegator_numerator_b
       in
       return_unit)
 
