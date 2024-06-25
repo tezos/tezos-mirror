@@ -14,6 +14,7 @@ use crate::{abi, fail_if_too_much, EthereumError};
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
 use tezos_ethereum::wei::mutez_from_wei;
+use tezos_ethereum::wei::ErrorMutezFromWei;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Info;
 use tezos_smart_rollup_encoding::contract::Contract;
@@ -98,9 +99,24 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal())
             };
 
-            let Some(amount) = mutez_from_wei(transfer.value).ok() else {
-                log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: amount is too large");
-                return Ok(revert_withdrawal())
+            let amount = match mutez_from_wei(transfer.value) {
+                Ok(amount) => amount,
+                Err(ErrorMutezFromWei::NonNullRemainder) => {
+                    log!(
+                        handler.borrow_host(),
+                        Info,
+                        "Withdrawal precompiled contract: rounding would lose wei"
+                    );
+                    return Ok(revert_withdrawal());
+                }
+                Err(ErrorMutezFromWei::AmountTooLarge) => {
+                    log!(
+                        handler.borrow_host(),
+                        Info,
+                        "Withdrawal precompiled contract: amount is too large"
+                    );
+                    return Ok(revert_withdrawal());
+                }
             };
 
             log!(

@@ -18,13 +18,23 @@ pub fn eth_from_mutez(mutez: u64) -> Wei {
     U256::from(mutez) * U256::exp10(12)
 }
 
-pub fn mutez_from_wei(wei: Wei) -> Result<u64, primitive_types::Error> {
-    // Wei is 10^18, Mutez is 10^6
-    let amount: U256 = U256::checked_div(wei, U256::exp10(12)).unwrap();
+pub enum ErrorMutezFromWei {
+    AmountTooLarge,
+    NonNullRemainder,
+}
 
-    if amount < U256::from(u64::max_value()) {
-        Ok(amount.as_u64())
+pub fn mutez_from_wei(wei: Wei) -> Result<u64, ErrorMutezFromWei> {
+    // Wei is 10^18, Mutez is 10^6
+    let amount: U256 = wei / U256::exp10(12);
+    // Check that remainder is 0 to make sure we don't lose Wei when
+    // rounding to mutez.
+    let remainder: U256 = wei % U256::exp10(12);
+
+    if !remainder.is_zero() {
+        Err(ErrorMutezFromWei::NonNullRemainder)
+    } else if !amount < U256::from(u64::max_value()) {
+        Err(ErrorMutezFromWei::AmountTooLarge)
     } else {
-        Err(primitive_types::Error::Overflow)
+        Ok(amount.as_u64())
     }
 }
