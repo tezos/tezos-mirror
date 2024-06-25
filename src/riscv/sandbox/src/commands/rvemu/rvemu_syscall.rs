@@ -96,7 +96,7 @@ fn sbi_tezos_inbox_next(emu: &mut Emulator, inbox: &mut Inbox) -> SBIResult {
 /// Metadata relating to the rollup
 pub struct RollupMetadata {
     /// Tezos level at which the rollup was originated
-    pub origination_level: u64,
+    pub origination_level: u32,
 
     /// Adress of the rollup
     pub address: SmartRollupAddress,
@@ -108,7 +108,7 @@ fn sbi_tezos_meta(emu: &mut Emulator, meta: &RollupMetadata) -> SBIResult {
     let addr_bytes = meta.address.hash().as_ref().as_slice();
     emu.cpu.bus.write_bytes(dest_addr, &addr_bytes[..20])?;
 
-    emu.cpu.xregs.write(A0, meta.origination_level);
+    emu.cpu.xregs.write(A0, meta.origination_level as u64);
 
     Ok(())
 }

@@ -185,7 +185,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout>
         initrd: Option<&[u8]>,
         inbox: Inbox,
         rollup_address: [u8; 20],
-        origination_level: u64,
+        origination_level: u32,
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
 

@@ -5,69 +5,57 @@
 use super::{PvmHooks, PvmStatus};
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Addressable, OutOfBounds},
-        registers::{a0, a1, a2, a3, a6, a7},
+        bus::{main_memory::MainMemoryLayout, Addressable},
+        registers::{a0, a1, a2, a3, a6, a7, XValue},
         AccessType, MachineState,
     },
     parser::instruction::Instr,
     state_backend::{CellRead, CellWrite, Manager},
-    traps::{EnvironException, Exception},
+    traps::EnvironException,
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use std::cmp;
-use tezos_smart_rollup_constants::riscv::{
-    SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
-    SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
-    SBI_TEZOS_METADATA_REVEAL,
+use tezos_smart_rollup_constants::{
+    core::MAX_INPUT_MESSAGE_SIZE,
+    riscv::{
+        SbiError, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
+        SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
+        SBI_TEZOS_METADATA_REVEAL,
+    },
 };
-use thiserror::Error;
 
-/// Fatal errors that occur during SBI handling
-#[derive(Debug, Error)]
-pub enum PvmSbiFatalError {
-    /// The PVM was in an unexpected state.
-    #[error("Expected PVM status {expected:?}, got {got:?}")]
-    UnexpectedStatus { expected: PvmStatus, got: PvmStatus },
+/// Write the SBI error code as the return value.
+#[inline(always)]
+fn sbi_return_error<ML: MainMemoryLayout, M: Manager>(
+    machine: &mut MachineState<ML, M>,
+    code: SbiError,
+) {
+    machine.hart.xregisters.write(a0, code as i64 as u64);
+}
 
-    /// Unsupported SBI extension.
-    #[error("Unsupported SBI extension {sbi_extension}")]
-    BadSBIExtension { sbi_extension: u64 },
+/// Write an arbitrary value as single return value.
+#[inline(always)]
+fn sbi_return1<ML: MainMemoryLayout, M: Manager>(machine: &mut MachineState<ML, M>, value: XValue) {
+    // The SBI caller interprets the return value as a [i64]. We don't want the value to be
+    // interpreted as negative because that indicates an error.
+    if (value as i64) < 0 {
+        return sbi_return_error(machine, SbiError::Failed);
+    }
 
-    /// Unsupported Tezos SBI extension function.
-    #[error("Unsupported Tezos SBI extension function {sbi_function}")]
-    BadTezosSBIFunction { sbi_function: u64 },
+    machine.hart.xregisters.write(a0, value);
+}
 
-    /// Received an ECALL from M-mode.
-    #[error("ECALLs from M-mode are not supported")]
-    EcallFromMMode,
-
-    /// Encountered a machine exception (e.g. during address translation).
-    #[error("Encountered an exception: {exception:?}")]
-    Exception {
-        #[from]
-        exception: Exception,
-    },
-
-    /// A memory access was out of bounds.
-    #[error("Encountered an out-of-bounds memory access")]
-    MemoryAccess {
-        #[from]
-        oob: OutOfBounds,
-    },
-
-    /// A ed25519 operation failed.
-    #[error("Error during Ed25519 operation: {error:?}")]
-    Ed25519Error {
-        #[from]
-        error: ed25519_dalek::SignatureError,
-    },
-
-    /// A BLAKE2B operation failed.
-    #[error("Error during BLAKE2B operation: {error:?}")]
-    Blake2BError {
-        #[from]
-        error: tezos_crypto_rs::blake2b::Blake2bError,
-    },
+/// Run the given closure `inner` and write the corresponding SBI results to `machine`.
+#[inline(always)]
+fn sbi_wrap<ML, M, F>(machine: &mut MachineState<ML, M>, inner: F)
+where
+    ML: MainMemoryLayout,
+    M: Manager,
+    F: FnOnce(&mut MachineState<ML, M>) -> Result<XValue, SbiError>,
+{
+    match inner(machine) {
+        Ok(value) => sbi_return1(machine, value),
+        Err(error) => sbi_return_error(machine, error),
+    }
 }
 
 /// Respond to a request for input with no input. Returns `false` in case the
@@ -87,11 +75,8 @@ where
     // We're evaluating again after this.
     status.write(PvmStatus::Evaluating);
 
-    // Zeros in all these registers is equivalent to 'None'.
-    machine.hart.xregisters.write(a0, 0);
-    machine.hart.xregisters.write(a1, 0);
-    machine.hart.xregisters.write(a2, 0);
-
+    // Inform the caller that there is no more input by returning "bytes written" (a0) as 0.
+    sbi_return1(machine, 0);
     true
 }
 
@@ -100,8 +85,8 @@ where
 pub fn provide_input<S, ML, M>(
     status: &mut S,
     machine: &mut MachineState<ML, M>,
-    level: u64,
-    counter: u64,
+    level: u32,
+    counter: u32,
     payload: &[u8],
 ) -> bool
 where
@@ -118,41 +103,37 @@ where
     // We're evaluating again after this.
     status.write(PvmStatus::Evaluating);
 
-    // These arguments should have been set by the previous SBI call.
-    let arg_buffer_addr = machine.hart.xregisters.read(a0);
-    let arg_buffer_size = machine.hart.xregisters.read(a1);
+    sbi_wrap(machine, |machine| {
+        // These arguments should have been set by the previous SBI call.
+        let arg_buffer_addr = machine.hart.xregisters.read(a0);
+        let arg_buffer_size = machine.hart.xregisters.read(a1);
+        let arg_level_addr = machine.hart.xregisters.read(a2);
+        let arg_counter_addr = machine.hart.xregisters.read(a3);
 
-    // The argument address is a virtual address. We need to translate it to
-    // a physical address.
-    let phys_dest_addr = match machine.translate(arg_buffer_addr, AccessType::Store) {
-        Ok(phys_addr) => phys_addr,
-        Err(_exc) => {
-            // We back out on failure.
-            machine.hart.xregisters.write(a0, 0);
-            machine.hart.xregisters.write(a1, 0);
-            machine.hart.xregisters.write(a2, 0);
-            return true;
-        }
-    };
+        // The argument addresses are virtual addresses. We need to translate them to
+        // physical addresses.
+        let phys_buffer_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
+        let phys_level_addr = machine.translate(arg_level_addr, AccessType::Store)?;
+        let phys_counter_addr = machine.translate(arg_counter_addr, AccessType::Store)?;
 
-    // The SBI caller expects the payload to be returned at [phys_dest_addr]
-    // with at maximum [max_buffer_size] bytes written.
-    let max_buffer_size = cmp::min(arg_buffer_size as usize, payload.len());
-    let write_res = machine
-        .bus
-        .write_all(phys_dest_addr, &payload[..max_buffer_size]);
+        // The SBI caller expects the payload to be returned at [phys_dest_addr]
+        // with at maximum [max_buffer_size] bytes written.
+        let max_buffer_size = payload.len().min(arg_buffer_size as usize).min(
+            // If we were to allow more data to be passed, we could run into problems with proof
+            // sizes for inputs.
+            MAX_INPUT_MESSAGE_SIZE,
+        );
 
-    if write_res.is_err() {
-        // We back out on failure.
-        machine.hart.xregisters.write(a0, 0);
-        machine.hart.xregisters.write(a1, 0);
-        machine.hart.xregisters.write(a2, 0);
-    } else {
-        // Write meta information as return data.
-        machine.hart.xregisters.write(a0, level);
-        machine.hart.xregisters.write(a1, counter);
-        machine.hart.xregisters.write(a2, max_buffer_size as u64);
-    }
+        machine
+            .bus
+            .write_all(phys_buffer_addr, &payload[..max_buffer_size])?;
+        machine.bus.write(phys_level_addr, level)?;
+        machine.bus.write(phys_counter_addr, counter)?;
+
+        // At the moment, this case is unlikely to occur because we cap [max_buffer_size] at
+        // [MAX_INPUT_MESSAGE_SIZE].
+        Ok(max_buffer_size as u64)
+    });
 
     true
 }
@@ -163,7 +144,7 @@ pub fn provide_metadata<S, ML, M>(
     status: &mut S,
     machine: &mut MachineState<ML, M>,
     rollup_address: &[u8; 20],
-    origination_level: u64,
+    origination_level: u32,
 ) -> bool
 where
     S: CellWrite<Value = PvmStatus>,
@@ -179,67 +160,48 @@ where
     // We're evaluating again after this.
     status.write(PvmStatus::Evaluating);
 
-    // These arguments should have been set by the previous SBI call.
-    let arg_buffer_addr = machine.hart.xregisters.read(a0);
+    sbi_wrap(machine, |machine| {
+        // These arguments should have been set by the previous SBI call.
+        let arg_buffer_addr = machine.hart.xregisters.read(a0);
 
-    // The argument address is a virtual address. We need to translate it to
-    // a physical address.
-    let phys_dest_addr = match machine.translate(arg_buffer_addr, AccessType::Store) {
-        Ok(phys_addr) => phys_addr,
-        Err(_exc) => {
-            // TODO: https://app.asana.com/0/1206655199123740/1207434664665316/f
-            // Error handling needs to be improved.
-            machine.hart.xregisters.write(a0, 0);
-            return true;
-        }
-    };
+        // The argument address is a virtual address. We need to translate it to
+        // a physical address.
+        let phys_dest_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
 
-    let write_res = machine
-        .bus
-        .write_all(phys_dest_addr, rollup_address.as_slice());
+        machine
+            .bus
+            .write_all(phys_dest_addr, rollup_address.as_slice())?;
 
-    if write_res.is_err() {
-        // TODO: https://app.asana.com/0/1206655199123740/1207434664665316/f
-        // Error handling needs to be improved.
-        machine.hart.xregisters.write(a0, 0);
-    } else {
-        machine.hart.xregisters.write(a0, origination_level);
-    }
+        // [origination_level] should not wrap around and become negative.
+        Ok(origination_level as u64)
+    });
 
     true
 }
 
 /// Handle a [SBI_TEZOS_INBOX_NEXT] call.
 #[inline]
-fn handle_tezos_inbox_next<S>(status: &mut S) -> Result<bool, PvmSbiFatalError>
+fn handle_tezos_inbox_next<S>(status: &mut S)
 where
     S: CellWrite<Value = PvmStatus>,
 {
     // Prepare the EE state for an input tick.
     status.write(PvmStatus::WaitingForInput);
-
-    // We can't evaluate after this. The next step is an input step.
-    Ok(false)
 }
 
 /// Handle a [SBI_TEZOS_META] call.
 #[inline]
-fn handle_tezos_metadata_reveal<S>(status: &mut S) -> Result<bool, PvmSbiFatalError>
+fn handle_tezos_metadata_reveal<S>(status: &mut S)
 where
     S: CellWrite<Value = PvmStatus>,
 {
     // Prepare the EE state for a reveal metadata tick.
     status.write(PvmStatus::WaitingForMetadata);
-
-    // We can't evaluate after this. The next step is a revelation step.
-    Ok(false)
 }
 
 /// Produce a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_sign<ML, M>(
-    machine: &mut MachineState<ML, M>,
-) -> Result<bool, PvmSbiFatalError>
+fn handle_tezos_ed25519_sign<ML, M>(machine: &mut MachineState<ML, M>) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
     M: Manager,
@@ -255,7 +217,7 @@ where
 
     let mut sk_bytes = [0u8; 32];
     machine.bus.read_all(sk_addr, &mut sk_bytes)?;
-    let sk = SigningKey::try_from(sk_bytes.as_slice())?;
+    let sk = SigningKey::try_from(sk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     sk_bytes.fill(0);
 
     let mut msg_bytes = vec![0; arg_msg_len as usize];
@@ -265,14 +227,12 @@ where
     let sig_bytes: [u8; 64] = sig.to_bytes();
     machine.bus.write_all(sig_addr, &sig_bytes)?;
 
-    Ok(true)
+    Ok(sig_bytes.len() as u64)
 }
 
 /// Verify a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_verify<ML, M>(
-    machine: &mut MachineState<ML, M>,
-) -> Result<bool, PvmSbiFatalError>
+fn handle_tezos_ed25519_verify<ML, M>(machine: &mut MachineState<ML, M>) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
     M: Manager,
@@ -295,20 +255,16 @@ where
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
     machine.bus.read_all(msg_addr, &mut msg_bytes)?;
 
-    let pk = VerifyingKey::try_from(pk_bytes.as_slice())?;
-    let sig = Signature::from_slice(sig_bytes.as_slice())?;
+    let pk = VerifyingKey::try_from(pk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
+    let sig = Signature::from_slice(sig_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     let valid = pk.verify_strict(msg_bytes.as_slice(), &sig).is_ok();
 
-    machine.hart.xregisters.write(a0, valid as u64);
-
-    Ok(true)
+    Ok(valid as u64)
 }
 
 /// Compute a BLAKE2B 256-bit digest.
 #[inline]
-fn handle_tezos_blake2b_hash256<ML, M>(
-    machine: &mut MachineState<ML, M>,
-) -> Result<bool, PvmSbiFatalError>
+fn handle_tezos_blake2b_hash256<ML, M>(machine: &mut MachineState<ML, M>) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
     M: Manager,
@@ -323,25 +279,27 @@ where
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
     machine.bus.read_all(msg_addr, &mut msg_bytes)?;
 
-    let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice())?;
+    let hash =
+        tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     machine.bus.write_all(out_addr, hash.as_slice())?;
 
-    Ok(true)
+    Ok(hash.len() as u64)
 }
 
 /// Handle a [SBI_SHUTDOWN] call.
 #[inline(always)]
-const fn handle_shutdown() -> Result<bool, PvmSbiFatalError> {
-    // Shutting down in the PVM does nothing at the moment.
-    Ok(true)
+fn handle_shutdown<ML, M>(machine: &mut MachineState<ML, M>)
+where
+    ML: MainMemoryLayout,
+    M: Manager,
+{
+    // This call always fails.
+    handle_not_supported(machine);
 }
 
 /// Handle a [SBI_CONSOLE_PUTCHAR] call.
 #[inline(always)]
-fn handle_console_putchar<ML, M>(
-    machine: &mut MachineState<ML, M>,
-    hooks: &mut PvmHooks,
-) -> Result<bool, PvmSbiFatalError>
+fn handle_console_putchar<ML, M>(machine: &mut MachineState<ML, M>, hooks: &mut PvmHooks)
 where
     ML: MainMemoryLayout,
     M: Manager,
@@ -350,26 +308,37 @@ where
     (hooks.putchar_hook)(char);
 
     // This call always succeeds.
-    machine.hart.xregisters.write(a0, 0);
-
-    Ok(true)
+    sbi_return1(machine, 0);
 }
 
-/// Handle a PVM SBI call. Returns `Ok(true)` if it makes sense to continue evaluation.
+/// Handle unsupported SBI calls.
+#[inline(always)]
+fn handle_not_supported<ML, M>(machine: &mut MachineState<ML, M>)
+where
+    ML: MainMemoryLayout,
+    M: Manager,
+{
+    // SBI requires us to indicate that we don't support this function by returning
+    // `ERR_NOT_SUPPORTED`.
+    sbi_return_error(machine, SbiError::NotSupported);
+}
+
+/// Handle a PVM SBI call. Returns `true` if it makes sense to continue evaluation.
 #[inline]
 pub fn handle_call<S, ML, M>(
     status: &mut S,
     machine: &mut MachineState<ML, M>,
     hooks: &mut PvmHooks,
     env_exception: EnvironException,
-) -> Result<bool, PvmSbiFatalError>
+) -> bool
 where
     S: CellWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
     M: Manager,
 {
     if let EnvironException::EnvCallFromMMode = env_exception {
-        return Err(PvmSbiFatalError::EcallFromMMode);
+        sbi_return_error(machine, SbiError::Failed);
+        return true;
     }
 
     // No matter the outcome, we need to bump the
@@ -380,26 +349,22 @@ where
 
     // SBI extension is contained in a7.
     let sbi_extension = machine.hart.xregisters.read(a7);
-
     match sbi_extension {
         SBI_CONSOLE_PUTCHAR => handle_console_putchar(machine, hooks),
-        SBI_SHUTDOWN => handle_shutdown(),
+        SBI_SHUTDOWN => handle_shutdown(machine),
         SBI_FIRMWARE_TEZOS => {
             let sbi_function = machine.hart.xregisters.read(a6);
-
             match sbi_function {
                 SBI_TEZOS_INBOX_NEXT => handle_tezos_inbox_next(status),
                 SBI_TEZOS_METADATA_REVEAL => handle_tezos_metadata_reveal(status),
-                SBI_TEZOS_ED25519_SIGN => handle_tezos_ed25519_sign(machine),
-                SBI_TEZOS_ED25519_VERIFY => handle_tezos_ed25519_verify(machine),
-                SBI_TEZOS_BLAKE2B_HASH256 => handle_tezos_blake2b_hash256(machine),
-
-                // Unimplemented
-                _ => Err(PvmSbiFatalError::BadTezosSBIFunction { sbi_function }),
+                SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
+                SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
+                SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),
+                _ => handle_not_supported(machine),
             }
         }
-
-        // Unimplemented
-        _ => Err(PvmSbiFatalError::BadSBIExtension { sbi_extension }),
+        _ => handle_not_supported(machine),
     }
+
+    status.read() == PvmStatus::Evaluating
 }

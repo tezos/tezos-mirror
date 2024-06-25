@@ -6,12 +6,12 @@ pub mod dummy_pvm;
 mod sbi;
 
 use crate::{
-    machine_state::{self, bus::main_memory, StepManyResult},
+    machine_state::{self, bus::main_memory},
     state_backend::{self, CellRead, CellWrite, EnumCell, EnumCellLayout},
     traps::EnvironException,
 };
-use sbi::PvmSbiFatalError;
 use std::{
+    convert::Infallible,
     io::{stdout, Write},
     ops::RangeBounds,
 };
@@ -122,22 +122,15 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         &mut self,
         hooks: &mut PvmHooks<'_>,
         exception: EnvironException,
-    ) -> Result<bool, PvmSbiFatalError> {
+    ) -> bool {
         sbi::handle_call(&mut self.status, &mut self.machine_state, hooks, exception)
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) -> Result<(), EvalError> {
+    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) {
         if let Err(exc) = self.machine_state.step() {
-            if let Err(err) = self.handle_exception(hooks, exc) {
-                return Err(EvalError {
-                    cause: exc,
-                    error: err,
-                });
-            }
+            self.handle_exception(hooks, exc);
         }
-
-        Ok(())
     }
 
     /// Perform a range of evaluation steps. Returns the actual number of steps
@@ -161,19 +154,20 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         hooks: &mut PvmHooks<'_>,
         step_bounds: &impl RangeBounds<usize>,
         should_continue: F,
-    ) -> EvalManyResult
+    ) -> usize
     where
         F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
     {
         self.machine_state
-            .step_range_handle(step_bounds, should_continue, |machine_state, exc| {
-                sbi::handle_call(&mut self.status, machine_state, hooks, exc).map_err(|err| {
-                    EvalError {
-                        cause: exc,
-                        error: err,
-                    }
-                })
+            .step_range_handle::<Infallible>(step_bounds, should_continue, |machine_state, exc| {
+                Ok(sbi::handle_call(
+                    &mut self.status,
+                    machine_state,
+                    hooks,
+                    exc,
+                ))
             })
+            .steps
     }
 
     /// Respond to a request for input with no input. Returns `false` in case the
@@ -184,7 +178,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 
     /// Provide input. Returns `false` if the machine state is not expecting
     /// input.
-    pub fn provide_input(&mut self, level: u64, counter: u64, payload: &[u8]) -> bool {
+    pub fn provide_input(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool {
         sbi::provide_input(
             &mut self.status,
             &mut self.machine_state,
@@ -196,7 +190,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 
     /// Provide metadata in response to a metadata request. Returns `false`
     /// if the machine is not expecting metadata.
-    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u64) -> bool {
+    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) -> bool {
         sbi::provide_metadata(
             &mut self.status,
             &mut self.machine_state,
@@ -211,23 +205,13 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     }
 }
 
-/// Error during evaluation
-#[derive(Debug)]
-pub struct EvalError {
-    pub cause: EnvironException,
-    pub error: PvmSbiFatalError,
-}
-
-/// Result of [`Pvm::eval_range`]
-pub type EvalManyResult = StepManyResult<EvalError>;
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         machine_state::{
             bus::{main_memory::M1M, start_of_main_memory, Addressable},
-            registers::{a0, a1, a2, a6, a7},
+            registers::{a0, a1, a2, a3, a6, a7},
         },
         state_backend::{memory_backend::InMemoryBackend, Backend},
     };
@@ -248,7 +232,10 @@ mod tests {
         let mut pvm = Pvm::<ML, _>::bind(space);
         pvm.reset();
 
-        let buffer_addr = start_of_main_memory::<ML>();
+        let level_addr = start_of_main_memory::<ML>();
+        let counter_addr = level_addr + 4;
+        let buffer_addr = counter_addr + 4;
+
         const BUFFER_LEN: usize = 1024;
 
         // Configure machine for 'sbi_tezos_inbox_next'
@@ -257,6 +244,8 @@ mod tests {
             .hart
             .xregisters
             .write(a1, BUFFER_LEN as u64);
+        pvm.machine_state.hart.xregisters.write(a2, level_addr);
+        pvm.machine_state.hart.xregisters.write(a3, counter_addr);
         pvm.machine_state
             .hart
             .xregisters
@@ -272,7 +261,7 @@ mod tests {
         // Handle the ECALL successfully
         let outcome =
             pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
-        assert!(matches!(outcome, Ok(false)));
+        assert!(matches!(outcome, false));
 
         // After the ECALL we should be waiting for input
         assert_eq!(pvm.status(), PvmStatus::WaitingForInput);
@@ -287,13 +276,13 @@ mod tests {
         // The status should switch from WaitingForInput to Evaluating
         assert_eq!(pvm.status(), PvmStatus::Evaluating);
 
-        // Returned meta data is as expected
-        assert_eq!(pvm.machine_state.hart.xregisters.read(a0), level);
-        assert_eq!(pvm.machine_state.hart.xregisters.read(a1), counter);
+        // Returned data is as expected
         assert_eq!(
-            pvm.machine_state.hart.xregisters.read(a2) as usize,
+            pvm.machine_state.hart.xregisters.read(a0) as usize,
             BUFFER_LEN
         );
+        assert_eq!(pvm.machine_state.bus.read(level_addr), Ok(level));
+        assert_eq!(pvm.machine_state.bus.read(counter_addr), Ok(counter));
 
         // Payload in memory should be as expected
         for (offset, &byte) in payload[..BUFFER_LEN].iter().enumerate() {
@@ -342,10 +331,7 @@ mod tests {
             written.push(char);
 
             let outcome = pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
-            assert!(
-                matches!(outcome, Ok(true)),
-                "Unexpected outcome: {outcome:?}"
-            );
+            assert!(outcome, "Unexpected outcome");
         }
 
         // Drop `hooks` to regain access to the mutable references it kept

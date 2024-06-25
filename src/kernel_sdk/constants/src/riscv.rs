@@ -26,3 +26,38 @@ pub const SBI_TEZOS_ED25519_SIGN: u64 = 0x06;
 
 /// Function ID for `sbi_tezos_blake2b_hash256`
 pub const SBI_TEZOS_BLAKE2B_HASH256: u64 = 0x07;
+
+/// Standard SBI errors
+#[derive(Debug, Copy, Clone)]
+#[repr(i64)]
+pub enum SbiError {
+    Failed = -1,
+    NotSupported = -2,
+    InvalidParam = -3,
+    Denied = -4,
+    InvalidAddress = -5,
+    AlreadyAvailable = -6,
+    AlreadyStarted = -7,
+    AlreadyStopped = -8,
+    NoSharedMemory = -9,
+    Unknown = i64::MIN,
+}
+
+impl SbiError {
+    /// Interpret the given integer as an SBI error.
+    pub fn from_result(result: isize) -> Option<Self> {
+        match result {
+            -1 => Some(Self::Failed),
+            -2 => Some(Self::NotSupported),
+            -3 => Some(Self::InvalidParam),
+            -4 => Some(Self::Denied),
+            -5 => Some(Self::InvalidAddress),
+            -6 => Some(Self::AlreadyAvailable),
+            -7 => Some(Self::AlreadyStarted),
+            -8 => Some(Self::AlreadyStopped),
+            -9 => Some(Self::NoSharedMemory),
+            _ if result < 0 => Some(Self::Unknown),
+            _ => None,
+        }
+    }
+}
