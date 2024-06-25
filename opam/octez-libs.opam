@@ -58,7 +58,7 @@ depends: [
   "lwt-exit"
   "ppxlib"
   "astring"
-  "bheap"
+  "bheap" { >= "2.0.0" }
   "digestif"
   "jsonm"
   "ocamlgraph"

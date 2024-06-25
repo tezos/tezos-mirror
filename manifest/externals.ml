@@ -36,7 +36,7 @@ let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
 let astring = external_lib "astring" V.True
 
-let bheap = external_lib "bheap" V.True
+let bheap = external_lib "bheap" V.(at_least "2.0.0")
 
 let bigarray_compat = external_lib "bigarray-compat" V.True
 
