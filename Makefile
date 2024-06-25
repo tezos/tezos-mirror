@@ -28,3 +28,9 @@ full: octez-full.jsonnet
 compact: octez-compact.jsonnet
 
 dal-basic: dal/dal-basic.jsonnet
+
+octez-compact-new:
+	jsonnet \
+		-J vendor src/octez-compact-new.jsonnet \
+		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
+		> output/$@.json
