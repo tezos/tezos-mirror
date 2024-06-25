@@ -18,6 +18,8 @@ type tracer_config = {
   disable_storage : bool;
 }
 
+val bool_encoding : bool -> Rlp.item
+
 val default_tracer_config : tracer_config
 
 val tracer_config_encoding : tracer_config Data_encoding.t

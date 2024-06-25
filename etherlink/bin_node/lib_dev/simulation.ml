@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori  <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,12 +26,23 @@
 
 open Ethereum_types
 
+(** New versions of estimate gas may specify whether we want to
+    include the DA fees or not.  As currently some kernels running on
+    Ghostnet and/or Mainnet don't support yet this feature, we put
+    this as optional. *)
+type estimate_gas_input = {
+  call : Ethereum_types.call;
+  with_da_fees : bool option;
+      (** If true, the gas returned by the simulation include the DA
+          gas units. *)
+}
+
 (** [hex_string_to_bytes s] transforms a hex string [s] into a byte string. *)
 let hex_string_to_bytes (Hex s) = `Hex s |> Hex.to_bytes_exn
 
 (** Encoding used to forward the call to the kernel, to be used in simulation
      mode only. *)
-let rlp_encode call =
+let rlp_encode ({call; with_da_fees} : estimate_gas_input) =
   let of_opt of_val = function
     | None -> Rlp.Value Bytes.empty
     | Some v -> of_val v
@@ -40,15 +52,20 @@ let rlp_encode call =
   let of_hash (Hash h) = Rlp.Value (hex_string_to_bytes h) in
   let rlp_form =
     Rlp.List
-      [
-        of_opt of_addr call.from;
-        of_opt of_addr call.to_;
-        of_opt of_qty call.gas;
-        of_opt of_qty call.gasPrice;
-        of_opt of_qty call.value;
-        of_opt of_hash call.data;
-      ]
+      ([
+         of_opt of_addr call.from;
+         of_opt of_addr call.to_;
+         of_opt of_qty call.gas;
+         of_opt of_qty call.gasPrice;
+         of_opt of_qty call.value;
+         of_opt of_hash call.data;
+       ]
+      @
+      match with_da_fees with
+      | Some with_da_fees -> [Tracer_types.bool_encoding with_da_fees]
+      | None -> [])
   in
+
   (* we aim to use [String.chunk_bytes] *)
   Rlp.encode rlp_form
 
@@ -95,7 +112,8 @@ let validation_tag = "\001"
 (** [add_tag tag bytes] prefixes bytes by the given tag *)
 let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
 
-let encode_message = function
+let encode_message message =
+  match message with
   | Start -> simulation_tag
   | Simple s -> simulation_tag ^ simple_tag ^ s
   | NewChunked n ->

@@ -13,6 +13,8 @@
 - Allow `eth_call` to return the contract bytecode on contract creation. (!13830)
 - Stack depth for smart contracts are temporarily limited to 256, instead of
   the expected limit of 1024 on Shanghai. (!12345)
+- The simulation now caps the gas limit for execution at the maximum allowed
+  per transaction (30 million gas at most). (!13729)
 
 ## Internal
 

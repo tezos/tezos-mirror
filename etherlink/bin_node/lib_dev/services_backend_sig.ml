@@ -174,7 +174,7 @@ module Make (Backend : Backend) : S = struct
   module Reader = Backend.Reader
   include Durable_storage.Make (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
-  include Simulator.Make (Backend.SimulatorBackend)
+  include Simulator.Make (Backend.Reader) (Backend.SimulatorBackend)
 
   let block_param_to_block_number = Backend.block_param_to_block_number
 

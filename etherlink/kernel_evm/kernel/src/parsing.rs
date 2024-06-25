@@ -66,6 +66,7 @@ pub fn split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {
 }
 
 pub const SIMULATION_TAG: u8 = u8::MAX;
+
 const EVM_NODE_DELAYED_INPUT_TAG: u8 = u8::MAX - 1;
 
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
@@ -543,6 +544,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         if *input_tag == SIMULATION_TAG {
             return Self::parse_simulation(remaining);
         };
+
         if *input_tag == EVM_NODE_DELAYED_INPUT_TAG {
             let mut delayed_inbox = DelayedInbox::new(host).unwrap();
             if let Ok(transaction) = Transaction::from_rlp_bytes(remaining) {
