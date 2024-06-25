@@ -109,6 +109,7 @@ let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
       (fun hash -> Block_producer_events.transaction_selected ~hash)
       hashes
   in
+  let* () = Tx_pool.clear_popped_transactions () in
   return n
 
 module Handlers = struct
