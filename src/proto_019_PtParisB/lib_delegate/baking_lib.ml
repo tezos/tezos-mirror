@@ -26,13 +26,26 @@
 open Protocol
 open Alpha_context
 open Baking_state
+module Events = Baking_events.Lib
 
 let sleep_until_block_timestamp prepared_block =
+  let open Lwt_syntax in
   match
     Baking_scheduling.sleep_until
       prepared_block.signed_block_header.shell.timestamp
   with
-  | Some waiter -> waiter
+  | Some waiter ->
+      let* () =
+        Events.(
+          emit
+            waiting_block_timestamp
+            ( prepared_block.signed_block_header.shell.timestamp,
+              Ptime.diff
+                (Time.System.of_protocol_exn
+                   prepared_block.signed_block_header.shell.timestamp)
+                (Ptime_clock.now ()) ))
+      in
+      waiter
   | None -> Lwt.return_unit
 
 let create_state cctxt ?synchronize ?monitor_node_mempool ~config
@@ -61,8 +74,6 @@ let get_current_proposal cctxt ?cache () =
   match current_head with
   | Some current_head -> return (block_stream, current_head)
   | None -> failwith "head stream unexpectedly ended"
-
-module Events = Baking_events.Lib
 
 let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
