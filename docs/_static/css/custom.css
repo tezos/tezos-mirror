@@ -366,3 +366,7 @@ footer {
     margin-left:0.2em;
     margin-top:0.4em;
 }
+
+button.theme-switch-button {
+    display: none !important;
+}
