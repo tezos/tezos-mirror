@@ -10,8 +10,8 @@ let
   };
 
   default-pkgs-src = fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/cd07839e2e61f8b7c467f20a896c3f9e63a04918.tar.gz";
-    sha256 = "1xr250f9z72v560pkvi25iwclnysjn8h9mw8cdnjl4izq0milmzi";
+    url = "https://github.com/NixOS/nixpkgs/archive/refs/tags/24.05.tar.gz";
+    sha256 = "1lr1h35prqkd1mkmzriwlpvxcb34kmhc9dnr48gkm8hh089hifmx";
   };
 in
   {
