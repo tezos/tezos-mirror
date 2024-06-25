@@ -77,7 +77,7 @@ Errors
 Protocol parameters
 -------------------
 
-8s Blocks Time (MR :gl:`!`)
+8s Blocks Time (MR :gl:`!12716`)
 ---------------------------------
 
 Blocks time have been reduced from 10 seconds to 8 seconds. That is, a block can
@@ -89,7 +89,6 @@ following quantities are kept the same:
 - the minimal time period of a cycle (namely, 2 days, 20 hours, and 16 minutes),
 - the length of the nonce revelation period (namely, around 2 hours and 8 minutes)
 - the number of nonce commitments per cycle (namely, 128),
-- the number of stake snapshots per cycle (namely, 16),
 - the maximum rewards per minute (namely 80 tez), and therefore roughly the same issuance,
 - the minimal "time to live" of an operation (namely, 1 hour),
 - the block gas limit per minute (namely, 10400000 gas),

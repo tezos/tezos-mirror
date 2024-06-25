@@ -214,6 +214,10 @@ More precisely, the active stake is:
 - and the liquid delegated balance + the spendable balance, up to 9 times the delegate's staked balance.
 
 Before Adaptive Issuance, each part weighs equally when computing the baking and voting rights. After Adaptive Issuance, the frozen balances (non-liquid, non-spendable) are weighed for twice as much per tez as the liquid part.
+Moreover:
+
+- Rights originating from staked tez are computed from the value at the end of the cycle;
+- Rights originating from delegated tez are computing using the minimum value over the cycle.
 
 Let's take some examples. Say that the full balance of a delegate is ``1000`` tez.
 Then, without external staking, its theoretical maximum active stake is

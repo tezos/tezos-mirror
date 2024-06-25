@@ -150,3 +150,22 @@ For instance, if your software depends on ``tezos-rpc`` which is now a sub-libra
   - In your code, update all references to the ``Tezos_rpc`` module (e.g. ``open Tezos_rpc``) to ``Octez-libs.Rpc`` (e.g. ``open Octez-libs.Rpc``).
 
 The same method applies to each dependency that is now a sub-library of a new package. Check the :doc:`API <../api/api-inline>` to see the new packages.
+
+Delegates rights vs stake snapshots
+-----------------------------------
+
+The selection of the delegates' participation rights in the proof-of-stake consensus protocol is done based on their stake.
+This computation is explained in generic terms in :doc:`../active/proof_of_stake`.
+
+One detail of the rights computation has changed: which values are considered for the delegates' stake in each cycle.
+Previously, the considered values corresponded to a notion of stake snapshots, recorderd regularly by the protocol.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Since :doc:`protocol Paris <../protocols/019_paris>`, there are no more stake snapshots, so the protocol no longer relies on stake snapshots to compute the rights.
+
+Instead:
+
+- Rights originating from staked tez are computed from the value at the end of the cycle;
+- Rights originating from delegated tez are computing using the minimum value over the cycle.
