@@ -456,6 +456,38 @@ module Handler = struct
           remove_slots_and_shards ~slot_size store slot_id)
       (0 -- (number_of_slots - 1))
 
+  (* Here [block_level] is the level of the currently processed block, that is,
+     when the DAL node is up-to-date, the L1 head level minus 2. *)
+  let may_update_topics ctxt proto_parameters ~block_level =
+    let open Lwt_result_syntax in
+    (* If a slot is published in a block at some level [n], it is important to
+       be in the mesh for the corresponding topics when the block is
+       processed. The topic of a message with level [n] is given by committee at
+       level [n + attestation_lag - 1]. To have time to connect, subscribe and
+       get new peers for these (possibly new) topics, this must be done in
+       advance.
+
+       We do it [attestation_lag] levels in advance. This means the node has the
+       current "block time" (so 5-10 seconds) to prepare. This should be
+       sufficient.
+
+       Note that this does not affect processing messages for levels before [n +
+       attestation_lag], because the node does not unsubscribe, and message
+       validation does not depend on the subscribed topics. *)
+    let+ committee =
+      let level =
+        Int32.add
+          block_level
+          (Int32.of_int proto_parameters.Dal_plugin.attestation_lag)
+      in
+      Node_context.fetch_committee ctxt ~level
+    in
+    Profile_manager.on_new_head
+      (Node_context.get_profile_ctxt ctxt)
+      proto_parameters
+      (Node_context.get_gs_worker ctxt)
+      committee
+
   let process_block ctxt cctxt proto_parameters skip_list_cells_store
       finalized_shell_header =
     let open Lwt_result_syntax in
@@ -559,14 +591,7 @@ module Handler = struct
               Int32.(sub block_level (of_int proto_parameters.attestation_lag))
             (Plugin.is_attested attested_slots)
         in
-        let* committee = Node_context.fetch_committee ctxt ~level:block_level in
-        let () =
-          Profile_manager.on_new_head
-            (Node_context.get_profile_ctxt ctxt)
-            proto_parameters
-            (Node_context.get_gs_worker ctxt)
-            committee
-        in
+        let* () = may_update_topics ctxt proto_parameters ~block_level in
         return_unit
       else return_unit
     in
