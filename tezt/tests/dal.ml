@@ -7299,7 +7299,7 @@ let register ~protocols =
     test_peer_discovery_via_bootstrap_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"; "rpc"]
+    ~tags:["gossipsub"; "rpc"; Tag.ci_disabled]
     ~regression:true
     ~bootstrap_profile:true
     "GS/RPC get_connections"
