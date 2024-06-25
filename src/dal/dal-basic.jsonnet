@@ -79,7 +79,7 @@ dashboard.new(
   )
 )
 
-# The grid is 24 slots wide, where a slot is the unit used to position Grafana panels
+// The grid is 24 slots wide, where a slot is the unit used to position Grafana panels
 .addPanels(
   [
 
