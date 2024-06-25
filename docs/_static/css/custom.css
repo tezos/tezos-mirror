@@ -294,11 +294,11 @@ a:hover {
     overflow-x: hidden;
 }
 
-.rst-content code, .rst-content .important {
+.bd-content code, .bd-content .important {
     all: unset;
 }
 
-.rst-content :not(pre) > code {
+.bd-content :not(pre) > code {
     padding: 2px 4px;
     font-size: 90%;
     color: #c7254e;
@@ -306,16 +306,18 @@ a:hover {
     border-radius: 4px;
 }
 
-.rst-content tt.literal, .rst-content tt.literal, .rst-content code.literal {
+.bd-content tt.literal, .bd-content tt.literal, .bd-content code.literal {
     color: rgb(151, 32, 18);
 }
 
-.rst-content a:visited {
+.bd-content a:visited {
     color: rgb(13, 50, 200);
+    text-decoration:none;
 }
 
-.rst-content a:link {
+.bd-content a:link {
     color: rgb(13, 50, 255);
+    text-decoration:none;
 }
 
 .btn.btn-default {
