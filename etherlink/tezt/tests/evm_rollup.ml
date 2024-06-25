@@ -2488,6 +2488,20 @@ let test_withdraw_amount =
       ~value:(Wei.of_string "99999999999")
       ()
   in
+  (* 1000000000001 must be refused, as 1 wei will be lost during the conversion
+     to mutez. *)
+  let* _err =
+    call_withdraw
+      ~expect_failure:true
+      ~sender
+      ~endpoint
+      ~evm_node
+      ~sc_rollup_node
+      ~client
+      ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+      ~value:(Wei.of_string "1000000000001")
+      ()
+  in
   unit
 
 let get_kernel_boot_wasm ~sc_rollup_node =

@@ -24,6 +24,8 @@
   (!13901)
 - Forced blueprints (in case of delayed inbox timeout) always use a timestamp
   equal or greater than the predecessor. (!13832)
+- Withdrawal reverts if the amount loses wei during the conversion to mutez,
+  e.g. `1000000000001` would make caller lose 1 wei. (!13928)
 
 ## Internal
 
