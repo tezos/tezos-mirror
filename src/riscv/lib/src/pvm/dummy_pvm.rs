@@ -2,10 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::storage::Hash;
-use bincode::serialize;
+use crate::storage::{self, Hash, Repo};
+use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, path::Path};
+use thiserror::Error;
 
 const DUMMY_STATUS: &str = "riscv_dummy_status";
 
@@ -114,5 +115,52 @@ impl DummyPvm {
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum PvmStorageError {
+    #[error("Storage error: {0}")]
+    StorageError(#[from] storage::StorageError),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] bincode::Error),
+}
+
+pub struct PvmStorage {
+    repo: Repo,
+}
+
+impl PvmStorage {
+    /// Load or create new repo at `path`.
+    pub fn load(path: impl AsRef<Path>) -> Result<PvmStorage, PvmStorageError> {
+        let repo = Repo::load(path)?;
+        Ok(PvmStorage { repo })
+    }
+
+    pub fn close(self) {
+        self.repo.close()
+    }
+
+    /// Create a new commit for `state` and  return the commit id.
+    pub fn commit(&mut self, state: &DummyPvm) -> Result<Hash, PvmStorageError> {
+        let bytes = serialize(state)?;
+        Ok(self.repo.commit(&bytes)?)
+    }
+
+    /// Checkout the PVM state committed under `id`, if the commit exists.
+    pub fn checkout(&self, id: &Hash) -> Result<DummyPvm, PvmStorageError> {
+        let bytes = self.repo.checkout(id)?;
+        let state: DummyPvm = deserialize(&bytes)?;
+        Ok(state)
+    }
+
+    /// A snapshot is a new repo to which only `id` has been committed.
+    pub fn export_snapshot(
+        &self,
+        id: &Hash,
+        path: impl AsRef<Path>,
+    ) -> Result<(), PvmStorageError> {
+        Ok(self.repo.export_snapshot(id, path)?)
     }
 }

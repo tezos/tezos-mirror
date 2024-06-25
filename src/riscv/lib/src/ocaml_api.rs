@@ -3,12 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::pvm::dummy_pvm::{self, DummyPvm};
+use crate::pvm::dummy_pvm::{self, DummyPvm, PvmStorage, PvmStorageError};
 use crate::storage::{self, StorageError};
 use ocaml::{Pointer, ToValue};
 
 #[ocaml::sig]
-pub struct Repo(storage::Repo<DummyPvm>);
+pub struct Repo(PvmStorage);
 
 #[ocaml::sig]
 pub struct State(DummyPvm);
@@ -59,7 +59,7 @@ pub fn octez_riscv_storage_state_empty() -> Pointer<State> {
 #[ocaml::func]
 #[ocaml::sig("string -> repo")]
 pub fn octez_riscv_storage_load(path: String) -> Result<Pointer<Repo>, ocaml::Error> {
-    match storage::Repo::load(path) {
+    match PvmStorage::load(path) {
         Ok(repo) => Ok(Repo(repo).into()),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }
@@ -91,7 +91,7 @@ pub fn octez_riscv_storage_checkout(
     let id = &id.as_ref().0;
     match repo.as_ref().0.checkout(id) {
         Ok(state) => Ok(Some(State(state).into())),
-        Err(StorageError::NotFound(_)) => Ok(None),
+        Err(PvmStorageError::StorageError(StorageError::NotFound(_))) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }
 }

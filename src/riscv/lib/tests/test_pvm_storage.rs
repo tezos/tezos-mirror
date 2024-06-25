@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use octez_riscv::storage::{Repo, StorageError};
+use octez_riscv::{
+    pvm::dummy_pvm::{DummyPvm, PvmStorage},
+    storage::{Repo, StorageError},
+};
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::TestRunner;
@@ -16,7 +19,7 @@ fn test_repo() {
 
     // Create a new repo, commit 5 times and check that all 5 commits can
     // be checked out
-    let mut repo = Repo::<Vec<u8>>::load(tmp_dir.path()).unwrap();
+    let mut repo = Repo::load(tmp_dir.path()).unwrap();
     for _ in 0..5 {
         let data = prop::collection::vec(any::<u8>(), 0..100)
             .new_tree(&mut runner)
@@ -32,7 +35,7 @@ fn test_repo() {
     repo.close();
 
     // Reload the repo and check that all previous commits can be checked out
-    let mut repo = Repo::<Vec<u8>>::load(tmp_dir.path()).unwrap();
+    let mut repo = Repo::load(tmp_dir.path()).unwrap();
     for (commit_id, bytes) in test_data.iter() {
         let checked_out_data = repo.checkout(commit_id).unwrap();
         assert_eq!(checked_out_data, *bytes);
@@ -63,7 +66,7 @@ fn test_repo() {
     let snapshot_dir = tempfile::tempdir().unwrap();
     let (export_hash, export_data) = &test_data[0];
     repo.export_snapshot(export_hash, &snapshot_dir).unwrap();
-    let snapshot_repo = Repo::<Vec<u8>>::load(tmp_dir.path()).unwrap();
+    let snapshot_repo = Repo::load(tmp_dir.path()).unwrap();
     let checked_out_data = snapshot_repo.checkout(export_hash).unwrap();
     assert_eq!(checked_out_data, *export_data);
 
@@ -73,10 +76,10 @@ fn test_repo() {
 
 // Mirrors `src/lib_riscv/pvm/test/test_storage.ml`
 #[test]
-fn test_simple() {
+fn test_pvm_storage() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let empty = octez_riscv::pvm::dummy_pvm::DummyPvm::empty();
-    let mut repo = Repo::<octez_riscv::pvm::dummy_pvm::DummyPvm>::load(tmp_dir.path()).unwrap();
+    let empty = DummyPvm::empty();
+    let mut repo = PvmStorage::load(tmp_dir.path()).unwrap();
     let id = repo.commit(&empty).unwrap();
     let checked_out_empty = repo.checkout(&id).unwrap();
     assert_eq!(empty, checked_out_empty);

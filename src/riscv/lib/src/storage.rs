@@ -3,10 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use bincode::{deserialize, serialize};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     io::{self, Write},
-    marker::PhantomData,
     path::{Path, PathBuf},
 };
 use thiserror::Error;
@@ -20,7 +18,7 @@ pub enum StorageError {
     IoError(#[from] io::Error),
 
     #[error("Serialization error: {0}")]
-    SerializationError(#[from] bincode::Error),
+    CommitSerializationError(#[from] bincode::Error),
 
     #[error("Invalid repo")]
     InvalidRepo,
@@ -114,28 +112,22 @@ impl Store {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Repo<T> {
+pub struct Repo {
     backend: Store,
-    _pd: PhantomData<T>,
 }
 
-impl<T> Repo<T>
-where
-    T: Serialize + DeserializeOwned,
-{
+impl Repo {
     /// Load or create new repo at `path`.
-    pub fn load(path: impl AsRef<Path>) -> Result<Repo<T>, StorageError> {
+    pub fn load(path: impl AsRef<Path>) -> Result<Repo, StorageError> {
         Ok(Repo {
             backend: Store::init(path)?,
-            _pd: PhantomData,
         })
     }
 
     pub fn close(self) {}
 
-    /// Create a new commit for `data` and  return the commit id.
-    pub fn commit(&mut self, data: &T) -> Result<Hash, StorageError> {
-        let bytes = serialize(data)?;
+    /// Create a new commit for `bytes` and  return the commit id.
+    pub fn commit(&mut self, bytes: &[u8]) -> Result<Hash, StorageError> {
         let mut commit = Vec::with_capacity(bytes.len().div_ceil(CHUNK_SIZE) * DIGEST_SIZE);
 
         for chunk in bytes.chunks(CHUNK_SIZE) {
@@ -148,8 +140,8 @@ where
         self.backend.store(&commit_bytes)
     }
 
-    /// Checkout the value committed under `id`, if it exists.
-    pub fn checkout(&self, id: &Hash) -> Result<T, StorageError> {
+    /// Checkout the bytes committed under `id`, if the commit exists.
+    pub fn checkout(&self, id: &Hash) -> Result<Vec<u8>, StorageError> {
         let bytes = self.backend.load(id)?;
         let commit: Vec<Hash> = deserialize(&bytes)?;
         let mut bytes = Vec::new();
@@ -163,8 +155,7 @@ where
             })?;
             bytes.append(&mut chunk);
         }
-        let data: T = deserialize(&bytes)?;
-        Ok(data)
+        Ok(bytes)
     }
 
     /// A snapshot is a new repo to which only `id` has been committed.
