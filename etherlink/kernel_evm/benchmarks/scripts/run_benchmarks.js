@@ -580,6 +580,16 @@ async function run_all_benchmarks(benchmark_scripts) {
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
     fs.writeFileSync(logs, "Logging debugger\n")
     fs.writeFileSync(all_opcodes_dump, " [");
+    function end_run() {
+        fs.appendFileSync(all_opcodes_dump, "]");
+        console.log("Benchmarking complete");
+        fs.appendFileSync(logs, "=================================================\nBenchmarking complete.\n")
+        execSync(`rm ${inbox}`);
+    }
+    ['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach(signal => process.on(signal, () => {
+        end_run();
+        process.exit();
+    }));
     console.log(`Full logs in ${logs}`)
     let benchmark_csv_config = Object();
     for (var i = 0; i < benchmark_scripts.length; i++) {
@@ -603,10 +613,7 @@ async function run_all_benchmarks(benchmark_scripts) {
             console.error(err);
         }
     }
-    fs.appendFileSync(all_opcodes_dump, "]");
-    console.log("Benchmarking complete");
-    fs.appendFileSync(logs, "=================================================\nBenchmarking complete.\n")
-    execSync(`rm ${inbox}`);
+    end_run();
 }
 
 // we exclude bench_loop_calldataload because with the current tick model it
