@@ -13,11 +13,20 @@ description = "SDK for Tezos Smart Rollup kernel development."
 keywords = ["tezos", "smart", "rollup"]
 categories = ["development-tools"]
 
+[features]
+default = []
+native-kernel = ["dep:quanta", "dep:clap", "dep:tezos-smart-rollup-mock"]
+
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
 version = "0.2.2"
 default-features = false
 features = ["alloc", "tezos-encoding"]
+
+[dependencies.tezos-smart-rollup-mock]
+path = "../mock"
+version = "0.2.2"
+optional = true
 
 [dependencies.tezos_crypto_rs]
 version = "=0.5.2"
@@ -37,3 +46,12 @@ features = ["derive"]
 
 [dependencies.serde_json]
 version = "1.0.115"
+
+[dependencies.quanta]
+version = "0.12.3"
+optional = true
+
+[dependencies.clap]
+version = "4.4.10"
+features = ["derive"]
+optional = true
