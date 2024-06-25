@@ -74,10 +74,6 @@ Errors
   counters. The error messages have been updated accordingly, but the
   error IDs remain unchanged. (MR :gl:`!13138`)
 
-- The message of the ``validate.operation.incorrect_reveal_position``
-  error has been updated to specify that the incorrectly placed
-  revelation concerns the fee payer. (MR :gl:`!13290`)
-
 Protocol parameters
 -------------------
 

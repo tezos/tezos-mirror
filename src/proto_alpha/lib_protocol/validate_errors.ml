@@ -1179,8 +1179,8 @@ module Manager = struct
       (fun (source, previous_counter, counter) ->
         Inconsistent_counters {source; previous_counter; counter}) ;
     let incorrect_reveal_description =
-      "Incorrect reveal operation position in batch: revelation of the fee \
-       payer's public key is only allowed in first position."
+      "Incorrect reveal operation position in batch: only allowed in first \
+       position."
     in
     register_error_kind
       `Permanent
