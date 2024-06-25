@@ -1457,7 +1457,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args22
+    (args23
        mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
@@ -1477,6 +1477,9 @@ let make_kernel_config_command =
        (config_key_arg
           ~name:"maximum_gas_per_transaction"
           ~placeholder:"30000...")
+       (config_key_arg
+          ~name:"max_blueprint_lookahead_in_seconds"
+          ~placeholder:"500")
        (config_key_flag ~name:"remove_whitelist")
        (Tezos_clic.default_arg
           ~long:"bootstrap-balance"
@@ -1513,6 +1516,7 @@ let make_kernel_config_command =
            sequencer_pool_address,
            maximum_allowed_ticks,
            maximum_gas_per_transaction,
+           max_blueprint_lookahead_in_seconds,
            remove_whitelist,
            boostrap_balance,
            bootstrap_accounts,
@@ -1538,6 +1542,7 @@ let make_kernel_config_command =
         ?sequencer_pool_address
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
+        ?max_blueprint_lookahead_in_seconds
         ?remove_whitelist
         ~boostrap_balance
         ?bootstrap_accounts

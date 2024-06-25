@@ -1,7 +1,9 @@
 use crate::{
+    blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
     delayed_inbox::DelayedInbox,
     storage::{
-        enable_dal, is_enable_fa_bridge, read_admin, read_delayed_transaction_bridge,
+        enable_dal, evm_node_flag, is_enable_fa_bridge,
+        max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
         read_sequencer_governance, sequencer,
@@ -21,6 +23,8 @@ pub enum ConfigurationMode {
         delayed_inbox: Box<DelayedInbox>,
         sequencer: PublicKey,
         enable_dal: bool,
+        evm_node_flag: bool,
+        max_blueprint_lookahead_in_seconds: i64,
     },
 }
 
@@ -33,10 +37,12 @@ impl std::fmt::Display for ConfigurationMode {
                 delayed_inbox: _, // Ignoring delayed_inbox
                 sequencer,
                 enable_dal,
+                evm_node_flag,
+                max_blueprint_lookahead_in_seconds,
             } => write!(
                 f,
-                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?}, enable_dal: {:?} }}",
-                delayed_bridge, sequencer, enable_dal
+                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?}, enable_dal: {}, evm_node_flag: {}, max_blueprints_lookahead_in_seconds: {} }}",
+                delayed_bridge, sequencer, enable_dal, evm_node_flag, max_blueprint_lookahead_in_seconds
             ),
         }
     }
@@ -177,6 +183,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let enable_dal = enable_dal(host).unwrap_or(false);
+    let evm_node_flag = evm_node_flag(host).unwrap_or(false);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -188,6 +195,10 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                     )
                     .unwrap()
                 });
+            // Default to 5 minutes.
+            let max_blueprint_lookahead_in_seconds =
+                max_blueprint_lookahead_in_seconds(host)
+                    .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
             match DelayedInbox::new(host) {
                 Ok(delayed_inbox) => Configuration {
                     tezos_contracts,
@@ -196,6 +207,8 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
                         enable_dal,
+                        evm_node_flag,
+                        max_blueprint_lookahead_in_seconds,
                     },
                     limits,
                     enable_fa_bridge,

@@ -153,9 +153,9 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?enable_fa_bridge ?(threshold_encryption = false)
-    ?(wal_sqlite_journal_mode = true) ?(drop_duplicate_when_injection = true)
-    ?history_mode ~enable_dal protocol =
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
+    ?(drop_duplicate_when_injection = true) ?history_mode ~enable_dal protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -188,6 +188,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
       ~enable_dal
+      ?max_blueprint_lookahead_in_seconds
       ~bootstrap_accounts
       ~output:output_config
       ?enable_fa_bridge
@@ -375,7 +376,8 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?enable_fa_bridge
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
     ?history_mode ~enable_dal body ~title ~tags protocols =
   let additional_uses =
@@ -405,6 +407,7 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
         ?preimages_dir
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
+        ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
         ~threshold_encryption
         ?history_mode
@@ -428,8 +431,9 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?enable_fa_bridge
-    ?history_mode ?additional_uses ~title ~tags body protocols =
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
+    ?additional_uses ~title ~tags body protocols =
   let register ~kernel ~threshold_encryption ~title ~tags =
     let _, kernel_use = Kernel.to_uses_and_tags kernel in
     register_test
@@ -452,6 +456,7 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
       ?preimages_dir
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
+      ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
       ?additional_uses
       ~threshold_encryption
@@ -2570,6 +2575,70 @@ let test_non_increasing_timestamp =
   in
   unit
 
+let test_timestamp_from_the_future =
+  register_both
+    ~max_blueprint_lookahead_in_seconds:300L
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "block"; "timestamp"]
+    ~title:"Timestamp from the future are refused"
+  @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
+  (* In this test the time between blocks is 1 second. *)
+  let l1_timestamp () =
+    let* l1_header = Client.RPC.call client @@ RPC.get_chain_block_header () in
+    return
+      JSON.(
+        l1_header |-> "timestamp" |> as_string |> Client.Time.of_notation_exn)
+  in
+
+  (* Producing a block 4:50 minutes after the L1 timestamp will be accepted. We
+     do not check precisely 4:59 minutes to avoid flakiness w.r.t to blueprint
+     inclusion. *)
+  let* current_l1_timestamp = l1_timestamp () in
+  let accepted_timestamp =
+    Ptime.(add_span current_l1_timestamp (Span.of_int_s 270))
+    |> Option.get |> Ptime.to_rfc3339
+  in
+  (* The sequencer will accept it anyway, but we need to check that the rollup
+     node accepts it. *)
+  let*@ (_ : int) = Rpc.produce_block ~timestamp:accepted_timestamp sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+
+  (* Producing a block 5:30 minutes after the L1 timetamp will be accepted by
+     the sequencer and not the rollup node. *)
+  let* current_l1_timestamp = l1_timestamp () in
+  let refused_timestamp =
+    Ptime.(add_span current_l1_timestamp (Span.of_int_s 330))
+    |> Option.get |> Ptime.to_rfc3339
+  in
+  let*@ (_ : int) = Rpc.produce_block ~timestamp:refused_timestamp sequencer in
+  let* _ =
+    repeat 5 (fun () ->
+        let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  let*@ proxy_head = Rpc.block_number proxy in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
+  Check.((sequencer_head = Int32.succ proxy_head) int32)
+    ~error_msg:"The proxy was supposed to refuse the block" ;
+
+  let kernel_log =
+    let path = Sc_rollup_node.data_dir sc_rollup_node // "kernel.log" in
+    read_file path
+  in
+
+  Check.(
+    kernel_log
+    =~ rex
+         "Deleting invalid blueprint at path /evm/blueprints/2, error: \
+          TimestampFromFuture")
+    ~error_msg:"The blueprint should have been refused by TimestampFromFuture" ;
+
+  unit
+
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_sequencer_upgrade =
@@ -3899,6 +3968,7 @@ let () =
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_non_increasing_timestamp protocols ;
+  test_timestamp_from_the_future protocols ;
   test_sequencer_upgrade protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;

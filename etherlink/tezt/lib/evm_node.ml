@@ -994,6 +994,7 @@ let make_kernel_installer_config ?(mainnet_compat = false)
     ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?(max_blueprint_lookahead_in_seconds = 157_680_000L)
     ?(enable_fa_bridge = false) ?(enable_dal = false) ~output () =
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
@@ -1036,6 +1037,10 @@ let make_kernel_installer_config ?(mainnet_compat = false)
         "maximum-gas-per-transaction"
         Int64.to_string
         maximum_gas_per_transaction
+    @ [
+        "--max-blueprint-lookahead-in-seconds";
+        Int64.to_string max_blueprint_lookahead_in_seconds;
+      ]
     @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
     @ Cli_arg.optional_switch "enable-dal" enable_dal
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance

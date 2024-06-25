@@ -379,6 +379,7 @@ val make_kernel_installer_config :
   ?sequencer_pool_address:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
   ?enable_dal:bool ->
   output:string ->

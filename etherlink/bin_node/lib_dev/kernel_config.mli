@@ -28,6 +28,7 @@ val make :
   ?sequencer_pool_address:string * string ->
   ?maximum_allowed_ticks:string * string ->
   ?maximum_gas_per_transaction:string * string ->
+  ?max_blueprint_lookahead_in_seconds:string * string ->
   ?remove_whitelist:string * string ->
   enable_fa_bridge:bool ->
   ?enable_dal:string * string ->
