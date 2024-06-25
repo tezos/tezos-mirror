@@ -669,6 +669,7 @@ let test_persistent_state =
   register_both
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
+    ~time_between_blocks:Nothing
   @@ fun {sequencer; _} _protocol ->
   (* Force the sequencer to produce a block. *)
   let*@ _ = Rpc.produce_block sequencer in
@@ -1106,6 +1107,7 @@ let test_delayed_transfer_is_included =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1214,6 +1216,7 @@ let test_largest_delayed_transfer_is_included =
 
 let test_delayed_deposit_is_included =
   register_both
+    ~time_between_blocks:Nothing
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
     ~title:"Delayed deposit is included"
