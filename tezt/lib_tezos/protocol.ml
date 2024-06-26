@@ -270,7 +270,7 @@ let write_parameter_file :
   Lwt.return output_file
 
 let previous_protocol = function
-  | Alpha -> Some ParisB
+  | Alpha -> Some ParisC
   | ParisC -> Some ParisB
   | ParisB -> None
 
