@@ -66,11 +66,12 @@ proptest.workspace = true
 getrandom = { version = "=0.2.15", features = ["custom"] }
 
 pretty_assertions.workspace = true
+evm-execution = { workspace = true, features = ["fa_bridge_testing"] }
 
 [features]
 default = ["panic-hook"]
 panic-hook = []
-testing = ["proptest", "debug"]
+testing = ["proptest", "debug", "evm-execution/testing"]
 debug = ["tezos-evm-logging/debug"]
 benchmark = ["tezos-evm-logging/benchmark", "evm-execution/benchmark"]
 benchmark-bypass-stage2 = ["benchmark"]

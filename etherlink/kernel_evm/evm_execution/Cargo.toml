@@ -66,7 +66,8 @@ alloy-primitives.workspace = true
 
 [features]
 default = ["evm_execution"]
-testing = ["rand", "proptest", "dep:tezos-smart-rollup-mock", "dep:alloy-primitives", "dep:alloy-sol-types"]
+testing = ["rand", "proptest", "dep:tezos-smart-rollup-mock"]
+fa_bridge_testing = ["dep:tezos-smart-rollup-mock", "dep:alloy-primitives", "dep:alloy-sol-types"]
 evm_execution = []
 debug = ["tezos-evm-logging/debug"]
 # the `benchmark` and `benchmark-opcodes` feature flags instrument the kernel for profiling

@@ -315,6 +315,7 @@ impl Evaluation {
         &self,
         host: &mut Host,
         tracer_config: Option<TracerConfig>,
+        enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
@@ -348,7 +349,7 @@ impl Evaluation {
 
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
-        let precompiles = precompiles::precompile_set::<Host>();
+        let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
         let default_caller = H160::zero();
         let tx_data_size = self.data.len() as u64;
         let limits = fetch_limits(host);
@@ -419,6 +420,7 @@ impl TxValidation {
         host: &mut Host,
         transaction: &EthereumTransactionCommon,
         caller: &H160,
+        enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
@@ -453,7 +455,7 @@ impl TxValidation {
 
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
-        let precompiles = precompiles::precompile_set::<Host>();
+        let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
         let tx_data_size = transaction.data.len() as u64;
         let limits = fetch_limits(host);
         let allocated_ticks =
@@ -522,6 +524,7 @@ impl TxValidation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
+        enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let tx = &self.transaction;
         let evm_account_storage = account_storage::init_account_storage()?;
@@ -552,7 +555,7 @@ impl TxValidation {
         }
         // Check if running the transaction (assuming it is valid) would run out
         // of ticks, or fail validation for another reason.
-        Self::validate(host, tx, &caller)
+        Self::validate(host, tx, &caller, enable_fa_withdrawals)
     }
 }
 
@@ -691,6 +694,7 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
+    enable_fa_withdrawals: bool,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
@@ -698,11 +702,11 @@ pub fn start_simulation_mode<Host: Runtime>(
         Message::Evaluation(simulation) => {
             let trace_input = read_tracer_input(host)?;
             let tracer_config = get_tracer_config(None, &trace_input);
-            let outcome = simulation.run(host, tracer_config)?;
+            let outcome = simulation.run(host, tracer_config, enable_fa_withdrawals)?;
             storage::store_simulation_result(host, outcome)
         }
         Message::TxValidation(tx_validation) => {
-            let outcome = tx_validation.run(host)?;
+            let outcome = tx_validation.run(host, enable_fa_withdrawals)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -809,7 +813,7 @@ mod tests {
             crate::block::GAS_LIMIT,
             H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<Host>();
+        let precompiles = precompiles::precompile_set::<Host>(false);
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
 
         let callee = None;
@@ -865,7 +869,7 @@ mod tests {
             value: None,
             with_da_fees: false,
         };
-        let outcome = evaluation.run(&mut host, None);
+        let outcome = evaluation.run(&mut host, None, false);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -890,7 +894,7 @@ mod tests {
             value: None,
             with_da_fees: false,
         };
-        let outcome = evaluation.run(&mut host, None);
+        let outcome = evaluation.run(&mut host, None, false);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -921,7 +925,7 @@ mod tests {
             value: None,
             with_da_fees: false,
         };
-        let outcome = evaluation.run(&mut host, None);
+        let outcome = evaluation.run(&mut host, None, false);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -1151,7 +1155,7 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let result = simulation.run(&mut host);
+        let result = simulation.run(&mut host, false);
         println!("{result:?}");
         assert!(result.is_ok());
         assert_eq!(
@@ -1200,7 +1204,7 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let result = simulation.run(&mut host);
+        let result = simulation.run(&mut host, false);
 
         assert!(result.is_ok());
         assert_eq!(

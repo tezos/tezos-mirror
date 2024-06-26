@@ -28,6 +28,7 @@ use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
 use ecdsa::ecrecover_precompile;
 use evm::{Context, ExitReason, Handler, Transfer};
+use fa_bridge::fa_bridge_precompile;
 use hash::{ripemd160_precompile, sha256_precompile};
 use host::runtime::Runtime;
 use identity::identity_precompile;
@@ -156,8 +157,10 @@ pub const WITHDRAWAL_ADDRESS: H160 = H160([
 ]);
 
 /// Factory function for generating the precompileset that the EVM kernel uses.
-pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
-    BTreeMap::from([
+pub fn precompile_set<Host: Runtime>(
+    enable_fa_withdrawals: bool,
+) -> PrecompileBTreeMap<Host> {
+    let mut precompiles = BTreeMap::from([
         (
             H160::from_low_u64_be(1u64),
             ecrecover_precompile as PrecompileFn<Host>,
@@ -198,7 +201,16 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             WITHDRAWAL_ADDRESS,
             withdrawal_precompile as PrecompileFn<Host>,
         ),
-    ])
+    ]);
+
+    if enable_fa_withdrawals {
+        precompiles.insert(
+            FA_BRIDGE_PRECOMPILE_ADDRESS,
+            fa_bridge_precompile as PrecompileFn<Host>,
+        );
+    }
+
+    precompiles
 }
 
 #[macro_export]
@@ -306,7 +318,7 @@ mod test_helpers {
             H160::zero(),
         );
         let mut evm_account_storage = init_evm_account_storage().unwrap();
-        let precompiles = precompile_set::<MockHost>();
+        let precompiles = precompile_set::<MockHost>(false);
         let config = Config::shanghai();
         let gas_price = U256::from(21000);
 

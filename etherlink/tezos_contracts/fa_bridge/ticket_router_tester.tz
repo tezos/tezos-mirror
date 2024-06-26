@@ -18,13 +18,10 @@
              (mutez %xtz_amount))
           (big_map %metadata string bytes)) ;
   code { LAMBDA
-           (pair (ticket (pair nat (option bytes)))
-                 (pair address (or unit (or address bytes)) mutez)
-                 (big_map string bytes))
+           (pair (ticket (pair nat (option bytes))) address (or unit (or address bytes)) mutez)
            operation
            { UNPAIR ;
              SWAP ;
-             CAR ;
              UNPAIR 3 ;
              SWAP ;
              IF_LEFT
@@ -68,6 +65,7 @@
                  DUP 2 ;
                  NIL operation ;
                  DIG 3 ;
+                 CAR ;
                  DIG 3 ;
                  PAIR ;
                  DIG 3 ;
@@ -75,11 +73,14 @@
                  EXEC ;
                  CONS }
                { IF_LEFT
-                   { DUP 2 ;
+                   { UNPAIR ;
+                     DUP 3 ;
                      NIL operation ;
+                     DIG 4 ;
+                     CAR ;
                      DIG 3 ;
+                     UPDATE 1 ;
                      DIG 3 ;
-                     CDR ;
                      PAIR ;
                      DIG 3 ;
                      SWAP ;
@@ -89,6 +90,7 @@
                        { DUP 2 ;
                          NIL operation ;
                          DIG 3 ;
+                         CAR ;
                          DIG 3 ;
                          PAIR ;
                          DIG 3 ;

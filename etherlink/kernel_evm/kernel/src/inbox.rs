@@ -519,7 +519,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
-    enable_fa_deposits: bool,
+    enable_fa_bridge: bool,
 ) -> anyhow::Result<ReadStatus> {
     let input: InputResult<Mode> = read_input(
         host,
@@ -527,7 +527,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
         tezos_contracts,
         inbox_is_empty,
         parsing_context,
-        enable_fa_deposits,
+        enable_fa_bridge,
     )?;
     match input {
         InputResult::NoInput => {
@@ -547,7 +547,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             // kernel enters in simulation mode, reading will be done by the
             // simulation and all the previous and next transactions are
             // discarded.
-            simulation::start_simulation_mode(host)?;
+            simulation::start_simulation_mode(host, enable_fa_bridge)?;
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
@@ -561,7 +561,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-    enable_fa_deposits: bool,
+    enable_fa_bridge: bool,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -579,7 +579,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             &mut (),
             &mut inbox_is_empty,
             &mut res,
-            enable_fa_deposits,
+            enable_fa_bridge,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -627,7 +627,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     sequencer: PublicKey,
     delayed_inbox: &mut DelayedInbox,
-    enable_fa_deposits: bool,
+    enable_fa_bridge: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -663,7 +663,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             &mut parsing_context,
             &mut inbox_is_empty,
             delayed_inbox,
-            enable_fa_deposits,
+            enable_fa_bridge,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.

@@ -167,7 +167,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
 let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks
+    ?max_number_of_chunks ?commitment_period ?challenge_window
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -179,12 +179,18 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
     ?(drop_duplicate_when_injection = true) ?history_mode ~enable_dal ?dal_slots
     protocol =
-  let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
+  let* node, client =
+    setup_l1
+      ?commitment_period
+      ?challenge_window
+      ?timestamp:genesis_timestamp
+      protocol
+  in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
     Sc_rollup_node.create
       ~default_operator:Constant.bootstrap1.public_key_hash
-      Batcher
+      Operator
       node
       ~base_dir:(Client.base_dir client)
       ?history_mode
@@ -424,9 +430,9 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
-    ?history_mode ~enable_dal
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
+    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
+    ?(additional_uses = []) ?history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
     protocols =
   let additional_uses =
@@ -438,6 +444,8 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     let* sequencer_setup =
       setup_sequencer
         ~mainnet_compat
+        ?commitment_period
+        ?challenge_window
         ?genesis_timestamp
         ?time_between_blocks
         ?max_blueprints_lag
@@ -483,11 +491,14 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
-    ?additional_uses ~title ~tags body protocols =
+    ?commitment_period ?challenge_window ?additional_uses ~title ~tags body
+    protocols =
   let register ~kernel ~threshold_encryption ~title ~tags =
     let _, kernel_use = Kernel.to_uses_and_tags kernel in
     register_test
       ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
+      ?commitment_period
+      ?challenge_window
       ?genesis_timestamp
       ?time_between_blocks
       ?max_blueprints_lag
@@ -518,6 +529,8 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
       protocols ;
     register_test
       ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
+      ?commitment_period
+      ?challenge_window
       ?genesis_timestamp
       ?time_between_blocks
       ?max_blueprints_lag
@@ -1287,10 +1300,7 @@ let encode_data json codec =
   let hex = `Hex (Durable_storage_path.no_0x hex_string) in
   return (Hex.to_bytes hex)
 
-let ticket_hash ticketer token_id =
-  let* ticketer_bytes =
-    encode_data (Ezjsonm.string ticketer) "alpha.contract"
-  in
+let ticket_content token_id =
   let* content_bytes =
     encode_data
       (Ezjsonm.from_string
@@ -1300,6 +1310,17 @@ let ticket_hash ticketer token_id =
             token_id))
       "alpha.script.expr"
   in
+  return content_bytes
+
+let ticket_creator ticketer =
+  let* ticketer_bytes =
+    encode_data (Ezjsonm.string ticketer) "alpha.contract"
+  in
+  return ticketer_bytes
+
+let ticket_hash ticketer token_id =
+  let* ticketer_bytes = ticket_creator ticketer in
+  let* content_bytes = ticket_content token_id in
   let payload = Bytes.concat Bytes.empty [ticketer_bytes; content_bytes] in
   let payload_digest = Tezos_crypto.Hacl.Hash.Keccak_256.digest payload in
   return (payload_digest |> Hex.of_bytes |> Hex.show)
@@ -1463,6 +1484,177 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
   Check.((0 = ticket_balance_via_sequencer) int)
     ~error_msg:
       "The deposit should have been refused by sequencer, but balance is %R" ;
+  unit
+
+let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
+    ~routing_info ~amount ~ticketer ~content () =
+  let* () =
+    Eth_cli.add_abi ~label:"fa_withdrawal" ~abi:(fa_withdrawal_abi_path ()) ()
+  in
+  send_transaction
+    (Eth_cli.contract_send
+       ?expect_failure
+       ~source_private_key:sender.Eth_account.private_key
+       ~endpoint
+       ~abi_label:"fa_withdrawal"
+       ~address:"0xff00000000000000000000000000000000000002"
+       ~method_call:
+         (sf
+            {|withdraw("%s", "0x%s", %d, "0x%s", "0x%s")|}
+            ticket_owner
+            routing_info
+            amount
+            ticketer
+            content))
+    evm_node
+
+let test_fa_withdrawal_is_included =
+  register_both
+    ~da_fee:Wei.one
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "delayed_outbox";
+        "inclusion";
+        "fa_withdrawal";
+        "enabled";
+      ]
+    ~title:"FA withdrawal is included"
+    ~enable_fa_bridge:true
+    ~commitment_period:5
+    ~challenge_window:5
+    ~kernels:[Kernel.Latest]
+    ~additional_uses:[Constant.octez_codec]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (* 1. Deposit some tickets *)
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let receiver = Eth_account.bootstrap_accounts.(0).address in
+
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
+
+  (* Check that deposit is successful *)
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+
+  let* ticket_balance_after_deposit =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_after_deposit) int)
+    ~error_msg:
+      "After deposit we expect %L ticket balance in the sequencer, got %R" ;
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  (* Withdrawing to the zero implicit account *)
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+
+  (* Initiate withdrawal *)
+  let* withdrawal_level = Client.level client in
+  let* _tx =
+    call_fa_withdraw
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~evm_node:sequencer
+      ~ticket_owner:receiver
+      ~routing_info
+      ~amount
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ()
+  in
+
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+
+  (* Check that tickets are gone *)
+  let* ticket_balance_after_withdraw =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((0 = ticket_balance_after_withdraw) int)
+    ~error_msg:
+      "After withdrawal we expect %L ticket balance in the sequencer, got %R" ;
+
+  (* Switch ticket tester contract to proxy mode *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"set"
+      ~arg:(sf "Pair %S (Pair (Left Unit) 0)" depositor.public_key_hash)
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.ticket_router_tester
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  (* Wait till the cementation and execute outbox message *)
+  let* _ =
+    find_and_execute_withdrawal
+      ~withdrawal_level
+      ~commitment_period:5
+      ~challenge_window:5
+      ~evm_node:proxy
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~client
+  in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Check ticket balance for the zero account on L1 *)
+  let* l1_balance =
+    Client.ticket_balance
+      ~contract:"tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+  Check.(("42" = String.trim l1_balance) string)
+    ~error_msg:
+      "After outbox message execution we expect %L ticket balance for the \
+       receiver, got %R" ;
+
   unit
 
 let test_delayed_deposit_from_init_rollup_node =
@@ -4412,6 +4604,7 @@ let () =
   test_delayed_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
+  test_fa_withdrawal_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
   test_delayed_deposit_from_init_rollup_node protocols ;
   test_init_from_rollup_node_data_dir protocols ;

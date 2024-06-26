@@ -132,12 +132,10 @@ mod tests {
             },
         },
         handler::{EvmHandler, ExecutionOutcome, ExtendedExitReason},
-        precompiles::{self, PrecompileFn, FA_BRIDGE_PRECOMPILE_ADDRESS},
+        precompiles::{self, FA_BRIDGE_PRECOMPILE_ADDRESS},
         transaction::TransactionContext,
         utilities::{bigint_to_u256, keccak256_hash},
     };
-
-    use super::fa_bridge_precompile;
 
     fn execute_precompile(
         host: &mut MockHost,
@@ -152,11 +150,7 @@ mod tests {
         let config = Config::shanghai();
         let callee = FA_BRIDGE_PRECOMPILE_ADDRESS;
 
-        let mut precompiles = precompiles::precompile_set::<MockHost>();
-        precompiles.insert(
-            FA_BRIDGE_PRECOMPILE_ADDRESS,
-            fa_bridge_precompile as PrecompileFn<MockHost>,
-        );
+        let precompiles = precompiles::precompile_set::<MockHost>(true);
 
         let mut handler = EvmHandler::new(
             host,
@@ -276,11 +270,7 @@ mod tests {
         let block = dummy_first_block();
         let config = Config::shanghai();
 
-        let mut precompiles = precompiles::precompile_set::<MockHost>();
-        precompiles.insert(
-            FA_BRIDGE_PRECOMPILE_ADDRESS,
-            fa_bridge_precompile as PrecompileFn<MockHost>,
-        );
+        let precompiles = precompiles::precompile_set::<MockHost>(true);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,

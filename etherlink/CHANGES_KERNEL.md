@@ -12,6 +12,7 @@
   error of 5 minutes. 5 minutes is the default value but can be configured by
   the installer. (!13827)
 - FA deposits are applied if FA bridge feature is enabled. (!13835)
+- FA withdrawals are applied if FA bridge feature is enabled. (!13958)
 
 ## Bug fixes
 

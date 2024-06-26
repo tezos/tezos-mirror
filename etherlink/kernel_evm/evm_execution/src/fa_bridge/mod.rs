@@ -59,7 +59,7 @@ pub mod withdrawal;
 #[cfg(test)]
 mod tests;
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature = "fa_bridge_testing"))]
 pub mod test_utils;
 
 /// TODO: Gas limit for calling "deposit" method of the proxy contract call.

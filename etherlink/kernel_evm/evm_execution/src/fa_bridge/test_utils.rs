@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+pub use alloy_sol_types::SolCall;
 use alloy_sol_types::{sol, SolConstructor};
 use crypto::hash::ContractKt1Hash;
 use evm::Config;
@@ -63,7 +64,7 @@ pub fn deploy_mock_wrapper(
     ));
 
     let block = dummy_block_constants();
-    let precompiles = precompile_set::<MockHost>();
+    let precompiles = precompile_set::<MockHost>(false);
 
     set_balance(host, evm_account_storage, caller, U256::from(1_000_000));
     run_transaction(
@@ -96,7 +97,7 @@ pub fn run_fa_deposit(
     caller: &H160,
 ) -> ExecutionOutcome {
     let block = dummy_block_constants();
-    let precompiles = precompile_set::<MockHost>();
+    let precompiles = precompile_set::<MockHost>(false);
 
     execute_fa_deposit(
         host,
@@ -306,7 +307,7 @@ pub fn fa_bridge_precompile_call_withdraw(
     caller: H160,
 ) -> ExecutionOutcome {
     let block = dummy_first_block();
-    let precompiles = precompiles::precompile_set::<MockHost>();
+    let precompiles = precompiles::precompile_set::<MockHost>(false);
     let config = Config::shanghai();
 
     let mut handler = EvmHandler::new(
