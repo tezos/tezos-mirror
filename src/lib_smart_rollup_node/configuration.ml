@@ -60,6 +60,7 @@ type t = {
   rpc_port : int;
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
   metrics_addr : string option;
+  performance_metrics : bool;
   reconnection_delay : float;
   fee_parameters : fee_parameters;
   mode : mode;
@@ -429,6 +430,7 @@ let encoding default_display : t Data_encoding.t =
            rpc_port;
            acl;
            metrics_addr;
+           performance_metrics;
            reconnection_delay;
            fee_parameters;
            mode;
@@ -461,6 +463,7 @@ let encoding default_display : t Data_encoding.t =
             rpc_port,
             acl ),
           ( metrics_addr,
+            performance_metrics,
             reconnection_delay,
             fee_parameters,
             mode,
@@ -491,6 +494,7 @@ let encoding default_display : t Data_encoding.t =
                rpc_port,
                acl ),
              ( metrics_addr,
+               performance_metrics,
                reconnection_delay,
                fee_parameters,
                mode,
@@ -522,6 +526,7 @@ let encoding default_display : t Data_encoding.t =
         rpc_port;
         acl;
         metrics_addr;
+        performance_metrics;
         reconnection_delay;
         fee_parameters;
         mode;
@@ -571,8 +576,9 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Access control list"
                 Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
                 default_acl))
-          (obj6
+          (obj7
              (opt "metrics-addr" ~description:"Metrics address" string)
+             (dft "performance-metrics" bool false)
              (dft
                 "reconnection_delay"
                 ~description:
@@ -735,12 +741,13 @@ module Cli = struct
       operators
 
   let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
-      ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
-      ~dac_timeout ~pre_images_endpoint ~injector_retention_period
-      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches =
+      ~enable_performance_metrics ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
+      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches =
     let open Result_syntax in
     let* purposed_operator, default_operator =
       get_purposed_and_default_operators operators
@@ -769,6 +776,7 @@ module Cli = struct
       dac_timeout;
       pre_images_endpoint;
       metrics_addr;
+      performance_metrics = enable_performance_metrics;
       fee_parameters = Operation_kind.Map.empty;
       mode;
       loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
@@ -815,8 +823,8 @@ module Cli = struct
     }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-      ~acl_override ~metrics_addr ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+      ~acl_override ~metrics_addr ~enable_performance_metrics ~loser_mode
+      ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
       ~pre_images_endpoint ~injector_retention_period ~injector_attempts
       ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
@@ -879,6 +887,8 @@ module Cli = struct
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         apply_unsafe_patches;
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
+        performance_metrics =
+          enable_performance_metrics || configuration.performance_metrics;
         index_buffer_size =
           Option.either index_buffer_size configuration.index_buffer_size;
         irmin_cache_size =
@@ -910,12 +920,13 @@ module Cli = struct
       }
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
-      ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-      ~dac_observer_endpoint ~dac_timeout ~pre_images_endpoint
-      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches =
+      ~metrics_addr ~enable_performance_metrics ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
+      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -942,6 +953,7 @@ module Cli = struct
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -992,6 +1004,7 @@ module Cli = struct
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint

@@ -270,6 +270,7 @@ module For_snapshots = struct
                rpc_port = Configuration.default_rpc_port;
                acl = Configuration.default_acl;
                metrics_addr = None;
+               performance_metrics = false;
                reconnection_delay = 1.;
                fee_parameters = Configuration.default_fee_parameters;
                mode;
@@ -380,6 +381,7 @@ module Internal_for_tests = struct
           rpc_port = Configuration.default_rpc_port;
           acl = Configuration.default_acl;
           metrics_addr = None;
+          performance_metrics = false;
           reconnection_delay = 5.;
           fee_parameters = Configuration.default_fee_parameters;
           mode;

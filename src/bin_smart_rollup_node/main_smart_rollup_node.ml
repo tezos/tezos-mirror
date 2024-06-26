@@ -42,13 +42,14 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args24
+    (args25
        force_switch
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
        acl_override_arg
        metrics_addr_arg
+       enable_performance_metrics_arg
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
@@ -78,6 +79,7 @@ let config_init_command =
            rpc_port,
            acl_override,
            metrics_addr,
+           enable_performance_metrics,
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
@@ -106,6 +108,7 @@ let config_init_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -145,14 +148,15 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args7
+       (args8
           data_dir_arg
           mode_arg
           sc_rollup_address_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
-          metrics_addr_arg)
+          metrics_addr_arg
+          enable_performance_metrics_arg)
        (args20
           loser_mode_arg
           reconnection_delay_arg
@@ -181,7 +185,8 @@ let legacy_run_command =
              rpc_addr,
              rpc_port,
              acl_override,
-             metrics_addr ),
+             metrics_addr,
+             enable_performance_metrics ),
            ( loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -210,6 +215,7 @@ let legacy_run_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -251,12 +257,13 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args11
+       (args12
           data_dir_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
           metrics_addr_arg
+          enable_performance_metrics_arg
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -287,6 +294,7 @@ let run_command =
              rpc_port,
              acl_override,
              metrics_addr,
+             enable_performance_metrics,
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -318,6 +326,7 @@ let run_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
