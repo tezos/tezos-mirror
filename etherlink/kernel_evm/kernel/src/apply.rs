@@ -390,7 +390,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
                 host,
                 Benchmarking,
                 "Transaction status: OK_{}.",
-                execution_outcome.is_success
+                execution_outcome.is_success()
             );
             (
                 execution_outcome.gas_used.into(),
@@ -447,7 +447,6 @@ fn apply_deposit<Host: Runtime>(
 
     let execution_outcome = ExecutionOutcome {
         gas_used,
-        is_success,
         reason: reason.into(),
         new_address: None,
         logs: vec![],

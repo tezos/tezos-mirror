@@ -321,7 +321,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // zero sum test
@@ -344,7 +344,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // no input test
@@ -360,7 +360,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // point not on curve fail
@@ -399,7 +399,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // zero multiplication test
@@ -421,7 +421,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // no input test
@@ -437,7 +437,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // point not on curve fail
@@ -483,7 +483,7 @@ mod tests {
         println!("result {:?}", result);
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // no input test
@@ -497,7 +497,7 @@ mod tests {
             execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(outcome.result.unwrap(), expected);
 
         // point not on curve fail

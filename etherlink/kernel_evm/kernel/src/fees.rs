@@ -530,7 +530,6 @@ mod tests {
     fn mock_execution_outcome(gas_used: u64) -> ExecutionOutcome {
         ExecutionOutcome {
             gas_used,
-            is_success: true,
             reason: ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
             new_address: None,
             logs: Vec::new(),

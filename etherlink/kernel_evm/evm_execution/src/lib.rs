@@ -187,7 +187,7 @@ where
         match outcome.reason {
             ExtendedExitReason::Exit(ExitReason::Revert(_))
             | ExtendedExitReason::OutOfTicks => pay_for_gas,
-            _ => pay_for_gas && outcome.is_success,
+            _ => pay_for_gas && outcome.is_success(),
         }
     }
 
@@ -249,7 +249,7 @@ where
                 trace_outcome(
                     handler,
                     tracing,
-                    result.is_success,
+                    result.is_success(),
                     &result.result,
                     result.gas_used,
                 )?;
@@ -488,7 +488,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
-            is_success: false,
             reason: ExitReason::Error(ExitError::OutOfFund).into(),
             new_address: None,
             logs: vec![],
@@ -556,7 +555,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
@@ -618,7 +616,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
-            is_success: false,
             reason: ExitReason::Error(ExitError::OutOfFund).into(),
             new_address: None,
             logs: vec![],
@@ -685,7 +682,7 @@ mod test {
             "execution should have produced some outcome"
         );
         let result = result.unwrap();
-        assert!(result.is_success, "transaction should have succeeded");
+        assert!(result.is_success(), "transaction should have succeeded");
         assert_eq!(
             new_address, result.new_address,
             "Contract addess not its expected value"
@@ -718,7 +715,7 @@ mod test {
             "execution should have produced some outcome"
         );
         let result = result.unwrap();
-        assert!(result.is_success, "transaction should have succeeded");
+        assert!(result.is_success(), "transaction should have succeeded");
         assert!(result.result.is_some(), "Call should have returned a value");
         let value = U256::from_little_endian(result.result.unwrap().as_slice());
         assert_eq!(U256::zero(), value, "unexpected result value");
@@ -749,7 +746,7 @@ mod test {
             "execution should have produced some outcome"
         );
         let result = result.unwrap();
-        assert!(result.is_success, "transaction should have succeeded");
+        assert!(result.is_success(), "transaction should have succeeded");
         assert!(result.result.is_some(), "Call should have returned a value");
         let value = U256::from_big_endian(result.result.unwrap().as_slice());
         assert_eq!(U256::zero(), value, "unexpected result value");
@@ -779,7 +776,7 @@ mod test {
             "execution should have produced some outcome"
         );
         let result = result.unwrap();
-        assert!(result.is_success, "transaction should have succeeded");
+        assert!(result.is_success(), "transaction should have succeeded");
         assert!(result.result.is_some(), "Call should have returned a value");
         let value = U256::from_big_endian(result.result.unwrap().as_slice());
         assert_eq!(U256::from(42), value, "unexpected result value");
@@ -834,7 +831,7 @@ mod test {
         let result = result.unwrap();
         assert!(result.is_some());
         let result = result.unwrap();
-        assert!(result.is_success);
+        assert!(result.is_success());
         assert_eq!(
             Some(H160::from_str("907823e0a92f94355968feb2cbf0fbb594fe3214").unwrap()),
             result.new_address
@@ -885,7 +882,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
-            is_success: false,
             reason: ExitReason::Error(ExitError::DesignatedInvalid).into(),
             new_address: None,
             logs: vec![],
@@ -944,7 +940,6 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
@@ -1094,7 +1089,6 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
@@ -1160,7 +1154,6 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: false,
             reason: ExitReason::Revert(ExitRevert::Reverted).into(),
             new_address: None,
             logs: vec![],
@@ -1222,7 +1215,6 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
-            is_success: false,
             reason: ExitReason::Error(ExitError::DesignatedInvalid).into(),
             new_address: None,
             logs: vec![],
@@ -1281,7 +1273,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
-            is_success: false,
             reason: ExitReason::Error(ExitError::DesignatedInvalid).into(),
             new_address: None,
             logs: vec![],
@@ -1347,7 +1338,6 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
@@ -1409,7 +1399,6 @@ mod test {
             "0000000000000000000000007156526fbd7a3c72969b54f64e42c10fbb768c8a";
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 25676,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
@@ -1608,7 +1597,6 @@ mod test {
         // _all_ the gas allocated to the call (so 0xFFFF or 65535)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
@@ -1704,7 +1692,6 @@ mod test {
         // expect to spend _all_ the gas.
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             // No logs were produced
@@ -1830,7 +1817,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![log_record1, log_record2],
@@ -1939,7 +1925,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![log_record1],
@@ -2035,7 +2020,6 @@ mod test {
         + 5124; // execution gas cost (taken at face value from tests)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
@@ -2155,8 +2139,6 @@ mod test {
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: all_the_gas,
-            is_success: false,
-
             reason: ExitReason::Error(ExitError::InvalidCode(Opcode::INVALID)).into(),
             new_address: None,
             logs: vec![],
@@ -2261,7 +2243,6 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
@@ -2347,7 +2328,6 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            is_success: true,
             new_address: None,
             logs: vec![],
             result: Some(base_fee_per_gas_bytes.into()),
@@ -2367,7 +2347,8 @@ mod test {
             assert!(tmp.is_some(), "Couldn't unwrap, Option was None");
             let tmp = tmp.as_ref().unwrap();
             assert_eq!(
-                tmp.is_success, $expect_success,
+                tmp.is_success(),
+                $expect_success,
                 "outcome field 'is_success' should be {}",
                 $expect_success
             );

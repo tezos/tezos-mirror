@@ -165,7 +165,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(Some(vec![]), outcome.result);
     }
 
@@ -181,7 +181,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(Some(vec![]), outcome.result);
     }
 
@@ -257,7 +257,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(
             hex::encode(expected_output),
             hex::encode(outcome.result.unwrap())
@@ -319,7 +319,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(
             hex::encode(expected_output),
             hex::encode(outcome.result.unwrap())
