@@ -206,7 +206,7 @@ struct
       ~long:"enable-performance-metrics"
       ~doc:
         "Enable performance metrics when the metrics server is started \
-         (disabled by default)."
+         (requires lsof, disabled by default)."
       ()
 
   let dac_observer_endpoint_arg =
