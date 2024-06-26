@@ -297,7 +297,7 @@ type t = {
   bakers : baker list;
   producers : producer list;
   observers : observer list;
-  etherlink : etherlink;
+  etherlink : etherlink option;
   parameters : Dal_common.Parameters.t;
   infos : (int, per_level_info) Hashtbl.t;
   metrics : (int, metrics) Hashtbl.t;
@@ -1105,11 +1105,16 @@ let init ~(configuration : configuration) cloud next_agent =
   in
   let* etherlink_agent = next_agent ~name:"etherlink" in
   let* etherlink =
-    init_etherlink
-      cloud
-      ~bootstrap_node:bootstrap.node
-      etherlink_rollup_operator_key
-      etherlink_agent
+    if Cli.etherlink then
+      let* etherlink =
+        init_etherlink
+          cloud
+          ~bootstrap_node:bootstrap.node
+          etherlink_rollup_operator_key
+          etherlink_agent
+      in
+      some etherlink
+    else none
   in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
@@ -1317,7 +1322,11 @@ let benchmark () =
           let* t = init ~configuration cloud next_agent in
           let first_protocol_level = 2 in
           let main_loop = loop t first_protocol_level in
-          let etherlink_loop = etherlink_loop t.etherlink in
+          let etherlink_loop =
+            match t.etherlink with
+            | None -> unit
+            | Some etherlink -> etherlink_loop etherlink
+          in
           Lwt.join [main_loop; etherlink_loop])
 
 let register () = benchmark ()
