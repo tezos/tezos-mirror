@@ -139,7 +139,7 @@ pub fn ticks_of_valid_transaction(
         }
         // Ticks are already spent during the validation of the transaction (see
         // apply.rs).
-        Deposit(_) => resulting_ticks,
+        Deposit(_) | FaDeposit(_) => resulting_ticks,
     }
 }
 

@@ -87,6 +87,16 @@ let reveal_config = "/__tmp/reveal_config"
 
 let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
 
+module Ticket_table = struct
+  let ticket_table =
+    sf
+      "%s/ticket_table"
+      (eth_account "0x0000000000000000000000000000000000000000")
+
+  let balance ~ticket_hash ~account =
+    String.concat "/" [ticket_table; ticket_hash; account]
+end
+
 module Ghostnet = struct
   let eth_accounts = evm "/eth_accounts"
 

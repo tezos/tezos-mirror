@@ -146,7 +146,7 @@ pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
 // If this path contains a value, the fa bridge is enabled in the kernel.
-const ENABLE_FA_BRIDGE: RefPath =
+pub const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
 
 // If the flag is set, the kernel consider that this is local evm node execution.

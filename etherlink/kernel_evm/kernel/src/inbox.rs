@@ -25,6 +25,7 @@ use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
+use evm_execution::fa_bridge::deposit::FaDeposit;
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
@@ -74,11 +75,13 @@ pub enum TransactionContent {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
     EthereumDelayed(EthereumTransactionCommon),
+    FaDeposit(FaDeposit),
 }
 
 const ETHEREUM_TX_TAG: u8 = 1;
 const DEPOSIT_TX_TAG: u8 = 2;
 const ETHEREUM_DELAYED_TX_TAG: u8 = 3;
+const FA_DEPOSIT_TX_TAG: u8 = 4;
 
 impl Encodable for TransactionContent {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
@@ -95,6 +98,10 @@ impl Encodable for TransactionContent {
             TransactionContent::EthereumDelayed(eth) => {
                 stream.append(&ETHEREUM_DELAYED_TX_TAG);
                 eth.rlp_append(stream)
+            }
+            TransactionContent::FaDeposit(fa_dep) => {
+                stream.append(&FA_DEPOSIT_TX_TAG);
+                fa_dep.rlp_append(stream)
             }
         }
     }
@@ -123,6 +130,10 @@ impl Decodable for TransactionContent {
                 let eth = EthereumTransactionCommon::decode(&tx)?;
                 Ok(Self::EthereumDelayed(eth))
             }
+            FA_DEPOSIT_TX_TAG => {
+                let fa_deposit = FaDeposit::decode(&tx)?;
+                Ok(Self::FaDeposit(fa_deposit))
+            }
             _ => Err(DecoderError::Custom("Unknown transaction tag.")),
         }
     }
@@ -142,14 +153,15 @@ impl Transaction {
                 // FIXME: probably need to take into account the access list
                 e.data.len() as u64
             }
+            TransactionContent::FaDeposit(_) => 0,
         }
     }
 
     pub fn is_delayed(&self) -> bool {
         match &self.content {
-            TransactionContent::Deposit(_) | TransactionContent::EthereumDelayed(_) => {
-                true
-            }
+            TransactionContent::Deposit(_)
+            | TransactionContent::EthereumDelayed(_)
+            | TransactionContent::FaDeposit(_) => true,
             TransactionContent::Ethereum(_) => false,
         }
     }
@@ -183,7 +195,9 @@ impl Transaction {
     pub fn type_(&self) -> TransactionType {
         match &self.content {
             // The deposit is considered arbitrarily as a legacy transaction
-            TransactionContent::Deposit(_) => TransactionType::Legacy,
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
+                TransactionType::Legacy
+            }
             TransactionContent::Ethereum(tx)
             | TransactionContent::EthereumDelayed(tx) => tx.type_,
         }
@@ -201,6 +215,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
     tezos_contracts: &TezosContracts,
     inbox_is_empty: &mut bool,
     parsing_context: &mut Mode::Context,
+    enable_fa_deposits: bool,
 ) -> Result<InputResult<Mode>, Error> {
     let input = host.read_input()?;
 
@@ -213,6 +228,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
                 smart_rollup_address,
                 tezos_contracts,
                 parsing_context,
+                enable_fa_deposits,
             ))
         }
         None => Ok(InputResult::NoInput),
@@ -233,6 +249,12 @@ pub trait InputHandler {
     fn handle_deposit<Host: Runtime>(
         host: &mut Host,
         deposit: Deposit,
+        inbox_content: &mut Self::Inbox,
+    ) -> anyhow::Result<()>;
+
+    fn handle_fa_deposit<Host: Runtime>(
+        host: &mut Host,
+        fa_deposit: FaDeposit,
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>;
 }
@@ -280,6 +302,17 @@ impl InputHandler for ProxyInput {
             .push(handle_deposit(host, deposit)?);
         Ok(())
     }
+
+    fn handle_fa_deposit<Host: Runtime>(
+        host: &mut Host,
+        fa_deposit: FaDeposit,
+        inbox_content: &mut Self::Inbox,
+    ) -> anyhow::Result<()> {
+        inbox_content
+            .transactions
+            .push(handle_fa_deposit(host, fa_deposit)?);
+        Ok(())
+    }
 }
 
 impl InputHandler for SequencerInput {
@@ -323,6 +356,17 @@ impl InputHandler for SequencerInput {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         let tx = handle_deposit(host, deposit)?;
+        delayed_inbox.save_transaction(host, tx, previous_timestamp, level)
+    }
+
+    fn handle_fa_deposit<Host: Runtime>(
+        host: &mut Host,
+        fa_deposit: FaDeposit,
+        delayed_inbox: &mut Self::Inbox,
+    ) -> anyhow::Result<()> {
+        let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+        let level = read_l1_level(host)?;
+        let tx = handle_fa_deposit(host, fa_deposit)?;
         delayed_inbox.save_transaction(host, tx, previous_timestamp, level)
     }
 }
@@ -406,6 +450,18 @@ fn handle_deposit<Host: Runtime>(
     })
 }
 
+fn handle_fa_deposit<Host: Runtime>(
+    host: &mut Host,
+    fa_deposit: FaDeposit,
+) -> Result<Transaction, Error> {
+    let seed = host.reveal_metadata().raw_rollup_address;
+    let tx_hash = fa_deposit.hash(&seed).into();
+    Ok(Transaction {
+        tx_hash,
+        content: TransactionContent::FaDeposit(fa_deposit),
+    })
+}
+
 fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
     match upgrade::read_kernel_upgrade(host)? {
         Some(kernel_upgrade) => {
@@ -442,6 +498,9 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             store_l1_level(host, info.level)?
         }
         Input::Deposit(deposit) => Mode::handle_deposit(host, deposit, inbox_content)?,
+        Input::FaDeposit(fa_deposit) => {
+            Mode::handle_fa_deposit(host, fa_deposit, inbox_content)?
+        }
         Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
     }
     Ok(())
@@ -460,6 +519,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
+    enable_fa_deposits: bool,
 ) -> anyhow::Result<ReadStatus> {
     let input: InputResult<Mode> = read_input(
         host,
@@ -467,6 +527,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
         tezos_contracts,
         inbox_is_empty,
         parsing_context,
+        enable_fa_deposits,
     )?;
     match input {
         InputResult::NoInput => {
@@ -500,6 +561,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
+    enable_fa_deposits: bool,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -517,6 +579,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             &mut (),
             &mut inbox_is_empty,
             &mut res,
+            enable_fa_deposits,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -564,6 +627,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     sequencer: PublicKey,
     delayed_inbox: &mut DelayedInbox,
+    enable_fa_deposits: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -599,6 +663,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             &mut parsing_context,
             &mut inbox_is_empty,
             delayed_inbox,
+            enable_fa_deposits,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -768,10 +833,14 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap()
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap()
+        .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -793,10 +862,14 @@ mod tests {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap()
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap()
+        .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -848,6 +921,7 @@ mod tests {
                 kernel_governance: None,
                 kernel_security_governance: None,
             },
+            false,
         )
         .unwrap()
         .unwrap();
@@ -888,9 +962,13 @@ mod tests {
             new_chunk2,
         )));
 
-        let _inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap();
+        let _inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
             .expect("The number of chunks should exist");
@@ -932,9 +1010,13 @@ mod tests {
         };
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap();
+        let _inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -965,9 +1047,13 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap();
+        let _inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -1014,10 +1100,14 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap()
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(
             inbox_content,
             ProxyInboxContent {
@@ -1029,10 +1119,14 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap()
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap()
+        .unwrap();
 
         let expected_transactions = vec![Transaction {
             tx_hash,
@@ -1086,10 +1180,14 @@ mod tests {
 
         host.add_external(framed);
 
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap()
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap()
+        .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -1105,15 +1203,23 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         host.add_external(Bytes::from(vec![]));
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
-        let inbox_content =
-            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            false,
+        )
+        .unwrap();
         assert!(inbox_content.is_none());
     }
 }

@@ -68,6 +68,9 @@ pub const FA_DEPOSIT_PROXY_GAS_LIMIT: u64 = 1_200_000;
 /// the global ticket table and emitting deposit event.
 pub const FA_DEPOSIT_INNER_TICKS: u64 = 2_000_000;
 
+/// Number of ticks used to parse FA deposit
+pub const TICKS_PER_FA_DEPOSIT_PARSING: u64 = 2_000_000;
+
 /// TODO: Overapproximation of the amount of ticks required
 /// to execute a FA deposit.
 pub const FA_DEPOSIT_TOTAL_TICKS: u64 = 10_000_000;

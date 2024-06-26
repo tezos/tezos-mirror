@@ -86,6 +86,8 @@ pub enum Error {
     Storage(StorageError),
     #[error("Invalid conversion")]
     InvalidConversion,
+    #[error("Failed to decode: {0}")]
+    RlpDecoderError(DecoderError),
     #[error("Invalid parsing")]
     InvalidParsing,
     #[error(transparent)]
@@ -133,8 +135,8 @@ impl From<TransferError> for Error {
 }
 
 impl From<DecoderError> for Error {
-    fn from(_: DecoderError) -> Self {
-        Self::InvalidConversion
+    fn from(e: DecoderError) -> Self {
+        Self::RlpDecoderError(e)
     }
 }
 

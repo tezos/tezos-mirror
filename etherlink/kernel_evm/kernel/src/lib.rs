@@ -356,8 +356,11 @@ mod tests {
     use crate::fees;
     use crate::main;
     use crate::mock_internal::MockInternal;
+    use crate::parsing::RollupType;
     use crate::safe_storage::SafeStorage;
-    use crate::storage::store_chain_id;
+    use crate::storage::{
+        read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
+    };
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
@@ -365,13 +368,16 @@ mod tests {
         upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
+    use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::handler::RouterInterface;
     use evm_execution::utilities::keccak256_hash;
     use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
+    use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
+    use tezos_ethereum::transaction::TransactionStatus;
     use tezos_ethereum::{
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
@@ -379,7 +385,7 @@ mod tests {
 
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
-        MichelsonContract, MichelsonOption, MichelsonPair,
+        MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonOption, MichelsonPair,
     };
     use tezos_smart_rollup::outbox::{OutboxMessage, OutboxMessageTransaction};
     use tezos_smart_rollup::types::{Contract, Entrypoint};
@@ -389,7 +395,7 @@ mod tests {
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
@@ -766,5 +772,103 @@ mod tests {
             OutboxMessage::AtomicTransactionBatch(vec![expected_transaction].into());
 
         assert_eq!(expected_message, decoded_message);
+    }
+
+    fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
+        // init host
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut safe_storage = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
+
+        // enable FA bridge feature
+        if enable_fa_bridge {
+            safe_storage
+                .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
+                .unwrap();
+        }
+
+        // init rollup parameters (legacy optimized forge)
+        // type:
+        //   (or
+        //     (or (pair %deposit (bytes %routing_info)
+        //                        (ticket %ticket (pair %content (nat %token_id)
+        //                                                       (option %metadata bytes))))
+        //         (bytes %b))
+        //     (bytes %c))
+        // value:
+        // {
+        //   "deposit": {
+        //     "routing_info": "01" * 20 + "02" * 20,
+        //     "ticket": (
+        //         "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
+        //         (1, None),
+        //         42
+        //     )
+        //   }
+        // }
+        let params = hex::decode(
+            "\
+            0505050507070a00000028010101010101010101010101010101010101010102\
+            0202020202020202020202020202020202020207070a0000001601d496def47a\
+            3be89f5d54c6e6bb13cc6645d6e166000707070700010306002a",
+        )
+        .unwrap();
+        let (_, payload) =
+            RollupType::nom_read(&params).expect("Failed to decode params");
+
+        let metadata = TransferMetadata::new(
+            "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
+            "tz1P2Po7YM526ughEsRbY4oR9zaUPDZjxFrb",
+        );
+        safe_storage.host.add_transfer(payload, &metadata);
+
+        // run kernel
+        main(&mut safe_storage).expect("Kernel error");
+        // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
+        main(&mut safe_storage).expect("Kernel error");
+
+        // reconstruct ticket
+        let ticket = FA2_1Ticket::new(
+            Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
+                )
+                .unwrap(),
+            ),
+            MichelsonPair::<MichelsonNat, MichelsonOption<MichelsonBytes>>(
+                1u32.into(),
+                MichelsonOption(None),
+            ),
+            42i32,
+        )
+        .expect("Failed to construct ticket");
+
+        // reconstruct deposit
+        let deposit = FaDeposit {
+            amount: 42.into(),
+            proxy: Some(H160([2u8; 20])),
+            inbox_level: safe_storage.host.level(), // level not yet advanced
+            inbox_msg_id: 2,
+            receiver: H160([1u8; 20]),
+            ticket_hash: ticket_hash(&ticket).unwrap(),
+        };
+        // smart rollup address as a seed
+        let tx_hash = deposit.hash(&[0u8; 20]);
+
+        // read transaction receipt
+        read_transaction_receipt_status(&mut safe_storage, &tx_hash.0).ok()
+    }
+
+    #[test]
+    fn test_fa_deposit_applied_if_feature_enabled() {
+        assert_eq!(send_fa_deposit(true), Some(TransactionStatus::Success));
+    }
+
+    #[test]
+    fn test_fa_deposit_rejected_if_feature_disabled() {
+        assert_eq!(send_fa_deposit(false), None);
     }
 }

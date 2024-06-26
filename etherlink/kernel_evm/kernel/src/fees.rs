@@ -82,12 +82,23 @@ impl TransactionContent {
             Self::EthereumDelayed(_) => {
                 FeeUpdates::for_delayed_tx(block_fees, execution_gas_used)
             }
+            Self::FaDeposit(_) => FeeUpdates::for_fa_deposit(execution_gas_used),
         }
     }
 }
 
 impl FeeUpdates {
     fn for_deposit(gas_used: U256) -> Self {
+        Self {
+            overall_gas_used: gas_used,
+            overall_gas_price: U256::zero(),
+            burn_amount: U256::zero(),
+            charge_user_amount: U256::zero(),
+            compensate_sequencer_amount: U256::zero(),
+        }
+    }
+
+    fn for_fa_deposit(gas_used: U256) -> Self {
         Self {
             overall_gas_used: gas_used,
             overall_gas_price: U256::zero(),
