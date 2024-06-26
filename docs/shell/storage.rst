@@ -58,7 +58,7 @@ Pruning
 *******
 
 When the complete (hence, un-reorganizable) cycle is retrieved, it is
-archived with the *cemented cycles*. This process is
+archived in the *cemented cycles*. This process is
 called a **merge** and is performed asynchronously. Depending on which
 history mode is ran and on the amount of additional cycles, blocks
 and/or their associated metadata present in these cemented cycles may
