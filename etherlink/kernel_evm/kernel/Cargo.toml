@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 # SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 #
@@ -26,7 +26,7 @@ softfloat.workspace = true
 rlp.workspace = true
 hex.workspace = true
 
-bytes.worspace = true
+bytes.workspace = true
 
 sha3.workspace = true
 libsecp256k1.workspace = true
