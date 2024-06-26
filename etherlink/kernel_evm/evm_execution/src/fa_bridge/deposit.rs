@@ -34,7 +34,10 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::Log;
 use tezos_smart_rollup_encoding::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
-use crate::utilities::{bigint_to_u256, keccak256_hash};
+use crate::{
+    abi::{ABI_H160_LEFT_PADDING, ABI_U32_LEFT_PADDING},
+    utilities::{bigint_to_u256, keccak256_hash},
+};
 
 use super::error::FaBridgeError;
 
@@ -47,11 +50,6 @@ pub const DEPOSIT_METHOD_ID: &[u8; 4] = b"\x0e\xfe\x6a\x8b";
 pub const DEPOSIT_EVENT_TOPIC: &[u8; 32] = b"\
     \x7e\xe7\xa1\xde\x9c\x18\xce\x69\x5c\x95\xb8\xb1\x9f\xbd\xf2\x6c\
     \xce\x35\x44\xe3\xca\x9e\x08\xc9\xf4\x87\x77\x67\x83\xd7\x59\x9f";
-
-/// All arguments in ABI encoding are padded to 32 bytes
-/// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
-const ABI_H160_LEFT_PADDING: [u8; 12] = [0u8; 12];
-const ABI_U32_LEFT_PADDING: [u8; 28] = [0u8; 28];
 
 /// Overapproximation for the typical FA ticket payload (ticketer address and content)
 const TICKET_PAYLOAD_SIZE_HINT: usize = 200;
@@ -82,7 +80,7 @@ impl FaDeposit {
         inbox_msg_id: u32,
     ) -> Result<Self, FaBridgeError> {
         let amount = bigint_to_u256(ticket.amount())?;
-        let (receiver, proxy) = parse_routing_info(routing_info)?;
+        let (receiver, proxy) = parse_l2_routing_info(routing_info)?;
         let ticket_hash = ticket_hash(&ticket)?;
 
         Ok(FaDeposit {
@@ -174,7 +172,7 @@ impl FaDeposit {
 }
 
 /// Split routing info (raw bytes passed along with the ticket) into receiver and optional proxy addresses.
-fn parse_routing_info(
+fn parse_l2_routing_info(
     routing_info: MichelsonBytes,
 ) -> Result<(H160, Option<H160>), FaBridgeError> {
     if routing_info.0.len() == 20 {

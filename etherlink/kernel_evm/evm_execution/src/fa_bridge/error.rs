@@ -18,7 +18,7 @@ pub enum FaBridgeError {
     InvalidRoutingInfo(&'static str),
 
     #[error("Ticket parsing error: {0}")]
-    TicketParseError(&'static str),
+    TicketConstructError(&'static str),
 
     #[error("Entrypoint pasing error")]
     EntrypointParseError,

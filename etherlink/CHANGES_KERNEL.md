@@ -38,6 +38,7 @@
   `s` hash compressed were impacted. (!13654)
 - Allows a `/__evm_node` flag in the kernel to have a different logic whether
   the kernel is run by the evm-node or the rollup node. (!13827)
+- Add FA withdrawal structure and helper methods for parsing and encoding. (!13843)
 
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
