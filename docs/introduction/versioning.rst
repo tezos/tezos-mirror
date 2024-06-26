@@ -121,9 +121,3 @@ Currently, the following RPCs are subject to the deprecation policy.
 - Deprecated: v8.0, January 2021
 - Planned Sunset: v21.0 (not before Q3 2024)
 - Comment: Use `/version <../shell/rpc.html#get-version>`__ instead.
-
-`/chains/<chain_id>/checkpoint <../shell/rpc.html#get-chains-chain-id-checkpoint>`__
-
-- Deprecated: v12.0, February 2022
-- Planned Sunset: v21.0 (not before Q3 2024)
-- Comment: Use `/levels/checkpoint <../shell/rpc.html#get-chains-chain-id-levels-checkpoint>`__, `/levels/caboose <../shell/rpc.html#get-chains-chain-id-levels-caboose>`__, `/levels/savepoint <../shell/rpc.html#get-chains-chain-id-levels-savepoint>`__, or `/config/history_mode <../shell/rpc.html#get-config-history-mode>`__ instead to obtain the current checkpoint for this chain.
