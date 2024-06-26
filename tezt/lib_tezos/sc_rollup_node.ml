@@ -327,10 +327,15 @@ let spawn_command sc_node args =
 
 let runlike_argument rollup_node =
   let rollup_node_state = rollup_node.persistent_state in
+  let metrics_arg =
+    let metrics_addr, metrics_port = metrics rollup_node in
+    match rollup_node.persistent_state.runner with
+    | None -> metrics_addr ^ ":" ^ string_of_int metrics_port
+    | Some _ -> "0.0.0.0:" ^ string_of_int metrics_port
+  in
   [
     Data_dir (data_dir rollup_node);
-    (let metrics_addr, metrics_port = metrics rollup_node in
-     Metrics_addr (metrics_addr ^ ":" ^ string_of_int metrics_port));
+    Metrics_addr metrics_arg;
     Rpc_addr (rpc_host rollup_node);
     Rpc_port (rpc_port rollup_node);
     History_mode rollup_node_state.history_mode;
