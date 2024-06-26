@@ -168,6 +168,11 @@ val get_global_block_durable_state_value :
 val post_local_batcher_injection :
   ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
 
+(** RPC: [POST local/dal/injection] injects the given DAL [slot_content] at
+    [slot_index] in the rollup node's DAL queue. *)
+val post_local_dal_injection :
+  slot_content:string -> slot_index:int -> unit RPC_core.t
+
 type outbox_proof = {commitment_hash : string; proof : string}
 
 (** RPC: [GET global/block/<block>/helpers/proofs/outbox/<outbox_level>/messages] *)

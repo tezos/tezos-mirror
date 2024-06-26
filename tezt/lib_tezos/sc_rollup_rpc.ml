@@ -243,6 +243,19 @@ let post_local_batcher_injection ?drop_duplicate ~messages () =
     ~data
     JSON.(fun json -> as_list json |> List.map as_string)
 
+let post_local_dal_injection ~slot_content ~slot_index =
+  let data =
+    `O
+      [
+        ("slot_content", `String slot_content);
+        ("slot_index", `Float (float_of_int slot_index));
+      ]
+  in
+  make POST ["local"; "dal"; "injection"] ~data:(Data data) (fun json ->
+      match JSON.as_object json with
+      | [] -> ()
+      | _ -> JSON.error json "Not an empty object")
+
 type outbox_proof = {commitment_hash : string; proof : string}
 
 let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =

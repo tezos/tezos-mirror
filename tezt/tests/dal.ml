@@ -436,8 +436,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover variant
-    scenario =
+    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover
+    ?attestation_threshold variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -469,6 +469,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?activation_timestamp
         ?smart_rollup_timeout_period_in_blocks
         ?prover
+        ?attestation_threshold
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
@@ -938,8 +939,10 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let attestation =
     match metadata.dal_attestation with
     | None ->
-        assert false
         (* Field is part of the encoding when the feature flag is true *)
+        Test.fail
+          "Field dal_attestation in block headers is mandatory when DAL is \
+           activated"
     | Some x -> x
   in
   Check.(
@@ -7142,6 +7145,57 @@ module Refutations = struct
       ~msg:(rex "lost the refutation game")
 end
 
+(** This test injects a DAL slot to (DAL and L1) network(s) via the rollup node
+    using {!post_local_dal_injection} rollup RPC. It then checks that the slot
+    is attested, which implies that the commitment is published to L1 and that
+    the shards of the slot are declared available by the DAL node.  *)
+let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
+    sc_rollup_address node client _pvm_name =
+  let* () = Sc_rollup_node.run sc_node sc_rollup_address [] in
+  let dal_node_endpoint = Helpers.endpoint dal_node in
+  let* () =
+    Sc_rollup_node.RPC.call sc_node
+    @@ Sc_rollup_rpc.post_local_dal_injection
+         ~slot_content:"Hello DAL from a Smart Rollup"
+         ~slot_index:0
+  in
+  (* We need to bake once to get the commitment injected and once more to have it
+     included in a block. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* () = bake_for ~dal_node_endpoint client in
+        let* level = Client.level client in
+        let* _level =
+          Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
+        in
+        unit)
+  in
+  let* () =
+    repeat parameters.Dal.Parameters.attestation_lag (fun () ->
+        let* () = bake_for ~dal_node_endpoint client in
+        let* level = Client.level client in
+        let* _level =
+          Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
+        in
+        unit)
+  in
+  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
+  let expected_dal_attestation = [|true|] in
+  let obtained_dal_attestation =
+    match metadata.dal_attestation with
+    | None ->
+        (* Field is part of the encoding when the feature flag is true *)
+        Test.fail
+          "Field dal_attestation in block headers is mandatory when DAL is \
+           activated"
+    | Some x -> x
+  in
+  Check.(
+    (expected_dal_attestation = obtained_dal_attestation)
+      (array bool)
+      ~error_msg:"Expected attestation bitset %L, got %R") ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -7458,6 +7512,19 @@ let register ~protocols =
        ~refute_operations_priority:`Honest_first)
     ~smart_rollup_timeout_period_in_blocks:20
     ~tags:[Tag.slow]
+    protocols ;
+
+  scenario_with_all_nodes
+    "Rollup injects DAL slots"
+    ~regression:false
+    ~pvm_name:"wasm_2_0_0"
+    ~commitment_period:5
+    rollup_node_injects_dal_slots
+    ~producer_profiles:[0]
+      (* It it sufficient for a single baker here to receive some shards here to
+         declare the slot available. Otherwise the test might be flaky as we
+         bake with a timestamp in the past. *)
+    ~attestation_threshold:1
     protocols ;
 
   (* Register end-to-end tests *)
