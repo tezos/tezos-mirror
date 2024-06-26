@@ -8,7 +8,6 @@
   tezt.core
   octez-libs.base
   octez-shell-libs.shell-services
-  octez-alcotezt
   octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
@@ -16,8 +15,7 @@
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_shell_services
-  -open Octez_alcotezt)
+  -open Tezos_shell_services)
  (modules test_block_services))
 
 (executable
