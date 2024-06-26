@@ -1,9 +1,9 @@
 bls12-381	all	7
 octez-accuser-PsParisC	exec	1
-octez-accuser-PtParisB	exec	1
+octez-accuser-PtParisB	exec	2
 octez-alcotezt	all	7
 octez-baker-PsParisC	exec	1
-octez-baker-PtParisB	exec	1
+octez-baker-PtParisB	exec	2
 octez-client	exec	1
 octez-codec	exec	1
 octez-crawler	all	4
@@ -53,10 +53,10 @@ octez-shell-libs	all	6
 octez-signer	exec	4
 octez-smart-rollup-node	exec	1
 octez-smart-rollup-node-Proxford	all	2
-octez-smart-rollup-node-PsParisC	all	2
+octez-smart-rollup-node-PsParisC	all	1
 octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2
-octez-smart-rollup-node-alpha	all	2
+octez-smart-rollup-node-alpha	all	1
 octez-smart-rollup-node-lib	all	2
 octez-smart-rollup-wasm-debugger	exec	1
 octez-smart-rollup-wasm-debugger-lib	all	2
