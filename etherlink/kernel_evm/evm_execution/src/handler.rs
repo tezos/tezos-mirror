@@ -578,7 +578,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Add withdrawals to the current transaction layer
-    fn add_withdrawals(
+    pub fn add_withdrawals(
         &mut self,
         withdrawals: &mut Vec<Withdrawal>,
     ) -> Result<(), EthereumError> {

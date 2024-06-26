@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+use alloy_primitives::FixedBytes;
 use alloy_sol_types::SolEvent;
+use evm::{ExitError, ExitReason};
 use primitive_types::{H160, U256};
 use tezos_smart_rollup_mock::MockHost;
 
@@ -10,9 +12,12 @@ use crate::{
     account_storage::{account_path, init_account_storage},
     fa_bridge::test_utils::{
         convert_h160, convert_log, convert_u256, deploy_mock_wrapper, dummy_fa_deposit,
-        dummy_ticket, get_storage_flag, kernel_wrapper, run_fa_deposit,
-        ticket_balance_add, ticket_balance_get, token_wrapper,
+        dummy_fa_withdrawal, dummy_ticket, fa_bridge_precompile_call_withdraw,
+        get_storage_flag, kernel_wrapper, run_fa_deposit, ticket_balance_add,
+        ticket_balance_get, token_wrapper,
     },
+    handler::ExtendedExitReason,
+    storage::withdraw_nonce,
 };
 
 #[test]
@@ -274,5 +279,178 @@ fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
             &deposit.proxy.unwrap()
         ),
         U256::MAX
+    );
+}
+
+#[test]
+fn fa_withdrawal_executed_via_l2_proxy_contract() {
+    let mut mock_runtime = MockHost::default();
+    let mut evm_account_storage = init_account_storage().unwrap();
+
+    let sender = H160::from_low_u64_be(1);
+    let caller = H160::zero();
+    let ticket = dummy_ticket();
+
+    let proxy = deploy_mock_wrapper(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &ticket,
+        &caller,
+        0,
+    )
+    .new_address
+    .unwrap();
+
+    let withdrawal = dummy_fa_withdrawal(ticket, sender, proxy);
+
+    // Patch ticket table
+    ticket_balance_add(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &withdrawal.ticket_hash,
+        &proxy,
+        withdrawal.amount,
+    );
+
+    let res = fa_bridge_precompile_call_withdraw(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        withdrawal,
+        caller,
+    );
+    assert!(res.is_success());
+    assert!(!res.withdrawals.is_empty());
+    assert_eq!(2, res.logs.len());
+
+    // Re-create withdrawal struct
+    let withdrawal = dummy_fa_withdrawal(dummy_ticket(), sender, proxy);
+
+    // Ensure proxy contract state changed
+    let flag = get_storage_flag(&mock_runtime, &evm_account_storage, proxy);
+    assert_eq!(withdrawal.amount.as_u32(), flag);
+
+    // Ensure ticket balance reduced to zero (if not then will overflow)
+    assert!(ticket_balance_add(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &withdrawal.ticket_hash,
+        &withdrawal.ticket_owner,
+        U256::MAX,
+    ));
+
+    // Ensure events are emitted correctly
+    let withdrawal_event =
+        kernel_wrapper::Withdrawal::decode_log_data(&convert_log(&res.logs[0]), true)
+            .expect("Failed to parse Withdrawal event");
+
+    let burn_event =
+        token_wrapper::Burn::decode_log_data(&convert_log(&res.logs[1]), true)
+            .expect("Failed to parse Burn event");
+
+    assert_eq!(
+        withdrawal_event.ticketHash,
+        alloy_primitives::U256::from_be_bytes(withdrawal.ticket_hash.0)
+    );
+    assert_eq!(withdrawal_event.sender, convert_h160(&sender));
+    assert_eq!(
+        withdrawal_event.ticketOwner,
+        convert_h160(&withdrawal.ticket_owner)
+    );
+    assert_eq!(withdrawal_event.receiver, FixedBytes::new([0u8; 22]));
+    assert_eq!(withdrawal_event.amount, convert_u256(&withdrawal.amount));
+    assert_eq!(withdrawal_event.withdrawalId, convert_u256(&U256::from(0)));
+
+    assert_eq!(burn_event.sender, convert_h160(&withdrawal.sender));
+    assert_eq!(burn_event.amount, convert_u256(&withdrawal.amount));
+
+    // Ensure withdrawal counter is updated
+    assert_eq!(
+        U256::one(),
+        withdraw_nonce::get_and_increment(&mut mock_runtime).unwrap()
+    );
+}
+
+#[test]
+fn fa_withdrawal_fails_due_to_faulty_l2_proxy() {
+    let mut mock_runtime = MockHost::default();
+    let mut evm_account_storage = init_account_storage().unwrap();
+
+    let sender = H160::from_low_u64_be(1);
+    let caller = H160::zero();
+    let ticket = dummy_ticket();
+    let proxy = H160::from_low_u64_be(2); // non-existing contract
+
+    let withdrawal = dummy_fa_withdrawal(ticket, sender, proxy);
+
+    // Patch ticket table
+    ticket_balance_add(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &withdrawal.ticket_hash,
+        &proxy,
+        withdrawal.amount,
+    );
+
+    let res = fa_bridge_precompile_call_withdraw(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        withdrawal,
+        caller,
+    );
+    assert!(!res.is_success());
+    assert!(res.withdrawals.is_empty());
+    assert!(res.logs.is_empty());
+
+    // Re-create withdrawal struct
+    let withdrawal = dummy_fa_withdrawal(dummy_ticket(), sender, proxy);
+
+    // Ensure ticket balance is non-zero (should overflow)
+    assert!(!ticket_balance_add(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &withdrawal.ticket_hash,
+        &withdrawal.ticket_owner,
+        U256::MAX,
+    ));
+
+    // Ensure withdrawal counter is updated
+    assert_eq!(
+        U256::one(),
+        withdraw_nonce::get_and_increment(&mut mock_runtime).unwrap()
+    );
+    assert!(
+        matches!(res.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("Proxy contract does not exist"))
+    );
+}
+
+#[test]
+fn fa_withdrawal_fails_due_to_insufficient_balance() {
+    let mut mock_runtime = MockHost::default();
+    let mut evm_account_storage = init_account_storage().unwrap();
+
+    let sender = H160::from_low_u64_be(1);
+    let caller = H160::zero();
+    let ticket = dummy_ticket();
+    let proxy = H160::from_low_u64_be(2); // non-existing contract
+
+    let withdrawal = dummy_fa_withdrawal(ticket, sender, proxy);
+
+    let res = fa_bridge_precompile_call_withdraw(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        withdrawal,
+        caller,
+    );
+    assert!(!res.is_success());
+    assert!(res.withdrawals.is_empty());
+    assert!(res.logs.is_empty());
+
+    // Ensure withdrawal counter is not updated (returned before incrementing the nonce)
+    assert_eq!(
+        U256::zero(),
+        withdraw_nonce::get_and_increment(&mut mock_runtime).unwrap()
+    );
+    assert!(
+        matches!(res.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("Insufficient ticket balance"))
     );
 }
