@@ -10,7 +10,7 @@
 
 use crate::configuration::fetch_limits;
 use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
-use crate::storage::read_sequencer_pool_address;
+use crate::storage::{read_sequencer_pool_address, read_tracer_input};
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
@@ -21,6 +21,7 @@ use crate::{
 
 use evm::ExitReason;
 use evm_execution::handler::ExtendedExitReason;
+use evm_execution::trace::{get_tracer_config, TracerConfig};
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
@@ -241,6 +242,7 @@ impl Evaluation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
+        tracer_config: Option<TracerConfig>,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
@@ -309,7 +311,7 @@ impl Evaluation {
             allocated_ticks,
             false,
             false,
-            None,
+            tracer_config,
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
@@ -666,7 +668,9 @@ pub fn start_simulation_mode<Host: Runtime>(
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let outcome = simulation.run(host)?;
+            let trace_input = read_tracer_input(host)?;
+            let tracer_config = get_tracer_config(None, &trace_input);
+            let outcome = simulation.run(host, tracer_config)?;
             storage::store_simulation_result(host, outcome)
         }
         Message::TxValidation(tx_validation) => {
@@ -843,7 +847,7 @@ mod tests {
             value: None,
             with_da_fees: false,
         };
-        let outcome = evaluation.run(&mut host);
+        let outcome = evaluation.run(&mut host, None);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -868,7 +872,7 @@ mod tests {
             value: None,
             with_da_fees: false,
         };
-        let outcome = evaluation.run(&mut host);
+        let outcome = evaluation.run(&mut host, None);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -899,7 +903,7 @@ mod tests {
             value: None,
             with_da_fees: false,
         };
-        let outcome = evaluation.run(&mut host);
+        let outcome = evaluation.run(&mut host, None);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
