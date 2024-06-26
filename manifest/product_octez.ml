@@ -2332,6 +2332,7 @@ let tezt_cloud =
       [
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_performance_regression |> open_;
       ]
     ~release_status:Unreleased
 

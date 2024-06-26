@@ -34,6 +34,7 @@ type t = {
   agents : Agent.t list;
   website : Web.t option;
   prometheus : Prometheus.t option;
+  grafana : Grafana.t option;
   deployement : Deployement.t option;
 }
 
@@ -55,6 +56,9 @@ let shutdown ?exn t =
   in
   let* () =
     Option.fold ~none:Lwt.return_unit ~some:Prometheus.shutdown t.prometheus
+  in
+  let* () =
+    Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
   in
   let* () =
     Option.fold
@@ -109,7 +113,14 @@ let register ?(docker_push = true) ?vms ~__FILE__ ~title ~tags ?seed f =
   match vms with
   | None ->
       (* If there is no configuration, it is a similar scenario as if there were not agent. *)
-      f {agents = []; website = None; prometheus = None; deployement = None}
+      f
+        {
+          agents = [];
+          website = None;
+          grafana = None;
+          prometheus = None;
+          deployement = None;
+        }
   | Some configurations ->
       let ports_per_vm = Cli.ports_per_vm in
       let* deployement =
@@ -151,7 +162,15 @@ let register ?(docker_push = true) ?vms ~__FILE__ ~title ~tags ?seed f =
           Lwt.return_some prometheus
         else Lwt.return_none
       in
-      let t = {website; agents; prometheus; deployement = Some deployement} in
+      let* grafana =
+        if Cli.grafana then
+          let* grafana = Grafana.run () in
+          Lwt.return_some grafana
+        else Lwt.return_none
+      in
+      let t =
+        {website; agents; prometheus; grafana; deployement = Some deployement}
+      in
       let sigint = sigint () in
       let main_promise =
         (* We also catch error raised from the scenario directly. *)
