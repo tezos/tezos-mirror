@@ -67,7 +67,10 @@ let rlp_encode ({call; with_da_fees} : estimate_gas_input) =
   in
 
   (* we aim to use [String.chunk_bytes] *)
-  Rlp.encode rlp_form
+  if Option.is_some with_da_fees then
+    (* If with_da_fees is present, that's the new version of simulation. *)
+    Bytes.cat (Bytes.make 1 '\001') (Rlp.encode rlp_form)
+  else Rlp.encode rlp_form
 
 type simulation_message =
   | Start
