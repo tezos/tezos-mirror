@@ -232,10 +232,82 @@ impl From<Result<Option<ExecutionOutcome>, EthereumError>>
 }
 
 impl Evaluation {
-    /// Unserialize bytes as RLP encoded data.
-    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
-        let decoder = Rlp::new(bytes);
-        Evaluation::decode(&decoder)
+    fn rlp_decode_v0(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        // the proxynode works preferably with little endian
+        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
+        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
+        if decoder.is_list() {
+            if Ok(6) == decoder.item_count() {
+                let mut it = decoder.iter();
+                let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+                let gas: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
+                let gas_price: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
+                let value: Option<U256> =
+                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
+                let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+                Ok(Self {
+                    from,
+                    to,
+                    gas,
+                    gas_price,
+                    value,
+                    data,
+                    with_da_fees: true,
+                })
+            } else {
+                Err(DecoderError::RlpIncorrectListLen)
+            }
+        } else {
+            Err(DecoderError::RlpExpectedToBeList)
+        }
+    }
+
+    fn rlp_decode_v1(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        // the proxynode works preferably with little endian
+        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
+        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
+        if decoder.is_list() {
+            if Ok(7) == decoder.item_count() {
+                let mut it = decoder.iter();
+                let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+                let gas: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
+                let gas_price: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
+                let value: Option<U256> =
+                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
+                let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+                let with_da_fees: bool = decode_field(&next(&mut it)?, "with_da_fees")?;
+                Ok(Self {
+                    from,
+                    to,
+                    gas,
+                    gas_price,
+                    value,
+                    data,
+                    with_da_fees,
+                })
+            } else {
+                Err(DecoderError::RlpIncorrectListLen)
+            }
+        } else {
+            Err(DecoderError::RlpExpectedToBeList)
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
+        let first = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
+        if first == 0x01 {
+            let decoder = Rlp::new(&bytes[1..]);
+            Self::rlp_decode_v1(&decoder)
+        } else {
+            let decoder = Rlp::new(bytes);
+            Self::rlp_decode_v0(&decoder)
+        }
     }
 
     /// Execute the simulation
@@ -331,50 +403,6 @@ impl Evaluation {
             }
             result => Ok(result.into()),
         }
-    }
-}
-
-impl Decodable for Evaluation {
-    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
-        // the proxynode works preferably with little endian
-        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
-        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
-        if decoder.is_list() {
-            if Ok(7) == decoder.item_count() {
-                let mut it = decoder.iter();
-                let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
-                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
-                let gas: Option<u64> =
-                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
-                let gas_price: Option<u64> =
-                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
-                let value: Option<U256> =
-                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
-                let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
-                let with_da_fees: bool = decode_field(&next(&mut it)?, "with_da_fees")?;
-                Ok(Self {
-                    from,
-                    to,
-                    gas,
-                    gas_price,
-                    value,
-                    data,
-                    with_da_fees,
-                })
-            } else {
-                Err(DecoderError::RlpIncorrectListLen)
-            }
-        } else {
-            Err(DecoderError::RlpExpectedToBeList)
-        }
-    }
-}
-
-impl TryFrom<&[u8]> for Evaluation {
-    type Error = DecoderError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        Self::from_rlp_bytes(bytes)
     }
 }
 
@@ -551,7 +579,7 @@ impl TryFrom<&[u8]> for Message {
         let Some(bytes) = bytes.get(1..) else {return Err(DecoderError::Custom("Empty simulation message"))};
 
         match tag {
-            EVALUATION_TAG => Evaluation::try_from(bytes).map(Message::Evaluation),
+            EVALUATION_TAG => Evaluation::from_bytes(bytes).map(Message::Evaluation),
             VALIDATION_TAG => TxValidation::try_from(bytes)
                 .map(|tx| Message::TxValidation(Box::new(tx))),
             _ => Err(DecoderError::Custom("Unknown message to simulate")),
@@ -695,25 +723,16 @@ mod tests {
 
     use super::*;
 
-    impl Evaluation {
-        /// Unserialize an hex string as RLP encoded data.
-        pub fn from_rlp(e: String) -> Result<Evaluation, DecoderError> {
-            let tx = hex::decode(e)
-                .or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
-            Self::from_rlp_bytes(&tx)
-        }
-    }
-
     fn address_of_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
         Some(H160::from_slice(data))
     }
 
-    #[ignore]
     #[test]
     fn test_decode_empty() {
         let input_string =
-            "da8094353535353535353535353535353535353535353580808080".to_string();
+            hex::decode("da8094353535353535353535353535353535353535353580808080")
+                .unwrap();
         let address = address_of_str("3535353535353535353535353535353535353535");
         let expected = Evaluation {
             from: None,
@@ -722,10 +741,10 @@ mod tests {
             gas_price: None,
             value: None,
             data: vec![],
-            with_da_fees: false,
+            with_da_fees: true,
         };
 
-        let evaluation = Evaluation::from_rlp(input_string);
+        let evaluation = Evaluation::from_bytes(&input_string);
 
         assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
@@ -735,11 +754,10 @@ mod tests {
         );
     }
 
-    #[ignore]
     #[test]
     fn test_decode_non_empty() {
         let input_string =
-            "f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616".to_string();
+            hex::decode("f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616").unwrap();
         let to = address_of_str("3535353535353535353535353535353535353535");
         let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
@@ -750,10 +768,10 @@ mod tests {
             gas_price: Some(22222),
             value: Some(U256::from(33333)),
             data,
-            with_da_fees: false,
+            with_da_fees: true,
         };
 
-        let evaluation = Evaluation::from_rlp(input_string);
+        let evaluation = Evaluation::from_bytes(&input_string);
 
         assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
