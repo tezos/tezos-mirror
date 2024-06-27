@@ -256,63 +256,69 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         self.bus.reset();
     }
 
+    /// Translate an instruction address.
+    #[inline]
+    fn translate_instr_address(
+        &mut self,
+        mode: Mode,
+        satp: CSRRepr,
+        virt_addr: Address,
+    ) -> Result<Address, Exception> {
+        // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
+        // If mtval is written with a nonzero value when a
+        // breakpoint, address-misaligned, access-fault, or page-fault exception
+        // occurs on an instruction fetch, load, or store, then mtval will contain the
+        // faulting virtual address.
+
+        let phys_addr =
+            if let Some(phys_addr) = self.translation_cache.try_translate(mode, satp, virt_addr) {
+                phys_addr
+            } else {
+                let phys_addr =
+                    self.translate_with_prefetch(mode, satp, virt_addr, AccessType::Instruction)?;
+
+                self.translation_cache
+                    .update_cache(mode, satp, virt_addr, phys_addr);
+
+                phys_addr
+            };
+
+        Ok(phys_addr)
+    }
+
+    /// Fetch the 16 bits of an instruction at the given physical address.
+    #[inline]
+    fn fetch_instr_halfword(&self, phys_addr: Address) -> Result<u16, Exception> {
+        self.bus
+            .read(phys_addr)
+            .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
+    }
+
     /// Fetch instruction from the address given by program counter
     /// The spec stipulates translation is performed for each byte respectively.
     /// However, we assume the `raw_pc` is 2-byte aligned.
-    fn fetch_instr(&mut self, raw_pc: Address, current_mode: Mode) -> Result<Instr, Exception> {
-        let current_satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
-
-        // procedure to obtain 2 bytes of an instruction, either the first or last 2 bytes
-        let mut get_half_instr = |raw_pc: Address, with_translation: bool| {
-            // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
-            // If mtval is written with a nonzero value when a
-            // breakpoint, address-misaligned, access-fault, or page-fault exception
-            // occurs on an instruction fetch, load, or store, then mtval will contain the
-            // faulting virtual address.
-
-            let translated_pc = if !with_translation {
-                raw_pc
-            } else if let Some(translation) =
-                self.translation_cache
-                    .try_translate(current_mode, current_satp, raw_pc)
-            {
-                translation
-            } else {
-                let translation = self.translate(raw_pc, AccessType::Instruction)?;
-
-                self.translation_cache.update_cache(
-                    current_mode,
-                    current_satp,
-                    raw_pc,
-                    translation,
-                );
-
-                translation
-            };
-
-            let half_instr = self
-                .bus
-                .read(translated_pc)
-                .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(raw_pc))?;
-
-            Ok((half_instr, translated_pc))
-        };
+    #[inline]
+    fn fetch_instr(&mut self, virt_addr: Address, mode: Mode) -> Result<Instr, Exception> {
+        let satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
+        let phys_addr = self.translate_instr_address(mode, satp, virt_addr)?;
+        let first_halfword = self.fetch_instr_halfword(phys_addr)?;
 
         // The reasons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
-        // Hence we can't read eagerly all 4 bytes.
-        let (first_half, translated_pc) = get_half_instr(raw_pc, true)?;
-        parse(first_half, || {
+        // Hence we can't read all 4 bytes eagerly.
+        parse(first_halfword, || {
+            let next_addr = phys_addr + 2;
+
             // Optimization to skip an extra address translation lookup:
             // If the last 2 bytes of the instruction are in the same page
             // as the first 2 bytes, then we already know the translated address
-            let (half_instr, _) = if (raw_pc + 2) % PAGE_SIZE == 0 {
-                get_half_instr(raw_pc + 2, true)?
+            let phys_addr = if next_addr % PAGE_SIZE == 0 {
+                self.translate_instr_address(mode, satp, virt_addr + 2)?
             } else {
-                get_half_instr(translated_pc + 2, false)?
+                next_addr
             };
 
-            Ok(half_instr)
+            self.fetch_instr_halfword(phys_addr)
         })
     }
 

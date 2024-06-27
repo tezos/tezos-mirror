@@ -480,6 +480,7 @@ const RS2_5: u32 = 0b101;
 const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
 
+#[inline]
 fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use Instr::*;
     match opcode(instr) {
@@ -1068,6 +1069,7 @@ const C_Q1_1: u16 = 0b01;
 const C_Q1_2: u16 = 0b10;
 const C_Q1_3: u16 = 0b11;
 
+#[inline]
 fn parse_compressed_instruction(instr: u16) -> Instr {
     use Instr::*;
     match c_opcode(instr) {
@@ -1219,6 +1221,7 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
 /// Attempt to parse `bytes` into an instruction. If `bytes` encodes a 2-byte
 /// compressed instruction, parse it immediately. If it encodes a 4-byte
 /// uncompressed instruction, request 2 extra bytes via `more`.
+#[inline(always)]
 pub fn parse<E>(bytes: u16, more: impl FnOnce() -> Result<u16, E>) -> Result<Instr, E> {
     if bytes & 0b11 != 0b11 {
         Ok(parse_compressed_instruction(bytes))

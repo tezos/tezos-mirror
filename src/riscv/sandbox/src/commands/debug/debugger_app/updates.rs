@@ -5,9 +5,10 @@
 
 use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use octez_riscv::{
+    bits::Bits64,
     machine_state::{
         bus::{Address, Addressable},
-        csregisters::CSRegister,
+        csregisters::{satp::Satp, CSRegister},
         AccessType,
     },
     parser::{instruction::Instr, parse},
@@ -67,16 +68,18 @@ where
 
     /// Updates the state of [`super::TranslationState`]
     fn update_translation_after_step(&mut self, faulting: bool) {
-        let effective_mode = self
-            .stepper
-            .machine_state()
-            .effective_translation_alg(&AccessType::Instruction);
-        let satp_val = self
+        let mode = self.stepper.machine_state().hart.mode.read_default();
+        let satp_val: Satp = self
             .stepper
             .machine_state()
             .hart
             .csregisters
             .read(CSRegister::satp);
+        let effective_mode = self.stepper.machine_state().effective_translation_alg(
+            mode,
+            satp_val.to_bits(),
+            AccessType::Instruction,
+        );
         self.state
             .translation
             .update(faulting, effective_mode, satp_val)

@@ -7,7 +7,7 @@ use super::{
     csregisters::{
         satp::{Satp, SvLength, TranslationAlgorithm},
         xstatus::MStatus,
-        CSRegister,
+        CSRRepr, CSRegister,
     },
     mode::Mode,
     MachineState,
@@ -28,7 +28,7 @@ pub const PAGE_SIZE: u64 = 1 << PAGE_OFFSET_WIDTH;
 
 /// Access type that is used in the virtual address translation process.
 /// Section 5.3.2
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AccessType {
     Instruction,
     Load,
@@ -76,7 +76,7 @@ fn sv_translate_impl<ML, M>(
     v_addr: Address,
     satp: Satp,
     sv_length: SvLength,
-    access_type: &AccessType,
+    access_type: AccessType,
 ) -> Result<Address, Exception>
 where
     ML: main_memory::MainMemoryLayout,
@@ -158,7 +158,7 @@ where
     //      – If the comparison fails, return to step 2
     let pte_a = pte.a();
     let pte_d = pte.d();
-    if !pte_a || (*access_type == AccessType::Store && !pte_d) {
+    if !pte_a || (access_type == AccessType::Store && !pte_d) {
         // Trying first case for now
         return Err(access_type.exception(v_addr));
     }
@@ -196,53 +196,67 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// addresses are translated and protected, and endianness is applied,
     /// as though the current privilege mode were set to MPP.
     /// Instruction address-translation and protection are unaffected by the setting of MPRV
-    pub fn effective_translation_hart_mode(&self, access_type: &AccessType) -> Mode {
+    #[inline]
+    pub fn effective_translation_hart_mode(&self, mode: Mode, access_type: AccessType) -> Mode {
         let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
-        if mstatus.mprv() && (access_type == &AccessType::Store || access_type == &AccessType::Load)
-        {
-            mstatus.mpp().into()
-        } else {
-            self.hart.mode.read_default()
+        match access_type {
+            AccessType::Store | AccessType::Load if mstatus.mprv() => mstatus.mpp().into(),
+            _ => mode,
         }
     }
 
     /// Get the effective translation mode when addressing memory.
     /// [`None`] represents that either `SATP.mode` is a reserved / not implemented mode or
     /// that the system is in `Machine` mode in which case translation is ignored.
+    #[inline]
     pub fn effective_translation_alg(
         &self,
-        access_type: &AccessType,
+        mode: Mode,
+        satp: CSRRepr,
+        access_type: AccessType,
     ) -> Option<TranslationAlgorithm> {
         // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
         //    The satp register must be active, i.e.,
         //    the effective privilege mode must be S-mode or U-mode.
-        let mode = self.effective_translation_hart_mode(access_type);
 
-        match mode {
-            Mode::User | Mode::Supervisor => (),
-            Mode::Machine => return None,
-        };
-        let satp: Satp = self.hart.csregisters.read(CSRegister::satp);
-        satp.mode().ok()
+        if let Mode::Machine = self.effective_translation_hart_mode(mode, access_type) {
+            return None;
+        }
+
+        Satp::from_bits(satp).mode().ok()
     }
 
-    /// Translate a virtual address to a physical address as described in section 5.3.2
-    pub fn translate(
+    /// Like [`Self::translate`] but allows the caller to prevent extraneous reads from CSRs.
+    #[inline]
+    pub(crate) fn translate_with_prefetch(
         &self,
-        v_addr: Address,
+        mode: Mode,
+        satp: CSRRepr,
+        virt_addr: Address,
         access_type: AccessType,
     ) -> Result<Address, Exception> {
-        let mode = self.effective_translation_alg(&access_type);
+        let mode = self.effective_translation_alg(mode, satp, access_type);
 
         match mode {
             // An invalid mode should not be writable, but it is treated as BARE
-            None => Ok(v_addr),
-            Some(TranslationAlgorithm::Bare) => Ok(v_addr),
+            None | Some(TranslationAlgorithm::Bare) => Ok(virt_addr),
             Some(TranslationAlgorithm::Sv(length)) => {
                 let satp = self.hart.csregisters.read(CSRegister::satp);
-                sv_translate_impl(&self.bus, v_addr, satp, length, &access_type)
-                    .map_err(|_e| access_type.exception(v_addr))
+                sv_translate_impl(&self.bus, virt_addr, satp, length, access_type)
+                    .map_err(|_e| access_type.exception(virt_addr))
             }
         }
+    }
+
+    /// Translate a virtual address to a physical address as described in section 5.3.2
+    #[inline]
+    pub fn translate(
+        &self,
+        virt_addr: Address,
+        access_type: AccessType,
+    ) -> Result<Address, Exception> {
+        let mode = self.hart.mode.read_default();
+        let satp = self.hart.csregisters.read(CSRegister::satp);
+        self.translate_with_prefetch(mode, satp, virt_addr, access_type)
     }
 }
