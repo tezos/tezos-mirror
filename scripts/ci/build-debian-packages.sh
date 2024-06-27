@@ -13,6 +13,8 @@ export BLST_PORTABLE=true
 cp -a ./* /root/tezos/
 cd /root/tezos/
 
+export DEBEMAIL="contact@nomadic-labs.com"
+
 if [ -n "${gitlab_release_no_v:-}" ]; then
   DEBVERSION=$gitlab_release_no_v
   DEBCHANGELOG="New Release $gitlab_release_no_v / $CI_COMMIT_SHORT_SHA"
