@@ -21,6 +21,7 @@ When new features are needed by a proposed protocol, or if the protocol API is c
 see :ref:`Protocol environment versions <environment_versions>`.
 The new environment is delivered as part of a new Octez release.
 
+.. _rpc_versioning:
 
 RPC Versioning
 --------------

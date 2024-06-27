@@ -6,11 +6,13 @@ different Protocols or Octez versions. It complements the "Breaking changes"
 sections in the development changelogs by providing more context and/or less
 fragmented mentions.
 
-For each change, there may be a subsection ``deprecation`` and ``breaking
-changes``. The first subsection will explain what changes can be made during a
-deprecation phase to adapt smoothly to the new changes. The second subsection
+For each change, there may be subsections ``deprecation`` and ``breaking
+changes``. The former subsection will explain what changes can be made during a
+deprecation phase to adapt smoothly to the new changes. The latter subsection
 will present the changes that can not be done by the deprecation mechanism and
 that may be breaking.
+
+In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
 
 Attestations
 ------------
