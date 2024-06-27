@@ -376,10 +376,6 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/5665
-            // Because the proposal's state is unclear, and we do not have a sequencer
-            // if an error that leads to a durable storage corruption is caught, we
-            // invalidate the entire proposal.
             return Err(Error::InvalidRunTransaction(err).into());
         }
     };
