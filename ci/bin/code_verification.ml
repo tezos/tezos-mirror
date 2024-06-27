@@ -36,10 +36,6 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Common
 
-(* Encodes the conditional [before_merging] pipeline and its
-   unconditional variant [schedule_extended_test]. *)
-type code_verification_pipeline = Before_merging | Schedule_extended_test
-
 (** Configuration of manual jobs for [make_rules] *)
 type manual =
   | No  (** Do not add rule for manual start. *)
@@ -311,8 +307,15 @@ let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
 
-let debian_repository_child_pipeline =
-  Pipeline.register_child "debian_repository" ~jobs:Debian_repository.jobs
+let debian_repository_child_pipeline pipeline_type =
+  let pipeline_name =
+    match pipeline_type with
+    | Before_merging -> "debian_repository"
+    | Schedule_extended_test -> "debian_repository_scheduled"
+  in
+  Pipeline.register_child
+    pipeline_name
+    ~jobs:(Debian_repository.jobs pipeline_type)
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
@@ -1812,7 +1815,7 @@ let jobs pipeline_type =
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
-        debian_repository_child_pipeline
+        (debian_repository_child_pipeline pipeline_type)
     in
     match pipeline_type with
     | Before_merging ->

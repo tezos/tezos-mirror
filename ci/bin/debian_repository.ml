@@ -22,16 +22,26 @@ let build_debian_packages_image =
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job
     [job_build_debian_package]. A dependency image will be built once
-    for each combination of [RELEASE] and [TAGS]. *)
-let debian_package_release_matrix =
-  [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+    for each combination of [RELEASE] and [TAGS].
+
+    If [release_pipeline] is false, we only tests a subset of the matrix,
+    one release, and one architecture. *)
+let debian_package_release_matrix = function
+  | Before_merging -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
+  | Schedule_extended_test ->
+      [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job
     [job_build_ubuntu_package]. See {!debian_package_release_matrix}
-    for more information. *)
-let ubuntu_package_release_matrix =
-  [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+    for more information.
+
+    If [release_pipeline] is false, we only tests a subset of the matrix,
+    one release, and one architecture. *)
+let ubuntu_package_release_matrix = function
+  | Before_merging -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
+  | Schedule_extended_test ->
+      [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
 let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
@@ -55,7 +65,9 @@ let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     ~variables
     script
 
-let jobs =
+(* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
+   we test only on Debian stable. *)
+let jobs pipeline_type =
   let variables add =
     ("DEP_IMAGE", "registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE")
     :: add
@@ -76,14 +88,14 @@ let jobs =
       ~__POS__
       ~name:"oc.docker-build-debian-dependencies"
       ~distribution:"debian"
-      ~matrix:debian_package_release_matrix
+      ~matrix:(debian_package_release_matrix pipeline_type)
   in
   let job_docker_build_ubuntu_dependencies : tezos_job =
     make_job_docker_build_debian_dependencies
       ~__POS__
       ~name:"oc.docker-build-ubuntu-dependencies"
       ~distribution:"ubuntu"
-      ~matrix:ubuntu_package_release_matrix
+      ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
   let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution
       ~script =
@@ -122,16 +134,16 @@ let jobs =
       ~__POS__
       ~name:"oc.build-debian-current"
       ~distribution:"debian"
-      ~matrix:debian_package_release_matrix
       ~script:"./scripts/ci/build-debian-packages_current.sh"
+      ~matrix:(debian_package_release_matrix pipeline_type)
   in
   let job_build_ubuntu_package_current : tezos_job =
     make_job_build_debian_packages
       ~__POS__
       ~name:"oc.build-ubuntu-current"
       ~distribution:"ubuntu"
-      ~matrix:ubuntu_package_release_matrix
       ~script:"./scripts/ci/build-debian-packages_current.sh"
+      ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
   (* These jobs build the next packages in a matrix using the
@@ -141,16 +153,16 @@ let jobs =
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
-      ~matrix:debian_package_release_matrix
       ~script:"./scripts/ci/build-debian-packages.sh"
+      ~matrix:(debian_package_release_matrix pipeline_type)
   in
   let job_build_ubuntu_package : tezos_job =
     make_job_build_debian_packages
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
-      ~matrix:ubuntu_package_release_matrix
       ~script:"./scripts/ci/build-debian-packages.sh"
+      ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
   (* These create the apt repository for the current packages *)
@@ -172,18 +184,20 @@ let jobs =
   in
 
   (* These test the installability of the current packages *)
-  let test_current_packages_jobs =
-    let job_install_bin ~__POS__ ~name ~dependencies ~image ?allow_failure
-        script =
-      job
-        ?allow_failure
-        ~__POS__
-        ~name
-        ~image
-        ~dependencies
-        ~stage:Stages.publishing_tests
-        script
-    in
+  let job_install_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
+      =
+    job
+      ?allow_failure
+      ~__POS__
+      ~name
+      ~image
+      ~dependencies
+      ~stage:Stages.publishing_tests
+      script
+  in
+  let test_current_ubuntu_packages_jobs =
+    (* in merge pipelines we tests only debian. release pipelines
+       test the entire matrix *)
     [
       job_install_bin
         ~__POS__
@@ -197,6 +211,10 @@ let jobs =
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+    ]
+  in
+  let test_current_debian_packages_jobs =
+    [
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"
@@ -205,14 +223,24 @@ let jobs =
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
     ]
   in
-  [
-    job_docker_build_debian_dependencies;
-    job_docker_build_ubuntu_dependencies;
-    job_build_debian_package;
-    job_build_ubuntu_package;
-    job_build_debian_package_current;
-    job_build_ubuntu_package_current;
-    job_apt_repo_debian_current;
-    job_apt_repo_ubuntu_current;
-  ]
-  @ test_current_packages_jobs
+  let debian_jobs =
+    [
+      job_docker_build_debian_dependencies;
+      job_build_debian_package;
+      job_build_debian_package_current;
+      job_apt_repo_debian_current;
+    ]
+    @ test_current_debian_packages_jobs
+  in
+  let ubuntu_jobs =
+    [
+      job_docker_build_ubuntu_dependencies;
+      job_build_ubuntu_package;
+      job_build_ubuntu_package_current;
+      job_apt_repo_ubuntu_current;
+    ]
+    @ test_current_ubuntu_packages_jobs
+  in
+  match pipeline_type with
+  | Before_merging -> debian_jobs
+  | Schedule_extended_test -> debian_jobs @ ubuntu_jobs
