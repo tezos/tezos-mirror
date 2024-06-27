@@ -406,12 +406,13 @@ module Dal_RPC = struct
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?extra_headers
         (Dal_node.as_rpc_endpoint node)
         rpc
 
@@ -439,12 +440,13 @@ module Dal_RPC = struct
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        endpoint rpc =
+        ?extra_headers endpoint rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?extra_headers
         endpoint
         rpc
 

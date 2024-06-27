@@ -726,12 +726,13 @@ module RPC = struct
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?extra_headers
         (as_rpc_endpoint node)
         rpc
 

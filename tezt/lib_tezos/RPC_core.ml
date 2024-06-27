@@ -103,6 +103,7 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?extra_headers:(string * string) list ->
     uri_provider ->
     'result t ->
     string response Lwt.t
@@ -118,7 +119,7 @@ module type CALLERS = sig
 end
 
 let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
-    ?(log_response_body = true) endpoint rpc =
+    ?(log_response_body = true) ?(extra_headers = []) endpoint rpc =
   let uri = make_uri endpoint rpc in
   let () =
     Option.iter
@@ -138,6 +139,7 @@ let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
     | None -> []
     | Some _ -> [("Content-Type", "application/json")]
   in
+  let headers = headers @ extra_headers in
   let* response, response_body =
     Cohttp_lwt_unix.Client.call
       ~headers:(Cohttp.Header.of_list headers)

@@ -156,6 +156,7 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?extra_headers:(string * string) list ->
     uri_provider ->
     'result t ->
     string response Lwt.t
