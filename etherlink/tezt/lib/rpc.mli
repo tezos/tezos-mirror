@@ -48,6 +48,8 @@ module Request : sig
 
   val eth_feeHistory :
     block_count:string -> newest_block:string -> Evm_node.request
+
+  val coinbase : Evm_node.request
 end
 
 (** [net_version evm_node] calls [net_version]. *)
@@ -186,3 +188,6 @@ type fee_history = {
 (** [fee_history block_count newest_block evm_node] calls [eth_feeHistory]. *)
 val fee_history :
   string -> string -> Evm_node.t -> (fee_history, error) result Lwt.t
+
+(** [coinbase] calls [eth_coinbase]. *)
+val coinbase : Evm_node.t -> (string, error) result Lwt.t

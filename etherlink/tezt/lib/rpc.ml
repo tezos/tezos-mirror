@@ -170,6 +170,8 @@ module Request = struct
             `A [`Float 0.; `Float 1.; `Float 2.; `Float 3.];
           ];
     }
+
+  let coinbase = {method_ = "eth_coinbase"; parameters = `Null}
 end
 
 let net_version evm_node =
@@ -441,3 +443,10 @@ let fee_history block_count newest_block evm_node =
   in
 
   return @@ decode_or_error decode_fee_history_result response
+
+let coinbase evm_node =
+  let* response = Evm_node.call_evm_rpc evm_node Request.coinbase in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
