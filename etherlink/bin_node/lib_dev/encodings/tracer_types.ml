@@ -183,7 +183,7 @@ let input_rlp_encoder ?hash config =
   let storage =
     Ethereum_types.bool_to_rlp_bytes config.tracer_config.disable_storage
   in
-  List [hash; return_data; memory; stack; storage] |> encode |> Bytes.to_string
+  List [hash; memory; return_data; stack; storage] |> encode |> Bytes.to_string
 
 let hex_encoding =
   let open Data_encoding in
