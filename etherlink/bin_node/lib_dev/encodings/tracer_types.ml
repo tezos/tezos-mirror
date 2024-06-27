@@ -71,6 +71,52 @@ type config = {
   reexec : int64;
 }
 
+(* See debug_traceTransaction specification:
+   https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debugtracetransaction.
+
+   It ignores durations below milliseconds.
+*)
+let timeout_parser duration =
+  let regex = Re.Perl.re {|(?:(\d+)(h|ms|s|m))|} |> Re.compile in
+  let groups = Re.all regex duration in
+  let to_seconds kind value =
+    match kind with
+    (* Hours *)
+    | "h" -> value *. 3600.
+    (* Minutes *)
+    | "m" -> value *. 60.
+    (* Seconds *)
+    | "s" -> value
+    (* Milliseconds *)
+    | "ms" -> value /. 1000.
+    (* There shouldn't be any other group. *)
+    | _ -> 0.
+  in
+  let extract g =
+    match
+      ( Re.Group.get_opt g 2,
+        Option.bind (Re.Group.get_opt g 1) float_of_string_opt )
+    with
+    | Some kind, Some value -> Some (to_seconds kind value)
+    | _, _ -> None
+  in
+  List.fold_left
+    (fun seconds group ->
+      match extract group with None -> seconds | Some s -> s +. seconds)
+    0.
+    groups
+
+let timeout_encoding =
+  let open Data_encoding in
+  conv
+    (fun timeout -> Format.asprintf "%a" Time.System.Span.pp_hum timeout)
+    (fun timeout_str ->
+      let seconds = timeout_parser timeout_str in
+      (* It's okay to raise an exception, it will simply reject the RPC, not
+         crash the node. *)
+      Time.System.Span.of_seconds_exn seconds)
+    string
+
 (* Default config is derived from the specification of the RPC:
    https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debugtracetransaction. *)
 let default_config =
@@ -95,7 +141,7 @@ let config_encoding =
     (merge_objs
        (obj3
           (dft "tracer" tracer_kind_encoding default_config.tracer)
-          (dft "timeout" Time.System.Span.encoding default_config.timeout)
+          (dft "timeout" timeout_encoding default_config.timeout)
           (dft "reexec" int64 default_config.reexec))
        tracer_config_encoding)
 
