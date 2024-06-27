@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -154,6 +155,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Gas_bound.register ~protocols ;
   Global_constants.register ~protocols ;
   Hash_data.register ~protocols ;
+  Http_cache_headers.register ~protocols ;
   Increase_paid_storage.register ~protocols ;
   Injector_test.register ~protocols ;
   Large_metadata.register ~protocols ;

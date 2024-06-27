@@ -221,10 +221,10 @@ module Http_cache_headers = struct
     match seconds_to_round_end_opt with
     | None -> return resp
     | Some s ->
-        (* `floor` the value to ensure data stored in caches are always
+        (* `floor` the value to ensure data stored in caches is always
             correct. This means a potential increase in cache misses at
-            the end of a round. The value needs to be truncated becuase
-            max-age expects a integer. *)
+            the end of a round. The value needs to be truncated because
+            max-age expects an integer. *)
         let s = Float.floor (Ptime.Span.to_float_s s) in
         if s = 0. then return resp
         else
