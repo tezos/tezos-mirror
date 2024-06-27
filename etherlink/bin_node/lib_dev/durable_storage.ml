@@ -266,4 +266,20 @@ module Make (Reader : READER) = struct
         Bytes.to_string bytes |> Hex.of_string |> Hex.show
         |> Ethereum_types.hex_of_string
     | None -> Ethereum_types.Hex (pad32left0 "0")
+
+  let coinbase () =
+    let open Lwt_result_syntax in
+    let+ res =
+      inspect_durable_and_decode_opt
+        Durable_storage_path.sequencer_pool_address
+        (fun bytes ->
+          Address
+            (Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string))
+    in
+    Option.value
+      ~default:
+        (Address
+           (Ethereum_types.hex_of_string
+              "0x0000000000000000000000000000000000000000"))
+      res
 end

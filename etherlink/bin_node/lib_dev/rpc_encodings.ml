@@ -756,6 +756,20 @@ module Eth_fee_history = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Coinbase = struct
+  type input = unit
+
+  type output = Ethereum_types.address
+
+  let input_encoding = Data_encoding.null
+
+  let output_encoding = Ethereum_types.address_encoding
+
+  let method_ = "eth_coinbase"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -804,6 +818,7 @@ let supported_methods : (module METHOD) list =
     (module Replay_block);
     (module Trace_transaction);
     (module Eth_fee_history);
+    (module Coinbase);
   ]
 
 let unsupported_methods : string list =
@@ -814,7 +829,6 @@ let unsupported_methods : string list =
     (* eth *)
     "eth_protocolVersion";
     "eth_syncing";
-    "eth_coinbase";
     "eth_mining";
     "eth_hashrate";
     "eth_sign";
