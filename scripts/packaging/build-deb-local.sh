@@ -12,7 +12,11 @@ make all
 mkdir -p scripts/packaging/octez/binaries
 mkdir -p scripts/packaging/octez/zcash-params
 rm -Rf scripts/packaging/octez/binaries/*
-cp octez-* scripts/packaging/octez/binaries/
+
+EXECUTABLES=$(cat script-inputs/*-executables)
+for ex in $EXECUTABLES; do
+  cp "$ex" scripts/packaging/octez/binaries/
+done
 
 # Copy the zcash parametes to be packaged
 cp -a _opam/share/zcash-params scripts/packaging/octez/
