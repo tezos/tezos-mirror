@@ -135,15 +135,17 @@ let config_encoding =
   let open Data_encoding in
   conv
     (fun {tracer; tracer_config; timeout; reexec} ->
-      ((tracer, timeout, reexec), tracer_config))
-    (fun ((tracer, timeout, reexec), tracer_config) ->
+      (((tracer, timeout, reexec), tracer_config), ()))
+    (fun (((tracer, timeout, reexec), tracer_config), ()) ->
       {tracer; tracer_config; timeout; reexec})
     (merge_objs
-       (obj3
-          (dft "tracer" tracer_kind_encoding default_config.tracer)
-          (dft "timeout" timeout_encoding default_config.timeout)
-          (dft "reexec" int64 default_config.reexec))
-       tracer_config_encoding)
+       (merge_objs
+          (obj3
+             (dft "tracer" tracer_kind_encoding default_config.tracer)
+             (dft "timeout" timeout_encoding default_config.timeout)
+             (dft "reexec" int64 default_config.reexec))
+          tracer_config_encoding)
+       unit)
 
 type input = Ethereum_types.hash * config
 
