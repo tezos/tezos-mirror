@@ -39,6 +39,8 @@
 - Allows a `/__evm_node` flag in the kernel to have a different logic whether
   the kernel is run by the evm-node or the rollup node. (!13827)
 - Add FA withdrawal structure and helper methods for parsing and encoding. (!13843)
+- Rework the semantics of migrations in order to allow a network to skip frozen
+  versions. (!13895)
 
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
