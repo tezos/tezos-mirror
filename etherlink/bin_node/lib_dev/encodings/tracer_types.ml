@@ -81,18 +81,23 @@ let default_config =
     reexec = 128L;
   }
 
+(* Technically, the tracer_config is specific to `structLogger`. As we only
+   support this one for now, the encoding assumes they can be used. However if
+   we need to add a new tracer, we might want to make it more constrained to
+   structLogger, or simply ignore it. *)
 let config_encoding =
   let open Data_encoding in
   conv
     (fun {tracer; tracer_config; timeout; reexec} ->
-      (tracer, tracer_config, timeout, reexec))
-    (fun (tracer, tracer_config, timeout, reexec) ->
+      ((tracer, timeout, reexec), tracer_config))
+    (fun ((tracer, timeout, reexec), tracer_config) ->
       {tracer; tracer_config; timeout; reexec})
-    (obj4
-       (dft "tracer" tracer_kind_encoding default_config.tracer)
-       (dft "tracerConfig" tracer_config_encoding default_config.tracer_config)
-       (dft "timeout" Time.System.Span.encoding default_config.timeout)
-       (dft "reexec" int64 default_config.reexec))
+    (merge_objs
+       (obj3
+          (dft "tracer" tracer_kind_encoding default_config.tracer)
+          (dft "timeout" Time.System.Span.encoding default_config.timeout)
+          (dft "reexec" int64 default_config.reexec))
+       tracer_config_encoding)
 
 type input = Ethereum_types.hash * config
 
