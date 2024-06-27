@@ -20,6 +20,7 @@ anyhow = "1.0"
 primitive-types = { version = "0.12.1", default-features = false }
 num-bigint = "0.3"
 num-traits = "0.2.8"
+num-derive = "0.3"
 ethereum = { version = "0.14.0", default-features = false }
 ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
 softfloat = "1.0.0"

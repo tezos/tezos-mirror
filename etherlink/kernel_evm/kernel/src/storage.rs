@@ -12,6 +12,8 @@ use anyhow::Context;
 use evm_execution::account_storage::{AccountStorageError, EthereumAccount};
 use evm_execution::storage::blocks::add_new_block_hash;
 use evm_execution::trace::TracerInput;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::IndexableStorage;
@@ -32,7 +34,28 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 12;
+#[derive(
+    FromPrimitive, ToPrimitive, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord,
+)]
+#[repr(u64)]
+pub enum StorageVersion {
+    V11 = 11,
+    V12,
+}
+
+impl From<StorageVersion> for u64 {
+    fn from(value: StorageVersion) -> Self {
+        ToPrimitive::to_u64(&value).expect("StorageVersion fits in `u64` primitive")
+    }
+}
+
+impl StorageVersion {
+    pub fn next(self) -> Option<StorageVersion> {
+        FromPrimitive::from_u64(u64::from(self) + 1)
+    }
+}
+
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V12;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -902,18 +925,24 @@ pub fn index_transaction_hash(
 
 pub fn store_storage_version<Host: Runtime>(
     host: &mut Host,
-    storage_version: u64,
+    storage_version: StorageVersion,
 ) -> Result<(), Error> {
+    let storage_version = u64::from(storage_version);
     host.store_write_all(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes())
         .map_err(Error::from)
 }
 
-pub fn read_storage_version<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
+pub fn read_storage_version<Host: Runtime>(
+    host: &mut Host,
+) -> Result<StorageVersion, Error> {
     match host.store_read_all(&STORAGE_VERSION_PATH) {
         Ok(bytes) => {
             let slice_of_bytes: [u8; 8] =
                 bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
-            Ok(u64::from_le_bytes(slice_of_bytes))
+            let version_u64 = u64::from_le_bytes(slice_of_bytes);
+            let version =
+                FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
+            Ok(version)
         }
         Err(e) => Err(e.into()),
     }
