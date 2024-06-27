@@ -19,7 +19,7 @@ if [ -n "${gitlab_release_no_v:-}" ]; then
   DEBVERSION=$gitlab_release_no_v
   DEBCHANGELOG="New Release $gitlab_release_no_v / $CI_COMMIT_SHORT_SHA"
 else
-  DEBVERSION=$(date +'%Y%m%d%h%m')+$CI_COMMIT_SHORT_SHA
+  DEBVERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
   DEBCHANGELOG="Test package commit $CI_COMMIT_REF_NAME"
 fi
 
