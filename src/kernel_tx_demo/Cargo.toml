@@ -5,10 +5,7 @@
 
 [workspace]
 
-members = [
-  "kernel",
-  "collector",
-]
+members = ["kernel", "collector"]
 
 [workspace.dependencies]
 tezos-smart-rollup = { path = "../kernel_sdk/sdk" }

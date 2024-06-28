@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -10,6 +10,7 @@ use crate::inbox::v1::ParsedBatch;
 use crate::inbox::ParsedExternalInboxMessage;
 use crate::storage::AccountStorage;
 use crate::transactions::withdrawal::Withdrawal;
+use crypto::hash::HashTrait;
 use crypto::hash::PublicKeyBls;
 use crypto::CryptoError;
 #[cfg(feature = "debug")]
@@ -81,7 +82,7 @@ pub(crate) fn get_dac_committee(
         let mut dac_member = [0; 48];
         host.store_read_slice(&path, 0, &mut dac_member)
             .map_err(LoadDacCommitteeError::RuntimeError)?;
-        let pk = PublicKeyBls(dac_member.to_vec());
+        let pk = PublicKeyBls::try_from_bytes(&dac_member).unwrap();
         res.push(pk);
     }
     Ok(res)
