@@ -1890,7 +1890,7 @@ module Revamped = struct
     let inject_attestation (delegate : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~use_legacy_name:true
+           ~use_legacy_name:false
            ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
            ~level
            ~round:0
@@ -2142,7 +2142,7 @@ module Revamped = struct
       let* op =
         Operation.Consensus.operation
           (Operation.Consensus.attestation
-             ~use_legacy_name:true
+             ~use_legacy_name:false
              ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
              ~level
              ~round:0
@@ -2404,7 +2404,7 @@ module Revamped = struct
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~use_legacy_name:true
+           ~use_legacy_name:false
            ~slot:(Operation.Consensus.first_slot ~slots_json account)
            ~level
            ~round:0
@@ -2538,7 +2538,7 @@ module Revamped = struct
     let inject_attestation ~(account : Account.key) ~(signer : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~use_legacy_name:true
+           ~use_legacy_name:false
            ~slot:(Operation.Consensus.first_slot ~slots_json account)
            ~level
            ~round:0
@@ -2734,9 +2734,7 @@ module Revamped = struct
       let branch = JSON.(op |-> "branch" |> as_string) in
       let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
       let kind = JSON.(content |-> "kind" |> as_string) in
-      let expected_kind =
-        if Protocol.number protocol < 018 then "endorsement" else "attestation"
-      in
+      let expected_kind = "attestation" in
       Check.(
         (expected_kind = kind)
           string
@@ -2749,7 +2747,7 @@ module Revamped = struct
       in
       let op =
         Operation.Consensus.attestation
-          ~use_legacy_name:true
+          ~use_legacy_name:false
           ~slot
           ~level
           ~round
