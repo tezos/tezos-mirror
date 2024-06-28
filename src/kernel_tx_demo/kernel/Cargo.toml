@@ -15,11 +15,11 @@ crate-type = ["cdylib", "rlib"]
 nom = "7.1"
 thiserror = "1.0"
 hex = "0.4"
-num-bigint = "0.3"
+num-bigint = "0.4"
 num-traits = "0.2.8"
 
-tezos_data_encoding = "0.5.2"
-tezos_crypto_rs = { version = "0.5.2", default-features = false }
+tezos_data_encoding = "0.6"
+tezos_crypto_rs = { version = "0.6", default-features = false }
 
 # Adding these to 'dev_dependencies' causes the rand feature in crypto to be enabled
 # on wasm builds, when building the entire workspace.
@@ -38,20 +38,20 @@ tezos-smart-rollup-mock.workspace = true
 [features]
 default = ["tx-kernel"]
 dal = [
-    "tezos-smart-rollup/proto-alpha",
-    "tezos-smart-rollup-core/proto-alpha",
-    "tezos-smart-rollup-host/proto-alpha",
-    "tezos-smart-rollup-mock/proto-alpha",
+  "tezos-smart-rollup/proto-alpha",
+  "tezos-smart-rollup-core/proto-alpha",
+  "tezos-smart-rollup-host/proto-alpha",
+  "tezos-smart-rollup-mock/proto-alpha",
 ]
 debug = []
 testing = [
-    "rand",
-    "proptest",
-    "tezos-smart-rollup-core/testing",
-    "tezos-smart-rollup-host/testing",
-    "tezos-smart-rollup-entrypoint/testing",
-    "tezos-smart-rollup-encoding/testing",
-    "tezos_crypto_rs/std",
+  "rand",
+  "proptest",
+  "tezos-smart-rollup-core/testing",
+  "tezos-smart-rollup-host/testing",
+  "tezos-smart-rollup-entrypoint/testing",
+  "tezos-smart-rollup-encoding/testing",
+  "tezos_crypto_rs/std",
 ]
 tx-kernel = []
 tx-kernel-no-sig-verif = ["tx-kernel"]
