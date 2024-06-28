@@ -39,7 +39,12 @@ sys.path.insert(0, os.path.abspath('.') + '/_extensions')
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.extlinks', 'tezos_custom_roles', 'michelsonlexer']
+extensions = [
+    'sphinx.ext.extlinks',
+    'tezos_custom_roles',
+    'michelsonlexer',
+    'sphinxcontrib.jquery',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
