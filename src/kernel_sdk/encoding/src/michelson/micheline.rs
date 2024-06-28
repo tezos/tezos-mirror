@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
 //
@@ -89,7 +89,7 @@ pub(crate) mod annots {
         }
     }
 
-    impl NomReader for Annotations {
+    impl NomReader<'_> for Annotations {
         fn nom_read(input: &[u8]) -> NomResult<Self> {
             // TODO: #6665
             // this does two passes over the input buffer (up to `dynamic` size)
@@ -425,25 +425,25 @@ where
 // ----------
 // NOM_READER
 // ----------
-impl NomReader for MichelineInt {
+impl NomReader<'_> for MichelineInt {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_int, MichelineInt)(input)
     }
 }
 
-impl NomReader for MichelineString {
+impl NomReader<'_> for MichelineString {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_string, MichelineString)(input)
     }
 }
 
-impl NomReader for MichelineBytes {
+impl NomReader<'_> for MichelineBytes {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_bytes(nom_read::bytes), MichelineBytes)(input)
     }
 }
 
-impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
+impl<const PRIM_TAG: u8> NomReader<'_> for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(
             tag([MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
@@ -452,7 +452,7 @@ impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     }
 }
 
-impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
+impl<const PRIM_TAG: u8> NomReader<'_> for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, PRIM_TAG]),
@@ -463,11 +463,12 @@ impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
     }
 }
 
-impl<Arg, const PRIM_TAG: u8> NomReader for MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>
+impl<'a, Arg, const PRIM_TAG: u8> NomReader<'a>
+    for MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>
 where
-    Arg: NomReader + Debug + PartialEq + Eq,
+    Arg: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, PRIM_TAG]),
             Arg::nom_read,
@@ -477,11 +478,12 @@ where
     }
 }
 
-impl<Arg, const PRIM_TAG: u8> NomReader for MichelinePrim1ArgSomeAnnots<Arg, PRIM_TAG>
+impl<'a, Arg, const PRIM_TAG: u8> NomReader<'a>
+    for MichelinePrim1ArgSomeAnnots<Arg, PRIM_TAG>
 where
-    Arg: NomReader + Debug + PartialEq + Eq,
+    Arg: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, PRIM_TAG]),
             pair(Arg::nom_read, Annotations::nom_read),
@@ -494,13 +496,13 @@ where
     }
 }
 
-impl<Arg1, Arg2, const PRIM_TAG: u8> NomReader
+impl<'a, Arg1, Arg2, const PRIM_TAG: u8> NomReader<'a>
     for MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>
 where
-    Arg1: NomReader + Debug + PartialEq + Eq,
-    Arg2: NomReader + Debug + PartialEq + Eq,
+    Arg1: NomReader<'a> + Debug + PartialEq + Eq,
+    Arg2: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
             pair(Arg1::nom_read, Arg2::nom_read),
@@ -513,13 +515,13 @@ where
     }
 }
 
-impl<Arg1, Arg2, const PRIM_TAG: u8> NomReader
+impl<'a, Arg1, Arg2, const PRIM_TAG: u8> NomReader<'a>
     for MichelinePrim2ArgsSomeAnnots<Arg1, Arg2, PRIM_TAG>
 where
-    Arg1: NomReader + Debug + PartialEq + Eq,
-    Arg2: NomReader + Debug + PartialEq + Eq,
+    Arg1: NomReader<'a> + Debug + PartialEq + Eq,
+    Arg2: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, PRIM_TAG]),
             pair(Arg1::nom_read, pair(Arg2::nom_read, Annotations::nom_read)),
@@ -631,7 +633,7 @@ impl Node {
     }
 }
 
-impl NomReader for Node {
+impl NomReader<'_> for Node {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         nom::branch::alt((
             map(nom_read_micheline_int, Node::Int),
@@ -775,7 +777,7 @@ fn nom_read_tagged_micheline<'a, T: Clone, const TAG: u8>(
 
 /// Read dynamically-sized bytes with a prefix of [MICHELINE_BYTES_TAG] into `parser`.
 pub(crate) fn nom_read_micheline_bytes<'a, T: Clone>(
-    parser: impl FnMut(NomInput) -> NomResult<T>,
+    parser: impl FnMut(NomInput<'a>) -> NomResult<T>,
 ) -> impl FnMut(NomInput<'a>) -> NomResult<'a, T> {
     nom_read_tagged_micheline::<_, { MICHELINE_BYTES_TAG }>(nom_read::dynamic(parser))
 }
