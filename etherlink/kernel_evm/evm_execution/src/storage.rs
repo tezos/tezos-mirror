@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022,2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
@@ -204,7 +204,7 @@ pub mod blocks {
                 .enumerate()
                 .for_each(|(i, hash)| {
                     let keccak_hash =
-                        H256::from_slice(Keccak256::digest(hash.0).as_slice());
+                        H256::from_slice(Keccak256::digest(hash.as_ref()).as_slice());
                     if i == DELETE_BLOCKS_N {
                         last_kept_block_hash = Some(keccak_hash)
                     }

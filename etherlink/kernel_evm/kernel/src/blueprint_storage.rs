@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -485,7 +486,7 @@ mod tests {
     use crate::Timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
-    use tezos_crypto_rs::hash::Signature;
+    use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_mock::MockHost;
@@ -539,7 +540,7 @@ mod tests {
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
-        let signature = Signature::from_base58_check(
+        let signature = UnknownSignature::from_base58_check(
           "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
       ).expect("signature decoding should work");
 
@@ -606,7 +607,7 @@ mod tests {
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_parent_hash);
-        let signature = Signature::from_base58_check(
+        let signature = UnknownSignature::from_base58_check(
           "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
       ).expect("signature decoding should work");
 

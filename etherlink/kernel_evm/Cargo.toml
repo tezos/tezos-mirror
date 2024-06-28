@@ -8,7 +8,14 @@
 
 [workspace]
 
-members = ["ethereum", "kernel", "evm_execution", "evm_evaluation", "indexable_storage", "logging"]
+members = [
+  "ethereum",
+  "kernel",
+  "evm_execution",
+  "evm_evaluation",
+  "indexable_storage",
+  "logging",
+]
 
 [workspace.dependencies]
 
@@ -18,7 +25,7 @@ anyhow = "1.0"
 
 # types
 primitive-types = { version = "0.12.1", default-features = false }
-num-bigint = "0.3"
+num-bigint = "0.4"
 num-traits = "0.2.8"
 num-derive = "0.3"
 ethereum = { version = "0.14.0", default-features = false }
@@ -29,7 +36,7 @@ bytes = "^1"
 # serialization
 hex = "0.4"
 hex-literal = "0.4.1"
-tezos_data_encoding = "0.5.2"
+tezos_data_encoding = "0.6"
 const-decoder = { version = "0.3.0" }
 rlp = "0.5.2"
 
@@ -42,7 +49,7 @@ bn = { package = "substrate-bn", version = "0.6", default-features = false }
 sha2 = { version = "0.10.6", default-features = false }
 sha3 = { version = "0.10.6", default-features = false }
 ripemd = { version = "0.1.3", default-features = false }
-tezos_crypto_rs = { version = "0.5.2", default-features = false }
+tezos_crypto_rs = { version = "0.6", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false, features = [
   "static-context",
   "hmac",
@@ -76,5 +83,7 @@ proptest = { version = "1.0" }
 pretty_assertions = { version = "1.4.0" }
 
 # alloy
-alloy-sol-types = { version = "0.7.6", default-features = false, features = ["json"]}
+alloy-sol-types = { version = "0.7.6", default-features = false, features = [
+  "json",
+] }
 alloy-primitives = { version = "0.7.6", default-features = false }
