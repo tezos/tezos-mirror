@@ -354,7 +354,7 @@ let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
   let transaction = transaction () in
   let* _ = wait_for in
   (* Once the transaction is in the transaction pool the next block will include it. *)
-  let*@ _ = Rpc.produce_block sequencer in
+  let*@ _ = produce_block sequencer in
   (* Resolve the transaction send to make sure it was included. *)
   transaction
 
@@ -687,7 +687,7 @@ let test_persistent_state =
     ~time_between_blocks:Nothing
   @@ fun {sequencer; _} _protocol ->
   (* Force the sequencer to produce a block. *)
-  let*@ _ = Rpc.produce_block sequencer in
+  let*@ _ = produce_block sequencer in
   (* Ask for the current block. *)
   let*@ block_number = Rpc.block_number sequencer in
   Check.is_true
@@ -717,7 +717,7 @@ let test_publish_blueprints =
   @@ fun {sequencer; proxy; client; sc_rollup_node; _} _protocol ->
   let* _ =
     repeat 5 (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
 
@@ -746,10 +746,19 @@ let test_sequencer_too_ahead =
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   let* () =
-    repeat (max_blueprints_ahead * 2) (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+    repeat (max_blueprints_ahead + 1) (fun () ->
+        let*@ _ = produce_block sequencer in
         unit)
+  in
+  let* () =
+    let*@ _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+    unit
   and* () = Evm_node.wait_for_block_producer_locked sequencer in
+  let* () =
+    repeat max_blueprints_ahead (fun () ->
+        let*@ _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+        unit)
+  in
   let*@ block_number = Rpc.block_number sequencer in
   Check.((block_number = 6l) int32)
     ~error_msg:"The sequencer should have been locked" ;
@@ -765,13 +774,15 @@ let test_sequencer_too_ahead =
   let new_blocks = 3l in
   let* () =
     repeat (Int32.to_int new_blocks) (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
   let previous_block_number = block_number in
   let*@ block_number = Rpc.block_number sequencer in
   Check.((block_number = Int32.add previous_block_number new_blocks) int32)
-    ~error_msg:"The sequencer should have been unlocked" ;
+    ~error_msg:
+      "The sequencer should have been unlocked (block_number: %L, prev + \
+       new_block: %R)" ;
   unit
 
 let test_resilient_to_rollup_node_disconnect =
@@ -805,7 +816,7 @@ let test_resilient_to_rollup_node_disconnect =
   (* Produce blueprints *)
   let* _ =
     repeat first_batch_blueprints_count (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
   let* () =
@@ -841,7 +852,7 @@ let test_resilient_to_rollup_node_disconnect =
      it cannot catchup in one go. *)
   let* _ =
     repeat (2 * max_blueprints_lag) (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
 
@@ -865,7 +876,7 @@ let test_resilient_to_rollup_node_disconnect =
      up at the end. *)
   let* _ =
     repeat max_blueprints_lag (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
 
@@ -930,7 +941,7 @@ let test_can_fetch_blueprint =
   let number_of_blocks = 5 in
   let* _ =
     repeat number_of_blocks (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
 
@@ -1065,7 +1076,7 @@ let test_rpc_produceBlock =
     ~title:"RPC method produceBlock"
   @@ fun {sequencer; _} _protocol ->
   let*@ start_block_number = Rpc.block_number sequencer in
-  let*@ _ = Rpc.produce_block sequencer in
+  let*@ _ = produce_block sequencer in
   let*@ new_block_number = Rpc.block_number sequencer in
   Check.((Int32.succ start_block_number = new_block_number) int32)
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
@@ -1083,7 +1094,7 @@ let wait_for_event ?(timeout = 30.) ?(levels = 10) event_watcher ~sequencer
     if n = 0 then Test.fail error_msg
     else
       let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-      let*@ _ = Rpc.produce_block sequencer in
+      let*@ _ = produce_block sequencer in
       if Option.is_some !event_value then unit else rollup_node_loop (n - 1)
   in
   let* () = Lwt.pick [rollup_node_loop levels; Lwt_unix.sleep timeout] in
@@ -1713,7 +1724,7 @@ let test_delayed_deposit_from_init_rollup_node =
   Log.info "sequencer restarted" ;
   (* The block will include the delayed deposit. *)
   let* () =
-    let*@ _lvl = Rpc.produce_block new_sequencer in
+    let*@ _lvl = produce_block new_sequencer in
     unit
   and* _hash = Evm_node.wait_for_block_producer_tx_injected new_sequencer in
   let* () =
@@ -1744,7 +1755,7 @@ let test_init_from_rollup_node_data_dir =
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         unit)
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -1774,7 +1785,7 @@ let test_init_from_rollup_node_data_dir =
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
 
-  let*@ _ = Rpc.produce_block evm_node' in
+  let*@ _ = produce_block evm_node' in
   let* () =
     bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' ~proxy ()
   in
@@ -1855,7 +1866,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
 
-  let*@ _ = Rpc.produce_block evm_node' in
+  let*@ _ = produce_block evm_node' in
   let* () =
     bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' ~proxy ()
   in
@@ -1922,7 +1933,7 @@ let test_observer_applies_blueprint_when_restarted =
   @@ fun {sequencer; observer; _} _protocol ->
   (* We produce a block and check the observer applies it. *)
   let* _ = Evm_node.wait_for_blueprint_applied observer 1
-  and* _ = Rpc.produce_block sequencer in
+  and* _ = produce_block sequencer in
 
   (* We restart the observer *)
   let* () = Evm_node.terminate observer in
@@ -1930,7 +1941,7 @@ let test_observer_applies_blueprint_when_restarted =
 
   (* We produce a block and check the observer applies it. *)
   let* _ = Evm_node.wait_for_blueprint_applied observer 2
-  and* _ = Rpc.produce_block sequencer in
+  and* _ = produce_block sequencer in
 
   unit
 
@@ -2205,7 +2216,7 @@ let test_observer_applies_blueprint_when_sequencer_restarted =
   @@ fun {sequencer; observer; _} _protocol ->
   (* We produce a block and check the observer applies it. *)
   let* _ = Evm_node.wait_for_blueprint_applied observer 1
-  and* _ = Rpc.produce_block sequencer in
+  and* _ = produce_block sequencer in
 
   (* We stop the sequencer and wait for the observer to detect it and emit an
      event accordingly. *)
@@ -2221,7 +2232,7 @@ let test_observer_applies_blueprint_when_sequencer_restarted =
 
   (* We produce a block and check the observer applies it. *)
   let* _ = Evm_node.wait_for_blueprint_applied observer 2
-  and* _ = Rpc.produce_block sequencer in
+  and* _ = produce_block sequencer in
 
   unit
 
@@ -2291,7 +2302,7 @@ let test_observer_timeout_when_necessary =
 
   (* We produce a block, and verify that the observer nodes correctly applies
      it. *)
-  let* _ = Rpc.produce_block sequencer in
+  let* _ = produce_block sequencer in
   let* () = Evm_node.wait_for_blueprint_applied observer 1 in
 
   unit
@@ -2402,9 +2413,7 @@ let test_self_upgrade_kernel =
      the kernel is upgraded. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
-        in
+        let* _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
         unit)
   in
 
@@ -2423,9 +2432,7 @@ let test_self_upgrade_kernel =
      node and the sequencer will upgrade to itself. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
-        in
+        let* _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
         unit)
   and* _ = Evm_node.wait_for_successful_upgrade sequencer
   and* _ = Evm_node.wait_for_successful_upgrade observer in
@@ -2499,9 +2506,7 @@ let test_upgrade_kernel_auto_sync =
      the kernel is upgraded. *)
   let* _ =
     repeat 2 (fun () ->
-        let*@ _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
-        in
+        let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
         unit)
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -2519,9 +2524,7 @@ let test_upgrade_kernel_auto_sync =
      therefore not produce the block. *)
   let* _ =
     repeat 2 (fun () ->
-        let*@ _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
-        in
+        let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
         unit)
   and* _upgrade = Evm_node.wait_for_successful_upgrade sequencer in
 
@@ -2643,9 +2646,7 @@ let test_forced_blueprint_takes_pred_timestamp =
              _protocol ->
   (* The head timestamp will be high enough that we don't use the L1 timestamp
      for the forced blueprint and just take the same timestamp. *)
-  let*@ (_ : int) =
-    Rpc.produce_block ~timestamp:"2020-01-01T00:04:00Z" sequencer
-  in
+  let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:04:00Z" sequencer in
   let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
   (* Make a delayed transaction and force it by creating L1 blocks. *)
   let raw_transfer =
@@ -2695,9 +2696,7 @@ let test_forced_blueprint_takes_l1_timestamp =
            _;
          }
              _protocol ->
-  let*@ (_ : int) =
-    Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
-  in
+  let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer in
   let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
   (* Make a delayed transaction and force it by creating L1 blocks. *)
   let raw_transfer =
@@ -2961,7 +2960,7 @@ let test_external_transaction_to_delayed_inbox_fails =
      if added *)
   let* () =
     repeat 10 (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
+        let*@ _ = produce_block sequencer in
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
@@ -3105,17 +3104,25 @@ let test_non_increasing_timestamp =
     ~tags:["evm"; "sequencer"; "block"; "timestamp"]
     ~title:"Non increasing timestamp are forbidden"
   @@ fun {sequencer; _} _protocol ->
-  let*@ (_ : int) =
-    Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
-  in
+  let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
   (* This produce block will fail as the timestamp is before the previous block. *)
-  let*@? (_err : Rpc.error) =
-    Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
+  let* () =
+    match Evm_node.mode sequencer with
+    | Sequencer _ ->
+        let*@? _err =
+          Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
+        in
+        unit
+    | Threshold_encryption_sequencer _ ->
+        let wait_for_invalid = Evm_node.wait_for_blueprint_invalid sequencer in
+        let* _ntx =
+          Rpc.produce_proposal ~timestamp:"2020-01-01T00:00:00Z" sequencer
+        and* () = wait_for_invalid in
+        unit
+    | _ -> assert false (* impossible case as it's a sequencer. *)
   in
   (* However the same timestamp is accepted. *)
-  let*@ (_ : int) =
-    Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
-  in
+  let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
   unit
 
 let test_timestamp_from_the_future =
@@ -3138,7 +3145,7 @@ let test_timestamp_from_the_future =
   in
   (* The sequencer will accept it anyway, but we need to check that the rollup
      node accepts it. *)
-  let*@ (_ : int) = Rpc.produce_block ~timestamp:accepted_timestamp sequencer in
+  let*@ (_ : int) = produce_block ~timestamp:accepted_timestamp sequencer in
   let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
 
   (* Producing a block 5:30 minutes after the L1 timetamp will be accepted by
@@ -3147,7 +3154,7 @@ let test_timestamp_from_the_future =
   let refused_timestamp =
     Tezos_base.Time.Protocol.(add current_l1_timestamp 330L |> to_notation)
   in
-  let*@ (_ : int) = Rpc.produce_block ~timestamp:refused_timestamp sequencer in
+  let*@ (_ : int) = produce_block ~timestamp:refused_timestamp sequencer in
   let* _ =
     repeat 5 (fun () ->
         let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
@@ -3195,7 +3202,7 @@ let test_sequencer_upgrade =
          }
              _protocol ->
   (* produce an initial block *)
-  let*@ _lvl = Rpc.produce_block sequencer in
+  let*@ _lvl = produce_block sequencer in
   let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
   let* () =
     check_head_consistency
@@ -3238,8 +3245,18 @@ let test_sequencer_upgrade =
   let nb_block = 4l in
   (* apply the upgrade in the kernel  *)
   let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-  (*   produce_block fails because sequencer changed *)
-  let*@? _err = Rpc.produce_block sequencer in
+  (* produce_block fails because sequencer changed *)
+  let* () =
+    match Evm_node.mode sequencer with
+    | Sequencer _ ->
+        let*@? _err = Rpc.produce_block sequencer in
+        unit
+    | Threshold_encryption_sequencer _ ->
+        let wait_for_invalid = Evm_node.wait_for_blueprint_invalid sequencer in
+        let* _ntx = Rpc.produce_proposal sequencer and* () = wait_for_invalid in
+        unit
+    | _ -> assert false (* impossible case as it's a sequencer. *)
+  in
   let* () =
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
@@ -3294,7 +3311,7 @@ let test_sequencer_upgrade =
     let* () = Evm_node.run new_sequencer in
     let* () =
       repeat (Int32.to_int nb_block) (fun () ->
-          let* _ = Rpc.produce_block new_sequencer in
+          let* _ = produce_block new_sequencer in
           unit)
     in
     let* () =
@@ -3335,7 +3352,7 @@ let test_sequencer_diverge =
   let* () =
     repeat 4 (fun () ->
         let*@ _l2_level =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
+          produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
         in
         unit)
   in
@@ -3353,10 +3370,7 @@ let test_sequencer_diverge =
           @@ Evm_node.Sequencer
                {config with private_rpc_port = Some (Port.fresh ())}
       | Threshold_encryption_sequencer config ->
-          let sequencer_sidecar_port = Some (Port.fresh ()) in
-          let sequencer_sidecar =
-            Dsn_node.sequencer ?rpc_port:sequencer_sidecar_port ()
-          in
+          let sequencer_sidecar = Dsn_node.sequencer () in
           let* () = Dsn_node.start sequencer_sidecar in
           return
           @@ Evm_node.Threshold_encryption_sequencer
@@ -3397,10 +3411,8 @@ let test_sequencer_diverge =
       ]
   and* () =
     (* diff timestamp to differ *)
-    let* _ = Rpc.produce_block ~timestamp:"2020-01-01T00:13:00Z" sequencer
-    and* _ =
-      Rpc.produce_block ~timestamp:"2020-01-01T00:12:00Z" sequencer_bis
-    in
+    let* _ = produce_block ~timestamp:"2020-01-01T00:13:00Z" sequencer
+    and* _ = produce_block ~timestamp:"2020-01-01T00:12:00Z" sequencer_bis in
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
@@ -3418,11 +3430,11 @@ let test_sequencer_can_catch_up_on_event =
   @@ fun {sc_rollup_node; client; sequencer; proxy; observer; _} _protocol ->
   let* () =
     repeat 2 (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let* _ = produce_block sequencer in
         unit)
   in
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
-  let* _ = Rpc.produce_block sequencer in
+  let* _ = produce_block sequencer in
   let*@ last_produced_block = Rpc.block_number sequencer in
   let* () =
     Evm_node.wait_for_blueprint_injected
@@ -3495,7 +3507,7 @@ let test_sequencer_dont_read_level_twice =
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
 
   (* We expect the deposit to be in this block. *)
-  let* _ = Rpc.produce_block sequencer in
+  let* _ = produce_block sequencer in
 
   let*@ block = Rpc.get_block_by_number ~block:Int.(to_string 1) sequencer in
   let nb_transactions =
@@ -3513,8 +3525,8 @@ let test_sequencer_dont_read_level_twice =
   let* _ = Evm_node.run sequencer in
 
   (* We produce some empty blocks. *)
-  let*@ _ = Rpc.produce_block sequencer in
-  let*@ _ = Rpc.produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
 
   (* If the logic of the sequencer is correct (i.e., it does not process the
      deposit twice), then it is possible for the rollup node to apply them. *)
@@ -3932,7 +3944,7 @@ let test_preimages_endpoint =
   in
   (* Produce a block so the sequencer sees the event. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = Rpc.produce_block new_sequencer in
+  let* _ = produce_block new_sequencer in
   Check.is_true
     !served
     ~error_msg:"The sequencer should have used the file server" ;
@@ -4084,9 +4096,7 @@ let test_txpool_content_empty_with_legacy_encoding =
      the kernel is upgraded. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
-        in
+        let* _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
         unit)
   in
 
@@ -4097,9 +4107,7 @@ let test_txpool_content_empty_with_legacy_encoding =
      node and the sequencer will upgrade to itself. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
-        in
+        let* _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
         unit)
   and* _ = Evm_node.wait_for_successful_upgrade sequencer
   and* _ = Evm_node.wait_for_successful_upgrade observer in

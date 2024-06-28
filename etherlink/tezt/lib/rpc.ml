@@ -78,6 +78,12 @@ module Request = struct
 
   let stateValue path = {method_ = "stateValue"; parameters = `String path}
 
+  let produceProposal ?timestamp () =
+    let parameters =
+      match timestamp with None -> `Null | Some timestamp -> `String timestamp
+    in
+    {method_ = "produceProposal"; parameters}
+
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
@@ -284,6 +290,20 @@ let produce_block ?timestamp evm_node =
   return
   @@ decode_or_error
        (fun json -> Evm_node.extract_result json |> JSON.as_int)
+       json
+
+let produce_proposal ?timestamp evm_node =
+  let* json =
+    Evm_node.call_evm_rpc
+      ~private_:true
+      evm_node
+      (Request.produceProposal ?timestamp ())
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
        json
 
 let state_value evm_node path =
