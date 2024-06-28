@@ -22,6 +22,7 @@
 - Add `AtomicBatch2` ... `AtomicBatch5` structs implementing `AtomicBatch` and constructed from tuples
   of `OutboxMessageTransaction` with potentially different parameter types.
 - Add `--keep-going` option to native cli, to control whether the kernel should exit once the inbox has been drained.
+- Bump `tezos_crypto_rs`/`tezos_data_encoding` to `0.6.0` release.
 
 ### Installer client/kernel
 
