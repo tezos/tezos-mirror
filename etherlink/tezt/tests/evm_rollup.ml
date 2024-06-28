@@ -988,6 +988,15 @@ let test_rpc_batch =
     ~error_msg:"Expected a chain_id of %R, but got %L" ;
   unit
 
+let test_rpc_eth_coinbase =
+  register_both ~tags:["evm"; "rpc"; "coinbase"] ~title:"RPC eth_coinbase"
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  let*@ coinbase = Rpc.coinbase evm_node in
+  (* If there's no sequencer pool address, coinbase returns 0x00..00. *)
+  Check.((coinbase = "0x0000000000000000000000000000000000000000") string)
+    ~error_msg:"eth_coinbase returned %L, expected %R" ;
+  unit
+
 let test_l2_blocks_progression =
   register_proxy
     ~tags:["evm"; "l2_blocks_progression"]
@@ -6193,6 +6202,7 @@ let register_evm_node ~protocols =
   test_rpc_getTransactionCount protocols ;
   test_rpc_getTransactionCountBatch protocols ;
   test_rpc_batch protocols ;
+  test_rpc_eth_coinbase protocols ;
   test_l2_block_size_non_zero protocols ;
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;

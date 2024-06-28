@@ -570,6 +570,13 @@ let dispatch_request (config : Configuration.t)
                 rpc_ok fee_history_result
             in
             build_with_input ~f module_ parameters
+        | Coinbase.Method ->
+            let f (_ : unit option) =
+              let open Lwt_result_syntax in
+              let* coinbase = Backend_rpc.coinbase () in
+              rpc_ok coinbase
+            in
+            build ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in

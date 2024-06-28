@@ -4235,6 +4235,12 @@ let test_miner =
       string)
     ~error_msg:
       "Viewed coinbase should be the sequencer pool address, expected %R got %L" ;
+
+  let*@ rpc_coinbase = Rpc.coinbase sequencer in
+  Check.((rpc_coinbase = sequencer_pool_address) string)
+    ~error_msg:
+      "eth_coinbase should be the sequencer pool address, expected %R got %L" ;
+
   unit
 
 let test_fa_bridge_feature_flag =

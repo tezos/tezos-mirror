@@ -148,6 +148,10 @@ module type S = sig
     Ethereum_types.hash ->
     Tracer_types.config ->
     Tracer_types.output tzresult Lwt.t
+
+  (** [coinbase ()] returns the sequencer pool address if it exists,
+      or the zero address. *)
+  val coinbase : unit -> Ethereum_types.address tzresult Lwt.t
 end
 
 module type Backend = sig

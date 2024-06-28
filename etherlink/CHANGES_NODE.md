@@ -12,6 +12,8 @@
 - Log the errors trace when blueprint injection fails. (!13859)
 - Add support for `max_blueprint_lookahead_in_seconds` in the kernel config helper
   command. (!13827)
+- Support the RPC `eth_coinbase`. It returns the sequencer pool address if it
+  exists, otherwise returns the zero address. (!todo)
 
 ### Bug fixes
 
