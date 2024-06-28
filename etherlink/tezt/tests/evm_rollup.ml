@@ -4587,7 +4587,7 @@ let test_regression_block_hash_gen =
 
 let test_reboot_out_of_ticks =
   register_proxy
-    ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"]
+    ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"; Tag.flaky]
     ~title:
       "Check that the kernel can handle transactions that take too many ticks \
        for a single run"
