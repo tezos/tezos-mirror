@@ -176,7 +176,7 @@ let job_tezt ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
     ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
     ?(tezt_parallel = 1) ?(tezt_variant = "")
     ?(before_script = before_script ~source_version:true ~eval_opam:true [])
-    ~dependencies () : tezos_job =
+    ?timeout ~dependencies () : tezos_job =
   let variables =
     [
       ("JUNIT", "tezt-junit.xml");
@@ -225,6 +225,7 @@ let job_tezt ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
   in
   let retry = if retry = 0 then None else Some retry in
   job
+    ?timeout
     ~__POS__
     ~image:Images.CI.e2etest
     ~name
@@ -1322,6 +1323,7 @@ let jobs pipeline_type =
           ~tezt_tests:(tezt_tests [Not (Has_tag "flaky")])
           ~tezt_parallel:3
           ~parallel:(Vector 60)
+          ~timeout:(Minutes 40)
           ~rules
           ~dependencies
           ()
