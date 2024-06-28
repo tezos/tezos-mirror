@@ -119,6 +119,19 @@ let next_level node =
   let* current_level = Node.get_level node in
   return (current_level + 1)
 
+let check_in_TB_committee ~__LOC__ node ?(inside = true) ?level pkh =
+  let* slots =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_helper_validators ?level ~delegate:pkh ()
+  in
+  let in_committee = JSON.as_list slots <> [] in
+  Check.(
+    (in_committee = inside)
+      ~__LOC__
+      bool
+      ~error_msg:"The account is in the TB committee? Expected %R, got %L") ;
+  unit
+
 let get_peer_score dal_node peer_id =
   let* scores = Dal_RPC.(call dal_node @@ get_scores ()) in
   let peer_score =
@@ -1142,7 +1155,7 @@ let test_all_available_slots _protocol parameters cryptobox node client
 
 (* Tests that DAL attestation payloads are only attached if the attestation is
    from a DAL-committee member. This test creates a new account and registers it
-   as a bakers, and bakes blocks until it reaches a level where the new account
+   as a baker, and bakes blocks until it reaches a level where the new account
    is in the TB committee but not in the DAL committee).*)
 let test_slots_attestation_operation_dal_committee_membership_check _protocol
     parameters _cryptobox node client _bootstrap_key =
@@ -1214,22 +1227,9 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
     else (
       Log.info "The new account is not in the DAL committee" ;
       Log.info "We check that the new account is in the Tenderbake committee" ;
-      let* validators =
-        Client.RPC.call client
-        @@ RPC.get_chain_block_helper_validators ~level ()
+      let* () =
+        check_in_TB_committee ~__LOC__ node new_account.public_key_hash ~level
       in
-      let is_validator =
-        List.exists
-          (fun validator ->
-            JSON.(validator |-> "delegate" |> as_string)
-            |> String.equal new_account.public_key_hash)
-          (JSON.as_list validators)
-      in
-      Check.(
-        (is_validator = true)
-          bool
-          ~error_msg:
-            "The new account is not a validator, the test needs to be adapted") ;
       let* (`OpHash _oph) =
         inject_dal_attestation
           ~error:Operation.dal_data_availibility_attester_not_in_committee
@@ -7265,6 +7265,200 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
       ~error_msg:"Expected attestation bitset %L, got %R") ;
   unit
 
+let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
+    =
+  let loop ~from ~into ~task =
+    Seq.ints from
+    |> Seq.take (into - from + 1)
+    |> Seq.map task |> List.of_seq |> Lwt.join
+  in
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap2 in
+  let task current_level =
+    let* level = Node.wait_for_level l1_node current_level in
+    (* We expected to advance level by level, otherwise, the test should fail. *)
+    Check.(
+      (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
+    let (publish_level as payload) = level in
+    Log.info
+      "[slot_producer] publish slot %d for level %d with payload %d at level %d"
+      slot_index
+      publish_level
+      payload
+      level ;
+    let* _ =
+      Helpers.publish_and_store_slot l1_client dal_node source ~index:slot_index
+      @@ Helpers.make_slot ~slot_size (sf " %d " payload)
+    in
+    let* () = bake_for l1_client in
+    unit
+  in
+  let* () = loop ~from ~into ~task in
+  Log.info "[slot_producer] will terminate" ;
+  unit
+
+(* We have a bootstrap node, a producer node and an attester node for a new
+   attester. We check that as soon as the attester is in the DAL committee it
+   attests. *)
+let test_new_attester_attests _protocol dal_parameters _cryptobox node client
+    dal_bootstrap =
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let slot_index = 0 in
+  let* () = check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap in
+  Log.info "Bootstrap DAL node is running" ;
+
+  let peers = [Dal_node.listen_addr dal_bootstrap] in
+
+  let producer = Dal_node.create ~name:"producer" ~node () in
+  let* () =
+    Dal_node.init_config ~producer_profiles:[slot_index] ~peers producer
+  in
+  let* () = Dal_node.run ~wait_ready:true producer in
+  let* () =
+    check_profiles
+      ~__LOC__
+      producer
+      ~expected:Dal_RPC.(Operator [Producer slot_index])
+  in
+  Log.info "Slot producer DAL node is running" ;
+
+  (* Set up a new account that holds a big amount of tez and make sure it can be
+     an attester. *)
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let* balance =
+    Client.get_balance_for ~account:Constant.bootstrap1.alias client
+  in
+  let* new_account = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:new_account.alias
+      ~amount:Tez.(balance - one)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = bake_for client in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+  let* () = bake_for client in
+  let* () = Client.register_key new_account.alias client in
+  let* () = bake_for client in
+
+  let attester_node = Dal_node.create ~name:"attester" ~node () in
+  let* () =
+    Dal_node.init_config
+      ~attester_profiles:[new_account.public_key_hash]
+      ~peers
+      attester_node
+  in
+  let* () = Dal_node.run ~wait_ready:true attester_node in
+
+  let num_cycles = 1 + consensus_rights_delay in
+  let* level = Client.level client in
+
+  (* We need to publish at the level [n-lag], where [n] is the first level where
+     we should see the attestation of the new attester. But for simplicity we
+     keep publish till level [n-1]. *)
+  let last_publish_level = (num_cycles * blocks_per_cycle) - 1 in
+  let first_publish_level =
+    last_publish_level - dal_parameters.attestation_lag
+  in
+  Log.info
+    "Bake blocks fast (without publishing) up to level %d"
+    (first_publish_level - 1) ;
+  let* () = bake_for ~count:(first_publish_level - level) client in
+  Log.info
+    "Publish slots for levels %d to %d"
+    first_publish_level
+    last_publish_level ;
+
+  let* () =
+    slot_producer
+      ~slot_index
+      ~slot_size
+      ~from:first_publish_level
+      ~into:last_publish_level
+      producer
+      node
+      client
+  in
+  let* level = Client.level client in
+  let* () =
+    check_in_TB_committee
+      ~__LOC__
+      node
+      new_account.public_key_hash
+      ~inside:false
+      ~level
+  in
+  let* () =
+    Dal.Committee.check_is_in
+      ~__LOC__
+      node
+      new_account.public_key_hash
+      ~inside:false
+      ~level
+  in
+  Log.info "Bake one more block for %s to be in the committee" new_account.alias ;
+  let* () = bake_for client in
+  let* () =
+    check_in_TB_committee
+      ~__LOC__
+      node
+      new_account.public_key_hash
+      ~level:(level + 1)
+  in
+  let* () =
+    Dal.Committee.check_is_in
+      ~__LOC__
+      node
+      new_account.public_key_hash
+      ~level:(level + 1)
+  in
+
+  Log.info "Bake a block with all accounts, including the new account" ;
+  let* () =
+    let bootstrap_accounts =
+      Array.to_list Account.Bootstrap.keys
+      |> List.map (fun a -> a.Account.public_key_hash)
+    in
+    bake_for
+      ~dal_node_endpoint:(Helpers.endpoint attester_node)
+      ~delegates:(`For (new_account.public_key_hash :: bootstrap_accounts))
+      client
+  in
+  let* json =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+  in
+  let dal_attestation_opt =
+    List.find_map
+      (fun json ->
+        let contents = JSON.(json |-> "contents" |> as_list) |> List.hd in
+        let delegate =
+          JSON.(contents |-> "metadata" |-> "delegate" |> as_string)
+        in
+        let kind = JSON.(contents |-> "kind" |> as_string) in
+        if
+          delegate = new_account.public_key_hash
+          && kind = "attestation_with_dal"
+        then Some JSON.(contents |-> "dal_attestation" |> as_string)
+        else None)
+      (JSON.as_list json)
+  in
+  Check.(
+    (dal_attestation_opt = Some "1")
+      (option string)
+      ~error_msg:
+        "Expected a DAL attestation for slot 0 for the new attester: got %L, \
+         expected %R") ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -7502,6 +7696,12 @@ let register ~protocols =
     "DAL node crawler reconnects to L1 without crashing"
     ~prover:false
     test_dal_node_crawler_reconnects_to_l1
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~bootstrap_profile:true
+    ~number_of_slots:1
+    "new attester attests"
+    test_new_attester_attests
     protocols ;
 
   (* Tests with all nodes *)
