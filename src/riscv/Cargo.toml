@@ -40,7 +40,7 @@ path = "../kernel_sdk/sdk"
 features = ["utils"]
 
 [workspace.dependencies.tezos_crypto_rs]
-version = "0.5.2"
+version = "0.6.0"
 default-features = false
 
 [workspace.dependencies.strum]

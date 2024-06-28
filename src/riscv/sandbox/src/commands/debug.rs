@@ -68,7 +68,7 @@ fn debug_pvm(
             program,
             initrd,
             inbox.build(),
-            rollup_address.into_hash().0.try_into().unwrap(),
+            rollup_address.into_hash().as_ref().try_into().unwrap(),
             opts.common.inbox.origination_level,
         )?,
     )
