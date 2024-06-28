@@ -5,11 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let process_new_block ~finalized_level () =
+let process_new_block ~proxy ~finalized_level () =
   let open Lwt_result_syntax in
   let* () = Evm_events_follower.new_rollup_block finalized_level in
   let* () = Blueprints_publisher.new_rollup_block finalized_level in
-  Tx_pool.pop_and_inject_transactions_lazy ()
+  if proxy then Tx_pool.pop_and_inject_transactions_lazy () else return_unit
 
 type error += Connection_lost | Connection_timeout
 
@@ -21,11 +21,11 @@ type error += Connection_lost | Connection_timeout
     This is necessary for the very beginning of the rollup life, when
     the evm node is started at the same moment at the origination of
     the rollup, and so `finalized_level` is < origination level. *)
-let process_finalized_level ~oldest_rollup_node_known_l1_level ~finalized_level
-    () =
+let process_finalized_level ~proxy ~oldest_rollup_node_known_l1_level
+    ~finalized_level () =
   let open Lwt_result_syntax in
   if oldest_rollup_node_known_l1_level <= finalized_level then
-    process_new_block ~finalized_level ()
+    process_new_block ~proxy ~finalized_level ()
   else return_unit
 
 let reconnection_delay = 5.0
@@ -183,6 +183,7 @@ let[@tailrec] rec loop_on_rollup_node_stream ~keep_alive ~catchup_event ~proxy
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* () =
     process_finalized_level
+      ~proxy
       ~oldest_rollup_node_known_l1_level
       ~finalized_level
       ()
