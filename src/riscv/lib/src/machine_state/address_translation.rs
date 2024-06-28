@@ -214,16 +214,16 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         mode: Mode,
         satp: CSRRepr,
         access_type: AccessType,
-    ) -> Option<TranslationAlgorithm> {
+    ) -> TranslationAlgorithm {
         // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
         //    The satp register must be active, i.e.,
         //    the effective privilege mode must be S-mode or U-mode.
 
         if let Mode::Machine = self.effective_translation_hart_mode(mode, access_type) {
-            return None;
+            return TranslationAlgorithm::Bare;
         }
 
-        Satp::from_bits(satp).mode().ok()
+        Satp::from_bits(satp).mode()
     }
 
     /// Like [`Self::translate`] but allows the caller to prevent extraneous reads from CSRs.
@@ -237,15 +237,17 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     ) -> Result<Address, Exception> {
         let mode = self.effective_translation_alg(mode, satp, access_type);
 
-        match mode {
-            // An invalid mode should not be writable, but it is treated as BARE
-            None | Some(TranslationAlgorithm::Bare) => Ok(virt_addr),
-            Some(TranslationAlgorithm::Sv(length)) => {
-                let satp = self.hart.csregisters.read(CSRegister::satp);
-                sv_translate_impl(&self.bus, virt_addr, satp, length, access_type)
-                    .map_err(|_e| access_type.exception(virt_addr))
-            }
-        }
+        use TranslationAlgorithm::*;
+        let sv_length = match mode {
+            Bare => return Ok(virt_addr),
+            Sv39 => SvLength::Sv39,
+            Sv48 => SvLength::Sv48,
+            Sv57 => SvLength::Sv57,
+        };
+
+        let satp = self.hart.csregisters.read(CSRegister::satp);
+        sv_translate_impl(&self.bus, virt_addr, satp, sv_length, access_type)
+            .map_err(|_e| access_type.exception(virt_addr))
     }
 
     /// Translate a virtual address to a physical address as described in section 5.3.2

@@ -607,7 +607,7 @@ impl CSRegister {
             CSRegister::mepc | CSRegister::sepc | CSRegister::mnepc => {
                 new_value & CSRegister::WARL_MASK_XEPC
             }
-            CSRegister::satp => Satp::from_bits(new_value).normalise()?.to_bits(),
+            CSRegister::satp => Satp::from_bits(new_value).normalise().to_bits(),
             CSRegister::mstatus => MStatus::from_bits(new_value).normalise().to_bits(),
             CSRegister::sstatus => SStatus::from_bits(new_value).normalise().to_bits(),
             CSRegister::mnstatus => MNStatus::from_bits(new_value).normalise().to_bits(),
@@ -1500,7 +1500,8 @@ mod tests {
         // satp
         assert_eq!(check_wrapped(csreg::satp, 0x0), Some(0x0));
         assert_eq!(check_wrapped(csreg::satp, 0x0000_FFFF_0000_FFFF), Some(0x0));
-        assert_eq!(check_wrapped(csreg::satp, 0x4200_FFFF_FFFF_FFFF), None);
+        // Invalid mode is read as 0
+        assert_eq!(check_wrapped(csreg::satp, 0x4200_FFFF_FFFF_FFFF), Some(0x0));
         assert_eq!(
             check_wrapped(csreg::satp, 0x90F0_0000_FFFF_0000),
             Some(0x90F0_0000_FFFF_0000)
