@@ -552,22 +552,6 @@ module Send_raw_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-module Send_transaction = struct
-  open Ethereum_types
-
-  type input = transaction
-
-  type output = hash
-
-  let input_encoding = transaction_encoding
-
-  let output_encoding = hash_encoding
-
-  let method_ = "eth_sendTransaction"
-
-  type ('input, 'output) method_ += Method : (input, output) method_
-end
-
 module Eth_call = struct
   open Ethereum_types
 
@@ -805,7 +789,6 @@ let supported_methods : (module METHOD) list =
     (module Get_transaction_by_block_number_and_index);
     (module Get_uncle_by_block_hash_and_index);
     (module Get_uncle_by_block_number_and_index);
-    (module Send_transaction);
     (module Send_raw_transaction);
     (module Eth_call);
     (module Get_estimate_gas);
@@ -842,6 +825,7 @@ let unsupported_methods : string list =
     "eth_newFilter";
     "eth_newPendingTransactionFilter";
     "eth_uninstallFilter";
+    "eth_sendTransaction";
     (* debug *)
     "debug_getBadBlocks";
     "debug_getRawBlock";
