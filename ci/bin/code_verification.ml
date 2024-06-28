@@ -1322,7 +1322,7 @@ let jobs pipeline_type =
                [tezt_tags_exclusive_tags]. *)
           ~tezt_tests:(tezt_tests [Not (Has_tag "flaky")])
           ~tezt_parallel:3
-          ~parallel:(Vector 60)
+          ~parallel:(Vector 100)
           ~timeout:(Minutes 40)
           ~rules
           ~dependencies
@@ -1572,7 +1572,7 @@ let jobs pipeline_type =
     | Before_merging ->
         (* Write the name of each job that produces coverage as input for other scripts.
            Only includes the stem of the name: parallel jobs only appear once.
-           E.g. as [tezt], not [tezt 1/60], [tezt 2/60], etc. *)
+           E.g. as [tezt], not [tezt X/Y]. *)
         Base.write_file
           "script-inputs/ci-coverage-producing-jobs"
           ~contents:
