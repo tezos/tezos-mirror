@@ -2,56 +2,99 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::storage::{self, Hash, Repo};
-use bincode::{deserialize, serialize};
-use serde::{Deserialize, Serialize};
+use crate::{
+    state_backend::{
+        self,
+        memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
+        Backend, CellRead, CellWrite, Layout, Region,
+    },
+    storage::{self, Hash, Repo},
+};
 use std::{fmt, path::Path};
 use thiserror::Error;
 
 const DUMMY_STATUS: &str = "riscv_dummy_status";
-
-#[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
-pub struct State {
-    payload: Vec<u8>,
-    level: Option<u32>,
-    message_counter: u64,
-    tick: u64,
-}
-
-impl State {
-    fn empty() -> &'static Self {
-        const EMPTY_STATE: &State = &State {
-            payload: Vec::new(),
-            level: None,
-            message_counter: 0,
-            tick: 0,
-        };
-        EMPTY_STATE
-    }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum DummyPvm {
-    // The purpose of this variant is for the encoding (hence, the hash)
-    // of an empty PVM state to remain constant if the `State` type changes.
-    // This hash is hardcored in the protocol implementation of the dummy PVM
-    // in src/proto_alpha/lib_protocol/sc_rollup_riscv.ml.
-    Empty,
-    Pvm(State),
-}
+const PAYLOAD_SIZE: usize = 1024;
+const EMPTY_PAYLOAD: [u8; PAYLOAD_SIZE] = [0u8; PAYLOAD_SIZE];
 
 pub struct Status(String);
 
-impl DummyPvm {
-    pub fn empty() -> Self {
-        Self::Empty
+pub type StateLayout = (
+    state_backend::Array<u8, PAYLOAD_SIZE>,
+    state_backend::BoolCellLayout,
+    state_backend::Atom<u32>,
+    state_backend::Atom<u64>,
+    state_backend::Atom<u64>,
+);
+
+pub struct State<M: state_backend::Manager> {
+    payload: M::Region<u8, PAYLOAD_SIZE>,
+    level_is_set: state_backend::BoolCell<M>,
+    level: state_backend::Cell<u32, M>,
+    message_counter: state_backend::Cell<u64, M>,
+    tick: state_backend::Cell<u64, M>,
+}
+
+impl<M: state_backend::Manager> State<M> {
+    pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
+        Self {
+            payload: space.0,
+            level_is_set: state_backend::BoolCell::bind(space.1),
+            level: space.2,
+            message_counter: space.3,
+            tick: space.4,
+        }
     }
 
-    fn state(&self) -> &State {
-        match self {
-            Self::Empty => State::empty(),
-            Self::Pvm(state) => state,
-        }
+    pub fn reset(&mut self) {
+        self.payload.write_some(0, &EMPTY_PAYLOAD);
+        self.level_is_set.write(false);
+        self.level.write(0);
+        self.message_counter.write(0);
+        self.tick.write(0);
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum PvmError {
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+}
+
+#[derive(Clone)]
+pub struct DummyPvm {
+    backend: InMemoryBackend<StateLayout>,
+}
+
+impl DummyPvm {
+    fn with_backend<T, F>(&self, f: F) -> T
+    where
+        F: FnOnce(&State<SliceManagerRO>) -> T,
+    {
+        let placed = <StateLayout as Layout>::placed().into_location();
+        let space = self.backend.allocate_ro(placed);
+        let state = State::bind(space);
+        f(&state)
+    }
+
+    fn with_new_backend<F>(&self, f: F) -> Self
+    where
+        F: FnOnce(&mut State<SliceManager>),
+    {
+        let mut backend = self.backend.clone();
+        let placed = <StateLayout as Layout>::placed().into_location();
+        let space = backend.allocate(placed);
+        let mut state = State::bind(space);
+        f(&mut state);
+        Self { backend }
+    }
+
+    pub fn empty() -> Self {
+        let (mut backend, placed) = InMemoryBackend::<StateLayout>::new();
+        let space = backend.allocate(placed);
+        let mut state = State::bind(space);
+        state.reset();
+        Self { backend }
     }
 
     pub fn get_status(&self) -> Status {
@@ -59,56 +102,75 @@ impl DummyPvm {
     }
 
     pub fn get_tick(&self) -> u64 {
-        self.state().tick
+        self.with_backend(|state| state.tick.read())
     }
 
     pub fn get_current_level(&self) -> Option<u32> {
-        self.state().level
+        self.with_backend(|state| {
+            if state.level_is_set.read() {
+                Some(state.level.read())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn get_message_counter(&self) -> u64 {
-        self.state().message_counter
+        self.with_backend(|state| state.message_counter.read())
     }
 
     pub fn install_boot_sector(&self, boot_sector: Vec<u8>) -> Self {
-        let state = self.state();
-        Self::Pvm(State {
-            payload: boot_sector,
-            level: state.level,
-            message_counter: state.message_counter,
-            tick: state.tick,
-        })
+        self.with_new_backend(|state| state.payload.write_some(0, boot_sector.as_ref()))
     }
 
     pub fn compute_step(&self) -> Self {
-        let state = self.state();
-        Self::Pvm(State {
-            payload: state.payload.clone(),
-            level: state.level,
-            message_counter: state.message_counter,
-            tick: state.tick + 1,
+        self.with_new_backend(|state| {
+            let tick = state.tick.read();
+            state.tick.write(tick + 1);
         })
     }
 
-    pub fn compute_step_many(&self, _max_steps: usize) -> (Self, i64) {
-        (Self::Empty, 0)
+    pub fn compute_step_many(&self, max_steps: usize) -> (Self, i64) {
+        (0..max_steps).fold((self.clone(), 0), |(state, steps), _| {
+            let next_state = state.compute_step();
+            (next_state, steps + 1)
+        })
     }
 
     pub fn hash(&self) -> Hash {
-        let bytes = serialize(&self).unwrap();
-        tezos_crypto_rs::blake2b::digest_256(&bytes)
+        tezos_crypto_rs::blake2b::digest_256(self.to_bytes())
             .unwrap()
             .try_into()
             .unwrap()
     }
 
     pub fn set_input(&self, level: u32, message_counter: u64, input: Vec<u8>) -> Self {
-        Self::Pvm(State {
-            payload: input,
-            level: Some(level),
-            message_counter,
-            tick: self.get_tick() + 1,
+        self.with_new_backend(|state| {
+            let tick = state.tick.read();
+            state.payload.write_some(0, input.as_slice());
+            state.tick.write(tick + 1);
+            state.message_counter.write(message_counter);
+            state.level_is_set.write(true);
+            state.level.write(level);
         })
+    }
+
+    pub fn to_bytes(&self) -> &[u8] {
+        self.backend.borrow()
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PvmError> {
+        if bytes.len() != StateLayout::placed().size() {
+            Err(PvmError::SerializationError(format!(
+                "Unexpected byte buffer size (expected {}, got {})",
+                StateLayout::placed().size(),
+                bytes.len()
+            )))
+        } else {
+            let mut backend = InMemoryBackend::<StateLayout>::new().0;
+            backend.write(0, bytes);
+            Ok(Self { backend })
+        }
     }
 }
 
@@ -124,7 +186,7 @@ pub enum PvmStorageError {
     StorageError(#[from] storage::StorageError),
 
     #[error("Serialization error: {0}")]
-    SerializationError(#[from] bincode::Error),
+    PvmError(#[from] PvmError),
 }
 
 pub struct PvmStorage {
@@ -144,14 +206,13 @@ impl PvmStorage {
 
     /// Create a new commit for `state` and  return the commit id.
     pub fn commit(&mut self, state: &DummyPvm) -> Result<Hash, PvmStorageError> {
-        let bytes = serialize(state)?;
-        Ok(self.repo.commit(&bytes)?)
+        Ok(self.repo.commit(state.to_bytes())?)
     }
 
     /// Checkout the PVM state committed under `id`, if the commit exists.
     pub fn checkout(&self, id: &Hash) -> Result<DummyPvm, PvmStorageError> {
         let bytes = self.repo.checkout(id)?;
-        let state: DummyPvm = deserialize(&bytes)?;
+        let state = DummyPvm::from_bytes(&bytes)?;
         Ok(state)
     }
 
