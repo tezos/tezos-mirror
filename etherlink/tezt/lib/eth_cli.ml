@@ -89,6 +89,16 @@ let block_number ~endpoint =
 
 let add_abi ~label ~abi () = spawn_command ["abi:add"; label; abi]
 
+let update_abi ~label ~abi () = spawn_command ["abi:update"; label; abi]
+
+let show_abi ~label () =
+  let* abi = spawn_command_and_read_string ["abi:show"; label] in
+  return abi
+
+let check_abi ~label () =
+  let* abi_list = spawn_command_and_read_string ["abi:list"] in
+  return (String.split_on_char '\n' abi_list |> List.mem label)
+
 let deploy ~source_private_key ~endpoint ~abi ~bin =
   let decode json =
     let open JSON in

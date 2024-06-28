@@ -625,7 +625,13 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
 let deploy ~contract ~sender full_evm_setup =
   let {client; sc_rollup_node; evm_node; _} = full_evm_setup in
   let evm_node_endpoint = Evm_node.endpoint evm_node in
-  let* () = Eth_cli.add_abi ~label:contract.label ~abi:contract.abi () in
+  (* if contract label is already among them, then update, otherwise add *)
+  let* already_registered = Eth_cli.check_abi ~label:contract.label () in
+  let* () =
+    if already_registered then
+      Eth_cli.update_abi ~label:contract.label ~abi:contract.abi ()
+    else Eth_cli.add_abi ~label:contract.label ~abi:contract.abi ()
+  in
   let send_deploy () =
     Eth_cli.deploy
       ~source_private_key:sender.Eth_account.private_key
