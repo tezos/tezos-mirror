@@ -279,8 +279,7 @@ where
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
     machine.bus.read_all(msg_addr, &mut msg_bytes)?;
 
-    let hash =
-        tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
+    let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice());
     machine.bus.write_all(out_addr, hash.as_slice())?;
 
     Ok(hash.len() as u64)
