@@ -176,6 +176,23 @@ let daemon_error =
     ~pp1:Error_monad.pp_print_trace
     ("error", Error_monad.trace_encoding)
 
+let failed_to_fetch_block =
+  declare_4
+    ~section
+    ~name:"dal_node_crawler_failed_to_fetch_header"
+    ~msg:
+      "the crawler failed to fetch the block {type} at level {level} (for \
+       last_notified_level {last_notified}): {error}\n\
+       If you're a rollup producer or observer, you may be not be able to \
+       defend your rollup commitments involving DAL inputs in a refutation \
+       game."
+    ~level:Warning
+    ~pp4:Error_monad.pp_print_trace
+    ("type", Data_encoding.string)
+    ("level", Data_encoding.int32)
+    ("last_notified", Data_encoding.int32)
+    ("error", Error_monad.trace_encoding)
+
 let configuration_loaded =
   declare_0
     ~section

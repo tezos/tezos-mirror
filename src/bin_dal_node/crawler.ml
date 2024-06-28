@@ -77,16 +77,31 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
       (* This block header is already notified or not targetted by the user. *)
       return acc
     else
-      let* pred_hash, _level =
-        get_predecessor crawler_lib hash shell_header.level
-      in
-      let* pred_shell_header =
-        fetch_tezos_shell_header cctxt headers_cache pred_hash
-      in
-      catch_up_if_needed
-        pred_hash
-        pred_shell_header
-        ((hash, shell_header) :: acc)
+      let*! res = get_predecessor crawler_lib hash shell_header.level in
+      match res with
+      | Error err ->
+          let*! () =
+            Event.(emit failed_to_fetch_block)
+              ("hash", Int32.pred shell_header.level, !last_notified_level, err)
+          in
+          return acc
+      | Ok (pred_hash, _level) -> (
+          let*! res = fetch_tezos_shell_header cctxt headers_cache pred_hash in
+          match res with
+          | Error err ->
+              let*! () =
+                Event.(emit failed_to_fetch_block)
+                  ( "hash",
+                    Int32.pred shell_header.level,
+                    !last_notified_level,
+                    err )
+              in
+              return acc
+          | Ok pred_shell_header ->
+              catch_up_if_needed
+                pred_hash
+                pred_shell_header
+                ((hash, shell_header) :: acc))
   in
   let process (hash, Block_header.{shell = shell_header; _}) =
     let shell_header_level = shell_header.level in
