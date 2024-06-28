@@ -3610,7 +3610,25 @@ let test_reset =
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
+
+  (* Recreate the evm node simply to reset the state of the tezt
+     instance. *)
+  let sequencer =
+    Evm_node.create
+      ~mode:(Evm_node.mode sequencer)
+      ~data_dir:(Evm_node.data_dir sequencer)
+      ~rpc_port:(Evm_node.rpc_port sequencer)
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   let* () = Evm_node.run sequencer in
+  let observer =
+    Evm_node.create
+      ~mode:(Evm_node.mode observer)
+      ~data_dir:(Evm_node.data_dir observer)
+      ~rpc_port:(Evm_node.rpc_port observer)
+      (Evm_node.endpoint sequencer)
+  in
+
   let* () = Evm_node.run observer in
 
   Log.info "Check sequencer and observer is at %d level" reset_level ;
@@ -3622,7 +3640,7 @@ let test_reset =
        reset." ;
   Check.((sequencer_level = observer_level) int32)
     ~error_msg:
-      "The sequencer (currently at level %L) and observer ( currently at level \
+      "The sequencer (currently at level %L) and observer (currently at level \
        %R) should be at the same level after both being reset." ;
   let* () =
     repeat after_reset_level (fun () ->

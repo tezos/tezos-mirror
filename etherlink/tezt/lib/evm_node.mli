@@ -113,6 +113,9 @@ val mode : t -> mode
 (** Returns the name of the EVM node. *)
 val name : t -> string
 
+(** Returns the data_dir of the EVM node. *)
+val data_dir : t -> string
+
 (** [create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server.
 

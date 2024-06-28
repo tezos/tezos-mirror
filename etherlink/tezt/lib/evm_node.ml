@@ -470,12 +470,16 @@ let name evm_node = evm_node.name
 
 let rpc_port evm_node = evm_node.persistent_state.rpc_port
 
-let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
+let data_dir evm_node = evm_node.persistent_state.data_dir
+
+let data_dir_arg evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
 (* assume a valid config for the given command and uses new latest run
    command format. *)
 let run_args evm_node =
-  let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
+  let shared_args =
+    data_dir_arg evm_node @ evm_node.persistent_state.arguments
+  in
   let mode_args =
     match evm_node.persistent_state.mode with
     | Proxy -> ["run"; "proxy"]
@@ -596,7 +600,9 @@ module Config_file = struct
 end
 
 let spawn_init_config ?(extra_arguments = []) evm_node =
-  let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
+  let shared_args =
+    data_dir_arg evm_node @ evm_node.persistent_state.arguments
+  in
   let time_between_blocks_fmt = function
     | Nothing -> "none"
     | Time_between_blocks f -> Format.sprintf "%.3f" f
@@ -849,7 +855,7 @@ let init_from_rollup_node_data_dir ?reconstruct evm_node rollup_node =
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
-      @ data_dir evm_node
+      @ data_dir_arg evm_node
       @ Cli_arg.optional_arg "reconstruct" Fun.id reconstruct)
   in
   Process.check process
@@ -923,7 +929,7 @@ let transform_dump ~dump_json ~dump_rlp =
 
 let reset evm_node ~l2_level =
   let args =
-    ["reset"; "at"; string_of_int l2_level; "--force"] @ data_dir evm_node
+    ["reset"; "at"; string_of_int l2_level; "--force"] @ data_dir_arg evm_node
   in
   let process = Process.spawn evm_node.path @@ args in
   Process.check process
