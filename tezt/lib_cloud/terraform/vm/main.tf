@@ -45,6 +45,12 @@ variable "docker_image" {
   default     = null
 }
 
+variable "max_run_duration" {
+  type        = number
+  description = "Default maximum duration of a VM (seconds)"
+  default     = null
+}
+
 # Those values should not be modified
 locals {
   artifact_registry = "europe-west1-docker.pkg.dev"
@@ -159,19 +165,22 @@ resource "google_compute_firewall" "default" {
   source_ranges = ["0.0.0.0/0"]
 }
 
+data "google_compute_image" "cos" {
+  family  = "cos-stable"
+  project = "cos-cloud"
+}
+
 # This module creates a blueprint for the VM that will be spawned.
-module "instance_template" {
-  source  = "terraform-google-modules/vm/google//modules/instance_template"
-  version = "~> 11.0.0"
+resource "google_compute_instance_template" "default" {
 
-  project_id = var.project_id
+  # To support the `max-run-duration` argument
+  provider = google-beta
 
-  # This source image is specialized to run docker images.
-  source_image = "cos-stable"
+  project = var.project_id
 
-  source_image_project = "cos-cloud"
+  name = "instance-template"
 
-  service_account = {
+  service_account {
     # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.
     email  = google_service_account.default.email
     scopes = ["cloud-platform"]
@@ -183,13 +192,40 @@ module "instance_template" {
   }
 
   # We register the subnetwork configuration
-  subnetwork = google_compute_subnetwork.default.self_link
+  network_interface {
+    subnetwork = google_compute_subnetwork.default.self_link
+  }
 
   machine_type = var.machine_type
 
-  disk_type = "pd-ssd"
+  disk {
+    source_image = data.google_compute_image.cos.self_link
+    type         = "PERSISTENT"
+    boot         = true
+    auto_delete  = true
+  }
 
   region = var.region
+
+
+  # Write a scheduling block only if variable "max_rune_duration" is set
+  dynamic "scheduling" {
+    for_each = var.max_run_duration == null ? [] : [var.max_run_duration]
+    content {
+      max_run_duration {
+        seconds = var.max_run_duration
+      }
+
+      instance_termination_action = "DELETE"
+    }
+  }
+
+  # We don't want to replace the instances if there is just a change in the 'max_run_duration'
+  lifecycle {
+    ignore_changes = [
+      scheduling
+    ]
+  }
 }
 
 # This module deploys a set of VM using the same blueprint
@@ -200,7 +236,7 @@ module "umig" {
   project_id        = var.project_id
   num_instances     = var.number_of_vms
   hostname          = terraform.workspace
-  instance_template = module.instance_template.self_link
+  instance_template = google_compute_instance_template.default.self_link
   zones             = [var.zone]
   region            = var.region
   subnetwork        = google_compute_subnetwork.default.self_link

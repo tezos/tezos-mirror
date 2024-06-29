@@ -211,6 +211,14 @@ module VM = struct
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
            let* () = Workspace.select workspace in
+           let* () =
+             (* Remote machines could have been destroyed automatically. *)
+             Process.run
+               ~name
+               ~color
+               "terraform"
+               (chdir Path.terraform_vm @ ["refresh"])
+           in
            Process.run
              ~name
              ~color
