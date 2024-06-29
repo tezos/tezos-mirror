@@ -13,17 +13,28 @@ module Cloud : sig
       | Custom of {tezt_cloud : string}
       | Image of {docker_image : string}
 
-    type t = private {machine_type : string; docker_image : docker_image}
+    type t = private {
+      machine_type : string;
+      docker_image : docker_image;
+      max_run_duration : int option;
+    }
 
-    (** [make ?machine_type ()] is a smart-constructor to make a VM
+    (** [make ?max_run_duration ?machine_type ?docker_image ()] is a smart-constructor to make a VM
       configuration. 
 
+    Default value for [max_run_duration] is [7200].  
+        
     Default value for [machine_type] is [n1-standard-2]. 
 
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
     is the value provided by the environement variable [$TEZT_CLOUD].
     *)
-    val make : ?machine_type:string -> ?docker_image:docker_image -> unit -> t
+    val make :
+      ?max_run_duration:int ->
+      ?machine_type:string ->
+      ?docker_image:docker_image ->
+      unit ->
+      t
   end
 
   (** A wrapper around [Test.register] that can be used to register new tests

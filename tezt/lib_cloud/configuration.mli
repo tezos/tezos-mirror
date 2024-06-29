@@ -11,6 +11,15 @@ type docker_image =
 
 val string_of_docker_image : project_id:string -> docker_image -> string
 
-type t = private {machine_type : string; docker_image : docker_image}
+type t = private {
+  machine_type : string;
+  docker_image : docker_image;
+  max_run_duration : int option;
+}
 
-val make : ?machine_type:string -> ?docker_image:docker_image -> unit -> t
+val make :
+  ?max_run_duration:int ->
+  ?machine_type:string ->
+  ?docker_image:docker_image ->
+  unit ->
+  t

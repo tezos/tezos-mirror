@@ -64,3 +64,9 @@ val machine_type : string
 (** Specify the dockerfile image to use. If not specified, the image
     name will be given by the value of the variable `TEZT_CLOUD`. *)
 val dockerfile : string option
+
+(** Maximum running time of a VM. *)
+val max_run_duration : int
+
+(** Deactivate the max run duration parameter. *)
+val no_max_run_duration : bool
