@@ -92,13 +92,14 @@ let rec wait_ssh_server_running runner =
       let* () = Lwt_unix.sleep 2. in
       wait_ssh_server_running runner
 
-let register ?(docker_push = true) ?vms ~__FILE__ ~title ~tags ?seed f =
+let register ?(docker_push = not Cli.localhost) ?vms ~__FILE__ ~title ~tags
+    ?seed f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () =
     if docker_push then
       let* () = Jobs.deploy_docker_registry () in
       Jobs.docker_build ~push:true ()
-    else Lwt.return_unit
+    else Jobs.docker_build ~push:false ()
   in
   let vms =
     (* The Cli arguments by-pass the argument given here. This enable the user
