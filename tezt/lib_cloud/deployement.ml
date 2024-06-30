@@ -70,10 +70,15 @@ module Remote = struct
         wait_docker_running ~zone ~vm_name
 
   let workspace_deploy ?(base_port = 30_000) ?(ports_per_vm = 50)
-      ~workspace_name ~machine_type ~number_of_vms () =
+      ~workspace_name ~machine_type ~number_of_vms ~docker_image () =
     let* () = Terraform.VM.Workspace.select workspace_name in
     let* () =
-      Terraform.VM.deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms
+      Terraform.VM.deploy
+        ~machine_type
+        ~base_port
+        ~ports_per_vm
+        ~number_of_vms
+        ~docker_image
     in
     let names =
       List.init number_of_vms (fun i ->
@@ -160,7 +165,9 @@ module Remote = struct
     let* agents =
       workspaces_info |> Hashtbl.to_seq |> List.of_seq
       |> Lwt_list.map_s
-           (fun (workspace_name, {configuration = {machine_type}; number_of_vms})
+           (fun
+             ( workspace_name,
+               {configuration = {machine_type; docker_image}; number_of_vms} )
            ->
              let* () = Terraform.VM.Workspace.select workspace_name in
              let* () = Terraform.VM.init () in
@@ -171,6 +178,7 @@ module Remote = struct
                  ~workspace_name
                  ~machine_type
                  ~number_of_vms
+                 ~docker_image
                  ()
              in
              agents

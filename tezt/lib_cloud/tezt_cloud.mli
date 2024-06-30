@@ -9,13 +9,21 @@ module Cloud : sig
   type t
 
   module Configuration : sig
-    type t = private {machine_type : string}
+    type docker_image =
+      | Custom of {tezt_cloud : string}
+      | Image of {docker_image : string}
+
+    type t = private {machine_type : string; docker_image : docker_image}
 
     (** [make ?machine_type ()] is a smart-constructor to make a VM
       configuration. 
 
-    Default value for [machine_type] is [n1-standard-2]. *)
-    val make : ?machine_type:string -> unit -> t
+    Default value for [machine_type] is [n1-standard-2]. 
+
+    Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
+    is the value provided by the environement variable [$TEZT_CLOUD].
+    *)
+    val make : ?machine_type:string -> ?docker_image:docker_image -> unit -> t
   end
 
   (** A wrapper around [Test.register] that can be used to register new tests

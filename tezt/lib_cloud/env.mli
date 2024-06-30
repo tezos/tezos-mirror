@@ -25,4 +25,5 @@ val ssh_public_key : string Lazy.t
 val dockerfile : string Lazy.t
 
 (** URI where to find the custom docker image based on the [tezt_cloud] value. *)
-val custom_docker_image : project_id:string -> string
+val custom_docker_image :
+  ?docker_image_name:string -> project_id:string -> unit -> string

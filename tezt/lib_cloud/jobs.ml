@@ -23,10 +23,10 @@ let docker_push () =
     in
     Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_file]
   in
+  let dockerfile = Lazy.force Env.dockerfile in
   Log.info
     "Checking the existence of the docker file %s.Dockerfile..."
-    tezt_cloud ;
-  let dockerfile = Lazy.force Env.dockerfile in
+    dockerfile ;
   if not (Sys.file_exists dockerfile) then
     Test.fail
       "Could not find the dockerfile %s. See README for more information why \

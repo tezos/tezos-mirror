@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = private {machine_type : string}
+type docker_image =
+  | Custom of {tezt_cloud : string}
+  | Image of {docker_image : string}
 
-val make : ?machine_type:string -> unit -> t
+type t = private {machine_type : string; docker_image : docker_image}
+
+val make : ?machine_type:string -> ?docker_image:docker_image -> unit -> t

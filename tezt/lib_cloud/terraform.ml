@@ -139,9 +139,15 @@ module VM = struct
   let init () =
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
-  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms =
+  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms ~docker_image
+      =
     let* project_id = Gcloud.project_id () in
-    let docker_image = Env.custom_docker_image ~project_id in
+    let docker_image =
+      match docker_image with
+      | Configuration.Custom {tezt_cloud} ->
+          Env.custom_docker_image ~docker_image_name:tezt_cloud ~project_id ()
+      | Image {docker_image} -> docker_image
+    in
     let args =
       [
         "--var";
@@ -207,7 +213,7 @@ module VM = struct
   let destroy workspaces =
     let* project_id = Gcloud.project_id () in
     let* machine_type = machine_type () in
-    let docker_image = Env.custom_docker_image ~project_id in
+    (* let docker_image = Env.custom_docker_image ~project_id in *)
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
            let* () = Workspace.select workspace in
