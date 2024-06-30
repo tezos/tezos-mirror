@@ -5,10 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type configuration = {machine_type : string}
-
 module Remote = struct
-  type workspace_info = {configuration : configuration; number_of_vms : int}
+  type workspace_info = {configuration : Configuration.t; number_of_vms : int}
 
   type point_info = {workspace_name : string; gcp_name : string}
 
@@ -326,7 +324,7 @@ module Localhost = struct
 
   let get_configuration _t _agent =
     (* The configuration is not used in localhost. *)
-    {machine_type = Cli.machine_type}
+    Configuration.make ()
 
   let terminate ?exn _t =
     (match exn with

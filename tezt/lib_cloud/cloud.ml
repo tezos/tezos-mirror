@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Configuration = Configuration
+
 (* Tezt-cloud requires to bypass the clean-up process of Tezt. Hence, when the
    user press Ctrl+C, tezt-cloud needs to catch-up the signal before Tezt.
 
@@ -104,9 +106,7 @@ let register ?(docker_push = true) ?vms ~__FILE__ ~title ~tags ?seed f =
     match (vms, Cli.vms) with
     | None, None -> None
     | None, Some i | Some _, Some i ->
-        let vms =
-          List.init i (fun _ -> Deployement.{machine_type = Cli.machine_type})
-        in
+        let vms = List.init i (fun _ -> Configuration.make ()) in
         Some vms
     | Some vms, None -> Some vms
   in
@@ -197,13 +197,9 @@ let register ?(docker_push = true) ?vms ~__FILE__ ~title ~tags ?seed f =
 
 let agents t = t.agents
 
-type vm_configuration = Deployement.configuration = {machine_type : string}
-
-let default_vm_configuration = {machine_type = Cli.machine_type}
-
 let get_configuration t agent =
   match t.deployement with
-  | None -> default_vm_configuration
+  | None -> Configuration.make ()
   | Some deployement -> Deployement.get_configuration deployement agent
 
 let set_agent_name t agent name =

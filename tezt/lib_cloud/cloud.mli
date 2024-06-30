@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type vm_configuration = Deployement.configuration = {machine_type : string}
-
-val default_vm_configuration : vm_configuration
+module Configuration : sig
+  include module type of Configuration
+end
 
 type t
 
@@ -16,7 +16,7 @@ type t
     cloud. *)
 val register :
   ?docker_push:bool ->
-  ?vms:vm_configuration list ->
+  ?vms:Configuration.t list ->
   __FILE__:string ->
   title:string ->
   tags:string list ->
@@ -26,7 +26,7 @@ val register :
 
 val agents : t -> Agent.t list
 
-val get_configuration : t -> Agent.t -> vm_configuration
+val get_configuration : t -> Agent.t -> Configuration.t
 
 val push_metric :
   t -> ?labels:(string * string) list -> name:string -> float -> unit

@@ -24,5 +24,5 @@ val ssh_public_key : string Lazy.t
     VMs. Depends on [workspace]. *)
 val dockerfile : string Lazy.t
 
-(** Name of the docker registry where the docker image is (when the docker image is a custom one). *)
-val docker_registry : string Lazy.t
+(** URI where to find the custom docker image based on the [tezt_cloud] value. *)
+val custom_docker_image : project_id:string -> string
