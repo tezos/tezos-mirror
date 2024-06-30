@@ -50,7 +50,7 @@ let docker_push () =
       ("SSH_PUBLIC_KEY", ssh_public_key);
       ("ZCASH_PARAMS_PATH", Path.zcash_params);
       ("DAL_TRUSTED_SETUP_PATH", Path.dal_trusted_setup);
-      ("BINARIES_DESTINATION_PATH", Agent.default_binaries_path ());
+      ("BINARIES_DESTINATION_PATH", Path.default_binaries_path ());
     ]
   in
   Log.info "Building image from %s.Dockerfile..." tezt_cloud ;

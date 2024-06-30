@@ -103,6 +103,7 @@ module Remote = struct
       else Lwt.return_unit
     in
     let ssh_id = Lazy.force Env.ssh_private_key in
+    let binaries_path = Path.default_binaries_path () in
     let agent_of_name name =
       let* ip = Gcloud.get_ip_address_from_name ~zone name in
       let point = (ip, base_port) in
@@ -112,7 +113,8 @@ module Remote = struct
           incr port ;
           !port
       in
-      Agent.make ~ssh_id ~point ~next_available_port ~name () |> Lwt.return
+      Agent.make ~ssh_id ~point ~binaries_path ~next_available_port ~name ()
+      |> Lwt.return
     in
     let* agents = names |> Lwt_list.map_p agent_of_name in
     Lwt.return agents
@@ -304,6 +306,7 @@ module Localhost = struct
       Hashtbl.replace next_port point (port + 1) ;
       port
     in
+    let binaries_path = Path.default_binaries_path () in
     let agents =
       List.init number_of_vms (fun i ->
           let name = Format.asprintf "localhost_docker_%d" i in
@@ -311,6 +314,7 @@ module Localhost = struct
           Agent.make
             ~ssh_id
             ~point
+            ~binaries_path
             ~next_available_port:(fun () -> next_port point)
             ~name
             ())
