@@ -139,10 +139,19 @@ module VM = struct
   let init () =
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
-  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms
-      ~docker_registry =
+  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms =
     let* project_id = Gcloud.project_id () in
     let docker_image_name = Lazy.force Env.tezt_cloud in
+    let artifact_registry = "europe-west1-docker.pkg.dev" in
+    let docker_registry = Lazy.force Env.docker_registry in
+    let docker_image =
+      Format.asprintf
+        "%s/%s/%s/%s"
+        artifact_registry
+        project_id
+        docker_registry
+        docker_image_name
+    in
     let args =
       [
         "--var";
@@ -152,13 +161,11 @@ module VM = struct
         "--var";
         Format.asprintf "number_of_vms=%d" number_of_vms;
         "--var";
-        Format.asprintf "docker_registry_name=%s" docker_registry;
-        "--var";
         Format.asprintf "project_id=%s" project_id;
         "--var";
         Format.asprintf "machine_type=%s" machine_type;
         "--var";
-        Format.asprintf "docker_image_name=%s" docker_image_name;
+        Format.asprintf "docker_image=%s" docker_image;
       ]
     in
     Process.run
@@ -211,6 +218,16 @@ module VM = struct
     let* project_id = Gcloud.project_id () in
     let* machine_type = machine_type () in
     let docker_image_name = Lazy.force Env.tezt_cloud in
+    let artifact_registry = "europe-west1-docker.pkg.dev" in
+    let docker_registry = Lazy.force Env.docker_registry in
+    let docker_image =
+      Format.asprintf
+        "%s/%s/%s/%s"
+        artifact_registry
+        project_id
+        docker_registry
+        docker_image_name
+    in
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
            let* () = Workspace.select workspace in
@@ -226,8 +243,6 @@ module VM = struct
                  Format.asprintf "project_id=%s" project_id;
                  "--var";
                  Format.asprintf "machine_type=%s" machine_type;
-                 "--var";
-                 Format.asprintf "docker_image_name=%s" docker_image_name;
                ]))
 end
 

@@ -31,3 +31,8 @@ let dockerfile =
       let tezt_cloud = Lazy.force tezt_cloud in
       let basename = Option.value ~default:tezt_cloud Cli.dockerfile in
       Path.docker // Format.asprintf "%s.Dockerfile" basename)
+
+let docker_registry =
+  Lazy.from_fun (fun () ->
+      let tezt_cloud = Lazy.force tezt_cloud in
+      Format.asprintf "%s-docker-registry" tezt_cloud)

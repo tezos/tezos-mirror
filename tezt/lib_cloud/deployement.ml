@@ -72,15 +72,10 @@ module Remote = struct
         wait_docker_running ~zone ~vm_name
 
   let workspace_deploy ?(base_port = 30_000) ?(ports_per_vm = 50)
-      ~workspace_name ~machine_type ~number_of_vms ~docker_registry () =
+      ~workspace_name ~machine_type ~number_of_vms () =
     let* () = Terraform.VM.Workspace.select workspace_name in
     let* () =
-      Terraform.VM.deploy
-        ~machine_type
-        ~base_port
-        ~ports_per_vm
-        ~number_of_vms
-        ~docker_registry
+      Terraform.VM.deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms
     in
     let names =
       List.init number_of_vms (fun i ->
@@ -146,7 +141,6 @@ module Remote = struct
 
   let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~configurations () =
     let tezt_cloud = Lazy.force Env.tezt_cloud in
-    let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud in
     let workspaces_info = Hashtbl.create 11 in
     let agents_info = Hashtbl.create 11 in
     let () =
@@ -179,7 +173,6 @@ module Remote = struct
                  ~workspace_name
                  ~machine_type
                  ~number_of_vms
-                 ~docker_registry
                  ()
              in
              agents

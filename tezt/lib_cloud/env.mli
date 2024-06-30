@@ -23,3 +23,6 @@ val ssh_public_key : string Lazy.t
 (** Path to the docker image that will be used when running
     VMs. Depends on [workspace]. *)
 val dockerfile : string Lazy.t
+
+(** Name of the docker registry where the docker image is (when the docker image is a custom one). *)
+val docker_registry : string Lazy.t
