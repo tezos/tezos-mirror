@@ -97,7 +97,7 @@ let register ?(docker_push = true) ?vms ~__FILE__ ~title ~tags ?seed f =
   let* () =
     if docker_push then
       let* () = Jobs.deploy_docker_registry () in
-      Jobs.docker_push ()
+      Jobs.docker_build ~push:true ()
     else Lwt.return_unit
   in
   let vms =
