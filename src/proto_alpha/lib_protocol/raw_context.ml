@@ -881,7 +881,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | ParisB_019
+type previous_protocol = Genesis of Parameters_repr.t | ParisC_020
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -897,7 +897,7 @@ let check_and_update_protocol_version ctxt =
         else if Compare.String.(s = "genesis") then
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
-        else if Compare.String.(s = "paris_019") then return (ParisB_019, ctxt)
+        else if Compare.String.(s = "paris_020") then return (ParisC_020, ctxt)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1016,7 +1016,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let* ctxt = set_cycle_eras ctxt cycle_eras in
         let*! result = add_constants ctxt param.constants in
         return (result, None)
-    | ParisB_019 ->
+    | ParisC_020 ->
         let*! c = get_previous_protocol_constants ctxt in
 
         let dal =

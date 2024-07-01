@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = ParisB | ParisC | Alpha
+type t = ParisC | Alpha
 
 val encoding : t Data_encoding.t
 

@@ -14,7 +14,6 @@ depends: [
   "tezos-micheline-rewriting" { = version }
   "tezos-protocol-019-PtParisB" { = version }
   "hashcons"
-  "octez-protocol-019-PtParisB-libs" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

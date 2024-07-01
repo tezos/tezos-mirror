@@ -1876,7 +1876,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
-    ~supports:(Protocol.From_protocol 20)
+    ~supports:(Protocol.From_protocol 21)
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
