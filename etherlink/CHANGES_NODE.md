@@ -17,6 +17,9 @@
 
 ### Bug fixes
 
+- `eth_sendTransaction` now returns "unsupported method" error
+  instead of "the pattern matching is not exhaustive" one. (!13960)
+
 ### Experimental
 
 ### Internal

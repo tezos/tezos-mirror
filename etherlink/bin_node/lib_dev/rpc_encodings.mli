@@ -232,11 +232,6 @@ module Send_raw_transaction :
     with type input = Ethereum_types.hex
      and type output = Ethereum_types.hash
 
-module Send_transaction :
-  METHOD
-    with type input = Ethereum_types.transaction
-     and type output = Ethereum_types.hash
-
 module Eth_call :
   METHOD
     with type input =
