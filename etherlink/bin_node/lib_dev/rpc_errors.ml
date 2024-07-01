@@ -72,6 +72,10 @@ let method_not_supported method_ =
       data = Some (`String method_);
     }
 
+let method_disabled method_ =
+  JSONRPC.
+    {code = -32007; message = "Method disabled"; data = Some (`String method_)}
+
 let limit_exceeded reason hash =
   JSONRPC.
     {

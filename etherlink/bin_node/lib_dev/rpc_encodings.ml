@@ -775,6 +775,7 @@ type map_result =
       -> map_result
   | Unsupported
   | Unknown
+  | Disabled
 
 let supported_methods : (module METHOD) list =
   [
@@ -865,13 +866,16 @@ let unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let map_method_name method_name =
-  match
-    List.find
-      (fun (module M : METHOD) -> M.method_ = method_name)
-      supported_methods
-  with
-  | Some (module M) -> Method (M.Method, (module M))
-  | None ->
-      if List.mem ~equal:( = ) method_name unsupported_methods then Unsupported
-      else Unknown
+let map_method_name ?(restrict = Re.(compile empty)) method_name =
+  if Re.execp restrict method_name then Disabled
+  else
+    match
+      List.find
+        (fun (module M : METHOD) -> M.method_ = method_name)
+        supported_methods
+    with
+    | Some (module M) -> Method (M.Method, (module M))
+    | None ->
+        if List.mem ~equal:( = ) method_name unsupported_methods then
+          Unsupported
+        else Unknown

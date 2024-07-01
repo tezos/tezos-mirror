@@ -254,14 +254,20 @@ let dispatch_request (config : Configuration.t)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
+  let restrict =
+    Option.map (fun {Configuration.regex; _} -> regex) config.restricted_rpcs
+  in
   let*! value =
-    match map_method_name method_ with
+    match map_method_name ?restrict method_ with
     | Unknown ->
         Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unknown") ;
         Lwt.return_error (Rpc_errors.method_not_found method_)
     | Unsupported ->
         Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unsupported") ;
         Lwt.return_error (Rpc_errors.method_not_supported method_)
+    | Disabled ->
+        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "disabled") ;
+        Lwt.return_error (Rpc_errors.method_disabled method_)
     (* Ethereum JSON-RPC API methods we support *)
     | Method (method_rpc, module_) -> (
         Prometheus.Counter.inc_one (Metrics.Rpc.method_ method_) ;
@@ -604,7 +610,9 @@ let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
   let* value =
-    match map_method_name method_ with
+    (* Private RPCs can only be accessed locally, they're not accessible to the
+       end user. *)
+    match map_method_name ~restrict:Re.(compile empty) method_ with
     | Unknown ->
         return
           (Error
@@ -623,6 +631,7 @@ let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
                  message = "Method not supported";
                  data = Some (`String method_);
                })
+    | Disabled -> Lwt.return_error (Rpc_errors.method_disabled method_)
     | Method (Produce_block.Method, module_) ->
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in

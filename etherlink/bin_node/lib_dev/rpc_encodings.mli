@@ -303,5 +303,6 @@ type map_result =
       -> map_result
   | Unsupported
   | Unknown
+  | Disabled
 
-val map_method_name : string -> map_result
+val map_method_name : ?restrict:Re.re -> string -> map_result

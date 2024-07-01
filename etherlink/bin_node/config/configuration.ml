@@ -64,6 +64,10 @@ type proxy = unit
 
 type fee_history = {max_count : int option; max_past : int option}
 
+(* The regular expression is compiled at the launch of the node, and encoded
+   into its raw form. *)
+type restricted_rpcs = {raw : string; regex : Re.re}
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
@@ -84,6 +88,7 @@ type t = {
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
+  restricted_rpcs : restricted_rpcs option;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -152,6 +157,8 @@ let default_blueprints_publisher_config =
   }
 
 let default_fee_history = {max_count = None; max_past = None}
+
+let make_restricted_rpcs raw = {raw; regex = Re.Perl.compile_pat raw}
 
 let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ~sequencer
@@ -520,6 +527,7 @@ let encoding data_dir : t Data_encoding.t =
            verbose;
            experimental_features;
            fee_history;
+           restricted_rpcs;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -540,7 +548,8 @@ let encoding data_dir : t Data_encoding.t =
           verbose,
           experimental_features,
           proxy,
-          fee_history ) ))
+          fee_history,
+          Option.map (fun {raw; _} -> raw) restricted_rpcs ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              _devmode,
@@ -559,7 +568,8 @@ let encoding data_dir : t Data_encoding.t =
              verbose,
              experimental_features,
              proxy,
-             fee_history ) ) ->
+             fee_history,
+             restricted_rpcs ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -579,6 +589,7 @@ let encoding data_dir : t Data_encoding.t =
         verbose;
         experimental_features;
         fee_history;
+        restricted_rpcs = Option.map make_restricted_rpcs restricted_rpcs;
       })
     (merge_objs
        (obj10
@@ -601,7 +612,7 @@ let encoding data_dir : t Data_encoding.t =
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj9
+       (obj10
           (dft
              "tx-pool-timeout-limit"
              ~description:
@@ -629,7 +640,8 @@ let encoding data_dir : t Data_encoding.t =
              experimental_features_encoding
              default_experimental_features)
           (dft "proxy" proxy_encoding default_proxy)
-          (dft "fee_history" fee_history_encoding default_fee_history)))
+          (dft "fee_history" fee_history_encoding default_fee_history)
+          (opt "restricted_rpcs" string)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -672,7 +684,7 @@ module Cli = struct
       ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?sequencer_sidecar_endpoint () =
+      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -731,6 +743,7 @@ module Cli = struct
         ?chunk_size:log_filter_chunk_size
         ()
     in
+    let restricted_rpcs = Option.map make_restricted_rpcs restricted_rpcs in
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -757,6 +770,7 @@ module Cli = struct
       verbose = (if verbose then Debug else Internal_event.Notice);
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
+      restricted_rpcs;
     }
 
   let patch_configuration_from_args ~data_dir ?rpc_addr ?rpc_port ?cors_origins
@@ -767,7 +781,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint configuration =
+      ?sequencer_sidecar_endpoint ?restricted_rpcs configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -975,6 +989,11 @@ module Cli = struct
             log_filter_chunk_size;
       }
     in
+    let restricted_rpcs =
+      Option.either
+        (Option.map make_restricted_rpcs restricted_rpcs)
+        configuration.restricted_rpcs
+    in
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -1008,6 +1027,7 @@ module Cli = struct
       verbose = (if verbose then Debug else configuration.verbose);
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
+      restricted_rpcs;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?cors_origins
@@ -1018,7 +1038,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint () =
+      ?sequencer_sidecar_endpoint ?restricted_rpcs () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1068,6 +1088,7 @@ module Cli = struct
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
+          ?restricted_rpcs
           configuration
       in
       return configuration
@@ -1106,6 +1127,7 @@ module Cli = struct
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
+          ?restricted_rpcs
           ()
       in
       return config

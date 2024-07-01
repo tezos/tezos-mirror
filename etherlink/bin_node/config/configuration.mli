@@ -99,6 +99,8 @@ type proxy = unit
 
 type fee_history = {max_count : int option; max_past : int option}
 
+type restricted_rpcs = {raw : string; regex : Re.re}
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
@@ -119,6 +121,7 @@ type t = {
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
+  restricted_rpcs : restricted_rpcs option;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -225,6 +228,7 @@ module Cli : sig
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
+    ?restricted_rpcs:string ->
     unit ->
     t
 
@@ -256,6 +260,7 @@ module Cli : sig
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
+    ?restricted_rpcs:string ->
     unit ->
     t tzresult Lwt.t
 end
