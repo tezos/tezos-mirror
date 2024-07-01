@@ -119,7 +119,7 @@ let create_endorsing_rights =
 
 let create_cycles =
   "CREATE TABLE IF NOT EXISTS cycles(\n\
-  \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \   id INTEGER PRIMARY KEY,\n\
   \   level INTEGER NOT NULL,\n\
   \   size INTEGER NOT NULL,\n\
   \   UNIQUE (level))"
@@ -242,7 +242,6 @@ let alter_tables =
       alter_blocks_reception_add_validation_timestamp;
     ];
     [alter_nodes];
-    [alter_cycles_id_type];
     [alter_missing_blocks_id_type];
   ]
 
