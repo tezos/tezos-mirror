@@ -275,9 +275,17 @@ val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
     not running, make the test fail. *)
 val wait_for_shutdown_event : t -> int Lwt.t
 
-(** [endpoint ?private_ evm_node] returns the endpoint to communicate with the
+(** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private
-    RPC server is returned. *)
+    RPC server is returned.
+
+    If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument).
+*)
+val rpc_endpoint : ?local:bool -> ?private_:bool -> t -> string
+
+(** A deprecated alias for [rpc_endpoint] where [local] optional parameter is not given. *)
 val endpoint : ?private_:bool -> t -> string
 
 (** JSON-RPC request. *)
