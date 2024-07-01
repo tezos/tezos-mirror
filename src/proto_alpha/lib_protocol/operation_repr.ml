@@ -1915,13 +1915,7 @@ let encoding = Encoding.operation_encoding
 
 let contents_encoding = Encoding.contents_encoding
 
-let contents_encoding_with_legacy_attestation_name =
-  Encoding.contents_encoding_with_legacy_attestation_name
-
 let contents_list_encoding = Encoding.contents_list_encoding
-
-let contents_list_encoding_with_legacy_attestation_name =
-  Encoding.contents_list_encoding_with_legacy_attestation_name
 
 let protocol_data_encoding = Encoding.protocol_data_encoding
 

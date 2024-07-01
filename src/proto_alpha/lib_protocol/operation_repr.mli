@@ -528,13 +528,7 @@ val encoding : packed_operation Data_encoding.t
 
 val contents_encoding : packed_contents Data_encoding.t
 
-val contents_encoding_with_legacy_attestation_name :
-  packed_contents Data_encoding.t
-
 val contents_list_encoding : packed_contents_list Data_encoding.t
-
-val contents_list_encoding_with_legacy_attestation_name :
-  packed_contents_list Data_encoding.t
 
 val protocol_data_encoding : packed_protocol_data Data_encoding.t
 

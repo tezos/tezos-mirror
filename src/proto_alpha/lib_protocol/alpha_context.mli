@@ -4718,9 +4718,6 @@ module Operation : sig
 
   val contents_encoding : packed_contents Data_encoding.t
 
-  val contents_encoding_with_legacy_attestation_name :
-    packed_contents Data_encoding.t
-
   type nonrec 'kind protocol_data = 'kind protocol_data
 
   type nonrec packed_protocol_data = packed_protocol_data
@@ -4746,9 +4743,6 @@ module Operation : sig
   val raw_encoding : raw Data_encoding.t
 
   val contents_list_encoding : packed_contents_list Data_encoding.t
-
-  val contents_list_encoding_with_legacy_attestation_name :
-    packed_contents_list Data_encoding.t
 
   type 'kind t = 'kind operation = {
     shell : Operation.shell_header;
