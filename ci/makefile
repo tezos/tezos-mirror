@@ -35,10 +35,8 @@ docker-inline-source-info: docker-do-inline-source-info # Build the target 'inli
 docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remove-extra-files' using the 'build' Docker image.
 
 .PHONY: check
-check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
-	@git diff --exit-code HEAD || (echo "Cannot check generated GitLab CI YAML files, some changes are uncommitted"; exit 1)
-	@$(MAKE) all
-	@git diff --exit-code HEAD > /dev/null || ( \
+check: all # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
+	@git status | grep "nothing to commit" > /dev/null || ( \
 	  echo "Repository not clean after 'make -C ci'."; \
 	  echo "You should not edit generated GitLab CI .yml files directly."; \
 	  echo "Edit the appropriate file(s) in ci/bin/ instead."; \
