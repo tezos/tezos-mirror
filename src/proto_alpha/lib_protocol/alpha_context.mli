@@ -4735,9 +4735,6 @@ module Operation : sig
 
   val protocol_data_encoding : packed_protocol_data Data_encoding.t
 
-  val protocol_data_encoding_with_legacy_attestation_name :
-    packed_protocol_data Data_encoding.t
-
   val unsigned_encoding :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
 
@@ -4761,8 +4758,6 @@ module Operation : sig
   type nonrec packed = packed_operation
 
   val encoding : packed Data_encoding.t
-
-  val encoding_with_legacy_attestation_name : packed Data_encoding.t
 
   val raw : _ operation -> raw
 

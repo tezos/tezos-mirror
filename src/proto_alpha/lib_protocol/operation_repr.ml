@@ -1744,18 +1744,6 @@ module Encoding = struct
          (req "contents" (dynamic_size contents_list_encoding))
          (opt "signature" Signature.encoding))
 
-  let protocol_data_json_encoding_with_legacy_attestation_name =
-    conv
-      (fun (Operation_data {contents; signature}) ->
-        (Contents_list contents, signature))
-      (fun (Contents_list contents, signature) ->
-        Operation_data {contents; signature})
-      (obj2
-         (req
-            "contents"
-            (dynamic_size contents_list_encoding_with_legacy_attestation_name))
-         (opt "signature" Signature.encoding))
-
   type contents_or_signature_prefix =
     | Actual_contents of packed_contents
     | Signature_prefix of Signature.prefix
@@ -1903,25 +1891,11 @@ module Encoding = struct
          ~json:protocol_data_json_encoding
          ~binary:protocol_data_binary_encoding
 
-  let protocol_data_encoding_with_legacy_attestation_name =
-    def "operation_with_legacy_attestation_name.alpha.contents_and_signature"
-    @@ splitted
-         ~json:protocol_data_json_encoding_with_legacy_attestation_name
-         ~binary:protocol_data_binary_encoding
-
   let operation_encoding =
     conv
       (fun {shell; protocol_data} -> (shell, protocol_data))
       (fun (shell, protocol_data) -> {shell; protocol_data})
       (merge_objs Operation.shell_header_encoding protocol_data_encoding)
-
-  let operation_encoding_with_legacy_attestation_name =
-    conv
-      (fun {shell; protocol_data} -> (shell, protocol_data))
-      (fun (shell, protocol_data) -> {shell; protocol_data})
-      (merge_objs
-         Operation.shell_header_encoding
-         protocol_data_encoding_with_legacy_attestation_name)
 
   let unsigned_operation_encoding =
     def "operation.alpha.unsigned_operation"
@@ -1939,9 +1913,6 @@ end
 
 let encoding = Encoding.operation_encoding
 
-let encoding_with_legacy_attestation_name =
-  Encoding.operation_encoding_with_legacy_attestation_name
-
 let contents_encoding = Encoding.contents_encoding
 
 let contents_encoding_with_legacy_attestation_name =
@@ -1953,9 +1924,6 @@ let contents_list_encoding_with_legacy_attestation_name =
   Encoding.contents_list_encoding_with_legacy_attestation_name
 
 let protocol_data_encoding = Encoding.protocol_data_encoding
-
-let protocol_data_encoding_with_legacy_attestation_name =
-  Encoding.protocol_data_encoding_with_legacy_attestation_name
 
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
 
