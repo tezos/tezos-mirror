@@ -45,6 +45,62 @@ type proto_parameters = {
   dal_attested_slots_validity_lag : int;
 }
 
+let proto_parameters_encoding : proto_parameters Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {
+           feature_enable;
+           incentives_enable;
+           number_of_slots;
+           attestation_lag;
+           attestation_threshold;
+           cryptobox_parameters;
+           sc_rollup_challenge_window_in_blocks;
+           commitment_period_in_blocks;
+           dal_attested_slots_validity_lag;
+         } ->
+      ( feature_enable,
+        incentives_enable,
+        number_of_slots,
+        attestation_lag,
+        attestation_threshold,
+        cryptobox_parameters,
+        sc_rollup_challenge_window_in_blocks,
+        commitment_period_in_blocks,
+        dal_attested_slots_validity_lag ))
+    (fun ( feature_enable,
+           incentives_enable,
+           number_of_slots,
+           attestation_lag,
+           attestation_threshold,
+           cryptobox_parameters,
+           sc_rollup_challenge_window_in_blocks,
+           commitment_period_in_blocks,
+           dal_attested_slots_validity_lag ) ->
+      {
+        feature_enable;
+        incentives_enable;
+        number_of_slots;
+        attestation_lag;
+        attestation_threshold;
+        cryptobox_parameters;
+        sc_rollup_challenge_window_in_blocks;
+        commitment_period_in_blocks;
+        dal_attested_slots_validity_lag;
+      })
+    (obj9
+       (req "feature_enable" bool)
+       (req "incentives_enable" bool)
+       (req "number_of_slots" int31)
+       (req "attestation_lag" int31)
+       (req "attestation_threshold" int31)
+       (req
+          "cryptobox_parameters"
+          Tezos_crypto_dal.Cryptobox.Verifier.parameters_encoding)
+       (req "sc_rollup_challenge_window_in_blocks" int31)
+       (req "commitment_period_in_blocks" int31)
+       (req "dal_attested_slots_validity_lag" int31))
+
 module type T = sig
   module Proto : Registered_protocol.T
 
