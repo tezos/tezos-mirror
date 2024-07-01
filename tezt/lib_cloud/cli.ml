@@ -84,12 +84,19 @@ let website_port =
     ~description:"Set the port used for the website. Default is 8080"
     8080
 
+let grafana =
+  Clap.flag
+    ~section
+    ~set_long:"grafana"
+    ~description:"Flag to set whether to run grafana"
+    false
+
 let prometheus =
   Clap.flag
     ~section
     ~set_long:"prometheus"
     ~description:"Flag to set whether metrics are exported into prometheus"
-    false
+    grafana
 
 let prometheus_snapshot_directory =
   Clap.default_string

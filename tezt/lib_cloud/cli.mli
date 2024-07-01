@@ -46,6 +46,8 @@ val website_port : int
     test, the database is snapshotted so that it can be imported later on. *)
 val prometheus : bool
 
+val grafana : bool
+
 val prometheus_snapshot_directory : string
 
 val prometheus_snapshot : string option

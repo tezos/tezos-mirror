@@ -6,10 +6,12 @@
  (package tezt-cloud)
  (libraries
   tezt
-  tezt-tezos)
+  tezt-tezos
+  tezt-tezos.tezt-performance-regression)
  (flags
   (:standard)
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax))
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_tezos_tezt_performance_regression))
