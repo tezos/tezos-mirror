@@ -249,7 +249,6 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
-  sponsored_operations_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -589,9 +588,8 @@ let encoding =
                   c.cache_sampler_state_cycles ),
                 ( c.dal,
                   ( (c.sc_rollup, c.zk_rollup),
-                    ( c.adaptive_issuance,
-                      ( c.direct_ticket_spending_enable,
-                        c.sponsored_operations_enable ) ) ) ) ) ) ) ) ))
+                    (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
+              ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay ),
@@ -632,9 +630,8 @@ let encoding =
                      cache_sampler_state_cycles ),
                    ( dal,
                      ( (sc_rollup, zk_rollup),
-                       ( adaptive_issuance,
-                         ( direct_ticket_spending_enable,
-                           sponsored_operations_enable ) ) ) ) ) ) ) ) ) ->
+                       (adaptive_issuance, direct_ticket_spending_enable) ) ) )
+               ) ) ) ) ->
       {
         consensus_rights_delay;
         blocks_preservation_cycles;
@@ -679,7 +676,6 @@ let encoding =
         zk_rollup;
         adaptive_issuance;
         direct_ticket_spending_enable;
-        sponsored_operations_enable;
       })
     (merge_objs
        (merge_objs
@@ -745,8 +741,7 @@ let encoding =
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            ((obj2 (req "direct_ticket_spending_enable" bool))
-                               (req "sponsored_operations_enable" bool))))))))))
+                            (obj1 (req "direct_ticket_spending_enable" bool))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a

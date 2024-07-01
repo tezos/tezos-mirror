@@ -184,7 +184,7 @@ module Manager : sig
         conflict : operation_conflict;
       }
     | Inconsistent_sources of {
-        fee_payer : public_key_hash;
+        expected_source : public_key_hash;
         source : public_key_hash;
       }
     | Inconsistent_counters of {
@@ -198,14 +198,6 @@ module Manager : sig
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
-    | Sponsored_transaction_feature_disabled
-    | Guest_operation_wrong_source of {
-        guest : public_key_hash;
-        source : public_key_hash;
-      }
-    | Guest_hosted_twice of {guest : public_key_hash}
-    | Guest_is_sponsor of public_key_hash
-    | Guest_incorrect_reveal_position of {guest : public_key_hash}
 end
 
 type error += Failing_noop_error

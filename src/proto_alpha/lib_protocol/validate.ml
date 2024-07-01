@@ -1835,13 +1835,13 @@ module Manager = struct
         let* acc = f init (Elt contents) in
         batch_fold_left_e ~f ~init:acc ~batch:tail
 
-  let check_source_is_fee_payer ~fee_payer ~source =
+  let check_source ~expected_source ~source =
     Option.iter_e
-      (fun fee_payer ->
+      (fun expected_source ->
         error_unless
-          (Signature.Public_key_hash.equal source fee_payer)
-          (Inconsistent_sources {fee_payer; source}))
-      fee_payer
+          (Signature.Public_key_hash.equal source expected_source)
+          (Inconsistent_sources {expected_source; source}))
+      expected_source
 
   let check_counter ~previous_counter ~counter ~source =
     Option.iter_e
@@ -1853,25 +1853,12 @@ module Manager = struct
 
   (** Used in [check_consistency] below. *)
   type consistency_state = {
-    fee_payer : public_key_hash option;
+    source : public_key_hash option;
         (** [None] while checking the first operation in the batch,
-            then the source of the first operation in the batch, who
-            will pay the fees for the whole batch. *)
-    fee_payer_previous_counter : Manager_counter.t option;
+            then the source of the first operation in the batch. *)
+    previous_counter : Manager_counter.t option;
         (** [None] while checking the first operation in the batch,
-            then the counter of the last encountered operation from
-            [fee_payer]. *)
-    current_guest : public_key_hash option;
-        (** [None] if no [Host] operations have been encountered, else
-            the guest indicated inside the last encountered [Host]
-            operation. *)
-    current_guest_previous_counter : Manager_counter.t option;
-        (** [None] when [current_guest] is [None], or when no
-            operations with source [current_guest] have been
-            encountered yet. Otherwise, contains the counter of the
-            last seen operation from [current_guest]. *)
-    previous_guests : Signature.Public_key_hash.Set.t;
-        (** Set of all the guests seen inside [Host] operations. *)
+            then the counter of the last encountered operation. *)
   }
 
   (** Checks that a batch of manager operations is well-formed.
@@ -1884,251 +1871,63 @@ module Manager = struct
 
       Accordingly, all potential errors here should be [`Permanent].
 
-      {b Source consistency -- first source aka fee payer aka sponsor}
+      {b Source consistency}
 
-      - The source of the very first operation in the batch (which may
-      or may not be a [Host] operation) is called the [fee_payer],
-      because it will pay the fees for all the operations in the
-      batch, regardless of their own sources. The [fee_payer] is also
-      known as the {i sponsor} or {i host} of the batch.
-
-      - All [Host] operations in the batch must have the [fee_payer]
-      as their source.
-
-      - Any operations before the first [Host] operation must also
-      have the [fee_payer] as their source.
-
-      In particular, note that if a batch contains no [Host]
-      operations, then all its operations must have the [fee_payer] as
-      their source. In other words, a non-sponsored batch always has a
-      single source (who obviously pays all the fees).
-
-      {b Source consistency -- guests}
-
-      - After a [Host {guest; _}] operation, all operations must have
-      [guest] as their source, until the next [Host] operation is
-      encountered or the batch ends.
-
-      - The same guest must not appear in two separate [Host]
-      operations.
-
-      - The [fee_payer] must not appear as guest in a [Host]
-      operation.
+      All operations in the batch must have the same source.
 
       {b Counter consistency}
 
-      The [counter] of an individual operation relates to the [source]
-      of this operation. For every source in the batch, all counters
-      associated with that source must be increasing and consecutive.
+      The counters must be increasing and consecutive.
 
       {b Reveal position}
 
-      A [Reveal] operation must always be either the very first
-      operation of the whole batch (in which case its source is the
-      [fee_payer] as specified above), or must come immediately after
-      a [Host] operation (in which case its source is the [Host]
-      operation's [guest]).
-
-      All other [Reveal] positions are forbidden.
+      A [Reveal] operation is only allowed if it is the very first
+      operation in the batch.
 
       ---
 
       This function can return the following errors:
 
-      - [Inconsistent_sources] when a [Host] operation, or an
-      operation before the first [Host] operation, has a source other
-      than [fee_payer].
+      - [Inconsistent_sources] when the batch contains multiple
+      sources.
 
-      - [Guest_operation_wrong_source] when an operation after a
-      [Host] operation has a source other than the guest.
+      - [Inconsistent_counters] when the counters are not increasing and consecutive.
 
-      - [Guest_hosted_twice] when the same guest appears in two [Host]
-      operations.
-
-      - [Guest_is_sponsor] when the [fee_payer] appears as guest in
-      a [Host] operation.
-
-      - [Inconsistent_counters] when the counters for a source
-      (whether it be the first source or a guest) are not consecutive.
-
-      - [Incorrect_reveal_position] when a [Reveal] operation is
-      neither the first operation of the whole batch, nor right after
-      a [Host] operation.
-  *)
+      - [Incorrect_reveal_position] when a [Reveal] operation is not
+      the first operation of the whole batch.  *)
   let check_consistency batch =
     let open Result_syntax in
-    let initial_state =
-      {
-        fee_payer = None;
-        fee_payer_previous_counter = None;
-        current_guest = None;
-        current_guest_previous_counter = None;
-        previous_guests = Signature.Public_key_hash.Set.empty;
-      }
-    in
-    let check_elt
-        {
-          fee_payer;
-          fee_payer_previous_counter;
-          current_guest;
-          current_guest_previous_counter;
-          previous_guests;
-        } (Elt (Manager_operation {source; counter; operation; _})) =
+    let initial_state = {source = None; previous_counter = None} in
+    let check_elt {source = expected_source; previous_counter}
+        (Elt (Manager_operation {source; counter; operation; _})) =
       (* Checks an individual operation of the batch. Relies on the
          given {!consistency_state} (see the type definition for
          invariants), and returns the appropriate {!consistency_state}
          for the next operation in the batch. *)
-      match operation with
-      | Host {guest; guest_signature = _} ->
-          let* () = check_source_is_fee_payer ~fee_payer ~source in
-          let* () =
-            check_counter
-              ~previous_counter:fee_payer_previous_counter
-              ~counter
-              ~source
-          in
-          let* () =
-            error_when
-              Signature.Public_key_hash.(guest = source)
-              (Guest_is_sponsor guest)
-          in
-          let* () =
-            error_when
-              (Signature.Public_key_hash.Set.mem guest previous_guests)
-              (Guest_hosted_twice {guest})
-          in
-          return
-            {
-              fee_payer = Some source;
-              fee_payer_previous_counter = Some counter;
-              current_guest = Some guest;
-              current_guest_previous_counter = None;
-              previous_guests =
-                Signature.Public_key_hash.Set.add guest previous_guests;
-            }
-      | _ (* Not a [Host] operation *) -> (
-          match current_guest with
-          | None ->
-              (* No [Host] operations have been encountered yet, so
-                 [source] must be the [fee_payer] of the batch. *)
-              let* () = check_source_is_fee_payer ~fee_payer ~source in
-              let* () =
-                check_counter
-                  ~previous_counter:fee_payer_previous_counter
-                  ~counter
-                  ~source
-              in
-              let* () =
-                match operation with
-                | Reveal _ -> (
-                    (* A [Reveal] operation is only allowed as either
-                       the first operation of the whole batch, or
-                       immediately after a [Host] operation.
-
-                       But we know that no [Host] operations have been
-                       encountered yet, so this [Reveal] isn't right
-                       after a [Host] operation.
-
-                       To check whether it is the first operation of
-                       the whole batch, we look at the [fee_payer]
-                       field. Indeed, the invariants of
-                       {!consistency_state} guarantee that [fee_payer]
-                       is [None] when checking the first operation,
-                       then [Some _] for other operations. *)
-                    match fee_payer with
-                    | None -> (* First op in the whole batch: OK *) return_unit
-                    | Some _ -> tzfail Incorrect_reveal_position)
-                | _ -> return_unit
-              in
-              return
-                {
-                  fee_payer = Some source;
-                  fee_payer_previous_counter = Some counter;
-                  current_guest;
-                  current_guest_previous_counter;
-                  previous_guests;
-                }
-          | Some guest ->
-              (* This means that the last encountered [Host] operation
-                 contained [guest].
-
-                 Moreover, recall that the current operation is not
-                 itself a [Host] operation, thanks to the outermost
-                 pattern matching.
-
-                 Therefore, the [source] must be [guest], and the
-                 [counter] is also [guest]'s. *)
-              let* () =
-                error_unless
-                  (Signature.Public_key_hash.equal source guest)
-                  (Guest_operation_wrong_source {guest; source})
-              in
-              let* () =
-                check_counter
-                  ~previous_counter:current_guest_previous_counter
-                  ~counter
-                  ~source
-              in
-              let* () =
-                match operation with
-                | Reveal _ -> (
-                    (* A [Reveal] operation is only allowed as either
-                       the first operation of the whole batch, or
-                       immediately after a [Host] operation.
-
-                       A [Host] operation has already been
-                       encountered, so this [Reveal] is not the first
-                       operation in the batch.
-
-                       To know whether it is right after a [Host]
-                       operation, we look at the
-                       [current_guest_previous_counter] field. Indeed,
-                       it is reset to [None] when a [Host] operation
-                       is encountered, then set to [Some _] after
-                       operations from the new guest have been
-                       seen. *)
-                    match current_guest_previous_counter with
-                    | None -> (* Right after a [Host] op: OK *) return_unit
-                    | Some _ -> tzfail (Guest_incorrect_reveal_position {guest})
-                    )
-                | _ -> return_unit
-              in
-              return
-                {
-                  fee_payer;
-                  fee_payer_previous_counter;
-                  current_guest;
-                  current_guest_previous_counter = Some counter;
-                  previous_guests;
-                })
+      let* () = check_source ~expected_source ~source in
+      let* () = check_counter ~previous_counter ~counter ~source in
+      let* () =
+        match operation with
+        | Reveal _ -> (
+            (* A [Reveal] operation is only allowed if it is
+               the first operation of the whole batch. The
+               invariants of {!consistency_state} guarantee
+               that [expected_source] is [None] if and only if
+               we are currently checking the first
+               operation. *)
+            match expected_source with
+            | None -> (* First op in the whole batch: OK *) return_unit
+            | Some _ -> tzfail Incorrect_reveal_position)
+        | _ -> return_unit
+      in
+      return {source = Some source; previous_counter = Some counter}
     in
     batch_fold_left_e ~f:check_elt ~init:initial_state ~batch
-
-  let assert_sponsored_operations_feature_enabled vi =
-    error_unless
-      (Constants.sponsored_operations_enable vi.ctxt)
-      Sponsored_transaction_feature_disabled
-
-  let rec check_for_hosted_ops :
-      type kind. _ -> kind Kind.manager contents_list -> unit tzresult =
-   fun vi contents_list ->
-    let open Result_syntax in
-    match contents_list with
-    | Single (Manager_operation {operation = Host _; _}) ->
-        assert_sponsored_operations_feature_enabled vi
-    | Single (Manager_operation _) -> return_unit
-    | Cons (Manager_operation {operation = Host _; _}, _) ->
-        assert_sponsored_operations_feature_enabled vi
-    | Cons (Manager_operation _, rest) -> check_for_hosted_ops vi rest
 
   (** Check a few simple properties of the batch, and return the
       initial {!batch_state} and the contract public key.
 
       Invariants checked:
-
-      - The feature flag for sponsored operations (ie fail if the
-      batch contains a [Host] operation but the feature flag is
-      disabled).
 
       - The batch is well formed: see {!check_consistency}.
 
@@ -2146,7 +1945,6 @@ module Manager = struct
   let check_sanity_and_find_public_key vi (type kind)
       (contents_list : kind Kind.manager contents_list) =
     let open Lwt_result_syntax in
-    let*? () = check_for_hosted_ops vi contents_list in
     let*? (_ : consistency_state) = check_consistency contents_list in
     let source, first_counter =
       match contents_list with
@@ -2303,7 +2101,6 @@ module Manager = struct
         Dal_apply.validate_publish_commitment vi.ctxt slot_header
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         assert_zk_rollup_feature_enabled vi
-    | Host _ -> assert_sponsored_operations_feature_enabled vi
 
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) ~consume_gas_for_sig_check

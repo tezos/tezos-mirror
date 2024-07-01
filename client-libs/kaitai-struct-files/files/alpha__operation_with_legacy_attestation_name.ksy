@@ -231,9 +231,6 @@ types:
     - id: zk_rollup_update
       type: zk_rollup_update
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::zk_rollup_update)
-    - id: host
-      type: host
-      if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::host)
   alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature:
     seq:
     - id: contents_and_signature_prefix
@@ -483,37 +480,6 @@ types:
     - id: destination
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
-  guest_signature:
-    seq:
-    - id: signature__v1
-      size-eos: true
-  guest_signature_0:
-    seq:
-    - id: len_guest_signature
-      type: u4be
-      valid:
-        max: 1073741823
-    - id: guest_signature
-      type: guest_signature
-      size: len_guest_signature
-  host:
-    seq:
-    - id: source
-      type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
-    - id: fee
-      type: alpha__mutez
-    - id: counter
-      type: n
-    - id: gas_limit
-      type: n
-    - id: storage_limit
-      type: n
-    - id: guest
-      type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
-    - id: guest_signature
-      type: guest_signature_0
   inbox__proof:
     seq:
     - id: level
@@ -1938,7 +1904,6 @@ enums:
     112: set_deposits_limit
     113: increase_paid_storage
     114: update_consensus_key
-    115: host
     158: transfer_ticket
     200: smart_rollup_originate
     201: smart_rollup_add_messages

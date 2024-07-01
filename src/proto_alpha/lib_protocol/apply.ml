@@ -1623,9 +1623,6 @@ let apply_manager_operation :
         Zk_rollup_apply.publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops:ops
     | Zk_rollup_update {zk_rollup; update} ->
         Zk_rollup_apply.update ~ctxt_before_op ~ctxt ~zk_rollup ~update
-    | Host _ ->
-        (* This feature is disabled *)
-        assert false
 
 type success_or_failure = Success of context | Failure
 
@@ -1871,9 +1868,6 @@ let burn_manager_storage_fees :
         ( ctxt,
           storage_limit,
           Zk_rollup_update_result {payload with balance_updates} )
-    | Host_result _ ->
-        (* This feature is disabled *)
-        assert false
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].

@@ -28,21 +28,22 @@
     Component:  Protocol (combined operations)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_combined_operations.ml
-    Subject:    Multiple operations can be grouped in one ensuring their
-                deterministic application.
 
-                Only manager operations are allowed in batches of more
-                than one operation. This file only tests batches where
-                all operations belong to the same manager. See
-                {!Test_host_operation} for tests involving multiple
-                managers.
+    Subject:    Multiple manager operations can be grouped in one
+                batch, ensuring their ordered and atomic application
+                (that is, either they all succeed, or none of them is
+                applied).
 
-                For single-manager batches, if an invalid operation is
-                present in this group of operations then the
-                previously applied operations are backtracked, leaving
-                the context unchanged, and the following operations
-                are skipped. Fees attributed to the operations are
-                collected by the baker nonetheless.
+                More precisely, if any operation in the batch fails at
+                application time, then the previously applied
+                operations are backtracked, leaving the context
+                unchanged, and the remaining operations are
+                skipped. However, note that the fees for the batch are
+                collected by the baker regardless of the success or
+                failure of the application of the batch.
+
+                All manager operations in a batch must have the same
+                source.
 
                 There may be overlap with
                 [lib_protocol/test/integration/validate/test_validation_batch.ml].

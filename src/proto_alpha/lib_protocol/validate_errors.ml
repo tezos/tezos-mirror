@@ -1093,7 +1093,7 @@ module Manager = struct
         conflict : operation_conflict;
       }
     | Inconsistent_sources of {
-        fee_payer : public_key_hash;
+        expected_source : public_key_hash;
         source : public_key_hash;
       }
     | Inconsistent_counters of {
@@ -1107,14 +1107,6 @@ module Manager = struct
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
-    | Sponsored_transaction_feature_disabled
-    | Guest_operation_wrong_source of {
-        guest : public_key_hash;
-        source : public_key_hash;
-      }
-    | Guest_hosted_twice of {guest : public_key_hash}
-    | Guest_is_sponsor of public_key_hash
-    | Guest_incorrect_reveal_position of {guest : public_key_hash}
 
   let () =
     register_error_kind
@@ -1145,32 +1137,25 @@ module Manager = struct
       ~id:"validate.operation.inconsistent_sources"
       ~title:"Inconsistent sources in operation batch"
       ~description:
-        "Unexpected source encountered in a non-guest operation of a batch."
-      ~pp:(fun ppf (first_source, source) ->
-        Format.fprintf
-          ppf
-          "Unexpected source encountered in a non-guest operation. Expected %a \
-           (the source of the very first operation in the batch, who is the \
-           fee payer, a.k.a. the sponsor), but got %a."
-          Signature.Public_key_hash.pp
-          first_source
-          Signature.Public_key_hash.pp
-          source)
+        "Inconsistent sources in operation batch. All operations in a batch \
+         must have the same source."
       Data_encoding.(
         obj2
           (req "first_source" Signature.Public_key_hash.encoding)
           (req "unexpected_source" Signature.Public_key_hash.encoding))
       (function
-        | Inconsistent_sources {fee_payer; source} -> Some (fee_payer, source)
+        | Inconsistent_sources {expected_source; source} ->
+            Some (expected_source, source)
         | _ -> None)
-      (fun (fee_payer, source) -> Inconsistent_sources {fee_payer; source}) ;
+      (fun (expected_source, source) ->
+        Inconsistent_sources {expected_source; source}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.inconsistent_counters"
       ~title:"Inconsistent counters in operation"
       ~description:
-        "Inconsistent counters in operation batch. Counters for the same \
-         source must be consecutive."
+        "Inconsistent counters in operation batch. Counters must be increasing \
+         and consecutive."
       ~pp:(fun ppf (source, previous_counter, counter) ->
         Format.fprintf
           ppf
@@ -1193,8 +1178,8 @@ module Manager = struct
       (fun (source, previous_counter, counter) ->
         Inconsistent_counters {source; previous_counter; counter}) ;
     let incorrect_reveal_description =
-      "Incorrect reveal operation position in batch: revelation of the fee \
-       payer's public key is only allowed in first position."
+      "Incorrect reveal operation position in batch: only allowed in first \
+       position."
     in
     register_error_kind
       `Permanent
@@ -1270,95 +1255,7 @@ module Manager = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" zkru_disabled_description)
       Data_encoding.unit
       (function Zk_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Zk_rollup_feature_disabled) ;
-
-    let sptx_disabled =
-      "Sponsored transactions will be enabled in a future proposal."
-    in
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.sponsored_transactions_disabled"
-      ~title:"Sponsored transactions are disabled"
-      ~description:sptx_disabled
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" sptx_disabled)
-      Data_encoding.unit
-      (function Sponsored_transaction_feature_disabled -> Some () | _ -> None)
-      (fun () -> Sponsored_transaction_feature_disabled) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.guest_operation_wrong_source"
-      ~title:"Wrong source in guest operation"
-      ~description:
-        "The source of an operation does not match the last hosted guest in \
-         the batch."
-      ~pp:(fun ppf (guest, source) ->
-        Format.fprintf
-          ppf
-          "Found an operation with source %a at a position where the source \
-           should be the last hosted guest: %a."
-          Signature.Public_key_hash.pp
-          source
-          Signature.Public_key_hash.pp
-          guest)
-      Data_encoding.(
-        obj2
-          (req "current_guest" Signature.Public_key_hash.encoding)
-          (req "wrong_source" Signature.Public_key_hash.encoding))
-      (function
-        | Guest_operation_wrong_source {guest; source} -> Some (guest, source)
-        | _ -> None)
-      (fun (guest, source) -> Guest_operation_wrong_source {guest; source}) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.guest_hosted_twice"
-      ~title:"Guest hosted twice"
-      ~description:"The same guest is hosted twice in the same sponsored batch."
-      ~pp:(fun ppf guest ->
-        Format.fprintf
-          ppf
-          "Guest %a is hosted twice."
-          Signature.Public_key_hash.pp
-          guest)
-      Data_encoding.(obj1 (req "guest" Signature.Public_key_hash.encoding))
-      (function Guest_hosted_twice {guest} -> Some guest | _ -> None)
-      (fun guest -> Guest_hosted_twice {guest}) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.guest_is_sponsor"
-      ~title:"Guest is sponsor"
-      ~description:"The sponsor also appears as a guest."
-      ~pp:(fun ppf pkh ->
-        Format.fprintf
-          ppf
-          "The sponsor %a also appears as a guest."
-          Signature.Public_key_hash.pp
-          pkh)
-      Data_encoding.(
-        obj1 (req "sponsor_and_guest" Signature.Public_key_hash.encoding))
-      (function Guest_is_sponsor pkh -> Some pkh | _ -> None)
-      (fun pkh -> Guest_is_sponsor pkh) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.guest_incorrect_reveal_position"
-      ~title:"Incorrect guest reveal position"
-      ~description:
-        "Incorrect position of a Reveal operation for a guest in the sponsored \
-         batch. A guest Reveal operation is only allowed as the first \
-         operation from this guest, that is, right after the Host operation \
-         introducing this guest."
-      ~pp:(fun ppf guest ->
-        Format.fprintf
-          ppf
-          "Incorrect position of a Reveal operation for guest %a in the \
-           sponsored batch. A guest Reveal operation is only allowed as the \
-           first operation from this guest, that is, right after the Host \
-           operation introducing this guest."
-          Signature.Public_key_hash.pp
-          guest)
-      Data_encoding.(obj1 (req "guest" Signature.Public_key_hash.encoding))
-      (function
-        | Guest_incorrect_reveal_position {guest} -> Some guest | _ -> None)
-      (fun guest -> Guest_incorrect_reveal_position {guest})
+      (fun () -> Zk_rollup_feature_disabled)
 end
 
 type error += Failing_noop_error

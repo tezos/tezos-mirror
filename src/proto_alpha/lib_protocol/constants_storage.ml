@@ -298,6 +298,3 @@ let adaptive_issuance_ns_enable c = (adaptive_issuance c).ns_enable
 
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable
-
-let sponsored_operations_enable c =
-  (Raw_context.constants c).sponsored_operations_enable

@@ -261,10 +261,6 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.zk_rollup_update successful_manager_operation_result
-  | Host_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.host successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

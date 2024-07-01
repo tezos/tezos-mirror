@@ -184,5 +184,3 @@ val consensus_key_activation_delay : Raw_context.t -> int
     slashing of the funds that are currently in its frozen deposit. *)
 
 val slashable_deposits_period : Raw_context.t -> int
-
-val sponsored_operations_enable : Raw_context.t -> bool
