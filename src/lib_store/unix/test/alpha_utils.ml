@@ -602,7 +602,7 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
   in
   let block_header_metadata =
     Data_encoding.Binary.to_bytes_exn
-      Main.block_header_metadata_encoding_with_legacy_attestation_name
+      Main.block_header_metadata_encoding
       block_header_metadata
   in
   let payload_hash =

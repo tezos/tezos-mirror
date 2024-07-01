@@ -476,7 +476,7 @@ module Make (Proto : Protocol_plugin.T) = struct
         List.map_es (fun {hash; operation; check_signature} ->
             match
               Data_encoding.Binary.of_bytes_opt
-                Proto.operation_data_encoding_with_legacy_attestation_name
+                Proto.operation_data_encoding
                 operation.Operation.proto
             with
             | None ->
@@ -518,7 +518,7 @@ module Make (Proto : Protocol_plugin.T) = struct
     let block_metadata =
       let metadata =
         Data_encoding.Binary.to_bytes_exn
-          Proto.block_header_metadata_encoding_with_legacy_attestation_name
+          Proto.block_header_metadata_encoding
           block_data
       in
       let metadata_hash_opt =
@@ -537,14 +537,12 @@ module Make (Proto : Protocol_plugin.T) = struct
                     serializable/deserializable *)
                  let bytes =
                    Data_encoding.Binary.to_bytes_exn
-                     Proto
-                     .operation_receipt_encoding_with_legacy_attestation_name
+                     Proto.operation_receipt_encoding
                      receipt
                  in
                  let _ =
                    Data_encoding.Binary.of_bytes_exn
-                     Proto
-                     .operation_receipt_encoding_with_legacy_attestation_name
+                     Proto.operation_receipt_encoding
                      bytes
                  in
                  let metadata =
@@ -944,10 +942,8 @@ module Make (Proto : Protocol_plugin.T) = struct
           match
             Data_encoding.Binary.(
               of_bytes_exn
-                Proto.operation_receipt_encoding_with_legacy_attestation_name
-                (to_bytes_exn
-                   Proto.operation_receipt_encoding_with_legacy_attestation_name
-                   receipt))
+                Proto.operation_receipt_encoding
+                (to_bytes_exn Proto.operation_receipt_encoding receipt))
           with
           | receipt -> Applied (pv, receipt)
           | exception exn ->
@@ -970,9 +966,7 @@ module Make (Proto : Protocol_plugin.T) = struct
     | Some protocol_data -> return protocol_data
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
-    safe_binary_of_bytes
-      Proto.operation_data_encoding_with_legacy_attestation_name
-      proto
+    safe_binary_of_bytes Proto.operation_data_encoding proto
 
   let parse {hash; operation = raw; check_signature} =
     let open Result_syntax in
