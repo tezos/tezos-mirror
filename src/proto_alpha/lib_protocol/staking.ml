@@ -34,7 +34,7 @@ let () =
      cycle (no more than consensus_rights_delay + max_slashing_period)."
   in
   register_error_kind
-    `Permanent
+    `Temporary
     ~id:
       "operation.cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate"
     ~title:
