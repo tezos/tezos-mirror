@@ -104,7 +104,7 @@ octez:
 
 .PHONY: octez-layer1
 octez-layer1:
-	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_LAYER1_EXECUTABLES)"
+	@$(MAKE) build OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_LAYER1_EXECUTABLES)"
 
 .PHONY: experimental-release
 experimental-release:
