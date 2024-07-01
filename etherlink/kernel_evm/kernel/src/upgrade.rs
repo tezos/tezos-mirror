@@ -22,7 +22,6 @@ use rlp::Encodable;
 use tezos_ethereum::rlp_helpers::append_public_key;
 use tezos_ethereum::rlp_helpers::append_timestamp;
 use tezos_ethereum::rlp_helpers::decode_field;
-use tezos_ethereum::rlp_helpers::decode_h160;
 use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
@@ -168,7 +167,7 @@ impl Decodable for SequencerUpgrade {
 
         let mut it = decoder.iter();
         let sequencer = decode_public_key(&next(&mut it)?)?;
-        let pool_address = decode_h160(&next(&mut it)?)?;
+        let pool_address: H160 = decode_field(&next(&mut it)?, "sequencer_pool_address")?;
         let activation_timestamp = decode_timestamp(&next(&mut it)?)?;
 
         Ok(Self {
