@@ -14,6 +14,8 @@
   command. (!13827)
 - Support the RPC `eth_coinbase`. It returns the sequencer pool address if it
   exists, otherwise returns the zero address. (!todo)
+- Add `--restricted-rpcs` to disable RPCs, following the given regular
+  expression. (!13993)
 
 ### Bug fixes
 
