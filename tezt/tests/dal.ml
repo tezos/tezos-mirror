@@ -603,7 +603,6 @@ let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
     ?request
     ~signer
     (Operation.Consensus.attestation
-       ~use_legacy_name:false
        ~level
        ~round
        ~dal_attestation

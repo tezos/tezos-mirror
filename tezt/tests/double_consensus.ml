@@ -142,19 +142,13 @@ let double_consensus_wrong_slot
 let attest_utils =
   ( Client.attest_for,
     (fun ~slot ~level ~round ~block_payload_hash ->
-      Operation.Consensus.attestation
-        ~use_legacy_name:false
-        ~slot
-        ~level
-        ~round
-        ~block_payload_hash
-        ()),
+      Operation.Consensus.attestation ~slot ~level ~round ~block_payload_hash ()),
     double_attestation_waiter,
     "attestation" )
 
 let preattest_utils =
   ( Client.preattest_for,
-    Operation.Consensus.preattestation ~use_legacy_name:false,
+    Operation.Consensus.preattestation,
     double_preattestation_waiter,
     "preattestation" )
 
@@ -361,13 +355,7 @@ let operation_too_old =
     "Craft and inject an attestation 1 level in the past and wait for \
      [consensus_operation_too_old.v0] event from the accuser." ;
   let op =
-    Operation.Consensus.attestation
-      ~use_legacy_name:false
-      ~slot
-      ~level
-      ~round:3
-      ~block_payload_hash
-      ()
+    Operation.Consensus.attestation ~slot ~level ~round:3 ~block_payload_hash ()
   in
   let waiter = consensus_operation_too_old_waiter accuser in
   let* _ =
@@ -440,7 +428,6 @@ let operation_too_far_in_future =
      [consensus_operation_too_far_in_future.v0] event from the accuser." ;
   let op =
     Operation.Consensus.attestation
-      ~use_legacy_name:false
       ~slot:(List.hd slots)
       ~level
       ~round:0
