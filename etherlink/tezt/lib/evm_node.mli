@@ -75,6 +75,7 @@ type mode =
       tx_pool_tx_per_addr_limit : int option;
           (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
               simultaneously inside the pool. *)
+      dal_slots : int list option;
     }
   | Threshold_encryption_sequencer of {
       initial_kernel : string;
@@ -104,6 +105,7 @@ type mode =
       sequencer_sidecar_endpoint : string;
           (** --sequencer-sidecar-endpoint: Uri of the sidecar endpoints to which
               proposals are forwarded, and from where preblocks are fetched. *)
+      dal_slots : int list option;
     }
   | Proxy of {
       finalized_view : bool;

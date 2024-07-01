@@ -243,6 +243,9 @@ module Cli = struct
          of <levels_disconnected> levels."
       disconnect_typ
       ()
+
+  let etherlink_dal_slots =
+    Clap.list_int ~section ~long:"etherlink-dal-slots" ()
 end
 
 type configuration = {
@@ -260,6 +263,8 @@ type configuration = {
   disconnect : (int * int) option;
   network : Network.t;
   bootstrap : bool;
+  (* Empty list means DAL FF is set to false. *)
+  etherlink_dal_slots : int list;
 }
 
 type bootstrap = {
@@ -1048,8 +1053,8 @@ let init_observer cloud ~bootstrap ~slot_index i agent =
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap account
-    agent =
+let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
+    account agent =
   let open Sc_rollup_helpers in
   let open Tezt_etherlink in
   let* node =
@@ -1142,6 +1147,7 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap account
         tx_pool_timeout_limit = None;
         tx_pool_addr_limit = None;
         tx_pool_tx_per_addr_limit = None;
+        dal_slots;
       }
   in
   let endpoint = Sc_rollup_node.endpoint sc_rollup_node in
@@ -1266,11 +1272,13 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   in
   return operator
 
-let init_etherlink cloud ~bootstrap etherlink_rollup_operator_key next_agent =
+let init_etherlink cloud ~bootstrap etherlink_rollup_operator_key ~dal_slots
+    next_agent =
   let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
   let* operator =
     init_etherlink_operator_setup
       cloud
+      ~dal_slots
       Cli.etherlink_sequencer
       "operator"
       ~bootstrap
@@ -1362,8 +1370,18 @@ let init ~(configuration : configuration) cloud next_agent =
       let etherlink_rollup_operator_key =
         Option.get etherlink_rollup_operator_key
       in
+      let dal_slots =
+        match configuration.etherlink_dal_slots with
+        | [] -> None
+        | slots -> Some slots
+      in
       let* etherlink =
-        init_etherlink cloud ~bootstrap etherlink_rollup_operator_key next_agent
+        init_etherlink
+          cloud
+          ~bootstrap
+          etherlink_rollup_operator_key
+          next_agent
+          ~dal_slots
       in
       some etherlink
     else none
@@ -1522,6 +1540,7 @@ let configuration =
   let disconnect = Cli.disconnect in
   let network = Cli.network in
   let bootstrap = Cli.bootstrap in
+  let etherlink_dal_slots = Cli.etherlink_dal_slots in
   {
     stake;
     stake_machine_type;
@@ -1535,6 +1554,7 @@ let configuration =
     disconnect;
     network;
     bootstrap;
+    etherlink_dal_slots;
   }
 
 let benchmark () =
