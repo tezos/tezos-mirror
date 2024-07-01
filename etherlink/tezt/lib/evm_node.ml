@@ -95,6 +95,7 @@ module Parameters = struct
     rpc_port : int;
     endpoint : string;
     runner : Runner.t option;
+    restricted_rpcs : string option;
   }
 
   type session_state = {mutable ready : bool}
@@ -425,7 +426,7 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   @@ JSON.as_string_opt
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port endpoint =
+    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -458,6 +459,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         rpc_addr;
         rpc_port;
         endpoint;
+        restricted_rpcs;
         runner;
       }
   in
@@ -602,6 +604,10 @@ end
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args =
     data_dir_arg evm_node @ evm_node.persistent_state.arguments
+    @ Cli_arg.optional_arg
+        "restricted-rpcs"
+        Fun.id
+        evm_node.persistent_state.restricted_rpcs
   in
   let time_between_blocks_fmt = function
     | Nothing -> "none"
@@ -836,9 +842,17 @@ let patch_config_with_experimental_feature ?(wal_sqlite_journal_mode = false)
        (`Bool true)
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    rollup_node =
+    ?restricted_rpcs rollup_node =
   let evm_node =
-    create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node
+    create
+      ?name
+      ?runner
+      ?mode
+      ?data_dir
+      ?rpc_addr
+      ?rpc_port
+      ?restricted_rpcs
+      rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
   let* () =
