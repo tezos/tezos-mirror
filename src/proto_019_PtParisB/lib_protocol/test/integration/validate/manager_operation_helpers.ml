@@ -1001,7 +1001,7 @@ let make_test
        unit) name test (subjects : manager_operation_kind list) info_builder =
   List.iter
     (fun kind ->
-      let title = Format.sprintf "%s: %s@." name (kind_to_string kind) in
+      let title = sf "%s: %s" name (kind_to_string kind) in
       register_test ~title @@ fun () ->
       let open Lwt_syntax in
       let* infos = info_builder () in
@@ -1026,9 +1026,7 @@ let make_test_batched
       let k1s = kind_to_string kind1 in
       List.iter
         (fun kind2 ->
-          let title =
-            Format.sprintf "%s: [%s ; %s]@." name k1s (kind_to_string kind2)
-          in
+          let title = sf "%s: [%s ; %s]" name k1s (kind_to_string kind2) in
           register_test ~title @@ fun () ->
           let* infos = info_builder () in
           let infos =
