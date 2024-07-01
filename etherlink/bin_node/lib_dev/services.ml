@@ -690,3 +690,37 @@ let private_directory config
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
        sequencer_rpc
+
+let call (type input output)
+    (module R : Rpc_encodings.METHOD
+      with type input = input
+       and type output = output) ~keep_alive ~evm_node_endpoint (input : input)
+    =
+  let open Lwt_result_syntax in
+  let* response =
+    Rollup_services.call_service
+      ~keep_alive
+      ~base:evm_node_endpoint
+      (dispatch_service ~path:Resto.Path.root)
+      ()
+      ()
+      (Singleton
+         JSONRPC.
+           {
+             method_ = R.method_;
+             parameters =
+               Some (Data_encoding.Json.construct R.input_encoding input);
+             id = None;
+           })
+  in
+  match response with
+  | Singleton {value = Ok value; _} | Batch [{value = Ok value; _}] ->
+      return (Data_encoding.Json.destruct R.output_encoding value)
+  | Singleton {value = Error err; _} | Batch [{value = Error err; _}] ->
+      failwith
+        "Request failed with error %s"
+        Data_encoding.Json.(
+          to_string
+            (construct (JSONRPC.error_encoding Data_encoding.Json.encoding) err))
+  | Batch l ->
+      failwith "request: unexpected number of responses (%d)" List.(length l)
