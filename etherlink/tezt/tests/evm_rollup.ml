@@ -305,7 +305,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
-    ?restricted_rpcs ?enable_dal protocol =
+    ?restricted_rpcs ?enable_dal ?dal_slots protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -368,6 +368,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ?maximum_allowed_ticks
         ~output:output_config
         ?enable_dal
+        ?dal_slots
         ()
     in
     match additional_config with
@@ -463,7 +464,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
-    ~enable_dal f protocols =
+    ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None) f protocols
+    =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -511,6 +513,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ~admin
               ~setup_mode
               ~enable_dal
+              ?dal_slots
               protocol
           in
           f ~protocol ~evm_setup)
