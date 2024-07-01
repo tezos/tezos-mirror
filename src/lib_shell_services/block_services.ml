@@ -1275,6 +1275,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             branch_delayed
             validation_passes
             sources
+            operation_hash
           ->
             object
               method version = version
@@ -1292,6 +1293,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               method validation_passes = validation_passes
 
               method sources = sources
+
+              method operation_hash = operation_hash
             end)
         |+ field
              "version"
@@ -1339,6 +1342,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              "source"
              Tezos_rpc.Arg.string
              (fun t -> t#sources)
+        |+ multi_field
+             ~descr:"Include operations filtered by hash (all by default)"
+             "operation_hash"
+             Tezos_rpc.Arg.string
+             (fun t -> t#operation_hash)
         |> seal
 
       let pending_operations_encoding =
@@ -1832,7 +1840,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ?(version = S.Mempool.pending_operations_versions.default)
         ?(validated = true) ?(branch_delayed = true) ?(branch_refused = true)
         ?(refused = true) ?(outdated = true) ?(validation_passes = [])
-        ?(sources = []) () =
+        ?(sources = []) ?(operation_hash = []) () =
       let open Lwt_result_syntax in
       let* _version, pending_operations =
         Tezos_rpc.Context.make_call1
@@ -1855,6 +1863,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              method validation_passes = validation_passes
 
              method sources = sources
+
+             method operation_hash = operation_hash
           end)
           ()
       in
