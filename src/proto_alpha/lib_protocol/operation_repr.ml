@@ -1647,8 +1647,13 @@ module Encoding = struct
 
   type packed_case = PCase : 'b case -> packed_case
 
-  let common_cases =
+  let contents_cases =
     [
+      PCase preattestation_case;
+      PCase attestation_case;
+      PCase attestation_with_dal_case;
+      PCase double_preattestation_evidence_case;
+      PCase double_attestation_evidence_case;
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
       PCase double_baking_evidence_case;
@@ -1680,26 +1685,6 @@ module Encoding = struct
       PCase zk_rollup_update_case;
     ]
 
-  let contents_cases =
-    PCase preattestation_case :: PCase attestation_case
-    :: PCase attestation_with_dal_case
-    :: PCase double_preattestation_evidence_case
-    :: PCase double_attestation_evidence_case :: common_cases
-
-  (** Encoding cases that accepts legacy attestation name : `endorsement` (and
-      preendorsement, double_<op>_evidence) in JSON
-
-      https://gitlab.com/tezos/tezos/-/issues/5529
-
-      This encoding is temporary and should be removed when the endorsements
-      kinds in JSON will not be accepted any more by the protocol (Planned for
-      protocol Q). *)
-  let contents_cases_with_legacy_attestation_name =
-    PCase preendorsement_case :: PCase endorsement_case
-    :: PCase endorsement_with_dal_case
-    :: PCase double_preendorsement_evidence_case
-    :: PCase double_endorsement_evidence_case :: common_cases
-
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
       assert (not @@ reserved_tag tag) ;
@@ -1712,27 +1697,8 @@ module Encoding = struct
     in
     def "operation.alpha.contents" @@ union (List.map make contents_cases)
 
-  let contents_encoding_with_legacy_attestation_name =
-    let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
-      assert (not @@ reserved_tag tag) ;
-      case
-        (Tag tag)
-        name
-        encoding
-        (fun o -> match select o with None -> None | Some o -> Some (proj o))
-        (fun x -> Contents (inj x))
-    in
-    def "operation_with_legacy_attestation_name.alpha.contents"
-    @@ union (List.map make contents_cases_with_legacy_attestation_name)
-
   let contents_list_encoding =
     conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
-
-  let contents_list_encoding_with_legacy_attestation_name =
-    conv_with_guard
-      to_list
-      of_list_internal
-      (Variable.list contents_encoding_with_legacy_attestation_name)
 
   let protocol_data_json_encoding =
     conv
@@ -1902,13 +1868,6 @@ module Encoding = struct
     @@ merge_objs
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
-
-  let unsigned_operation_encoding_with_legacy_attestation_name =
-    def "operation_with_legacy_attestation_name.alpha.unsigned_operation"
-    @@ merge_objs
-         Operation.shell_header_encoding
-         (obj1
-            (req "contents" contents_list_encoding_with_legacy_attestation_name))
 end
 
 let encoding = Encoding.operation_encoding
@@ -1920,9 +1879,6 @@ let contents_list_encoding = Encoding.contents_list_encoding
 let protocol_data_encoding = Encoding.protocol_data_encoding
 
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
-
-let unsigned_operation_encoding_with_legacy_attestation_name =
-  Encoding.unsigned_operation_encoding_with_legacy_attestation_name
 
 let raw ({shell; protocol_data} : _ operation) =
   let proto =

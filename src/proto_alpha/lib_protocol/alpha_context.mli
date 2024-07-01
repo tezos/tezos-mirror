@@ -4735,9 +4735,6 @@ module Operation : sig
   val unsigned_encoding :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
 
-  val unsigned_encoding_with_legacy_attestation_name :
-    (Operation.shell_header * packed_contents_list) Data_encoding.t
-
   type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
   val raw_encoding : raw Data_encoding.t

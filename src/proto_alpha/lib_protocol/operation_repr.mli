@@ -535,9 +535,6 @@ val protocol_data_encoding : packed_protocol_data Data_encoding.t
 val unsigned_operation_encoding :
   (Operation.shell_header * packed_contents_list) Data_encoding.t
 
-val unsigned_operation_encoding_with_legacy_attestation_name :
-  (Operation.shell_header * packed_contents_list) Data_encoding.t
-
 val raw : _ operation -> raw
 
 val hash_raw : raw -> Operation_hash.t
