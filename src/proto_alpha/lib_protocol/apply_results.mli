@@ -274,29 +274,7 @@ val pack_migration_operation_results :
 (** Serializer for {!packed_operation_result}. *)
 val operation_metadata_encoding : packed_operation_metadata Data_encoding.t
 
-(** Operation metadata encoding that accepts legacy attestation name :
-    `endorsement` (and preendorsement, double_<op>_evidence) in JSON
-
-    https://gitlab.com/tezos/tezos/-/issues/5531
-
-    This encoding is temporary and should be removed when the protocol no longer
-    accepts JSON endorsements kinds
-*)
-val operation_metadata_encoding_with_legacy_attestation_name :
-  packed_operation_metadata Data_encoding.t
-
 val operation_data_and_metadata_encoding :
-  (Operation.packed_protocol_data * packed_operation_metadata) Data_encoding.t
-
-(** Operation data and metadata encoding that accepts legacy attestation name :
-    `endorsement` (and preendorsement, double_<op>_evidence) in JSON
-
-    https://gitlab.com/tezos/tezos/-/issues/5531
-
-    This encoding is temporary and should be removed when the protocol no longer
-    accepts JSON endorsements kinds
-*)
-val operation_data_and_metadata_encoding_with_legacy_attestation_name :
   (Operation.packed_protocol_data * packed_operation_metadata) Data_encoding.t
 
 type 'kind contents_and_result_list =
@@ -315,9 +293,6 @@ type packed_contents_and_result_list =
       -> packed_contents_and_result_list
 
 val contents_and_result_list_encoding :
-  packed_contents_and_result_list Data_encoding.t
-
-val contents_and_result_list_encoding_with_legacy_attestation_name :
   packed_contents_and_result_list Data_encoding.t
 
 val pack_contents_list :
@@ -353,8 +328,5 @@ type block_metadata = {
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t;
 }
-
-val block_metadata_encoding_with_legacy_attestation_name :
-  block_metadata Data_encoding.encoding
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding

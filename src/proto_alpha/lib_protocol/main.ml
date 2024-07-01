@@ -38,7 +38,7 @@ let block_header_data_encoding =
 type block_header_metadata = Apply_results.block_metadata
 
 let block_header_metadata_encoding_with_legacy_attestation_name =
-  Apply_results.block_metadata_encoding_with_legacy_attestation_name
+  Apply_results.block_metadata_encoding
 
 let block_header_metadata_encoding = Apply_results.block_metadata_encoding
 
@@ -61,14 +61,13 @@ type operation_receipt = Apply_results.packed_operation_metadata =
 let operation_receipt_encoding = Apply_results.operation_metadata_encoding
 
 let operation_receipt_encoding_with_legacy_attestation_name =
-  Apply_results.operation_metadata_encoding_with_legacy_attestation_name
+  Apply_results.operation_metadata_encoding
 
 let operation_data_and_receipt_encoding =
   Apply_results.operation_data_and_metadata_encoding
 
 let operation_data_and_receipt_encoding_with_legacy_attestation_name =
-  Apply_results
-  .operation_data_and_metadata_encoding_with_legacy_attestation_name
+  Apply_results.operation_data_and_metadata_encoding
 
 type operation = Alpha_context.packed_operation = {
   shell : Operation.shell_header;
