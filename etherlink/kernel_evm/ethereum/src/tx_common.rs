@@ -20,8 +20,8 @@ use thiserror::Error;
 use crate::{
     access_list::AccessList,
     rlp_helpers::{
-        append_h256, append_option, append_vec, decode_field, decode_field_h256,
-        decode_list, decode_option, next,
+        append_compressed_h256, append_option, append_vec, decode_compressed_h256,
+        decode_field, decode_list, decode_option, next,
     },
     transaction::TransactionType,
     tx_signature::{TxSigError, TxSignature},
@@ -158,8 +158,8 @@ impl EthereumTransactionCommon {
             // It might be either signed NON-legacy tx case or usigned legacy with all zeros
             (Some(v), Some(r), Some(s)) => {
                 let v: U256 = decode_field(&v, "v")?;
-                let r: H256 = decode_field_h256(&r, "r")?;
-                let s: H256 = decode_field_h256(&s, "s")?;
+                let r: H256 = decode_compressed_h256(&r)?;
+                let s: H256 = decode_compressed_h256(&s)?;
                 Ok(Some((v, r, s)))
             }
             // It might be unsigned NON-legacy tx case
@@ -374,8 +374,8 @@ impl EthereumTransactionCommon {
             None => {
                 // In case of unsigned legacy tx we have to append chain_id as v component of (v, r, s)
                 stream.append(&chain_id);
-                append_h256(stream, H256::zero());
-                append_h256(stream, H256::zero());
+                append_compressed_h256(stream, H256::zero());
+                append_compressed_h256(stream, H256::zero());
             }
             Some(sig) => sig.rlp_append(stream),
         }
@@ -625,7 +625,7 @@ mod test {
 
     use libsecp256k1::curve::Scalar;
 
-    use crate::{access_list::AccessListItem, rlp_helpers::decode_h256};
+    use crate::access_list::AccessListItem;
 
     use crate::tx_signature::{h256_to_scalar, TxSignature};
 
@@ -734,19 +734,19 @@ mod test {
 
     /// used in test to decode a string and get the size of the decoded input,
     /// before determining the H256 value
-    fn decode(str: &str) -> (Result<H256, DecoderError>, usize) {
+    fn decode_compressed_h256_helper(str: &str) -> (Result<H256, DecoderError>, usize) {
         let hash = hex::decode(str).unwrap();
         let decoder = Rlp::new(&hash);
-        let decoded = decode_h256(&decoder);
+        let decoded = decode_compressed_h256(&decoder);
         assert!(decoded.is_ok(), "hash should be decoded ok");
         let length = decoder.data().unwrap().len();
         (decoded, length)
     }
 
     #[test]
-    fn test_decode_h256_l0() {
+    fn test_decode_compressed_h256_l0() {
         // rlp encoding of empty is the byte 80
-        let (decoded, length) = decode("80");
+        let (decoded, length) = decode_compressed_h256_helper("80");
         assert_eq!(0, length);
         assert_eq!(
             H256::zero(),
@@ -758,8 +758,9 @@ mod test {
     #[test]
     fn test_decode_h256_l32() {
         // rlp encoding of hex string of 32 bytes
-        let (decoded, length) =
-            decode("a03232323232323232323232323232323232323232323232323232323232323232");
+        let (decoded, length) = decode_compressed_h256_helper(
+            "a03232323232323232323232323232323232323232323232323232323232323232",
+        );
         assert_eq!(32, length);
         assert_eq!(
             "3232323232323232323232323232323232323232323232323232323232323232",
@@ -771,8 +772,9 @@ mod test {
     #[test]
     fn test_decode_h256_l31() {
         // rlp encoding of hex string of 31 bytes
-        let (decoded, length) =
-            decode("9f31313131313131313131313131313131313131313131313131313131313131");
+        let (decoded, length) = decode_compressed_h256_helper(
+            "9f31313131313131313131313131313131313131313131313131313131313131",
+        );
         assert_eq!(31, length);
         assert_eq!(
             "0031313131313131313131313131313131313131313131313131313131313131",
