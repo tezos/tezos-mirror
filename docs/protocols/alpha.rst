@@ -137,3 +137,6 @@ Internal
 
 - ``balance_update_encoding_with_legacy_attestation_name`` has been removed.
   (MR :gl:`!13461`)
+
+- Encoding that supports ``endorsement`` kind in apply_result JSON has been
+  removed. (MR :gl:`!13974`)
