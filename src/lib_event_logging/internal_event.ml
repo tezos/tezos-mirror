@@ -213,9 +213,14 @@ module type EVENT = sig
   include EVENT_DEFINITION
 
   val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
+
+  val emit_at_top_level : t -> unit
 end
 
 type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
+
+type top_level_event =
+  | TopLevel : ('a event_definition * 'a) -> top_level_event
 
 module type SINK = sig
   type t
@@ -254,6 +259,8 @@ module All_sinks = struct
   let registered : registered list ref = ref []
 
   let active : active list ref = ref []
+
+  let top_level_events : top_level_event list ref = ref []
 
   let find_registered scheme_to_find =
     List.find
@@ -345,6 +352,12 @@ module All_sinks = struct
               activate scheme definition
         in
         active := act :: !active ;
+        let* () =
+          List.iter_es
+            (fun (TopLevel (ev, x)) -> handle ev None x)
+            (List.rev !top_level_events)
+        in
+        top_level_events := [] ;
         return_unit
 
   let close ?(except = fun _ -> false) () =
@@ -489,6 +502,12 @@ module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
 
   let emit ?section x = All_sinks.handle (module E) section x
 
+  let emit_at_top_level x =
+    (* Ensure we only register this event to be emitted once *)
+    let ev = TopLevel ((module E), x) in
+    if not (List.mem ~equal:( = ) ev !All_sinks.top_level_events) then
+      All_sinks.top_level_events := ev :: !All_sinks.top_level_events
+
   let () = All_definitions.add (module E)
 end
 
@@ -497,7 +516,11 @@ module Simple = struct
      explicitly splitting the place where the partial application
      takes place. Indeed, it is important that events are declared
      only once. *)
-  type 'a t = {name : string; emit : 'a -> unit tzresult Lwt.t}
+  type 'a t = {
+    name : string;
+    emit : 'a -> unit tzresult Lwt.t;
+    emit_at_top_level : 'a -> unit;
+  }
 
   let emit simple_event parameters =
     Lwt.try_bind
@@ -527,6 +550,9 @@ module Simple = struct
           simple_event.name
           (Printexc.to_string exc) ;
         Lwt.return_unit)
+
+  let emit_at_top_level simple_event parameters =
+    simple_event.emit_at_top_level parameters
 
   let emit__dont_wait__use_with_care simple_event parameters =
     Lwt.dont_wait
@@ -799,7 +825,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun () -> Event.emit ?section ())}
+    {
+      name;
+      emit = (fun () -> Event.emit ?section ());
+      emit_at_top_level = (fun () -> Event.emit_at_top_level ());
+    }
 
   let declare_1 (type a) ?alternative_color ?section ~name ~msg ?(level = Info)
       ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) =
@@ -829,7 +859,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameter -> Event.emit ?section parameter)}
+    {
+      name;
+      emit = (fun parameter -> Event.emit ?section parameter);
+      emit_at_top_level = (fun parameter -> Event.emit_at_top_level parameter);
+    }
 
   let declare_2 (type a b) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -867,7 +901,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
   let declare_3 (type a b c) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -908,7 +946,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
   let declare_4 (type a b c d) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -953,7 +995,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
   let declare_5 (type a b c d e) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1003,7 +1049,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
   let declare_6 (type a b c d e f) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1056,7 +1106,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
   let declare_7 (type a b c d e f g) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1114,7 +1168,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
   let declare_8 (type a b c d e f g h) ?alternative_color ?section ~name ~msg
       ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1175,7 +1233,11 @@ module Simple = struct
       let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 end
 
 module Lwt_worker_logger = struct
