@@ -47,11 +47,11 @@ features = ["derive"]
 [dependencies.serde_json]
 version = "1.0.115"
 
-[dependencies.quanta]
+[target.'cfg(not(any(target_arch = "wasm32", all(target_arch = "riscv64", target_os = "hermit"))))'.dependencies.quanta]
 version = "0.12.3"
 optional = true
 
-[dependencies.clap]
+[target.'cfg(not(any(target_arch = "wasm32", all(target_arch = "riscv64", target_os = "hermit"))))'.dependencies.clap]
 version = "4.4.10"
 features = ["derive"]
 optional = true

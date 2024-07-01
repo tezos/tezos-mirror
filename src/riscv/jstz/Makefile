@@ -31,6 +31,10 @@ build-kernel:
 build-kernel-static:
 	@INBOX_FILE=$(INBOX_FILE) cargo build -p jstz --release --features static-inbox
 
+.PHONY: build-kernel-native
+build-kernel-native:
+	@INBOX_FILE=$(INBOX_FILE) cargo build -p jstz --release --features static-inbox $(NATIVE_OPT)
+
 .PHONY: test
 test:
 	@cargo test --no-default-features $(NATIVE_OPT)

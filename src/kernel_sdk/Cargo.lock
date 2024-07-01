@@ -1603,6 +1603,7 @@ dependencies = [
 name = "tezos-smart-rollup-entrypoint"
 version = "0.2.2"
 dependencies = [
+ "cfg-if",
  "dlmalloc",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",

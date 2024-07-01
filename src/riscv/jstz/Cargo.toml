@@ -39,6 +39,7 @@ features = [
   "proto-alpha",
   "experimental-host-in-memory-store",
   "extra",
+  "native-kernel",
 ]
 
 [workspace.dependencies.jstz_kernel]
