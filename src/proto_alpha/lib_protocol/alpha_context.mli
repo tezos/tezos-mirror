@@ -4793,15 +4793,9 @@ module Operation : sig
         }
           -> 'b case
 
-    val preendorsement_case : Kind.preattestation case
-
     val preattestation_case : Kind.preattestation case
 
-    val endorsement_case : Kind.attestation case
-
     val attestation_case : Kind.attestation case
-
-    val endorsement_with_dal_case : Kind.attestation case
 
     val attestation_with_dal_case : Kind.attestation case
 
@@ -4809,13 +4803,8 @@ module Operation : sig
 
     val vdf_revelation_case : Kind.vdf_revelation case
 
-    val double_preendorsement_evidence_case :
-      Kind.double_preattestation_evidence case
-
     val double_preattestation_evidence_case :
       Kind.double_preattestation_evidence case
-
-    val double_endorsement_evidence_case : Kind.double_attestation_evidence case
 
     val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
