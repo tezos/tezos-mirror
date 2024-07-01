@@ -2345,6 +2345,7 @@ tezt:
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
+  timeout: 40 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
