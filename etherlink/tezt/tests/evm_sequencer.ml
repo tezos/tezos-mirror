@@ -240,10 +240,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   in
   let* sequencer_mode =
     if threshold_encryption then
-      let sequencer_sidecar_port = Some (Port.fresh ()) in
-      let sequencer_sidecar =
-        Dsn_node.sequencer ?rpc_port:sequencer_sidecar_port ()
-      in
+      let sequencer_sidecar = Dsn_node.sequencer () in
       let* () = Dsn_node.start sequencer_sidecar in
       return
       @@ Evm_node.Threshold_encryption_sequencer
@@ -669,6 +666,7 @@ let test_persistent_state =
   register_both
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
+    ~time_between_blocks:Nothing
   @@ fun {sequencer; _} _protocol ->
   (* Force the sequencer to produce a block. *)
   let*@ _ = Rpc.produce_block sequencer in
@@ -886,7 +884,15 @@ let test_resilient_to_rollup_node_disconnect =
 
   (* Go through several cooldown periods to let the sequencer sends the rest of
      the blueprints. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () =
+    bake_until_sync
+      ~timeout_in_blocks:(catchup_cooldown * 3)
+      ~sc_rollup_node
+      ~client
+      ~sequencer
+      ~proxy
+      ()
+  in
 
   (* Check the consistency again *)
   check_head_consistency
@@ -1106,6 +1112,7 @@ let test_delayed_transfer_is_included =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1214,6 +1221,7 @@ let test_largest_delayed_transfer_is_included =
 
 let test_delayed_deposit_is_included =
   register_both
+    ~time_between_blocks:Nothing
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
     ~title:"Delayed deposit is included"
@@ -1534,7 +1542,8 @@ let test_init_from_rollup_node_data_dir =
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
     ~history_mode:Archive
-  @@ fun {sc_rollup_node; sequencer; proxy; client; boot_sector; _} _protocol ->
+  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; boot_sector; _}
+             _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -1542,7 +1551,8 @@ let test_init_from_rollup_node_data_dir =
         unit)
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
-  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate sequencer
+  and* () = Evm_node.terminate observer in
   let evm_node' =
     Evm_node.create
       ~mode:(Evm_node.mode sequencer)
@@ -2066,6 +2076,9 @@ let test_observer_timeout_when_necessary =
     match Evm_node.mode observer with
     | Observer conf ->
         Evm_node.Observer
+          {conf with time_between_blocks = Some (Time_between_blocks 3.)}
+    | Threshold_encryption_observer conf ->
+        Evm_node.Threshold_encryption_observer
           {conf with time_between_blocks = Some (Time_between_blocks 3.)}
     | _ -> Test.fail "Should be an observer"
   in
@@ -3597,7 +3610,25 @@ let test_reset =
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
+
+  (* Recreate the evm node simply to reset the state of the tezt
+     instance. *)
+  let sequencer =
+    Evm_node.create
+      ~mode:(Evm_node.mode sequencer)
+      ~data_dir:(Evm_node.data_dir sequencer)
+      ~rpc_port:(Evm_node.rpc_port sequencer)
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   let* () = Evm_node.run sequencer in
+  let observer =
+    Evm_node.create
+      ~mode:(Evm_node.mode observer)
+      ~data_dir:(Evm_node.data_dir observer)
+      ~rpc_port:(Evm_node.rpc_port observer)
+      (Evm_node.endpoint sequencer)
+  in
+
   let* () = Evm_node.run observer in
 
   Log.info "Check sequencer and observer is at %d level" reset_level ;
@@ -3609,7 +3640,7 @@ let test_reset =
        reset." ;
   Check.((sequencer_level = observer_level) int32)
     ~error_msg:
-      "The sequencer (currently at level %L) and observer ( currently at level \
+      "The sequencer (currently at level %L) and observer (currently at level \
        %R) should be at the same level after both being reset." ;
   let* () =
     repeat after_reset_level (fun () ->
