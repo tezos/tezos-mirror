@@ -66,7 +66,6 @@ macro_rules! fregister_line {
 impl SATPModeState {
     pub fn text(&self) -> &'static str {
         match self {
-            Self::Invalid => "Invalid",
             Self::Bare => "Bare",
             Self::Sv(length) => match length {
                 SvLength::Sv39 => "Sv39",
@@ -78,7 +77,6 @@ impl SATPModeState {
 
     pub fn fg(&self) -> Color {
         match self {
-            Self::Invalid => GRAY,
             Self::Bare => BLUE,
             Self::Sv(_) => GREEN,
         }

@@ -93,8 +93,6 @@ impl EffectiveTranslationState {
 }
 
 enum SATPModeState {
-    // Reserved / Unsupported
-    Invalid,
     // Translation is BARE mode
     Bare,
     // Translation is SvXY mode
@@ -111,26 +109,26 @@ impl TranslationState {
     pub(super) fn update(
         &mut self,
         faulting: bool,
-        effective_mode: Option<TranslationAlgorithm>,
+        effective_mode: TranslationAlgorithm,
         satp_val: Satp,
     ) {
         self.effective = if faulting {
             EffectiveTranslationState::Faulting
         } else {
             match effective_mode {
-                None => EffectiveTranslationState::Off,
-                Some(_alg) => EffectiveTranslationState::On,
+                Bare => EffectiveTranslationState::Off,
+                Sv39 | Sv48 | Sv57 => EffectiveTranslationState::On,
             }
         };
 
         self.base = satp_val.ppn().to_bits();
 
-        self.mode = match satp_val.mode().ok() {
-            None => SATPModeState::Invalid,
-            Some(alg) => match alg {
-                TranslationAlgorithm::Bare => SATPModeState::Bare,
-                TranslationAlgorithm::Sv(length) => SATPModeState::Sv(length),
-            },
+        use TranslationAlgorithm::*;
+        self.mode = match satp_val.mode() {
+            Bare => SATPModeState::Bare,
+            Sv39 => SATPModeState::Sv(SvLength::Sv39),
+            Sv48 => SATPModeState::Sv(SvLength::Sv48),
+            Sv57 => SATPModeState::Sv(SvLength::Sv57),
         }
     }
 }

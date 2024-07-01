@@ -36,51 +36,46 @@ pub enum SvLength {
 }
 
 /// `MODE` field of the `satp` register. See table 5.4
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
+#[repr(u8)]
 pub enum TranslationAlgorithm {
-    Bare,
-    Sv(SvLength),
+    Bare = 0,
+    Sv39 = 8,
+    Sv48 = 9,
+    Sv57 = 10,
 }
 
 impl TranslationAlgorithm {
     pub const fn enc(&self) -> CSRRepr {
-        match self {
-            Self::Bare => MODE_BARE,
-            Self::Sv(SvLength::Sv39) => MODE_SV39,
-            Self::Sv(SvLength::Sv48) => MODE_SV48,
-            Self::Sv(SvLength::Sv57) => MODE_SV57,
-        }
+        *self as u8 as u64
     }
 }
 
 /// `Err` represents that the value of SATP.mode is reserved or
 /// that we do not care about it / is irrelevant.
-impl Bits64 for Result<TranslationAlgorithm, u64> {
+impl Bits64 for TranslationAlgorithm {
     const WIDTH: usize = 4;
 
     fn from_bits(value: u64) -> Self {
-        use SvLength::*;
         use TranslationAlgorithm::*;
 
         match value & 0b1111 {
-            MODE_BARE => Ok(Bare),
-            MODE_SV39 => Ok(Sv(Sv39)),
-            MODE_SV48 => Ok(Sv(Sv48)),
-            MODE_SV57 => Ok(Sv(Sv57)),
-            value @ (1..=7 | 11..=15) => {
-                // We need to retain invalid/unknown values so we can re-encode
-                // them correctly later. In other words we want to be loss-less.
-                Err(value)
-            }
-            16.. => unreachable!(),
+            MODE_BARE => Bare,
+            MODE_SV39 => Sv39,
+            MODE_SV48 => Sv48,
+            MODE_SV57 => Sv57,
+            // The satp.mode is a WARL field.
+            // This allows us to treat any illegal value as
+            // a legal one of our choice or to throw an exception.
+            // We are choosing to treat illegal values as `Bare` mode.
+            // Note: Reading an illegal value is only be possible if the raw memory is
+            // tampered with as the `reset` method and any write also leaves a legal value.
+            _ => Bare,
         }
     }
 
     fn to_bits(&self) -> u64 {
-        match self {
-            Err(code) => *code,
-            Ok(algorithm) => algorithm.enc(),
-        }
+        self.enc()
     }
 }
 
@@ -88,7 +83,7 @@ csr! {
     pub struct Satp {
         PPN: FixedWidthBits<44>,
         ASID: FixedWidthBits<16>,
-        MODE: Result<TranslationAlgorithm, u64>,
+        MODE: TranslationAlgorithm,
     }
 }
 
@@ -100,18 +95,16 @@ impl Default for Satp {
 
 impl Satp {
     /// Normalise the SATP value.
-    pub fn normalise(self) -> Option<Self> {
+    pub fn normalise(self) -> Self {
+        use TranslationAlgorithm::*;
         match self.mode() {
-            Err(_) => None,
-            Ok(TranslationAlgorithm::Bare) => {
+            Bare => {
                 // When no address translation algo is selected, the other fields
                 // have no meaning and shall therefore be reset.
-                Some(
-                    self.with_ppn(FixedWidthBits::from_bits(0))
-                        .with_asid(FixedWidthBits::from_bits(0)),
-                )
+                self.with_ppn(FixedWidthBits::from_bits(0))
+                    .with_asid(FixedWidthBits::from_bits(0))
             }
-            Ok(TranslationAlgorithm::Sv(_)) => Some(self),
+            Sv39 | Sv48 | Sv57 => self,
         }
     }
 }
@@ -120,7 +113,7 @@ impl Satp {
 mod tests {
     use crate::{
         bits::Bits64,
-        machine_state::csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
+        machine_state::csregisters::satp::{Satp, TranslationAlgorithm},
     };
 
     #[test]
@@ -128,29 +121,29 @@ mod tests {
         let field = u64::from_bits(0xF0F0_0BC0_AAAA_DEAD);
         assert_eq!(field.to_bits(), 0xF0F0_0BC0_AAAA_DEAD);
 
-        type AlgoField = Result<TranslationAlgorithm, u64>;
+        type AlgoField = TranslationAlgorithm;
 
         let field = <AlgoField>::from_bits(0x0000);
-        assert_eq!(field, Ok(TranslationAlgorithm::Bare));
+        assert_eq!(field, TranslationAlgorithm::Bare);
 
         // This `FieldValue` looks at only at the 4 least significant bits
         let field = <AlgoField>::from_bits(0xFFFF_FFF0);
-        assert_eq!(field, Ok(TranslationAlgorithm::Bare));
+        assert_eq!(field, TranslationAlgorithm::Bare);
 
         let field = <AlgoField>::from_bits(0x0002);
-        assert_eq!(field, Err(0x2));
+        assert_eq!(field, TranslationAlgorithm::Bare);
 
         let field = <AlgoField>::from_bits(0x0008);
-        assert_eq!(field, Ok(TranslationAlgorithm::Sv(SvLength::Sv39)));
+        assert_eq!(field, TranslationAlgorithm::Sv39);
 
         let field = <AlgoField>::from_bits(0x0009);
-        assert_eq!(field, Ok(TranslationAlgorithm::Sv(SvLength::Sv48)));
+        assert_eq!(field, TranslationAlgorithm::Sv48);
 
         let field = <AlgoField>::from_bits(0x000A);
-        assert_eq!(field, Ok(TranslationAlgorithm::Sv(SvLength::Sv57)));
+        assert_eq!(field, TranslationAlgorithm::Sv57);
 
         let field = <AlgoField>::from_bits(0x000B);
-        assert_eq!(field, Err(0xB));
+        assert_eq!(field, TranslationAlgorithm::Bare);
     }
 
     #[test]
@@ -159,15 +152,15 @@ mod tests {
         let mode = satp.mode();
         let asid = satp.asid();
         let ppn = satp.ppn();
-        assert_eq!(mode, Ok(TranslationAlgorithm::Sv(SvLength::Sv39)));
+        assert_eq!(mode, TranslationAlgorithm::Sv39);
         assert_eq!(asid.to_bits(), 0xD07);
         assert_eq!(ppn.to_bits(), 0xABC_DEAD_0BAD);
 
-        let satp = satp.with_mode(Ok(TranslationAlgorithm::Bare));
+        let satp = satp.with_mode(TranslationAlgorithm::Bare);
         let mode = satp.mode();
         let asid = satp.asid();
         let ppn = satp.ppn();
-        assert_eq!(mode, Ok(TranslationAlgorithm::Bare));
+        assert_eq!(mode, TranslationAlgorithm::Bare);
         assert_eq!(asid.to_bits(), 0xD07);
         assert_eq!(ppn.to_bits(), 0xABC_DEAD_0BAD);
     }
