@@ -15,7 +15,7 @@ depends: [
   "aches-lwt" {= "1.0.0"}
   "afl-persistent" {= "1.4"}
   "alcotest" {= "1.7.0"}
-  "alcotest-lwt" {= "1.7.0" }
+  "alcotest-lwt" {= "1.7.0"}
   "angstrom" {= "0.16.0"}
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.2.6"}
@@ -59,7 +59,6 @@ depends: [
   "conf-libev" {= "4-12"}
   "conf-libffi" {= "2.0.0"}
   "conf-pkg-config" {= "3"}
-  "conf-protoc" {= "4.4.0"}
   "conf-rust" {= "0.1"}
   "conf-sqlite3" {= "1"}
   "conf-which" {= "1"}
@@ -89,7 +88,6 @@ depends: [
   "fix" {= "20230505"}
   "fmt" {= "0.9.0"}
   "fpath" {= "0.7.3"}
-  "gen" {= "1.1"}
   "gmap" {= "0.3.0"}
   "hacl-star" {= "0.7.1"}
   "hacl-star-raw" {= "0.7.1"}
@@ -138,7 +136,6 @@ depends: [
   "ocaml-config" {= "2"}
   "ocaml-migrate-parsetree" {= "2.4.0"}
   "ocaml-options-vanilla" {= "1"}
-  "ocaml-protoc-plugin" {= "6.1.0"}
   "ocaml-syntax-shims" {= "1.0.0"}
   "ocaml-version" {= "3.6.7"}
   "ocamlbuild" {= "0.14.3"}
@@ -193,7 +190,6 @@ depends: [
   "rresult" {= "0.7.0"}
   "rusage" {= "1.0.0"}
   "secp256k1-internal" {= "0.4.0"}
-  "sedlex" {= "3.2"}
   "semaphore-compat" {= "1.0.1"}
   "seq" {= "base"}
   "seqes" {= "0.2"}
@@ -225,7 +221,6 @@ depends: [
   "vector" {= "1.0.0"}
   "x509" {= "0.16.5"}
   "yaml" {= "3.2.0"}
-  "yojson" {= "2.1.2"}
   "zarith" {= "1.13"}
   "zed" {= "3.2.3"}
 ]

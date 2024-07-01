@@ -16,8 +16,8 @@ depends: [
   "tezos-dal-node-lib" { = version }
   "tezos-dal-node-services" { = version }
   "octez-l2-libs" { = version }
-  "prometheus-app" { >= "1.2" }
-  "prometheus" { >= "1.2" }
+  "prometheus-app" { = "1.2" }
+  "prometheus" { = "1.2" }
   "octez-crawler" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
 ]
