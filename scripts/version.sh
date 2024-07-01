@@ -31,6 +31,9 @@ export opam_repository_tag=0bdad08fb7e8f889d600aa06619fdb88cd179258
 export dal_srsu_g1_sha=c48ce4add1de2a7561108f17bf0c16bc1e93c0bff24bc7da465c24e0b4b2653e
 export dal_srsu_g2_sha=e7fbe747ae3648a5b664d8f8bd7c524996f7ed07f3331f905d2e73767d580f7c
 
+export dal_srs_g1_sha=1ecc6debe5fdf363afd77073111bf84947dd72b26ed7f27db8871f9279d34604
+export dal_srs_g2_sha=97d76e266e657cc3c859c3359c717136f55cfe4c0256ea418f907406cb130218
+
 ##
 ## Versions installed in the images/ci
 ##
