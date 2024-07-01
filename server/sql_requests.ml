@@ -119,14 +119,14 @@ let create_endorsing_rights =
 
 let create_cycles =
   "CREATE TABLE IF NOT EXISTS cycles(\n\
-  \   id INTEGER PRIMARY KEY,\n\
+  \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \   level INTEGER NOT NULL,\n\
   \   size INTEGER NOT NULL,\n\
   \   UNIQUE (level))"
 
 let create_missing_blocks =
   "CREATE TABLE IF NOT EXISTS missing_blocks(\n\
-  \  id INTEGER PRIMARY KEY,\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  source $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER NOT NULL,\n\
@@ -224,6 +224,14 @@ let alter_blocks_reception_add_validation_timestamp =
 
 let alter_nodes = "ALTER TABLE nodes ADD COLUMN password $(BYTES)"
 
+let alter_cycles_id_type =
+  "ALTER TABLE cycles ALTER COLUMN id TYPE $(PRIMARY_INCREMENTING_INT) PRIMARY \
+   KEY"
+
+let alter_missing_blocks_id_type =
+  "ALTER TABLE missing_blocks ALTER COLUMN id TYPE $(PRIMARY_INCREMENTING_INT) \
+   PRIMARY KEY"
+
 let alter_tables =
   [
     [alter_blocks];
@@ -234,6 +242,8 @@ let alter_tables =
       alter_blocks_reception_add_validation_timestamp;
     ];
     [alter_nodes];
+    [alter_cycles_id_type];
+    [alter_missing_blocks_id_type];
   ]
 
 module Type = struct
