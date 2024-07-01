@@ -79,6 +79,9 @@ val tezos2 : string
 (** ["etherlink"]: tag for tests owned by the Etherlink product unit. *)
 val etherlink : string
 
+(** ["base"]: tag for tests related to lib_base. *)
+val base : string
+
 (** ["shell"]: tag for tests related to lib_shell and lib_shell_services. *)
 val shell : string
 
@@ -87,6 +90,9 @@ val encodings : string
 
 (** ["services"]: tag for tests related to services. *)
 val services : string
+
+(** ["unix"]: tag for tests related to unix. *)
+val unix : string
 
 (** ["slow"]: tag for tests that are too slow for the CI's [before_merging]
     pipelines and that will only be run on the scheduled pipeline.
