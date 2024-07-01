@@ -34,6 +34,10 @@ Smart Rollups
   of indiscriminately imposing them (e.g., imposing 2 weeks for the challenge
   window or 15 minutes for the commitment period). (MR :gl:`!13821`)
 
+- Fixed the traversal logic of the commitments tree, by considering previous
+  commitment periods when computing what should be the level of a commitment
+  successor. (MR :gl:`!13841`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 

@@ -100,3 +100,23 @@ end
 
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t
+
+module Past_commitment_period : sig
+  type t = {
+    commitment_period_in_blocks : int;
+        (** The number of blocks separating two valid commitment for a given
+            particular Tezos protocol. *)
+    next_protocol_activation : Raw_level_repr.t;
+        (** The activation level of the next protocol, which is also the last
+            level during which the commitment period is valid. That is, if
+
+            {math inbox_level + commitment_period_in_blocks <= next_protocol_activation}
+
+            then [inbox_level + commitment_period_in_blocks] is the expected
+            level of the next commitment.
+
+            Otherwise, the commitment period of the next protocol applies. *)
+  }
+
+  val encoding : t Data_encoding.t
+end

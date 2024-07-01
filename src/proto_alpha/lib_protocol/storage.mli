@@ -850,6 +850,11 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
 
+  module Past_commitment_periods :
+    Single_data_storage
+      with type value = Sc_rollup_repr.Past_commitment_period.t list
+       and type t := Raw_context.t
+
   module Inbox :
     Single_data_storage
       with type value = Sc_rollup_inbox_repr.t

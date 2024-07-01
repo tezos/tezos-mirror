@@ -112,8 +112,20 @@ let patch_script ctxt (address, hash, patched_code) =
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
-  let* previous_protocol, _previous_proto_constants, ctxt =
+  let* previous_protocol, previous_proto_constants, ctxt =
     Raw_context.prepare_first_block ~level ~timestamp chain_id ctxt
+  in
+  let*? level = Raw_level_repr.of_int32 level in
+  (* To gracefully handle time block change, we keep a record of all commitment
+     periods used in the past. *)
+  let* ctxt =
+    match previous_proto_constants with
+    | Some previous_proto_constants ->
+        Sc_rollup_storage.save_commitment_period
+          ctxt
+          previous_proto_constants.sc_rollup.commitment_period_in_blocks
+          level
+    | None -> return ctxt
   in
   let parametric = Raw_context.constants ctxt in
   let*! ctxt =
@@ -128,7 +140,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     match previous_protocol with
     | Genesis param ->
         (* This is the genesis protocol: initialise the state *)
-        let*? level = Raw_level_repr.of_int32 level in
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.init ctxt level
         in
@@ -191,7 +202,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
            if that is done, do not set Storage.Tenderbake.First_level_of_protocol.
            /!\ this storage is also use to add the smart rollup
                inbox migration message. see `sc_rollup_inbox_storage`. *)
-        let*? level = Raw_level_repr.of_int32 level in
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in

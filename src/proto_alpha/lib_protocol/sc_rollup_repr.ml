@@ -106,3 +106,21 @@ module Number_of_ticks = struct
     | Some zero -> zero
     | None -> assert false (* unreachable case, since [min_int = 0l] *)
 end
+
+module Past_commitment_period = struct
+  type t = {
+    commitment_period_in_blocks : int;
+    next_protocol_activation : Raw_level_repr.t;
+  }
+
+  let encoding =
+    Data_encoding.(
+      conv
+        (fun {commitment_period_in_blocks; next_protocol_activation} ->
+          (commitment_period_in_blocks, next_protocol_activation))
+        (fun (commitment_period_in_blocks, next_protocol_activation) ->
+          {commitment_period_in_blocks; next_protocol_activation})
+      @@ obj2
+           (req "commitment_period" int31)
+           (req "next_protocol_activation" Raw_level_repr.encoding))
+end
