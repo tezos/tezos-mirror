@@ -4,6 +4,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::borrow::Cow;
+
+use crate::abi::ABI_B22_RIGHT_PADDING;
+use crate::abi::ABI_H160_LEFT_PADDING;
 use crate::handler::EvmHandler;
 use crate::handler::RouterInterface;
 use crate::handler::Withdrawal;
@@ -11,11 +15,17 @@ use crate::precompiles::tick_model;
 use crate::precompiles::PrecompileOutcome;
 use crate::precompiles::WITHDRAWAL_ADDRESS;
 use crate::read_ticketer;
+use crate::storage::withdraw_nonce;
 use crate::{abi, fail_if_too_much, EthereumError};
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
+use primitive_types::H160;
+use primitive_types::H256;
+use primitive_types::U256;
+use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::wei::mutez_from_wei;
 use tezos_ethereum::wei::ErrorMutezFromWei;
+use tezos_ethereum::Log;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Info;
 use tezos_smart_rollup_encoding::contract::Contract;
@@ -30,6 +40,13 @@ use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransactio
 /// takes almost 880000 ticks, and one gas unit takes 1000 ticks.
 /// The ticks/gas ratio is from benchmarks on `ecrecover`.
 const WITHDRAWAL_COST: u64 = 880;
+
+/// Keccak256 of Withdrawal(uint256,address,bytes22,uint256)
+/// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
+pub const WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
+    45, 90, 215, 147, 24, 31, 91, 107, 215, 39, 192, 194, 22, 70, 30, 1, 158, 207, 228,
+    102, 53, 63, 221, 233, 204, 248, 19, 244, 91, 132, 250, 130,
+];
 
 fn prepare_message(
     parameters: RouterInterface,
@@ -150,6 +167,15 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal())
             };
 
+            let withdrawal_id = withdraw_nonce::get_and_increment(handler.borrow_host())
+                .map_err(|e| {
+                    EthereumError::WrappedError(Cow::from(format!("{:?}", e)))
+                })?;
+
+            // We use the original amount in order not to lose additional information
+            let withdrawal_event =
+                event_log(&transfer.value, &context.caller, &target, withdrawal_id);
+
             let parameters = MichelsonPair::<MichelsonContract, FA2_1Ticket>(
                 MichelsonContract(target),
                 ticket,
@@ -168,6 +194,11 @@ pub fn withdrawal_precompile<Host: Runtime>(
             // Ethereum gas units
 
             let withdrawals = vec![message];
+
+            // Emit withdrawal event
+            handler.add_log(withdrawal_event).map_err(|e| {
+                EthereumError::WrappedError(Cow::from(format!("{:?}", e)))
+            })?;
 
             Ok(PrecompileOutcome {
                 exit_status: ExitReason::Succeed(ExitSucceed::Returned),
@@ -188,21 +219,58 @@ pub fn withdrawal_precompile<Host: Runtime>(
     }
 }
 
+/// Construct withdrawal event log from parts:
+/// * `amount` - TEZ amount in wei
+/// * `sender` - account on L2
+/// * `receiver` - account on L1
+/// * `withdrawal_id` - unique withdrawal ID (incremented on every successful or failed XTZ/FA withdrawal)
+fn event_log(
+    amount: &U256,
+    sender: &H160,
+    receiver: &Contract,
+    withdrawal_id: U256,
+) -> Log {
+    let mut data = Vec::with_capacity(3 * 32);
+
+    data.extend_from_slice(&Into::<[u8; 32]>::into(*amount));
+    debug_assert!(data.len() % 32 == 0);
+
+    data.extend_from_slice(&ABI_H160_LEFT_PADDING);
+    data.extend_from_slice(&sender.0);
+    debug_assert!(data.len() % 32 == 0);
+
+    // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
+    receiver.bin_write(&mut data).unwrap();
+    data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
+    debug_assert!(data.len() % 32 == 0);
+
+    data.extend_from_slice(&Into::<[u8; 32]>::into(withdrawal_id));
+    debug_assert!(data.len() % 32 == 0);
+
+    Log {
+        address: H160::zero(),
+        topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
+        data,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
         handler::{ExecutionOutcome, Withdrawal},
         precompiles::{
             test_helpers::{execute_precompiled, DUMMY_TICKETER},
-            withdrawal::WITHDRAWAL_COST,
+            withdrawal::{WITHDRAWAL_COST, WITHDRAWAL_EVENT_TOPIC},
             WITHDRAWAL_ADDRESS,
         },
     };
+    use alloy_sol_types::SolEvent;
     use evm::{ExitReason, ExitRevert, ExitSucceed, Transfer};
     use pretty_assertions::assert_eq;
-    use primitive_types::{H160, U256};
+    use primitive_types::{H160, H256, U256};
+    use sha3::{Digest, Keccak256};
     use std::str::FromStr;
-    use tezos_ethereum::wei::eth_from_mutez;
+    use tezos_ethereum::{wei::eth_from_mutez, Log};
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup_encoding::michelson::{
@@ -210,6 +278,17 @@ mod tests {
     };
 
     use super::prepare_message;
+
+    mod events {
+        alloy_sol_types::sol! {
+            event Withdrawal (
+                uint256 amount,
+                address sender,
+                bytes22 receiver,
+                uint256 withdrawalId,
+            );
+        }
+    }
 
     fn make_message(ticketer: &str, target: &str, amount: u64) -> Withdrawal {
         let target = Contract::from_b58check(target).unwrap();
@@ -228,6 +307,58 @@ mod tests {
         );
 
         prepare_message(parameters, ticketer, Some("burn")).unwrap()
+    }
+
+    #[test]
+    fn withdrawal_event_signature() {
+        assert_eq!(
+            WITHDRAWAL_EVENT_TOPIC.to_vec(),
+            Keccak256::digest(b"Withdrawal(uint256,address,bytes22,uint256)").to_vec()
+        );
+    }
+
+    #[test]
+    fn withdrawal_event_codec() {
+        assert_eq!(events::Withdrawal::SIGNATURE_HASH.0, WITHDRAWAL_EVENT_TOPIC);
+
+        let amount = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            9, 24, 78, 114, 160, 0,
+        ];
+        let sender = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 118,
+        ];
+        let receiver = [
+            0, 0, 66, 236, 118, 95, 39, 0, 19, 78, 158, 14, 254, 137, 208, 51, 142, 46,
+            132, 60, 83, 220, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let withdrawal_id = [1u8; 32];
+
+        let log = Log {
+            address: H160::zero(),
+            topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
+            data: [amount, sender, receiver, withdrawal_id].concat(),
+        };
+
+        let log_data = alloy_primitives::LogData::new_unchecked(
+            log.topics.iter().map(|x| x.0.into()).collect(),
+            log.data.clone().into(),
+        );
+        let event = events::Withdrawal::decode_log_data(&log_data, true).unwrap();
+        assert_eq!(event.amount, alloy_primitives::U256::from_be_bytes(amount));
+        assert_eq!(
+            event.sender,
+            alloy_primitives::Address::from_slice(&sender[12..])
+        );
+        assert_eq!(
+            event.receiver,
+            alloy_primitives::FixedBytes::from_slice(&receiver[..22])
+        );
+        assert_eq!(
+            event.withdrawalId,
+            alloy_primitives::U256::from_be_bytes(withdrawal_id)
+        );
     }
 
     #[test]
@@ -272,11 +403,32 @@ mod tests {
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
     + WITHDRAWAL_COST; // cost of calling withdrawal precompiled contract
 
+        let expected_log = Log {
+            address: H160::zero(),
+            topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
+            data: [
+                [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 9, 24, 78, 114, 160, 0,
+                ],
+                [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 118,
+                ],
+                [
+                    0, 0, 66, 236, 118, 95, 39, 0, 19, 78, 158, 14, 254, 137, 208, 51,
+                    142, 46, 132, 60, 83, 220, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                [0u8; 32],
+            ]
+            .concat(),
+        };
+
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
-            logs: vec![],
+            logs: vec![expected_log],
             result: Some(expected_output),
             withdrawals: vec![message],
             estimated_ticks_used: 880_000,
@@ -326,11 +478,32 @@ mod tests {
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
     + WITHDRAWAL_COST; // cost of calling withdrawal precompiled contract
 
+        let expected_log = Log {
+            address: H160::zero(),
+            topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
+            data: [
+                [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 9, 24, 78, 114, 160, 0,
+                ],
+                [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 118,
+                ],
+                [
+                    1, 36, 102, 103, 169, 49, 254, 11, 210, 251, 28, 182, 4, 247, 20, 96,
+                    30, 136, 40, 69, 80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                [0u8; 32],
+            ]
+            .concat(),
+        };
+
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
-            logs: vec![],
+            logs: vec![expected_log],
             result: Some(expected_output),
             withdrawals: vec![message],
             // TODO (#6426): estimate the ticks consumption of precompiled contracts
