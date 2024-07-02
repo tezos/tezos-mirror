@@ -798,14 +798,25 @@ let init_bootstrap cloud (configuration : configuration) agent =
   let* () = Node.wait_for_ready bootstrap_node in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* baker_accounts =
-    Client.stresstest_gen_keys (List.length configuration.stake) client
+    Client.stresstest_gen_keys
+      ~alias_prefix:"baker"
+      (List.length configuration.stake)
+      client
   in
   let* producer_accounts =
-    Client.stresstest_gen_keys configuration.dal_node_producer client
+    Client.stresstest_gen_keys
+      ~alias_prefix:"dal_producer"
+      configuration.dal_node_producer
+      client
   in
-  let* etherlink_rollup_operator_key = Client.stresstest_gen_keys 1 client in
+  let* etherlink_rollup_operator_key =
+    Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
+  in
   let* etherlink_rollup_producers_key =
-    Client.stresstest_gen_keys Cli.etherlink_producers client
+    Client.stresstest_gen_keys
+      ~alias_prefix:"etherlink_producer"
+      Cli.etherlink_producers
+      client
   in
   let* parameter_file =
     let base =
