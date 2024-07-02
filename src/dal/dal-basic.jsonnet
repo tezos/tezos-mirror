@@ -53,7 +53,7 @@ dashboard.new(
   template.new(
     name='node_instance',
     datasource='Prometheus',
-    query='label_values(octez_version,' + std.extVar('node_instance_label') + ')',
+    query='label_values(dal_node_new_layer1_head,' + std.extVar('node_instance_label') + ')',
     refresh='load',
     label='Node instance'
   )
