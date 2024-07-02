@@ -163,7 +163,10 @@ module GS = struct
       ref Prometheus.LabelSetMap.empty
 
     let topic_as_label Types.Topic.{pkh; slot_index} =
-      Format.asprintf "topic-%a-%d" Signature.Public_key_hash.pp pkh slot_index
+      [
+        string_of_int slot_index;
+        Format.asprintf "%a" Signature.Public_key_hash.pp pkh;
+      ]
 
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
 
@@ -173,7 +176,7 @@ module GS = struct
       W.GS.Topic.Map.fold
         (fun topic peers accu ->
           Prometheus.LabelSetMap.add
-            [topic_as_label topic]
+            (topic_as_label topic)
             [
               W.GS.Peer.Set.cardinal peers
               |> float |> Prometheus.Sample_set.sample;
@@ -355,7 +358,7 @@ module GS = struct
     labeled_metric
       ~name:"count_peers_per_topic"
       ~help:"The number of peers the node is connected to per topic in the mesh"
-      ~label_names:["count_peers_per_topic"]
+      ~label_names:["slot_index"; "pkh"]
       (fun () -> !Stats.count_peers_per_topic)
 
   let scores_of_peers =
