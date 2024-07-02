@@ -188,6 +188,9 @@ module Cli = struct
     (* We want the sequencer to be active by default if etherlink is activated. *)
     Clap.flag ~section ~unset_long:"no-etherlink-sequencer" etherlink
 
+  let etherlink_producers =
+    Clap.default_int ~section ~long:"etherlink-producers" 0
+
   let disconnect =
     let disconnect_typ =
       let parse string =
@@ -221,6 +224,8 @@ type configuration = {
   protocol : Protocol.t;
   producer_machine_type : string option;
   etherlink : bool;
+  etherlink_sequencer : bool;
+  etherlink_producers : int;
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
   disconnect : (int * int) option;
@@ -246,11 +251,27 @@ type producer = {
 
 type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
 
-type etherlink = {
+type etherlink_operator_setup = {
   node : Node.t;
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
   evm_node : Tezt_etherlink.Evm_node.t;
+  is_sequencer : bool;
+  sc_rollup_address : string;
+  account : Account.key;
+}
+
+type etherlink_producer_setup = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_node : Sc_rollup_node.t;
+  evm_node : Tezt_etherlink.Evm_node.t;
+  account : Tezt_etherlink.Eth_account.t;
+}
+
+type etherlink = {
+  operator : etherlink_operator_setup;
+  producers : etherlink_producer_setup list;
   accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
@@ -711,6 +732,46 @@ let add_source cloud agent ~job_name node dal_node =
     ~job_name
     [node_metric_target; dal_node_metric_target]
 
+let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
+  let agent_name = Agent.name agent in
+  let node_metric_target =
+    Cloud.
+      {
+        agent;
+        port = Node.metrics_port node;
+        app_name = Format.asprintf "%s:%s" agent_name (Node.name node);
+      }
+  in
+  let sc_rollup_metric_target =
+    let metrics = Sc_rollup_node.metrics sc_rollup_node in
+    Cloud.
+      {
+        agent;
+        port = snd metrics;
+        app_name =
+          Format.asprintf
+            "%s:%s"
+            agent_name
+            (Sc_rollup_node.name sc_rollup_node);
+      }
+  in
+  let evm_node_metric_target =
+    Cloud.
+      {
+        agent;
+        port = Tezt_etherlink.Evm_node.Agent.rpc_port evm_node;
+        app_name =
+          Format.asprintf
+            "%s:%s"
+            agent_name
+            (Tezt_etherlink.Evm_node.name evm_node);
+      }
+  in
+  Cloud.add_prometheus_source
+    cloud
+    ~job_name
+    [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
+
 let init_bootstrap cloud (configuration : configuration) agent =
   let* bootstrap_node = Node.Agent.create ~name:"bootstrap-node" agent in
   let* dal_bootstrap_node =
@@ -742,6 +803,9 @@ let init_bootstrap cloud (configuration : configuration) agent =
     Client.stresstest_gen_keys configuration.dal_node_producer client
   in
   let* etherlink_rollup_operator_key = Client.stresstest_gen_keys 1 client in
+  let* etherlink_rollup_producers_key =
+    Client.stresstest_gen_keys Cli.etherlink_producers client
+  in
   let* parameter_file =
     let base =
       Either.right (configuration.protocol, Some Protocol.Constants_mainnet)
@@ -755,7 +819,8 @@ let init_bootstrap cloud (configuration : configuration) agent =
     let additional_bootstrap_accounts =
       List.map
         (fun key -> (key, Some 1_000_000_000_000, false))
-        (producer_accounts @ etherlink_rollup_operator_key)
+        (producer_accounts @ etherlink_rollup_operator_key
+       @ etherlink_rollup_producers_key)
     in
     Protocol.write_parameter_file
       ~bootstrap_accounts
@@ -927,12 +992,13 @@ let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
+let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap_node
+    account agent =
   let open Sc_rollup_helpers in
   let open Tezt_etherlink in
   let* node =
     Node.Agent.init
-      ~name:"etherlink-node"
+      ~name:(Format.asprintf "etherlink-%s-node" name)
       ~arguments:
         [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
       agent
@@ -942,15 +1008,12 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
     Client.import_secret_key
       client
       ~endpoint:(Node node)
-      etherlink_rollup_operator_key.Account.secret_key
-      ~alias:etherlink_rollup_operator_key.Account.alias
+      account.Account.secret_key
+      ~alias:account.Account.alias
   in
   let l = Node.get_last_seen_level node in
   let*! () =
-    Client.reveal
-      client
-      ~endpoint:(Node node)
-      ~src:etherlink_rollup_operator_key.Account.alias
+    Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
   in
   let* _ = Node.wait_for_level node (l + 2) in
   (* A configuration is generated locally by the orchestrator. The resulting
@@ -961,16 +1024,18 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
     |> List.map (fun account -> account.Eth_account.address)
   in
   let*! () =
+    let sequencer = if is_sequencer then Some account.public_key else None in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
-      ~sequencer:etherlink_rollup_operator_key.Account.public_key
+      ?sequencer
       ~bootstrap_accounts
       ~output:output_config
       ()
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
+      ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
       ~base_dir:(Client.base_dir client)
-      ~default_operator:etherlink_rollup_operator_key.Account.alias
+      ~default_operator:account.Account.alias
       agent
       Operator
       node
@@ -995,7 +1060,7 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
       ~kind:pvm_kind
       ~boot_sector:output
       ~parameters_ty:Helpers.evm_type
-      ~src:etherlink_rollup_operator_key.alias
+      ~src:account.alias
       client
   in
   let* _ = Node.wait_for_level node (l + 2) in
@@ -1003,14 +1068,15 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let private_rpc_port = Agent.next_available_port agent |> Option.some in
+  let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
   let sequencer_mode =
     Evm_node.Sequencer
       {
         initial_kernel = output;
         preimage_dir = Some preimages_dir;
         private_rpc_port;
-        time_between_blocks = Some (Time_between_blocks 10.);
-        sequencer = etherlink_rollup_operator_key.alias;
+        time_between_blocks;
+        sequencer = account.alias;
         genesis_timestamp = None;
         max_blueprints_lag = None;
         max_blueprints_ahead = None;
@@ -1023,18 +1089,160 @@ let init_etherlink _cloud ~bootstrap_node etherlink_rollup_operator_key agent =
         tx_pool_tx_per_addr_limit = None;
       }
   in
-  let mode =
-    if Cli.etherlink_sequencer then sequencer_mode else Evm_node.Proxy
-  in
+  let endpoint = Sc_rollup_node.endpoint sc_rollup_node in
+  let mode = if is_sequencer then sequencer_mode else Evm_node.Proxy in
   let* evm_node =
     Evm_node.Agent.init
-      ~name:"etherlink-evm-node"
+      ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      endpoint
       agent
   in
+  let operator =
+    {
+      node;
+      client;
+      sc_rollup_node;
+      evm_node;
+      is_sequencer;
+      account;
+      sc_rollup_address;
+    }
+  in
+  let* () =
+    add_etherlink_source
+      cloud
+      agent
+      ~job_name:(Format.asprintf "etherlink-%s" name)
+      node
+      sc_rollup_node
+      evm_node
+  in
+  return operator
+
+let init_etherlink_producer_setup cloud operator name account ~bootstrap_node
+    agent =
+  let open Sc_rollup_helpers in
+  let open Tezt_etherlink in
+  let* node =
+    Node.Agent.init
+      ~name:(Format.asprintf "etherlink-%s-node" name)
+      ~arguments:
+        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      agent
+  in
+  let* client = Client.Agent.create ~node agent in
+  let l = Node.get_last_seen_level node in
+  let* _ = Node.wait_for_level node (l + 2) in
+  (* A configuration is generated locally by the orchestrator. The resulting
+     kernel will be pushed to Etherlink. *)
+  let output_config = Temp.file "config.yaml" in
+  let bootstrap_accounts =
+    Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
+    |> List.map (fun account -> account.Eth_account.address)
+  in
+  let*! () =
+    let sequencer =
+      if operator.is_sequencer then Some operator.account.public_key else None
+    in
+    Tezt_etherlink.Evm_node.make_kernel_installer_config
+      ?sequencer
+      ~bootstrap_accounts
+      ~output:output_config
+      ()
+  in
+  let* sc_rollup_node =
+    Sc_rollup_node.Agent.create
+      ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
+      ~base_dir:(Client.base_dir client)
+      agent
+      Observer
+      node
+  in
+  let preimages_dir =
+    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
+  in
+  let* remote_output_config = Agent.copy agent ~source:output_config in
+  let* {output; _} =
+    prepare_installer_kernel
+      ~config:(`Path remote_output_config)
+      ~agent
+      ~preimages_dir
+      Constant.WASM.evm_kernel
+  in
+  let* () =
+    Sc_rollup_node.run
+      sc_rollup_node
+      operator.sc_rollup_address
+      [Log_kernel_debug]
+  in
+  let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
+  let mode =
+    Evm_node.Observer
+      {
+        initial_kernel = output;
+        preimages_dir;
+        time_between_blocks;
+        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+      }
+  in
+  let endpoint = Evm_node.endpoint operator.evm_node in
+  let* evm_node =
+    Evm_node.Agent.init
+      ~name:(Format.asprintf "etherlink-%s-evm-node" name)
+      ~mode
+      endpoint
+      agent
+  in
+  let operator = {node; client; sc_rollup_node; evm_node; account} in
+  let* () =
+    add_etherlink_source
+      cloud
+      agent
+      ~job_name:(Format.asprintf "etherlink-%s" name)
+      node
+      sc_rollup_node
+      evm_node
+  in
+  let* () =
+    (* This is to avoid producing operations too soon. *)
+    Evm_node.wait_for_blueprint_applied evm_node 1
+  in
+  return operator
+
+let init_etherlink cloud ~bootstrap_node etherlink_rollup_operator_key
+    next_agent =
+  let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
+  let* operator =
+    init_etherlink_operator_setup
+      cloud
+      Cli.etherlink_sequencer
+      "operator"
+      ~bootstrap_node
+      etherlink_rollup_operator_key
+      operator_agent
+  in
   let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
-  return {node; client; sc_rollup_node; evm_node; accounts}
+  let* producers_agents =
+    List.init Cli.etherlink_producers (fun i ->
+        let name = Format.asprintf "etherlink-producer-%d" i in
+        next_agent ~name)
+    |> Lwt.all
+  in
+  let* producers =
+    producers_agents
+    |> List.mapi (fun i agent ->
+           assert (i < Array.length accounts) ;
+           init_etherlink_producer_setup
+             cloud
+             operator
+             (Format.asprintf "producer-%d" i)
+             accounts.(i)
+             ~bootstrap_node
+             agent)
+    |> Lwt.all
+  in
+  return {operator; accounts; producers}
 
 let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
@@ -1103,7 +1311,6 @@ let init ~(configuration : configuration) cloud next_agent =
           agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
-  let* etherlink_agent = next_agent ~name:"etherlink" in
   let* etherlink =
     if Cli.etherlink then
       let* etherlink =
@@ -1111,7 +1318,7 @@ let init ~(configuration : configuration) cloud next_agent =
           cloud
           ~bootstrap_node:bootstrap.node
           etherlink_rollup_operator_key
-          etherlink_agent
+          next_agent
       in
       some etherlink
     else none
@@ -1221,29 +1428,36 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
-let etherlink_loop etherlink =
+let etherlink_loop (etherlink : etherlink) =
   let open Tezt_etherlink in
-  let rec account_loop i =
-    let wait_for =
-      Evm_node.wait_for_tx_pool_add_transaction etherlink.evm_node
+  let* () = Lwt_unix.sleep 30. in
+  let account_loop i =
+    let producer : etherlink_producer_setup =
+      List.nth etherlink.producers (i mod List.length etherlink.producers)
     in
-    let* _ =
-      let source_private_key = etherlink.accounts.(i).private_key in
-      let to_public_key =
-        etherlink.accounts.((i + 1) mod Array.length etherlink.accounts).address
-      in
-      Eth_cli.transaction_send
-        ~source_private_key
-        ~to_public_key
-        ~value:(Wei.of_eth_int 10)
-        ~endpoint:(Evm_node.endpoint etherlink.evm_node)
-        ()
+    let runner = Node.runner producer.node |> Option.get in
+    let firehose = Agent.default_binaries_path () // "firehose" in
+    let* () =
+      Process.spawn
+        ~runner
+        firehose
+        [
+          "configure";
+          "--endpoint";
+          Evm_node.endpoint etherlink.operator.evm_node;
+          "--controller";
+          etherlink.accounts.(i).private_key |> String.to_seq |> Seq.drop 2
+          |> String.of_seq;
+        ]
+      |> Process.check
     in
-    let* _ = wait_for in
-    account_loop i
+    Process.spawn ~runner firehose ["flood"; "--kind"; "xtz"; "--workers"; "20"]
+    |> Process.check
   in
-  Array.mapi (fun i _ -> account_loop i) etherlink.accounts
-  |> Array.to_list |> Lwt.join
+  if List.length etherlink.producers > 0 then
+    Array.mapi (fun i _ -> account_loop i) etherlink.accounts
+    |> Array.to_list |> Lwt.join
+  else Lwt.return_unit
 
 let configuration =
   let stake = Cli.stake in
@@ -1253,6 +1467,8 @@ let configuration =
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
   let etherlink = Cli.etherlink in
+  let etherlink_sequencer = Cli.etherlink_sequencer in
+  let etherlink_producers = Cli.etherlink_producers in
   let disconnect = Cli.disconnect in
   {
     stake;
@@ -1262,6 +1478,8 @@ let configuration =
     protocol;
     producer_machine_type;
     etherlink;
+    etherlink_sequencer;
+    etherlink_producers;
     disconnect;
   }
 
@@ -1272,7 +1490,9 @@ let benchmark () =
       List.map (fun i -> `Baker i) configuration.stake;
       List.init configuration.dal_node_producer (fun _ -> `Producer);
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
-      (if configuration.etherlink then [`Etherlink] else []);
+      (if configuration.etherlink then [`Etherlink_operator] else []);
+      List.init configuration.etherlink_producers (fun i ->
+          `Etherlink_producer i);
     ]
     |> List.concat
   in
@@ -1290,7 +1510,8 @@ let benchmark () =
                match configuration.producer_machine_type with
                | None -> Cloud.default_vm_configuration
                | Some machine_type -> {machine_type})
-           | `Etherlink -> Cloud.default_vm_configuration)
+           | `Etherlink_operator -> Cloud.default_vm_configuration
+           | `Etherlink_producer _ -> Cloud.default_vm_configuration)
   in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)

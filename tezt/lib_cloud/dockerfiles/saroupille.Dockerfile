@@ -48,7 +48,5 @@ COPY ./octez-baker-alpha $BINARIES_DESTINATION_PATH/octez-baker-alpha
 COPY ./octez-smart-rollup-node $BINARIES_DESTINATION_PATH/octez-smart-rollup-node
 COPY ./smart-rollup-installer $BINARIES_DESTINATION_PATH/smart-rollup-installer
 COPY ./octez-evm-node  $BINARIES_DESTINATION_PATH/octez-evm-node
-
 # You can compile it by executing `make build` in the `etherlink/firehose` directory
 COPY ./etherlink/firehose/target/release/firehose $BINARIES_DESTINATION_PATH/firehose
-

@@ -107,6 +107,7 @@ type argument =
   | Pre_images_endpoint of string
   | Apply_unsafe_patches
   | Injector_retention_period of int
+  | Acl_allow_all
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
@@ -129,6 +130,7 @@ let make_argument = function
   | Apply_unsafe_patches -> ["--apply-unsafe-patches"]
   | Injector_retention_period nb_block ->
       ["--injector-retention-period"; string_of_int nb_block]
+  | Acl_allow_all -> ["--acl-override"; "allow-all"]
 
 let is_redundant = function
   | Data_dir _, Data_dir _
@@ -148,7 +150,8 @@ let is_redundant = function
   | Rollup _, Rollup _
   | Pre_images_endpoint _, Pre_images_endpoint _
   | Apply_unsafe_patches, Apply_unsafe_patches
-  | Injector_retention_period _, Injector_retention_period _ ->
+  | Injector_retention_period _, Injector_retention_period _
+  | Acl_allow_all, Acl_allow_all ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
@@ -169,7 +172,8 @@ let is_redundant = function
   | Rollup _, _
   | Pre_images_endpoint _, _
   | Apply_unsafe_patches, _
-  | Injector_retention_period _, _ ->
+  | Injector_retention_period _, _
+  | Acl_allow_all, _ ->
       false
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
@@ -355,6 +359,7 @@ let runlike_argument rollup_node =
   @ optional_arg (fun s -> Loser_mode s) rollup_node_state.loser_mode
   @ optional_switch No_degraded (not rollup_node_state.allow_degraded)
   @ optional_arg (fun n -> Dal_node n) rollup_node_state.dal_node
+  @ optional_arg (fun _ -> Acl_allow_all) rollup_node_state.runner
 
 let node_args rollup_node rollup_address =
   let mode = string_of_mode rollup_node.persistent_state.mode in
@@ -751,12 +756,14 @@ module Agent = struct
     let runner = Agent.runner agent in
     let rpc_port = Agent.next_available_port agent in
     let metrics_port = Agent.next_available_port agent in
+    let metrics_addr = "0.0.0.0" in
     create
       ?name
       ?default_operator
       ~path
       ~runner
       ~rpc_port
+      ~metrics_addr
       ~metrics_port
       ~base_dir
       mode

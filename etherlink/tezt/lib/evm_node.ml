@@ -1086,4 +1086,8 @@ module Agent = struct
     in
     let* () = run evm_node in
     return evm_node
+
+  let rpc_port evm_node = evm_node.persistent_state.rpc_port
+
+  let name evm_node = evm_node.name
 end
