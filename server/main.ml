@@ -239,24 +239,25 @@ let get_stats ~logger db_pool =
             (req "version" version_encoding))
         (highest_block, version))
 
-let get_available_data ~logger ~conf db_pool =
+let get_available_data ~logger ~conf db_pool boundaries =
   let select_available_data_request =
-    Caqti_request.Infix.(Caqti_type.unit ->* Caqti_type.(t2 int32 int32))
-      "SELECT level, round FROM blocks"
+    Caqti_request.Infix.(
+      Caqti_type.(t2 int32 int32) ->* Caqti_type.(t2 int32 int32))
+      "SELECT level, round FROM blocks WHERE level >= ? AND level <= ?"
   in
   with_caqti_error
     ~logger
     (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
          maybe_with_metrics conf "select_available_data" @@ fun () ->
-         Db.fold select_available_data_request List.cons () [])
+         Db.fold select_available_data_request List.cons boundaries [])
        db_pool)
     (fun list -> reply_public_json Data_encoding.(list (tup2 int32 int32)) list)
 
-let get_missing_data ~logger ~conf db_pool =
+let get_missing_data ~logger ~conf db_pool boundaries =
   let select_missing_data_request =
     Caqti_request.Infix.(
-      Caqti_type.unit
+      Caqti_type.(t2 int32 int32)
       ->* Caqti_type.(t4 int32 int32 Sql_requests.Type.public_key_hash bool))
       "SELECT\n\
       \  missing_blocks.level,\n\
@@ -271,14 +272,15 @@ let get_missing_data ~logger ~conf db_pool =
       \   AND blocks_reception.id IS NOT NULL\n\
       \  )\n\
       \  FROM missing_blocks\n\
-      \  JOIN delegates ON delegates.id = missing_blocks.baker"
+      \  JOIN delegates ON delegates.id = missing_blocks.baker\n\
+      \  WHERE missing_blocks.level >= ? AND missing_blocks.level <= ?"
   in
   with_caqti_error
     ~logger
     (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
          maybe_with_metrics conf "select_missing_data" @@ fun () ->
-         Db.fold select_missing_data_request List.cons () [])
+         Db.fold select_missing_data_request List.cons boundaries [])
        db_pool)
     (fun list ->
       reply_public_json
@@ -977,6 +979,11 @@ let import_callback ~logger conf db_pool g data =
         ~body:"Level imported"
         ())
 
+let extract_boundaries g =
+  let min = Re.Group.get g 1 in
+  let max = Re.Group.get g 2 in
+  (Int32.of_string min, Int32.of_string max)
+
 (*
   - /<LEVEL>/rights
       Used by archiver to send attesting rights informations for a given level.
@@ -1086,23 +1093,14 @@ let routes :
         ],
       fun g ~logger ~conf ~admins:_ ~users:_ db_pool header meth _body ->
         get_only_endpoint meth (fun () ->
-            let min = Re.Group.get g 1 in
-            let max = Re.Group.get g 2 in
-            let min' = int_of_string min in
-            let max' = int_of_string max in
-            if
-              min' > max'
-              || max' - min' > Int32.to_int conf.Config.max_batch_size
-            then
+            let min, max = extract_boundaries g in
+            if min > max || Int32.sub max min > conf.Config.max_batch_size then
               let body = "Invalid block range." in
               Cohttp_lwt_unix.Server.respond_error ~body ()
             else
               with_caqti_error
                 ~logger
-                (Exporter.data_at_level_range
-                   conf
-                   db_pool
-                   (Int32.of_string min, Int32.of_string max))
+                (Exporter.data_at_level_range conf db_pool (min, max))
                 (fun data ->
                   reply_public_compressed_json
                     header
@@ -1146,12 +1144,28 @@ let routes :
     ( Re.str "/stats.json",
       fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_stats ~logger db_pool );
-    ( Re.str "/available.json",
-      fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
-        get_available_data ~logger ~conf db_pool );
-    ( Re.str "/missing.json",
-      fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
-        get_missing_data ~logger ~conf db_pool );
+    ( Re.seq
+        [
+          Re.str "/";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "-";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "/available.json";
+        ],
+      fun g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
+        let boundaries = extract_boundaries g in
+        get_available_data ~logger ~conf db_pool boundaries );
+    ( Re.seq
+        [
+          Re.str "/";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "-";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "/missing.json";
+        ],
+      fun g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
+        let boundaries = extract_boundaries g in
+        get_missing_data ~logger ~conf db_pool boundaries );
     ( Re.str "/head.json",
       fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_head conf ~logger db_pool );
