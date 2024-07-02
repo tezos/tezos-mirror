@@ -594,68 +594,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         self.run_instr(instr)
     }
 
-    /// Return the current [`Interrupt`] with highest priority to be handled
-    /// or [`None`] if there isn't any available
-    fn get_pending_interrupt(&mut self, current_mode: Mode) -> Option<Interrupt> {
-        let possible = match self.hart.csregisters.possible_interrupts(current_mode) {
-            0 => return None,
-            possible => possible,
-        };
-
-        // Normally, interrupts from devices / external sources are signaled to the CPU
-        // by updating the MEIP,MTIP,MSIP,SEIP,STIP,SSIP interrupt bits in the MIP register.
-        // In the hardware world, these CSRs updates would be done by PLIC / CLINT
-        // based on memory written by devices on the bus
-
-        // Section 3.1.9 MIP & MIE registers
-        // Multiple simultaneous interrupts destined for M-mode are handled in the
-        // following decreasing priority order: MEI, MSI, MTI, SEI, SSI, STI
-
-        // sip is a shadow of mip and sie is a shadow of mie
-        // hence we only need to look at mie to find out the interrupt bits
-        let mip: CSRRepr = self.hart.csregisters.read(CSRegister::mip);
-        let active_interrupts = mip & possible;
-
-        if u64::bit(
-            active_interrupts,
-            Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::MachineExternal);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::MachineSoftware);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::MachineTimer);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::SupervisorExternal);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::SupervisorSoftware);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::SupervisorTimer);
-        }
-
-        None
-    }
-
     /// Handle interrupts (also known as asynchronous exceptions)
     /// by taking a trap for the given interrupt.
     ///
@@ -709,7 +647,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
         // Try to take an interrupt if available, and then
         // obtain the pc for the next instruction to be executed
-        let instr_pc = match self.get_pending_interrupt(current_mode) {
+        let instr_pc = match self.hart.get_pending_interrupt(current_mode) {
             None => self.hart.pc.read(),
             Some(interrupt) => self.address_on_interrupt(interrupt)?,
         };

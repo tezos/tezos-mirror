@@ -1,14 +1,22 @@
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
+
+pub(super) mod interrupts_cache;
+
 use super::csregisters::xstatus::MStatus;
 use crate::{
+    bits::u64,
     machine_state::{
         bus::Address,
-        csregisters::{self, xstatus, CSRegister},
+        csregisters::{self, xstatus, CSRRepr, CSRegister},
         mode::{self, Mode, TrapMode},
         registers,
         reservation_set::{self, ReservationSet},
     },
     state_backend::{self as backend, Atom, Cell, CellWrite},
-    traps::TrapContext,
+    traps::{Interrupt, TrapContext},
 };
 
 /// RISC-V hart state
@@ -144,6 +152,74 @@ impl<M: backend::Manager> HartState<M> {
         self.mode.write(trap_mode.as_mode());
 
         trap_source.trap_handler_address(self.csregisters.read(xtvec_reg))
+    }
+
+    /// Return the current [`Interrupt`] with highest priority to be handled
+    /// or [`None`] if there isn't any available
+    pub fn get_pending_interrupt(&mut self, current_mode: Mode) -> Option<Interrupt> {
+        let possible = if let Some(cache_hit) = self.get_possible_interrupts_cache(current_mode) {
+            cache_hit
+        } else {
+            let possible = self.csregisters.possible_interrupts(current_mode);
+            self.update_possible_interrupts_cache(current_mode, possible);
+            possible
+        };
+        if possible == 0 {
+            return None;
+        };
+
+        // Normally, interrupts from devices / external sources are signaled to the CPU
+        // by updating the MEIP,MTIP,MSIP,SEIP,STIP,SSIP interrupt bits in the MIP register.
+        // In the hardware world, these CSRs updates would be done by PLIC / CLINT
+        // based on memory written by devices on the bus
+
+        // Section 3.1.9 MIP & MIE registers
+        // Multiple simultaneous interrupts destined for M-mode are handled in the
+        // following decreasing priority order: MEI, MSI, MTI, SEI, SSI, STI
+
+        // sip is a shadow of mip and sie is a shadow of mie
+        // hence we only need to look at mie to find out the interrupt bits
+        let mip: CSRRepr = self.csregisters.read(CSRegister::mip);
+        let active_interrupts = mip & possible;
+
+        if u64::bit(
+            active_interrupts,
+            Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize,
+        ) {
+            return Some(Interrupt::MachineExternal);
+        }
+        if u64::bit(
+            active_interrupts,
+            Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize,
+        ) {
+            return Some(Interrupt::MachineSoftware);
+        }
+        if u64::bit(
+            active_interrupts,
+            Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize,
+        ) {
+            return Some(Interrupt::MachineTimer);
+        }
+        if u64::bit(
+            active_interrupts,
+            Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize,
+        ) {
+            return Some(Interrupt::SupervisorExternal);
+        }
+        if u64::bit(
+            active_interrupts,
+            Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize,
+        ) {
+            return Some(Interrupt::SupervisorSoftware);
+        }
+        if u64::bit(
+            active_interrupts,
+            Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize,
+        ) {
+            return Some(Interrupt::SupervisorTimer);
+        }
+
+        None
     }
 }
 
