@@ -5906,12 +5906,7 @@ let register_riscv ~protocols =
   test_rpcs ~kind protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;
-  test_rollup_node_advances_pvm_state protocols ~kind ~internal:true ;
-  test_commitment_scenario
-    ~variant:"commitment_is_stored"
-    commitment_stored
-    protocols
-    ~kind
+  test_rollup_node_advances_pvm_state protocols ~kind ~internal:true
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;

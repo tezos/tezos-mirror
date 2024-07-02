@@ -46,7 +46,7 @@ let state_hash _state =
    * we set the state hash to be the initial state hash of the node
    * implementation. *)
   State_hash.of_b58check_exn
-    "srs11ugymFmCdduVdBtFnrprkvz3dBQqs4egPfFdogPoEgKXggveHp"
+    "srs1235hdYS7pvhw4Q9oG516gXM6NfNrbaGvPVmVUSBajCdrbxhjLA"
 
 module type S = sig
   include PS.S
