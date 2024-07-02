@@ -21,8 +21,7 @@ end
 
 module Make (Storage : sig
   val transaction_receipt :
-    Ethereum_types.hash ->
-    Ethereum_types.transaction_receipt option tzresult Lwt.t
+    Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
 end)
 (Tracer : Backend) =
 struct
@@ -31,7 +30,7 @@ struct
     let* receipt = Storage.transaction_receipt transaction_hash in
     match receipt with
     | None -> tzfail (Tracer_types.Transaction_not_found transaction_hash)
-    | Some Ethereum_types.{blockNumber; _} ->
+    | Some Transaction_receipt.{blockNumber; _} ->
         Tracer.trace_transaction
           ~block_number:blockNumber
           ~transaction_hash

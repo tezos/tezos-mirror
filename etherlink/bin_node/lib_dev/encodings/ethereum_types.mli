@@ -181,27 +181,6 @@ type transaction_log = {
   removed : bool option;
 }
 
-type transaction_receipt = {
-  transactionHash : hash;
-  transactionIndex : quantity;
-  blockHash : block_hash;
-  blockNumber : quantity;
-  from : address;
-  to_ : address option;
-  cumulativeGasUsed : quantity;
-  effectiveGasPrice : quantity;
-  gasUsed : quantity;
-  logs : transaction_log list;
-  logsBloom : hex;
-  type_ : quantity;
-  status : quantity;
-  contractAddress : address option;
-}
-
-val transaction_receipt_encoding : transaction_receipt Data_encoding.t
-
-val transaction_receipt_from_rlp : block_hash -> bytes -> transaction_receipt
-
 type call = {
   from : address option;
   to_ : address option;
@@ -272,3 +251,8 @@ val timestamp_of_bytes : bytes -> Time.Protocol.t
 val encode_address : address -> bytes
 
 val transaction_log_encoding : transaction_log Data_encoding.t
+
+val transaction_log_body_from_rlp :
+  Rlp.item -> address * hash list * hex * quantity
+
+val decode_hex : bytes -> hex

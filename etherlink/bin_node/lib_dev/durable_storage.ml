@@ -91,7 +91,7 @@ module Make (Reader : READER) = struct
     let* opt_receipt =
       inspect_durable_and_decode_opt
         (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-        (Ethereum_types.transaction_receipt_from_rlp mock_block_hash)
+        (Transaction_receipt.of_rlp_bytes mock_block_hash)
     in
     match opt_receipt with
     | Some temp_receipt ->

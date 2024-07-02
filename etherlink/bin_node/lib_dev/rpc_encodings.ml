@@ -313,11 +313,11 @@ module Get_block_receipts = struct
 
   type input = Block_parameter.t
 
-  type output = Ethereum_types.transaction_receipt list
+  type output = Transaction_receipt.t list
 
   let input_encoding = Data_encoding.tup1 Block_parameter.encoding
 
-  let output_encoding = Data_encoding.list transaction_receipt_encoding
+  let output_encoding = Data_encoding.list Transaction_receipt.encoding
 
   let method_ = "eth_getBlockReceipts"
 
@@ -443,11 +443,11 @@ module Get_transaction_receipt = struct
 
   type input = hash
 
-  type output = transaction_receipt option
+  type output = Transaction_receipt.t option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = Data_encoding.option transaction_receipt_encoding
+  let output_encoding = Data_encoding.option Transaction_receipt.encoding
 
   let method_ = "eth_getTransactionReceipt"
 

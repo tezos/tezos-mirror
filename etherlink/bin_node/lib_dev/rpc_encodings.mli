@@ -160,7 +160,7 @@ module Get_block_by_hash :
 module Get_block_receipts :
   METHOD
     with type input = Ethereum_types.Block_parameter.t
-     and type output = Ethereum_types.transaction_receipt list
+     and type output = Transaction_receipt.t list
 
 module Get_code :
   METHOD
@@ -200,7 +200,7 @@ module Get_uncle_count_by_block_number :
 module Get_transaction_receipt :
   METHOD
     with type input = Ethereum_types.hash
-     and type output = Ethereum_types.transaction_receipt option
+     and type output = Transaction_receipt.t option
 
 module Get_transaction_by_hash :
   METHOD
