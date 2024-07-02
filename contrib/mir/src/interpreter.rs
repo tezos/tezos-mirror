@@ -42,9 +42,9 @@ pub enum InterpretError<'a> {
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
-    /// Encountered an argument outside of the bounds defined in the documentation
-    #[error("Argument out of bounds")]
-    ArgOutOfBounds,
+    /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
+    #[error("Overflow")]
+    Overflow,
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
@@ -554,7 +554,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(256u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
@@ -566,7 +566,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(64000u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
@@ -601,7 +601,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(256u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
@@ -613,7 +613,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(64000u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();

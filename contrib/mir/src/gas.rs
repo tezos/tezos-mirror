@@ -557,7 +557,8 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150).as_gas_cost()
+        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150)
+            .as_gas_cost()
     }
 
     pub fn ediv_nat(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
@@ -568,7 +569,8 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150).as_gas_cost()
+        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150)
+            .as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
