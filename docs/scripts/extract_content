@@ -4,15 +4,6 @@
 # dropping the left menu and the navigation header and footer.
 # The result is a standalone HTML page that can be published on any website.
 
-BEGIN {
-  if (ENVIRON["PWD"] !~ "/_build$" || ARGC != 2) {
-    printf "usage (in _build/): extract_content <path>/<file>.html\n";
-    exit 1;
-  }
-  PATH = ARGV[1];
-  sub ("/?[^/]*$", "", PATH);
-}
-
 # Drop some items from the document header (extracted later)
 
 /<link rel=".*"/ { next; }
@@ -35,7 +26,7 @@ BEGIN {
   if ($0 !~ /<footer>/) {
     gsub("¶"," ");
     gsub("class=\"reference internal\" href=\"#", "class=\"reference local\" href=\"#");
-    gsub("class=\"reference internal\" href=\"", "class=\"reference external\" href=\"https://tezos.gitlab.io/" PATH "/");
+    gsub("class=\"reference internal\" href=\"", "class=\"reference external\" href=\"https://tezos.gitlab.io/active/");
     print;
   }
 }
