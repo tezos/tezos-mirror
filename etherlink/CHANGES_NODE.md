@@ -29,6 +29,7 @@
   (!13738)
 - The simulation can be called by not taking into account DA fees in the gas
   computation. (!13729)
+- Simulation supports mainnet after the security upgrade. (!14006)
 
 ## Version for ec7c3b349624896b269e179384d0a45cf39e1145
 

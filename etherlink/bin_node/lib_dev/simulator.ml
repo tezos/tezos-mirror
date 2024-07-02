@@ -55,7 +55,9 @@ struct
     let open Lwt_result_syntax in
     let+ kernel_version = get_kernel_version () in
     match kernel_version with
-    | "b9f6c9138719220db83086f0548e49c5c4c8421f" (* Mainnet *)
+    | "b9f6c9138719220db83086f0548e49c5c4c8421f"
+      (* Mainnet before security ugprade *)
+    | "4d98081699595b57512ffeff35bca320f281c806" (* Mainnet *)
     | "ec7c3b349624896b269e179384d0a45cf39e1145" (* Ghostnet *)
     | "KERNEL_VERSION_NOT_INITIALISED" ->
         false
