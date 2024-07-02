@@ -9,6 +9,8 @@ stages:
   - release
 
 build:
+  tags:
+    - gcp
   stage: build
   before_script:
     - apk add git make jsonnet
@@ -27,6 +29,8 @@ build:
     - tags
 
 release:
+  tags:
+    - gcp
   stage: release
   dependencies: [build]
   before_script:
