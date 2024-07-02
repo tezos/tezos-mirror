@@ -129,7 +129,7 @@ module GS = struct
     in
     (info, collect)
 
-  let labeled_metric ~help ~name ~label_name collectors =
+  let labeled_metric ~help ~name ~label_names collectors =
     let info =
       {
         Prometheus.MetricInfo.name =
@@ -137,7 +137,7 @@ module GS = struct
             (String.concat "_" [namespace; subsystem; name]);
         help;
         metric_type = Gauge;
-        label_names = [Prometheus.LabelName.v label_name];
+        label_names = List.map Prometheus.LabelName.v label_names;
       }
     in
     (info, collectors)
@@ -355,14 +355,14 @@ module GS = struct
     labeled_metric
       ~name:"count_peers_per_topic"
       ~help:"The number of peers the node is connected to per topic in the mesh"
-      ~label_name:"count_peers_per_topic"
+      ~label_names:["count_peers_per_topic"]
       (fun () -> !Stats.count_peers_per_topic)
 
   let scores_of_peers =
     labeled_metric
       ~name:"scores_of_peers"
       ~help:"The score of peers connected to the node"
-      ~label_name:"scores_of_peers"
+      ~label_names:["scores_of_peers"]
       (fun () -> !Stats.scores_of_peers)
 
   let metrics =
