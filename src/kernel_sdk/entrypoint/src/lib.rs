@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -69,5 +69,6 @@ pub(crate) mod host;
 pub use host::RollupHostWithInMemoryStorage as RollupHost;
 
 mod kernel_entrypoint;
+mod panic_protection;
 
 pub use kernel_entrypoint::*;
