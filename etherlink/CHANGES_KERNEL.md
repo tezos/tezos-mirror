@@ -47,6 +47,7 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 - FA deposits are applied if FA bridge feature is enabled (disabled on Mainnet
   Beta and Testnet). (!13835)
 - Native token withdrawals emit event log in case of successful execution. (!14014)
+- Native token deposits emit EVM event log. (!14012)
 
 ## Bug fixes
 

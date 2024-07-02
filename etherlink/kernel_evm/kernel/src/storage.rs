@@ -9,7 +9,7 @@ use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use anyhow::Context;
-use evm_execution::account_storage::{AccountStorageError, EthereumAccount};
+use evm_execution::account_storage::EthereumAccount;
 use evm_execution::storage::blocks::add_new_block_hash;
 use evm_execution::trace::TracerInput;
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -131,8 +131,6 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
     RefPath::assert_from(b"/evm/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
-
-pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/evm/deposit_nonce");
 
 /// Path where all indexes are stored.
 pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/evm/world_state/indexes");
@@ -723,7 +721,8 @@ pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
 
 pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
     let mut bytes = [0; std::mem::size_of::<H160>()];
-    let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice()) else {
+    let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice())
+    else {
         log!(host, Debug, "No sequencer pool address set");
         return None;
     };
@@ -887,26 +886,6 @@ pub fn read_maximum_gas_per_transaction<Host: Runtime>(host: &mut Host) -> Optio
     read_u64(host, &MAXIMUM_GAS_PER_TRANSACTION).ok()
 }
 
-pub fn get_and_increment_deposit_nonce<Host: Runtime>(
-    host: &mut Host,
-) -> Result<u32, Error> {
-    let current_nonce = || -> Option<u32> {
-        let bytes = host.store_read_all(&DEPOSIT_NONCE).ok()?;
-        let slice_of_bytes: [u8; 4] = bytes[..]
-            .try_into()
-            .map_err(|_| Error::InvalidConversion)
-            .ok()?;
-        Some(u32::from_le_bytes(slice_of_bytes))
-    };
-
-    let nonce = current_nonce().unwrap_or(0u32);
-    let new_nonce = nonce
-        .checked_add(1)
-        .ok_or(AccountStorageError::NonceOverflow)?;
-    host.store_write_all(&DEPOSIT_NONCE, &new_nonce.to_le_bytes())?;
-    Ok(nonce)
-}
-
 pub fn index_block(
     host: &mut impl Runtime,
     block_hash: &H256,
@@ -1027,8 +1006,12 @@ pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Resul
 pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
     if host.store_has(&SEQUENCER)?.is_some() {
         let bytes = host.store_read_all(&SEQUENCER)?;
-        let Ok(tz1_b58) = String::from_utf8(bytes) else { return Ok(None) };
-        let Ok(tz1) = PublicKey::from_b58check(&tz1_b58) else { return Ok(None)};
+        let Ok(tz1_b58) = String::from_utf8(bytes) else {
+            return Ok(None);
+        };
+        let Ok(tz1) = PublicKey::from_b58check(&tz1_b58) else {
+            return Ok(None);
+        };
         Ok(Some(tz1))
     } else {
         Ok(None)

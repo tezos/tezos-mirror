@@ -1180,13 +1180,36 @@ let test_send_deposit_to_delayed_inbox =
          ~key:"/evm/delayed-inbox"
          ()
   in
-  Check.(
-    list_mem
-      string
-      "a07feb67aff94089c8d944f5f8ffb5acc37306da9102fc310264e90999a42eb1"
-      delayed_transactions_hashes)
-    ~error_msg:"the deposit is not present in the delayed inbox" ;
-  unit
+  let* deposit =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value (* taking the first item *)
+         ~key:
+           (sf
+              "/evm/delayed-inbox/%s/data"
+              (List.hd delayed_transactions_hashes))
+         ()
+  in
+  let deposit_bytes = Hex.to_bytes (`Hex (Option.get deposit)) in
+
+  match Evm_node_lib_dev_encoding.Rlp.decode deposit_bytes with
+  | Ok
+      Evm_node_lib_dev_encoding.Rlp.(
+        List (List (Value tag :: List (Value amnt :: Value rcvr :: _) :: _) :: _))
+    ->
+      let deposit_tag = tag |> Hex.of_bytes |> Hex.show in
+      Check.((deposit_tag = "02") string)
+        ~error_msg:"Expected tag %R, but got: %L" ;
+      let receiver = rcvr |> Hex.of_bytes |> Hex.show in
+      Check.((receiver = "1074fd1ec02cbeaa5a90450505cf3b48d834f3eb") string)
+        ~error_msg:"Expected receiver %R, but got: %L" ;
+      let amount = amnt |> Hex.of_bytes |> Hex.show in
+      (* 16000000000000000000 big endian *)
+      Check.((amount = "de0b6b3a76400000") string)
+        ~error_msg:"Expected amount %R, but got: %L" ;
+      unit
+  | _ -> failwith "invalid delayed inbox item"
 
 let test_rpc_produceBlock =
   register_all
@@ -2748,6 +2771,112 @@ let test_upgrade_kernel_auto_sync =
       ~error_msg:"The head should be the same after the upgrade"
       ()
   in
+
+  unit
+
+let test_legacy_deposits_dispatched_after_kernel_upgrade =
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:01Z" in
+  register_upgrade_all
+    ~kernels:[Mainnet; Ghostnet]
+    ~upgrade_to:(fun _ -> Latest)
+    ~genesis_timestamp
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "upgrade"; "deposit"; "legacy"; "delayed"]
+    ~title:
+      "After kernel upgrade a legacy deposit from delayed inbox can be decoded \
+       and processed."
+  @@ fun from
+             to_
+             {
+               sc_rollup_node;
+               l1_contracts;
+               sc_rollup_address;
+               client;
+               sequencer;
+               proxy;
+               _;
+             }
+             _protocol ->
+  let* () =
+    match Kernel.commit_of from with
+    | Some from_commit ->
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:true from_commit
+        in
+        unit
+    | None -> unit
+  in
+
+  let* receiver_balance_prev =
+    Eth_cli.balance
+      ~account:Eth_account.bootstrap_accounts.(1).address
+      ~endpoint:(Evm_node.endpoint sequencer)
+  in
+
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount:Tez.(of_int 16)
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:Eth_account.bootstrap_accounts.(1).address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+
+  let _, to_use = Kernel.to_uses_and_tags to_ in
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:to_use
+      ~activation_timestamp
+  in
+
+  (* The sequencer follows finalized levels of the octez-node,
+     so we need to have 2 tezos levels before the sequencer sees the upgrade *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  (* Produce a block where the upgrade would happen *)
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:10Z" sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* Ensure the kernel is upgraded *)
+  let* () =
+    match Kernel.commit_of from with
+    | Some from_commit ->
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:false from_commit
+        in
+        unit
+    | None -> unit
+  in
+
+  (* Produce a block where deposit would be handled *)
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:20Z" sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* Deposit must be applied by now *)
+  let* receiver_balance_next =
+    Eth_cli.balance
+      ~account:Eth_account.bootstrap_accounts.(1).address
+      ~endpoint:(Evm_node.endpoint sequencer)
+  in
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
+
+  (* Ensure delayed inbox is empty now *)
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
 
   unit
 
@@ -4968,6 +5097,7 @@ let () =
   test_fa_withdrawal_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
   test_delayed_deposit_from_init_rollup_node protocols ;
+  test_legacy_deposits_dispatched_after_kernel_upgrade protocols ;
   test_init_from_rollup_node_data_dir protocols ;
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;

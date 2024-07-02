@@ -326,16 +326,23 @@ where
     ///
     /// Returns None if the element is not present
     pub fn find(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
-        let Some::<Pointer<Id, Elt>>(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
+        let Some::<Pointer<Id, Elt>>(pointer) = Pointer::read(host, &self.path, id)?
+        else {
+            return Ok(None);
+        };
         storage::read_optional_rlp(host, &pointer.data_path(&self.path)?)
     }
 
     /// Removes and returns the element at position index within the vector.
     pub fn remove(&mut self, host: &mut impl Runtime, id: &Id) -> Result<Option<Elt>> {
         // Check if the list is empty
-        let Some(LinkedListPointer { front, back }) = &self.pointers else {return Ok(None)};
+        let Some(LinkedListPointer { front, back }) = &self.pointers else {
+            return Ok(None);
+        };
         // Get the previous and the next pointer
-        let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
+        let Some(pointer) = Pointer::read(host, &self.path, id)? else {
+            return Ok(None);
+        };
         let previous = match pointer.previous {
             Some(ref previous) => Pointer::read(host, &self.path, previous)?,
             None => None,
@@ -404,20 +411,26 @@ where
     /// Returns the first element of the list
     /// or `None` if it is empty.
     pub fn first(&self, host: &impl Runtime) -> Result<Option<Elt>> {
-        let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
+        let Some(LinkedListPointer { front, .. }) = &self.pointers else {
+            return Ok(None);
+        };
         Ok(Some(front.get_data(host, &self.path)?))
     }
 
     /// Returns the first element of the list alongside its id
     /// or `None` if it is empty.
     pub fn first_with_id(&self, host: &impl Runtime) -> Result<Option<(Id, Elt)>> {
-        let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
+        let Some(LinkedListPointer { front, .. }) = &self.pointers else {
+            return Ok(None);
+        };
         Ok(Some((front.id.clone(), front.get_data(host, &self.path)?)))
     }
 
     /// Removes the first element of the list and returns it
     pub fn pop_first(&mut self, host: &mut impl Runtime) -> Result<Option<Elt>> {
-        let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
+        let Some(LinkedListPointer { front, .. }) = &self.pointers else {
+            return Ok(None);
+        };
         let to_remove = front.id.clone();
         self.remove(host, &to_remove)
     }

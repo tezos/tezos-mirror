@@ -100,8 +100,12 @@ pub fn withdrawal_precompile<Host: Runtime>(
     }
 
     let Some(transfer) = transfer else {
-        log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: no transfer");
-        return Ok(revert_withdrawal())
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Withdrawal precompiled contract: no transfer"
+        );
+        return Ok(revert_withdrawal());
     };
 
     if transfer.target != WITHDRAWAL_ADDRESS
@@ -116,13 +120,21 @@ pub fn withdrawal_precompile<Host: Runtime>(
         // "cda4fee2" is the function selector for `withdraw_base58(string)`
         [0xcd, 0xa4, 0xfe, 0xe2, input_data @ ..] => {
             let Some(address_str) = abi::string_parameter(input_data, 0) else {
-                log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: unable to get address argument");
-                return Ok(revert_withdrawal())
+                log!(
+                    handler.borrow_host(),
+                    Info,
+                    "Withdrawal precompiled contract: unable to get address argument"
+                );
+                return Ok(revert_withdrawal());
             };
 
             let Some(target) = Contract::from_b58check(address_str).ok() else {
-                log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: invalid target address string");
-                return Ok(revert_withdrawal())
+                log!(
+                    handler.borrow_host(),
+                    Info,
+                    "Withdrawal precompiled contract: invalid target address string"
+                );
+                return Ok(revert_withdrawal());
             };
 
             let amount = match mutez_from_wei(transfer.value) {
@@ -154,17 +166,26 @@ pub fn withdrawal_precompile<Host: Runtime>(
             );
 
             let Some(ticketer) = read_ticketer(handler.borrow_host()) else {
-                log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: failed to read ticketer");
-                return Ok(revert_withdrawal())
+                log!(
+                    handler.borrow_host(),
+                    Info,
+                    "Withdrawal precompiled contract: failed to read ticketer"
+                );
+                return Ok(revert_withdrawal());
             };
 
             let Some(ticket) = FA2_1Ticket::new(
                 Contract::Originated(ticketer.clone()),
                 MichelsonPair(0.into(), MichelsonOption(None)),
                 amount,
-            ).ok() else {
-                log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: ticket amount is invalid");
-                return Ok(revert_withdrawal())
+            )
+            .ok() else {
+                log!(
+                    handler.borrow_host(),
+                    Info,
+                    "Withdrawal precompiled contract: ticket amount is invalid"
+                );
+                return Ok(revert_withdrawal());
             };
 
             let withdrawal_id = withdraw_nonce::get_and_increment(handler.borrow_host())
@@ -181,12 +202,14 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 ticket,
             );
 
-            let Some(message) = prepare_message(
-                parameters,
-                Contract::Originated(ticketer),
-                Some("burn"),
-            ) else {
-                log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: failed to encode outbox message");
+            let Some(message) =
+                prepare_message(parameters, Contract::Originated(ticketer), Some("burn"))
+            else {
+                log!(
+                    handler.borrow_host(),
+                    Info,
+                    "Withdrawal precompiled contract: failed to encode outbox message"
+                );
                 return Ok(revert_withdrawal());
             };
 

@@ -543,7 +543,8 @@ impl TxValidation {
                 tx_data_size,
             );
 
-        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
+        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false)
+        else {
             return Self::to_error(GAS_LIMIT_TOO_LOW);
         };
 
@@ -607,7 +608,9 @@ impl TxValidation {
         let tx = &self.transaction;
         let evm_account_storage = account_storage::init_account_storage()?;
         // Get the caller
-        let Ok(caller) = tx.caller() else {return  Self::to_error(INCORRECT_SIGNATURE)};
+        let Ok(caller) = tx.caller() else {
+            return Self::to_error(INCORRECT_SIGNATURE);
+        };
         // Get the caller account
         let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
         let caller_account = evm_account_storage.get(host, &caller_account_path)?;
@@ -656,8 +659,12 @@ impl TryFrom<&[u8]> for Message {
     type Error = DecoderError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        let Some(&tag) = bytes.first() else {return Err(DecoderError::Custom("Empty simulation message"))};
-        let Some(bytes) = bytes.get(1..) else {return Err(DecoderError::Custom("Empty simulation message"))};
+        let Some(&tag) = bytes.first() else {
+            return Err(DecoderError::Custom("Empty simulation message"));
+        };
+        let Some(bytes) = bytes.get(1..) else {
+            return Err(DecoderError::Custom("Empty simulation message"));
+        };
 
         match tag {
             EVALUATION_TAG => Evaluation::from_bytes(bytes).map(Message::Evaluation),

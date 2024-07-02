@@ -764,6 +764,8 @@ dependencies = [
 name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
  "anyhow",
  "bytes",
  "ethbloom",
