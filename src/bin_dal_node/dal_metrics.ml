@@ -58,7 +58,7 @@ module Node_metrics = struct
   let slots_waiting_for_attestation =
     let name = "slots_waiting_for_attestaion" in
     Prometheus.Gauge.v_label
-      ~label_name:"slot_waiting_for_attestaion"
+      ~label_name:"slot_index"
       ~help:
         "The slot at index <i> is waiting for attestation (value is 1) or not \
          (value is 0)"
