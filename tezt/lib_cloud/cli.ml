@@ -68,22 +68,6 @@ let ports_per_vm =
     ~description:"Number of opened port per VM (default is 50)"
     50
 
-let website =
-  Clap.flag
-    ~section
-    ~set_long:"website"
-    ~description:
-      "A webpage is up on localhost to summarize various informations related \
-       to the experiment"
-    false
-
-let website_port =
-  Clap.default_int
-    ~section
-    ~long:"website-port"
-    ~description:"Set the port used for the website. Default is 8080"
-    8080
-
 let grafana =
   Clap.flag
     ~section
@@ -97,6 +81,22 @@ let prometheus =
     ~set_long:"prometheus"
     ~description:"Flag to set whether metrics are exported into prometheus"
     grafana
+
+let website =
+  Clap.flag
+    ~section
+    ~set_long:"website"
+    ~description:
+      "A webpage is up on localhost to summarize various informations related \
+       to the experiment"
+    prometheus
+
+let website_port =
+  Clap.default_int
+    ~section
+    ~long:"website-port"
+    ~description:"Set the port used for the website. Default is 8080"
+    8080
 
 let prometheus_snapshot_directory =
   Clap.default_string
