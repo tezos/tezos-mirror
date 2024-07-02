@@ -25,6 +25,9 @@ local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'dal_gs';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
+local slot_index_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}';
+local pkh_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", pkh="$pkh"}';
+local topic_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index", pkh="$pkh"}';
 
 //##
 // Gossipsub related stats
@@ -222,7 +225,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       format='none',
     ).addTargets([
       prometheus.target(
-        namespace + '_scores_of_peers' + node_instance,
+        namespace + '_scores_of_peers' + pkh_instance,
         legendFormat='{{ scores_of_peers }}',
         interval='3s',
       ),
@@ -235,7 +238,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       format='none',
     ).addTargets([
       prometheus.target(
-        namespace + '_count_peers_per_topic' + node_instance,
+        namespace + '_count_peers_per_topic' + topic_instance,
         legendFormat='{{ count_peers_per_topic }}',
         interval='3s',
       ),

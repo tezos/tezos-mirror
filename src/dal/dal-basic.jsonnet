@@ -59,6 +59,26 @@ dashboard.new(
   )
 )
 
+.addTemplate(
+  template.new(
+    name='slot_index',
+    datasource='Prometheus',
+    query='label_values(dal_gs_count_peers_per_topic, slot_index)',
+    refresh='load',
+    label='Slot index'
+  )
+)
+
+.addTemplate(
+  template.new(
+    name='pkh',
+    datasource='Prometheus',
+    query='label_values(dal_gs_count_peers_per_topic, pkh)',
+    refresh='load',
+    label='Pkh'
+  )
+)
+
 # The grid is 24 slots wide, where a slot is the unit used to position Grafana panels
 .addPanels(
   [

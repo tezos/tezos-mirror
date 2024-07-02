@@ -27,6 +27,7 @@ local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'dal_node';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
+local slot_index_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}';
 
 //##
 // DAL node related stats
@@ -116,12 +117,12 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       },
     ).addTargets([
       prometheus.target(
-        'sum(' + namespace + '_slots_waiting_for_attestaion' + node_instance + ')',
+        'sum(' + namespace + '_slots_waiting_for_attestaion' + slot_index_instance + ')',
         legendFormat=waiting,
         interval='3s',
       ),
       prometheus.target(
-        'sum(' + namespace + '_slots_attested' + node_instance + ')',
+        'sum(' + namespace + '_slots_attested' + slot_index_instance + ')',
         legendFormat=attested
       ),
     ]),
@@ -133,7 +134,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       format='none',
     ).addTargets([
       prometheus.target(
-        namespace + '_slots_waiting_for_attestaion' + node_instance,
+        namespace + '_slots_waiting_for_attestaion' + slot_index_instance,
         legendFormat='{{ slot_waiting_for_attestaion }}',
         interval='3s',
       ),
@@ -146,7 +147,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       format='none',
     ).addTargets([
       prometheus.target(
-        namespace + '_slots_attested' + node_instance,
+        namespace + '_slots_attested' + slot_index_instance,
         legendFormat='{{ slot_attested }}',
         interval='3s',
       ),
