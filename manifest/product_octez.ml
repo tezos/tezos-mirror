@@ -179,6 +179,13 @@ let octez_internal_lib =
 let tezt_wrapper =
   octez_lib "tezt-wrapper" ~path:"tezt/lib_wrapper" ~deps:[tezt_lib]
 
+let qcheck_tezt =
+  octez_lib
+    "qcheck-tezt"
+    ~path:"tezt/lib_qcheck"
+    ~synopsis:"Wrapper to register QCheck tests as Tezt tests"
+    ~deps:[tezt_core_lib; qcheck_core]
+
 let octez_test_helpers =
   octez_lib
     "test-helpers"
@@ -3640,8 +3647,7 @@ let octez_requester_tests =
         octez_stdlib |> open_;
         octez_stdlib_unix;
         octez_requester |> open_;
-        alcotezt;
-        qcheck_alcotest;
+        qcheck_tezt;
       ]
 
 let octez_shell =
