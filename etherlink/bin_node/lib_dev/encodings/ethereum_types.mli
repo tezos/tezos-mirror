@@ -250,29 +250,6 @@ module Block_parameter : sig
   val pp_extended : Format.formatter -> extended -> unit
 end
 
-(** Event filter, see
-    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs *)
-type filter_topic = One of hash | Or of hash list
-
-type filter_address = Single of address | Vec of address list
-
-type filter_changes =
-  | Block_filter of block_hash
-  | Pending_transaction_filter of hash
-  | Log of transaction_log
-
-val filter_changes_encoding : filter_changes Data_encoding.t
-
-type filter = {
-  from_block : Block_parameter.t option;
-  to_block : Block_parameter.t option;
-  address : filter_address option;
-  topics : filter_topic option list option;
-  block_hash : block_hash option;
-}
-
-val filter_encoding : filter Data_encoding.t
-
 module Address : sig
   type t = address
 
@@ -293,3 +270,5 @@ val hash_raw_tx : string -> hash
 val timestamp_of_bytes : bytes -> Time.Protocol.t
 
 val encode_address : address -> bytes
+
+val transaction_log_encoding : transaction_log Data_encoding.t

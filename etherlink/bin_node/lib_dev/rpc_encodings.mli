@@ -255,9 +255,7 @@ module Web3_sha3 :
      and type output = Ethereum_types.hash
 
 module Get_logs :
-  METHOD
-    with type input = Ethereum_types.filter
-     and type output = Ethereum_types.filter_changes list
+  METHOD with type input = Filter.t and type output = Filter.changes list
 
 module Produce_block :
   METHOD
