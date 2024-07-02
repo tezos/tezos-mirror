@@ -1,5 +1,383 @@
 [
   {
+    "file": "src/lib_requester/test/test_requester.ml",
+    "title": "test fetch: full requester issues request",
+    "tags": [
+      "flaky",
+      "requester",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "100558",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
+    "title": "tezos-p2p: p2p-connection-pool (simple)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "3309621",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
+    "title": "tezos-p2p: p2p-connection-pool (random)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "11384854",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
+    "title": "tezos-p2p: p2p-connection-pool (garbled)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "3238853",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
+    "title": "tezos-p2p: p2p-connection-pool (overcrowded)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "737957",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
+    "title": "tezos-p2p: p2p-connection-pool (overcrowded-mixed)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "755284",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
+    "title": "tezos-p2p: p2p-connection-pool (no-common-network-protocol)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "732486",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_p2p/tezt/test_p2p_node.ml",
+    "title": "tezos-p2p: p2p-node (propagation-tzresult)",
+    "tags": [
+      "p2p",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "373218",
+      "count": "1"
+    }
+  },
+  {
+    "file": "irmin/test/test_lib_irmin_store.ml",
+    "title": "irmin_disk:simple",
+    "tags": [
+      "layer1",
+      "irmin",
+      "store",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "5467",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Sequencer is resilient to rollup node disconnection (sequencer, mainnet) (without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "data",
+      "evm",
+      "evm_node",
+      "flaky",
+      "mainnet",
+      "mainnet_evm_kernel",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "failed_runs": {
+      "total_time": "112294641",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Sequencer is resilient to rollup node disconnection (sequencer, ghostnet) (without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "data",
+      "evm",
+      "evm_node",
+      "flaky",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Sequencer is resilient to rollup node disconnection (sequencer, latest) (without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "data",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "flaky",
+      "latest",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, mainnet) (without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "auto",
+      "client",
+      "evm",
+      "evm_node",
+      "flaky",
+      "mainnet",
+      "mainnet_evm_kernel",
+      "node",
+      "sequencer",
+      "sequencer_upgrade",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "sync"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, ghostnet) (without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "auto",
+      "client",
+      "evm",
+      "evm_node",
+      "flaky",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "node",
+      "sequencer",
+      "sequencer_upgrade",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "sync"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, latest) (without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "auto",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "flaky",
+      "latest",
+      "node",
+      "sequencer",
+      "sequencer_upgrade",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "sync"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Parisb: Random generation based on block hash and timestamp",
+    "tags": [
+      "admin_client",
+      "block_hash",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "flaky",
+      "l2_call",
+      "node",
+      "parisb",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "timestamp"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Parisc: Random generation based on block hash and timestamp",
+    "tags": [
+      "admin_client",
+      "block_hash",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "flaky",
+      "l2_call",
+      "node",
+      "parisc",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "timestamp"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Random generation based on block hash and timestamp",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "block_hash",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "flaky",
+      "l2_call",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "timestamp"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, mainnet, without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "flaky",
+      "loop",
+      "mainnet",
+      "mainnet_evm_kernel",
+      "node",
+      "out_of_ticks",
+      "proxy",
+      "reboot",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, ghostnet, without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "flaky",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "loop",
+      "node",
+      "out_of_ticks",
+      "proxy",
+      "reboot",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, latest, without dal)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "flaky",
+      "latest",
+      "loop",
+      "node",
+      "out_of_ticks",
+      "proxy",
+      "reboot",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "brassaia/test/test_lib_brassaia_store.ml",
+    "title": "brassaia_disk:simple",
+    "tags": [
+      "layer1",
+      "brassaia",
+      "store",
+      "flaky"
+    ]
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "p2p - set a trusted ring",
+    "tags": [
+      "connection",
+      "flaky",
+      "layer1",
+      "node",
+      "p2p",
+      "ring",
+      "trusted"
+    ]
+  },
+  {
     "file": "tezt/tests/sc_rollup.ml",
     "title": "Alpha: wasm_2_0_0 - multiple keys set for batcher",
     "tags": [
@@ -14,11 +392,7 @@
       "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "35345443",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -35,11 +409,7 @@
       "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "65367524",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -57,11 +427,7 @@
       "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "19331452",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -79,15 +445,11 @@
       "smart_rollup_node",
       "sparse_gc",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "33881767",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
+    "title": "Parisb->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
     "tags": [
       "admin_client",
       "alpha",
@@ -97,19 +459,15 @@
       "l2",
       "migration",
       "node",
-      "oxford",
+      "parisb",
       "refutation",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "47686425",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
+    "title": "Parisb->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
     "tags": [
       "admin_client",
       "alpha",
@@ -119,19 +477,15 @@
       "l2",
       "migration",
       "node",
-      "oxford",
+      "parisb",
       "refutation",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "50781694",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
+    "title": "Parisb->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
     "tags": [
       "admin_client",
       "alpha",
@@ -141,19 +495,15 @@
       "l2",
       "migration",
       "node",
-      "oxford",
+      "parisb",
       "refutation",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "47063335",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Oxford->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
+    "title": "Parisb->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
     "tags": [
       "admin_client",
       "alpha",
@@ -163,198 +513,229 @@
       "l2",
       "migration",
       "node",
-      "oxford",
+      "parisb",
       "refutation",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "49742990",
-      "count": "1"
-    }
+    ]
   },
   {
-    "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
+    "file": "tezt/tests/prevalidator.ml",
+    "title": "Parisb: mempool do not reclassify",
     "tags": [
       "admin_client",
       "client",
-      "etherlink",
+      "filter",
       "flaky",
-      "l2",
-      "migration",
-      "nairobi",
+      "layer1",
+      "mempool",
       "node",
-      "oxford",
-      "refutation",
-      "smart_rollup_node",
-      "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "47651539",
-      "count": "1"
-    }
+      "parisb",
+      "refused",
+      "validated"
+    ]
   },
   {
-    "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
+    "file": "tezt/tests/prevalidator.ml",
+    "title": "Parisc: mempool do not reclassify",
     "tags": [
       "admin_client",
       "client",
-      "etherlink",
+      "filter",
       "flaky",
-      "l2",
-      "migration",
-      "nairobi",
+      "layer1",
+      "mempool",
       "node",
-      "oxford",
-      "refutation",
-      "smart_rollup_node",
-      "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "51357892",
-      "count": "1"
-    }
+      "parisc",
+      "refused",
+      "validated"
+    ]
   },
   {
-    "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
+    "file": "tezt/tests/prevalidator.ml",
+    "title": "Alpha: mempool do not reclassify",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "filter",
+      "flaky",
+      "layer1",
+      "mempool",
+      "node",
+      "refused",
+      "validated"
+    ]
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Parisb: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "admin_client",
       "client",
+      "commitment",
       "etherlink",
       "flaky",
-      "l2",
-      "migration",
-      "nairobi",
       "node",
-      "oxford",
-      "refutation",
+      "parisb",
+      "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "47623735",
-      "count": "1"
-    }
+    ]
   },
   {
-    "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Nairobi->Oxford: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Parisc: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "admin_client",
       "client",
+      "commitment",
       "etherlink",
       "flaky",
-      "l2",
-      "migration",
-      "nairobi",
       "node",
-      "oxford",
-      "refutation",
+      "parisc",
+      "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "48964707",
-      "count": "1"
-    }
+    ]
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "commitment",
+      "etherlink",
+      "flaky",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ]
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Parisb: arith - rollup node - correct handling of commitments (non_final_level)",
+    "tags": [
+      "admin_client",
+      "arith",
+      "client",
+      "commitment",
+      "etherlink",
+      "flaky",
+      "node",
+      "parisb",
+      "sc_rollup",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Parisc: arith - rollup node - correct handling of commitments (non_final_level)",
+    "tags": [
+      "admin_client",
+      "arith",
+      "client",
+      "commitment",
+      "etherlink",
+      "flaky",
+      "node",
+      "parisc",
+      "sc_rollup",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: arith - rollup node - correct handling of commitments (non_final_level)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "arith",
+      "client",
+      "commitment",
+      "etherlink",
+      "flaky",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node"
+    ]
+  },
+  {
+    "file": "tezt/tests/stresstest_command.ml",
+    "title": "Parisb: stresstest multiple nodes",
+    "tags": [
+      "admin_client",
+      "client",
+      "flaky",
+      "layer1",
+      "multiple_nodes",
+      "node",
+      "parisb",
+      "stresstest"
+    ]
+  },
+  {
+    "file": "tezt/tests/stresstest_command.ml",
+    "title": "Parisc: stresstest multiple nodes",
+    "tags": [
+      "admin_client",
+      "client",
+      "flaky",
+      "layer1",
+      "multiple_nodes",
+      "node",
+      "parisc",
+      "stresstest"
+    ]
+  },
+  {
+    "file": "tezt/tests/stresstest_command.ml",
+    "title": "Alpha: stresstest multiple nodes",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "flaky",
+      "layer1",
+      "multiple_nodes",
+      "node",
+      "stresstest"
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: check synchronization state",
+    "title": "Parisb: bootstrap: test threshold zero",
     "tags": [
       "admin_client",
+      "baker_ptparisb",
       "bootstrap",
       "client",
       "flaky",
-      "memory_3k",
-      "nairobi",
+      "layer1",
       "node",
-      "sync",
-      "synchronisation_threshold"
-    ],
-    "successful_runs": {
-      "total_time": "16300750",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: check synchronization state",
-    "tags": [
-      "admin_client",
-      "bootstrap",
-      "client",
-      "flaky",
-      "memory_3k",
-      "node",
-      "oxford",
-      "sync",
-      "synchronisation_threshold"
-    ],
-    "successful_runs": {
-      "total_time": "16649691",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Alpha: check synchronization state",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "bootstrap",
-      "client",
-      "flaky",
-      "memory_3k",
-      "node",
-      "sync",
-      "synchronisation_threshold"
-    ],
-    "successful_runs": {
-      "total_time": "36087916",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: bootstrap: test threshold zero",
-    "tags": [
-      "admin_client",
-      "baker_ptnairob",
-      "bootstrap",
-      "client",
-      "flaky",
-      "nairobi",
-      "node",
+      "parisb",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "4423985",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: bootstrap: test threshold zero",
+    "title": "Parisc: bootstrap: test threshold zero",
     "tags": [
       "admin_client",
-      "baker_proxford",
+      "baker_psparisc",
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
-      "oxford",
+      "parisc",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "4340126",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
@@ -366,52 +747,43 @@
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "4356465",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: bootstrap: test threshold two",
+    "title": "Parisb: bootstrap: test threshold two",
     "tags": [
       "admin_client",
-      "baker_ptnairob",
+      "baker_ptparisb",
       "bootstrap",
       "client",
       "flaky",
-      "nairobi",
+      "layer1",
       "node",
+      "parisb",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "16726823",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: bootstrap: test threshold two",
+    "title": "Parisc: bootstrap: test threshold two",
     "tags": [
       "admin_client",
-      "baker_proxford",
+      "baker_psparisc",
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
-      "oxford",
+      "parisc",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "16072740",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
@@ -423,52 +795,43 @@
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "16971438",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: bootstrap: test threshold stuck",
+    "title": "Parisb: bootstrap: test threshold stuck",
     "tags": [
       "admin_client",
-      "baker_ptnairob",
+      "baker_ptparisb",
       "bootstrap",
       "client",
       "flaky",
-      "nairobi",
+      "layer1",
       "node",
+      "parisb",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "20761409",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: bootstrap: test threshold stuck",
+    "title": "Parisc: bootstrap: test threshold stuck",
     "tags": [
       "admin_client",
-      "baker_proxford",
+      "baker_psparisc",
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
-      "oxford",
+      "parisc",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "18520874",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
@@ -480,52 +843,43 @@
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "19775274",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: bootstrap: test threshold split view",
+    "title": "Parisb: bootstrap: test threshold split view",
     "tags": [
       "admin_client",
-      "baker_ptnairob",
+      "baker_ptparisb",
       "bootstrap",
       "client",
       "flaky",
-      "nairobi",
+      "layer1",
       "node",
+      "parisb",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "17401455",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: bootstrap: test threshold split view",
+    "title": "Parisc: bootstrap: test threshold split view",
     "tags": [
       "admin_client",
-      "baker_proxford",
+      "baker_psparisc",
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
-      "oxford",
+      "parisc",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "18025475",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
@@ -537,50 +891,41 @@
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
       "synchronisation_threshold",
       "threshold"
-    ],
-    "successful_runs": {
-      "total_time": "17944831",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: Check prevalidator start",
+    "title": "Parisb: Check prevalidator start",
     "tags": [
       "admin_client",
       "bootstrap",
       "client",
       "flaky",
-      "nairobi",
+      "layer1",
       "node",
+      "parisb",
       "prevalidator",
       "synchronisation_threshold"
-    ],
-    "successful_runs": {
-      "total_time": "65048227",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: Check prevalidator start",
+    "title": "Parisc: Check prevalidator start",
     "tags": [
       "admin_client",
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
-      "oxford",
+      "parisc",
       "prevalidator",
       "synchronisation_threshold"
-    ],
-    "successful_runs": {
-      "total_time": "65141501",
-      "count": "1"
-    }
+    ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
@@ -591,13 +936,10 @@
       "bootstrap",
       "client",
       "flaky",
+      "layer1",
       "node",
       "prevalidator",
       "synchronisation_threshold"
-    ],
-    "successful_runs": {
-      "total_time": "64804489",
-      "count": "1"
-    }
+    ]
   }
 ]

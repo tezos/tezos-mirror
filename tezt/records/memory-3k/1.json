@@ -1,249 +1,298 @@
 [
   {
-    "file": "tezt/tests/p2p.ml",
-    "title": "Test [octez-admin-client p2p stat]",
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL L1 integration (slots attestation operation behavior)",
     "tags": [
       "admin_client",
       "client",
-      "connections",
+      "dal",
       "memory_3k",
       "node",
-      "p2p",
-      "p2p_stat"
+      "parisc",
+      "tezos2"
     ],
     "successful_runs": {
-      "total_time": "7003319",
+      "total_time": "23167341",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/nonce_seed_revelation.ml",
-    "title": "Nairobi: Nonce seed revelation",
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (dal node slot headers tracking)",
     "tags": [
       "admin_client",
-      "baker_ptnairob",
       "client",
+      "dal",
+      "dal_node",
       "memory_3k",
-      "nairobi",
       "node",
-      "nonce",
-      "revelation",
-      "seed"
+      "parisc",
+      "tezos2"
     ],
     "successful_runs": {
-      "total_time": "17009006",
+      "total_time": "43874243",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/nonce_seed_revelation.ml",
-    "title": "Oxford: Nonce seed revelation",
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (dal node PATCH+GET /profiles)",
     "tags": [
       "admin_client",
-      "baker_proxford",
       "client",
+      "dal",
+      "dal_node",
       "memory_3k",
       "node",
-      "nonce",
-      "oxford",
-      "revelation",
-      "seed"
+      "parisc",
+      "tezos2"
     ],
     "successful_runs": {
-      "total_time": "17961208",
+      "total_time": "4132398",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/nonce_seed_revelation.ml",
-    "title": "Alpha: Nonce seed revelation",
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (dal attester with bake for)",
     "tags": [
       "admin_client",
-      "alpha",
-      "baker_alpha",
       "client",
+      "dal",
+      "dal_node",
       "memory_3k",
       "node",
-      "nonce",
-      "revelation",
-      "seed"
+      "parisc",
+      "tezos2"
     ],
     "successful_runs": {
-      "total_time": "17231936",
+      "total_time": "59211887",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/precheck.ml",
-    "title": "Nairobi: forge fake block",
-    "tags": [
-      "admin_client",
-      "client",
-      "codec",
-      "fake_block",
-      "memory_3k",
-      "nairobi",
-      "node",
-      "precheck",
-      "propagation"
-    ],
-    "successful_runs": {
-      "total_time": "8836864",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/precheck.ml",
-    "title": "Oxford: forge fake block",
-    "tags": [
-      "admin_client",
-      "client",
-      "codec",
-      "fake_block",
-      "memory_3k",
-      "node",
-      "oxford",
-      "precheck",
-      "propagation"
-    ],
-    "successful_runs": {
-      "total_time": "8796853",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/precheck.ml",
-    "title": "Alpha: forge fake block",
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (GS/P2P connection and disconnection)",
     "tags": [
       "admin_client",
       "alpha",
       "client",
-      "codec",
-      "fake_block",
+      "dal",
+      "dal_node",
+      "gossipsub",
       "memory_3k",
       "node",
-      "precheck",
-      "propagation"
+      "tezos2"
     ],
     "successful_runs": {
-      "total_time": "8899300",
+      "total_time": "4077620",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/precheck.ml",
-    "title": "Nairobi: forge block with wrong payload",
-    "tags": [
-      "admin_client",
-      "client",
-      "codec",
-      "fake_block",
-      "memory_3k",
-      "nairobi",
-      "node",
-      "payload",
-      "precheck",
-      "propagation"
-    ],
-    "successful_runs": {
-      "total_time": "14007325",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/precheck.ml",
-    "title": "Oxford: forge block with wrong payload",
-    "tags": [
-      "admin_client",
-      "client",
-      "codec",
-      "fake_block",
-      "memory_3k",
-      "node",
-      "oxford",
-      "payload",
-      "precheck",
-      "propagation"
-    ],
-    "successful_runs": {
-      "total_time": "13943994",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/precheck.ml",
-    "title": "Alpha: forge block with wrong payload",
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (GS join topic)",
     "tags": [
       "admin_client",
       "alpha",
       "client",
-      "codec",
-      "fake_block",
+      "dal",
+      "dal_node",
+      "gossipsub",
       "memory_3k",
       "node",
-      "payload",
-      "precheck",
-      "propagation"
+      "tezos2"
     ],
     "successful_runs": {
-      "total_time": "14188608",
+      "total_time": "3795120",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Nairobi: check synchronization state",
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (GS valid messages exchange)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "gossipsub",
+      "memory_3k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "14092033",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisb: Testing DAL node (trusted peers reconnection)",
     "tags": [
       "admin_client",
       "bootstrap",
       "client",
-      "flaky",
+      "connection",
+      "dal",
+      "dal_node",
       "memory_3k",
-      "nairobi",
       "node",
-      "sync",
-      "synchronisation_threshold"
+      "parisb",
+      "tezos2",
+      "trusted"
     ],
     "successful_runs": {
-      "total_time": "11791966",
+      "total_time": "26942162",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Oxford: check synchronization state",
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (trusted peers reconnection)",
     "tags": [
       "admin_client",
       "bootstrap",
       "client",
-      "flaky",
+      "connection",
+      "dal",
+      "dal_node",
       "memory_3k",
       "node",
-      "oxford",
-      "sync",
-      "synchronisation_threshold"
+      "parisc",
+      "tezos2",
+      "trusted"
     ],
     "successful_runs": {
-      "total_time": "11180624",
+      "total_time": "26815557",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Alpha: check synchronization state",
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (trusted peers reconnection)",
     "tags": [
       "admin_client",
       "alpha",
       "bootstrap",
       "client",
-      "flaky",
+      "connection",
+      "dal",
+      "dal_node",
       "memory_3k",
       "node",
-      "sync",
-      "synchronisation_threshold"
+      "tezos2",
+      "trusted"
     ],
     "successful_runs": {
-      "total_time": "11163671",
+      "total_time": "27004069",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisb: garbage collection of skip list cells",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_3k",
+      "node",
+      "parisb",
+      "skip_list",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "8997731",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: garbage collection of skip list cells",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_3k",
+      "node",
+      "parisc",
+      "skip_list",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "8968760",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisb: Testing DAL rollup and node with L1 (test reveal_dal_page in fast exec wasm pvm)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "dal",
+      "dal_echo_kernel",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "parisb",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "27821415",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL rollup and node with L1 (test reveal_dal_page in fast exec wasm pvm)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "dal",
+      "dal_echo_kernel",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "parisc",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "27429048",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL rollup and node with L1 (test echo_kernel)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_echo_kernel",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "28693176",
       "count": "1"
     }
   }

@@ -5,13 +5,113 @@
     "tags": [
       "admin_client",
       "client",
+      "layer1",
       "maintenance",
       "memory_4k",
       "node",
       "p2p"
     ],
     "successful_runs": {
-      "total_time": "4330698",
+      "total_time": "11093734",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/storage_snapshots.ml",
+    "title": "Parisb: storage snapshot export and import",
+    "tags": [
+      "admin_client",
+      "client",
+      "export",
+      "import",
+      "layer1",
+      "memory_4k",
+      "node",
+      "parisb",
+      "snapshot",
+      "storage"
+    ],
+    "successful_runs": {
+      "total_time": "65984596",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: many nodes bootstrap",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "bootstrap",
+      "client",
+      "layer1",
+      "memory_4k",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "49051887",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (banned attesters receive their shards thanks to amplification)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "amplification",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_4k",
+      "node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "39227083",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (garbage collection of shards for producer and attester)",
+    "tags": [
+      "admin_client",
+      "attester",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_4k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "39180328",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisb: Testing DAL node (garbage collection of shards for all profiles)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_4k",
+      "multi",
+      "node",
+      "parisb",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "44578722",
       "count": "1"
     }
   }
