@@ -69,7 +69,7 @@ module Node_metrics = struct
   let slots_attested =
     let name = "slots_attested" in
     Prometheus.Gauge.v_label
-      ~label_name:"slot_attested"
+      ~label_name:"slot_index"
       ~help:"The slot at index <i> is attested (value is 1) or not (value is 0)"
       ~namespace
       ~subsystem
