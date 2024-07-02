@@ -6563,26 +6563,91 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
 
   (* Calling RPC on each node *)
   Log.info "Producer get_connections" ;
-  let* _producer_connections =
-    Dal_RPC.call
-      ~rpc_hooks
-      producer
-      (Dal_common.RPC.get_gossipsub_connections ())
+  let* producer_connections =
+    Dal_RPC.call producer (Dal_common.RPC.get_gossipsub_connections ())
   in
   Log.info "Observer get_connections" ;
-  let* _observer_connections =
-    Dal_RPC.call
-      ~rpc_hooks
-      observer
-      (Dal_common.RPC.get_gossipsub_connections ())
+  let* observer_connections =
+    Dal_RPC.call observer (Dal_common.RPC.get_gossipsub_connections ())
   in
   Log.info "Bootstrap get_connections" ;
-  let* _bootstrap_connections =
-    Dal_RPC.call
-      ~rpc_hooks
-      dal_bootstrap
-      (Dal_common.RPC.get_gossipsub_connections ())
+  let* bootstrap_connections =
+    Dal_RPC.call dal_bootstrap (Dal_common.RPC.get_gossipsub_connections ())
   in
+
+  let sort list =
+    List.sort
+      (fun (peer1, _, _) (peer2, _, _) -> String.compare peer1 peer2)
+      list
+    |> List.map (fun (peer, bootstrap, topics) ->
+           let topics =
+             List.sort
+               (fun (i1, pkh1) (i2, pkh2) ->
+                 let index = Int.compare i1 i2 in
+                 if index = 0 then String.compare pkh1 pkh2 else index)
+               topics
+           in
+           (peer, bootstrap, topics))
+  in
+  let eq l1 l2 =
+    List.equal
+      (fun (peer1, bootstrap1, topics1) (peer2, bootstrap2, topics2) ->
+        peer1 = peer2 && bootstrap1 = bootstrap2
+        && List.equal (fun a b -> a = b) topics1 topics2)
+      (sort l1)
+      (sort l2)
+  in
+
+  let parse_connections connections =
+    JSON.(connections |> as_list)
+    |> List.map
+         JSON.(
+           fun json ->
+             let peer = json |-> "peer" |> as_string in
+             let connection = json |-> "connection" in
+             let bootstrap = connection |-> "bootstrap" |> as_bool in
+             let topics =
+               connection |-> "topics" |> as_list
+               |> List.map (fun t ->
+                      (t |-> "slot_index" |> as_int, t |-> "pkh" |> as_string))
+             in
+             (peer, bootstrap, topics))
+  in
+  let* bootstrap = Dal_node.read_identity dal_bootstrap in
+  let* observer = Dal_node.read_identity observer in
+  let* producer = Dal_node.read_identity producer in
+  let expected_connections peers_id =
+    List.map
+      (fun peer_id ->
+        let bootstrap = peer_id = bootstrap in
+        let topics =
+          if bootstrap then [] else List.map (fun pkh -> (0, pkh)) all_pkhs
+        in
+        (peer_id, bootstrap, topics))
+      peers_id
+  in
+
+  let parsed_bootstrap = parse_connections bootstrap_connections in
+  let expected_bootstrap = expected_connections [observer; producer] in
+  Check.(eq parsed_bootstrap expected_bootstrap = true)
+    ~__LOC__
+    Check.bool
+    ~error_msg:"Unexpected result for bootstrap get_connections" ;
+
+  let parsed_observer = parse_connections observer_connections in
+  let expected_observer = expected_connections [bootstrap; producer] in
+  Check.(eq parsed_observer expected_observer = true)
+    ~__LOC__
+    Check.bool
+    ~error_msg:"Unexpected result for observer get_connections" ;
+
+  let parsed_producer = parse_connections producer_connections in
+  let expected_producer = expected_connections [observer; bootstrap] in
+  Check.(eq parsed_producer expected_producer = true)
+    ~__LOC__
+    Check.bool
+    ~error_msg:"Unexpected result for producer get_connections" ;
+
   unit
 
 let dal_crypto_benchmark () =
@@ -7353,8 +7418,7 @@ let register ~protocols =
     test_peer_discovery_via_bootstrap_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"; "rpc"; Tag.ci_disabled]
-    ~regression:true
+    ~tags:["gossipsub"; "rpc"]
     ~bootstrap_profile:true
     "GS/RPC get_connections"
     test_rpc_get_connections

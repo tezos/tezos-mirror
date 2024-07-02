@@ -306,8 +306,13 @@ module P2P : sig
     val get_topics_peers :
       subscribed:bool -> t -> (Types.Topic.t * Types.Peer.t list) list
 
-    (** [get_connections t] returns the list of connections. *)
-    val get_connections : t -> (Types.Peer.t * Types.Gossipsub.connection) list
+    (** [get_connections t] returns the list of connections. If
+        [ignore_bootstrap_topics] (false by default) is set to [true],
+        bootstrap topics will not be included in the result *)
+    val get_connections :
+      ?ignore_bootstrap_topics:bool ->
+      t ->
+      (Types.Peer.t * Types.Gossipsub.connection) list
 
     (** [get_scores t] returns the score of peers with a known score. *)
     val get_scores : t -> (Types.Peer.t * Types.Score.t) list

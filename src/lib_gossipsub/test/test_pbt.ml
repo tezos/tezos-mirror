@@ -588,9 +588,14 @@ module Test_connections = struct
               | Gossipsub_pbt_generators.Input i ->
                   let conns =
                     match i with
-                    | Add_peer {peer; direct; outbound} -> (
+                    | Add_peer {peer; direct; outbound; bootstrap = false} -> (
                         match
-                          Connections.add_peer peer ~direct ~outbound conns
+                          Connections.add_peer
+                            peer
+                            ~direct
+                            ~outbound
+                            ~bootstrap:false
+                            conns
                         with
                         | `added conns -> conns
                         | `already_known -> conns)

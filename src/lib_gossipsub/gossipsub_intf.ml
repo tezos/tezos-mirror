@@ -572,7 +572,12 @@ module type AUTOMATON = sig
 
   (** The types of payloads for inputs to the gossipsub automaton. *)
 
-  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+  type add_peer = {
+    direct : bool;
+    outbound : bool;
+    peer : Peer.t;
+    bootstrap : bool;
+  }
 
   type remove_peer = {peer : Peer.t}
 
@@ -891,7 +896,12 @@ module type AUTOMATON = sig
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
-    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
+    type connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      bootstrap : bool;
+    }
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -910,6 +920,7 @@ module type AUTOMATON = sig
         Peer.t ->
         direct:bool ->
         outbound:bool ->
+        bootstrap:bool ->
         t ->
         [`added of t | `already_known]
 
