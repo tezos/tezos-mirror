@@ -47,6 +47,9 @@ Data Availability Layer
 Adaptive Issuance
 -----------------
 
+- Added the Dynamic Maximum system, that changes the maximum issuance as a
+  function of the stake ratio. (MR :gl:`!13519`)
+
 Gas improvements
 ----------------
 

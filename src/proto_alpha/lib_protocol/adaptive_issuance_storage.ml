@@ -142,8 +142,27 @@ let compute_min
     ~initial:issuance_ratio_initial_min
     ~final:issuance_ratio_final_min
 
-let compute_max
-    ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
+let dyn_max ~stake_ratio =
+  let r =
+    if Compare.Q.(stake_ratio <= Q.(5 // 100)) then Q.(10 // 100)
+    else if Compare.Q.(stake_ratio >= Q.(50 // 100)) then Q.(1 // 100)
+    else
+      (* (5115 - 17670 * x + 19437 * (x ^ 2)) / (24149 + 178695 * x) *)
+      let q5115 = Q.of_int 5115 in
+      let q17670 = Q.of_int 17670 in
+      let q19437 = Q.of_int 19437 in
+      let q24149 = Q.of_int 24149 in
+      let q178695 = Q.of_int 178695 in
+      let x = stake_ratio in
+      Q.((q5115 - (q17670 * x) + (q19437 * x * x)) / (q24149 + (q178695 * x)))
+  in
+  if Compare.Q.(r <= Q.(1 // 100)) then Q.(1 // 100)
+  else if Compare.Q.(r >= Q.(10 // 100)) then Q.(10 // 100)
+  else r
+
+let compute_max ~issuance_ratio_min
+    ~(reward_params : Constants_parametric_repr.adaptive_rewards_params)
+    ~launch_cycle ~new_cycle ~stake_ratio =
   let Constants_parametric_repr.
         {
           initial_period;
@@ -154,11 +173,19 @@ let compute_max
         } =
     reward_params
   in
-  compute_extremum
-    ~initial_period
-    ~transition_period
-    ~initial:issuance_ratio_initial_max
-    ~final:issuance_ratio_final_max
+  let max_max =
+    compute_extremum
+      ~initial_period
+      ~transition_period
+      ~initial:issuance_ratio_initial_max
+      ~final:issuance_ratio_final_max
+      ~launch_cycle
+      ~new_cycle
+  in
+  let dyn_max = dyn_max ~stake_ratio in
+  let true_max = Compare.Q.min max_max dyn_max in
+  (* If max < min, we set the max to the min *)
+  Compare.Q.max true_max issuance_ratio_min
 
 let compute_reward_coeff_ratio_without_bonus =
   let q_1600 = Q.of_int 1600 in
@@ -209,8 +236,8 @@ let compute_bonus ~issuance_ratio_max ~seconds_per_cycle ~stake_ratio
   let new_bonus =
     Q.(add q_previous_bonus (mul q_dist (mul growth_rate q_days_per_cycle)))
   in
-  let new_bonus = Q.max new_bonus Q.zero in
   let new_bonus = Q.min new_bonus max_new_bonus in
+  let new_bonus = Q.max new_bonus Q.zero in
   Issuance_bonus_repr.of_Q ~max_bonus new_bonus
 
 let compute_coeff =
@@ -267,18 +294,29 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let stake_ratio =
       Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
     in
+    (* Once computed here, the minimum is final. *)
     let issuance_ratio_min =
       compute_min ~launch_cycle ~new_cycle ~reward_params
     in
+    (* Once computed here, the maximum is final. If it would have been smaller than
+       the min, then it is set to the min. *)
     let issuance_ratio_max =
-      compute_max ~launch_cycle ~new_cycle ~reward_params
+      compute_max
+        ~issuance_ratio_min
+        ~stake_ratio
+        ~launch_cycle
+        ~new_cycle
+        ~reward_params
     in
+    (* Compute the static curve, within the given bounds *)
     let base_reward_coeff_ratio =
       compute_reward_coeff_ratio_without_bonus
         ~stake_ratio
         ~issuance_ratio_max
         ~issuance_ratio_min
     in
+    (* Compute the dynamic curve. Keeps the sum static + dynamic within the
+       given bounds *)
     let*? bonus =
       compute_bonus
         ~issuance_ratio_max
@@ -288,6 +326,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
         ~previous_bonus
         ~reward_params
     in
+    (* Compute the multiplicative coefficient to apply to the base rewards *)
     let coeff =
       compute_coeff
         ~issuance_ratio_max
@@ -392,6 +431,8 @@ module Internal_for_tests = struct
   let compute_coeff = compute_coeff
 
   let compute_min = compute_min
+
+  let dyn_max = dyn_max
 
   let compute_max = compute_max
 end
