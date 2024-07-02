@@ -365,7 +365,7 @@ module GS = struct
     labeled_metric
       ~name:"scores_of_peers"
       ~help:"The score of peers connected to the node"
-      ~label_names:["scores_of_peers"]
+      ~label_names:["peer"]
       (fun () -> !Stats.scores_of_peers)
 
   let metrics =
