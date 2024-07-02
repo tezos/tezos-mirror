@@ -22,17 +22,6 @@ variable "number_of_vms" {
   default     = 1
 }
 
-variable "docker_registry_name" {
-  type        = string
-  description = "The docker registry"
-  default     = "docker-registry"
-}
-
-variable "docker_image_name" {
-  type        = string
-  description = "The docker image name"
-}
-
 variable "base_port" {
   type        = number
   description = "First open port by the firewall"
@@ -48,6 +37,12 @@ variable "ports_per_vm" {
 variable "project_id" {
   type        = string
   description = "Your project ID"
+}
+
+variable "docker_image" {
+  type        = string
+  description = "Docker image used by the VM"
+  default     = null
 }
 
 # Those values should not be modified
@@ -98,7 +93,7 @@ module "gce-container" {
   source  = "terraform-google-modules/container-vm/google"
   version = "~> 3.0"
 
-  container = { image = "${local.artifact_registry}/${var.project_id}/${var.docker_registry_name}/${var.docker_image_name}" }
+  container = { image = "${var.docker_image}" }
 }
 
 # When running a VM, it must be associated with a Virtual Private

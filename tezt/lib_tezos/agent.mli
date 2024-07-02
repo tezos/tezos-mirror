@@ -17,10 +17,10 @@ type t
     the agent. [ssh_id] is a path to the private key that will be used for
     the ssh connection. *)
 val make :
-  ?binaries_path:string ->
   ?ssh_user:string ->
   ssh_id:string ->
   point:string * int ->
+  binaries_path:string ->
   next_available_port:(unit -> int) ->
   name:string ->
   unit ->
@@ -45,5 +45,5 @@ val next_available_port : t -> int
 (** [runner agent] returns the runner associated with the agent. *)
 val runner : t -> Runner.t
 
-(** [default_binaries_path ()] is the path where binaries should be stored. *)
-val default_binaries_path : unit -> string
+(** [binaries_path t] the path where binaries should be stored by the agent. *)
+val binaries_path : t -> string

@@ -7,7 +7,7 @@
 
 let simple () =
   Cloud.register
-    ~vms:[Cloud.default_vm_configuration; Cloud.default_vm_configuration]
+    ~vms:[Cloud.Configuration.make (); Cloud.Configuration.make ()]
     ~__FILE__
     ~tags:["simple"; "health"; Tag.cloud]
     ~title:"Simple health check to check local configuration"

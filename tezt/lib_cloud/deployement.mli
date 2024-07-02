@@ -8,8 +8,6 @@
 (** Type for resources managed by a deployment. *)
 type t
 
-type configuration = {machine_type : string}
-
 (** [deploy ?base_port ?ports_per_vm ~number_of_vms ~machine_type ()] deploys the
       expected number of vms. For each vm, we can specify a [base_port]
       which is the first port to be opened and [ports_per_vm] specify the
@@ -19,7 +17,7 @@ type configuration = {machine_type : string}
 val deploy :
   ?base_port:int ->
   ?ports_per_vm:int ->
-  configurations:configuration list ->
+  configurations:Configuration.t list ->
   localhost:bool ->
   unit ->
   t Lwt.t
@@ -27,7 +25,7 @@ val deploy :
 (** [get_agents t] returns the list of agents deployed. *)
 val agents : t -> Agent.t list
 
-val get_configuration : t -> Agent.t -> configuration
+val get_configuration : t -> Agent.t -> Configuration.t
 
 (** [run_vm_command t ~address cmd args] can run a command on the vm located at
     [address]. This is different from running a commend on the agent directly

@@ -262,6 +262,7 @@ type etherlink_operator_setup = {
 }
 
 type etherlink_producer_setup = {
+  agent : Agent.t;
   node : Node.t;
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
@@ -1194,7 +1195,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap_node
       endpoint
       agent
   in
-  let operator = {node; client; sc_rollup_node; evm_node; account} in
+  let operator = {agent; node; client; sc_rollup_node; evm_node; account} in
   let* () =
     add_etherlink_source
       cloud
@@ -1436,7 +1437,7 @@ let etherlink_loop (etherlink : etherlink) =
       List.nth etherlink.producers (i mod List.length etherlink.producers)
     in
     let runner = Node.runner producer.node |> Option.get in
-    let firehose = Agent.default_binaries_path () // "firehose" in
+    let firehose = Agent.binaries_path producer.agent // "firehose" in
     let* () =
       Process.spawn
         ~runner
@@ -1496,22 +1497,25 @@ let benchmark () =
     ]
     |> List.concat
   in
+  let default_vm_configuration = Cloud.Configuration.make () in
   let vms =
     vms
     |> List.map (function
-           | `Bootstrap -> Cloud.default_vm_configuration
+           | `Bootstrap -> default_vm_configuration
            | `Baker i -> (
                match configuration.stake_machine_type with
-               | None -> Cloud.default_vm_configuration
+               | None -> default_vm_configuration
                | Some list -> (
-                   try {machine_type = List.nth list i}
-                   with _ -> Cloud.default_vm_configuration))
+                   try
+                     let machine_type = List.nth list i in
+                     Cloud.Configuration.make ~machine_type ()
+                   with _ -> default_vm_configuration))
            | `Producer | `Observer -> (
                match configuration.producer_machine_type with
-               | None -> Cloud.default_vm_configuration
-               | Some machine_type -> {machine_type})
-           | `Etherlink_operator -> Cloud.default_vm_configuration
-           | `Etherlink_producer _ -> Cloud.default_vm_configuration)
+               | None -> default_vm_configuration
+               | Some machine_type -> Cloud.Configuration.make ~machine_type ())
+           | `Etherlink_operator -> default_vm_configuration
+           | `Etherlink_producer _ -> default_vm_configuration)
   in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)

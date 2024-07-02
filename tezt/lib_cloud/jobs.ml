@@ -10,7 +10,7 @@ module C = Cli
 open Tezt
 module Cli = C
 
-let docker_push () =
+let docker_build ~push () =
   let tezt_cloud = Lazy.force Env.tezt_cloud in
   Log.info "TEZT_CLOUD environment variable found with value: %s" tezt_cloud ;
   let ssh_public_key = Lazy.force Env.ssh_public_key in
@@ -23,10 +23,10 @@ let docker_push () =
     in
     Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_file]
   in
+  let dockerfile = Lazy.force Env.dockerfile in
   Log.info
     "Checking the existence of the docker file %s.Dockerfile..."
-    tezt_cloud ;
-  let dockerfile = Lazy.force Env.dockerfile in
+    dockerfile ;
   if not (Sys.file_exists dockerfile) then
     Test.fail
       "Could not find the dockerfile %s. See README for more information why \
@@ -50,7 +50,7 @@ let docker_push () =
       ("SSH_PUBLIC_KEY", ssh_public_key);
       ("ZCASH_PARAMS_PATH", Path.zcash_params);
       ("DAL_TRUSTED_SETUP_PATH", Path.dal_trusted_setup);
-      ("BINARIES_DESTINATION_PATH", Agent.default_binaries_path ());
+      ("BINARIES_DESTINATION_PATH", Path.default_binaries_path ());
     ]
   in
   Log.info "Building image from %s.Dockerfile..." tezt_cloud ;
@@ -58,7 +58,12 @@ let docker_push () =
   Log.info "Tagging the image..." ;
   let*! () = Docker.tag docker_registry in
   Log.info "Push the image..." ;
-  let*! () = Docker.push docker_registry in
+  let* () =
+    if push then
+      let*! () = Docker.push docker_registry in
+      Lwt.return_unit
+    else Lwt.return_unit
+  in
   unit
 
 let register_docker_push ~tags =
@@ -66,7 +71,7 @@ let register_docker_push ~tags =
     ~__FILE__
     ~title:"Push the dockerfile to the registry"
     ~tags:("docker" :: "push" :: tags)
-    docker_push
+  @@ fun () -> docker_build ~push:true ()
 
 let deploy_docker_registry () =
   let tezt_cloud = Lazy.force Env.tezt_cloud in

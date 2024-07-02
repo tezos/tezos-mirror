@@ -5,10 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type configuration = {machine_type : string}
-
 module Remote = struct
-  type workspace_info = {configuration : configuration; number_of_vms : int}
+  type workspace_info = {configuration : Configuration.t; number_of_vms : int}
 
   type point_info = {workspace_name : string; gcp_name : string}
 
@@ -72,15 +70,19 @@ module Remote = struct
         wait_docker_running ~zone ~vm_name
 
   let workspace_deploy ?(base_port = 30_000) ?(ports_per_vm = 50)
-      ~workspace_name ~machine_type ~number_of_vms ~docker_registry () =
+      ~workspace_name ~machine_type ~number_of_vms ~docker_image () =
     let* () = Terraform.VM.Workspace.select workspace_name in
+    let* project_id = Gcloud.project_id () in
+    let docker_image =
+      Configuration.string_of_docker_image ~project_id docker_image
+    in
     let* () =
       Terraform.VM.deploy
         ~machine_type
         ~base_port
         ~ports_per_vm
         ~number_of_vms
-        ~docker_registry
+        ~docker_image
     in
     let names =
       List.init number_of_vms (fun i ->
@@ -103,6 +105,7 @@ module Remote = struct
       else Lwt.return_unit
     in
     let ssh_id = Lazy.force Env.ssh_private_key in
+    let binaries_path = Path.default_binaries_path () in
     let agent_of_name name =
       let* ip = Gcloud.get_ip_address_from_name ~zone name in
       let point = (ip, base_port) in
@@ -112,7 +115,8 @@ module Remote = struct
           incr port ;
           !port
       in
-      Agent.make ~ssh_id ~point ~next_available_port ~name () |> Lwt.return
+      Agent.make ~ssh_id ~point ~binaries_path ~next_available_port ~name ()
+      |> Lwt.return
     in
     let* agents = names |> Lwt_list.map_p agent_of_name in
     Lwt.return agents
@@ -144,7 +148,6 @@ module Remote = struct
 
   let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~configurations () =
     let tezt_cloud = Lazy.force Env.tezt_cloud in
-    let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud in
     let workspaces_info = Hashtbl.create 11 in
     let agents_info = Hashtbl.create 11 in
     let () =
@@ -166,7 +169,9 @@ module Remote = struct
     let* agents =
       workspaces_info |> Hashtbl.to_seq |> List.of_seq
       |> Lwt_list.map_s
-           (fun (workspace_name, {configuration = {machine_type}; number_of_vms})
+           (fun
+             ( workspace_name,
+               {configuration = {machine_type; docker_image}; number_of_vms} )
            ->
              let* () = Terraform.VM.Workspace.select workspace_name in
              let* () = Terraform.VM.init () in
@@ -177,7 +182,7 @@ module Remote = struct
                  ~workspace_name
                  ~machine_type
                  ~number_of_vms
-                 ~docker_registry
+                 ~docker_image
                  ()
              in
              agents
@@ -248,31 +253,33 @@ module Localhost = struct
     (* We need to intialize the docker registry even on localhost to fetch the
        docker image. *)
     let* () = Terraform.Docker_registry.init () in
-    let* docker_registry = Terraform.Docker_registry.get_docker_registry () in
+    let* project_id = Gcloud.project_id () in
+    let number_of_vms = List.length configurations in
     let tezt_cloud = Lazy.force Env.tezt_cloud in
-    let image_name =
-      Format.asprintf "%s/%s:%s" docker_registry tezt_cloud "latest"
-    in
     let names = Hashtbl.create 11 in
     (* The current configuration is actually unused in localhost. Only the
        number of VMs matters. *)
-    let number_of_vms = List.length configurations in
     let processes =
-      Seq.ints 0 |> Seq.take number_of_vms
-      |> Seq.map (fun i ->
+      List.to_seq configurations
+      |> Seq.mapi (fun i configuration ->
              let name = Format.asprintf "%s-%03d" tezt_cloud (i + 1) in
              let start = base_port + (i * ports_per_vm) |> string_of_int in
              let stop =
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
              in
              let publish_ports = (start, stop, start, stop) in
+             let docker_image =
+               Configuration.string_of_docker_image
+                 ~project_id
+                 configuration.Configuration.docker_image
+             in
              let*? process =
                Docker.run
                  ~rm:true
                  ~name
                  ~network:"host"
                  ~publish_ports
-                 image_name
+                 docker_image
                  ["-D"; "-p"; start; "-e"]
              in
              process)
@@ -304,6 +311,7 @@ module Localhost = struct
       Hashtbl.replace next_port point (port + 1) ;
       port
     in
+    let binaries_path = Path.default_binaries_path () in
     let agents =
       List.init number_of_vms (fun i ->
           let name = Format.asprintf "localhost_docker_%d" i in
@@ -311,6 +319,7 @@ module Localhost = struct
           Agent.make
             ~ssh_id
             ~point
+            ~binaries_path
             ~next_available_port:(fun () -> next_port point)
             ~name
             ())
@@ -329,7 +338,7 @@ module Localhost = struct
 
   let get_configuration _t _agent =
     (* The configuration is not used in localhost. *)
-    {machine_type = Cli.machine_type}
+    Configuration.make ()
 
   let terminate ?exn _t =
     (match exn with

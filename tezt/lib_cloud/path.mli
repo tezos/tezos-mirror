@@ -27,3 +27,6 @@ val zcash_params : string
 (** Path to the DAL trusted setup directory that can be used for the
   dockerfiles.*)
 val dal_trusted_setup : string
+
+(** Default path where images can be found on the docker container. *)
+val default_binaries_path : unit -> string

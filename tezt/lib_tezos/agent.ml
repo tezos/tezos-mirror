@@ -13,11 +13,8 @@ type t = {
   binaries_path : string;
 }
 
-let default_binaries_path () = Filename.get_temp_dir_name () // "tezt-runners"
-
-let make ?(binaries_path = default_binaries_path ()) ?(ssh_user = "root")
-    ~ssh_id ~point:((address, ssh_port) as point) ~next_available_port ~name ()
-    =
+let make ?(ssh_user = "root") ~ssh_id ~point:((address, ssh_port) as point)
+    ~binaries_path ~next_available_port ~name () =
   let runner = Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () in
   {point; runner; name; next_available_port; binaries_path}
 
@@ -87,3 +84,5 @@ let copy =
 let next_available_port t = t.next_available_port ()
 
 let runner {runner; _} = runner
+
+let binaries_path {binaries_path; _} = binaries_path

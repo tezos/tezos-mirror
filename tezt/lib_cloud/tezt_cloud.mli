@@ -8,16 +8,30 @@
 module Cloud : sig
   type t
 
-  type vm_configuration = {machine_type : string}
+  module Configuration : sig
+    type docker_image =
+      | Custom of {tezt_cloud : string}
+      | Image of {docker_image : string}
 
-  val default_vm_configuration : vm_configuration
+    type t = private {machine_type : string; docker_image : docker_image}
+
+    (** [make ?machine_type ()] is a smart-constructor to make a VM
+      configuration. 
+
+    Default value for [machine_type] is [n1-standard-2]. 
+
+    Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
+    is the value provided by the environement variable [$TEZT_CLOUD].
+    *)
+    val make : ?machine_type:string -> ?docker_image:docker_image -> unit -> t
+  end
 
   (** A wrapper around [Test.register] that can be used to register new tests
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module. *)
   val register :
     ?docker_push:bool ->
-    ?vms:vm_configuration list ->
+    ?vms:Configuration.t list ->
     __FILE__:string ->
     title:string ->
     tags:string list ->
@@ -48,7 +62,7 @@ module Cloud : sig
   val add_prometheus_source :
     t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
 
-  val get_configuration : t -> Agent.t -> vm_configuration
+  val get_configuration : t -> Agent.t -> Configuration.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

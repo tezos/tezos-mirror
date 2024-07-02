@@ -33,7 +33,7 @@ module VM : sig
     base_port:int ->
     ports_per_vm:int ->
     number_of_vms:int ->
-    docker_registry:string ->
+    docker_image:string ->
     unit Lwt.t
 
   val points : unit -> string list Lwt.t

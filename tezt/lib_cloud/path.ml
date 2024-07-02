@@ -24,3 +24,5 @@ let docker = project // "dockerfiles"
 let zcash_params = "_opam" // "share" // "zcash-params"
 
 let dal_trusted_setup = "_opam" // "share" // "dal-trusted-setup"
+
+let default_binaries_path () = Filename.get_temp_dir_name () // "tezt-runners"

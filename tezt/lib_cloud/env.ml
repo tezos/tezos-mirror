@@ -31,3 +31,21 @@ let dockerfile =
       let tezt_cloud = Lazy.force tezt_cloud in
       let basename = Option.value ~default:tezt_cloud Cli.dockerfile in
       Path.docker // Format.asprintf "%s.Dockerfile" basename)
+
+let docker_registry =
+  Lazy.from_fun (fun () ->
+      let tezt_cloud = Lazy.force tezt_cloud in
+      Format.asprintf "%s-docker-registry" tezt_cloud)
+
+let custom_docker_image ?docker_image_name ~project_id () =
+  let artifact_registry = "europe-west1-docker.pkg.dev" in
+  let docker_registry = Lazy.force docker_registry in
+  let docker_image_name =
+    Option.value ~default:(Lazy.force tezt_cloud) docker_image_name
+  in
+  Format.asprintf
+    "%s/%s/%s/%s"
+    artifact_registry
+    project_id
+    docker_registry
+    docker_image_name

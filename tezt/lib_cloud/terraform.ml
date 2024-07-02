@@ -139,10 +139,9 @@ module VM = struct
   let init () =
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
-  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms
-      ~docker_registry =
+  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms ~docker_image
+      =
     let* project_id = Gcloud.project_id () in
-    let docker_image_name = Lazy.force Env.tezt_cloud in
     let args =
       [
         "--var";
@@ -152,13 +151,11 @@ module VM = struct
         "--var";
         Format.asprintf "number_of_vms=%d" number_of_vms;
         "--var";
-        Format.asprintf "docker_registry_name=%s" docker_registry;
-        "--var";
         Format.asprintf "project_id=%s" project_id;
         "--var";
         Format.asprintf "machine_type=%s" machine_type;
         "--var";
-        Format.asprintf "docker_image_name=%s" docker_image_name;
+        Format.asprintf "docker_image=%s" docker_image;
       ]
     in
     Process.run
@@ -210,7 +207,7 @@ module VM = struct
   let destroy workspaces =
     let* project_id = Gcloud.project_id () in
     let* machine_type = machine_type () in
-    let docker_image_name = Lazy.force Env.tezt_cloud in
+    (* let docker_image = Env.custom_docker_image ~project_id in *)
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
            let* () = Workspace.select workspace in
@@ -226,8 +223,6 @@ module VM = struct
                  Format.asprintf "project_id=%s" project_id;
                  "--var";
                  Format.asprintf "machine_type=%s" machine_type;
-                 "--var";
-                 Format.asprintf "docker_image_name=%s" docker_image_name;
                ]))
 end
 
