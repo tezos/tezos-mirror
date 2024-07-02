@@ -16,7 +16,7 @@ val received_upgrade : string -> unit Lwt.t
 
 (** [pending_upgrade upgrade] advertises that the EVM node is aware that an
     upgrade is pending. *)
-val pending_upgrade : Ethereum_types.Upgrade.t -> unit Lwt.t
+val pending_upgrade : Evm_events.Upgrade.t -> unit Lwt.t
 
 (** [applied_upgrade root_hash level] advertises that the kernel of the EVM
     node successfully upgraded to [root_hash] with the [level]th blueprint. *)

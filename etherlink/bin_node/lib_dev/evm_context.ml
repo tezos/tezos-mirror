@@ -13,7 +13,7 @@ type head = {
   finalized_number : Ethereum_types.quantity;
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
-  pending_upgrade : Ethereum_types.Upgrade.t option;
+  pending_upgrade : Evm_events.Upgrade.t option;
 }
 
 type parameters = {
@@ -31,7 +31,7 @@ type session_state = {
   mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
-  mutable pending_upgrade : Ethereum_types.Upgrade.t option;
+  mutable pending_upgrade : Evm_events.Upgrade.t option;
   mutable evm_state : Evm_state.t;
 }
 
@@ -92,7 +92,7 @@ module Request = struct
   type (_, _) t =
     | Apply_evm_events : {
         finalized_level : int32 option;
-        events : Ethereum_types.Evm_events.t list;
+        events : Evm_events.t list;
       }
         -> (unit, tztrace) t
     | Apply_blueprint : {
@@ -165,7 +165,7 @@ module Request = struct
           (obj3
              (req "request" (constant "apply_evm_events"))
              (opt "finalized_level" int32)
-             (req "events" (list Ethereum_types.Evm_events.encoding)))
+             (req "events" (list Evm_events.encoding)))
           (function
             | View (Apply_evm_events {finalized_level; events}) ->
                 Some ((), finalized_level, events)
@@ -387,9 +387,7 @@ module State = struct
           session.pending_upgrade <- Some upgrade ;
           on_success session
         in
-        let payload =
-          Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes
-        in
+        let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
         let*! evm_state =
           Evm_state.modify
             ~key:Durable_storage_path.kernel_upgrade
@@ -406,7 +404,8 @@ module State = struct
         return (evm_state, on_success)
     | Sequencer_upgrade_event sequencer_upgrade ->
         let payload =
-          Sequencer_upgrade.to_bytes sequencer_upgrade |> String.of_bytes
+          Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
+          |> String.of_bytes
         in
         let*! evm_state =
           Evm_state.modify
@@ -472,7 +471,8 @@ module State = struct
               `Input
                 ("\254"
                 ^ Bytes.to_string
-                    (Delayed_transaction.to_rlp delayed_transaction));
+                    (Evm_events.Delayed_transaction.to_rlp delayed_transaction)
+                );
             ]
         in
         let* () =
@@ -554,7 +554,7 @@ module State = struct
   let check_upgrade ctxt evm_state =
     let open Lwt_result_syntax in
     function
-    | Some Ethereum_types.Upgrade.({hash = root_hash; _} as kernel_upgrade) ->
+    | Some Evm_events.Upgrade.({hash = root_hash; _} as kernel_upgrade) ->
         let*! bytes =
           Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
         in
@@ -902,7 +902,7 @@ module State = struct
         let*? res =
           Option.to_result
             ~none:[error_of_fmt "cannot parse delayed inbox item "]
-          @@ Ethereum_types.Delayed_transaction.of_rlp_content
+          @@ Evm_events.Delayed_transaction.of_rlp_content
                ~transaction_tag:"\x01"
                ~fa_deposit_tag:"\x03"
                hash
@@ -1465,8 +1465,8 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
     let*! kernel_upgrade_payload =
       Evm_state.inspect evm_state Durable_storage_path.kernel_upgrade
     in
-    Option.bind kernel_upgrade_payload Ethereum_types.Upgrade.of_bytes
-    |> Option.map (fun e -> Ethereum_types.Evm_events.Upgrade_event e)
+    Option.bind kernel_upgrade_payload Evm_events.Upgrade.of_bytes
+    |> Option.map (fun e -> Evm_events.Upgrade_event e)
     |> return
   in
 
@@ -1474,10 +1474,8 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
     let*! sequencer_upgrade_payload =
       Evm_state.inspect evm_state Durable_storage_path.sequencer_upgrade
     in
-    Option.bind
-      sequencer_upgrade_payload
-      Ethereum_types.Sequencer_upgrade.of_bytes
-    |> Option.map (fun e -> Ethereum_types.Evm_events.Sequencer_upgrade_event e)
+    Option.bind sequencer_upgrade_payload Evm_events.Sequencer_upgrade.of_bytes
+    |> Option.map (fun e -> Evm_events.Sequencer_upgrade_event e)
     |> return
   in
 
@@ -1489,7 +1487,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
         List.map_es
           (fun hash ->
             let* item = State.delayed_inbox_item evm_state hash in
-            return (Ethereum_types.Evm_events.New_delayed_transaction item))
+            return (Evm_events.New_delayed_transaction item))
           hashes
       in
       return events

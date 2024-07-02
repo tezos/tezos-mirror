@@ -146,10 +146,8 @@ module Q = struct
 
   let upgrade =
     custom
-      ~encode:(fun Ethereum_types.Upgrade.{hash; timestamp} ->
-        Ok (hash, timestamp))
-      ~decode:(fun (hash, timestamp) ->
-        Ok Ethereum_types.Upgrade.{hash; timestamp})
+      ~encode:(fun Evm_events.Upgrade.{hash; timestamp} -> Ok (hash, timestamp))
+      ~decode:(fun (hash, timestamp) -> Ok Evm_events.Upgrade.{hash; timestamp})
       (t2 root_hash timestamp)
 
   let delayed_transaction =
@@ -157,12 +155,12 @@ module Q = struct
       ~encode:(fun payload ->
         Ok
           (Data_encoding.Binary.to_string_exn
-             Ethereum_types.Delayed_transaction.encoding
+             Evm_events.Delayed_transaction.encoding
              payload))
       ~decode:(fun bytes ->
         Option.to_result ~none:"Not a valid blueprint payload"
         @@ Data_encoding.Binary.of_string_opt
-             Ethereum_types.Delayed_transaction.encoding
+             Evm_events.Delayed_transaction.encoding
              bytes)
       string
 
@@ -533,7 +531,7 @@ module Context_hashes = struct
 end
 
 module Kernel_upgrades = struct
-  let store store next_blueprint_number (event : Ethereum_types.Upgrade.t) =
+  let store store next_blueprint_number (event : Evm_events.Upgrade.t) =
     with_connection store @@ fun conn ->
     Db.exec
       conn
@@ -559,7 +557,7 @@ end
 
 module Delayed_transactions = struct
   let store store next_blueprint_number
-      (delayed_transaction : Ethereum_types.Delayed_transaction.t) =
+      (delayed_transaction : Evm_events.Delayed_transaction.t) =
     with_connection store @@ fun conn ->
     Db.exec
       conn

@@ -13,10 +13,10 @@ type head = {
   finalized_number : Ethereum_types.quantity;
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
-  pending_upgrade : Ethereum_types.Upgrade.t option;
+  pending_upgrade : Evm_events.Upgrade.t option;
 }
 
-(** [vacuum ~data_dir ~output_db_file] initialize the database with data 
+(** [vacuum ~data_dir ~output_db_file] initialize the database with data
     from the [data_dir] and vacuum it into the [output_db_file]. *)
 val vacuum : data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
 
@@ -70,9 +70,7 @@ val reset :
     Stores [finalized_level] with {!new_last_known_l1_level} if provided.
 *)
 val apply_evm_events :
-  ?finalized_level:int32 ->
-  Ethereum_types.Evm_events.t list ->
-  unit tzresult Lwt.t
+  ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
 (** [inspect ?block path] returns the value (if it exists) stored in [path] on the EVM
     state of [block] (if [block] is omitted then the freshest state is used). *)

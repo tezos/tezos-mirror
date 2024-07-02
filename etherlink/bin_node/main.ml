@@ -1185,7 +1185,7 @@ let make_upgrade_command =
     @@ stop)
     (fun _devmode root_hash timestamp () ->
       let payload =
-        Evm_node_lib_dev_encoding.Ethereum_types.Upgrade.(
+        Evm_node_lib_dev_encoding.Evm_events.Upgrade.(
           to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
@@ -1225,7 +1225,7 @@ let make_sequencer_upgrade_command =
           sequencer_sk_opt
       in
       let* payload =
-        let open Evm_node_lib_dev_encoding.Ethereum_types in
+        let open Evm_node_lib_dev_encoding.Evm_events in
         let sequencer_upgrade : Sequencer_upgrade.t =
           {sequencer; pool_address; timestamp = activation_timestamp}
         in

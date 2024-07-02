@@ -7,7 +7,7 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  filter_event : Ethereum_types.Evm_events.t -> bool;
+  filter_event : Evm_events.t -> bool;
   keep_alive : bool;
 }
 
@@ -81,7 +81,7 @@ let fetch_event ({rollup_node_endpoint; keep_alive; _} : Types.state)
   let* bytes_opt =
     read_from_rollup_node ~keep_alive path rollup_block_lvl rollup_node_endpoint
   in
-  let event_opt = Option.bind bytes_opt Ethereum_types.Evm_events.of_bytes in
+  let event_opt = Option.bind bytes_opt Evm_events.of_bytes in
   let*! () =
     if Option.is_none event_opt then
       Evm_events_follower_events.unreadable_event (event_index, rollup_block_lvl)

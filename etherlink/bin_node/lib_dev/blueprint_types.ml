@@ -14,8 +14,8 @@ type t = {
 }
 
 type with_events = {
-  delayed_transactions : Ethereum_types.Delayed_transaction.t list;
-  kernel_upgrade : Ethereum_types.Upgrade.t option;
+  delayed_transactions : Evm_events.Delayed_transaction.t list;
+  kernel_upgrade : Evm_events.Upgrade.t option;
   blueprint : t;
 }
 
@@ -47,6 +47,6 @@ let with_events_encoding =
     (obj3
        (req
           "delayed_transactions"
-          (list Ethereum_types.Delayed_transaction.encoding))
-       (opt "kernel_upgrade" Ethereum_types.Upgrade.encoding)
+          (list Evm_events.Delayed_transaction.encoding))
+       (opt "kernel_upgrade" Evm_events.Upgrade.encoding)
        (req "blueprint" encoding))

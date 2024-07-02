@@ -208,7 +208,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     let*! head_info = Evm_context.head_info () in
     let is_going_to_upgrade =
       match head_info.pending_upgrade with
-      | Some Ethereum_types.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+      | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
           timestamp >= upgrade_timestamp
       | None -> false
     in
