@@ -130,6 +130,10 @@ html_theme_options = {
     'use_fullscreen_button': True,
 }
 
+html_theme_options["analytics"] = {
+    "google_analytics_id": "G-KT3Z3X4Y82",
+}
+
 html_logo = "logo.svg"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
