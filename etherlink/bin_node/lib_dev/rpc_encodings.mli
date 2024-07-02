@@ -299,7 +299,7 @@ module Eth_fee_history :
   METHOD
     with type input =
       Ethereum_types.quantity * Ethereum_types.Block_parameter.t * Float.t list
-     and type output = Ethereum_types.fee_history
+     and type output = Fee_history.t
 
 module Coinbase :
   METHOD with type input = unit and type output = Ethereum_types.address

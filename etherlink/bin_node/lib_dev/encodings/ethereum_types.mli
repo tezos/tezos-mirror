@@ -273,14 +273,6 @@ type filter = {
 
 val filter_encoding : filter Data_encoding.t
 
-type fee_history = {
-  oldest_block : quantity;
-  base_fee_per_gas : quantity list;
-  gas_used_ratio : float list;
-}
-
-val fee_history_encoding : fee_history Data_encoding.t
-
 module Address : sig
   type t = address
 

@@ -190,7 +190,8 @@ let get_fee_history block_count block_parameter config
       return (Option.value next_block.baseFeePerGas ~default:Qty.zero)
   in
 
-  let rec get_fee_history_aux block_count block_parameter history_acc =
+  let rec get_fee_history_aux block_count block_parameter
+      (history_acc : Fee_history.t) =
     if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
     then return history_acc
     else
@@ -214,7 +215,9 @@ let get_fee_history block_count block_parameter config
         block_base_fee_per_gas :: history_acc.base_fee_per_gas
       in
       let oldest_block = block.number in
-      let history_acc = {oldest_block; base_fee_per_gas; gas_used_ratio} in
+      let history_acc =
+        Fee_history.{oldest_block; base_fee_per_gas; gas_used_ratio}
+      in
       let next_block = Qty.pred block.number in
       if is_reachable next_block then
         get_fee_history_aux
@@ -224,13 +227,14 @@ let get_fee_history block_count block_parameter config
       else return history_acc
   in
   let init_acc =
-    {
-      (* default value if no block (which is a terrible
-         corner case) *)
-      oldest_block = Qty.zero;
-      base_fee_per_gas = [base_fee_per_gas_next_block];
-      gas_used_ratio = [];
-    }
+    Fee_history.
+      {
+        (* default value if no block (which is a terrible
+           corner case) *)
+        oldest_block = Qty.zero;
+        base_fee_per_gas = [base_fee_per_gas_next_block];
+        gas_used_ratio = [];
+      }
   in
   get_fee_history_aux block_count block_parameter init_acc
 

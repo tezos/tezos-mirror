@@ -1254,24 +1254,6 @@ let filter_changes_encoding =
         (fun f -> Log f);
     ]
 
-type fee_history = {
-  oldest_block : quantity;
-  base_fee_per_gas : quantity list;
-  gas_used_ratio : float list;
-}
-
-let fee_history_encoding =
-  let open Data_encoding in
-  conv
-    (fun {oldest_block; base_fee_per_gas; gas_used_ratio} ->
-      (oldest_block, base_fee_per_gas, gas_used_ratio))
-    (fun (oldest_block, base_fee_per_gas, gas_used_ratio) ->
-      {oldest_block; base_fee_per_gas; gas_used_ratio})
-    (obj3
-       (req "oldestBlock" quantity_encoding)
-       (req "baseFeePerGas" (list quantity_encoding))
-       (req "gasUsedRatio" (list float)))
-
 (* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
 let bool_to_rlp_bytes b =
   if b then Rlp.Value (Bytes.make 1 '\001') else Rlp.Value Bytes.empty

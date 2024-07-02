@@ -767,7 +767,7 @@ module Eth_fee_history = struct
 
   type input = quantity * Block_parameter.t * float list
 
-  type output = Ethereum_types.fee_history
+  type output = Fee_history.t
 
   let input_encoding =
     Data_encoding.tup3
@@ -775,7 +775,7 @@ module Eth_fee_history = struct
       Block_parameter.encoding
       (Data_encoding.list Data_encoding.float)
 
-  let output_encoding = Ethereum_types.fee_history_encoding
+  let output_encoding = Fee_history.encoding
 
   let method_ = "eth_feeHistory"
 
