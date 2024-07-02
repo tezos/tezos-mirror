@@ -67,3 +67,7 @@ pub(crate) mod host;
 #[doc(hidden)]
 #[cfg(feature = "experimental-host-in-memory-store")]
 pub use host::RollupHostWithInMemoryStorage as RollupHost;
+
+mod kernel_entrypoint;
+
+pub use kernel_entrypoint::*;

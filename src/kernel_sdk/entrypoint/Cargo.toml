@@ -22,6 +22,9 @@ version = "0.2.3"
 features = ["global"]
 optional = true
 
+[dependencies]
+cfg-if = "1.0.0"
+
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
 version = "0.2.2"
@@ -75,3 +78,4 @@ proto-alpha = [
     "tezos-smart-rollup-debug/proto-alpha",
 ]
 experimental-host-in-memory-store = ["tezos-smart-rollup-mock"]
+native-kernel = ["proto-alpha", "experimental-host-in-memory-store"]

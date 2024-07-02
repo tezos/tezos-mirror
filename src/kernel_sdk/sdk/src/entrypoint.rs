@@ -36,3 +36,5 @@ pub use tezos_smart_rollup_macros::{main, runtime};
 
 #[doc(hidden)]
 pub mod internal;
+
+pub use tezos_smart_rollup_entrypoint::*;

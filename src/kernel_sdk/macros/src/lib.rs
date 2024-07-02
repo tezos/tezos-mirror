@@ -43,33 +43,48 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = syn::parse_macro_input!(item as syn::ItemFn);
     let fn_name = item.sig.ident.to_token_stream();
 
-    let kernel_fn_code: TokenStream = quote! {
-        #item
-
+    let wasm_code = quote! {
         /// The `kernel_run` function is called by the wasm host at regular intervals.
         #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub extern "C" fn kernel_run() {
-            tezos_smart_rollup::entrypoint::internal::set_panic_hook();
-            use tezos_smart_rollup::entrypoint::internal::RollupHost;
-            let mut host = unsafe { RollupHost::new() };
-            #fn_name(&mut host)
+            tezos_smart_rollup::entrypoint::kernel_entrypoint_fn(#fn_name);
         }
+    };
 
+    let hermit_code = quote! {
         #[cfg(all(target_arch = "riscv64", target_os = "hermit"))]
-        pub fn main() -> ! {
-            tezos_smart_rollup::entrypoint::internal::set_panic_hook();
-            use tezos_smart_rollup::entrypoint::internal::RollupHost;
-            let mut host = unsafe { RollupHost::new() };
-            loop {
-                // TODO #6727: Capture and recover panics.
-                #fn_name(&mut host);
-            }
+        fn main() {
+            tezos_smart_rollup::entrypoint::kernel_entrypoint_fn(#fn_name);
         }
-    }
-    .into();
+    };
 
-    kernel_fn_code
+    // The native-kernel feature is here to ensure backwards compatibility
+    // for downstream users which already define main functions. (also helps to pass cargo check)
+    // (e.g. a wasm kernel defined in a lib, and the crate also has a binary with a main)
+    #[cfg(feature = "native-kernel")]
+    let native_code = quote! {
+        // Note: keep this cfg mutual exclusive to the wasm and hermit ones to ensure backwards compatibility
+        #[cfg(not(any(
+            target_arch = "wasm32",
+            all(target_arch = "riscv64", target_os = "hermit")
+        )))]
+        fn main() {
+            tezos_smart_rollup::entrypoint::kernel_entrypoint_fn(#fn_name);
+        }
+    };
+    #[cfg(not(feature = "native-kernel"))]
+    let native_code = quote! {};
+
+    let code = quote! {
+        #item
+
+        #wasm_code
+        #hermit_code
+        #native_code
+    };
+
+    code.into()
 }
 
 /// Wrap the runtime of a function of type `fn(&mut impl Runtime)` according to the arguments given.
