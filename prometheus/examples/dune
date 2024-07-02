@@ -1,4 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
-  (name         example)
-  (enabled_if   (>= %{ocaml_version} 4.08)) ; Work-around for dune bug #5621
-  (libraries    prometheus prometheus-app.unix cmdliner cohttp-lwt cohttp-lwt-unix))
+ (name example)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.prometheus
+  octez-libs.prometheus-app.unix
+  cmdliner
+  cohttp-lwt
+  cohttp-lwt-unix))

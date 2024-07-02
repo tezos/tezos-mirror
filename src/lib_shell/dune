@@ -8,7 +8,7 @@
  (libraries
   lwt-watcher
   lwt-canceler
-  prometheus
+  octez-libs.prometheus
   octez-libs.base
   octez-libs.base.unix
   octez-libs.rpc

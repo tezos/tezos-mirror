@@ -55,4 +55,5 @@ It contains the following libraries:
 - {{!page-tezos_workers}Tezos_workers}: Worker library
 - {{!module-Tezt_wrapper}Tezt_wrapper}
 - {{!module-Data_encoding}Data_encoding}
+- {{!module-Prometheus}Prometheus}
 - {{!module-Resto}Resto}

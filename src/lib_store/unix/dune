@@ -24,7 +24,7 @@
   camlzip
   tar
   tar-unix
-  prometheus)
+  octez-libs.prometheus)
  (flags
   (:standard)
   -open Tezos_shell_services

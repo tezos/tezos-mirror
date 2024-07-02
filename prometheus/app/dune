@@ -1,13 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name prometheus_app)
- (public_name prometheus-app)
- (libraries prometheus lwt cohttp-lwt astring asetmap fmt re)
- (modules Prometheus_app)
- (wrapped false))
+ (public_name octez-libs.prometheus-app)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.prometheus
+  lwt
+  cohttp-lwt
+  astring
+  asetmap
+  fmt
+  re)
+ (wrapped false)
+ (modules Prometheus_app))
 
 (library
  (name prometheus_app_unix)
- (public_name prometheus-app.unix)
- (libraries prometheus prometheus-app cmdliner cohttp-lwt cohttp-lwt-unix logs.fmt fmt.tty)
- (modules Prometheus_unix)
- (wrapped false))
+ (public_name octez-libs.prometheus-app.unix)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.prometheus
+  octez-libs.prometheus-app
+  cmdliner
+  cohttp-lwt
+  cohttp-lwt-unix
+  logs.fmt
+  fmt.tty)
+ (wrapped false)
+ (modules Prometheus_unix))

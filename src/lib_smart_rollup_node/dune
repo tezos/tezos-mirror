@@ -15,7 +15,7 @@
   cohttp-lwt-unix
   tezos-openapi
   octez-node-config
-  prometheus-app
+  octez-libs.prometheus-app
   camlzip
   tar
   tar-unix

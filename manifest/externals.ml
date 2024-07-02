@@ -34,6 +34,8 @@ let alcotest = external_lib "alcotest" V.(at_least "1.5.0")
 
 let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
+let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
+
 let astring = external_lib "astring" V.True
 
 let bheap = external_lib "bheap" V.(at_least "2.0.0")
