@@ -8,7 +8,8 @@
   tezt.core
   octez-libs.base
   octez-shell-libs.shell-services
-  octez-alcotezt)
+  octez-alcotezt
+  octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

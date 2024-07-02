@@ -2273,6 +2273,7 @@ let _octez_shell_services_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services |> open_;
         alcotezt;
+        octez_test_helpers;
       ]
 
 let octez_p2p =
