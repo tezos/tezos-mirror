@@ -62,25 +62,40 @@ mod tests;
 #[cfg(any(test, feature = "fa_bridge_testing"))]
 pub mod test_utils;
 
-/// TODO: Gas limit for calling "deposit" method of the proxy contract call.
+/// Gas limit for calling "deposit" method of the proxy contract call.
 /// Since we cannot control a particular destination,
 /// we need to make sure there's no DoS attack vector.
-pub const FA_DEPOSIT_PROXY_GAS_LIMIT: u64 = 1_200_000;
+///
+/// Current value reflects roughly the fees paid on L1 for initiating
+/// the deposit. Since only smart contracts can mint tickets and send
+/// internal inbox messages, the lower bound for a single deposit is
+/// approximately 0.0005ꜩ; assuming current price per L2 gas of 1 Gwei
+/// the equivalent amount of gas is 0.0005 * 10^18 / 10^9 = 500_000
+///
+/// Multiplying by two to enable more involved proxy contract implementations.
+pub const FA_DEPOSIT_PROXY_GAS_LIMIT: u64 = 1_000_000;
 
-/// TODO: Overapproximation of the amount of ticks for updating
+/// Overapproximation of the amount of ticks for updating
 /// the global ticket table and emitting deposit event.
-pub const FA_DEPOSIT_INNER_TICKS: u64 = 2_000_000;
+///
+/// It does not include the ticks consumed by the ERC proxy execution
+/// as it is accounted independently by the EVM hander.
+///
+/// Obtained by running the `bench_fa_deposit` script and examining the
+/// `run_transaction_ticks` for the maximum value.
+/// The final ticks amount has +50% safe reserve.
+pub const FA_DEPOSIT_EXECUTE_TICKS: u64 = 2_250_000;
 
-/// Number of ticks used to parse FA deposit
-pub const TICKS_PER_FA_DEPOSIT_PARSING: u64 = 2_000_000;
-
-/// TODO: Overapproximation of the amount of ticks required
-/// to execute a FA deposit.
-pub const FA_DEPOSIT_TOTAL_TICKS: u64 = 10_000_000;
-
-/// TODO: Overapproximation of the amount of ticks for updating
-/// the global ticket table, and emitting withdraw event.
-pub const FA_WITHDRAWAL_INNER_TICKS: u64 = 3_000_000;
+/// Overapproximation of the amount of ticks for parsing FA deposit.
+/// Also includes hashing costs.
+///
+/// Obtained by running the `bench_fa_deposit` and examining both
+/// `hashing_ticks` and `signature_verification_ticks` (parsing).
+/// The final value is maximum total plus +50% reserve.
+///
+/// NOTE that we have a hard cap because of the maximum inbox message size limitation.
+/// If it is lifted at some point in the future, we need to reflect that.
+pub const TICKS_PER_FA_DEPOSIT_PARSING: u64 = 3_500_000;
 
 macro_rules! create_outcome_error {
     ($($arg:tt)*) => {
@@ -158,7 +173,7 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
 
     // Adjust resource consumption to account for the outer transaction
     outcome.gas_used += config.gas_transaction_call;
-    outcome.estimated_ticks_used += FA_DEPOSIT_INNER_TICKS;
+    outcome.estimated_ticks_used += FA_DEPOSIT_EXECUTE_TICKS;
 
     Ok(outcome)
 }
@@ -207,7 +222,8 @@ pub fn execute_fa_withdrawal<Host: Runtime>(
         exit_status,
         withdrawals,
         output: vec![],
-        estimated_ticks: FA_WITHDRAWAL_INNER_TICKS,
+        // Precompile and inner proxy calls have already registered their costs
+        estimated_ticks: 0,
     })
 }
 

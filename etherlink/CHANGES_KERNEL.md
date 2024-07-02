@@ -31,6 +31,8 @@
 - L1 proxy address is added as a field to the FA withdrawal event. (!14260)
 - Forbids in the code module to overwrite the code storage of an
   account. Execution forbid this. (!14317)
+- Tick model is updated with regards to FA deposits and withdrawals. (!14016)
+- Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
 
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 

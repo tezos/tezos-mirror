@@ -24,13 +24,32 @@ use crate::{
 
 use super::{PrecompileOutcome, FA_BRIDGE_PRECOMPILE_ADDRESS};
 
-/// TODO: Overapproximation of the amount of ticks for parsing
-/// FA withdrawal from calldata, and checking transfer value.
-pub const FA_WITHDRAWAL_OUTER_TICKS: u64 = 3_000_000;
+/// Overapproximation of the amount of ticks for parsing
+/// FA withdrawal from calldata, checking transfer value,
+/// and executing the FA withdrawal, excluding the ticks consumed by
+/// the inner proxy call.
+///
+/// Linear regression parameters are obtained by running `bench_fa_withdrawal`
+/// script, evaluating `run_transaction_ticks` against `data_size`.
+/// Intercept is extended with +50% safe reserve.
+pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_INTERCEPT: u64 = 4_000_000;
+pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE: u64 = 700;
 
-/// TODO: Cost of doing FA withdrawal excluding the gas consumed
-/// by the inner proxy contract call.
-pub const FA_WITHDRAWAL_OUTER_GAS_COST: u64 = 1500;
+/// Added ("artificial") cost of doing FA withdrawal not including actual gas
+/// spent for executing the withdrawal (and inner proxy contract call).
+///
+/// This is roughly the implied costs of executing the outbox message on L1
+/// as a spam prevention mechanism (outbox queue clogging).
+/// In particular it prevents cases when a big number of withdrawals is batched
+/// together in a single transaction which exploits the system.
+///
+/// An execution of a single outbox message carrying a FA withdrawal
+/// costs around 0.0025ꜩ on L1; assuming current price per L2 gas of 1 Gwei
+/// the equivalent amount of gas is 0.0025 * 10^18 / 10^9 = 2_500_000
+///
+/// Multiplying by 2 to have a safe reserve but at the same time keeping
+/// L2 fees per withdrawal below 1 cent.
+pub const FA_WITHDRAWAL_PRECOMPILE_ADDED_GAS_COST: u64 = 5_000_000;
 
 macro_rules! precompile_outcome_error {
     ($($arg:tt)*) => {
@@ -40,7 +59,7 @@ macro_rules! precompile_outcome_error {
             )),
             withdrawals: vec![],
             output: vec![],
-            estimated_ticks: FA_WITHDRAWAL_OUTER_TICKS,
+            estimated_ticks: 0,
         }
     };
 }
@@ -54,9 +73,17 @@ pub fn fa_bridge_precompile<Host: Runtime>(
     is_static: bool,
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    fail_if_too_much!(FA_WITHDRAWAL_OUTER_TICKS, handler);
+    // We register the cost of the precompile early to prevent cases where inner proxy call
+    // consumes more ticks than allowed.
+    let estimated_ticks = FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE * (input.len() as u64)
+        + FA_WITHDRAWAL_PRECOMPILE_TICKS_INTERCEPT;
+    handler.estimated_ticks_used += fail_if_too_much!(estimated_ticks, handler);
 
-    if handler.record_cost(FA_WITHDRAWAL_OUTER_GAS_COST).is_err() {
+    // We also record gas cost which consists of computation cost (1 gas unit per 1000 ticks)
+    // and added FA withdrawal cost (spam prevention measure).
+    let estimated_gas_cost =
+        estimated_ticks / 1000 + FA_WITHDRAWAL_PRECOMPILE_ADDED_GAS_COST;
+    if handler.record_cost(estimated_gas_cost).is_err() {
         return Ok(precompile_outcome_error!(
             "FA withdrawal: gas limit too low"
         ));
@@ -366,7 +393,7 @@ mod tests {
             ticket_owner,
             None,
             input,
-            Some(40000),
+            Some(6000000),
             false,
         );
         assert!(outcome.is_success());

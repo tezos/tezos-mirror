@@ -39,7 +39,10 @@ use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransactio
 /// Cost of doing a withdrawal. A valid call to this precompiled contract
 /// takes almost 880000 ticks, and one gas unit takes 1000 ticks.
 /// The ticks/gas ratio is from benchmarks on `ecrecover`.
-const WITHDRAWAL_COST: u64 = 880;
+///
+/// Also includes the implied costs of executing the outbox message on L1
+/// see FA_WITHDRAWAL_PRECOMPILE_GAS_COST constant for more details.
+const WITHDRAWAL_COST: u64 = 880 + 5_000_000;
 
 /// Keccak256 of Withdrawal(uint256,address,bytes22,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
@@ -412,7 +415,7 @@ mod tests {
             value: eth_from_mutez(value_mutez),
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(25000), false);
+        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
 
         let expected_output = vec![];
         let message = make_message(
@@ -487,7 +490,7 @@ mod tests {
             value: eth_from_mutez(value_mutez),
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(25000), false);
+        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
 
         let expected_output = vec![];
         let message = make_message(
@@ -551,7 +554,7 @@ mod tests {
 
         let transfer: Option<Transfer> = None;
 
-        let result = execute_precompiled(target, input, transfer, Some(25000), false);
+        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
@@ -589,7 +592,7 @@ mod tests {
             estimated_ticks_used: 880_000,
         };
 
-        let result = execute_precompiled(target, input, transfer, Some(25000), false);
+        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
 
         assert_eq!(Ok(expected), result);
 
@@ -613,7 +616,7 @@ mod tests {
             estimated_ticks_used: 880_000,
         };
 
-        let result = execute_precompiled(target, input, transfer, Some(25000), true);
+        let result = execute_precompiled(target, input, transfer, Some(6000000), true);
 
         assert_eq!(Ok(expected), result);
     }
