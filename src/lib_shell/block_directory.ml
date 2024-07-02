@@ -197,8 +197,7 @@ let build_raw_rpc_directory_with_validator (module Proto : Block_services.PROTO)
                 (fun op ->
                   let proto =
                     Data_encoding.Binary.to_bytes_exn
-                      Next_proto
-                      .operation_data_encoding_with_legacy_attestation_name
+                      Next_proto.operation_data_encoding
                       op.Next_proto.protocol_data
                   in
                   (op, {Operation.shell = op.shell; proto}))
@@ -272,7 +271,7 @@ let build_raw_rpc_directory_without_validator
     let* metadata = Store.Block.get_block_metadata chain_store block in
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
-        Proto.block_header_metadata_encoding_with_legacy_attestation_name
+        Proto.block_header_metadata_encoding
         (Store.Block.block_metadata metadata)
     in
     let* test_chain_status, _ =
@@ -303,16 +302,14 @@ let build_raw_rpc_directory_without_validator
   let convert_with_metadata chain_id (op : Operation.t) metadata :
       Block_services.operation =
     let protocol_data =
-      Data_encoding.Binary.of_bytes_exn
-        Proto.operation_data_encoding_with_legacy_attestation_name
-        op.proto
+      Data_encoding.Binary.of_bytes_exn Proto.operation_data_encoding op.proto
     in
     let receipt =
       match metadata with
       | Block_validation.Metadata bytes ->
           Block_services.Receipt
             (Data_encoding.Binary.of_bytes_exn
-               Proto.operation_receipt_encoding_with_legacy_attestation_name
+               Proto.operation_receipt_encoding
                bytes)
       | Too_large_metadata -> Too_large
     in
@@ -326,9 +323,7 @@ let build_raw_rpc_directory_without_validator
   in
   let convert_without_metadata chain_id (op : Operation.t) =
     let protocol_data =
-      Data_encoding.Binary.of_bytes_exn
-        Proto.operation_data_encoding_with_legacy_attestation_name
-        op.proto
+      Data_encoding.Binary.of_bytes_exn Proto.operation_data_encoding op.proto
     in
     {
       Block_services.chain_id;
@@ -767,7 +762,7 @@ let build_raw_rpc_directory_without_validator
           (fun op ->
             match
               Data_encoding.Binary.to_bytes
-                Next_proto.operation_data_encoding_with_legacy_attestation_name
+                Next_proto.operation_data_encoding
                 op.Next_proto.protocol_data
             with
             | Error _ ->
