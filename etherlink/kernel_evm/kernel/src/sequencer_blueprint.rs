@@ -33,7 +33,7 @@ impl Encodable for BlueprintWithDelayedHashes {
             timestamp,
         } = self;
         stream.begin_list(4);
-        rlp_helpers::append_h256(stream, *parent_hash);
+        stream.append(parent_hash);
         stream.append_list(delayed_hashes);
         stream.append_list::<Vec<u8>, _>(transactions);
         append_timestamp(stream, *timestamp);
@@ -51,7 +51,7 @@ impl Decodable for BlueprintWithDelayedHashes {
 
         let mut it = decoder.iter();
         let parent_hash =
-            rlp_helpers::decode_field_h256(&rlp_helpers::next(&mut it)?, "parent_hash")?;
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "parent_hash")?;
         let delayed_hashes =
             rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "delayed_hashes")?;
         let transactions =
