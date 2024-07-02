@@ -72,6 +72,10 @@ module Remote = struct
   let workspace_deploy ?(base_port = 30_000) ?(ports_per_vm = 50)
       ~workspace_name ~machine_type ~number_of_vms ~docker_image () =
     let* () = Terraform.VM.Workspace.select workspace_name in
+    let* project_id = Gcloud.project_id () in
+    let docker_image =
+      Configuration.string_of_docker_image ~project_id docker_image
+    in
     let* () =
       Terraform.VM.deploy
         ~machine_type
@@ -249,31 +253,33 @@ module Localhost = struct
     (* We need to intialize the docker registry even on localhost to fetch the
        docker image. *)
     let* () = Terraform.Docker_registry.init () in
-    let* docker_registry = Terraform.Docker_registry.get_docker_registry () in
+    let* project_id = Gcloud.project_id () in
+    let number_of_vms = List.length configurations in
     let tezt_cloud = Lazy.force Env.tezt_cloud in
-    let image_name =
-      Format.asprintf "%s/%s:%s" docker_registry tezt_cloud "latest"
-    in
     let names = Hashtbl.create 11 in
     (* The current configuration is actually unused in localhost. Only the
        number of VMs matters. *)
-    let number_of_vms = List.length configurations in
     let processes =
-      Seq.ints 0 |> Seq.take number_of_vms
-      |> Seq.map (fun i ->
+      List.to_seq configurations
+      |> Seq.mapi (fun i configuration ->
              let name = Format.asprintf "%s-%03d" tezt_cloud (i + 1) in
              let start = base_port + (i * ports_per_vm) |> string_of_int in
              let stop =
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
              in
              let publish_ports = (start, stop, start, stop) in
+             let docker_image =
+               Configuration.string_of_docker_image
+                 ~project_id
+                 configuration.Configuration.docker_image
+             in
              let*? process =
                Docker.run
                  ~rm:true
                  ~name
                  ~network:"host"
                  ~publish_ports
-                 image_name
+                 docker_image
                  ["-D"; "-p"; start; "-e"]
              in
              process)

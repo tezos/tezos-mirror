@@ -9,6 +9,11 @@ type docker_image =
   | Custom of {tezt_cloud : string}
   | Image of {docker_image : string}
 
+let string_of_docker_image ~project_id = function
+  | Custom {tezt_cloud} ->
+      Env.custom_docker_image ~docker_image_name:tezt_cloud ~project_id ()
+  | Image {docker_image} -> docker_image
+
 type t = {machine_type : string; docker_image : docker_image}
 
 let default_docker_image =

@@ -142,12 +142,6 @@ module VM = struct
   let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms ~docker_image
       =
     let* project_id = Gcloud.project_id () in
-    let docker_image =
-      match docker_image with
-      | Configuration.Custom {tezt_cloud} ->
-          Env.custom_docker_image ~docker_image_name:tezt_cloud ~project_id ()
-      | Image {docker_image} -> docker_image
-    in
     let args =
       [
         "--var";
