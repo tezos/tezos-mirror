@@ -279,6 +279,25 @@ actually listening on):
 .. literalinclude:: default-acl.json
    :language: json
 
+HTTP Caching Headers
+~~~~~~~~~~~~~~~~~~~~
+
+It is possible to enable http caching headers in the RPC responses with the
+``--enable-http-cache-headers`` option. This feature is disabled by default.
+
+When enabled, the RPC server will include ``Cache-control: public, max-age: <duration>`` in the response 
+headers of head related queries (``/chains/main/blocks/head*``) for responses that are considered fresh and can 
+be cached. This also works on paths that are relative to ``head`` such as ``head-n`` and ``head~n``. A response is 
+considered fresh if it was processed by the RPC server during the head block's consensus round. The calculated 
+``<duration>`` value will be the remaining time until the :ref:`estimated end time<time_between_blocks>` of the
+consensus round. If an RPC response cannot be cached, the RPC server will not include any cache control headers.
+
+This feature is useful when running the RPC server behind a reverse proxy that supports automatic
+content caching (eg. `NGINX's proxy_cache setting <https://blog.nginx.org/blog/nginx-caching-guide>`_). Beware that 
+enabling this feature adds a non-negligible performance overhead (up to 10-15% slower) to every head related query 
+as the RPC server needs to calculate the ``<duration>`` value. Consequently, it is advised to enable thie feature 
+only when operating the RPC server behind appropriate caching infrastructure.
+
 .. _configure_p2p:
 
 P2P parameters
