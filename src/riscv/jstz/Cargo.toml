@@ -43,16 +43,16 @@ features = [
 ]
 
 [workspace.dependencies.jstz_kernel]
-git = "https://github.com/trilitech/jstz.git"
-rev = "d9f8d3f887c0d01794b5968479168c87288bd817"
+git = "https://github.com/jstz-dev/jstz.git"
+rev = "5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 
 [workspace.dependencies.jstz_crypto]
-git = "https://github.com/trilitech/jstz.git"
-rev = "d9f8d3f887c0d01794b5968479168c87288bd817"
+git = "https://github.com/jstz-dev/jstz.git"
+rev = "5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 
 [workspace.dependencies.jstz_proto]
-git = "https://github.com/trilitech/jstz.git"
-rev = "d9f8d3f887c0d01794b5968479168c87288bd817"
+git = "https://github.com/jstz-dev/jstz.git"
+rev = "5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 
 [workspace.dependencies.serde]
 version = "1.0.197"

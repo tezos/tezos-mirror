@@ -1121,7 +1121,7 @@ dependencies = [
 [[package]]
 name = "jstz_api"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
+source = "git+https://github.com/jstz-dev/jstz.git?rev=5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70#5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 dependencies = [
  "base64 0.21.7",
  "boa_engine",
@@ -1145,7 +1145,7 @@ dependencies = [
 [[package]]
 name = "jstz_core"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
+source = "git+https://github.com/jstz-dev/jstz.git?rev=5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70#5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1163,7 +1163,7 @@ dependencies = [
 [[package]]
 name = "jstz_crypto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
+source = "git+https://github.com/jstz-dev/jstz.git?rev=5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70#5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 dependencies = [
  "anyhow",
  "boa_gc",
@@ -1177,7 +1177,7 @@ dependencies = [
 [[package]]
 name = "jstz_kernel"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
+source = "git+https://github.com/jstz-dev/jstz.git?rev=5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70#5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1196,7 +1196,7 @@ dependencies = [
 [[package]]
 name = "jstz_proto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/trilitech/jstz.git?rev=d9f8d3f887c0d01794b5968479168c87288bd817#d9f8d3f887c0d01794b5968479168c87288bd817"
+source = "git+https://github.com/jstz-dev/jstz.git?rev=5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70#5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
 dependencies = [
  "boa_engine",
  "boa_gc",
