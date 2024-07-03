@@ -77,6 +77,9 @@ Client
 
 - **Breaking change** Removed read-write commands specific to Oxford. (MR :gl:`!13799`)
 
+- **Breaking changes** client's encoding with legacy attestation name are no
+  longer supported starting from protocol following ParisC. (MR :gl:`!13454`)
+
 Baker
 -----
 

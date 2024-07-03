@@ -180,14 +180,6 @@ let () =
   register ~pp:Protocol.Alpha_context.Level.pp_full
   @@ def "level" [] Protocol.Alpha_context.Level.encoding ;
   register @@ def "operation" [] Protocol.Alpha_context.Operation.encoding ;
-  (* https://gitlab.com/tezos/tezos/-/issues/5528
-     We register legacy encoding, but only during the transition period until
-     the endorsement kind will be completely removed. *)
-  register
-  @@ def
-       "operation_with_legacy_attestation_name"
-       []
-       Protocol.Alpha_context.Operation.encoding_with_legacy_attestation_name ;
   register
   @@ def
        "operation"
@@ -215,15 +207,6 @@ let () =
        "operation"
        ["unsigned"]
        Protocol.Alpha_context.Operation.unsigned_encoding ;
-  (* https://gitlab.com/tezos/tezos/-/issues/5528
-     We register legacy encoding, but only during the transition period until
-     the endorsement kind will be completely removed. *)
-  register
-  @@ def
-       "operation_with_legacy_attestation_name"
-       ["unsigned"]
-       Protocol.Alpha_context.Operation
-       .unsigned_encoding_with_legacy_attestation_name ;
   register ~pp:Protocol.Alpha_context.Period.pp
   @@ def "period" [] Protocol.Alpha_context.Period.encoding ;
   register ~pp:Protocol.Alpha_context.Cycle.pp
