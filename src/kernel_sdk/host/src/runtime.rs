@@ -8,6 +8,8 @@
 //!
 //! Includes blanket implementation for all types implementing [SmartRollupCore].
 
+pub mod unwindable;
+
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
