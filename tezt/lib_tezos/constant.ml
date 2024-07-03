@@ -75,14 +75,6 @@ let smart_rollup_installer =
 let _octez_smart_rollup_wasm_debugger =
   Uses.make ~tag:"wasm_debugger" ~path:"./octez-smart-rollup-wasm-debugger"
 
-(* To be removed after Oxford is frozen *)
-let _octez_accuser_PtParisB =
-  Uses.make ~tag:"accuser_ptparisb" ~path:"./octez-accuser-PtParisB"
-
-(* To be removed after Oxford is frozen *)
-let _octez_baker_PtParisB =
-  Uses.make ~tag:"baker_ptparisb" ~path:"./octez-baker-PtParisB"
-
 module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm"
