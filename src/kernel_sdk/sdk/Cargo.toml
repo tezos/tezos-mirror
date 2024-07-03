@@ -94,7 +94,6 @@ default = [
     "storage",
     "bls",
     "testing",
-    "extra",
 ]
 crypto = ["tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]
@@ -123,7 +122,6 @@ experimental-host-in-memory-store = [
 extra = ["alloc", "std", "utils", "dep:serde_json"]
 utils = ["dep:tezos-smart-rollup-utils"]
 native-kernel = [
-    "tezos-smart-rollup-utils/native-kernel",
     "tezos-smart-rollup-macros/native-kernel",
     "tezos-smart-rollup-entrypoint/native-kernel",
 ]

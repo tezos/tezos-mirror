@@ -15,7 +15,6 @@ categories = ["development-tools"]
 
 [features]
 default = []
-native-kernel = ["dep:quanta", "dep:clap", "dep:tezos-smart-rollup-mock"]
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
@@ -26,7 +25,6 @@ features = ["alloc", "tezos-encoding"]
 [dependencies.tezos-smart-rollup-mock]
 path = "../mock"
 version = "0.2.2"
-optional = true
 
 [dependencies.tezos_crypto_rs]
 version = "=0.5.2"
@@ -49,9 +47,7 @@ version = "1.0.115"
 
 [target.'cfg(not(any(target_arch = "wasm32", all(target_arch = "riscv64", target_os = "hermit"))))'.dependencies.quanta]
 version = "0.12.3"
-optional = true
 
 [target.'cfg(not(any(target_arch = "wasm32", all(target_arch = "riscv64", target_os = "hermit"))))'.dependencies.clap]
 version = "4.4.10"
 features = ["derive"]
-optional = true

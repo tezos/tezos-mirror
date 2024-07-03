@@ -4,13 +4,10 @@
 
 //! Options for how the debug logs from the kernel are printed.
 
-#![cfg(all(
-    feature = "native-kernel",
-    not(any(
-        target_arch = "wasm32",
-        all(target_arch = "riscv64", target_os = "hermit")
-    ))
-))]
+#![cfg(not(any(
+    target_arch = "wasm32",
+    all(target_arch = "riscv64", target_os = "hermit")
+)))]
 
 use quanta::Instant;
 use serde::Serialize;

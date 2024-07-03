@@ -2230,7 +2230,6 @@ version = "0.2.2"
 dependencies = [
  "hermit",
  "hex",
- "serde_json",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -2291,9 +2290,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-host",
- "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
- "tezos-smart-rollup-utils",
 ]
 
 [[package]]

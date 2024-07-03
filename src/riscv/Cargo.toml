@@ -37,7 +37,7 @@ goldenfile = "1.7.1"
 
 [workspace.dependencies.tezos-smart-rollup]
 path = "../kernel_sdk/sdk"
-features = ["native-kernel"]
+features = ["utils"]
 
 [workspace.dependencies.tezos_crypto_rs]
 version = "0.5.2"

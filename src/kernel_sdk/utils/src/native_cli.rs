@@ -2,22 +2,18 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Native options when running a kernel on the native architecture,
+//! Options when running a kernel on the native architecture,
 //! for example, controlling whether debug logs are printed with
 //! timestamps.
 
-#![cfg(all(
-    feature = "native-kernel",
-    not(any(
-        target_arch = "wasm32",
-        all(target_arch = "riscv64", target_os = "hermit")
-    ))
-))]
-
-use clap::Parser;
-use tezos_smart_rollup_mock::MockHost;
+#![cfg(not(any(
+    target_arch = "wasm32",
+    all(target_arch = "riscv64", target_os = "hermit")
+)))]
 
 use crate::console::Console;
+use clap::Parser;
+use tezos_smart_rollup_mock::MockHost;
 
 #[derive(Debug, Clone, Parser)]
 struct NativeCli {
