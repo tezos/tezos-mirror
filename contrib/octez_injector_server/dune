@@ -15,9 +15,6 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-libs.data-encoding
-  (select void_for_linking-octez_injector_PtParisB from
-   (octez_injector_PtParisB -> void_for_linking-octez_injector_PtParisB.empty)
-   (-> void_for_linking-octez_injector_PtParisB.empty))
   (select void_for_linking-octez_injector_PsParisC from
    (octez_injector_PsParisC -> void_for_linking-octez_injector_PsParisC.empty)
    (-> void_for_linking-octez_injector_PsParisC.empty))
@@ -42,6 +39,5 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_injector_PtParisB.empty "")
    (write-file void_for_linking-octez_injector_PsParisC.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))
