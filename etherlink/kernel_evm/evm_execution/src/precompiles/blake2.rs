@@ -218,8 +218,13 @@ mod tests {
         let input = [0; 0];
 
         // act
-        let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(9),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         // assert
         // expected outcome is Err
@@ -236,8 +241,13 @@ mod tests {
             0000000000000000000000000000000000000000000000000300000000000000000000000000000002"
         ).unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(9),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         assert!(result.is_err());
     }
@@ -294,8 +304,13 @@ mod tests {
     fn test_blake2f_input_spec() {
         for test in BLAKE2F_TESTS.iter() {
             let input = hex::decode(test.input).unwrap();
-            let result =
-                execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+            let result = execute_precompiled(
+                H160::from_low_u64_be(9),
+                &input,
+                None,
+                Some(25000),
+                true,
+            );
 
             assert!(result.is_ok());
             let outcome = result.unwrap();

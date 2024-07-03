@@ -283,6 +283,7 @@ mod test_helpers {
         input: &[u8],
         transfer: Option<Transfer>,
         gas_limit: Option<u64>,
+        is_static: bool,
     ) -> Result<ExecutionOutcome, EthereumError> {
         let caller = H160::from_low_u64_be(118u64);
         let mut mock_runtime = MockHost::default();
@@ -331,7 +332,6 @@ mod test_helpers {
             None,
         );
 
-        let is_static = true;
         let value = transfer.map(|t| t.value);
 
         handler.call_contract(

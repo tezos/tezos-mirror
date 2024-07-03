@@ -157,8 +157,13 @@ mod tests {
     fn test_ecrecover_invalid_empty() {
         // act
         let input: [u8; 0] = [0; 0];
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         // assert
         // expected outcome is OK and empty output
@@ -173,8 +178,13 @@ mod tests {
     fn test_ecrecover_invalid_zero() {
         // act
         let input: [u8; 128] = [0; 128];
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         // assert
         // expected outcome is OK but empty output
@@ -249,8 +259,13 @@ mod tests {
         expected_output.append(&mut expected_address);
 
         // act
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(35000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(35000),
+            true,
+        );
 
         // assert
         // expected outcome is OK and address over 32 bytes
@@ -275,6 +290,7 @@ mod tests {
             &corrupted_input,
             None,
             Some(35000),
+            true,
         );
 
         assert!(result.is_ok());
@@ -293,6 +309,7 @@ mod tests {
             &input_overflow,
             None,
             Some(35000),
+            true,
         );
 
         assert!(result.is_ok());
@@ -311,8 +328,13 @@ mod tests {
         expected_output.append(&mut expected_address);
 
         // act
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(35000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(35000),
+            true,
+        );
 
         // assert
         // expected outcome is OK and address over 32 bytes
