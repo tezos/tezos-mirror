@@ -499,7 +499,8 @@ module Triggers = struct
   end
 
   module Timed = struct
-    (* TODO: checks that the maintenance maintains every
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7357
+       Checks that the maintenance maintains every
        [P2p_maintenance.config.maintenance_idle_time] seconds. *)
     let _run _nodes = Lwt_result_syntax.return_unit
   end
