@@ -58,7 +58,7 @@ module Node_metrics = struct
   let slots_waiting_for_attestation =
     let name = "slots_waiting_for_attestaion" in
     Prometheus.Gauge.v_label
-      ~label_name:"slot_waiting_for_attestaion"
+      ~label_name:"slot_index"
       ~help:
         "The slot at index <i> is waiting for attestation (value is 1) or not \
          (value is 0)"
@@ -69,7 +69,7 @@ module Node_metrics = struct
   let slots_attested =
     let name = "slots_attested" in
     Prometheus.Gauge.v_label
-      ~label_name:"slot_attested"
+      ~label_name:"slot_index"
       ~help:"The slot at index <i> is attested (value is 1) or not (value is 0)"
       ~namespace
       ~subsystem
@@ -129,7 +129,7 @@ module GS = struct
     in
     (info, collect)
 
-  let labeled_metric ~help ~name ~label_name collectors =
+  let labeled_metric ~help ~name ~label_names collectors =
     let info =
       {
         Prometheus.MetricInfo.name =
@@ -137,7 +137,7 @@ module GS = struct
             (String.concat "_" [namespace; subsystem; name]);
         help;
         metric_type = Gauge;
-        label_names = [Prometheus.LabelName.v label_name];
+        label_names = List.map Prometheus.LabelName.v label_names;
       }
     in
     (info, collectors)
@@ -163,7 +163,10 @@ module GS = struct
       ref Prometheus.LabelSetMap.empty
 
     let topic_as_label Types.Topic.{pkh; slot_index} =
-      Format.asprintf "topic-%a-%d" Signature.Public_key_hash.pp pkh slot_index
+      [
+        string_of_int slot_index;
+        Format.asprintf "%a" Signature.Public_key_hash.pp pkh;
+      ]
 
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
 
@@ -173,7 +176,7 @@ module GS = struct
       W.GS.Topic.Map.fold
         (fun topic peers accu ->
           Prometheus.LabelSetMap.add
-            [topic_as_label topic]
+            (topic_as_label topic)
             [
               W.GS.Peer.Set.cardinal peers
               |> float |> Prometheus.Sample_set.sample;
@@ -355,14 +358,14 @@ module GS = struct
     labeled_metric
       ~name:"count_peers_per_topic"
       ~help:"The number of peers the node is connected to per topic in the mesh"
-      ~label_name:"count_peers_per_topic"
+      ~label_names:["slot_index"; "pkh"]
       (fun () -> !Stats.count_peers_per_topic)
 
   let scores_of_peers =
     labeled_metric
       ~name:"scores_of_peers"
       ~help:"The score of peers connected to the node"
-      ~label_name:"scores_of_peers"
+      ~label_names:["peer"]
       (fun () -> !Stats.scores_of_peers)
 
   let metrics =
