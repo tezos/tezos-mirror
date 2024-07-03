@@ -15,22 +15,17 @@
 
 type config
 
-val serve : config -> unit Lwt.t list
 (** [serve config] starts a Cohttp server according to config.
     It returns a singleton list containing the thread to monitor,
     or an empty list if no server is configured. *)
+val serve : config -> unit Lwt.t list
 
-val opts : config Cmdliner.Term.t
 (** [opts] is the extra command-line options to offer Prometheus
     monitoring. *)
+val opts : config Cmdliner.Term.t
 
 (** Report metrics for messages logged. *)
 module Logging : sig
-  val init :
-    ?default_level:Logs.level ->
-    ?levels:(string * Logs.level) list ->
-    ?formatter:Format.formatter ->
-    unit -> unit
   (** Initialise the Logs library with a reporter that reports prometheus metrics too.
       The reporter is configured to log to stderr and the log messages include a
       timestamp and the event's source.
@@ -52,9 +47,15 @@ module Logging : sig
       @param default_level The default log-level to use (default {!Logs.Info}).
       @param levels Provides levels for specific log sources.
       @param formatter A custom formatter (default {!Fmt.stderr}). *)
+  val init :
+    ?default_level:Logs.level ->
+    ?levels:(string * Logs.level) list ->
+    ?formatter:Format.formatter ->
+    unit ->
+    unit
 
-  val inc_counter : Logs.level -> string -> unit
   (** [inc_counter level src] increments the count of messages logged by [src] at [level].
       The reporter installed by [init] calls this automatically, but you might want to
       use this if you use your own reporter instead. *)
+  val inc_counter : Logs.level -> string -> unit
 end
