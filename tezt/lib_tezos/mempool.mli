@@ -62,6 +62,7 @@ val get_mempool :
   ?outdated:bool ->
   ?validation_passes:int list ->
   ?sources:string list ->
+  ?operation_hash:string list ->
   Client.t ->
   t Lwt.t
 

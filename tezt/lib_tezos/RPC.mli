@@ -479,6 +479,7 @@ val get_chain_mempool_pending_operations :
   ?outdated:bool ->
   ?validation_passes:int list ->
   ?sources:string list ->
+  ?operation_hash:string list ->
   unit ->
   JSON.t t
 
