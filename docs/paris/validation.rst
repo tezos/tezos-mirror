@@ -71,7 +71,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V12``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-019-PtParisB/Tezos_raw_protocol_019_PtParisB/Main/index.html>`
+:package-api:`Main<tezos-protocol-020-PsParisC/Tezos_raw_protocol_020_PsParisC/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe
