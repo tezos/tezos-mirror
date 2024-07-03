@@ -150,6 +150,9 @@ Smart Rollup node
 - Under-approximate publication level for cementation when it is missing. (MR
   :gl:`!13725`)
 
+- New metrics for the rollup node, including performance ones which can be
+  enabled with the flag ``--enable-performance-metrics``. (MR :gl:`!12290`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
