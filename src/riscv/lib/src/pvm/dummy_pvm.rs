@@ -5,7 +5,7 @@
 use crate::{
     machine_state::{bus::main_memory::M100M, mode::Mode},
     program::Program,
-    pvm::common::{Pvm, PvmLayout},
+    pvm::common::{Pvm, PvmLayout, PvmStatus},
     state_backend::{
         self,
         memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
@@ -13,12 +13,8 @@ use crate::{
     },
     storage::{self, Hash, Repo},
 };
-use std::{fmt, path::Path};
+use std::path::Path;
 use thiserror::Error;
-
-const DUMMY_STATUS: &str = "riscv_dummy_status";
-
-pub struct Status(String);
 
 pub type StateLayout = (
     PvmLayout<M100M>,
@@ -98,8 +94,8 @@ impl DummyPvm {
         Self { backend }
     }
 
-    pub fn get_status(&self) -> Status {
-        Status(DUMMY_STATUS.to_string())
+    pub fn get_status(&self) -> PvmStatus {
+        self.with_backend(|state| state.pvm.status())
     }
 
     pub fn get_tick(&self) -> u64 {
@@ -179,12 +175,6 @@ impl DummyPvm {
             backend.write(0, bytes);
             Ok(Self { backend })
         }
-    }
-}
-
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 

@@ -48,7 +48,7 @@ pub type PvmLayout<ML> = (
 );
 
 /// PVM status
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::Display)]
 #[repr(u8)]
 pub enum PvmStatus {
     Evaluating,

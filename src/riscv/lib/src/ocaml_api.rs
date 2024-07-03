@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::pvm::dummy_pvm::{self, DummyPvm, PvmStorage, PvmStorageError};
+use crate::pvm::{
+    dummy_pvm::{DummyPvm, PvmStorage, PvmStorageError},
+    PvmStatus,
+};
 use crate::storage::{self, StorageError};
 use ocaml::{Pointer, ToValue};
 
@@ -20,7 +23,7 @@ pub struct State(DummyPvm);
 pub struct Id(storage::Hash);
 
 #[ocaml::sig]
-pub struct Status(dummy_pvm::Status);
+pub struct Status(PvmStatus);
 
 ocaml::custom!(Repo);
 ocaml::custom!(State);
