@@ -15,6 +15,7 @@ use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
+use std::cmp::min;
 use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
 
@@ -612,15 +613,11 @@ fn interpret_one<'a>(
                 let o1 = pop!(V::Bytes);
                 let o2 = pop!(V::Nat);
 
-                if o2 > BigUint::from(64000u16) {
-                    return Err(InterpretError::Overflow);
-                }
-
                 let o2_usize = o2.to_usize().unwrap();
                 ctx.gas
                     .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
 
-                let byte_shifts = o2_usize / 8;
+                let byte_shifts = min(o2_usize / 8, o1.len());
                 let bit_shifts = o2_usize % 8;
 
                 let need_carry = bit_shifts > 0;
