@@ -151,7 +151,8 @@ Smart Rollup node
   :gl:`!13725`)
 
 - New metrics for the rollup node, including performance ones which can be
-  enabled with the flag ``--enable-performance-metrics``. (MR :gl:`!12290`)
+  enabled with the flag ``--enable-performance-metrics`` (requires
+  ``lsof``). (MR :gl:`!12290`)
 
 Smart Rollup WASM Debugger
 --------------------------
