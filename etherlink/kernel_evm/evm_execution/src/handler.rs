@@ -949,7 +949,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // we can reproduce the exact same check on the stack from the Ethereum yellow paper (p.37).
         match (
             self.has_enough_fund(caller, value),
-            self.stack_depth() < self.config.stack_limit,
+            self.stack_depth() < self.config.call_stack_limit,
         ) {
             (Ok(true), true) => Precondition::PassPrecondition,
             (Ok(false), _) => {

@@ -311,10 +311,10 @@ mod test {
         "60fe47b1000000000000000000000000000000000000000000000000000000000000002a";
 
     const CONFIG: Config = Config {
-        // The current implementation doesn't support Shanghai stack limit of 256.
-        // We need to set a lower limit until we have switched to a head-based
-        // recursive calls.
-        stack_limit: 256,
+        // The current implementation doesn't support Shanghai call
+        // stack limit of 256.  We need to set a lower limit until we
+        // have switched to a head-based recursive calls.
+        call_stack_limit: 256,
         ..Config::shanghai()
     };
 
