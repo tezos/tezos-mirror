@@ -1114,8 +1114,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         if let Some(ref transfer) = transfer {
             match self.execute_transfer(
-                transaction_context.context.caller,
-                transaction_context.context.address,
+                transfer.source,
+                transfer.target,
                 transfer.value,
             )? {
                 TransferExitReason::OutOfFund => {

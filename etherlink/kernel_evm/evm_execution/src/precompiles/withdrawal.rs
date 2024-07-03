@@ -9,6 +9,7 @@ use crate::handler::RouterInterface;
 use crate::handler::Withdrawal;
 use crate::precompiles::tick_model;
 use crate::precompiles::PrecompileOutcome;
+use crate::precompiles::WITHDRAWAL_ADDRESS;
 use crate::read_ticketer;
 use crate::{abi, fail_if_too_much, EthereumError};
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
@@ -52,8 +53,8 @@ fn prepare_message(
 pub fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _context: &Context,
-    _is_static: bool,
+    context: &Context,
+    is_static: bool,
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_withdraw(), handler);
@@ -85,6 +86,14 @@ pub fn withdrawal_precompile<Host: Runtime>(
         log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: no transfer");
         return Ok(revert_withdrawal())
     };
+
+    if transfer.target != WITHDRAWAL_ADDRESS
+        || context.address != WITHDRAWAL_ADDRESS
+        || context.caller == WITHDRAWAL_ADDRESS
+        || is_static
+    {
+        return Ok(revert_withdrawal());
+    }
 
     match input {
         // "cda4fee2" is the function selector for `withdraw_base58(string)`
@@ -186,6 +195,7 @@ mod tests {
         precompiles::{
             test_helpers::{execute_precompiled, DUMMY_TICKETER},
             withdrawal::WITHDRAWAL_COST,
+            WITHDRAWAL_ADDRESS,
         },
     };
     use evm::{ExitReason, ExitRevert, ExitSucceed, Transfer};
@@ -240,7 +250,7 @@ mod tests {
         .unwrap();
 
         let source = H160::from_low_u64_be(118u64);
-        let target = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
+        let target = WITHDRAWAL_ADDRESS;
         let value_mutez = 10;
 
         let transfer = Some(Transfer {
@@ -249,7 +259,7 @@ mod tests {
             value: eth_from_mutez(value_mutez),
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(25000));
+        let result = execute_precompiled(target, input, transfer, Some(25000), false);
 
         let expected_output = vec![];
         let message = make_message(
@@ -303,7 +313,7 @@ mod tests {
             value: eth_from_mutez(value_mutez),
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(25000));
+        let result = execute_precompiled(target, input, transfer, Some(25000), false);
 
         let expected_output = vec![];
         let message = make_message(
@@ -346,7 +356,7 @@ mod tests {
 
         let transfer: Option<Transfer> = None;
 
-        let result = execute_precompiled(target, input, transfer, Some(25000));
+        let result = execute_precompiled(target, input, transfer, Some(25000), false);
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
@@ -384,7 +394,31 @@ mod tests {
             estimated_ticks_used: 880_000,
         };
 
-        let result = execute_precompiled(target, input, transfer, Some(25000));
+        let result = execute_precompiled(target, input, transfer, Some(25000), false);
+
+        assert_eq!(Ok(expected), result);
+
+        // 3. Fails if static is true.
+
+        let source = H160::from_low_u64_be(118u64);
+
+        let transfer: Option<Transfer> = Some(Transfer {
+            target,
+            source,
+            value: eth_from_mutez(13),
+        });
+
+        let expected = ExecutionOutcome {
+            gas_used: expected_gas,
+            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
+            new_address: None,
+            logs: vec![],
+            result: Some(vec![]),
+            withdrawals: vec![],
+            estimated_ticks_used: 880_000,
+        };
+
+        let result = execute_precompiled(target, input, transfer, Some(25000), true);
 
         assert_eq!(Ok(expected), result);
     }
