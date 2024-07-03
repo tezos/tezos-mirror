@@ -341,9 +341,6 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "chainId.json"
 
         // Reason: we temporarily reduce stack limit to 256.
-        | "stackOverflowM1PUSH.json"
-        | "stackOverflowM1DUP.json"
-        | "stackOverflowM1.json"
         | "Call1024PreCalls.json"
         | "gasPriceDiffPlaces.json"
         | "Create2Recursive.json"
@@ -366,7 +363,6 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "Create2OnDepth1023.json"
         | "CallRecursiveBomb2.json"
         | "ABAcalls2.json"
-        | "stacksanitySWAP.json"
         | "diffPlaces.json"
         | "Delegatecall1024OOG.json"
         | "CallRecursiveBomb0.json"
