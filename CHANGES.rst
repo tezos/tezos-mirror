@@ -98,6 +98,8 @@ Client
 - **Breaking changes** client's encoding with legacy attestation name are no
   longer supported starting from protocol following ParisC. (MR :gl:`!13454`)
 
+- **Breaking change** Removed read-write commands specific to ParisB. (MR :gl:`!14033`)
+
 Baker
 -----
 
