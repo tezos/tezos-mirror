@@ -21,6 +21,20 @@ open Rpc.Syntax
 open Contract_path
 open Solidity_contracts
 
+module Protocol = struct
+  include Protocol
+
+  let register_test =
+    Protocol.register_test ~additional_tags:(function
+        | Alpha -> []
+        | _ -> [Tag.slow])
+
+  let register_regression_test =
+    Protocol.register_regression_test ~additional_tags:(function
+        | Alpha -> []
+        | _ -> [Tag.slow])
+end
+
 let pvm_kind = "wasm_2_0_0"
 
 let base_fee_for_hardcoded_tx = Wei.to_wei_z @@ Z.of_int 21000
@@ -477,7 +491,6 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
              extra_tag
              kernel_tag
              (if enable_dal then "with dal" else "without dal"))
-        ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
         (fun protocol ->
           let* evm_setup =
             setup_evm_kernel
