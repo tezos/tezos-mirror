@@ -331,7 +331,7 @@ pub fn run_test(
         for (spec_name, tests) in &unit.post {
             let config = match spec_name {
                 SpecName::Shanghai => Config {
-                    stack_limit: 256,
+                    call_stack_limit: 256,
                     ..Config::shanghai()
                 },
                 // TODO: enable future configs when parallelization is enabled.
