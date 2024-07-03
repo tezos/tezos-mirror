@@ -26,14 +26,19 @@ use crate::public_key_hash::PublicKeyHash;
 ///
 /// Encoded as a dynamic list of [OutboxMessageTransaction], with **no** case tag.
 #[derive(Debug, PartialEq, Eq, HasEncoding, NomReader, BinWriter)]
-pub enum OutboxMessage<Expr: Michelson> {
+pub enum OutboxMessageFull<Batch: AtomicBatch> {
     /// List of outbox transactions that must succeed together.
     #[encoding(tag = 0)]
-    AtomicTransactionBatch(OutboxMessageTransactionBatch<Expr>),
+    AtomicTransactionBatch(Batch),
     /// Only keys in the whitelist are allowed to stake and publish a commitment.
     #[encoding(tag = 2)]
     WhitelistUpdate(OutboxMessageWhitelistUpdate),
 }
+
+/// Legacy variant of [OutboxMessageFull] for the backward compatibility.
+///
+/// Uses [OutboxMessageTransactionBatch] with generic argument as atomic batch type.
+pub type OutboxMessage<Expr> = OutboxMessageFull<OutboxMessageTransactionBatch<Expr>>;
 
 /// A batch of [`OutboxMessageTransaction`].
 #[derive(Debug, PartialEq, Eq, HasEncoding, BinWriter, NomReader)]
@@ -41,6 +46,14 @@ pub struct OutboxMessageTransactionBatch<Expr: Michelson> {
     #[encoding(dynamic, list)]
     batch: Vec<OutboxMessageTransaction<Expr>>,
 }
+
+/// This is a marker trait specifying that any type implementing it might be used
+/// as the underlying transaction container for the [OutboxMessageFull::AtomicTransactionBatch] variant.
+///
+/// This trait is already derived for homogeneous [OutboxMessageTransactionBatch] type
+/// and for code-generated structs supporting transactions with different Michelson types
+/// [AtomicBatch2] and further up to [AtomicBatch5].
+pub trait AtomicBatch: HasEncoding + BinWriter + NomReader {}
 
 impl<Expr: Michelson> OutboxMessageTransactionBatch<Expr> {
     /// Returns the number of transactions in the batch.
@@ -70,17 +83,84 @@ impl<Expr: Michelson> From<Vec<OutboxMessageTransaction<Expr>>>
     }
 }
 
-impl<Expr: Michelson> From<OutboxMessageTransaction<Expr>> for OutboxMessage<Expr> {
+impl<Expr: Michelson> From<OutboxMessageTransaction<Expr>>
+    for OutboxMessageFull<OutboxMessageTransactionBatch<Expr>>
+{
     fn from(transaction: OutboxMessageTransaction<Expr>) -> Self {
         Self::AtomicTransactionBatch(vec![transaction].into())
     }
 }
 
-impl<Expr: Michelson> From<Vec<OutboxMessageTransaction<Expr>>> for OutboxMessage<Expr> {
+impl<Expr: Michelson> From<Vec<OutboxMessageTransaction<Expr>>>
+    for OutboxMessageFull<OutboxMessageTransactionBatch<Expr>>
+{
     fn from(batch: Vec<OutboxMessageTransaction<Expr>>) -> Self {
         Self::AtomicTransactionBatch(batch.into())
     }
 }
+
+impl<Expr: Michelson> AtomicBatch for OutboxMessageTransactionBatch<Expr> {}
+
+/// This macro defines a new structure AtomicBatchN where N is the number of [OutboxMessageTransaction] elements
+/// (with potentially different Michelson parameters) it can hold.
+///
+/// It also derives [HasEncoding], [BinWriter], [NomReader], and [AtomicBatch] traits for this struct.
+macro_rules! impl_outbox_message_encodable {
+    ($s:ident, $($idx:tt),+) => {
+        // Using [paste] here to produce identifiers with suffixes (concat_ident! alternative).
+        paste::paste! {
+            /// Atomic batch of outbox message transactions which might have different parameter types.
+            /// Can be constructed out of a [OutboxMessageTransaction] tuple.
+            #[derive(Debug)]
+            pub struct $s<$( [<Expr $idx>]: Michelson ),+>($( pub OutboxMessageTransaction<[<Expr $idx>]> ),+);
+
+            impl<$( [<Expr $idx>]: Michelson ),+> AtomicBatch for $s<$( [<Expr $idx>] ),+> {}
+
+            impl<$( [<Expr $idx>]: Michelson ),+> HasEncoding for $s<$( [<Expr $idx>] ),+> {
+                fn encoding() -> tezos_data_encoding::encoding::Encoding {
+                    tezos_data_encoding::encoding::Encoding::Custom
+                }
+            }
+
+            impl<$( [<Expr $idx>]: Michelson ),+> BinWriter for $s<$( [<Expr $idx>] ),+> {
+                fn bin_write(&self, buffer: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+                    use tezos_data_encoding::enc::dynamic;
+                    use tezos_data_encoding::enc::BinResult;
+
+                    fn serializer<$( [<Expr $idx>]: Michelson ),+>(batch: &$s<$( [<Expr $idx>] ),+>, out: &mut Vec<u8>) -> BinResult {
+                        $( batch.$idx.bin_write(out)?; )+
+                        Ok(())
+                    }
+
+                    dynamic(serializer)(&self, buffer)
+                }
+            }
+
+            impl<$( [<Expr $idx>]: Michelson ),+> NomReader for $s<$( [<Expr $idx>] ),+> {
+                fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+                    use tezos_data_encoding::nom::dynamic;
+                    use nom::sequence::tuple;
+                    use nom::combinator::map;
+
+                    map(
+                        dynamic(
+                            tuple((
+                                $( OutboxMessageTransaction::<[<Expr $idx>]>::nom_read ),+
+                            ))
+                        ),
+                        |( $( [<x $idx>] ),+ )| $s( $( [<x $idx>] ),+ )
+                    )(input)
+                }
+            }
+        }
+    };
+}
+
+// Generate AtomicBatchN structures for tuples of size 2 - 5
+impl_outbox_message_encodable!(AtomicBatch2, 0, 1);
+impl_outbox_message_encodable!(AtomicBatch3, 0, 1, 2);
+impl_outbox_message_encodable!(AtomicBatch4, 0, 1, 2, 3);
+impl_outbox_message_encodable!(AtomicBatch5, 0, 1, 2, 3, 4);
 
 /// Outbox message transaction, part of the outbox message.
 ///
@@ -164,7 +244,7 @@ impl TryFrom<Option<Vec<PublicKeyHash>>> for OutboxMessageWhitelistUpdate {
 
 #[cfg(test)]
 mod test {
-    use crate::michelson::ticket::StringTicket;
+    use crate::michelson::{ticket::StringTicket, MichelsonBytes};
 
     use super::*;
 
@@ -210,6 +290,18 @@ mod test {
         245, 27, 242, b'%', 197, 0, // Entrypoint
         0, 0, 0, 7, // Entrypoint size
         b'a', b'n', b'o', b't', b'h', b'e', b'r', // Entrypoint name
+    ];
+
+    const ENCODED_TRANSACTION_THREE: [u8; 37] = [
+        // Single byte
+        10, // bytes binary tag
+        0, 0, 0, 1,   // size of payload
+        255, // payload
+        // Destination
+        1, 21, 237, 173, b'\'', 159, b'U', 226, 254, b'@', 17, 222, b'm', b',', b'$', 253,
+        245, 27, 242, b'%', 197, 0, // Entrypoint
+        0, 0, 0, 5, // Entrypoint size
+        b't', b'h', b'r', b'e', b'e', // Entrypoint name
     ];
 
     // To display the encoding from OCaml:
@@ -269,9 +361,7 @@ mod test {
         expected.extend_from_slice(ENCODED_TRANSACTION_ONE.as_slice());
         expected.extend_from_slice(ENCODED_TRANSACTION_TWO.as_slice());
 
-        let message = OutboxMessage::AtomicTransactionBatch(
-            vec![transaction_one(), transaction_two()].into(),
-        );
+        let message = OutboxMessage::from(vec![transaction_one(), transaction_two()]);
 
         let mut bin = vec![];
         message.bin_write(&mut bin).unwrap();
@@ -299,9 +389,7 @@ mod test {
         bytes.extend_from_slice(ENCODED_TRANSACTION_TWO.as_slice());
         bytes.extend_from_slice(ENCODED_TRANSACTION_ONE.as_slice());
 
-        let expected = OutboxMessage::AtomicTransactionBatch(
-            vec![transaction_two(), transaction_one()].into(),
-        );
+        let expected = OutboxMessage::from(vec![transaction_two(), transaction_one()]);
 
         let (remaining, message) = OutboxMessage::nom_read(bytes.as_slice()).unwrap();
 
@@ -417,5 +505,54 @@ mod test {
             w4.expect("Expected Ok(message)"),
             (OutboxMessageWhitelistUpdate { whitelist: l4 })
         );
+    }
+
+    fn transaction_three() -> OutboxMessageTransaction<MichelsonBytes> {
+        let parameters = MichelsonBytes::from(vec![255u8; 1]);
+        let destination =
+            Contract::from_b58check("KT1AaiUqbT3NmQts2w7ofY4vJviVchztiW4y").unwrap();
+        let entrypoint = Entrypoint::try_from("three".to_string()).unwrap();
+
+        OutboxMessageTransaction {
+            parameters,
+            destination,
+            entrypoint,
+        }
+    }
+
+    #[test]
+    fn serialize_homogeneous_batch_in_two_ways() {
+        let batch_1 = AtomicBatch2(transaction_two(), transaction_one());
+        let batch_2 = OutboxMessageTransactionBatch::from(vec![
+            transaction_two(),
+            transaction_one(),
+        ]);
+
+        let message_1 = OutboxMessageFull::AtomicTransactionBatch(batch_1);
+        let message_2 = OutboxMessageFull::AtomicTransactionBatch(batch_2);
+
+        let mut bytes_1 = Vec::new();
+        message_1.bin_write(&mut bytes_1).unwrap();
+
+        let mut bytes_2 = Vec::new();
+        message_2.bin_write(&mut bytes_2).unwrap();
+
+        assert_eq!(bytes_1, bytes_2);
+    }
+
+    #[test]
+    fn check_heterogeneous_batch_encoding() {
+        let batch = AtomicBatch2(transaction_three(), transaction_one());
+
+        let mut bytes = Vec::new();
+        batch.bin_write(&mut bytes).unwrap();
+
+        let txs_size =
+            (ENCODED_TRANSACTION_THREE.len() + ENCODED_TRANSACTION_ONE.len()) as u8;
+        let mut expected = [0, 0, 0, txs_size].to_vec();
+        expected.extend_from_slice(ENCODED_TRANSACTION_THREE.as_slice());
+        expected.extend_from_slice(ENCODED_TRANSACTION_ONE.as_slice());
+
+        assert_eq!(expected, bytes);
     }
 }

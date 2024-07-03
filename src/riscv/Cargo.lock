@@ -2271,6 +2271,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "num-traits",
+ "paste",
  "regex",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",

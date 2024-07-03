@@ -119,7 +119,7 @@ impl BinWriter for Entrypoint {
     }
 }
 
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 mod testing {
     use super::*;
     use proptest::prelude::*;
