@@ -40,11 +40,13 @@ use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::Info};
 use ticket_table::{TicketTable, TICKET_TABLE_ACCOUNT};
+use withdrawal::FaWithdrawal;
 
 use crate::{
     account_storage::EthereumAccountStorage,
     handler::{CreateOutcome, EvmHandler, ExecutionOutcome},
-    precompiles::PrecompileBTreeMap,
+    precompiles::{PrecompileBTreeMap, PrecompileOutcome},
+    storage::withdraw_nonce,
     transaction::TransactionContext,
     EthereumError,
 };
@@ -75,6 +77,10 @@ pub const TICKS_PER_FA_DEPOSIT_PARSING: u64 = 2_000_000;
 /// TODO: Overapproximation of the amount of ticks required
 /// to execute a FA deposit.
 pub const FA_DEPOSIT_TOTAL_TICKS: u64 = 10_000_000;
+
+/// TODO: Overapproximation of the amount of ticks for updating
+/// the global ticket table, and emitting withdraw event.
+pub const FA_WITHDRAWAL_INNER_TICKS: u64 = 3_000_000;
 
 macro_rules! create_outcome_error {
     ($($arg:tt)*) => {
@@ -157,6 +163,54 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     Ok(outcome)
 }
 
+/// Executes FA withdrawal.
+///
+/// From the EVM perspective this is a precompile contract
+/// call, that can be potentially an internal invocation from
+/// another smart contract.
+///
+/// We assume there is an open account storage transaction.
+pub fn execute_fa_withdrawal<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    caller: H160,
+    withdrawal: FaWithdrawal,
+) -> Result<PrecompileOutcome, EthereumError> {
+    log!(
+        handler.borrow_host(),
+        Info,
+        "Going to execute a {}",
+        withdrawal.display()
+    );
+
+    let mut withdrawals = Vec::with_capacity(1);
+
+    let (mut exit_status, _, _) = inner_execute_withdrawal(handler, &withdrawal)?;
+
+    // Withdrawal execution might fail because of non sufficient balance
+    // so we need to rollback the entire transaction in that case.
+    if exit_status.is_succeed() {
+        // In most cases sender is user's EOA and ticket owner is ERC wrapper contract
+        if withdrawal.ticket_owner != withdrawal.sender {
+            // If the proxy call fails we need to rollback the entire transaction
+            (exit_status, _, _) = inner_execute_proxy(
+                handler,
+                caller,
+                withdrawal.ticket_owner,
+                withdrawal.calldata(),
+            )?;
+        }
+        // Submit outbox message to the queue
+        withdrawals.push(withdrawal.into_outbox_message())
+    }
+
+    Ok(PrecompileOutcome {
+        exit_status,
+        withdrawals,
+        output: vec![],
+        estimated_ticks: FA_WITHDRAWAL_INNER_TICKS,
+    })
+}
+
 /// Updates ticket table according to the deposit and actual ticket owner.
 /// Assuming there is an open account storage transaction.
 fn inner_execute_deposit<Host: Runtime>(
@@ -186,6 +240,41 @@ fn inner_execute_deposit<Host: Runtime>(
             "Ticket table balance overflow: {} at {}",
             deposit.ticket_hash,
             ticket_owner
+        ))
+    }
+}
+
+/// Updates ticket ledger and outbox counter according to the withdrawal.
+/// Assuming there is an open account storage transaction.
+fn inner_execute_withdrawal<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    withdrawal: &FaWithdrawal,
+) -> Result<CreateOutcome, EthereumError> {
+    // Updating the ticket table in accordance with the ownership.
+    let mut system = handler.get_or_create_account(TICKET_TABLE_ACCOUNT)?;
+
+    if system.ticket_balance_remove(
+        handler.borrow_host(),
+        &withdrawal.ticket_hash,
+        &withdrawal.ticket_owner,
+        withdrawal.amount,
+    )? {
+        // NOTE that the nonce will remain incremented even if the precompile call fails.
+        // That is fine, since we only care about its uniqueness and determinism.
+        let withdrawal_id = withdraw_nonce::get_and_increment(handler.borrow_host())
+            .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+
+        handler
+            .add_log(withdrawal.event_log(withdrawal_id))
+            .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+
+        Ok((ExitReason::Succeed(evm::ExitSucceed::Stopped), None, vec![]))
+    } else {
+        Ok(create_outcome_error!(
+            "Insufficient ticket balance: {} of {} at {}",
+            withdrawal.amount,
+            withdrawal.ticket_hash,
+            withdrawal.ticket_owner
         ))
     }
 }

@@ -15,6 +15,7 @@ use std::vec;
 
 mod blake2;
 mod ecdsa;
+mod fa_bridge;
 mod hash;
 mod identity;
 mod modexp;
@@ -34,6 +35,11 @@ use modexp::modexp_precompile;
 use primitive_types::H160;
 use withdrawal::withdrawal_precompile;
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
+
+/// FA bridge precompile address
+pub const FA_BRIDGE_PRECOMPILE_ADDRESS: H160 = H160([
+    0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+]);
 
 /// Outcome of executing a precompiled contract. Covers both successful
 /// return, stop and revert and additionally, it covers contract execution

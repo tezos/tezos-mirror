@@ -41,7 +41,7 @@ use tezos_smart_rollup_encoding::{
 };
 
 use crate::{
-    abi::{self, ABI_B22_RIGHT_PADDING, ABI_H160_LEFT_PADDING, ABI_U32_LEFT_PADDING},
+    abi::{self, ABI_B22_RIGHT_PADDING, ABI_H160_LEFT_PADDING},
     handler::Withdrawal,
     utilities::keccak256_hash,
 };
@@ -144,7 +144,7 @@ impl FaWithdrawal {
     /// It also contains unique withdrawal identifier.
     ///
     /// Signature: Withdrawal(uint256,address,address,bytes22,uint256,uint256)
-    pub fn event_log(&self, withdrawal_id: u32) -> Log {
+    pub fn event_log(&self, withdrawal_id: U256) -> Log {
         let mut data = Vec::with_capacity(6 * 32);
 
         data.extend_from_slice(&ABI_H160_LEFT_PADDING);
@@ -163,8 +163,8 @@ impl FaWithdrawal {
         data.extend_from_slice(&Into::<[u8; 32]>::into(self.amount));
         debug_assert!(data.len() % 32 == 0);
 
-        data.extend_from_slice(&ABI_U32_LEFT_PADDING);
-        data.extend_from_slice(&withdrawal_id.to_be_bytes());
+        data.extend_from_slice(&Into::<[u8; 32]>::into(withdrawal_id));
+        debug_assert!(data.len() % 32 == 0);
 
         Log {
             address: H160::zero(),
@@ -251,7 +251,7 @@ fn ticket_hash_from_raw_parts(ticketer: &[u8], content: &[u8]) -> H256 {
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolCall, SolEvent};
-    use primitive_types::H160;
+    use primitive_types::{H160, U256};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_smart_rollup_encoding::contract::Contract;
 
@@ -353,7 +353,7 @@ mod tests {
     fn fa_withdrawal_verify_eventlog_encoding() {
         let withdrawal = dummy_fa_withdrawal();
 
-        let log = withdrawal.event_log(1);
+        let log = withdrawal.event_log(U256::one());
 
         let withdrawal_event =
             kernel_wrapper::Withdrawal::decode_log_data(&convert_log(&log), true)

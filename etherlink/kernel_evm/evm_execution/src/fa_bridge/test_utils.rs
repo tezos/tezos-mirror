@@ -20,16 +20,17 @@ use tezos_smart_rollup_mock::MockHost;
 
 use crate::{
     account_storage::{account_path, read_u256, EthereumAccountStorage},
-    handler::ExecutionOutcome,
-    precompiles::precompile_set,
+    handler::{EvmHandler, ExecutionOutcome},
+    precompiles::{self, precompile_set},
     run_transaction,
     utilities::keccak256_hash,
 };
 
 use super::{
     deposit::{ticket_hash, FaDeposit},
-    execute_fa_deposit,
+    execute_fa_deposit, execute_fa_withdrawal,
     ticket_table::{ticket_balance_path, TicketTable, TICKET_TABLE_ACCOUNT},
+    withdrawal::FaWithdrawal,
 };
 
 sol!(
@@ -260,4 +261,78 @@ pub fn convert_log(log: &Log) -> alloy_primitives::LogData {
         log.topics.iter().map(|x| x.0.into()).collect(),
         log.data.clone().into(),
     )
+}
+
+/// Create block constants
+pub fn dummy_first_block() -> BlockConstants {
+    let block_fees = BlockFees::new(
+        U256::from(21000),
+        U256::from(21000),
+        U256::from(2_000_000_000_000u64),
+    );
+    let gas_limit = 1u64;
+    BlockConstants::first_block(
+        U256::zero(),
+        U256::one(),
+        block_fees,
+        gas_limit,
+        H160::zero(),
+    )
+}
+
+/// Create FA withdrawal given ticket and sender/owner addresses
+pub fn dummy_fa_withdrawal(
+    ticket: FA2_1Ticket,
+    sender: H160,
+    ticket_owner: H160,
+) -> FaWithdrawal {
+    FaWithdrawal {
+        sender,
+        receiver: Contract::from_b58check("tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")
+            .unwrap(),
+        proxy: Contract::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT").unwrap(),
+        amount: 42.into(),
+        ticket_hash: ticket_hash(&ticket).expect("Failed to calc ticket hash"),
+        ticket,
+        ticket_owner,
+    }
+}
+
+/// Execute FA withdrawal directly without going through the precompile
+pub fn fa_bridge_precompile_call_withdraw(
+    host: &mut MockHost,
+    evm_account_storage: &mut EthereumAccountStorage,
+    withdrawal: FaWithdrawal,
+    caller: H160,
+) -> ExecutionOutcome {
+    let block = dummy_first_block();
+    let precompiles = precompiles::precompile_set::<MockHost>();
+    let config = Config::shanghai();
+
+    let mut handler = EvmHandler::new(
+        host,
+        evm_account_storage,
+        caller,
+        &block,
+        &config,
+        &precompiles,
+        1_000_000_000,
+        U256::from(21000),
+        false,
+        None,
+    );
+
+    handler.begin_initial_transaction(false, None).unwrap();
+
+    let res = execute_fa_withdrawal(&mut handler, caller, withdrawal);
+
+    let execution_result = match res {
+        Ok(mut outcome) => {
+            handler.add_withdrawals(&mut outcome.withdrawals).unwrap();
+            Ok((outcome.exit_status, None, vec![]))
+        }
+        Err(err) => Err(err),
+    };
+
+    handler.end_initial_transaction(execution_result).unwrap()
 }
