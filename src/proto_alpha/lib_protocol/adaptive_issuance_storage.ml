@@ -115,11 +115,12 @@ let compute_extremum ~launch_cycle ~new_cycle ~initial_period ~transition_period
       initial
   | Some launch_cycle ->
       let transition_period = transition_period + 1 in
-      assert (Compare.Int.(transition_period > 0)) ;
       let t1 = Cycle_repr.add launch_cycle initial_period in
       let t2 = Cycle_repr.add t1 transition_period in
       if Cycle_repr.(new_cycle <= t1) then initial
-      else if Cycle_repr.(new_cycle >= t2) then final
+      else if
+        Compare.Int.(transition_period <= 0) || Cycle_repr.(new_cycle >= t2)
+      then final
       else
         let t = Cycle_repr.diff new_cycle t1 |> Q.of_int32 in
         Q.(((final - initial) * t / of_int transition_period) + initial)
