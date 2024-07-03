@@ -591,7 +591,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
     /// Return the current [`Interrupt`] with highest priority to be handled
     /// or [`None`] if there isn't any available
-    fn get_pending_interrupt(&self, current_mode: Mode) -> Option<Interrupt> {
+    fn get_pending_interrupt(&mut self, current_mode: Mode) -> Option<Interrupt> {
         let possible = match self.hart.csregisters.possible_interrupts(current_mode) {
             0 => return None,
             possible => possible,
