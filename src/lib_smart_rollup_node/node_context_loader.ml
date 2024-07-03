@@ -85,7 +85,7 @@ let create_sync_info () =
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
-    l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
+    l1_ctxt genesis_info ~(lcc : lcc) ~lpc kind current_protocol
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -175,6 +175,13 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Pvm_patches.make kind rollup_address configuration.unsafe_pvm_patches
   in
   let sync = create_sync_info () in
+  Metrics.Info.set_lcc_level_l1 lcc.level ;
+  Metrics.Info.set_lcc_level_local lcc.level ;
+  Option.iter
+    (fun {Commitment.inbox_level = l; _} ->
+      Metrics.Info.set_lpc_level_l1 l ;
+      Metrics.Info.set_lpc_level_local l)
+    lpc ;
   let node_ctxt =
     {
       config = configuration;
@@ -263,6 +270,7 @@ module For_snapshots = struct
                rpc_port = Configuration.default_rpc_port;
                acl = Configuration.default_acl;
                metrics_addr = None;
+               performance_metrics = false;
                reconnection_delay = 1.;
                fee_parameters = Configuration.default_fee_parameters;
                mode;
@@ -373,6 +381,7 @@ module Internal_for_tests = struct
           rpc_port = Configuration.default_rpc_port;
           acl = Configuration.default_acl;
           metrics_addr = None;
+          performance_metrics = false;
           reconnection_delay = 5.;
           fee_parameters = Configuration.default_fee_parameters;
           mode;

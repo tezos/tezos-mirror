@@ -214,6 +214,12 @@ module Make (Parameters : PARAMETERS) = struct
       emit e (signers_alias signers, state.tags, x, y, z)
   end
 
+  module Metrics = Metrics.Make (struct
+    module Tag = Parameters.Tag
+
+    let registry = Parameters.metrics_registry
+  end)
+
   let last_head_encoding =
     let open Data_encoding in
     conv
@@ -1064,6 +1070,17 @@ module Make (Parameters : PARAMETERS) = struct
         | Forget -> return_unit)
       (List.rev expired_infos)
 
+  let set_metrics state =
+    Metrics.wrap @@ fun () ->
+    let tags = Tags.to_seq state.tags |> List.of_seq in
+    Metrics.set_queue_size tags (Op_queue.length state.queue) ;
+    Metrics.set_injected_operations_size
+      tags
+      (Injected_operations.length state.injected.injected_operations) ;
+    Metrics.set_included_operations_size
+      tags
+      (Included_operations.length state.included.included_operations)
+
   (** [on_new_tezos_head state head] is called when there is a new Tezos
       head. It first reverts any blocks that are in the alternative branch of
       the reorganization and then registers the effect of the new branch (the
@@ -1072,6 +1089,7 @@ module Make (Parameters : PARAMETERS) = struct
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
+    set_metrics state ;
     let*! reorg =
       match state.last_seen_head with
       | None ->
@@ -1408,6 +1426,9 @@ module Make (Parameters : PARAMETERS) = struct
     let () = Tags.iter (fun tag -> Tags_table.add tags_table tag worker) tags in
     return_unit
 
+  let register_metrics_gauges tags =
+    Metrics.wrap @@ fun () -> List.iteri Metrics.add_gauge tags
+
   let register_disjoint_signers (cctxt : #Client_context.full) l1_ctxt ~data_dir
       retention_period ~allowed_attempts ~injection_ttl state
       (signers :
@@ -1416,13 +1437,13 @@ module Make (Parameters : PARAMETERS) = struct
         * Parameters.Tag.t list)
         list) =
     let open Lwt_result_syntax in
-    let rec aux registered_signers registered_tags = function
-      | [] -> return_unit
-      | (signers, strategy, tags) :: rest ->
+    let rec aux registered_signers registered_tags tags_list = function
+      | [] -> return tags_list
+      | (signers, strategy, tags_l) :: rest ->
           let* () =
             check_signer_is_not_already_registered registered_signers signers
           in
-          let tags = Tags.of_list tags in
+          let tags = Tags.of_list tags_l in
           let*? () = check_tag_is_not_already_registered registered_tags tags in
           let*? () = Inj_proto.check_registered_proto_clients state in
           let* head_protocols = protocols_of_head cctxt in
@@ -1446,18 +1467,21 @@ module Make (Parameters : PARAMETERS) = struct
               registered_signers
           in
           let registered_tags = Tags.union tags registered_tags in
-          aux registered_signers registered_tags rest
+          aux registered_signers registered_tags (tags_l :: tags_list) rest
     in
-    aux Signature.Public_key_hash.Set.empty Tags.empty signers
+    let+ tags = aux Signature.Public_key_hash.Set.empty Tags.empty [] signers in
+    register_metrics_gauges tags
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 10) ?(injection_ttl = 120) l1_ctxt state ~signers =
+      ?(allowed_attempts = 10) ?(injection_ttl = 120) ?(collect_metrics = false)
+      l1_ctxt state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     assert (allowed_attempts >= 0) ;
     assert (injection_ttl > 0) ;
+    Metrics.produce_metrics collect_metrics ;
     let* () =
       register_disjoint_signers
         (cctxt : #Client_context.full)

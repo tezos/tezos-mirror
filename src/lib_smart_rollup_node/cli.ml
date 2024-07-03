@@ -200,6 +200,15 @@ struct
       ~doc:(Format.sprintf "The address of the %s metrics server." binary_name)
       string_parameter
 
+  let enable_performance_metrics_arg :
+      (bool, Client_context.full) Tezos_clic.arg =
+    Tezos_clic.switch
+      ~long:"enable-performance-metrics"
+      ~doc:
+        "Enable performance metrics when the metrics server is started \
+         (requires lsof, disabled by default)."
+      ()
+
   let dac_observer_endpoint_arg =
     Tezos_clic.arg
       ~long:"dac-observer"

@@ -140,15 +140,38 @@ let get_batches state ~only_full =
 
 let produce_batches state ~only_full =
   let open Lwt_result_syntax in
+  let start_timestamp = Time.System.now () in
   let batches, to_remove = get_batches state ~only_full in
+  let get_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Batcher.set_messages_queue_size
+      @@ Message_queue.length state.messages ;
+      Metrics.Batcher.set_messages_size @@ List.length to_remove ;
+      Metrics.Batcher.set_batches_size @@ List.length batches ;
+      Metrics.Batcher.set_get_time @@ Ptime.diff get_timestamp start_timestamp) ;
   match batches with
   | [] -> return_unit
   | _ ->
+      let* () =
+        Metrics.wrap_lwt (fun () ->
+            Metrics.Batcher.set_last_batch_time start_timestamp ;
+            let* block = Node_context.last_processed_head_opt state.node_ctxt in
+            let () =
+              match block with
+              | Some block ->
+                  Metrics.Batcher.set_last_batch_level block.header.level
+              | None -> ()
+            in
+            return_unit)
+      in
       let* () = inject_batches state batches in
       let*! () =
         Batcher_events.(emit batched)
           (List.length batches, List.length to_remove)
       in
+      let inject_timestamp = Time.System.now () in
+      Metrics.Batcher.set_inject_time
+      @@ Ptime.diff inject_timestamp get_timestamp ;
       List.iter
         (fun tr_hash -> Message_queue.remove state.messages tr_hash)
         to_remove ;

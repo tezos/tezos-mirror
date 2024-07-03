@@ -165,6 +165,8 @@ module type PARAMETERS = sig
   (** Indicate which operations should be persisted on disk to be reinjected
       upon restart.  *)
   val persist_operation : Operation.t -> bool
+
+  val metrics_registry : Prometheus.CollectorRegistry.t
 end
 
 module type PROTOCOL_CLIENT = sig
@@ -296,6 +298,9 @@ module type S = sig
       [injection_ttl] is the number of blocks after which an operation that is
       injected but never include is retried.
 
+      [collect_metrics] will allow the prometheus to register metrics for the
+      injector.
+
       Each pkh's list and tag list of [signers] must be disjoint. *)
   val init :
     #Client_context.full ->
@@ -303,6 +308,7 @@ module type S = sig
     ?retention_period:int ->
     ?allowed_attempts:int ->
     ?injection_ttl:int ->
+    ?collect_metrics:bool ->
     Layer_1.t ->
     state ->
     signers:

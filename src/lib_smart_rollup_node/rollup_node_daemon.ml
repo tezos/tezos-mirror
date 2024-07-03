@@ -86,6 +86,7 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   in
   state.plugin <- new_plugin ;
   Reference.set state.node_ctxt.current_protocol new_protocol ;
+  Metrics.Info.set_proto_info new_protocol.hash constants ;
   let*! () =
     Daemon_event.switched_protocol
       new_protocol.hash
@@ -125,9 +126,15 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
+  let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
     Plugin.Inbox.process_head node_ctxt ~predecessor head
   in
+  let fetch_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Inbox.set_fetch_time @@ Ptime.diff fetch_timestamp start_timestamp ;
+      Metrics.Inbox.set_messages messages ~is_internal:(fun s ->
+          String.length s > 0 && s.[0] = '\000')) ;
   let* () =
     when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
     Plugin.Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
@@ -191,6 +198,10 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       Int32.(sub head.level (of_int node_ctxt.block_finality_time))
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
+  let end_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Inbox.set_process_time @@ Ptime.diff end_timestamp fetch_timestamp ;
+      Metrics.Inbox.set_total_time @@ Ptime.diff end_timestamp start_timestamp) ;
   return l2_block
 
 let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
@@ -228,6 +239,10 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
   match done_ with
   | `Nothing -> return_unit
   | `Already_processed l2_block ->
+      Metrics.wrap (fun () ->
+          Metrics.Inbox.set_fetch_time Ptime.Span.zero ;
+          Metrics.Inbox.set_process_time Ptime.Span.zero ;
+          Metrics.Inbox.set_total_time Ptime.Span.zero) ;
       if recurse_pred then
         (* We are calling update_l2_chain recursively to ensure we have handled
            the predecessor. In this case, we don't update the head or notify the
@@ -238,7 +253,6 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
-      Metrics.Inbox.set_process_time process_time ;
       let*! () =
         Daemon_event.new_head_processed head.hash head.level process_time
       in
@@ -505,6 +519,15 @@ let make_signers_for_injector operators =
          in
          (operators, strategy, operation_kinds))
 
+let performance_metrics state =
+  let open Lwt_syntax in
+  let rec collect () =
+    let* () = Metrics.Performance.set_stats state.node_ctxt.data_dir in
+    let* () = Lwt_unix.sleep 10. in
+    collect ()
+  in
+  Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
+
 let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
   let fatal_error_exit e =
@@ -567,11 +590,17 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
+  let* history_mode = Node_context.get_history_mode node_ctxt in
   Metrics.Info.init_rollup_node_info
-    ~id:configuration.sc_rollup_address
-    ~mode:configuration.mode
+    configuration
     ~genesis_level:node_ctxt.genesis_info.level
-    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
+    ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
+    ~history_mode ;
+  Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
+  let* gc_info = Node_context.get_gc_levels node_ctxt in
+  Metrics.GC.set_oldest_available_level gc_info.first_available_level ;
+  if configuration.performance_metrics then performance_metrics state ;
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->
@@ -589,6 +618,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       ~signers
       ~retention_period:configuration.injector.retention_period
       ~allowed_attempts:configuration.injector.attempts
+      ~collect_metrics:(Option.is_some state.configuration.metrics_addr)
   in
   let* () = start_workers plugin node_ctxt in
   Lwt.dont_wait
@@ -637,7 +667,6 @@ module Internal_for_tests = struct
         node_ctxt
         ~is_first_block
         ~predecessor
-        head
         messages
     in
     let* ctxt, _num_messages, num_ticks, initial_tick =
@@ -770,6 +799,10 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       cctxt
       configuration.sc_rollup_address
   in
+  Metrics.Info.set_lcc_level_l1 lcc.level ;
+  Option.iter
+    (fun Commitment.{inbox_level = l; _} -> Metrics.Info.set_lpc_level_l1 l)
+    lpc ;
   let current_protocol =
     {
       Node_context.hash = protocol;
