@@ -88,8 +88,8 @@ let errors =
     EUNKNOWNERR 42;
   ]
 
-let unix_error_testable =
-  Alcotest.testable
+let unix_error_typ =
+  Check.equalable
     (fun ppf error ->
       let error_name =
         Tezos_stdlib_unix.Unix_error.Internal_for_tests.get_constructor_name
@@ -110,29 +110,40 @@ let binary_encode_and_decode error =
   let encoding = Tezos_stdlib_unix.Unix_error.encoding in
   of_bytes_exn encoding @@ to_bytes_exn encoding error
 
-let test_json () =
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"unix error json encoding roundtrip"
+    ~tags:Tag.[layer1; base; unix; encodings]
+  @@ fun () ->
   List.iter
     (fun error ->
-      let result = json_encode_and_decode error in
-      Alcotest.(check unix_error_testable) "unix error equality" error result)
-    errors
-
-let test_binary () =
-  List.iter
-    (fun error ->
-      let result = binary_encode_and_decode error in
-      Alcotest.(check unix_error_testable) "unix error equality" error result)
-    errors
+      let r = json_encode_and_decode error in
+      Check.(
+        (r = error)
+          unix_error_typ
+          ~__LOC__
+          ~error_msg:
+            "encoded and decoded error should be equal to the original error \
+             (obtained: %L, expected: %R)"))
+    errors ;
+  unit
 
 let () =
-  let open Alcotest in
-  run
+  Test.register
     ~__FILE__
-    "Base.unix.unix_error"
-    [
-      ( "encoding",
-        [
-          test_case "json encoding roundtrip" `Quick test_json;
-          test_case "binary encoding roundtrip" `Quick test_binary;
-        ] );
-    ]
+    ~title:"unix error json binary encoding roundtrip"
+    ~tags:Tag.[layer1; base; unix; encodings]
+  @@ fun () ->
+  List.iter
+    (fun error ->
+      let r = binary_encode_and_decode error in
+      Check.(
+        (r = error)
+          unix_error_typ
+          ~__LOC__
+          ~error_msg:
+            "binary encoded and decoded error should be equal to the original \
+             error (obtained: %L, expected: %R)"))
+    errors ;
+  unit
