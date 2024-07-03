@@ -30,6 +30,8 @@ General
 
 - Removed binaries for Oxford. (MR :gl:`!13795`)
 
+- Removed binaries for ParisB. (MR :gl:`!14026`)
+
 Node
 ----
 
