@@ -5,7 +5,7 @@
 
 use crate::pvm::{
     dummy_pvm::{DummyPvm, PvmStorage, PvmStorageError},
-    PvmStatus,
+    PvmHooks, PvmStatus,
 };
 use crate::storage::{self, StorageError};
 use ocaml::{Pointer, ToValue};
@@ -25,10 +25,20 @@ pub struct Id(storage::Hash);
 #[ocaml::sig]
 pub struct Status(PvmStatus);
 
+#[ocaml::sig]
+pub struct Hooks(PvmHooks<'static>);
+
 ocaml::custom!(Repo);
 ocaml::custom!(State);
 ocaml::custom!(Id);
 ocaml::custom!(Status);
+ocaml::custom!(Hooks);
+
+#[ocaml::func]
+#[ocaml::sig("unit -> hooks")]
+pub fn octez_riscv_default_pvm_hooks() -> Pointer<Hooks> {
+    Hooks(PvmHooks::default()).into()
+}
 
 #[ocaml::func]
 #[ocaml::sig("bytes -> id")]
@@ -115,18 +125,25 @@ pub fn octez_riscv_string_of_status(status: Pointer<Status>) -> String {
 }
 
 #[ocaml::func]
-#[ocaml::sig("state -> state")]
-pub fn octez_riscv_compute_step(state: Pointer<State>) -> Pointer<State> {
-    State(state.as_ref().0.compute_step()).into()
+#[ocaml::sig("state -> hooks -> state")]
+pub fn octez_riscv_compute_step(
+    state: Pointer<State>,
+    mut hooks: Pointer<Hooks>,
+) -> Pointer<State> {
+    State(state.as_ref().0.compute_step(&mut hooks.as_mut().0)).into()
 }
 
 #[ocaml::func]
-#[ocaml::sig("int64 -> state -> (state * int64)")]
+#[ocaml::sig("int64 -> state -> hooks -> (state * int64)")]
 pub fn octez_riscv_compute_step_many(
     max_steps: usize,
     state: Pointer<State>,
+    mut hooks: Pointer<Hooks>,
 ) -> (Pointer<State>, i64) {
-    let (s, steps) = state.as_ref().0.compute_step_many(max_steps);
+    let (s, steps) = state
+        .as_ref()
+        .0
+        .compute_step_many(&mut hooks.as_mut().0, max_steps);
     (State(s).into(), steps)
 }
 

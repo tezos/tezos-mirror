@@ -18,14 +18,17 @@ type state = Storage.State.t
 
 type status = Api.status
 
+let pvm_hooks = Api.octez_riscv_default_pvm_hooks ()
+
 let compute_step_many ?reveal_builtins:_ ?write_debug:_ ?stop_at_snapshot:_
     ~max_steps state =
-  Lwt.return (Api.octez_riscv_compute_step_many max_steps state)
+  Lwt.return (Api.octez_riscv_compute_step_many max_steps state pvm_hooks)
 
-let compute_step state = Lwt.return (Api.octez_riscv_compute_step state)
+let compute_step state =
+  Lwt.return (Api.octez_riscv_compute_step state pvm_hooks)
 
 let compute_step_with_debug ?write_debug:_ state =
-  Lwt.return (Api.octez_riscv_compute_step state)
+  Lwt.return (Api.octez_riscv_compute_step state pvm_hooks)
 
 let get_tick state = Lwt.return (Z.of_int64 (Api.octez_riscv_get_tick state))
 
