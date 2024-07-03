@@ -104,7 +104,7 @@ mod tests {
         // act
         let input: &[u8] = &[0xFF];
         let address = H160::from_low_u64_be(2u64);
-        let result = execute_precompiled(address, input, None, Some(22000));
+        let result = execute_precompiled(address, input, None, Some(22000), true);
 
         // assert
         let expected_hash = hex::decode(
@@ -134,7 +134,7 @@ mod tests {
         // act
         let input: &[u8] = &[0xFF];
         let address = H160::from_low_u64_be(3u64);
-        let result = execute_precompiled(address, input, None, Some(22000));
+        let result = execute_precompiled(address, input, None, Some(22000), true);
 
         // assert
         let expected_hash = hex::decode(

@@ -317,8 +317,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -340,8 +345,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -356,8 +366,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -373,8 +388,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         // ERR_BN128_INVALID_POINT
         assert!(result.is_err());
     }
@@ -395,8 +415,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -417,8 +442,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -433,8 +463,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -449,8 +484,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         // ERR_BN128_INVALID_POINT
         assert!(result.is_err());
     }
@@ -478,8 +518,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         println!("result {:?}", result);
         assert!(result.is_ok());
         let outcome = result.unwrap();
@@ -493,8 +538,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
@@ -512,8 +562,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         // ERR_BN128_INVALID_A
         assert!(result.is_err());
 
@@ -527,8 +582,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         // ERR_BN128_INVALID_LEN
         assert!(result.is_err());
     }
