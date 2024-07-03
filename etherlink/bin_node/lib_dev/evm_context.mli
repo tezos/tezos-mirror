@@ -143,3 +143,9 @@ val replay :
 val block_param_to_block_number :
   Ethereum_types.Block_parameter.extended ->
   Ethereum_types.quantity tzresult Lwt.t
+
+val execute :
+  ?alter_evm_state:(Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
+  Simulation.Encodings.simulate_input ->
+  Ethereum_types.Block_parameter.extended ->
+  Irmin_context.tree tzresult Lwt.t

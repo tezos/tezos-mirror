@@ -13,3 +13,11 @@ val trace_transaction :
   transaction_hash:Ethereum_types.hash ->
   config:Tracer_types.config ->
   Tracer_types.output tzresult Lwt.t
+
+(** [trace_call ~call ~block ~config] simulates and traces call
+    [call] in block [block], with the given [config]. *)
+val trace_call :
+  call:Ethereum_types.call ->
+  block:Ethereum_types.Block_parameter.extended ->
+  config:Tracer_types.config ->
+  Tracer_types.output tzresult Lwt.t

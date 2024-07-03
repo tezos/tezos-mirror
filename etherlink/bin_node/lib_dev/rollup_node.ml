@@ -163,6 +163,9 @@ end) : Services_backend_sig.Backend = struct
   module Tracer = struct
     let trace_transaction ~block_number:_ ~transaction_hash:_ ~config:_ =
       Lwt_result_syntax.tzfail Tracer_types.Not_supported
+
+    let trace_call ~call:_ ~block:_ ~config:_ =
+      Lwt_result_syntax.tzfail Tracer_types.Not_supported
   end
 
   let smart_rollup_address = Base.smart_rollup_address

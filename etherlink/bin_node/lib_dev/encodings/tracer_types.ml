@@ -96,23 +96,42 @@ let config_encoding =
 
 type input = Ethereum_types.hash * config
 
+type call_input =
+  (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
+
 let input_encoding =
-  Helpers.encoding_with_optional_second_param
+  Helpers.encoding_with_optional_last_param
     Ethereum_types.hash_encoding
     config_encoding
     default_config
 
-(* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
-let bool_encoding b =
-  if b then Rlp.Value (Bytes.make 1 '\001') else Rlp.Value Bytes.empty
+let call_input_encoding =
+  Helpers.encoding_with_optional_last_param
+    (Data_encoding.tup2
+       Ethereum_types.call_encoding
+       Ethereum_types.Block_parameter.extended_encoding)
+    config_encoding
+    default_config
 
-let input_rlp_encoder hash config =
+let input_rlp_encoder ?hash config =
   let open Rlp in
-  let hash = Value (Ethereum_types.hash_to_bytes hash |> Bytes.of_string) in
-  let return_data = bool_encoding config.tracer_config.enable_return_data in
-  let memory = bool_encoding config.tracer_config.enable_memory in
-  let stack = bool_encoding config.tracer_config.disable_stack in
-  let storage = bool_encoding config.tracer_config.disable_storage in
+  let hash =
+    match hash with
+    | Some hash -> Value (Ethereum_types.hash_to_bytes hash |> Bytes.of_string)
+    | None -> Value Bytes.empty
+  in
+  let return_data =
+    Ethereum_types.bool_to_rlp_bytes config.tracer_config.enable_return_data
+  in
+  let memory =
+    Ethereum_types.bool_to_rlp_bytes config.tracer_config.enable_memory
+  in
+  let stack =
+    Ethereum_types.bool_to_rlp_bytes config.tracer_config.disable_stack
+  in
+  let storage =
+    Ethereum_types.bool_to_rlp_bytes config.tracer_config.disable_storage
+  in
   List [hash; return_data; memory; stack; storage] |> encode |> Bytes.to_string
 
 let hex_encoding =

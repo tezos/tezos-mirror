@@ -158,6 +158,25 @@ module Request = struct
     in
     {method_ = "debug_traceTransaction"; parameters}
 
+  let trace_call ~block ~to_ ~data ?tracer ?tracer_config () =
+    let config =
+      match tracer with
+      | Some tracer -> [("tracer", `String tracer)]
+      | None -> []
+    in
+    let config =
+      match tracer_config with
+      | None -> config
+      | Some tracer_config -> ("tracerConfig", `O tracer_config) :: config
+    in
+    let parameters =
+      match config with
+      | [] -> `A [eth_call_obj ~to_ ~data; block_param_to_json block]
+      | config ->
+          `A [eth_call_obj ~to_ ~data; block_param_to_json block; `O config]
+    in
+    {method_ = "debug_traceCall"; parameters}
+
   let eth_feeHistory ~block_count ~newest_block =
     {
       method_ = "eth_feeHistory";
@@ -410,6 +429,15 @@ let trace_transaction ~transaction_hash ?tracer ?tracer_config evm_node =
     Evm_node.call_evm_rpc
       evm_node
       (Request.trace_transaction ~transaction_hash ?tracer ?tracer_config ())
+  in
+  return
+  @@ decode_or_error (fun response -> Evm_node.extract_result response) response
+
+let trace_call ~block ~to_ ~data ?tracer ?tracer_config evm_node =
+  let* response =
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.trace_call ~block ~to_ ~data ?tracer ?tracer_config ())
   in
   return
   @@ decode_or_error (fun response -> Evm_node.extract_result response) response

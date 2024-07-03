@@ -18,8 +18,6 @@ type tracer_config = {
   disable_storage : bool;
 }
 
-val bool_encoding : bool -> Rlp.item
-
 val default_tracer_config : tracer_config
 
 val tracer_config_encoding : tracer_config Data_encoding.t
@@ -41,9 +39,16 @@ val config_encoding : config Data_encoding.t
 
 type input = Ethereum_types.hash * config
 
+type call_input =
+  (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
+
 val input_encoding : (Ethereum_types.hash * config) Data_encoding.t
 
-val input_rlp_encoder : Ethereum_types.hash -> config -> string
+val call_input_encoding :
+  ((Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config)
+  Data_encoding.t
+
+val input_rlp_encoder : ?hash:Ethereum_types.hash -> config -> string
 
 module Opcode : sig
   type t = Char.t

@@ -1541,6 +1541,24 @@ let replay ?(log_file = "replay") ?profile
         Ethereum_types.pp_quantity
         (Qty number)
 
+let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
+  let open Lwt_result_syntax in
+  let message =
+    List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
+  in
+  let* evm_state = find_evm_state block in
+  match evm_state with
+  | Some evm_state ->
+      let* evm_state = alter_evm_state evm_state in
+      let*! data_dir, config = execution_config in
+      Evm_state.execute
+        ?log_file:input.log_kernel_debug_file
+        ~data_dir
+        ~config
+        evm_state
+        message
+  | None -> failwith "Cannot read evm state"
+
 let block_param_to_block_number
     (block_param : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in

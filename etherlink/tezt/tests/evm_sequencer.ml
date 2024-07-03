@@ -4029,32 +4029,32 @@ let test_trace_transaction_on_invalid_transaction =
           ~error_msg:"traceTransaction failed with the wrong error")) ;
   unit
 
-let check_trace expect_null expected_returned_value receipt trace =
-  (* Checks that each opcode log are either all empty or non empty, considering
-     the configuration. *)
-  let check_struct_logs expect_null log =
-    let check_field field =
-      if expect_null then
-        Check.(
-          JSON.(log |-> field |> JSON.unannotate = `Null)
-            json_u
-            ~error_msg:
-              (Format.sprintf
-                 "Field %s was expected to be null, but got %%L instead"
-                 field))
-      else
-        Check.(
-          JSON.(log |-> field |> JSON.unannotate <> `Null)
-            json_u
-            ~error_msg:
-              (Format.sprintf "Field %s wasn't expected to be null" field))
-    in
-    check_field "memory" ;
-    check_field "storage" ;
-    check_field "memSize" ;
-    check_field "stack" ;
-    check_field "returnData"
+(* Checks that each opcode log are either all empty or non empty, considering
+   the configuration. *)
+let check_struct_logs expect_null log =
+  let check_field field =
+    if expect_null then
+      Check.(
+        (JSON.is_null log = false)
+          bool
+          ~error_msg:
+            (Format.sprintf
+               "Field %s was expected to be null, but got %%L instead"
+               field))
+    else
+      Check.(
+        (JSON.is_null log = false)
+          bool
+          ~error_msg:
+            (Format.sprintf "Field %s wasn't expected to be null" field))
   in
+  check_field "memory" ;
+  check_field "storage" ;
+  check_field "memSize" ;
+  check_field "stack" ;
+  check_field "returnData"
+
+let check_trace expect_null expected_returned_value receipt trace =
   let failed = JSON.(trace |-> "failed" |> as_bool) in
   let gas_used = JSON.(trace |-> "gas" |> as_int64) in
   let returned_value =
@@ -4292,6 +4292,101 @@ let test_fa_bridge_feature_flag =
          Durable_storage_path.enable_fa_bridge) ;
   unit
 
+let test_trace_call =
+  register_both
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call"]
+    ~title:"Sequencer can run debug_traceCall and return a valid log"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy = _; _} _protocol ->
+  (* Transfer funds to a random address. *)
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+
+  (* deploy contract *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:Solidity_contracts.simple_storage.label
+      ~abi:Solidity_contracts.simple_storage.abi
+      ()
+  in
+  let* contract_address, _tx_deployment =
+    send_transaction
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:Solidity_contracts.simple_storage.label
+          ~bin:Solidity_contracts.simple_storage.bin)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+
+  let value_in_storage = 10 in
+  let* _ =
+    send_transaction
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:Solidity_contracts.simple_storage.label
+         ~address:contract_address
+         ~method_call:(Format.sprintf "set(%d)" value_in_storage))
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+
+  let* abi_string =
+    Eth_cli.encode_method
+      ~abi_label:Solidity_contracts.simple_storage.label
+      ~method_:"get()"
+  in
+
+  let*@ trace =
+    Rpc.trace_call
+      ~block:Latest
+      ~to_:contract_address
+      ~data:abi_string
+      ~tracer_config:
+        [("enableMemory", `Bool true); ("enableReturnData", `Bool true)]
+      sequencer
+  in
+
+  let logs = JSON.(trace |-> "structLogs" |> as_list) in
+  let returned_value =
+    JSON.(trace |-> "returnValue" |> as_string |> Durable_storage_path.no_0x)
+  in
+  Check.((logs <> []) (list json) ~error_msg:"Logs shouldn't be empty") ;
+  Check.(
+    (returned_value
+   = "000000000000000000000000000000000000000000000000000000000000000a")
+      string
+      ~error_msg:"Expect return value to be %R, got %L") ;
+  List.iter (check_struct_logs false) logs ;
+
+  let*@ trace_failed_transaction =
+    Rpc.trace_call
+      ~block:(Number 0)
+      ~to_:contract_address
+      ~data:abi_string
+      ~tracer_config:
+        [("enableMemory", `Bool true); ("enableReturnData", `Bool true)]
+      sequencer
+  in
+  Check.(
+    JSON.(
+      trace_failed_transaction |-> "returnValue" |> as_string
+      |> Durable_storage_path.no_0x = "")
+      string
+      ~error_msg:"Expect return value to be empty, got %L") ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -4351,4 +4446,5 @@ let () =
   test_trace_transaction_on_invalid_transaction protocols ;
   test_trace_transaction_call protocols ;
   test_miner protocols ;
-  test_fa_bridge_feature_flag protocols
+  test_fa_bridge_feature_flag protocols ;
+  test_trace_call protocols

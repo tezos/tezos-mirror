@@ -1714,3 +1714,7 @@ module Evm_events = struct
             New_delayed_transaction delayed_transaction);
       ]
 end
+
+(* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
+let bool_to_rlp_bytes b =
+  if b then Rlp.Value (Bytes.make 1 '\001') else Rlp.Value Bytes.empty
