@@ -224,10 +224,6 @@ let alter_blocks_reception_add_validation_timestamp =
 
 let alter_nodes = "ALTER TABLE nodes ADD COLUMN password $(BYTES)"
 
-let alter_missing_blocks_id_type =
-  "ALTER TABLE missing_blocks ALTER COLUMN id TYPE $(PRIMARY_INCREMENTING_INT) \
-   PRIMARY KEY"
-
 let alter_tables =
   [
     [alter_blocks];
@@ -238,7 +234,6 @@ let alter_tables =
       alter_blocks_reception_add_validation_timestamp;
     ];
     [alter_nodes];
-    [alter_missing_blocks_id_type];
   ]
 
 module Type = struct
