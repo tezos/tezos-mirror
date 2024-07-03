@@ -29,59 +29,23 @@ open Protocol
 open Environment
 open Alpha_context
 
-type version = Version_0 | Version_1
+type version = Version_1
 
-let string_of_version = function Version_0 -> "0" | Version_1 -> "1"
+let string_of_version = function Version_1 -> "1"
 
 let version_of_string = function
-  | "0" -> Ok Version_0
+  | "0" -> Error "Version \"0\" is not supported anymore"
   | "1" -> Ok Version_1
-  | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
-
-let default_operations_version = Version_1
+  | _ -> Error "Cannot parse version (supported version \"1\")"
 
 let version_arg =
   let open RPC_arg in
   make
-    ~descr:
-      "Supported RPC versions are version '1' (default) that will output \
-       \"attestation\" in the \"kind\" field and version '0' (deprecated) that \
-       will output \"endorsement\""
+    ~descr:"Supported RPC version is version '1'"
     ~name:"version"
     ~destruct:version_of_string
     ~construct:string_of_version
     ()
-
-(* This function creates an encoding that use the [latest_encoding] in binary
-   and that can use [latest_encoding] and any [old_encodings] in JSON. The
-   version value is only used to decide which encoding to use in JSON. *)
-let encoding_versioning ~encoding_name ~latest_encoding ~old_encodings =
-  let open Data_encoding in
-  let make_case ~version ~encoding =
-    case
-      ~title:
-        (Format.sprintf
-           "%s_encoding_v%s"
-           encoding_name
-           (string_of_version version))
-      Json_only
-      encoding
-      (function v, value when v == version -> Some value | _v, _value -> None)
-      (fun value -> (version, value))
-  in
-  let latest_version, latest_encoding = latest_encoding in
-  splitted
-    ~binary:
-      (conv
-         (fun (_, value) -> value)
-         (fun value -> (latest_version, value))
-         latest_encoding)
-    ~json:
-      (union
-         (make_case ~version:latest_version ~encoding:latest_encoding
-         :: List.map
-              (fun (version, encoding) -> make_case ~version ~encoding)
-              old_encodings))
 
 (** The assumed number of blocks between operation-creation time and
     the actual time when the operation is included in a block. *)
@@ -553,39 +517,11 @@ module Scripts = struct
           object
             method version = version
           end)
-      |+ field "version" version_arg default_operations_version (fun t ->
-             t#version)
+      |+ opt_field "version" version_arg (fun t -> t#version)
       |> seal
 
-    let operations_encodings =
-      union
-        [
-          case
-            ~title:"operations_encoding"
-            (Tag 0)
-            Operation.encoding
-            Option.some
-            Fun.id;
-          case
-            ~title:"operations_encoding_with_legacy_attestation_name"
-            Json_only
-            Operation.encoding_with_legacy_attestation_name
-            Option.some
-            Fun.id;
-        ]
-
     let run_operation_output_encoding =
-      encoding_versioning
-        ~encoding_name:"run_operation_output"
-        ~latest_encoding:
-          (Version_1, Apply_results.operation_data_and_metadata_encoding)
-        ~old_encodings:
-          [
-            ( Version_0,
-              Apply_results
-              .operation_data_and_metadata_encoding_with_legacy_attestation_name
-            );
-          ]
+      Apply_results.operation_data_and_metadata_encoding
 
     let run_operation =
       RPC_service.post_service
@@ -597,7 +533,7 @@ module Scripts = struct
         ~query:run_operation_query
         ~input:
           (obj2
-             (req "operation" operations_encodings)
+             (req "operation" Operation.encoding)
              (req "chain_id" Chain_id.encoding))
         ~output:run_operation_output_encoding
         RPC_path.(path / "run_operation")
@@ -610,8 +546,7 @@ module Scripts = struct
 
             method successor_level = successor_level
           end)
-      |+ field "version" version_arg default_operations_version (fun t ->
-             t#version)
+      |+ opt_field "version" version_arg (fun t -> t#version)
       |+ flag
            ~descr:
              "If true, the simulation is done on the successor level of the \
@@ -634,7 +569,7 @@ module Scripts = struct
         ~input:
           (obj4
              (opt "blocks_before_activation" int32)
-             (req "operation" operations_encodings)
+             (req "operation" Operation.encoding)
              (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:run_operation_output_encoding
@@ -1137,7 +1072,7 @@ module Scripts = struct
       Return the unchanged operation protocol data, and the operation
       receipt ie. metadata containing balance updates, consumed gas,
       application success or failure, etc. *)
-  let run_operation_service rpc_ctxt params (packed_operation, chain_id) =
+  let run_operation_service rpc_ctxt _params (packed_operation, chain_id) =
     let open Lwt_result_syntax in
     let {Services_registration.context; block_header; _} = rpc_ctxt in
     let*? () =
@@ -1179,7 +1114,7 @@ module Scripts = struct
     let* _ctxt, op_metadata =
       Apply.apply_operation application_state oph packed_operation
     in
-    return (params#version, (packed_operation.protocol_data, op_metadata))
+    return (packed_operation.protocol_data, op_metadata)
 
   (*
 
@@ -2216,10 +2151,9 @@ module Scripts = struct
   let normalize_type ~ty ctxt block =
     RPC_context.make_call0 S.normalize_type ctxt block () ty
 
-  let run_operation ~op ~chain_id ?(version = default_operations_version) ctxt
-      block =
+  let run_operation ~op ~chain_id ?version ctxt block =
     let open Lwt_result_syntax in
-    let* (Version_0 | Version_1), run_operation =
+    let* run_operation =
       RPC_context.make_call0
         S.run_operation
         ctxt
@@ -2231,11 +2165,10 @@ module Scripts = struct
     in
     return run_operation
 
-  let simulate_operation ~op ~chain_id ~latency
-      ?(version = default_operations_version) ?(successor_level = false)
-      ?blocks_before_activation ctxt block =
+  let simulate_operation ~op ~chain_id ~latency ?version
+      ?(successor_level = false) ?blocks_before_activation ctxt block =
     let open Lwt_result_syntax in
-    let* (Version_0 | Version_1), simulate_operation =
+    let* simulate_operation =
       RPC_context.make_call0
         S.simulate_operation
         ctxt
@@ -3285,28 +3218,11 @@ module Forge = struct
 
     let path = RPC_path.(path / "forge")
 
-    let operations_encoding =
-      union
-        [
-          case
-            ~title:"operations_encoding"
-            (Tag 0)
-            Operation.unsigned_encoding
-            Option.some
-            Fun.id;
-          case
-            ~title:"operations_encoding_with_legacy_attestation_name"
-            Json_only
-            Operation.unsigned_encoding_with_legacy_attestation_name
-            Option.some
-            Fun.id;
-        ]
-
     let operations =
       RPC_service.post_service
         ~description:"Forge an operation"
         ~query:RPC_query.empty
-        ~input:operations_encoding
+        ~input:Operation.unsigned_encoding
         ~output:(bytes Hex)
         RPC_path.(path / "operations")
 
@@ -3536,21 +3452,10 @@ module Parse = struct
           object
             method version = version
           end)
-      |+ field "version" version_arg default_operations_version (fun t ->
-             t#version)
+      |+ opt_field "version" version_arg (fun t -> t#version)
       |> seal
 
-    let parse_operations_encoding =
-      encoding_versioning
-        ~encoding_name:"parse_operations"
-        ~latest_encoding:(Version_1, list (dynamic_size Operation.encoding))
-        ~old_encodings:
-          [
-            ( Version_0,
-              list
-                (dynamic_size Operation.encoding_with_legacy_attestation_name)
-            );
-          ]
+    let parse_operations_encoding = list (dynamic_size Operation.encoding)
 
     let operations =
       RPC_service.post_service
@@ -3596,7 +3501,7 @@ module Parse = struct
     Registration.register0
       ~chunked:true
       S.operations
-      (fun _ctxt params (operations, check) ->
+      (fun _ctxt _params (operations, check) ->
         let* ops =
           List.map_es
             (fun raw ->
@@ -3614,13 +3519,11 @@ module Parse = struct
               return op)
             operations
         in
-        let version = params#version in
-        return (version, ops)) ;
+        return ops) ;
     Registration.register0_noctxt ~chunked:false S.block (fun () raw_block ->
         return @@ parse_protocol_data raw_block.protocol_data)
 
-  let operations ctxt block ?(version = default_operations_version) ?check
-      operations =
+  let operations ctxt block ?version ?check operations =
     let open Lwt_result_syntax in
     let*! v =
       RPC_context.make_call0
@@ -3634,7 +3537,7 @@ module Parse = struct
     in
     match v with
     | Error e -> tzfail e
-    | Ok ((Version_0 | Version_1), parse_operation) -> return parse_operation
+    | Ok parse_operation -> return parse_operation
 
   let block ctxt block shell protocol_data =
     RPC_context.make_call0

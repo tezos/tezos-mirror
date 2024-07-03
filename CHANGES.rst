@@ -67,6 +67,10 @@ Node
 - Remove support for deprecated version ``1`` for RPC ``GET
   ../mempool/pending_operations``. (MR :gl:`!13449`)
 
+- Remove support for deprecated version ``0`` from RPCs ``POST
+  ../helpers/parse/operations``, ``POST ../helpers/scripts/run_operation`` and
+  ``POST ../helpers/scripts/simulate_operation``. (MR :gl:`!13451`)
+
 Client
 ------
 
