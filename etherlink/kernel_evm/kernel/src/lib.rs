@@ -74,14 +74,14 @@ pub const CHAIN_ID: u32 = 1337;
 
 /// The configuration for the EVM execution.
 const CONFIG: Config = Config {
-    // The current implementation doesn't support Shanghai stack limit of 256.
+    // The current implementation doesn't support Shanghai call stack limit of 256.
     // We need to set a lower limit until we have switched to a head-based
     // recursive calls.
     //
     // TODO: When this limitation is removed, some evm evaluation tests needs
     // to be reactivated. As well as tests `call_too_deep_not_revert` and
     // `multiple_call_all_the_way_to_1024` in the evm execution crate.
-    stack_limit: 256,
+    call_stack_limit: 256,
     ..Config::shanghai()
 };
 
