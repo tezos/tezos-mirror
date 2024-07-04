@@ -41,36 +41,40 @@ module Full_staking_balance_repr_oxford = struct
          (req "delegated" Tez_repr.encoding))
 end
 
+(* for [level_of_min_delegated], only [level] is checked *)
 let equal_full_staking_balance (a : Full_staking_balance_repr.t)
     (b : Full_staking_balance_repr.t) =
   let open Lwt_result_syntax in
   let open Full_staking_balance_repr in
   let open Full_staking_balance_repr.Internal_for_tests_and_RPCs in
-  let equal_tez_repr ~loc a b =
-    Assert.equal_int64 ~loc (Tez_repr.to_mutez a) (Tez_repr.to_mutez b)
-  in
-  let equal_cycle_repr ~loc a b =
-    Assert.equal_int32 ~loc (Cycle_repr.to_int32 a) (Cycle_repr.to_int32 b)
-  in
-
-  let* () = equal_tez_repr ~loc:__LOC__ (own_frozen a) (own_frozen b) in
-  let* () = equal_tez_repr ~loc:__LOC__ (staked_frozen a) (staked_frozen b) in
+  let* () = Assert.equal_tez_repr ~loc:__LOC__ (own_frozen a) (own_frozen b) in
   let* () =
-    equal_tez_repr ~loc:__LOC__ (current_delegated a) (current_delegated b)
+    Assert.equal_tez_repr ~loc:__LOC__ (staked_frozen a) (staked_frozen b)
   in
   let* () =
-    equal_tez_repr
+    Assert.equal_tez_repr
+      ~loc:__LOC__
+      (current_delegated a)
+      (current_delegated b)
+  in
+  let* () =
+    Assert.equal_tez_repr
       ~loc:__LOC__
       (min_delegated_in_cycle a)
       (min_delegated_in_cycle b)
   in
   let* () =
-    let cycle s =
-      match level_of_min_delegated s with
-      | None -> Cycle_repr.root
-      | Some l -> l.cycle
-    in
-    equal_cycle_repr ~loc:__LOC__ (cycle a) (cycle b)
+    (* compare for [Level_repr.t] only checks [level] *)
+    Assert.equal
+      ~loc:__LOC__
+      (Option.equal Level_repr.( = ))
+      "Level_repr aren't equal"
+      (fun ppf x ->
+        match x with
+        | Some x -> Level_repr.pp ppf x
+        | None -> Format.fprintf ppf "None")
+      (level_of_min_delegated a)
+      (level_of_min_delegated b)
   in
   return_unit
 
@@ -109,6 +113,14 @@ let test_encodings () =
   let* () = equal_full_staking_balance_bytes sb_bytes staking_balance in
 
   (* Test a [None] case for [added_in_p] *)
+  let staking_balance =
+    Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~min_delegated_in_cycle:delegated
+      ~level_of_min_delegated:None
+  in
   let staking_balance_o =
     Full_staking_balance_repr_oxford.make ~own_frozen ~staked_frozen ~delegated
   in

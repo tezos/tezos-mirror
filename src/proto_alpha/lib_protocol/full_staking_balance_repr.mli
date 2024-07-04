@@ -93,4 +93,12 @@ module Internal_for_tests_and_RPCs : sig
   val min_delegated_in_cycle : t -> Tez_repr.t
 
   val level_of_min_delegated : t -> Level_repr.t option
+
+  val init_raw :
+    own_frozen:Tez_repr.t ->
+    staked_frozen:Tez_repr.t ->
+    delegated:Tez_repr.t ->
+    min_delegated_in_cycle:Tez_repr.t ->
+    level_of_min_delegated:Level_repr.t option ->
+    t
 end

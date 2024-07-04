@@ -204,6 +204,10 @@ let not_equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
   let open Alpha_context in
   not_equal ~loc Tez.( = ) "Tez are equal" Tez.pp a b
 
+(* tez_repr *)
+let equal_tez_repr ~loc (a : Tez_repr.t) (b : Tez_repr.t) =
+  equal ~loc Tez_repr.( = ) "Tez_repr aren't equal" Tez_repr.pp a b
+
 (* pkh *)
 let equal_pkh ~loc (a : Signature.Public_key_hash.t)
     (b : Signature.Public_key_hash.t) =
