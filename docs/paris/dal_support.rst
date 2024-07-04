@@ -82,6 +82,6 @@ This section describes the protocol constants specific to the DAL as well as the
 - ``attestation_threshold`` (66): The percentage of shards attested for a given slot to declare the slot available
 - ``blocks_per_epoch`` (1): Unused. Could be removed in the future
 - ``page_size`` (3967B, ~4KiB): The size of a page (see :ref:`dal_slots`)
-- ``slot_size`` (126944B, ~1MiB): The size of a slot (see :ref:`dal_slots`)
+- ``slot_size`` (126944B, ~128KiB): The size of a slot (see :ref:`dal_slots`)
 - ``redundancy_factor`` (8): The erasure-code factor (see :ref:`dal_slots`)
 - ``number_of_shards`` (512): The number of shards per slot (see :ref:`dal_slots`)
