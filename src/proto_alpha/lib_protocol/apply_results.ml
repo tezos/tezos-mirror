@@ -1020,9 +1020,6 @@ module Encoding = struct
       (req (Format.asprintf "%s_power" power_name) int31)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
-  let consensus_result_encoding_legacy power_name =
-    consensus_result_encoding power_name
-
   let consensus_result_encoding = consensus_result_encoding "consensus"
 
   type case =
@@ -1046,30 +1043,6 @@ module Encoding = struct
       (merge_objs (obj1 (req "kind" (constant name))) args)
       (fun x -> match proj x with None -> None | Some x -> Some ((), x))
       (fun ((), x) -> inj x)
-
-  let preendorsement_case =
-    Case
-      {
-        op_case = Operation.Encoding.preendorsement_case;
-        encoding = consensus_result_encoding_legacy "preendorsement";
-        select =
-          (function
-          | Contents_result (Preattestation_result _ as op) -> Some op
-          | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result ((Preattestation _ as op), res) -> Some (op, res)
-          | _ -> None);
-        proj =
-          (function
-          | Preattestation_result
-              {balance_updates; delegate; consensus_key; consensus_power} ->
-              (balance_updates, delegate, consensus_power, consensus_key));
-        inj =
-          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
-            Preattestation_result
-              {balance_updates; delegate; consensus_key; consensus_power});
-      }
 
   let preattestation_case =
     Case
@@ -1095,31 +1068,6 @@ module Encoding = struct
               {balance_updates; delegate; consensus_key; consensus_power});
       }
 
-  let endorsement_case =
-    Case
-      {
-        op_case = Operation.Encoding.endorsement_case;
-        encoding = consensus_result_encoding_legacy "endorsement";
-        select =
-          (function
-          | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result
-              ((Attestation {dal_content = None; _} as op), res) ->
-              Some (op, res)
-          | _ -> None);
-        proj =
-          (function
-          | Attestation_result
-              {balance_updates; delegate; consensus_key; consensus_power} ->
-              (balance_updates, delegate, consensus_power, consensus_key));
-        inj =
-          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
-            Attestation_result
-              {balance_updates; delegate; consensus_key; consensus_power});
-      }
-
   let attestation_case =
     Case
       {
@@ -1132,31 +1080,6 @@ module Encoding = struct
           (function
           | Contents_and_result
               ((Attestation {dal_content = None; _} as op), res) ->
-              Some (op, res)
-          | _ -> None);
-        proj =
-          (function
-          | Attestation_result
-              {balance_updates; delegate; consensus_key; consensus_power} ->
-              (balance_updates, delegate, consensus_power, consensus_key));
-        inj =
-          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
-            Attestation_result
-              {balance_updates; delegate; consensus_key; consensus_power});
-      }
-
-  let endorsement_with_dal_case =
-    Case
-      {
-        op_case = Operation.Encoding.endorsement_with_dal_case;
-        encoding = consensus_result_encoding_legacy "endorsement";
-        select =
-          (function
-          | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result
-              ((Attestation {dal_content = Some _; _} as op), res) ->
               Some (op, res)
           | _ -> None);
         proj =
@@ -1232,34 +1155,6 @@ module Encoding = struct
         inj = (fun bus -> Vdf_revelation_result bus);
       }
 
-  let double_endorsement_evidence_case =
-    Case
-      {
-        op_case = Operation.Encoding.double_endorsement_evidence_case;
-        encoding =
-          obj2
-            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
-            (dft "balance_updates" Receipt.balance_updates_encoding []);
-        select =
-          (function
-          | Contents_result (Double_attestation_evidence_result _ as op) ->
-              Some op
-          | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
-              Some (op, res)
-          | _ -> None);
-        proj =
-          (fun (Double_attestation_evidence_result
-                 {forbidden_delegate; balance_updates}) ->
-            (forbidden_delegate, balance_updates));
-        inj =
-          (fun (forbidden_delegate, balance_updates) ->
-            Double_attestation_evidence_result
-              {forbidden_delegate; balance_updates});
-      }
-
   let double_attestation_evidence_case =
     Case
       {
@@ -1285,35 +1180,6 @@ module Encoding = struct
         inj =
           (fun (forbidden_delegate, balance_updates) ->
             Double_attestation_evidence_result
-              {forbidden_delegate; balance_updates});
-      }
-
-  let double_preendorsement_evidence_case =
-    Case
-      {
-        op_case = Operation.Encoding.double_preendorsement_evidence_case;
-        encoding =
-          obj2
-            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
-            (dft "balance_updates" Receipt.balance_updates_encoding []);
-        select =
-          (function
-          | Contents_result (Double_preattestation_evidence_result _ as op) ->
-              Some op
-          | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result ((Double_preattestation_evidence _ as op), res)
-            ->
-              Some (op, res)
-          | _ -> None);
-        proj =
-          (fun (Double_preattestation_evidence_result
-                 {forbidden_delegate; balance_updates}) ->
-            (forbidden_delegate, balance_updates));
-        inj =
-          (fun (forbidden_delegate, balance_updates) ->
-            Double_preattestation_evidence_result
               {forbidden_delegate; balance_updates});
       }
 
@@ -1803,12 +1669,6 @@ let contents_cases =
   :: double_attestation_evidence_case :: double_preattestation_evidence_case
   :: common_cases
 
-let contents_cases_with_legacy_attestation_name =
-  let open Encoding in
-  endorsement_case :: endorsement_with_dal_case :: preendorsement_case
-  :: double_endorsement_evidence_case :: double_preendorsement_evidence_case
-  :: common_cases
-
 let make_contents_result
     (Encoding.Case
       {
@@ -1826,13 +1686,6 @@ let make_contents_result
 let contents_result_encoding =
   def "operation.alpha.contents_result"
   @@ union (List.map make_contents_result contents_cases)
-
-let contents_result_encoding_with_legacy_attestation_name =
-  def "operation_with_legacy_attestation_name.alpha.contents_result"
-  @@ union
-       (List.map
-          make_contents_result
-          contents_cases_with_legacy_attestation_name)
 
 let make_contents_and_result
     (Encoding.Case
@@ -1856,14 +1709,6 @@ let make_contents_and_result
 let contents_and_result_encoding =
   def "operation.alpha.operation_contents_and_result"
   @@ union (List.map make_contents_and_result contents_cases)
-
-let contents_and_result_encoding_with_legacy_attestation_name =
-  def
-    "operation_with_legacy_attestation_name.alpha.operation_contents_and_result"
-  @@ union
-       (List.map
-          make_contents_and_result
-          contents_cases_with_legacy_attestation_name)
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -1902,11 +1747,6 @@ let contents_result_list_conv_with_guard =
 let contents_result_list_encoding =
   def "operation.alpha.contents_list_result"
   @@ contents_result_list_conv_with_guard (list contents_result_encoding)
-
-let contents_result_list_encoding_with_legacy_attestation_name =
-  def "operation_with_legacy_attestation_name.alpha.contents_list_result"
-  @@ contents_result_list_conv_with_guard
-       (list contents_result_encoding_with_legacy_attestation_name)
 
 type 'kind contents_and_result_list =
   | Single_and_result :
@@ -1950,10 +1790,6 @@ let contents_and_result_list_encoding =
   contents_and_result_conv_with_guard
     (Variable.list contents_and_result_encoding)
 
-let contents_and_result_list_encoding_with_legacy_attestation_name =
-  contents_and_result_conv_with_guard
-    (Variable.list contents_and_result_encoding_with_legacy_attestation_name)
-
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
 
 type packed_operation_metadata =
@@ -1968,28 +1804,6 @@ let operation_metadata_encoding =
            (Tag 0)
            ~title:"Operation_metadata"
            contents_result_list_encoding
-           (function
-             | Operation_metadata {contents} ->
-                 Some (Contents_result_list contents)
-             | _ -> None)
-           (fun (Contents_result_list contents) ->
-             Operation_metadata {contents});
-         case
-           (Tag 1)
-           ~title:"No_operation_metadata"
-           empty
-           (function No_operation_metadata -> Some () | _ -> None)
-           (fun () -> No_operation_metadata);
-       ]
-
-let operation_metadata_encoding_with_legacy_attestation_name =
-  def "operation_with_legacy_attestation_name.alpha.result"
-  @@ union
-       [
-         case
-           (Tag 0)
-           ~title:"Operation_metadata"
-           contents_result_list_encoding_with_legacy_attestation_name
            (function
              | Operation_metadata {contents} ->
                  Some (Contents_result_list contents)
@@ -2679,53 +2493,6 @@ let operation_data_and_metadata_encoding =
              (Operation_data {contents; signature}, No_operation_metadata));
        ]
 
-let operation_data_and_metadata_encoding_with_legacy_attestation_name =
-  def "operation_with_legacy_attestation_name.alpha.operation_with_metadata"
-  @@ union
-       [
-         case
-           (Tag 0)
-           ~title:"Operation_with_metadata"
-           (obj2
-              (req
-                 "contents"
-                 (dynamic_size
-                    contents_and_result_list_encoding_with_legacy_attestation_name))
-              (opt "signature" Signature.encoding))
-           (function
-             | Operation_data _, No_operation_metadata -> None
-             | Operation_data op, Operation_metadata res -> (
-                 match kind_equal_list op.contents res.contents with
-                 | None ->
-                     Pervasives.failwith
-                       "cannot decode inconsistent combined operation result"
-                 | Some Eq ->
-                     Some
-                       ( Contents_and_result_list
-                           (pack_contents_list op.contents res.contents),
-                         op.signature )))
-           (fun (Contents_and_result_list contents, signature) ->
-             let op_contents, res_contents = unpack_contents_list contents in
-             ( Operation_data {contents = op_contents; signature},
-               Operation_metadata {contents = res_contents} ));
-         case
-           (Tag 1)
-           ~title:"Operation_without_metadata"
-           (obj2
-              (req
-                 "contents"
-                 (dynamic_size
-                    Operation
-                    .contents_list_encoding_with_legacy_attestation_name))
-              (opt "signature" Signature.encoding))
-           (function
-             | Operation_data op, No_operation_metadata ->
-                 Some (Contents_list op.contents, op.signature)
-             | Operation_data _, Operation_metadata _ -> None)
-           (fun (Contents_list contents, signature) ->
-             (Operation_data {contents; signature}, No_operation_metadata));
-       ]
-
 type block_metadata = {
   proposer : Consensus_key.t;
   baker : Consensus_key.t;
@@ -2742,12 +2509,9 @@ type block_metadata = {
   dal_attestation : Dal.Attestation.t;
 }
 
-let block_metadata_encoding ~use_legacy_attestation_name =
+let block_metadata_encoding =
   let open Data_encoding in
-  def
-    (if use_legacy_attestation_name then
-       "block_header.alpha.metadata_with_legacy_attestation_name"
-     else "block_header.alpha.metadata")
+  def "block_header.alpha.metadata"
   @@ conv
        (fun {
               proposer =
@@ -2834,9 +2598,3 @@ let block_metadata_encoding ~use_legacy_attestation_name =
              (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
              (req "dal_attestation" Dal.Attestation.encoding)))
-
-let block_metadata_encoding_with_legacy_attestation_name =
-  block_metadata_encoding ~use_legacy_attestation_name:true
-
-let block_metadata_encoding =
-  block_metadata_encoding ~use_legacy_attestation_name:false
