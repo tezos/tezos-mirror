@@ -142,6 +142,10 @@ module type EVENT = sig
   (** Output an event of type {!t}, if no sinks are listening the
       function won't be applied. *)
   val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
+
+  (** Registers an event of type {!t} to be output when event sinks activate.
+      Does not output anything if called after sink activation. *)
+  val emit_at_top_level : t -> unit
 end
 
 (** Build an event from an event-definition. *)
@@ -257,6 +261,9 @@ module Simple : sig
 
   (** Emit an instance of an event. *)
   val emit : 'a t -> 'a -> unit Lwt.t
+
+  (** Emit an instance of an event if called at toplevel *)
+  val emit_at_top_level : 'a t -> 'a -> unit
 
   (** Emit an instance of an event but do not wait for completion. Only use if
       you really need to not wait for logging resolution before continuing. May
