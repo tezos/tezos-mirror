@@ -394,6 +394,7 @@ mod tests {
                 &input,
                 None,
                 Some(100_000_000),
+                true,
             );
 
             assert!(result.is_ok());
@@ -406,7 +407,7 @@ mod tests {
     #[test]
     fn test_modexp_empty_input() {
         let result =
-            execute_precompiled(H160::from_low_u64_be(5), &[], None, Some(100_000));
+            execute_precompiled(H160::from_low_u64_be(5), &[], None, Some(100_000), true);
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
@@ -429,6 +430,7 @@ mod tests {
             &input_overflow,
             None,
             Some(100_000),
+            true,
         );
 
         assert!(result.is_ok());
