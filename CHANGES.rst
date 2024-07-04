@@ -39,6 +39,10 @@ Node
   /chains/<chain>/mempool/pending_operations`` which allows operations
   to be filtered by source. (MR :gl:`!11278`)
 
+- Add an ``operation_hash`` argument to ``GET
+  /chains/<chain>/mempool/pending_operations`` which allows operations
+  to be filtered by hash. (MR :gl:`!13977`)
+
 - Add an RPC
   ``/chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<sr1...>/consumed_outputs/<outbox_level>``
   that returns the consumed output's indexes for the given outbox
