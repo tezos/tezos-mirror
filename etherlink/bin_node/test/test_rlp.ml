@@ -157,7 +157,7 @@ let test_transaction_data_decoding_pos_invariance _ () =
          ]
   in
   let data =
-    Ethereum_types.transaction_data (Bytes.to_string encoded_data)
+    Transaction.data_of_rlp_raw_tx (Bytes.to_string encoded_data)
     |> Result.value_f ~default:(fun () -> Test.fail "Decoding failed")
   in
   Alcotest.(check bytes) "Expected data should coincide" expected_data data ;

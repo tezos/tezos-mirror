@@ -41,7 +41,7 @@ let chunk_transaction ~tx_hash ~tx_raw =
   let all_chunk_hashes, chunks =
     List.fold_left_i
       (fun i (all_chunk_hashes, chunks) chunk ->
-        let chunk_hash = Ethereum_types.hash_raw_tx chunk in
+        let chunk_hash = Transaction.hash_raw_tx chunk in
         let all_chunk_hashes = all_chunk_hashes ^ chunk_hash in
         let chunk =
           Chunk (tx_hash ^ Ethereum_types.u16_to_bytes i ^ chunk_hash ^ chunk)
@@ -63,7 +63,7 @@ let make_evm_inbox_transactions tx_raw =
     max_input_size - framing_protocol_tag_size - smart_rollup_address_size
     - transaction_tag_size - Ethereum_types.transaction_hash_size
   in
-  let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+  let tx_hash = Transaction.hash_raw_tx tx_raw in
   if String.length tx_raw <= maximum_size then
     (* Simple transaction, fits in a single input. *)
     let tx = Simple (tx_hash ^ tx_raw) in

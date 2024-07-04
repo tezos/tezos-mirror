@@ -29,7 +29,7 @@ end) : Services_backend_sig.Backend = struct
       let hashes =
         List.map
           (fun transaction ->
-            let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
+            let tx_hash_str = Transaction.hash_raw_tx transaction in
             Ethereum_types.(
               Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
           transactions

@@ -96,9 +96,9 @@ module Pool = struct
     let* nonce, gas_price, gas_limit =
       match transaction_object with
       | None ->
-          let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
-          let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
-          let* nonce = Ethereum_types.transaction_nonce raw_tx in
+          let* gas_price = Transaction.gas_price_of_rlp_raw_tx raw_tx in
+          let* gas_limit = Transaction.gas_limit_of_rlp_raw_tx raw_tx in
+          let* nonce = Transaction.nonce_of_rlp_raw_tx raw_tx in
           return (nonce, gas_price, gas_limit)
       | Some transaction_object ->
           let (Qty nonce) = transaction_object.nonce in
@@ -424,7 +424,7 @@ let insert_valid_transaction state tx_raw address
   in
   let*? tx_data =
     match transaction_object with
-    | None -> Ethereum_types.transaction_data tx_raw
+    | None -> Transaction.data_of_rlp_raw_tx tx_raw
     | Some transaction_object ->
         Result.return
           (transaction_object.input |> Ethereum_types.hash_to_bytes
@@ -445,7 +445,7 @@ let insert_valid_transaction state tx_raw address
     else
       (* Add the transaction to the pool *)
       (* Compute the hash *)
-      let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+      let tx_hash = Transaction.hash_raw_tx tx_raw in
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
       in
@@ -601,7 +601,7 @@ let pop_transactions state ~maximum_cumulative_size =
              match transaction_object with
              | Some {hash; _} -> (raw_tx, hash)
              | None ->
-                 let tx_hash = Ethereum_types.hash_raw_tx raw_tx in
+                 let tx_hash = Transaction.hash_raw_tx raw_tx in
                  let hash =
                    Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
                  in

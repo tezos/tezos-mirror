@@ -90,8 +90,6 @@ val transaction_hash_size : int
 
 val decode_hash : bytes -> hash
 
-val hash_raw_tx : string -> string
-
 (** [hash_of_string s] takes a string [s] representing a hash in
     hexadecimal format, e.g. [0xFFFFFFF]. Strips the prefix and keeps
     the hash value, e.g. [FFFFFFF]. *)
@@ -201,34 +199,6 @@ type transaction_receipt = {
 val transaction_receipt_encoding : transaction_receipt Data_encoding.t
 
 val transaction_receipt_from_rlp : block_hash -> bytes -> transaction_receipt
-
-type transaction = {
-  from : address;
-  to_ : address;
-  gas : quantity;
-  gasPrice : quantity;
-  value : quantity option;
-  data : hash;
-  nonce : quantity option;
-}
-
-val transaction_encoding : transaction Data_encoding.t
-
-(** [transaction_nonce bytes] returns the nonce of a given raw
-    transaction. *)
-val transaction_nonce : string -> Z.t tzresult
-
-(** [transaction_gas_price base_fee bytes] returns the maximum gas
-    price the user can pay for the tx. *)
-val transaction_gas_price : string -> Z.t tzresult
-
-(** [transaction_gas_limit bytes] returns the gas limit of a given raw
-    transaction. *)
-val transaction_gas_limit : string -> Z.t tzresult
-
-(** [transaction_data bytes] returns the data of a given raw
-    transaction. *)
-val transaction_data : string -> bytes tzresult
 
 type call = {
   from : address option;
