@@ -30,6 +30,9 @@ type t
     same configuration, they will generate the same context hashes. *)
 val equal : t -> t -> bool
 
+(** Pretty printing for context configurations *)
+val pp : Format.formatter -> t -> unit
+
 (** Constructor. *)
 val v :
   entries:int ->

@@ -14,6 +14,26 @@ module type BRASSAIA_CONTEXT =
     with type memory_context_tree :=
       Tezos_context_brassaia_memory.Tezos_context_memory.Context.tree
 
+let pp_print_option pp ppf = function
+  | Some v -> Format.fprintf ppf "Some %a" pp v
+  | None -> Format.fprintf ppf "None"
+
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "duo_context"]
+
+  let assertion_failure =
+    declare_3
+      ~section
+      ~level:Warning
+      ~name:"assertion_failure"
+      ~msg:"{function} returned {res1} for Irmin and {res2} for Brassaia"
+      ("res1", Data_encoding.string)
+      ("res2", Data_encoding.string)
+      ("function", Data_encoding.string)
+end
+
 module Make
     (Irmin_Context : IRMIN_CONTEXT)
     (Brassaia_Context : BRASSAIA_CONTEXT) =
@@ -39,66 +59,144 @@ struct
     brassaia_tree : Brassaia_Context.tree;
   }
 
+  let assert_and_return_result_lwt res1 res2 equal pp1 pp2 function_name
+      final_res =
+    if equal res1 res2 then Lwt.return final_res
+    else
+      let+ () =
+        Events.(
+          emit
+            assertion_failure
+            ( Format.asprintf "%a" pp1 res1,
+              Format.asprintf "%a" pp2 res2,
+              function_name ))
+      in
+      final_res
+
+  let assert_and_return_result res1 res2 equal pp1 pp2 function_name final_res =
+    if equal res1 res2 then final_res
+    else (
+      Events.(
+        emit__dont_wait__use_with_care
+          assertion_failure
+          ( Format.asprintf "%a" pp1 res1,
+            Format.asprintf "%a" pp2 res2,
+            function_name )) ;
+      final_res)
+
+  let option_equal_no_traversal o1 o2 =
+    match (o1, o2) with Some _, Some _ | None, None -> true | _ -> false
+
+  let pp_option_no_traversal ppf = function
+    | Some _ -> Format.fprintf ppf "Some _"
+    | None -> Format.fprintf ppf "None"
+
   module Tree = struct
     module Irmin_Tree = Irmin_Context.Tree
     module Brassaia_Tree = Brassaia_Context.Tree
 
     let mem : tree -> key -> bool Lwt.t =
      fun t key ->
-      let* b1 = Irmin_Tree.mem t.irmin_tree key in
-      let+ b2 = Brassaia_Tree.mem t.brassaia_tree key in
-      assert (b1 = b2) ;
-      b1
+      let* bool1 = Irmin_Tree.mem t.irmin_tree key in
+      let* bool2 = Brassaia_Tree.mem t.brassaia_tree key in
+      assert_and_return_result_lwt
+        bool1
+        bool2
+        Bool.equal
+        Format.pp_print_bool
+        Format.pp_print_bool
+        "Tree.mem"
+        bool1
 
     let mem_tree : tree -> key -> bool Lwt.t =
      fun t key ->
-      let* b1 = Irmin_Tree.mem_tree t.irmin_tree key in
-      let+ b2 = Brassaia_Tree.mem_tree t.brassaia_tree key in
-      assert (b1 = b2) ;
-      b1
+      let* bool1 = Irmin_Tree.mem_tree t.irmin_tree key in
+      let* bool2 = Brassaia_Tree.mem_tree t.brassaia_tree key in
+      assert_and_return_result_lwt
+        bool1
+        bool2
+        Bool.equal
+        Format.pp_print_bool
+        Format.pp_print_bool
+        "Tree.mem_tree"
+        bool1
 
     let find : tree -> key -> value option Lwt.t =
      fun t key ->
-      let* v1 = Irmin_Tree.find t.irmin_tree key in
-      let+ v2 = Brassaia_Tree.find t.brassaia_tree key in
-      assert (v1 = v2) ;
-      v1
+      let* value1 = Irmin_Tree.find t.irmin_tree key in
+      let* value2 = Brassaia_Tree.find t.brassaia_tree key in
+      assert_and_return_result_lwt
+        value1
+        value2
+        (Option.equal Bytes.equal)
+        (pp_print_option Format.pp_print_bytes)
+        (pp_print_option Format.pp_print_bytes)
+        "Tree.find"
+        value1
 
     let find_tree : tree -> key -> tree option Lwt.t =
      fun t key ->
       let* irmin_tree = Irmin_Tree.find_tree t.irmin_tree key in
-      let+ brassaia_tree = Brassaia_Tree.find_tree t.brassaia_tree key in
-      match (irmin_tree, brassaia_tree) with
-      | Some irmin_tree, Some brassaia_tree -> Some {irmin_tree; brassaia_tree}
-      | None, None -> None
-      | _ -> Fmt.failwith "Received Some tree and None"
+      let* brassaia_tree = Brassaia_Tree.find_tree t.brassaia_tree key in
+      let final_res =
+        match (irmin_tree, brassaia_tree) with
+        | Some irmin_tree, Some brassaia_tree ->
+            Some {irmin_tree; brassaia_tree}
+        | _ -> None
+      in
+      assert_and_return_result_lwt
+        irmin_tree
+        brassaia_tree
+        option_equal_no_traversal
+        pp_option_no_traversal
+        pp_option_no_traversal
+        "Tree.find_tree"
+        final_res
 
     let list :
         tree -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t
         =
      fun t ?offset ?length key ->
       let* irmin_list = Irmin_Tree.list t.irmin_tree ?offset ?length key in
-      let+ brassaia_list =
+      let* brassaia_list =
         Brassaia_Tree.list t.brassaia_tree ?offset ?length key
       in
-      assert (List.compare_lengths irmin_list brassaia_list = 0) ;
-      List.map
-        (fun (key, irmin_tree) ->
-          let brassaia_tree =
-            List.find (fun (key2, _) -> String.equal key key2) brassaia_list
-            |> Option.value
-                 ~default:(Fmt.failwith "No value associated to %s" key)
-            |> snd
-          in
-          (key, {irmin_tree; brassaia_tree}))
+      let final_res =
+        List.map
+          (fun (key, irmin_tree) ->
+            let brassaia_tree =
+              List.find (fun (key2, _) -> String.equal key key2) brassaia_list
+              |> Option.value
+                   ~default:(Fmt.failwith "No value associated to %s" key)
+              |> snd
+            in
+            (key, {irmin_tree; brassaia_tree}))
+          irmin_list
+      in
+      let pp_list ppf l =
+        Format.pp_print_list (fun ppf (s, _) -> Format.fprintf ppf "%s" s) ppf l
+      in
+      assert_and_return_result_lwt
         irmin_list
+        brassaia_list
+        (fun l1 l2 -> List.compare_lengths l1 l2 = 0)
+        pp_list
+        pp_list
+        "Tree.list"
+        final_res
 
     let length : tree -> key -> int Lwt.t =
      fun t key ->
       let* length1 = Irmin_Tree.length t.irmin_tree key in
-      let+ length2 = Brassaia_Tree.length t.brassaia_tree key in
-      assert (length1 = length2) ;
-      length1
+      let* length2 = Brassaia_Tree.length t.brassaia_tree key in
+      assert_and_return_result_lwt
+        length1
+        length2
+        Int.equal
+        Format.pp_print_int
+        Format.pp_print_int
+        "Tree.length"
+        length1
 
     let add : tree -> key -> value -> tree Lwt.t =
      fun t key value ->
@@ -144,8 +242,14 @@ struct
      fun t ->
       let config1 = Irmin_Tree.config t.irmin_tree in
       let config2 = Brassaia_Tree.config t.brassaia_tree in
-      assert (Tezos_context_sigs.Config.equal config1 config2) ;
-      config1
+      assert_and_return_result
+        config1
+        config2
+        Tezos_context_sigs.Config.equal
+        Tezos_context_sigs.Config.pp
+        Tezos_context_sigs.Config.pp
+        "Tree.config"
+        config1
 
     let empty : t -> tree =
      fun t ->
@@ -163,26 +267,44 @@ struct
      fun t ->
       let bool1 = Irmin_Tree.is_empty t.irmin_tree in
       let bool2 = Brassaia_Tree.is_empty t.brassaia_tree in
-      assert (bool1 = bool2) ;
-      bool1
+      assert_and_return_result
+        bool1
+        bool2
+        Bool.equal
+        Format.pp_print_bool
+        Format.pp_print_bool
+        "Tree.is_empty"
+        bool1
 
     let kind : tree -> Tezos_context_sigs.Context.Kind.t =
      fun t ->
       let kind1 = Irmin_Tree.kind t.irmin_tree in
       let kind2 = Brassaia_Tree.kind t.brassaia_tree in
-      assert (kind1 = kind2) ;
-      kind1
+      let pp_kind ppf = function
+        | `Value -> Format.fprintf ppf "value"
+        | `Tree -> Format.fprintf ppf "tree"
+      in
+      assert_and_return_result
+        kind1
+        kind2
+        ( = )
+        pp_kind
+        pp_kind
+        "Tree.kind"
+        kind1
 
     let to_value : tree -> value option Lwt.t =
      fun t ->
       let* value1 = Irmin_Tree.to_value t.irmin_tree in
-      let+ value2 = Brassaia_Tree.to_value t.brassaia_tree in
-      match (value1, value2) with
-      | Some value1, Some value2 ->
-          assert (value1 = value2) ;
-          Some value1
-      | None, None -> None
-      | _ -> Fmt.failwith "Received Some value and None"
+      let* value2 = Brassaia_Tree.to_value t.brassaia_tree in
+      assert_and_return_result_lwt
+        value1
+        value2
+        Option.(equal Bytes.equal)
+        (pp_print_option Format.pp_print_bytes)
+        (pp_print_option Format.pp_print_bytes)
+        "Tree.to_value"
+        value1
 
     let of_value : t -> value -> tree Lwt.t =
      fun t value ->
@@ -194,15 +316,27 @@ struct
      fun t ->
       let context_hash1 = Irmin_Tree.hash t.irmin_tree in
       let context_hash2 = Brassaia_Tree.hash t.brassaia_tree in
-      assert (context_hash1 = context_hash2) ;
-      context_hash1
+      assert_and_return_result
+        context_hash1
+        context_hash2
+        Context_hash.equal
+        Context_hash.pp
+        Context_hash.pp
+        "Tree.hash"
+        context_hash1
 
     let equal : tree -> tree -> bool =
      fun t1 t2 ->
       let bool1 = Irmin_Tree.equal t1.irmin_tree t2.irmin_tree in
       let bool2 = Brassaia_Tree.equal t1.brassaia_tree t2.brassaia_tree in
-      assert (bool1 = bool2) ;
-      bool1
+      assert_and_return_result
+        bool1
+        bool2
+        Bool.equal
+        Format.pp_print_bool
+        Format.pp_print_bool
+        "Tree.equal"
+        bool1
 
     let clear : ?depth:int -> tree -> unit =
      fun ?depth t ->
@@ -215,7 +349,6 @@ struct
       Brassaia_Tree.pp ppf t.brassaia_tree
 
     type raw = Irmin_Tree.raw
-    (*   [`Tree of raw Tezos_base.TzPervasives.String.Map.t | `Value of value] *)
 
     let raw_encoding : raw Tezos_base.TzPervasives.Data_encoding.t =
       Irmin_Tree.raw_encoding
@@ -224,8 +357,17 @@ struct
      fun t ->
       let* raw1 = Irmin_Tree.to_raw t.irmin_tree in
       let+ raw2 = Brassaia_Tree.to_raw t.brassaia_tree in
-      assert (raw1 = raw2) ;
-      raw1
+      let equal raw1 raw2 =
+        match (raw1, raw2) with
+        | `Value b1, `Value b2 -> Bytes.equal b1 b2
+        | `Tree _, `Tree _ -> true
+        | _ -> false
+      in
+      let pp ppf = function
+        | `Value b -> Format.fprintf ppf "Value %s" (Bytes.to_string b)
+        | `Tree _ -> Format.fprintf ppf "Tree"
+      in
+      assert_and_return_result raw1 raw2 equal pp pp "Tree.to_raw" raw1
 
     let of_raw : raw -> tree =
      fun raw ->
@@ -247,15 +389,31 @@ struct
      fun t ->
       let bool1 = Irmin_Tree.is_shallow t.irmin_tree in
       let bool2 = Brassaia_Tree.is_shallow t.brassaia_tree in
-      assert (bool1 = bool2) ;
-      bool1
+      assert_and_return_result
+        bool1
+        bool2
+        Bool.equal
+        Format.pp_print_bool
+        Format.pp_print_bool
+        "Tree.is_shallow"
+        bool1
 
     let kinded_key : tree -> Irmin_Context.kinded_key option =
      fun t ->
       let kinded_key1 = Irmin_Tree.kinded_key t.irmin_tree in
       let kinded_key2 = Brassaia_Tree.kinded_key t.brassaia_tree in
-      assert (kinded_key1 = Obj.magic kinded_key2) ;
-      kinded_key1
+      let pp ppf = function
+        | `Node _node_key -> Format.fprintf ppf "Node"
+        | `Value _value_key -> Format.fprintf ppf "Value"
+      in
+      assert_and_return_result
+        kinded_key1
+        kinded_key2
+        (fun k1 k2 -> k1 = Obj.magic k2)
+        (pp_print_option pp)
+        (pp_print_option pp)
+        "Tree.kinded_key"
+        kinded_key1
   end
 
   module Proof = Irmin_Context.Proof
@@ -271,64 +429,115 @@ struct
   let equal_config config1 config2 =
     let bool1 = Irmin_Context.equal_config config1 config2 in
     let bool2 = Brassaia_Context.equal_config config1 config2 in
-    assert (bool1 = bool2) ;
-    bool1
+    assert_and_return_result
+      bool1
+      bool2
+      Bool.equal
+      Format.pp_print_bool
+      Format.pp_print_bool
+      "equal_config"
+      bool1
 
   let mem : t -> key -> bool Lwt.t =
    fun t key ->
     let* bool1 = Irmin_Context.mem t.irmin_context key in
-    let+ bool2 = Brassaia_Context.mem t.brassaia_context (Obj.magic key) in
-    assert (bool1 = bool2) ;
-    bool1
+    let* bool2 = Brassaia_Context.mem t.brassaia_context (Obj.magic key) in
+    assert_and_return_result_lwt
+      bool1
+      bool2
+      Bool.equal
+      Format.pp_print_bool
+      Format.pp_print_bool
+      "mem"
+      bool1
 
   let mem_tree : t -> key -> bool Lwt.t =
    fun t key ->
     let* bool1 = Irmin_Context.mem_tree t.irmin_context key in
-    let+ bool2 = Brassaia_Context.mem_tree t.brassaia_context key in
-    assert (bool1 = bool2) ;
-    bool1
+    let* bool2 = Brassaia_Context.mem_tree t.brassaia_context key in
+    assert_and_return_result_lwt
+      bool1
+      bool2
+      Bool.equal
+      Format.pp_print_bool
+      Format.pp_print_bool
+      "mem_tree"
+      bool1
 
   let find : t -> key -> value option Lwt.t =
    fun t key ->
     let* value1 = Irmin_Context.find t.irmin_context key in
-    let+ value2 = Brassaia_Context.find t.brassaia_context key in
-    assert (value1 = value2) ;
-    value1
+    let* value2 = Brassaia_Context.find t.brassaia_context key in
+    assert_and_return_result_lwt
+      value1
+      value2
+      (Option.equal Bytes.equal)
+      (pp_print_option Format.pp_print_bytes)
+      (pp_print_option Format.pp_print_bytes)
+      "find"
+      value1
 
   let find_tree : t -> key -> tree option Lwt.t =
    fun t key ->
     let* irmin_tree = Irmin_Context.find_tree t.irmin_context key in
-    let+ brassaia_tree = Brassaia_Context.find_tree t.brassaia_context key in
-    match (irmin_tree, brassaia_tree) with
-    | Some irmin_tree, Some brassaia_tree -> Some {irmin_tree; brassaia_tree}
-    | None, None -> None
-    | _ -> Fmt.failwith "Received Some tree and None"
+    let* brassaia_tree = Brassaia_Context.find_tree t.brassaia_context key in
+    let final_res =
+      match (irmin_tree, brassaia_tree) with
+      | Some irmin_tree, Some brassaia_tree -> Some {irmin_tree; brassaia_tree}
+      | _ -> None
+    in
+    assert_and_return_result_lwt
+      irmin_tree
+      brassaia_tree
+      option_equal_no_traversal
+      pp_option_no_traversal
+      pp_option_no_traversal
+      "find_tree"
+      final_res
 
   let list :
       t -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t =
    fun t ?offset ?length key ->
     let* irmin_list = Irmin_Context.list t.irmin_context ?offset ?length key in
-    let+ brassaia_list =
+    let* brassaia_list =
       Brassaia_Context.list t.brassaia_context ?offset ?length key
     in
-    assert (List.compare_lengths irmin_list brassaia_list = 0) ;
-    List.map
-      (fun (key, irmin_tree) ->
-        let brassaia_tree =
-          List.find (fun (key2, _) -> String.equal key key2) brassaia_list
-          |> Option.value
-               ~default:(Fmt.failwith "No value associated to %s" key)
-          |> snd
-        in
-        (key, {irmin_tree; brassaia_tree}))
+    let final_res =
+      List.map
+        (fun (key, irmin_tree) ->
+          let brassaia_tree =
+            List.find (fun (key2, _) -> String.equal key key2) brassaia_list
+            |> Option.value
+                 ~default:(Fmt.failwith "No value associated to %s" key)
+            |> snd
+          in
+          (key, {irmin_tree; brassaia_tree}))
+        irmin_list
+    in
+    let pp_list ppf l =
+      Format.pp_print_list (fun ppf (s, _) -> Format.fprintf ppf "%s" s) ppf l
+    in
+    assert_and_return_result_lwt
       irmin_list
+      brassaia_list
+      (fun l1 l2 -> List.compare_lengths l1 l2 = 0)
+      pp_list
+      pp_list
+      "list"
+      final_res
 
   let length : t -> key -> int Lwt.t =
    fun t key ->
     let* length1 = Irmin_Context.length t.irmin_context key in
-    let+ length2 = Brassaia_Context.length t.brassaia_context key in
-    assert (length1 = length2) ;
-    length1
+    let* length2 = Brassaia_Context.length t.brassaia_context key in
+    assert_and_return_result_lwt
+      length1
+      length2
+      Int.equal
+      Format.pp_print_int
+      Format.pp_print_int
+      "length"
+      length1
 
   let add : t -> key -> value -> t Lwt.t =
    fun t key value ->
@@ -386,15 +595,27 @@ struct
    fun t ->
     let config1 = Irmin_Context.config t.irmin_context in
     let config2 = Brassaia_Context.config t.brassaia_context in
-    assert (Tezos_context_sigs.Config.equal config1 config2) ;
-    config1
+    assert_and_return_result
+      config1
+      config2
+      Tezos_context_sigs.Config.equal
+      Tezos_context_sigs.Config.pp
+      Tezos_context_sigs.Config.pp
+      "config"
+      config1
 
   let get_protocol : t -> Protocol_hash.t Lwt.t =
    fun t ->
     let* hash1 = Irmin_Context.get_protocol t.irmin_context in
-    let+ hash2 = Brassaia_Context.get_protocol t.brassaia_context in
-    assert (Protocol_hash.equal hash1 hash2) ;
-    hash1
+    let* hash2 = Brassaia_Context.get_protocol t.brassaia_context in
+    assert_and_return_result_lwt
+      hash1
+      hash2
+      Protocol_hash.equal
+      Protocol_hash.pp
+      Protocol_hash.pp
+      "get_protocol"
+      hash1
 
   let fork_test_chain :
       t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t =
@@ -422,8 +643,14 @@ struct
    fun t ->
     let version1 = Irmin_Context.get_hash_version t.irmin_context in
     let version2 = Brassaia_Context.get_hash_version t.brassaia_context in
-    assert (Context_hash.Version.equal version1 version2) ;
-    version1
+    assert_and_return_result
+      version1
+      version2
+      Context_hash.Version.equal
+      Context_hash.Version.pp
+      Context_hash.Version.pp
+      "get_hash_version"
+      version1
 
   let verify_tree_proof :
       Proof.tree Proof.t ->
@@ -504,8 +731,14 @@ struct
    fun index ->
     let bool1 = Irmin_Context.is_gc_allowed index.irmin_index in
     let bool2 = Brassaia_Context.is_gc_allowed index.brassaia_index in
-    assert (bool1 = bool2) ;
-    bool1
+    assert_and_return_result
+      bool1
+      bool2
+      Bool.equal
+      Format.pp_print_bool
+      Format.pp_print_bool
+      "is_gc_allowed"
+      bool1
 
   let split : index -> unit Lwt.t =
    fun index ->
@@ -520,9 +753,15 @@ struct
   let exists : index -> Context_hash.t -> bool Lwt.t =
    fun index context_hash ->
     let* bool1 = Irmin_Context.exists index.irmin_index context_hash in
-    let+ bool2 = Brassaia_Context.exists index.brassaia_index context_hash in
-    assert (bool1 = bool2) ;
-    bool1
+    let* bool2 = Brassaia_Context.exists index.brassaia_index context_hash in
+    assert_and_return_result_lwt
+      bool1
+      bool2
+      Bool.equal
+      Format.pp_print_bool
+      Format.pp_print_bool
+      "exists"
+      bool1
 
   let close : index -> unit Lwt.t =
    fun index ->
@@ -533,8 +772,14 @@ struct
    fun block_hash ->
     let chain_id1 = Irmin_Context.compute_testchain_chain_id block_hash in
     let chain_id2 = Brassaia_Context.compute_testchain_chain_id block_hash in
-    assert (Chain_id.equal chain_id1 chain_id2) ;
-    chain_id1
+    assert_and_return_result
+      chain_id1
+      chain_id2
+      Chain_id.equal
+      Chain_id.pp
+      Chain_id.pp
+      "compute_testchain_chain_id"
+      chain_id1
 
   (** Miscellaneous *)
 
@@ -568,21 +813,33 @@ struct
     let context_hash2 =
       Brassaia_Context.hash ~time ?message t.brassaia_context
     in
-    assert (Context_hash.equal context_hash1 context_hash2) ;
-    context_hash1
+    assert_and_return_result
+      context_hash1
+      context_hash2
+      Context_hash.equal
+      Context_hash.pp
+      Context_hash.pp
+      "hash"
+      context_hash1
 
   let commit_test_chain_genesis : t -> Block_header.t -> Block_header.t Lwt.t =
    fun context block_header ->
     let* block_header1 =
       Irmin_Context.commit_test_chain_genesis context.irmin_context block_header
     in
-    let+ block_header2 =
+    let* block_header2 =
       Brassaia_Context.commit_test_chain_genesis
         context.brassaia_context
         block_header
     in
-    assert (Block_header.equal block_header1 block_header2) ;
-    block_header1
+    assert_and_return_result_lwt
+      block_header1
+      block_header2
+      Block_header.equal
+      Block_header.pp
+      Block_header.pp
+      "commit_test_chain_genesis"
+      block_header1
 
   let get_test_chain : t -> Test_chain_status.t Lwt.t =
    fun t ->
@@ -603,11 +860,17 @@ struct
       time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t Lwt.t =
    fun ~time ?message t ->
     let* context_hash1 = Irmin_Context.commit ~time ?message t.irmin_context in
-    let+ context_hash2 =
+    let* context_hash2 =
       Brassaia_Context.commit ~time ?message t.brassaia_context
     in
-    assert (Context_hash.equal context_hash1 context_hash2) ;
-    context_hash1
+    assert_and_return_result_lwt
+      context_hash1
+      context_hash2
+      Context_hash.equal
+      Context_hash.pp
+      Context_hash.pp
+      "hash"
+      context_hash1
 
   let commit_genesis :
       index ->
@@ -634,8 +897,14 @@ struct
    fun block_hash ->
     let block_hash1 = Irmin_Context.compute_testchain_genesis block_hash in
     let block_hash2 = Brassaia_Context.compute_testchain_genesis block_hash in
-    assert (Block_hash.equal block_hash1 block_hash2) ;
-    block_hash1
+    assert_and_return_result
+      block_hash1
+      block_hash2
+      Block_hash.equal
+      Block_hash.pp
+      Block_hash.pp
+      "hash"
+      block_hash1
 
   let merkle_tree :
       t ->
