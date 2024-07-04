@@ -46,6 +46,11 @@ path = "../debug"
 version = "0.2.2"
 default-features = false
 
+[dependencies.tezos-smart-rollup-utils]
+path = "../utils"
+version = "0.2.2"
+optional = true
+
 [dependencies.tezos-smart-rollup-mock]
 path = "../mock"
 version = "0.2.2"
@@ -78,4 +83,8 @@ proto-alpha = [
     "tezos-smart-rollup-debug/proto-alpha",
 ]
 experimental-host-in-memory-store = ["tezos-smart-rollup-mock"]
-native-kernel = ["proto-alpha", "experimental-host-in-memory-store"]
+native-kernel = [
+    "proto-alpha",
+    "experimental-host-in-memory-store",
+    "tezos-smart-rollup-utils",
+]

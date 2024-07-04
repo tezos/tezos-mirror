@@ -4,6 +4,11 @@
 
 //! Options for how the debug logs from the kernel are printed.
 
+#![cfg(not(any(
+    target_arch = "wasm32",
+    all(target_arch = "riscv64", target_os = "hermit")
+)))]
+
 use quanta::Instant;
 use serde::Serialize;
 use std::io::{StdoutLock, Write};
@@ -17,6 +22,7 @@ pub struct Console<'a> {
 }
 
 impl<'a> Console<'a> {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             lock: std::io::stdout().lock(),

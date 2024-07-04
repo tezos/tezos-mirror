@@ -31,10 +31,13 @@ tempfile = "3.10.1"
 tezos-smart-rollup-constants.path = "../kernel_sdk/constants"
 tezos-smart-rollup-encoding.path = "../kernel_sdk/encoding"
 tezos-smart-rollup-utils.path = "../kernel_sdk/utils"
-tezos-smart-rollup.path = "../kernel_sdk/sdk"
 thiserror = "1.0.57"
 vm-fdt = "0.3.0"
 goldenfile = "1.7.1"
+
+[workspace.dependencies.tezos-smart-rollup]
+path = "../kernel_sdk/sdk"
+features = ["utils"]
 
 [workspace.dependencies.tezos_crypto_rs]
 version = "0.5.2"

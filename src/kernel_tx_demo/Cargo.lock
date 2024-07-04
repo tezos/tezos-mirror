@@ -891,9 +891,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "hmac"
@@ -2136,12 +2133,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ryu"
-version = "1.0.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
-
-[[package]]
 name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2243,17 +2234,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
-]
-
-[[package]]
-name = "serde_json"
-version = "1.0.117"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "455182ea6142b14f93f4bc5320a2b31c1f266b66a4a5c858b013302a5d8cbfc3"
-dependencies = [
- "itoa",
- "ryu",
- "serde",
 ]
 
 [[package]]
@@ -2464,7 +2444,6 @@ version = "0.2.2"
 dependencies = [
  "hermit",
  "hex",
- "serde_json",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -2473,7 +2452,6 @@ dependencies = [
  "tezos-smart-rollup-macros",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-smart-rollup-utils",
  "tezos_crypto_rs",
  "tezos_data_encoding",
 ]
@@ -2579,18 +2557,6 @@ dependencies = [
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "thiserror",
-]
-
-[[package]]
-name = "tezos-smart-rollup-utils"
-version = "0.2.2"
-dependencies = [
- "hex",
- "serde",
- "serde_json",
- "tezos-smart-rollup-encoding",
- "tezos_crypto_rs",
- "tezos_data_encoding",
 ]
 
 [[package]]
