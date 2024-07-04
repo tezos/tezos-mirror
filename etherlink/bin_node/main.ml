@@ -1488,10 +1488,7 @@ let make_kernel_config_command =
           ~placeholder:"9999000000000000000000"
        @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
        bootstrap_account_arg
-       (switch
-          ~doc:"Enable the FA bridge in the kernel"
-          ~long:"enable-fa-bridge"
-          ())
+       (config_key_flag ~name:"enable_fa_bridge")
        (config_key_flag ~name:"enable_dal"))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
@@ -1546,7 +1543,7 @@ let make_kernel_config_command =
         ?remove_whitelist
         ~boostrap_balance
         ?bootstrap_accounts
-        ~enable_fa_bridge
+        ?enable_fa_bridge
         ?enable_dal
         ~output
         ())
