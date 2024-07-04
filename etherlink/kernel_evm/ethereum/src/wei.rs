@@ -32,7 +32,7 @@ pub fn mutez_from_wei(wei: Wei) -> Result<u64, ErrorMutezFromWei> {
 
     if !remainder.is_zero() {
         Err(ErrorMutezFromWei::NonNullRemainder)
-    } else if !amount < U256::from(u64::max_value()) {
+    } else if amount >= U256::from(u64::max_value()) {
         Err(ErrorMutezFromWei::AmountTooLarge)
     } else {
         Ok(amount.as_u64())
