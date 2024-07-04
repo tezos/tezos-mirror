@@ -149,7 +149,7 @@ module Request = struct
     let config =
       match tracer_config with
       | None -> config
-      | Some tracer_config -> ("tracerConfig", `O tracer_config) :: config
+      | Some tracer_config -> config @ tracer_config
     in
     let parameters =
       match config with
@@ -167,7 +167,7 @@ module Request = struct
     let config =
       match tracer_config with
       | None -> config
-      | Some tracer_config -> ("tracerConfig", `O tracer_config) :: config
+      | Some tracer_config -> config @ tracer_config
     in
     let parameters =
       match config with

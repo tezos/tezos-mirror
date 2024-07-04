@@ -115,7 +115,11 @@ let evm_node_lib_dev_encoding =
       "EVM encodings for the EVM node and plugin for the WASM Debugger [dev \
        version]"
     ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_scoru_wasm_debugger_plugin;
+        re;
+      ]
 
 let evm_node_lib_dev =
   octez_evm_node_lib
