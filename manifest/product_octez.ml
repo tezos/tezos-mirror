@@ -1789,6 +1789,7 @@ let _octez_base_tests =
         octez_error_monad |> open_;
         data_encoding;
         octez_test_helpers |> open_;
+        qcheck_tezt;
         qcheck_alcotest;
         alcotezt;
       ]
