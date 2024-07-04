@@ -304,8 +304,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
-    ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks ?enable_dal
-    protocol =
+    ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
+    ?restricted_rpcs ?enable_dal protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -438,7 +438,10 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
              })
   in
   let* evm_node =
-    Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~mode
+      ?restricted_rpcs
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   return
@@ -459,8 +462,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
 let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
-    ?rollup_operator_key ?maximum_allowed_ticks ~setup_mode ~enable_dal f
-    protocols =
+    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
+    ~enable_dal f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -504,6 +507,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?minimum_base_fee_per_gas
               ?rollup_operator_key
               ?maximum_allowed_ticks
+              ?restricted_rpcs
               ~admin
               ~setup_mode
               ~enable_dal
@@ -516,7 +520,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
-    ?maximum_allowed_ticks f protocols =
+    ?maximum_allowed_ticks ?restricted_rpcs f protocols =
   let register ~enable_dal : unit =
     register_test
       ~title
@@ -533,6 +537,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ?whitelist
       ?rollup_operator_key
       ?maximum_allowed_ticks
+      ?restricted_rpcs
       f
       protocols
       ~enable_dal
@@ -544,7 +549,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
 let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks f protocols =
+    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs f protocols =
   let register ~enable_dal : unit =
     register_test
       ~title
@@ -561,6 +566,7 @@ let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
       ?whitelist
       ?rollup_operator_key
       ?maximum_allowed_ticks
+      ?restricted_rpcs
       f
       protocols
       ~enable_dal
@@ -573,7 +579,8 @@ let register_sequencer ~title ~tags ?kernels ?additional_uses ?additional_config
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks f protocols : unit =
+    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs f protocols :
+    unit =
   register_proxy
     ~title
     ~tags
@@ -589,6 +596,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?whitelist
     ?rollup_operator_key
     ?maximum_allowed_ticks
+    ?restricted_rpcs
     f
     protocols ;
   register_sequencer
@@ -607,6 +615,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?whitelist
     ?rollup_operator_key
     ?maximum_allowed_ticks
+    ?restricted_rpcs
     f
     protocols
 
@@ -6284,6 +6293,32 @@ let test_rpc_feeHistory_long =
     ~error_msg:"Expected list of size %R, but got %L" ;
   unit
 
+let test_rpcs_can_be_disabled =
+  register_both
+    ~tags:["evm"; "rpc"; "restricted"]
+    ~title:"RPCs can be restricted"
+    ~restricted_rpcs:"tez_*"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let* kernel_version = Rpc.tez_kernelVersion evm_setup.evm_node in
+  (match kernel_version with
+  | Ok _ -> Test.fail "tez_* methods should be unsupported"
+  | Error err ->
+      Check.(
+        (err.message = "Method disabled")
+          string
+          ~error_msg:"Disabled method should return %R, but returned %L")) ;
+  let* kernel_root_hash = Rpc.tez_kernelRootHash evm_setup.evm_node in
+  (match kernel_root_hash with
+  | Ok _ -> Test.fail "tez_* methods should be unsupported"
+  | Error err ->
+      Check.(
+        (err.message = "Method disabled")
+          string
+          ~error_msg:"Disabled method should return %R, but returned %L")) ;
+  (* Check that a non restricted RPC is available. *)
+  let*@ _block_number = Rpc.block_number evm_setup.evm_node in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -6400,7 +6435,8 @@ let register_evm_node ~protocols =
   test_rpc_feeHistory protocols ;
   test_rpc_feeHistory_past protocols ;
   test_rpc_feeHistory_future protocols ;
-  test_rpc_feeHistory_long protocols
+  test_rpc_feeHistory_long protocols ;
+  test_rpcs_can_be_disabled protocols
 
 let protocols = Protocol.all
 

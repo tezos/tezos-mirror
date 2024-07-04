@@ -461,8 +461,15 @@ let read_only_arg =
     ~long:"read-only"
     ()
 
+let restricted_rpcs_arg =
+  Tezos_clic.arg
+    ~doc:"Restrict methods that matches the given Perl regular expression."
+    ~long:"restricted-rpcs"
+    ~placeholder:"debug_trace*"
+    Params.string
+
 let common_config_args =
-  Tezos_clic.args15
+  Tezos_clic.args16
     data_dir_arg
     rpc_addr_arg
     rpc_port_arg
@@ -478,6 +485,7 @@ let common_config_args =
     tx_pool_addr_limit_arg
     tx_pool_tx_per_addr_limit_arg
     verbose_arg
+    restricted_rpcs_arg
 
 let assert_rollup_node_endpoint_equal ~arg ~param =
   if arg <> param then
@@ -494,7 +502,8 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~verbose ~read_only () =
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose
+    ~read_only () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -511,6 +520,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?tx_pool_timeout_limit
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
+      ?restricted_rpcs
       ~verbose
       ()
   in
@@ -568,7 +578,8 @@ let proxy_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            read_only )
          rollup_node_endpoint
          () ->
@@ -594,6 +605,7 @@ let proxy_command =
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit
+        ?restricted_rpcs
         ~verbose
         ~read_only
         ())
@@ -616,8 +628,8 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
     ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
-    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp ?kernel ()
-    =
+    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
+    ?restricted_rpcs ?kernel () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -651,6 +663,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs
       ?log_filter_chunk_size
+      ?restricted_rpcs
       ()
   in
   let*! () =
@@ -691,7 +704,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?genesis_timestamp ?kernel
+    ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
     ?sequencer_sidecar_endpoint () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
@@ -727,6 +740,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ?log_filter_max_nb_logs
       ?log_filter_chunk_size
       ?sequencer_sidecar_endpoint
+      ?restricted_rpcs
       ()
   in
   let*! () =
@@ -805,7 +819,8 @@ let sequencer_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            ( kernel,
              private_rpc_port,
              preimages,
@@ -858,6 +873,7 @@ let sequencer_command =
         ?log_filter_max_nb_logs
         ?log_filter_chunk_size
         ?genesis_timestamp
+        ?restricted_rpcs
         ?kernel
         ())
 
@@ -866,7 +882,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
-    ?kernel () =
+    ?restricted_rpcs ?kernel () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -888,6 +904,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?log_filter_chunk_size
       ?log_filter_max_nb_logs
       ?log_filter_max_nb_blocks
+      ?restricted_rpcs
       ()
   in
   let*! () =
@@ -951,7 +968,8 @@ let observer_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            ( kernel,
              preimages,
              preimages_endpoint,
@@ -986,6 +1004,7 @@ let observer_command =
     ?log_filter_chunk_size
     ?log_filter_max_nb_logs
     ?log_filter_max_nb_blocks
+    ?restricted_rpcs
     ?kernel
     ()
 
@@ -1373,7 +1392,8 @@ mode.|}
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1425,6 +1445,7 @@ mode.|}
           ?max_blueprints_ahead
           ?max_blueprints_catchup
           ?catchup_cooldown
+          ?restricted_rpcs
           ~verbose
           ()
       in
@@ -1568,7 +1589,8 @@ let proxy_simple_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            read_only )
          () ->
       start_proxy
@@ -1585,6 +1607,7 @@ let proxy_simple_command =
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit
+        ?restricted_rpcs
         ~verbose
         ~read_only
         ())
@@ -1626,7 +1649,8 @@ let sequencer_simple_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1670,6 +1694,7 @@ let sequencer_simple_command =
         ?log_filter_max_nb_logs
         ?log_filter_chunk_size
         ?genesis_timestamp
+        ?restricted_rpcs
         ?kernel
         ())
 
@@ -1713,7 +1738,8 @@ let threshold_encryption_sequencer_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1759,6 +1785,7 @@ let threshold_encryption_sequencer_command =
         ?log_filter_chunk_size
         ?genesis_timestamp
         ?sequencer_sidecar_endpoint
+        ?restricted_rpcs
         ?kernel
         ())
 
@@ -1790,7 +1817,8 @@ let observer_simple_command =
              tx_pool_timeout_limit,
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             verbose ),
+             verbose,
+             restricted_rpcs ),
            ( evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              preimages,
@@ -1816,6 +1844,7 @@ let observer_simple_command =
         ?log_filter_chunk_size
         ?log_filter_max_nb_logs
         ?log_filter_max_nb_blocks
+        ?restricted_rpcs
         ?kernel
         ())
 

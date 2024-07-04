@@ -136,6 +136,7 @@ val create :
   ?data_dir:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
+  ?restricted_rpcs:string ->
   string ->
   t
 
@@ -217,6 +218,7 @@ val init :
   ?data_dir:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
+  ?restricted_rpcs:string ->
   string ->
   t Lwt.t
 
