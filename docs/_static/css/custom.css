@@ -370,3 +370,7 @@ footer {
 button.theme-switch-button {
     display: none !important;
 }
+
+nav[class='contents'] {
+    background-color: #f9f9f9;
+}
