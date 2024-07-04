@@ -2915,7 +2915,11 @@ let stresstest_gen_keys ?endpoint ?alias_prefix n client =
   let json = JSON.parse ~origin:"stresstest_gen_keys" output in
   let read_one i json : Account.key =
     let bootstrap_accounts = Account.Bootstrap.keys |> Array.length in
-    let alias = Account.Bootstrap.alias (i + bootstrap_accounts + 1) in
+    let alias =
+      match alias_prefix with
+      | None -> Account.Bootstrap.alias (i + bootstrap_accounts + 1)
+      | Some prefix -> Format.asprintf "%s%i" prefix i
+    in
     let public_key_hash = JSON.(json |-> "pkh" |> as_string) in
     let public_key = JSON.(json |-> "pk" |> as_string) in
     let secret_key = Account.Unencrypted JSON.(json |-> "sk" |> as_string) in
