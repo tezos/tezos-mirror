@@ -421,7 +421,15 @@ let get_predecessor ~max_read state ancestor =
           | None ->
               (* This could happen if ancestors was empty, but it shouldn't
                  be. *)
-              return_none
+              let* pred =
+                Tezos_shell_services.Chain_services.Blocks.hash
+                  state.cctxt
+                  ~chain:state.chain
+                  ~block:(`Hash (ancestor, 1))
+                  ()
+              in
+              Precessor_cache.replace state.cache ancestor pred ;
+              return_some pred
           | Some predecessor -> return_some predecessor)
       | _ -> return_none)
 
