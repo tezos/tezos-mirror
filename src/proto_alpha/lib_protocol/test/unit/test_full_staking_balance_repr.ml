@@ -765,6 +765,150 @@ let test_remove_delegated_same_cycle () =
   in
   return_unit
 
+(* L_{M}: init_staking_balance; L_{N}: [-10 tez; +100 tez; -90 tez]; L_{N+1}: [-10 tez]
+   L_{M} and L_{N+1} are either in different cycles
+   L_{N} and L_{N+1} are in the same cycle *)
+let test_add_remove_delegated_no_global_change_different_cycle () =
+  let open Lwt_result_wrap_syntax in
+  let blocks_per_cycle = 20l in
+  let check_delegated_variation = check_delegated_variation ~blocks_per_cycle in
+  let create_staking_balance_level =
+    create_staking_balance_level ~blocks_per_cycle
+  in
+  let delegated = 1000 in
+  let* init_staking_balance =
+    create_staking_balance_level
+      ~own_frozen:50
+      ~staked_frozen:100
+      ~delegated
+      ~level_of_min_delegated:10l
+      ()
+  in
+  Log.info
+    ~color:Log.Color.BG.yellow
+    "Test add_remove_delegated_no_global_change_different_cycle" ;
+  Log.info ~color:info_color "Different cycle" ;
+  (* Remove 10 tez from delegated_balance (= 990) *)
+  let* staking_balance =
+    check_delegated_variation
+      ~kind:Remove
+      ~amount:10
+      ~current_level:50l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:50l
+      ~cycle_of_min_delegated:2l
+      init_staking_balance
+  in
+  Log.info ~color:info_color "Same level" ;
+  (* Add 100 tez to delegated_balance (= 1090) *)
+  let* staking_balance =
+    check_delegated_variation
+      ~kind:Add
+      ~amount:100
+      ~current_level:50l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:50l
+      ~cycle_of_min_delegated:2l
+      staking_balance
+  in
+  Log.info ~color:info_color "Same level" ;
+  (* Remove 90 tez from delegated_balance (= 1000) *)
+  let* staking_balance =
+    check_delegated_variation
+      ~kind:Remove
+      ~amount:90
+      ~current_level:50l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:50l
+      ~cycle_of_min_delegated:2l
+      staking_balance
+  in
+  Log.info ~color:info_color "Next level" ;
+  (* Remove 10 tez from delegated_balance (= 990) *)
+  let* _staking_balance =
+    check_delegated_variation
+      ~kind:Remove
+      ~amount:10
+      ~current_level:51l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:50l
+      ~cycle_of_min_delegated:2l
+      staking_balance
+  in
+  return_unit
+
+(* L_{M}: init_staking_balance; L_{N}: [-10 tez; +100 tez; -90 tez]; L_{N+1}: [-10 tez]
+   L_{M} and L_{N+1} are either in the same cycle
+   L_{N} and L_{N+1} are in the same cycle *)
+let test_add_remove_delegated_no_global_change_same_cycle () =
+  let open Lwt_result_wrap_syntax in
+  let blocks_per_cycle = 20l in
+  let check_delegated_variation = check_delegated_variation ~blocks_per_cycle in
+  let create_staking_balance_level =
+    create_staking_balance_level ~blocks_per_cycle
+  in
+  let delegated = 1000 in
+  let* init_staking_balance =
+    create_staking_balance_level
+      ~own_frozen:50
+      ~staked_frozen:100
+      ~delegated
+      ~level_of_min_delegated:10l
+      ()
+  in
+  Log.info
+    ~color:Log.Color.BG.yellow
+    "Test add_remove_delegated_no_global_change_same_cycle" ;
+  Log.info ~color:info_color "Same cycle" ;
+  (* Remove 10 tez from delegated_balance (= 990) *)
+  let* staking_balance =
+    check_delegated_variation
+      ~kind:Remove
+      ~amount:10
+      ~current_level:11l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:11l
+      ~cycle_of_min_delegated:0l
+      init_staking_balance
+  in
+  Log.info ~color:info_color "Same level" ;
+  (* Add 100 tez to delegated_balance (= 1090) *)
+  let* staking_balance =
+    check_delegated_variation
+      ~kind:Add
+      ~amount:100
+      ~current_level:11l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:11l
+      ~cycle_of_min_delegated:0l
+      staking_balance
+  in
+  Log.info ~color:info_color "Same level" ;
+  (* Remove 90 tez from delegated_balance (= 1000) *)
+  let* staking_balance =
+    check_delegated_variation
+      ~kind:Remove
+      ~amount:90
+      ~current_level:11l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:11l
+      ~cycle_of_min_delegated:0l
+      staking_balance
+  in
+  Log.info ~color:info_color "Next level" ;
+  (* Remove 10 tez from delegated_balance (= 990) *)
+  let* _staking_balance =
+    check_delegated_variation
+      ~kind:Remove
+      ~amount:10
+      ~current_level:12l
+      ~min_delegated_in_cycle:990
+      ~level_of_min_delegated:11l
+      ~cycle_of_min_delegated:0l
+      staking_balance
+  in
+  return_unit
+
 let tests =
   Tztest.
     [
@@ -783,6 +927,14 @@ let tests =
         "remove delegated (same cycle)"
         `Quick
         test_remove_delegated_same_cycle;
+      tztest
+        "add/remove delegated with no global change (different cycle)"
+        `Quick
+        test_add_remove_delegated_no_global_change_different_cycle;
+      tztest
+        "add/remove delegated with no global change (same cycle)"
+        `Quick
+        test_add_remove_delegated_no_global_change_same_cycle;
     ]
 
 let () =
