@@ -31,6 +31,10 @@ val keep_alive : bool
 (** [vms] enables to set the number of vms that will be spawned. *)
 val vms : int option
 
+(** First port opened on the VM. *)
+val vm_base_port : int
+
+(** Number of consecutive ports opened on the VM from the base port. *)
 val ports_per_vm : int
 
 (** When [website] is [true] (default) a website is up for summarizing various
@@ -41,16 +45,24 @@ val website : bool
   [8080]. *)
 val website_port : int
 
-(** When [prometheus_export] is [true] a Prometheus instance is run locally and
+(** When [prometheus] is [true] a Prometheus instance is run locally and
     metrics of the experiments are exported to prometheus. At the end of the
     test, the database is snapshotted so that it can be imported later on. *)
 val prometheus : bool
 
+(** If [true], exports a Promtheus snapshot at the end of the scenario. *)
+val prometheus_export : bool
+
+(** Specify the name of the prometheus snapshot. *)
+val prometheus_snapshot_filename : string option
+
+(** Specify the port of the Prometheus instance on the host machine. *)
+val prometheus_port : int
+
+(** Specify the scraping interval of Prometheus. *)
+val prometheus_scrape_interval : int
+
 val grafana : bool
-
-val prometheus_snapshot_directory : string
-
-val prometheus_snapshot : string option
 
 (** Enable to specify a machine type. The string must be a machine description
     compliant with GCP (ex: "n1-standard-2"). See the different type of machines
@@ -61,9 +73,9 @@ val prometheus_snapshot : string option
     *)
 val machine_type : string
 
-(** Specify the dockerfile image to use. If not specified, the image
+(** Specify the dockerfile alias to use. If not specified, the image
     name will be given by the value of the variable `TEZT_CLOUD`. *)
-val dockerfile : string option
+val dockerfile_alias : string option
 
 (** Maximum running time of a VM. *)
 val max_run_duration : int

@@ -5,25 +5,98 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {process : Process.t; dir : string; deployement : Deployement.t}
+type t = {
+  process : Process.t;
+  dir : string;
+  monitoring : bool;
+  prometheus : bool;
+}
 
-let configuration ~deployement ~agents =
+let pp_docker_image fmt = function
+  | Env.Gcp {alias} -> Format.fprintf fmt "%s" alias
+  | Octez_latest_release -> Format.fprintf fmt "Octez latest release"
+
+let configuration ~agents =
   let str =
     agents
     |> List.map (fun agent ->
-           let configuration =
-             Deployement.get_configuration deployement agent
-           in
+           let configuration = Agent.configuration agent in
            Format.asprintf
-             "- %s: %s"
+             {|
+## %s
+
+- **Machine type**: %s
+- **Docker_image**: %a
+
+           |}
              (Agent.name agent)
-             configuration.machine_type)
+             configuration.machine_type
+             pp_docker_image
+             configuration.docker_image)
     |> String.concat "\n"
   in
   Format.asprintf "# Configurations@.%s\n" str
 
+let string_docker_command agent =
+  let point = Agent.point agent in
+  let ssh_id = (Agent.runner agent).Runner.ssh_id in
+  String.concat
+    " "
+    [
+      "ssh";
+      Format.asprintf "root@%s" (fst point);
+      "-p";
+      string_of_int (snd point);
+      "-o";
+      "StrictHostKeyChecking=no";
+      "-i";
+      ssh_id |> Option.get;
+    ]
+
+let string_vm_command agent =
+  match Agent.cmd_wrapper agent with
+  | None -> "# Just run the command, the VM is the host machine"
+  | Some cmd_wrapper ->
+      String.concat " " (cmd_wrapper.Gcloud.cmd :: cmd_wrapper.args)
+
+let debugging ~agents =
+  let str =
+    agents
+    |> List.map (fun agent ->
+           let host_run_command =
+             Printf.sprintf
+               {|
+```bash
+%s
+```            
+            |}
+               (string_vm_command agent)
+           in
+           let docker_command =
+             Printf.sprintf {|
+```bash
+%s
+```
+|} (string_docker_command agent)
+           in
+           Printf.sprintf
+             {|
+## %s 
+Connect on the VM:
+%s 
+
+Connect on the Docker:
+%s
+|}
+             (Agent.name agent)
+             host_run_command
+             docker_command)
+    |> String.concat "\n"
+  in
+  Format.asprintf "# Debugging@.%s\n" str
+
 let monitoring ~agents =
-  if Cli.monitoring then
+  if Env.monitoring then
     let str =
       agents
       |> List.map (fun agent ->
@@ -40,13 +113,23 @@ let monitoring ~agents =
   else
     "# Monitoring\n Monitoring disabled. Use `--monitoring` to activate it.\n"
 
-let prometheus () =
-  if Cli.prometheus then
-    "# Prometheus\n [Prometheus dashboard](http://localhost:9090)"
-  else "Prometheus disabled. Use `--prometheus` to activate it."
+let prometheus =
+  if Env.prometheus then
+    "# Prometheus\n [Prometheus dashboard](http://localhost:9090)\n"
+  else "Prometheus disabled. Use `--prometheus` to activate it.\n"
 
-let markdown_content ~deployement ~agents =
-  [configuration ~deployement ~agents; monitoring ~agents; prometheus ()]
+let grafana =
+  if Env.grafana then "# Grafana\n [Grafana dashboard](http://localhost:3000)\n"
+  else "Grafana disabled. Use `--grafana` to activate it.\n"
+
+let markdown_content ~agents =
+  [
+    configuration ~agents;
+    grafana;
+    prometheus;
+    monitoring ~agents;
+    debugging ~agents;
+  ]
   |> String.concat "\n"
 
 let index dir = dir // "index.md"
@@ -54,7 +137,7 @@ let index dir = dir // "index.md"
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
      pandoc. *)
-  let content = markdown_content ~deployement:t.deployement ~agents in
+  let content = markdown_content ~agents in
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
@@ -72,9 +155,12 @@ let write t ~agents =
       "-s";
     ]
 
-let run ~port ~deployement =
+let run () =
   let dir = Temp.dir "website" in
   let index = index dir in
+  let port = Env.website_port in
+  let prometheus = Env.prometheus in
+  let monitoring = Env.monitoring in
   let process =
     Process.spawn
       "python3"
@@ -86,10 +172,10 @@ let run ~port ~deployement =
         Filename.dirname index;
       ]
   in
-  Lwt.return {process; dir; deployement}
+  {process; dir; monitoring; prometheus}
 
-let start ~port ~deployement ~agents =
-  let* t = run ~port ~deployement in
+let start ~agents =
+  let t = run () in
   let* () = write t ~agents in
   Lwt.return t
 

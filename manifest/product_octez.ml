@@ -2316,6 +2316,18 @@ let tezt_performance_regression =
     ~bisect_ppx:No
     ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
 
+let tezt_cloud =
+  public_lib
+    "tezt-tezos.tezt-cloud"
+    ~path:"tezt/lib_cloud"
+    ~opam:"tezt-tezos"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_performance_regression |> open_;
+      ]
+
 let tezt_tezos =
   public_lib
     "tezt-tezos"
@@ -2327,6 +2339,7 @@ let tezt_tezos =
       [
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
+        tezt_cloud |> open_;
         uri;
         hex;
         octez_crypto_dal;
@@ -2336,23 +2349,6 @@ let tezt_tezos =
       ]
     ~cram:true
     ~release_status:Released
-
-let tezt_cloud =
-  private_lib
-    "tezt_cloud"
-    ~path:"tezt/lib_cloud"
-    ~opam:"tezt-cloud"
-    ~synopsis:
-      "A library to ease the writing of test using machines onto cloud \
-       providers (GCP, AWS, ...)"
-    ~bisect_ppx:No
-    ~deps:
-      [
-        tezt_lib |> open_ |> open_ ~m:"Base";
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_performance_regression |> open_;
-      ]
-    ~release_status:Unreleased
 
 let octez_p2p_test_common =
   octez_shell_lib

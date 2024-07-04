@@ -5,17 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Configuration : sig
-  include module type of Configuration
-end
-
 type t
 
 (** [register ?docker_push ?vms] is a wrapper around [Test.register]. It
     enables to run a test that can use machines deployed onto the
     cloud. *)
 val register :
-  ?docker_push:bool ->
   ?vms:Configuration.t list ->
   __FILE__:string ->
   title:string ->
@@ -26,7 +21,7 @@ val register :
 
 val agents : t -> Agent.t list
 
-val get_configuration : t -> Agent.t -> Configuration.t
+val get_configuration : Agent.t -> Configuration.t
 
 val push_metric :
   t -> ?labels:(string * string) list -> name:string -> float -> unit

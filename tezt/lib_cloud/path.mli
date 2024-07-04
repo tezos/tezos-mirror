@@ -18,7 +18,7 @@ val terraform_state_bucket : string
 val terraform_vm : string
 
 (** Path to the directory containing dockerfiles for each user. *)
-val docker : string
+val dockerfile : alias:string -> string
 
 (** Path to the zcash_params directory that can be used for the
     dockerfiles. *)

@@ -4,56 +4,48 @@
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
+
 let name = "docker"
 
 let color = Log.Color.FG.yellow
 
-let build ?(tag = "latest") ?dockerfile ~args () =
+let build ?image_name ?alias ?(tag = "latest") ?dockerfile ~args () =
   let build_args =
     args
     |> List.map (fun (key, value) ->
            ["--build-arg"; Format.asprintf "%s=%s" key value])
     |> List.concat
   in
-  let tezt_cloud = Lazy.force Env.tezt_cloud in
-  let dockerfile_path = Lazy.force Env.dockerfile in
-  let dockerfile = Option.value ~default:dockerfile_path dockerfile in
-  let tag = ["-t"; Format.asprintf "%s:%s" tezt_cloud tag] in
+  let alias = Option.value ~default:Env.dockerfile_alias alias in
+  let dockerfile = Option.value ~default:(Path.dockerfile ~alias) dockerfile in
+  let image_name = Option.value ~default:alias image_name in
+  let tag = ["-t"; Format.asprintf "%s:%s" image_name tag] in
   let args = ["build"; "-f"; dockerfile] @ build_args @ tag @ ["."] in
-  let value = Process.spawn ~name ~color "docker" args in
-  let run = Process.check in
-  {value; run}
+  Process.spawn ~name ~color "docker" args
 
-let tag ?(tag = "latest") docker_registry =
-  let tezt_cloud = Lazy.force Env.tezt_cloud in
+let tag ?image_name ?alias ?(tag = "latest") ~registry_uri () =
+  let alias = Option.value ~default:Env.dockerfile_alias alias in
+  let image_name = Option.value ~default:alias image_name in
   let args =
     [
       "tag";
-      Format.asprintf "%s:%s" tezt_cloud tag;
-      Format.asprintf "%s/%s:%s" docker_registry tezt_cloud tag;
+      Format.asprintf "%s:%s" image_name tag;
+      Format.asprintf "%s/%s:%s" registry_uri image_name tag;
     ]
   in
-  let value = Process.spawn ~name ~color "docker" args in
-  let run = Process.check in
-  {value; run}
+  Process.spawn ~name ~color "docker" args
 
-let push ?(tag = "latest") docker_registry =
-  let tezt_cloud = Lazy.force Env.tezt_cloud in
-  let args =
-    ["push"; Format.asprintf "%s/%s:%s" docker_registry tezt_cloud tag]
-  in
-  let value = Process.spawn ~name ~color "docker" args in
-  let run = Process.check in
-  {value; run}
+let push ?image_name ?alias ?(tag = "latest") ~registry_uri () =
+  let alias = Option.value ~default:Env.dockerfile_alias alias in
+  let image_name = Option.value ~default:alias image_name in
+  let args = ["push"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
+  Process.spawn ~name ~color "docker" args
 
-let pull ?(tag = "latest") docker_registry =
-  let tezt_cloud = Lazy.force Env.tezt_cloud in
-  let args =
-    ["pull"; Format.asprintf "%s/%s:%s" docker_registry tezt_cloud tag]
-  in
-  let value = Process.spawn ~name ~color "docker" args in
-  let run = Process.check in
-  {value; run}
+let pull ?image_name ?alias ?(tag = "latest") ~registry_uri () =
+  let alias = Option.value ~default:Env.dockerfile_alias alias in
+  let image_name = Option.value ~default:alias image_name in
+  let args = ["pull"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
+  Process.spawn ~name ~color "docker" args
 
 let run ?(rm = false) ?name ?network ?publish_ports image args =
   let publish_ports =
@@ -67,40 +59,28 @@ let run ?(rm = false) ?name ?network ?publish_ports image args =
   in
   let name = match name with None -> [] | Some name -> ["--name"; name] in
   let rm = if rm then ["--rm"] else [] in
-  let value =
-    Process.spawn
-      ~color
-      "docker"
-      (["run"] @ rm @ name @ network @ publish_ports
-      @ [Format.asprintf "%s" image]
-      @ args)
-  in
-  let run = Process.check in
-  {value; run}
+  (* [init] can be used to ensure signals are forwarded properly to
+     the entrypoint run by the container. *)
+  Process.spawn
+    ~color
+    "docker"
+    (["run"] @ rm @ name @ network @ publish_ports
+    @ [Format.asprintf "%s" image]
+    @ args)
 
-let kill container_name =
-  let value = Process.spawn ~color "docker" ["kill"; container_name] in
-  let run = Process.check in
-  {value; run}
+let kill container_name = Process.spawn ~color "docker" ["kill"; container_name]
 
-let rm container_name =
-  let value = Process.spawn ~color "docker" ["rm"; container_name] in
-  let run = Process.check in
-  {value; run}
+let rm container_name = Process.spawn ~color "docker" ["rm"; container_name]
 
 let cp container_name ~kind ~source ~destination =
-  let value =
-    match kind with
-    | `From_host ->
-        Process.spawn
-          ~color
-          "docker"
-          ["cp"; source; Format.asprintf "%s:%s" container_name destination]
-    | `To_host ->
-        Process.spawn
-          ~color
-          "docker"
-          ["cp"; Format.asprintf "%s:%s" container_name source; destination]
-  in
-  let run = Process.check in
-  {value; run}
+  match kind with
+  | `From_host ->
+      Process.spawn
+        ~color
+        "docker"
+        ["cp"; source; Format.asprintf "%s:%s" container_name destination]
+  | `To_host ->
+      Process.spawn
+        ~color
+        "docker"
+        ["cp"; Format.asprintf "%s:%s" container_name source; destination]

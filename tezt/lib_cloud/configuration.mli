@@ -5,21 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type docker_image =
-  | Custom of {tezt_cloud : string}
-  | Image of {docker_image : string}
-
-val string_of_docker_image : project_id:string -> docker_image -> string
-
 type t = private {
   machine_type : string;
-  docker_image : docker_image;
+  docker_image : Env.docker_image;
   max_run_duration : int option;
+  binaries_path : string;
 }
 
 val make :
+  ?binaries_path:string ->
   ?max_run_duration:int ->
   ?machine_type:string ->
-  ?docker_image:docker_image ->
+  ?docker_image:Env.docker_image ->
   unit ->
   t

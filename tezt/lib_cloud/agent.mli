@@ -10,17 +10,17 @@
 (** Datatype for an agent *)
 type t
 
-(** [make ?binaries_path ?ssh_user ~ssh_id ~point ~next_available_port ~name]
+(** [make ?binaries_path ~ssh_id ~point ~next_available_port ~name]
     creates an [agent] from the given parameters. [point] is the point on
     which the VM is reachabled. [next_available_port] should always provide
     an available port or raise [Not_found] otherwise. [name] is the name of
     the agent. [ssh_id] is a path to the private key that will be used for
     the ssh connection. *)
 val make :
-  ?ssh_user:string ->
+  ?cmd_wrapper:Gcloud.cmd_wrapper ->
   ssh_id:string ->
   point:string * int ->
-  binaries_path:string ->
+  configuration:Configuration.t ->
   next_available_port:(unit -> int) ->
   name:string ->
   unit ->
@@ -45,5 +45,11 @@ val next_available_port : t -> int
 (** [runner agent] returns the runner associated with the agent. *)
 val runner : t -> Runner.t
 
-(** [binaries_path t] the path where binaries should be stored by the agent. *)
-val binaries_path : t -> string
+(** [point agent] returns the point asociated with the agent. *)
+val point : t -> string * int
+
+(** [configuration t] the configuration of the agent. *)
+val configuration : t -> Configuration.t
+
+(** A wrapper to run a command on the VM of the agent. *)
+val cmd_wrapper : t -> Gcloud.cmd_wrapper option

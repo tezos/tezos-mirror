@@ -5,21 +5,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Cloud : sig
+module Agent : sig
   type t
 
-  module Configuration : sig
-    type docker_image =
-      | Custom of {tezt_cloud : string}
-      | Image of {docker_image : string}
+  val configuration : Agent.t -> Configuration.t
+end
 
-    type t = private {
-      machine_type : string;
-      docker_image : docker_image;
-      max_run_duration : int option;
-    }
+module Configuration : sig
+  type docker_image = Gcp of {alias : string} | Octez_latest_release
 
-    (** [make ?max_run_duration ?machine_type ?docker_image ()] is a smart-constructor to make a VM
+  type t = private {
+    machine_type : string;
+    docker_image : docker_image;
+    max_run_duration : int option;
+    binaries_path : string;
+  }
+
+  (** [make ?machine_type ()] is a smart-constructor to make a VM
       configuration. 
 
     Default value for [max_run_duration] is [7200].  
@@ -29,19 +31,22 @@ module Cloud : sig
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
     is the value provided by the environement variable [$TEZT_CLOUD].
     *)
-    val make :
-      ?max_run_duration:int ->
-      ?machine_type:string ->
-      ?docker_image:docker_image ->
-      unit ->
-      t
-  end
+  val make :
+    ?binaries_path:string ->
+    ?max_run_duration:int ->
+    ?machine_type:string ->
+    ?docker_image:docker_image ->
+    unit ->
+    t
+end
+
+module Cloud : sig
+  type t
 
   (** A wrapper around [Test.register] that can be used to register new tests
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module. *)
   val register :
-    ?docker_push:bool ->
     ?vms:Configuration.t list ->
     __FILE__:string ->
     title:string ->
@@ -72,8 +77,6 @@ module Cloud : sig
       points to scrap. Each point can have a name defined by [app_name]. *)
   val add_prometheus_source :
     t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
-
-  val get_configuration : t -> Agent.t -> Configuration.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

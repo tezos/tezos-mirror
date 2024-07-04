@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Configuration = Configuration
-
 (* Tezt-cloud requires to bypass the clean-up process of Tezt. Hence, when the
    user press Ctrl+C, tezt-cloud needs to catch-up the signal before Tezt.
 
@@ -42,22 +40,45 @@ type t = {
 
 let shutdown ?exn t =
   let* () =
-    if Cli.keep_alive then (
+    if Env.keep_alive then (
       Log.info "Please press <enter> to terminate the scenario." ;
       let* _ = Lwt_io.read_line Lwt_io.stdin in
       Lwt.return_unit)
     else Lwt.return_unit
   in
   Log.info "Shutting down processes..." ;
-  let* () = Process.clean_up () in
   let* () =
-    Option.fold
-      ~none:Lwt.return_unit
-      ~some:Prometheus.export_snapshot
-      t.prometheus
+    Lwt.catch
+      (fun () -> Process.clean_up ())
+      (fun exn ->
+        Log.warn
+          "Tezt failed to clean up processes: %s"
+          (Printexc.to_string exn) ;
+        Log.warn
+          "in case you did not destroy VMs, you should execute the 'clean up' \
+           job" ;
+        Lwt.return_unit)
   in
   let* () =
-    Option.fold ~none:Lwt.return_unit ~some:Prometheus.shutdown t.prometheus
+    Lwt.catch
+      (fun () ->
+        Option.fold
+          ~none:Lwt.return_unit
+          ~some:Prometheus.export_snapshot
+          t.prometheus)
+      (fun exn ->
+        Log.warn "Prometheus snapshot export fails: %s" (Printexc.to_string exn) ;
+        Lwt.return_unit)
+  in
+  let* () =
+    Lwt.catch
+      (fun () ->
+        Option.fold ~none:Lwt.return_unit ~some:Prometheus.shutdown t.prometheus)
+      (fun exn ->
+        Log.warn
+          "unable to shutdown Prometheus properly: %s"
+          (Printexc.to_string exn) ;
+        Lwt.return_unit)
   in
   let* () =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
@@ -76,35 +97,24 @@ let shutdown ?exn t =
   | Some exn -> (* The exception is raised to Tezt. *) Lwt.reraise exn
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
-let rec wait_ssh_server_running runner =
-  let cmd, args =
-    Runner.wrap_with_ssh runner (Runner.Shell.cmd [] "echo" ["-n"; "check"])
-  in
-  let* status =
+let wait_ssh_server_running runner =
+  let is_ready _output = true in
+  let run () =
+    let cmd, args =
+      Runner.wrap_with_ssh runner (Runner.Shell.cmd [] "echo" ["-n"; "check"])
+    in
     Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-    |> Process.wait
   in
-  match status with
-  | Unix.WEXITED 0 -> Lwt.return_unit
-  | _ ->
-      Log.info
-        "SSH server is not running, let's wait 2 seconds and check again..." ;
-      let* () = Lwt_unix.sleep 2. in
-      wait_ssh_server_running runner
+  let* _ = Env.wait_process ~is_ready ~run () in
+  Lwt.return_unit
 
-let register ?(docker_push = not Cli.localhost) ?vms ~__FILE__ ~title ~tags
-    ?seed f =
+let register ?vms ~__FILE__ ~title ~tags ?seed f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
-  let* () =
-    if docker_push then
-      let* () = Jobs.deploy_docker_registry () in
-      Jobs.docker_build ~push:true ()
-    else Jobs.docker_build ~push:false ()
-  in
+  let* () = Env.init () in
   let vms =
     (* The Cli arguments by-pass the argument given here. This enable the user
        to always have decide precisely the number of vms to be run. *)
-    match (vms, Cli.vms) with
+    match (vms, Env.vms) with
     | None, None -> None
     | None, Some i | Some _, Some i ->
         let vms = List.init i (fun _ -> Configuration.make ()) in
@@ -123,48 +133,34 @@ let register ?(docker_push = not Cli.localhost) ?vms ~__FILE__ ~title ~tags
           deployement = None;
         }
   | Some configurations ->
-      let ports_per_vm = Cli.ports_per_vm in
-      let* deployement =
-        Deployement.deploy
-          ~ports_per_vm
-          ~configurations
-          ~localhost:Cli.localhost
-          ()
+      let* () =
+        match Env.mode with
+        | `Localhost -> Jobs.docker_build ~push:false ()
+        | `Cloud ->
+            let* () = Jobs.deploy_docker_registry () in
+            Jobs.docker_build ~push:true ()
       in
+      let* deployement = Deployement.deploy ~configurations in
       let agents = Deployement.agents deployement in
       let* () =
         agents
         |> List.map (fun agent -> Agent.runner agent |> wait_ssh_server_running)
         |> Lwt.join
       in
-      if Cli.monitoring then (
-        Log.info "Monitoring enabled" ;
-        agents
-        |> List.iter (fun agent ->
-               let address =
-                 Agent.runner agent |> fun runner ->
-                 Runner.address (Some runner)
-               in
-               Log.info
-                 "Monitoring of agent %s can be accessed at 'http://%s:19999'"
-                 (Agent.name agent)
-                 address)) ;
       let* website =
-        if Cli.website then
-          let* website =
-            Web.start ~port:Cli.website_port ~deployement ~agents
-          in
+        if Env.website then
+          let* website = Web.start ~agents in
           Lwt.return_some website
         else Lwt.return_none
       in
       let* prometheus =
-        if Cli.prometheus then
+        if Env.prometheus then
           let* prometheus = Prometheus.start agents in
           Lwt.return_some prometheus
         else Lwt.return_none
       in
       let* grafana =
-        if Cli.grafana then
+        if Env.grafana then
           let* grafana = Grafana.run () in
           Lwt.return_some grafana
         else Lwt.return_none
@@ -198,10 +194,7 @@ let register ?(docker_push = not Cli.localhost) ?vms ~__FILE__ ~title ~tags
 
 let agents t = t.agents
 
-let get_configuration t agent =
-  match t.deployement with
-  | None -> Configuration.make ()
-  | Some deployement -> Deployement.get_configuration deployement agent
+let get_configuration = Agent.configuration
 
 let set_agent_name t agent name =
   Agent.set_name agent name ;

@@ -7,6 +7,7 @@
  (libraries
   octez-libs.tezt-wrapper
   tezt-tezos.tezt-performance-regression
+  tezt-tezos.tezt-cloud
   uri
   hex
   octez-libs.crypto-dal
@@ -17,4 +18,5 @@
   (:standard)
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
-  -open Tezt_tezos_tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression
+  -open Tezt_tezos_tezt_cloud))

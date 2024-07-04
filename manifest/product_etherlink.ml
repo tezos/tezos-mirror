@@ -31,6 +31,7 @@ let tezt_etherlink =
         tezt_performance_regression |> open_;
         octez_crypto;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
       ]
     ~release_status:Unreleased
 

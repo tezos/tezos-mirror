@@ -17,6 +17,7 @@ let localhost =
   Clap.flag
     ~section
     ~set_long:"localhost"
+    ~unset_long:"cloud"
     ~description:"If set, the test is run locally"
     false
 
@@ -61,6 +62,13 @@ let vms =
     ~description:"Number of VMs running for the test."
     ()
 
+let vm_base_port =
+  Clap.default_int
+    ~section
+    ~long:"vm-base-port"
+    ~description:"The first available port on the VM"
+    30_000
+
 let ports_per_vm =
   Clap.default_int
     ~section
@@ -73,7 +81,7 @@ let grafana =
     ~section
     ~set_long:"grafana"
     ~description:"Flag to set whether to run grafana"
-    false
+    true
 
 let prometheus =
   Clap.flag
@@ -81,6 +89,36 @@ let prometheus =
     ~set_long:"prometheus"
     ~description:"Flag to set whether metrics are exported into prometheus"
     grafana
+
+let prometheus_export =
+  Clap.flag
+    ~section
+    ~set_long:"prometheus-export"
+    ~description:"Export a Prometheus snapshot at the end of the scenario"
+    true
+
+let prometheus_port =
+  Clap.default_int
+    ~section
+    ~long:"prometheus-port"
+    ~description:
+      "Set the port on which the prometheus instance will run (default: 9090)."
+    9090
+
+let prometheus_snapshot_filename =
+  Clap.optional_string
+    ~section
+    ~long:"prometheus-snapshot-filename"
+    ~description:"Name of the prometheus snapshot file"
+    ()
+
+let prometheus_scrape_interval =
+  Clap.default_int
+    ~section
+    ~long:"prometheus-scrape-interval"
+    ~description:
+      "Set the scraping interval of the prometheus instance (default: 5)"
+    5
 
 let website =
   Clap.flag
@@ -98,22 +136,6 @@ let website_port =
     ~description:"Set the port used for the website. Default is 8080"
     8080
 
-let prometheus_snapshot_directory =
-  Clap.default_string
-    ~section
-    ~long:"prometheus-snapshot-directory"
-    ~description:
-      "The directory where the prometheus snapshot can be exported (the \
-       default is /tmp)"
-    "/tmp"
-
-let prometheus_snapshot =
-  Clap.optional_string
-    ~section
-    ~long:"prometheus-snapshot"
-    ~description:"Name of the prometheus snapshot file"
-    ()
-
 let machine_type =
   Clap.default_string
     ~section
@@ -123,13 +145,13 @@ let machine_type =
        https://cloud.google.com/compute/docs/general-purpose-machines#c3d_series)"
     "n1-standard-2"
 
-let dockerfile =
+let dockerfile_alias =
   Clap.optional_string
     ~section
-    ~long:"dockerfile"
+    ~long:"dockerfile-alias"
     ~description:
-      "Specify the name of the dockerfile to use (default is given by the \
-       environment variable `TEZT_CLOUD`)"
+      "Specify the name of the dockerfile alias to use (default is given by \
+       the environment variable `TEZT_CLOUD`)"
     ()
 
 let max_run_duration =

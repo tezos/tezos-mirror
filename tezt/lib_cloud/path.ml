@@ -19,7 +19,8 @@ let terraform_state_bucket = terraform // "state-bucket"
 
 let terraform_vm = terraform // "vm"
 
-let docker = project // "dockerfiles"
+let dockerfile ~alias =
+  project // "dockerfiles" // Format.asprintf "%s.Dockerfile" alias
 
 let zcash_params = "_opam" // "share" // "zcash-params"
 

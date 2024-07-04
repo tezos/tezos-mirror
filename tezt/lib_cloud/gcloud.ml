@@ -32,27 +32,27 @@ let project_id =
       Lwt.return !project_id)
     else Lwt.return !project_id
 
-let compute_ssh ~zone ~vm_name cmd args =
-  let ssh_private_key = Lazy.force Env.ssh_private_key in
-  let value =
-    Process.spawn
-      ~name
-      ~color
-      "gcloud"
-      ([
-         "compute";
-         "ssh";
-         "--ssh-key-file";
-         ssh_private_key;
-         vm_name;
-         "--zone";
-         zone;
-         "--";
-       ]
-      @ [cmd] @ args)
-  in
-  let run = Process.check_and_read_stdout in
-  {value; run}
+type cmd_wrapper = {cmd : string; args : string list}
+
+let cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename =
+  {
+    cmd = "gcloud";
+    args =
+      [
+        "compute";
+        "ssh";
+        "--ssh-key-file";
+        ssh_private_key_filename;
+        vm_name;
+        "--zone";
+        zone;
+        "--";
+      ];
+  }
+
+let compute_ssh ~zone ~vm_name ~ssh_private_key_filename cmd args =
+  let wrapper = cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename in
+  Process.spawn ~name ~color wrapper.cmd (wrapper.args @ [cmd] @ args)
 
 let get_ip_address_from_name ~zone name =
   let* output =

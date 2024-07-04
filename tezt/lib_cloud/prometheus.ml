@@ -13,6 +13,8 @@ type t = {
   configuration_file : string;
   mutable sources : source list;
   scrape_interval : int;
+  snapshot_filename : string option;
+  port : int;
 }
 
 let netdata_source_of_agents agents =
@@ -71,7 +73,7 @@ let config ~scrape_interval sources =
   let sources = List.map str_of_source sources |> String.concat "" in
   prefix ~scrape_interval () ^ sources
 
-let write_configuration_file {scrape_interval; configuration_file; sources} =
+let write_configuration_file {scrape_interval; configuration_file; sources; _} =
   let config = config ~scrape_interval sources in
   with_open_out configuration_file (fun oc ->
       Stdlib.seek_out oc 0 ;
@@ -89,13 +91,18 @@ let add_source t ?(metric_path = "/metrics") ~job_name targets =
   write_configuration_file t ;
   reload t
 
-let start ?(scrape_interval = 5) agents =
+let start agents =
   let sources =
-    if Cli.monitoring then [tezt_source; netdata_source_of_agents agents]
+    if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
   in
   let configuration_file = Temp.file "prometheus.yml" in
-  let t = {configuration_file; sources; scrape_interval} in
+  let snapshot_filename = Env.prometheus_snapshot_filename in
+  let port = Env.prometheus_port in
+  let scrape_interval = Env.prometheus_scrape_interval in
+  let t =
+    {configuration_file; sources; scrape_interval; snapshot_filename; port}
+  in
   write_configuration_file t ;
   let process =
     Process.spawn
@@ -108,8 +115,8 @@ let start ?(scrape_interval = 5) agents =
         "prometheus";
         "--network";
         "host";
-        "-p";
-        "9090:9090";
+        (* We use the host mode so that in [localhost], prometheus can see the
+           metrics endpoint run by other docker containers. *)
         "-v";
         Format.asprintf "%s:/etc/prometheus/prometheus.yml" configuration_file;
         "prom/prometheus";
@@ -118,6 +125,8 @@ let start ?(scrape_interval = 5) agents =
         (* To export a snapshot. *)
         "--web.enable-lifecycle";
         (* To reload the configuration while prometheus is running.*)
+        Format.asprintf "--web.listen-address=:%d" port;
+        (* Specify the port on which the prometheus instance runs. *)
       ]
   in
   let* status = Process.wait process in
@@ -133,43 +142,25 @@ let start ?(scrape_interval = 5) agents =
         (* Fail if something unexpected happens. *)
         Process.check process
   in
-  let rec wait_for_ready () =
-    let process =
-      Process.spawn
-        "curl"
-        [
-          "-s";
-          "-o";
-          "/dev/null";
-          "-w";
-          "%{http_code}";
-          "http://localhost:9090/-/ready";
-        ]
-    in
-    let* status = Process.wait process in
-    match status with
-    | Unix.WEXITED 0 ->
-        let* status = Process.check_and_read_stdout process in
-        if String.trim status = "200" then Lwt.return_unit
-        else (
-          Log.info
-            "Prometheus container is not ready, let's wait 2 seconds and check \
-             again..." ;
-          let* () = Lwt_unix.sleep 2. in
-          wait_for_ready ())
-    | _ ->
-        Log.info
-          "Prometheus container is not ready, let's wait 2 seconds and check \
-           again..." ;
-        let* () = Lwt_unix.sleep 2. in
-        wait_for_ready ()
+  let is_ready output = String.trim output = "200" in
+  let run () =
+    Process.spawn
+      "curl"
+      [
+        "-s";
+        "-o";
+        "/dev/null";
+        "-w";
+        "%{http_code}";
+        "http://localhost:9090/-/ready";
+      ]
   in
-  let* () = wait_for_ready () in
+  let* _ = Env.wait_process ~is_ready ~run () in
   Lwt.return t
 
 let snapshots_path = "/prometheus" // "data" // "snapshots"
 
-let export_snapshot {configuration_file = _; _} =
+let export_snapshot {snapshot_filename; _} =
   Log.info "Exporting snapshot..." ;
   let* stdout =
     Process.run_and_read_stdout
@@ -179,27 +170,41 @@ let export_snapshot {configuration_file = _; _} =
   let json = JSON.parse ~origin:"Prometheus.export" stdout in
   let snapshot_name = JSON.(json |-> "data" |-> "name" |> as_string) in
   let destination =
-    match Cli.prometheus_snapshot with
-    | None -> Cli.prometheus_snapshot_directory
-    | Some file -> Cli.prometheus_snapshot_directory // file
+    Option.value
+      ~default:(Filename.get_temp_dir_name () // snapshot_name)
+      snapshot_filename
   in
-  let*! () =
+  let* () =
     Docker.cp
       "prometheus"
       ~kind:`To_host
       ~source:(snapshots_path // snapshot_name)
       ~destination
+    |> Process.check
   in
   Log.info "You can find the prometheus snapshot at %s" destination ;
   Lwt.return_unit
 
 let shutdown {configuration_file = _; _} =
-  let*! () = Docker.kill "prometheus" in
+  let* () = Docker.kill "prometheus" |> Process.check in
   Lwt.return_unit
 
-let run_with_snapshot ~snapshot ~port =
+let run_with_snapshot () =
   (* No need for a configuration file here. *)
   let configuration_file = "" in
+  let port = Env.prometheus_port in
+  let snapshot_filename =
+    match Env.prometheus_snapshot_filename with
+    | None ->
+        Test.fail
+          "You must specify the snapshot filename via \
+           --prometheus-snapshot-filename"
+    | Some file -> file
+  in
+  Log.info
+    "You can find the prometheus instance at http://localhost:%d"
+    Env.prometheus_port ;
+  Log.info "Use Ctrl+C to end the scenario and kill the prometheus instance." ;
   let* () =
     Process.run
       "docker"
@@ -207,7 +212,7 @@ let run_with_snapshot ~snapshot ~port =
         "run";
         "-uroot";
         "-v";
-        Format.asprintf "%s:/prometheus" snapshot;
+        Format.asprintf "%s:/prometheus" snapshot_filename;
         "-p";
         Format.asprintf "%d:9090" port;
         "prom/prometheus";
@@ -215,4 +220,11 @@ let run_with_snapshot ~snapshot ~port =
         "--storage.tsdb.path=/prometheus";
       ]
   in
-  Lwt.return {configuration_file; sources = []; scrape_interval = 0}
+  Lwt.return
+    {
+      configuration_file;
+      sources = [];
+      scrape_interval = 0;
+      snapshot_filename = Some snapshot_filename;
+      port;
+    }

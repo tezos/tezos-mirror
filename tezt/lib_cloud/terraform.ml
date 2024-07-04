@@ -21,9 +21,7 @@ module Docker_registry = struct
       "terraform"
       (chdir Path.terraform_docker_registry @ ["init"])
 
-  let deploy () =
-    let* project_id = Gcloud.project_id () in
-    let tezt_cloud = Lazy.force Env.tezt_cloud in
+  let deploy ~tezt_cloud ~project_id =
     Process.run
       ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
       ~name
@@ -37,8 +35,7 @@ module Docker_registry = struct
           Format.asprintf "project_id=%s" project_id;
         ])
 
-  let get_docker_registry () =
-    let tezt_cloud = Lazy.force Env.tezt_cloud in
+  let get_docker_registry ~tezt_cloud =
     let* output =
       Process.run_and_read_stdout
         ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
@@ -47,14 +44,13 @@ module Docker_registry = struct
         "terraform"
         (chdir Path.terraform_docker_registry @ ["output"; "-json"])
     in
-    let json = JSON.parse ~origin:"docker_registry" output in
+    let json = JSON.parse ~origin:"get_docker_registry" output in
     let registry_name =
       JSON.(json |-> "docker_registry" |-> "value" |> as_string)
     in
     Lwt.return registry_name
 
-  let get_hostname () =
-    let tezt_cloud = Lazy.force Env.tezt_cloud in
+  let get_hostname ~tezt_cloud =
     let* output =
       Process.run_and_read_stdout
         ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
@@ -63,8 +59,21 @@ module Docker_registry = struct
         "terraform"
         (chdir Path.terraform_docker_registry @ ["output"; "-json"])
     in
-    let json = JSON.parse ~origin:"docker_registry_hostname" output in
+    let json = JSON.parse ~origin:"get_hostname" output in
     let registry_name = JSON.(json |-> "hostname" |-> "value" |> as_string) in
+    Lwt.return registry_name
+
+  let get_zone ~tezt_cloud =
+    let* output =
+      Process.run_and_read_stdout
+        ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
+        ~name
+        ~color
+        "terraform"
+        (chdir Path.terraform_docker_registry @ ["output"; "-json"])
+    in
+    let json = JSON.parse ~origin:"get_zone" output in
+    let registry_name = JSON.(json |-> "zone" |-> "value" |> as_string) in
     Lwt.return registry_name
 end
 
@@ -81,8 +90,7 @@ module VM = struct
 
     (* Return all the workspaces associated with the current tezt cloud
        environment. *)
-    let get () =
-      let tezt_cloud = Lazy.force Env.tezt_cloud in
+    let list ~tezt_cloud =
       (* We select the default workspace to be sure we can parse correctly the
          output. *)
       let* () = select "default" in
@@ -96,14 +104,17 @@ module VM = struct
       String.split_on_char '\n' output
       |> List.map String.trim
       |> List.filter (fun workspace ->
-             String.starts_with ~prefix:tezt_cloud workspace)
+             String.starts_with ~prefix:tezt_cloud workspace
+             (* The workspace named "tezt-cloud" is used for the docker
+                registry, it does not need to be listed. *)
+             && workspace <> tezt_cloud)
       |> Lwt.return
 
-    (* Create workspaces that will be used for the experiment. Delete the ones
-       that won't be used. *)
-    let init workspaces =
-      let* existing_workspaces = get () in
+    (* Create workspaces that will be used for the experiment. *)
+    let init ~tezt_cloud workspaces =
+      let* existing_workspaces = list ~tezt_cloud in
       let to_create =
+        (* Create only new workspaces. *)
         List.filter
           (fun workspace -> not @@ List.mem workspace existing_workspaces)
           workspaces
@@ -124,8 +135,10 @@ module VM = struct
       let* () = select "default" in
       unit
 
-    let destroy () =
-      let* workspaces = get () in
+    let destroy ~tezt_cloud =
+      (* We ensure we are not using a workspace we want to delete. *)
+      let* () = select "default" in
+      let* workspaces = list ~tezt_cloud in
       workspaces
       |> List.map (fun workspace ->
              Process.run
@@ -210,9 +223,7 @@ module VM = struct
     in
     Lwt.return machine_type
 
-  let destroy workspaces =
-    let* project_id = Gcloud.project_id () in
-    (* let docker_image = Env.custom_docker_image ~project_id in *)
+  let destroy workspaces ~project_id =
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
            let* () = Workspace.select workspace in
@@ -240,30 +251,4 @@ module VM = struct
              ~color
              "terraform"
              (chdir Path.terraform_vm @ ["destroy"; "--auto-approve"] @ vars))
-end
-
-module State_bucket = struct
-  let init () =
-    let* () = Docker_registry.init () in
-    Process.run
-      ~name
-      ~color
-      "terraform"
-      (chdir Path.terraform_state_bucket @ ["init"])
-
-  let deploy () =
-    let tezt_cloud = Lazy.force Env.tezt_cloud in
-    let* project_id = Gcloud.project_id () in
-    Process.run
-      ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
-      ~name
-      ~color
-      "terraform"
-      (chdir Path.terraform_state_bucket
-      @ [
-          "apply";
-          "--auto-approve";
-          "--var";
-          Format.asprintf "project_id=%s" project_id;
-        ])
 end

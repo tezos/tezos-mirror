@@ -7,22 +7,37 @@
 
 type t = {
   mutable name : string;
+  vm_name : string;
+  cmd_wrapper : Gcloud.cmd_wrapper option;
   point : string * int;
   runner : Runner.t;
   next_available_port : unit -> int;
-  binaries_path : string;
+  configuration : Configuration.t;
 }
 
-let make ?(ssh_user = "root") ~ssh_id ~point:((address, ssh_port) as point)
-    ~binaries_path ~next_available_port ~name () =
+let make ?cmd_wrapper ~ssh_id ~point:((address, ssh_port) as point)
+    ~configuration ~next_available_port ~name () =
+  let ssh_user = "root" in
   let runner = Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () in
-  {point; runner; name; next_available_port; binaries_path}
+  {
+    point;
+    runner;
+    name;
+    vm_name = name;
+    next_available_port;
+    configuration;
+    cmd_wrapper;
+  }
 
 let name {name; _} = name
 
+let point {point; _} = point
+
+let cmd_wrapper agent = agent.cmd_wrapper
+
 let set_name agent name = agent.name <- name
 
-let path_of agent binary = agent.binaries_path // binary
+let path_of agent binary = agent.configuration.binaries_path // binary
 
 let copy agent ~source ~destination =
   let runner = agent.runner in
@@ -85,4 +100,4 @@ let next_available_port t = t.next_available_port ()
 
 let runner {runner; _} = runner
 
-let binaries_path {binaries_path; _} = binaries_path
+let configuration {configuration; _} = configuration

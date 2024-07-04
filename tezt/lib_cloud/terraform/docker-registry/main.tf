@@ -32,6 +32,12 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "gcs" {
+    # Generic bucket state that contains all the states for all the
+    # workspaces
+    bucket = "dal-tfstate"
+  }
 }
 
 resource "google_artifact_registry_repository" "docker-registry" {
@@ -60,4 +66,9 @@ output "hostname" {
 output "docker_registry" {
   value       = local.registry
   description = "URL of the GCP docker registry for this region"
+}
+
+output "zone" {
+  value       = var.zone
+  description = "Zone of the docker registry"
 }

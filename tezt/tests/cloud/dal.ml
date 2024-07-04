@@ -1451,7 +1451,9 @@ let etherlink_loop (etherlink : etherlink) =
       List.nth etherlink.producers (i mod List.length etherlink.producers)
     in
     let runner = Node.runner producer.node |> Option.get in
-    let firehose = Agent.binaries_path producer.agent // "firehose" in
+    let firehose =
+      (Agent.configuration producer.agent).binaries_path // "firehose"
+    in
     let* () =
       Process.spawn
         ~runner
@@ -1511,23 +1513,24 @@ let benchmark () =
     ]
     |> List.concat
   in
-  let default_vm_configuration = Cloud.Configuration.make () in
+  let default_vm_configuration = Configuration.make () in
   let vms =
     vms
     |> List.map (function
-           | `Bootstrap -> default_vm_configuration
+           | `Bootstrap ->
+               Configuration.make ~docker_image:Octez_latest_release ()
            | `Baker i -> (
                match configuration.stake_machine_type with
                | None -> default_vm_configuration
                | Some list -> (
                    try
                      let machine_type = List.nth list i in
-                     Cloud.Configuration.make ~machine_type ()
+                     Configuration.make ~machine_type ()
                    with _ -> default_vm_configuration))
            | `Producer | `Observer -> (
                match configuration.producer_machine_type with
                | None -> default_vm_configuration
-               | Some machine_type -> Cloud.Configuration.make ~machine_type ())
+               | Some machine_type -> Configuration.make ~machine_type ())
            | `Etherlink_operator -> default_vm_configuration
            | `Etherlink_producer _ -> default_vm_configuration)
   in
