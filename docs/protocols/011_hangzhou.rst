@@ -13,8 +13,6 @@ The code can be found in the :src:`src/proto_011_PtHangz2` directory of the
 This page documents the changes brought by protocol Hangzhou with respect
 to Granada.
 
-.. contents::
-
 New Environment Version (V3)
 ----------------------------
 

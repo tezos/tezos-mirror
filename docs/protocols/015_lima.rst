@@ -7,8 +7,6 @@ to Kathmandu (see :ref:`naming_convention`).
 The code can be found in the :src:`src/proto_015_PtLimaPt` directory of the
 ``master`` branch of Tezos.
 
-.. contents::
-
 New Environment Version (V7)
 ----------------------------
 

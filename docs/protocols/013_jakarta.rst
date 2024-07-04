@@ -14,8 +14,6 @@ The code can be found in the :src:`src/proto_013_PtJakart` directory of the
 This page documents the changes brought by protocol Jakarta with respect
 to Ithaca.
 
-.. contents::
-
 New Environment Version (V5)
 ----------------------------
 

@@ -7,8 +7,6 @@ to Oxford (see :ref:`naming_convention`).
 The code can be found in directory :src:`src/proto_019_PtParisB` of the ``master``
 branch of Octez.
 
-.. contents::
-
 Environment Version
 -------------------
 

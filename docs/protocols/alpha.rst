@@ -9,8 +9,6 @@ For changes brought by Paris with respect to Oxford, see :doc:`../protocols/019_
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
 
-.. contents::
-
 Environment Version
 -------------------
 
