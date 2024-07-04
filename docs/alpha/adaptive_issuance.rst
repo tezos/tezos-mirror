@@ -58,16 +58,16 @@ the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
 Adaptive Issuance lets the amount of participation rewards depend on
-the global **staked funds ratio** – that is, the
+the global **staked ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
 At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
-regular issuance is adjusted, to nudge the staked funds ratio towards a
+regular issuance is adjusted, to nudge the staked ratio towards a
 protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
 are recomputed to match that budget. When the staked
-funds ratio decreases and diverges from the target, emission rates
+ratio decreases and diverges from the target, emission rates
 increase, incentivizing participants to stake funds to re-approach the
 target. Conversely, incentives decrease as the ratio increases beyond
 the target.
@@ -80,18 +80,87 @@ Adaptive issuance rate
 The adaptive issuance rate determines, at the end
 of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
 adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
-and a :ref:`dynamic rate <dynamic_rate_alpha>`. The final result is clipped to
-ensure nominal emissions remain within the minimal and the maximum ratios.
+and a :ref:`dynamic rate <dynamic_rate_alpha>`. This value is kept within
+a minimal and a maximal value, to ensure nominal emissions remain within
+reasonable bounds.
 
-.. _minimum_and_maximum_ratios_alpha:
+.. _staked_ratio_alpha:
 
-Minimum and maximum ratios
+Staked ratio
+............
+
+The **staked ratio** is the ratio of staked tez to the total supply. It is computed at the end of a given ``cycle``:
+
+.. code-block:: python
+
+  def staked_ratio(cycle):
+    return total_frozen_stake(cycle + 1 + consensus_rights_delay) / total_supply(cycle)
+
+Where:
+
+- ``consensus_rights_delay`` (2) is the delay in cycles for a delegate to receive rights.
+- ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
+- ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
+
+.. _static_rate_alpha:
+
+Static rate
+...........
+
+The **static rate** is a mechanism which approximates `a Dutch
+auction <https://en.wikipedia.org/wiki/Dutch_auction>`__ to compute a
+nominal issuance rate as a function of the staked ratio for a
+given cycle. Its value decreases as the staked ratio increases.
+The static rate is defined as follows:
+
+.. code-block:: python
+
+  def static_rate(cycle):
+    return 1 / 1600 * (1 / (staked_ratio(cycle) ** 2))
+
+The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
+
+.. _dynamic_rate_alpha:
+
+Dynamic rate
+............
+
+The **dynamic reward rate** adjusts itself over time based on the distance between the staked ratio and the 50% (±2%) target ratio, increasing when < 48% and decreasing when > 52%. The dynamic rate is defined as follows:
+
+.. code-block:: python
+
+  def dynamic_rate(cycle):
+    if cycle <= ai_activation_cycle:
+      return 0
+    seconds_per_cycle = blocks_per_cycle * minimal_block_delay
+    days_per_cycle = seconds_per_cycle / 86400
+    previous_dynamic = dynamic_rate(cycle - 1)
+    staked_ratio = staked_ratio(cycle)
+    if staked_ratio < 0.48:
+      delta_d = (0.48 - staked_ratio) * growth_rate * days_per_cycle
+    elif staked_ratio > 0.52:
+      delta_d = (0.52 - staked_ratio) * growth_rate * days_per_cycle
+    else:
+      delta_d = 0
+    return previous_dynamic + delta_d
+
+Where:
+
+- ``blocks_per_cycle`` denotes the number of blocks in a Tezos cycle.
+- ``minimal_block_delay`` denotes the minimal duration of a block in seconds.
+- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
+- ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
+
+In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_alpha>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_alpha>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
+
+.. _minimum_and_maximum_rates_alpha:
+
+Minimum and maximum rates
 ..........................
 
-For the upcoming Paris protocol proposal, the minimum and maximum
-issuance rates will evolve smoothly over a predefined period of time,
-with the window between the maximum and minimum values progressively
-widening.
+Starting in Paris, the minimum and maximum
+issuance rates will evolve slowly over a set period of time,
+so that the range of possible issuance rate values widens progressively.
 
 The following figure describes the progressive maximum and minimum
 values of Adaptive Issuance.
@@ -107,13 +176,13 @@ The schedule consists of three periods:
 - an **initial** period, set to 1 month, where the minimum and maximum
   issuance rates are close to the current issuance rate and stay
   constant,
-- a **transition** period, set to 5 months, where they widen lineary, with
-  the minimum going lower and the maximum higher, and
+- a **transition** period, set to 5 months, where they evolve linearly, with
+  a decreasing minimum, and an increasing maximum, and
 - a **final** period where the minimum and maximum have reached their
-  minimum and maximum values.
+  final values.
 
-Formally, we define the main function for computing progressive ratios
-as follows.
+Formally, the functions for the minimum and maximum values are piecewise linear functions of time,
+and can be generally defined as follows:
 
 .. code-block:: python
 
@@ -138,141 +207,92 @@ Where:
 - ``initial_period`` is a predefined period of time, set to 1 month in Paris.
 - ``transition_period`` is a predefined period of time, set to 5 months in Paris.
 
-The issuance minimum ratio for Adaptive Issuance curve is then defined as follows.
+The issuance minimum rate for Adaptive Issuance curve is then defined as follows.
 
 .. code-block:: python
 
-  def minimum_ratio(cycle):
-    return compute_extremum(cycle, issuance_ratio_initial_min, issuance_ratio_global_min)
+  def minimum_rate(cycle):
+    return compute_extremum(cycle, issuance_initial_min, issuance_global_min)
 
 Where:
 
-- ``issuance_ratio_initial_min`` (4.5%) is the initial minimum
+- ``issuance_initial_min`` (4.5%) is the initial minimum
   value. At the time of :ref:`Adaptive Issuance
   activation<feature_activation_alpha>`, the issuance rate is kept
   above this bound for the initial period.
-- ``issuance_ratio_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
+- ``issuance_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
 
 
-The issuance maximum ratio for Adaptive Issuance curve is then defined as follows.
+The issuance maximum rate for Adaptive Issuance curve is then defined as follows.
 
 .. code-block:: python
 
-  def maximum_ratio(cycle):
-    return compute_extremum(cycle, issuance_ratio_initial_max, issuance_ratio_global_max)
+  def maximum_rate(cycle):
+    return compute_extremum(cycle, issuance_initial_max, issuance_global_max)
 
 Where:
 
-- ``issuance_ratio_initial_max`` (5.5%) controls the initial maximum
+- ``issuance_initial_max`` (5.5%) controls the initial maximum
   value. At the time of :ref:`Adaptive Issuance
   activation<feature_activation_alpha>`, the issuance rate is kept
   below this bound for the initial period.
-- ``issuance_ratio_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
+- ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
-.. _staked_ratio_alpha:
+.. _dynmax_rate_alpha:
 
-Staked ratio
-............
+Dynamic Maximum
+......................
 
-The staked ratio, that is the ratio of staked tez to the total supply, is computed at the end of a given ``cycle`` and defined as follows.
+In addition to the previous bounds, from Alpha onwards we are adding another upper bound to the issuance.
+Called **DynMax**, this maximum is defined as a function of the stake ratio, like the static rate. This
+bound ensures that the issuance rate stays close enough to the static rate, by bounding the dynamic rate
+following a function of the stake ratio.
 
-.. code-block:: python
-
-  def staked_ratio(cycle):
-    return total_frozen_stake(cycle + 1 + consensus_rights_delay) / total_supply(cycle)
-
-Where:
-
-- ``consensus_rights_delay`` (2) is the delay in cycles for a delegate to receive rights.
-- ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
-- ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
-
-.. _static_rate_alpha:
-
-Static rate
-...........
-
-The **static rate** is a static mechanism, which approximates `a Dutch
-auction <https://en.wikipedia.org/wiki/Dutch_auction>`__ to compute a
-nominal issuance rate as a function of the staked funds ratio for a
-given cycle. Its value decreases as the staked funds ratio increases,
-and *vice versa*. The static rate is defined as follows.
+The function chosen for the maximum applied to the total issuance is the following:
 
 .. code-block:: python
 
-  def static_rate(cycle):
-    staked_ratio_value = staked_ratio(cycle)
-    static_rate_value = 1 / 1600 * (1 / (staked_ratio_value ** 2))
-    return clip(static_rate_value, minimum_ratio(cycle + 1), maximum_ratio(cycle + 1))
-
-Where the function ``clip`` is defined as follows.
-
-.. code-block:: python
-
-  def clip(value, min_value, max_value):
-    return max(min_value, min(value, max_value))
-
-The choice of a scaling factor ensures that the curve takes reasonable values for plausible staking ratios. Moreover, assuming Adaptive Issuance is activated with a dynamic ratio of 0, and at current staked funds ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
-
-.. _dynamic_rate_alpha:
-
-Dynamic rate
-............
-
-The **dynamic reward rate** adjusts itself over time based on the distance between the staked funds ratio and the 50% (±2%) target ratio, increasing when < 48% and decreasing when > 52%, provided the total issuance rate is not hitting its lower or upper limit. The dynamic rate is defined as follows.
-
-.. code-block:: python
-
-  def dyn(cycle):
-    if cycle <= ai_activation_cycle:
-      return 0
-    previous_bonus = dyn(cycle - 1)
-    staked_ratio_value = staked_ratio(cycle)
-    seconds_per_cycle = blocks_per_cycle * minimal_block_delay
-    ratio_min = minimum_ratio(cycle + 1)
-    ratio_max = maximum_ratio(cycle + 1)
-    static_rate_value = static_rate(cycle)
-    static_rate_dist_to_max = ratio_max - static_rate_clipped
-    udist = abs(staked_ratio_value - ratio_target) - ratio_radius
-    dist = -udist if staked_ratio_value >= ratio_target else udist
-    days_per_cycle = seconds_per_cycle / 86400
-    new_bonus = max(previous_bonus + dist * growth_rate * days_per_cycle, 0)
-    max_new_bonus = min(static_rate_dist_to_max, max_bonus)
-    res = min(new_bonus, max_new_bonus)
-    assert 0 <= res <= max_bonus
-    return res
-
-Where:
-
-- ``ratio_target`` (0.5), ``ratio_radius`` (0.02) denote, respectively, the target staked funds ratio and the radius of the interval centered on the target ratio.
-- ``blocks_per_cycle`` denotes the number of blocks in a Tezos cycle.
-- ``minimal_block_delay`` denotes the minimal duration of a block in seconds.
-- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
-- ``dist`` denotes the distance between the staked funds ratio and the interval ``[ratio_target - ratio_radius; ratio_target + ratio_radius]``.
-- ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked funds ratio changes the dynamic rate by 0.01 percentage points per day.
-- ``max_bonus`` is set to 50_000_000 tez in the protocol.
-- 86400 is the number of seconds in a day.
+  def dynmax(stake_ratio):
+    r = stake_ratio
+    if r >= 0.5:
+      return 0.01
+    elif r <= 0.05:
+      return 0.1
+    dm = (5115 - 17670 * r + 19437 * (r ** 2)) / (24149 + 178695 * r)
+    if dm > 0.1:
+      return 0.1
+    elif dm < 0.01:
+      return 0.01
+    else:
+      return dm
 
 
-In a nutshell, ``dyn(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[ratio_target - ratio_radius; ratio_target + ratio_radius]``, while ensuring that the adaptive issuance rate is kept within the minimum and maximum bounds.
+.. figure:: dynmax.png
+
+ Figure 2. DynMax compared to the static rate in the range from 5% to 50% of stake ratio.
+
+Note that before reaching the final value of the minimum in the previous section, it is possible for
+this maximum value to theoretically be smaller than  the minimum bound. In this case, the minimum value
+takes priority, and the max is set to the min. In other words, the bounds in the previous section are always
+applied, regardless of the value of dynmax.
 
 .. _issuance_rate_alpha:
 
 Issuance rate
 ......................
 
-Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, clipped to stay within the minimum and maximum ratios computed for the cycle ``c + 1``.
+Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_alpha>`, along with the :ref:`dynamic maximum <dynmax_rate_alpha>`, computed for the cycle ``c + 1``.
 
 .. code-block:: python
 
   def issuance_rate(cycle):
     adjusted_cycle = cycle - consensus_rights_delay
-    static_rate_ratio = static_rate(adjusted_cycle - 1)
-    bonus = reward_bonus(adjusted_cycle - 1)
-    ratio_min = minimum_ratio(adjusted_cycle)
-    ratio_max = maximum_ratio(adjusted_cycle)
-    total_rate = static_rate_ratio + bonus
-    return clip(total_rate, ratio_min, ratio_max)
+    static_rate = static_rate(adjusted_cycle - 1)
+    dynamic_rate = dynamic_rate(adjusted_cycle - 1)
+    minimum_rate = minimum_rate(adjusted_cycle)
+    maximum_rate = min(maximum_rate(adjusted_cycle), dynmax(stake_ratio(adjusted_cycle)))
+    total_rate = static_rate + dynamic_rate
+    return max( min(total_rate, maximum_rate), minimum_rate )
 
 
 .. _adaptive_rewards_alpha:
@@ -505,7 +525,7 @@ parameters need to be supplied. The new parameters are then applied
 
 ::
 
-   octez-client transfer 0 from <delegate> to  <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth)> (Pair <edge as int value in billionth> Unit)"
+   octez-client transfer 0 from <delegate> to  <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth> (Pair <edge as int value in billionth> Unit)"
 
 or more conveniently::
 
@@ -534,7 +554,7 @@ they remain otherwise within the staker’s account at all times.
 
 .. figure:: staked_funds_transitions.png
 
-  Figure 2: staked funds management using pseudo-operations.
+  Figure 3: staked funds management using pseudo-operations.
 
 To *stake* funds, a delegator uses the ``stake`` pseudo-operation,
 transferring the chosen amount of **spendable** tez to their own
