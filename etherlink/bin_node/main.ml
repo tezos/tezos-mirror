@@ -1478,7 +1478,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args23
+    (args24
        mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
@@ -1510,7 +1510,8 @@ let make_kernel_config_command =
        @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
        bootstrap_account_arg
        (config_key_flag ~name:"enable_fa_bridge")
-       (config_key_flag ~name:"enable_dal"))
+       (config_key_flag ~name:"enable_dal")
+       (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -1539,7 +1540,8 @@ let make_kernel_config_command =
            boostrap_balance,
            bootstrap_accounts,
            enable_fa_bridge,
-           enable_dal )
+           enable_dal,
+           dal_slots )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
@@ -1566,6 +1568,7 @@ let make_kernel_config_command =
         ?bootstrap_accounts
         ?enable_fa_bridge
         ?enable_dal
+        ?dal_slots
         ~output
         ())
 

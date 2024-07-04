@@ -2,7 +2,7 @@ use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
     delayed_inbox::DelayedInbox,
     storage::{
-        enable_dal, evm_node_flag, is_enable_fa_bridge,
+        dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
         max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
@@ -16,13 +16,18 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_debug::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 
+#[derive(Debug, Clone, Default)]
+pub struct DalConfiguration {
+    pub slot_indices: Vec<u8>,
+}
+
 pub enum ConfigurationMode {
     Proxy,
     Sequencer {
         delayed_bridge: ContractKt1Hash,
         delayed_inbox: Box<DelayedInbox>,
         sequencer: PublicKey,
-        enable_dal: bool,
+        dal: Option<DalConfiguration>,
         evm_node_flag: bool,
         max_blueprint_lookahead_in_seconds: i64,
     },
@@ -36,13 +41,13 @@ impl std::fmt::Display for ConfigurationMode {
                 delayed_bridge,
                 delayed_inbox: _, // Ignoring delayed_inbox
                 sequencer,
-                enable_dal,
+                dal,
                 evm_node_flag,
                 max_blueprint_lookahead_in_seconds,
             } => write!(
                 f,
-                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?}, enable_dal: {}, evm_node_flag: {}, max_blueprints_lookahead_in_seconds: {} }}",
-                delayed_bridge, sequencer, enable_dal, evm_node_flag, max_blueprint_lookahead_in_seconds
+                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?}, dal: {:?}, evm_node_flag: {}, max_blueprints_lookahead_in_seconds: {} }}",
+                delayed_bridge, sequencer, dal, evm_node_flag, max_blueprint_lookahead_in_seconds
             ),
         }
     }
@@ -177,12 +182,22 @@ pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
     }
 }
 
+fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfiguration> {
+    let enable_dal = enable_dal(host).unwrap_or(false);
+    if enable_dal {
+        let slot_indices: Vec<u8> = dal_slots(host).unwrap_or(None)?;
+        Some(DalConfiguration { slot_indices })
+    } else {
+        None
+    }
+}
+
 pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
-    let enable_dal = enable_dal(host).unwrap_or(false);
+    let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
     match sequencer {
         Some(sequencer) => {
@@ -206,7 +221,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                         delayed_bridge,
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
-                        enable_dal,
+                        dal,
                         evm_node_flag,
                         max_blueprint_lookahead_in_seconds,
                     },

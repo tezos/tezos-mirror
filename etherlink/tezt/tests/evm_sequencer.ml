@@ -177,7 +177,8 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
-    ?(drop_duplicate_when_injection = true) ?history_mode ~enable_dal protocol =
+    ?(drop_duplicate_when_injection = true) ?history_mode ~enable_dal ?dal_slots
+    protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -210,6 +211,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
       ~enable_dal
+      ?dal_slots
       ?max_blueprint_lookahead_in_seconds
       ~bootstrap_accounts
       ~output:output_config
@@ -424,7 +426,9 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
-    ?history_mode ~enable_dal body ~title ~tags protocols =
+    ?history_mode ~enable_dal
+    ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
+    protocols =
   let additional_uses =
     if threshold_encryption then
       Constant.octez_dsn_node :: kernel :: additional_uses
@@ -457,6 +461,7 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
         ~threshold_encryption
         ?history_mode
         ~enable_dal
+        ?dal_slots
         protocol
     in
     body sequencer_setup protocol

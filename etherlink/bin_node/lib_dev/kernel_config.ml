@@ -24,7 +24,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_dal ~output () =
+    ?enable_dal ?dal_slots ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -42,6 +42,13 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     let b = Bytes.make 8 '\000' in
     Bytes.set_int64_le b 0 (Int64.of_string i) ;
     String.of_bytes b
+  in
+  (* Convert a comma-separated list of decimal values in the [0; 255]
+     range into a sequence of bytes (of type string). *)
+  let decimal_list_to_bytes l =
+    l |> String.split ',' |> List.to_seq
+    |> Seq.map (fun s -> Char.chr (int_of_string s))
+    |> String.of_seq
   in
   let instrs =
     (if mainnet_compat then make_instr ~path_prefix:"/evm/" ticketer
@@ -78,5 +85,6 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:"/evm/feature_flags/" enable_fa_bridge
     @ make_instr ~path_prefix:"/evm/feature_flags/" enable_dal
+    @ make_instr ~convert:decimal_list_to_bytes dal_slots
   in
   Installer_config.to_file instrs ~output

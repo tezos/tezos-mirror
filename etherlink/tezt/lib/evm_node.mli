@@ -395,6 +395,7 @@ val make_kernel_installer_config :
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
   ?enable_dal:bool ->
+  ?dal_slots:int list ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t

@@ -43,6 +43,12 @@
   versions. (!13895)
 - Add FA withdrawal execution methods and FA bridge precompile. (!13941)
 
+- A DAL feature flag is added to the configuration. If the path has a
+  value in `/evm/feature_flags/enable_dal`, the kernel is allowed to
+  import data from the DAL. (!13634)
+
+- The list of DAL slot indices on which the sequencer may publish DAL slots can be configured at path `/evm/dal_slots`. (!13717)
+
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
 ### Features

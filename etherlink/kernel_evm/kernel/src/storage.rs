@@ -165,6 +165,9 @@ pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
 // is not used.
 pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable_dal");
 
+// Path to the DAL slot indices to use.
+pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/evm/dal_slots");
+
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
@@ -1036,6 +1039,15 @@ pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
         Ok(true)
     } else {
         Ok(false)
+    }
+}
+
+pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> {
+    if host.store_has(&DAL_SLOTS)?.is_some() {
+        let bytes = host.store_read_all(&DAL_SLOTS)?;
+        Ok(Some(bytes))
+    } else {
+        Ok(None)
     }
 }
 

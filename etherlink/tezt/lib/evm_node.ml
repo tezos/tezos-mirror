@@ -1019,7 +1019,7 @@ let make_kernel_installer_config ?(mainnet_compat = false)
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = 157_680_000L)
-    ?(enable_fa_bridge = false) ?(enable_dal = false) ~output () =
+    ?(enable_fa_bridge = false) ?(enable_dal = false) ?dal_slots ~output () =
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_switch "mainnet-compat" mainnet_compat
@@ -1067,6 +1067,10 @@ let make_kernel_installer_config ?(mainnet_compat = false)
       ]
     @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
     @ Cli_arg.optional_switch "enable-dal" enable_dal
+    @ Cli_arg.optional_arg
+        "dal-slots"
+        (fun l -> String.concat "," (List.map string_of_int l))
+        dal_slots
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
     @
     match bootstrap_accounts with

@@ -32,6 +32,7 @@ val make :
   ?remove_whitelist:string * string ->
   ?enable_fa_bridge:string * string ->
   ?enable_dal:string * string ->
+  ?dal_slots:string * string ->
   output:string ->
   unit ->
   unit tzresult Lwt.t
