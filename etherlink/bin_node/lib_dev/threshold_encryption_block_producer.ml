@@ -61,14 +61,7 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let get_hashes ~transactions ~delayed_transactions =
   let open Result_syntax in
-  let hashes =
-    List.map
-      (fun transaction ->
-        let tx_hash_str = Transaction.hash_raw_tx transaction in
-        Ethereum_types.(
-          Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
-      transactions
-  in
+  let hashes = List.map Transaction.hash_raw_tx transactions in
   return (delayed_transactions @ hashes)
 
 let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =

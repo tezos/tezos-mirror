@@ -21,7 +21,7 @@ type t = {
 
 val encoding : t Data_encoding.t
 
-val hash_raw_tx : string -> string
+val hash_raw_tx : string -> hash
 
 (** [nonce_of_rlp_raw_tx bytes] returns the nonce of a given raw
     transaction. *)

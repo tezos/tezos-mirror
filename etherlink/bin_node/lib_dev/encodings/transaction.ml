@@ -46,7 +46,7 @@ let hash_raw_tx raw_tx =
   let hash =
     Tezos_crypto.Hacl.Hash.Keccak_256.digest (String.to_bytes raw_tx)
   in
-  Bytes.to_string hash
+  Hash (Hex Hex.(of_bytes hash |> show))
 
 let nonce_of_rlp_raw_tx bytes =
   let open Result_syntax in

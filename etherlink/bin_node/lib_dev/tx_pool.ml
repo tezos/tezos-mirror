@@ -445,10 +445,7 @@ let insert_valid_transaction state tx_raw address
     else
       (* Add the transaction to the pool *)
       (* Compute the hash *)
-      let tx_hash = Transaction.hash_raw_tx tx_raw in
-      let hash =
-        Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
-      in
+      let hash = Transaction.hash_raw_tx tx_raw in
       (* This is a temporary fix until the hash computation is fixed on the
          kernel side. *)
       let transaction_object =
@@ -601,10 +598,7 @@ let pop_transactions state ~maximum_cumulative_size =
              match transaction_object with
              | Some {hash; _} -> (raw_tx, hash)
              | None ->
-                 let tx_hash = Transaction.hash_raw_tx raw_tx in
-                 let hash =
-                   Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
-                 in
+                 let hash = Transaction.hash_raw_tx raw_tx in
                  (raw_tx, hash))
     in
     (* update the pool *)
