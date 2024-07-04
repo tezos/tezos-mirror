@@ -259,7 +259,7 @@ let get_missing_data ~logger ~conf db_pool boundaries =
     Caqti_request.Infix.(
       Caqti_type.(t2 int32 int32)
       ->* Caqti_type.(t4 int32 int32 Sql_requests.Type.public_key_hash bool))
-      "SELECT\n\
+      "SELECT DISTINCT\n\
       \  missing_blocks.level,\n\
       \  missing_blocks.round,\n\
       \  delegates.address,\n\
