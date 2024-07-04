@@ -23,11 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Validation = struct
-  include Registerer.Registered
-  module Plugin = Plugin.Mempool
-end
-
 module RPC = struct
   module Proto = Registerer.Registered
   include Plugin.RPC
@@ -44,8 +39,6 @@ module Http_cache_headers = struct
 
   let hash = Registerer.Registered.hash
 end
-
-let () = Protocol_plugin.register_validation_plugin (module Validation)
 
 let () = Protocol_plugin.register_rpc (module RPC)
 
