@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    machine_state::bus::main_memory::M100M,
+    pvm::common::{Pvm, PvmLayout},
     state_backend::{
         self,
         memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
-        Backend, CellRead, CellWrite, Layout, Region,
+        Backend, CellRead, CellWrite, Layout,
     },
     storage::{self, Hash, Repo},
 };
@@ -14,13 +16,11 @@ use std::{fmt, path::Path};
 use thiserror::Error;
 
 const DUMMY_STATUS: &str = "riscv_dummy_status";
-const PAYLOAD_SIZE: usize = 1024;
-const EMPTY_PAYLOAD: [u8; PAYLOAD_SIZE] = [0u8; PAYLOAD_SIZE];
 
 pub struct Status(String);
 
 pub type StateLayout = (
-    state_backend::Array<u8, PAYLOAD_SIZE>,
+    PvmLayout<M100M>,
     state_backend::BoolCellLayout,
     state_backend::Atom<u32>,
     state_backend::Atom<u64>,
@@ -28,7 +28,7 @@ pub type StateLayout = (
 );
 
 pub struct State<M: state_backend::Manager> {
-    payload: M::Region<u8, PAYLOAD_SIZE>,
+    pvm: Pvm<M100M, M>,
     level_is_set: state_backend::BoolCell<M>,
     level: state_backend::Cell<u32, M>,
     message_counter: state_backend::Cell<u64, M>,
@@ -38,7 +38,7 @@ pub struct State<M: state_backend::Manager> {
 impl<M: state_backend::Manager> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
-            payload: space.0,
+            pvm: Pvm::<M100M, M>::bind(space.0),
             level_is_set: state_backend::BoolCell::bind(space.1),
             level: space.2,
             message_counter: space.3,
@@ -47,7 +47,7 @@ impl<M: state_backend::Manager> State<M> {
     }
 
     pub fn reset(&mut self) {
-        self.payload.write_some(0, &EMPTY_PAYLOAD);
+        self.pvm.reset();
         self.level_is_set.write(false);
         self.level.write(0);
         self.message_counter.write(0);
@@ -119,8 +119,8 @@ impl DummyPvm {
         self.with_backend(|state| state.message_counter.read())
     }
 
-    pub fn install_boot_sector(&self, boot_sector: Vec<u8>) -> Self {
-        self.with_new_backend(|state| state.payload.write_some(0, boot_sector.as_ref()))
+    pub fn install_boot_sector(&self, _boot_sector: Vec<u8>) -> Self {
+        self.with_new_backend(|_state| ())
     }
 
     pub fn compute_step(&self) -> Self {
@@ -144,10 +144,9 @@ impl DummyPvm {
             .unwrap()
     }
 
-    pub fn set_input(&self, level: u32, message_counter: u64, input: Vec<u8>) -> Self {
+    pub fn set_input(&self, level: u32, message_counter: u64, _input: Vec<u8>) -> Self {
         self.with_new_backend(|state| {
             let tick = state.tick.read();
-            state.payload.write_some(0, input.as_slice());
             state.tick.write(tick + 1);
             state.message_counter.write(message_counter);
             state.level_is_set.write(true);
