@@ -214,7 +214,7 @@ let staking_pseudotoken_balance_update_encoding =
           "change"
           (conv_balance_update Staking_pseudotoken_repr.balance_update_encoding))
 
-let balance_and_update_encoding ~use_legacy_attestation_name =
+let balance_and_update_encoding =
   let open Data_encoding in
   let case = function
     | Tag tag ->
@@ -250,10 +250,7 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
         | _ -> None)
       (fun (x, update) -> Ex_token (inj x, update))
   in
-  def
-    (if use_legacy_attestation_name then
-       "operation_metadata_with_legacy_attestation_name.alpha.balance_and_update"
-     else "operation_metadata.alpha.balance_and_update")
+  def "operation_metadata.alpha.balance_and_update"
   @@ union
        [
          tez_case
@@ -293,16 +290,10 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
             https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
          tez_case
            (Tag 7)
-           ~title:
-             (if use_legacy_attestation_name then "Endorsing_rewards"
-              else "Attesting_rewards")
+           ~title:"Attesting_rewards"
            (obj2
               (req "kind" (constant "minted"))
-              (req
-                 "category"
-                 (constant
-                    (if use_legacy_attestation_name then "endorsing rewards"
-                     else "attesting rewards"))))
+              (req "category" (constant "attesting rewards")))
            (function Attesting_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Attesting_rewards);
          tez_case
@@ -339,17 +330,10 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (fun ((), ()) -> Double_signing_punishments);
          tez_case
            (Tag 13)
-           ~title:
-             (if use_legacy_attestation_name then "Lost_endorsing_rewards"
-              else "Lost_attesting_rewards")
+           ~title:"Lost_attesting_rewards"
            (obj5
               (req "kind" (constant "burned"))
-              (req
-                 "category"
-                 (constant
-                    (if use_legacy_attestation_name then
-                       "lost endorsing rewards"
-                     else "lost attesting rewards")))
+              (req "category" (constant "lost attesting rewards"))
               (req "delegate" Signature.Public_key_hash.encoding)
               (req "participation" Data_encoding.bool)
               (req "revelation" Data_encoding.bool))
@@ -479,12 +463,6 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (fun ((), (), delegate) -> Staking_delegate_denominator {delegate});
        ]
 
-let balance_and_update_encoding_with_legacy_attestation_name =
-  balance_and_update_encoding ~use_legacy_attestation_name:true
-
-let balance_and_update_encoding =
-  balance_and_update_encoding ~use_legacy_attestation_name:false
-
 type update_origin =
   | Block_application
   | Protocol_migration
@@ -558,18 +536,6 @@ type balance_update_item =
 let item balance balance_update update_origin =
   Balance_update_item (balance, balance_update, update_origin)
 
-let item_encoding_with_legacy_attestation_name =
-  let open Data_encoding in
-  conv
-    (function
-      | Balance_update_item (balance, balance_update, update_origin) ->
-          (Ex_token (balance, balance_update), update_origin))
-    (fun (Ex_token (balance, balance_update), update_origin) ->
-      Balance_update_item (balance, balance_update, update_origin))
-    (merge_objs
-       balance_and_update_encoding_with_legacy_attestation_name
-       update_origin_encoding)
-
 let item_encoding =
   let open Data_encoding in
   conv
@@ -581,11 +547,6 @@ let item_encoding =
     (merge_objs balance_and_update_encoding update_origin_encoding)
 
 type balance_updates = balance_update_item list
-
-let balance_updates_encoding_with_legacy_attestation_name =
-  let open Data_encoding in
-  def "operation_metadata_with_legacy_attestation_name.alpha.balance_updates"
-  @@ list item_encoding_with_legacy_attestation_name
 
 let balance_updates_encoding =
   let open Data_encoding in
