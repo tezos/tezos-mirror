@@ -77,13 +77,6 @@ let make_evm_inbox_transactions tx_raw =
     let* chunked = chunk_transaction ~tx_hash_raw ~tx_raw in
     return (tx_hash, chunked)
 
-(** [make_encoded_messages ~smart_rollup_address raw_tx] returns the
-    hash of the transaction, and a list of transactions to include in the inbox.
-    - [smart_rollup_address] is encoded on 20 bytes
-    - [raw_tx] is an ethereum transaction in hex format (without the 0x prefix).
-
-    All messages go through the same encoding, but will only be chunked if
-    necessary. *)
 let make_encoded_messages ~smart_rollup_address tx_raw =
   let open Result_syntax in
   let* tx_hash, messages = make_evm_inbox_transactions tx_raw in
