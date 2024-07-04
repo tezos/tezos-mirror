@@ -8,7 +8,7 @@
 use crate::transaction::{
     TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
 };
-use primitive_types::{H160, H256, U256};
+use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use tezos_smart_rollup_encoding::{public_key::PublicKey, timestamp::Timestamp};
 
@@ -32,49 +32,6 @@ pub fn decode_field<T: Decodable>(
 ) -> Result<T, DecoderError> {
     let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
     decoder.as_val().map_err(custom_err)
-}
-
-pub fn decode_h256(decoder: &Rlp<'_>) -> Result<H256, DecoderError> {
-    let length = decoder.data()?.len();
-    if length == 32 {
-        Ok(H256::from_slice(decoder.data()?))
-    } else if length < 32 && length > 0 {
-        // there were missing 0 that encoding deleted
-        let missing = 32 - length;
-        let mut full = [0u8; 32];
-        full[missing..].copy_from_slice(decoder.data()?);
-        Ok(H256::from(full))
-    } else if decoder.data()?.is_empty() {
-        // considering the case empty allows to decode unsigned transactions
-        Ok(H256::zero())
-    } else {
-        Err(DecoderError::RlpInvalidLength)
-    }
-}
-
-pub fn decode_field_h256(
-    decoder: &Rlp<'_>,
-    field_name: &'static str,
-) -> Result<H256, DecoderError> {
-    let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
-    decode_h256(decoder).map_err(custom_err)
-}
-
-pub fn decode_h160(decoder: &Rlp<'_>) -> Result<H160, DecoderError> {
-    let bytes = decoder.data()?;
-    const H160_EXPECTED_LENGTH: usize = std::mem::size_of::<H160>();
-    let length = bytes.len();
-    if length == H160_EXPECTED_LENGTH {
-        Ok(H160::from_slice(bytes))
-    } else if length < H160_EXPECTED_LENGTH && length > 0 {
-        // there were missing 0 that encoding deleted
-        let missing = H160_EXPECTED_LENGTH - length;
-        let mut full = [0u8; H160_EXPECTED_LENGTH];
-        full[missing..].copy_from_slice(bytes);
-        Ok(H160::from(full))
-    } else {
-        Err(DecoderError::RlpInvalidLength)
-    }
 }
 
 pub fn decode_option<T: Decodable>(
@@ -155,18 +112,29 @@ pub fn append_vec<'a>(stream: &'a mut RlpStream, data: &Vec<u8>) -> &'a mut RlpS
     }
 }
 
-pub fn append_h256(s: &mut rlp::RlpStream, h256: H256) -> &mut RlpStream {
-    if H256::zero() != h256 {
-        let mut bytes = H256::as_bytes(&h256);
-        while let Some(leading) = bytes.strip_prefix(&[0]) {
-            bytes = leading;
-        }
-        s.append(&bytes)
+/// Append H256 compressed must be used for signatures only. The signatures
+/// in transaction are meant to be compressed, we should switch them to
+/// U256 to make this explicit.
+pub fn append_compressed_h256(s: &mut rlp::RlpStream, h256: H256) -> &mut RlpStream {
+    s.append(&U256::from_big_endian(h256.as_bytes()))
+}
+
+/// Decode H256 compressed must be used for signatures only.
+pub fn decode_compressed_h256(decoder: &Rlp<'_>) -> Result<H256, DecoderError> {
+    let length = decoder.data()?.len();
+    if length == 32 {
+        Ok(H256::from_slice(decoder.data()?))
+    } else if length < 32 && length > 0 {
+        // there were missing 0 that encoding deleted
+        let missing = 32 - length;
+        let mut full = [0u8; 32];
+        full[missing..].copy_from_slice(decoder.data()?);
+        Ok(H256::from(full))
+    } else if decoder.data()?.is_empty() {
+        // considering the case empty allows to decode unsigned transactions
+        Ok(H256::zero())
     } else {
-        // we could make the distinction between 0 and null
-        // but we don't, null is encoded as 0
-        // which is not such a big deal as H256 is used for hashed values
-        s.append_empty_data()
+        Err(DecoderError::RlpInvalidLength)
     }
 }
 
@@ -242,7 +210,7 @@ pub fn append_u16_le<'a>(stream: &'a mut RlpStream, v: &u16) -> &'a mut RlpStrea
 pub fn decode_transaction_hash(
     decoder: &Rlp<'_>,
 ) -> Result<TransactionHash, DecoderError> {
-    let hash: H256 = decode_field_h256(decoder, "transaction_hash")?;
+    let hash: H256 = decode_field(decoder, "transaction_hash")?;
     Ok(hash.into())
 }
 
@@ -253,7 +221,7 @@ pub fn decode_transaction_hash_list(
     let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
     decoder
         .iter()
-        .map(|rlp| decode_h256(&rlp).map(|h| h.into()))
+        .map(|rlp| rlp.as_val::<H256>().map(|h| h.into()))
         .collect::<Result<Vec<TransactionHash>, DecoderError>>()
         .map_err(custom_err)
 }
@@ -398,30 +366,5 @@ pub trait VersionedEncoding: std::marker::Sized {
         let mut bytes: Vec<u8> = self.unversionned_encode().into();
         bytes.insert(0, Self::VERSION);
         bytes
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::rlp_helpers::decode_h160;
-    use primitive_types::H160;
-    use rlp::{Rlp, RlpStream};
-
-    #[test]
-    fn roundtrip_h160() {
-        let partial_bytes: [u8; 16] = [1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0];
-        let full_bytes: [u8; 20] =
-            [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0];
-        let h160 = H160::from(full_bytes);
-
-        let mut stream = RlpStream::new();
-        stream.encoder().encode_value(&partial_bytes);
-        let encoded_bytes = stream.out();
-        let decoder = Rlp::new(&encoded_bytes);
-        let result_h160 = decode_h160(&decoder).unwrap();
-        let result_bytes = result_h160.as_fixed_bytes();
-
-        assert!(result_h160.eq(&h160));
-        assert!(result_bytes.eq(&full_bytes));
     }
 }

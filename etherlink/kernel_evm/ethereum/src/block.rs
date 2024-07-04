@@ -7,9 +7,8 @@ use crate::eth_gen::OwnedHash;
 use crate::helpers::{bytes_of_u256, hex_of_option};
 use crate::rlp_helpers::{
     append_option_explicit, append_timestamp, append_u256_le, append_u64_le,
-    decode_field, decode_field_h256, decode_field_u256_le, decode_field_u64_le,
-    decode_option_explicit, decode_timestamp, decode_transaction_hash_list, next,
-    VersionedEncoding,
+    decode_field, decode_field_u256_le, decode_field_u64_le, decode_option_explicit,
+    decode_timestamp, decode_transaction_hash_list, next, VersionedEncoding,
 };
 use crate::transaction::TransactionHash;
 use ethbloom::Bloom;
@@ -237,9 +236,8 @@ impl L2Block {
             if Ok(13) == decoder.item_count() {
                 let mut it = decoder.iter();
                 let number: U256 = decode_field_u256_le(&next(&mut it)?, "number")?;
-                let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
-                let parent_hash: H256 =
-                    decode_field_h256(&next(&mut it)?, "parent_hash")?;
+                let hash: H256 = decode_field(&next(&mut it)?, "hash")?;
+                let parent_hash: H256 = decode_field(&next(&mut it)?, "parent_hash")?;
                 let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
                 let transactions_root: OwnedHash =
                     decode_field(&next(&mut it)?, "transactions_root")?;
@@ -285,9 +283,8 @@ impl L2Block {
             if Ok(15) == decoder.item_count() {
                 let mut it = decoder.iter();
                 let number: U256 = decode_field_u256_le(&next(&mut it)?, "number")?;
-                let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
-                let parent_hash: H256 =
-                    decode_field_h256(&next(&mut it)?, "parent_hash")?;
+                let hash: H256 = decode_field(&next(&mut it)?, "hash")?;
+                let parent_hash: H256 = decode_field(&next(&mut it)?, "parent_hash")?;
                 let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
                 let transactions_root: OwnedHash =
                     decode_field(&next(&mut it)?, "transactions_root")?;
@@ -305,7 +302,7 @@ impl L2Block {
                 let timestamp = decode_timestamp(&next(&mut it)?)?;
                 let base_fee_per_gas: U256 =
                     decode_field_u256_le(&next(&mut it)?, "base_fee_per_gas")?;
-                let mix_hash: H256 = decode_field_h256(&next(&mut it)?, "mix_hash")?;
+                let mix_hash: H256 = decode_field(&next(&mut it)?, "mix_hash")?;
                 Ok(L2Block {
                     number,
                     hash,
