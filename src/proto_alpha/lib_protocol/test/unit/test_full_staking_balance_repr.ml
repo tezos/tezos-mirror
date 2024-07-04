@@ -14,6 +14,7 @@
 *)
 
 open Protocol
+open Alpha_context
 open Data_encoding
 
 (* We duplicate the definition of the Full_staking_balance_repr module
@@ -78,6 +79,28 @@ let equal_full_staking_balance (a : Full_staking_balance_repr.t)
   in
   return_unit
 
+let equal_full_staking_balance_with_cycle staking_balance
+    expected_staking_balance ~cycle_of_min_delegated =
+  let open Lwt_result_wrap_syntax in
+  let module F = Full_staking_balance_repr in
+  let* () =
+    equal_full_staking_balance expected_staking_balance staking_balance
+  in
+
+  (* Check a [cycle] field of [Level_repr.t] as well *)
+  let level_of_min_delegated_new =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ F.Internal_for_tests_and_RPCs.level_of_min_delegated staking_balance
+  in
+  let cycle_of_min_delegated = Cycle_repr.of_int32_exn cycle_of_min_delegated in
+  let* () =
+    Assert.equal_cycle_repr
+      ~loc:__LOC__
+      level_of_min_delegated_new.cycle
+      cycle_of_min_delegated
+  in
+  return_unit
+
 let equal_full_staking_balance_bytes sb_bytes
     (sb_expected : Full_staking_balance_repr.t) =
   let open Lwt_result_syntax in
@@ -129,8 +152,389 @@ let test_encodings () =
   let* () = equal_full_staking_balance_bytes sb_o_bytes staking_balance in
   return_unit
 
+(** Tests for add_delegated and remove_delegated *)
+
+let constants =
+  {
+    Default_parameters.constants_test with
+    issuance_weights =
+      {
+        Default_parameters.constants_test.issuance_weights with
+        base_total_issued_per_minute = Tez.zero;
+      };
+    consensus_threshold = 0;
+    origination_size = 0;
+  }
+
+let originate_implicit_unrevealed_account b ?(amount = Tez_helpers.of_int 10)
+    source =
+  let open Lwt_result_syntax in
+  let a = Account.new_account () in
+  let c = Contract.Implicit a.pkh in
+  let* operation = Op.transaction (B b) ~fee:Tez.zero source c amount in
+  let* b = Block.bake b ~operation in
+  return (b, c)
+
+let get_min_delegated_in_current_cycle b ~(delegate : Contract.t) =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Block.get_alpha_ctxt b in
+  let raw_ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+  let* delegate_account = Context.Contract.manager (B b) delegate in
+  let*@ min_delegated_in_current_cycle =
+    Delegate_storage.For_RPC.min_delegated_in_current_cycle
+      raw_ctxt
+      delegate_account.pkh
+  in
+  return min_delegated_in_current_cycle
+
+let get_delegated_balance b ~(delegate : Contract.t) =
+  let open Lwt_result_syntax in
+  let* delegate_account = Context.Contract.manager (B b) delegate in
+  let* info = Context.Delegate.info (B b) delegate_account.pkh in
+  return info.delegated_balance
+
+let check_delegated_balance_and_delegated b ~loc ~(delegator : Contract.t)
+    ~(delegate : Contract.t) ~delegated_balance ~current_delegated =
+  let open Lwt_result_syntax in
+  let* delegated_balance_computed = get_delegated_balance b ~delegate in
+  let* () =
+    Assert.equal_tez ~loc delegated_balance_computed delegated_balance
+  in
+  let* delegator_balance = Context.Contract.balance (B b) delegator in
+  let* () = Assert.equal_tez ~loc delegator_balance delegated_balance in
+
+  let* liquid_balance = Context.Contract.balance (B b) delegate in
+  let current_delegated_computed =
+    Tez_helpers.(liquid_balance +! delegated_balance)
+  in
+  let current_delegated = Tez.(mul_exn one current_delegated) in
+  let* () =
+    Assert.equal_tez ~loc current_delegated_computed current_delegated
+  in
+  return_unit
+
+let pp_staking_balance (op : Full_staking_balance_repr.t) =
+  let to_json =
+    Data_encoding.Json.construct Full_staking_balance_repr.encoding op
+  in
+  let s = Format.asprintf "\n%a\n" Data_encoding.Json.pp to_json in
+  Log.info "full_staking_balance = %s" s
+
+let get_staking_balance b ~(delegate : Contract.t) =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Block.get_alpha_ctxt b in
+  let raw_ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+  let* delegate_account = Context.Contract.manager (B b) delegate in
+  let*@ staking_balance =
+    Storage.Stake.Staking_balance.get raw_ctxt delegate_account.pkh
+  in
+  Log.info ~color:Log.Color.BG.green "Staking balance:" ;
+  pp_staking_balance staking_balance ;
+  return staking_balance
+
+let create_staking_balance ~own_frozen ~staked_frozen ~delegated
+    ?min_delegated_in_cycle ?level_of_min_delegated () =
+  let open Lwt_result_wrap_syntax in
+  let own_frozen = Tez_repr.(mul_exn one own_frozen) in
+  let staked_frozen = Tez_repr.(mul_exn one staked_frozen) in
+  let delegated = Tez_repr.(mul_exn one delegated) in
+  let min_delegated_in_cycle =
+    match min_delegated_in_cycle with
+    | Some x -> Tez_repr.(mul_exn one x)
+    | None -> delegated
+  in
+  return
+  @@ Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+       ~own_frozen
+       ~staked_frozen
+       ~delegated
+       ~min_delegated_in_cycle
+       ~level_of_min_delegated
+
+let cycle_eras_init ~blocks_per_cycle =
+  let cycle_era =
+    {
+      Level_repr.first_level = Raw_level_repr.root;
+      first_cycle = Cycle_repr.root;
+      blocks_per_cycle;
+      blocks_per_commitment =
+        Default_parameters.constants_test.blocks_per_commitment;
+    }
+  in
+  Level_repr.create_cycle_eras [cycle_era]
+
+let level_from_int ~cycle_eras l =
+  let open Lwt_result_wrap_syntax in
+  let*?@ raw_level = Raw_level_repr.of_int32 l in
+  return @@ Level_repr.level_from_raw ~cycle_eras raw_level
+
+let create_staking_balance_level ~own_frozen ~staked_frozen ~delegated
+    ?min_delegated_in_cycle ~level_of_min_delegated ~blocks_per_cycle () =
+  let open Lwt_result_wrap_syntax in
+  let*?@ cycle_eras = cycle_eras_init ~blocks_per_cycle in
+  let* level = level_from_int ~cycle_eras level_of_min_delegated in
+  create_staking_balance
+    ~own_frozen
+    ~staked_frozen
+    ~delegated
+    ?min_delegated_in_cycle
+    ~level_of_min_delegated:level
+    ()
+
+let check_min_delegated_in_cycle_rpc b ~(delegate : Contract.t) =
+  let open Lwt_result_wrap_syntax in
+  let module F = Full_staking_balance_repr in
+  let* ctxt = Block.get_alpha_ctxt b in
+  let*@ balance = Alpha_context.Contract.get_balance ctxt delegate in
+  let* liquid_balance = Context.Contract.balance (B b) delegate in
+  let* () = Assert.equal_tez ~loc:__LOC__ balance liquid_balance in
+
+  let* min_delegated_in_current_cycle =
+    get_min_delegated_in_current_cycle b ~delegate
+  in
+  let min_delegated_in_cycle_rpc, level_of_min_delegated_rpc =
+    min_delegated_in_current_cycle
+  in
+
+  let* staking_balance = get_staking_balance b ~delegate in
+  let min_delegated_in_cycle =
+    F.Internal_for_tests_and_RPCs.min_delegated_in_cycle staking_balance
+  in
+  let level_of_min_delegated =
+    F.Internal_for_tests_and_RPCs.level_of_min_delegated staking_balance
+  in
+  let level_of_min_delegated =
+    Option.value
+      ~default:Level_repr.Internal_for_tests.root
+      level_of_min_delegated
+  in
+
+  let current_cycle = Block.current_cycle b in
+  match level_of_min_delegated_rpc with
+  | None ->
+      let* () =
+        Assert.equal_tez_repr
+          ~loc:__LOC__
+          (F.current_delegated staking_balance)
+          min_delegated_in_cycle_rpc
+      in
+      let* () =
+        Assert.not_equal_int32
+          ~loc:__LOC__
+          (Cycle.to_int32 current_cycle)
+          (Cycle_repr.to_int32 level_of_min_delegated.cycle)
+      in
+      return_unit
+  | Some level_of_min_delegated_rpc ->
+      let* () =
+        Assert.equal_tez_repr
+          ~loc:__LOC__
+          min_delegated_in_cycle
+          min_delegated_in_cycle_rpc
+      in
+      let* () =
+        Assert.equal_level_repr
+          ~loc:__LOC__
+          level_of_min_delegated_rpc
+          level_of_min_delegated
+      in
+      let* () =
+        Assert.equal_int32
+          ~loc:__LOC__
+          (Cycle.to_int32 current_cycle)
+          (Cycle_repr.to_int32 level_of_min_delegated.cycle)
+      in
+      return_unit
+
+let print_min_delegated_in_cycle_rpc b ~(delegate : Contract.t) =
+  let open Lwt_result_wrap_syntax in
+  let* liquid_balance = Context.Contract.balance (B b) delegate in
+  Log.info "liquid_balance = %a" Tez.pp liquid_balance ;
+
+  let* min_delegated_in_current_cycle =
+    get_min_delegated_in_current_cycle b ~delegate
+  in
+  let min_delegated_in_cycle, level_of_min_delegated =
+    min_delegated_in_current_cycle
+  in
+  Log.info "min_delegated_in_cycle = %a" Tez_repr.pp min_delegated_in_cycle ;
+  Log.info
+    "level_of_min_delegated_RPC = %s"
+    (match level_of_min_delegated with
+    | None -> "NONE"
+    | Some lvl -> Format.asprintf "%a" Level_repr.pp lvl) ;
+
+  let* delegated_balance = get_delegated_balance b ~delegate in
+  Log.info "delegated_balance = %a" Tez.pp delegated_balance ;
+  let* ctxt = Block.get_alpha_ctxt b in
+  Log.info "level of last baked block = %a" Level.pp_full (Level.current ctxt) ;
+  return_unit
+
+let test_min_delegated_in_cycle () =
+  let open Lwt_result_wrap_syntax in
+  let constants =
+    constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
+  in
+  let expected_staking_balance ~delegated ~min_delegated_in_cycle
+      ~level_of_min_delegated =
+    let blocks_per_cycle = constants.blocks_per_cycle in
+    (* [own_frozen] and [staked_frozen] are not changed *)
+    let own_frozen = 200_000 in
+    let staked_frozen = 0 in
+    create_staking_balance_level
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~min_delegated_in_cycle
+      ~level_of_min_delegated
+      ~blocks_per_cycle
+      ()
+  in
+  let get_staking_balance b ~delegate =
+    let* () = print_min_delegated_in_cycle_rpc b ~delegate in
+    let* () = check_min_delegated_in_cycle_rpc b ~delegate in
+    let* staking_balance = get_staking_balance b ~delegate in
+    return staking_balance
+  in
+
+  let* b, (delegate, contractor) = Context.init_with_constants2 constants in
+  let amount_1000 = Tez_helpers.of_int 1_000 in
+  let* b, delegator =
+    originate_implicit_unrevealed_account ~amount:amount_1000 b contractor
+  in
+  let* delegate_account = Context.Contract.manager (B b) delegate in
+  let* set_delegate =
+    Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
+  in
+  let* b = Block.bake ~operation:set_delegate b in
+  Log.info ~color:Log.Color.BG.blue "After setting delegate" ;
+  let* staking_balance = get_staking_balance b ~delegate in
+
+  let delegated_init = 3_801_000 in
+  let* init_staking_balance =
+    expected_staking_balance
+      ~delegated:delegated_init
+      ~min_delegated_in_cycle:3_800_000
+      ~level_of_min_delegated:0l
+  in
+  let* () =
+    equal_full_staking_balance_with_cycle
+      staking_balance
+      init_staking_balance
+      ~cycle_of_min_delegated:0l
+  in
+
+  let* b = Block.bake_until_cycle_end b in
+  let delegated_amount = amount_1000 in
+  let* () =
+    check_delegated_balance_and_delegated
+      b
+      ~loc:__LOC__
+      ~delegator
+      ~delegate
+      ~delegated_balance:delegated_amount
+      ~current_delegated:delegated_init
+  in
+  Log.info ~color:Log.Color.BG.blue "Before remove" ;
+  let* staking_balance = get_staking_balance b ~delegate in
+  let* () =
+    equal_full_staking_balance_with_cycle
+      staking_balance
+      init_staking_balance
+      ~cycle_of_min_delegated:0l
+  in
+
+  (* Remove 10 tez from delegated_balance *)
+  let amount_10 = Tez_helpers.of_int 10 in
+  let* op_minus_10 = Op.transaction (B b) delegator contractor amount_10 in
+  let* b = Block.bake ~operation:op_minus_10 b in
+  let delegated_amount = Tez_helpers.(delegated_amount -! amount_10) in
+  let delegated_minus_10 = delegated_init - 10 in
+  let* () =
+    check_delegated_balance_and_delegated
+      b
+      ~loc:__LOC__
+      ~delegator
+      ~delegate
+      ~delegated_balance:delegated_amount
+      ~current_delegated:delegated_minus_10
+  in
+  Log.info ~color:Log.Color.BG.blue "After remove" ;
+  let* staking_balance = get_staking_balance b ~delegate in
+  let cycle_of_min_delegated_minus_10 =
+    Cycle.to_int32 @@ Block.current_cycle b
+  in
+  let* staking_balance_minus_10 =
+    expected_staking_balance
+      ~delegated:delegated_minus_10
+      ~min_delegated_in_cycle:delegated_minus_10
+      ~level_of_min_delegated:(Block.current_level b)
+  in
+  let* () =
+    equal_full_staking_balance_with_cycle
+      staking_balance
+      staking_balance_minus_10
+      ~cycle_of_min_delegated:cycle_of_min_delegated_minus_10
+  in
+
+  let* b = Block.bake_until_cycle_end b in
+  Log.info ~color:Log.Color.BG.blue "Start of the new cycle" ;
+  let* staking_balance = get_staking_balance b ~delegate in
+  let* () =
+    equal_full_staking_balance_with_cycle
+      staking_balance
+      staking_balance_minus_10
+      ~cycle_of_min_delegated:cycle_of_min_delegated_minus_10
+  in
+
+  let* b = Block.bake_n 3 b in
+  Log.info ~color:Log.Color.BG.blue "Before add" ;
+  let* staking_balance = get_staking_balance b ~delegate in
+  let* () =
+    equal_full_staking_balance_with_cycle
+      staking_balance
+      staking_balance_minus_10
+      ~cycle_of_min_delegated:cycle_of_min_delegated_minus_10
+  in
+
+  (* Add 20 tez to delegated_balance *)
+  let amount_20 = Tez_helpers.of_int 20 in
+  let* op_plus_20 = Op.transaction (B b) contractor delegator amount_20 in
+  let* b = Block.bake ~operation:op_plus_20 b in
+  let delegated_amount = Tez_helpers.(delegated_amount +! amount_20) in
+  let delegated_plus_20 = delegated_minus_10 + 20 in
+  let* () =
+    check_delegated_balance_and_delegated
+      b
+      ~loc:__LOC__
+      ~delegator
+      ~delegate
+      ~delegated_balance:delegated_amount
+      ~current_delegated:delegated_plus_20
+  in
+  Log.info ~color:Log.Color.BG.blue "After add" ;
+  let* staking_balance = get_staking_balance b ~delegate in
+  let cycle_of_min_delegated_add_20 = Cycle.to_int32 @@ Block.current_cycle b in
+  let* staking_balance_add_20 =
+    expected_staking_balance
+      ~delegated:delegated_plus_20
+      ~min_delegated_in_cycle:delegated_minus_10
+      ~level_of_min_delegated:(Block.current_level b)
+  in
+  let* () =
+    equal_full_staking_balance_with_cycle
+      staking_balance
+      staking_balance_add_20
+      ~cycle_of_min_delegated:cycle_of_min_delegated_add_20
+  in
+  return_unit
+
 let tests =
-  Tztest.[tztest "full staking balance - encoding" `Quick test_encodings]
+  Tztest.
+    [
+      tztest "full staking balance - encoding" `Quick test_encodings;
+      tztest "min delegated in cycle" `Quick test_min_delegated_in_cycle;
+    ]
 
 let () =
   Alcotest_lwt.run ~__FILE__ Protocol.name [("full_staking_balance", tests)]
