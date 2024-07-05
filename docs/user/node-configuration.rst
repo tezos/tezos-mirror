@@ -189,7 +189,7 @@ modifying the file.
    Otherwise they'll be shadowed by the more general rule.
 
 Examples
-~~~~~~~~
+""""""""
 
 ::
 
@@ -247,7 +247,7 @@ in order to accommodate each specific setup.
 .. _default_acl:
 
 Default ACL for RPC
--------------------
+"""""""""""""""""""
 
 The default ACL for RPC depends on the listening address that the node is using.
 
