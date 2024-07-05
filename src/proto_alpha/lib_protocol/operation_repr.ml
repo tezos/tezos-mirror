@@ -1006,26 +1006,6 @@ module Encoding = struct
       }
         -> 'b case
 
-  (* Encoding case that accepts legacy preattestation name : `preendorsement` in
-     JSON
-
-     https://gitlab.com/tezos/tezos/-/issues/5529
-
-     This encoding is temporary and should be removed when the endorsements
-     kinds in JSON will not be accepted any more by the protocol (Planned for
-     protocol Q). *)
-  let preendorsement_case =
-    Case
-      {
-        tag = 20;
-        name = "preendorsement";
-        encoding = consensus_content_encoding;
-        select =
-          (function Contents (Preattestation _ as op) -> Some op | _ -> None);
-        proj = (fun (Preattestation preattestation) -> preattestation);
-        inj = (fun preattestation -> Preattestation preattestation);
-      }
-
   let preattestation_case =
     Case
       {
@@ -1037,39 +1017,6 @@ module Encoding = struct
         proj = (fun (Preattestation preattestation) -> preattestation);
         inj = (fun preattestation -> Preattestation preattestation);
       }
-
-  (* Encoding that accepts legacy preattestation name : `preendorsement` in JSON
-
-     https://gitlab.com/tezos/tezos/-/issues/5529
-
-     This encoding is temporary and should be removed when the endorsements
-     kinds in JSON will not be accepted any more by the protocol (Planned for
-     protocol Q). *)
-  let preendorsement_encoding =
-    let make (Case {tag; name; encoding; select = _; proj; inj}) =
-      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
-    in
-    let to_list : Kind.preattestation contents_list -> _ = function
-      | Single o -> o
-    in
-    let of_list : Kind.preattestation contents -> _ = function
-      | o -> Single o
-    in
-    def "inlined.preendorsement"
-    @@ conv
-         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
-           (shell, (contents, signature)))
-         (fun (shell, (contents, signature)) : _ operation ->
-           {shell; protocol_data = {contents; signature}})
-         (merge_objs
-            Operation.shell_header_encoding
-            (obj2
-               (req
-                  "operations"
-                  (conv to_list of_list
-                  @@ def "inlined.preendorsement.contents"
-                  @@ union [make preendorsement_case]))
-               (varopt "signature" Signature.encoding)))
 
   let preattestation_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
@@ -1107,9 +1054,7 @@ module Encoding = struct
   let dal_content_encoding =
     obj1 (req "dal_attestation" Dal_attestation_repr.encoding)
 
-  let endorsement_encoding = consensus_content_encoding
-
-  let endorsement_with_dal_encoding =
+  let consensus_content_with_dal_encoding =
     merge_objs consensus_content_encoding dal_content_encoding
 
   (* Precondition: [dal_content = None]. *)
@@ -1147,53 +1092,18 @@ module Encoding = struct
         dal_content = Some {attestation};
       }
 
-  (* Encoding case that accepts legacy attestation name : `endorsement` in JSON
-
-     https://gitlab.com/tezos/tezos/-/issues/5529
-
-     This encoding is temporary and should be removed when the endorsements
-     kinds in JSON will not be accepted any more by the protocol (Planned for
-     protocol Q). *)
-  let endorsement_case =
-    Case
-      {
-        tag = 21;
-        name = "endorsement";
-        encoding = endorsement_encoding;
-        select =
-          (function
-          | Contents (Attestation {dal_content = None; _} as op) -> Some op
-          | _ -> None);
-        proj = attestation_encoding_proj;
-        inj = attestation_encoding_inj;
-      }
-
   let attestation_case =
     Case
       {
         tag = 21;
         name = "attestation";
-        encoding = endorsement_encoding;
+        encoding = consensus_content_encoding;
         select =
           (function
           | Contents (Attestation {dal_content = None; _} as op) -> Some op
           | _ -> None);
         proj = attestation_encoding_proj;
         inj = attestation_encoding_inj;
-      }
-
-  let endorsement_with_dal_case =
-    Case
-      {
-        tag = 23;
-        name = "endorsement_with_dal";
-        encoding = endorsement_with_dal_encoding;
-        select =
-          (function
-          | Contents (Attestation {dal_content = Some _; _} as op) -> Some op
-          | _ -> None);
-        proj = attestation_with_dal_encoding_proj;
-        inj = attestation_with_dal_encoding_inj;
       }
 
   let attestation_with_dal_case =
@@ -1201,7 +1111,7 @@ module Encoding = struct
       {
         tag = 23;
         name = "attestation_with_dal";
-        encoding = endorsement_with_dal_encoding;
+        encoding = consensus_content_with_dal_encoding;
         select =
           (function
           | Contents (Attestation {dal_content = Some _; _} as op) -> Some op
@@ -1209,51 +1119,6 @@ module Encoding = struct
         proj = attestation_with_dal_encoding_proj;
         inj = attestation_with_dal_encoding_inj;
       }
-
-  (* Encoding that accepts legacy attestation name : `endorsement` in JSON
-
-     https://gitlab.com/tezos/tezos/-/issues/5529
-
-     This encoding is temporary and should be removed when the endorsements
-     kinds in JSON will not be accepted any more by the protocol (Planned for
-     protocol Q). *)
-  let endorsement_encoding =
-    let make kind (Case {tag; name; encoding; select = _; proj; inj}) =
-      case
-        (Tag tag)
-        name
-        encoding
-        (function
-          | o -> (
-              match (kind, o) with
-              | `Simple, (Attestation {dal_content = None; _} as op) ->
-                  Some (proj op)
-              | `Full, (Attestation {dal_content = Some _; _} as op) ->
-                  Some (proj op)
-              | _ -> None))
-        (fun x -> inj x)
-    in
-    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
-    def "inlined.endorsement"
-    @@ conv
-         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
-           (shell, (contents, signature)))
-         (fun (shell, (contents, signature)) : _ operation ->
-           {shell; protocol_data = {contents; signature}})
-         (merge_objs
-            Operation.shell_header_encoding
-            (obj2
-               (req
-                  "operations"
-                  (conv to_list of_list
-                  @@ def "inlined.endorsement_mempool.contents"
-                  @@ union
-                       [
-                         make `Simple endorsement_case;
-                         make `Full endorsement_with_dal_case;
-                       ]))
-               (varopt "signature" Signature.encoding)))
 
   let attestation_encoding =
     let make kind (Case {tag; name; encoding; select = _; proj; inj}) =
@@ -1321,32 +1186,6 @@ module Encoding = struct
         inj = (fun solution -> Vdf_revelation {solution});
       }
 
-  (* Encoding case that accepts legacy double preattestation evidence name :
-     `double_preendorsement_evidence` in JSON
-
-     https://gitlab.com/tezos/tezos/-/issues/5529
-
-     This encoding is temporary and should be removed when the endorsements
-     kinds in JSON will not be accepted any more by the protocol (Planned for
-     protocol Q). *)
-  let double_preendorsement_evidence_case :
-      Kind.double_preattestation_evidence case =
-    Case
-      {
-        tag = 7;
-        name = "double_preendorsement_evidence";
-        encoding =
-          obj2
-            (req "op1" (dynamic_size preendorsement_encoding))
-            (req "op2" (dynamic_size preendorsement_encoding));
-        select =
-          (function
-          | Contents (Double_preattestation_evidence _ as op) -> Some op
-          | _ -> None);
-        proj = (fun (Double_preattestation_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
-      }
-
   let double_preattestation_evidence_case :
       Kind.double_preattestation_evidence case =
     Case
@@ -1363,31 +1202,6 @@ module Encoding = struct
           | _ -> None);
         proj = (fun (Double_preattestation_evidence {op1; op2}) -> (op1, op2));
         inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
-      }
-
-  (* Encoding case that accepts legacy double attestation evidence name :
-     `double_endorsement_evidence` in JSON
-
-     https://gitlab.com/tezos/tezos/-/issues/5529
-
-     This encoding is temporary and should be removed when the endorsements
-     kinds in JSON will not be accepted any more by the protocol (Planned for
-     protocol Q). *)
-  let double_endorsement_evidence_case : Kind.double_attestation_evidence case =
-    Case
-      {
-        tag = 2;
-        name = "double_endorsement_evidence";
-        encoding =
-          obj2
-            (req "op1" (dynamic_size endorsement_encoding))
-            (req "op2" (dynamic_size endorsement_encoding));
-        select =
-          (function
-          | Contents (Double_attestation_evidence _ as op) -> Some op
-          | _ -> None);
-        proj = (fun (Double_attestation_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_attestation_evidence {op1; op2});
       }
 
   let double_attestation_evidence_case : Kind.double_attestation_evidence case =
@@ -1647,8 +1461,13 @@ module Encoding = struct
 
   type packed_case = PCase : 'b case -> packed_case
 
-  let common_cases =
+  let contents_cases =
     [
+      PCase preattestation_case;
+      PCase attestation_case;
+      PCase attestation_with_dal_case;
+      PCase double_preattestation_evidence_case;
+      PCase double_attestation_evidence_case;
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
       PCase double_baking_evidence_case;
@@ -1680,26 +1499,6 @@ module Encoding = struct
       PCase zk_rollup_update_case;
     ]
 
-  let contents_cases =
-    PCase preattestation_case :: PCase attestation_case
-    :: PCase attestation_with_dal_case
-    :: PCase double_preattestation_evidence_case
-    :: PCase double_attestation_evidence_case :: common_cases
-
-  (** Encoding cases that accepts legacy attestation name : `endorsement` (and
-      preendorsement, double_<op>_evidence) in JSON
-
-      https://gitlab.com/tezos/tezos/-/issues/5529
-
-      This encoding is temporary and should be removed when the endorsements
-      kinds in JSON will not be accepted any more by the protocol (Planned for
-      protocol Q). *)
-  let contents_cases_with_legacy_attestation_name =
-    PCase preendorsement_case :: PCase endorsement_case
-    :: PCase endorsement_with_dal_case
-    :: PCase double_preendorsement_evidence_case
-    :: PCase double_endorsement_evidence_case :: common_cases
-
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
       assert (not @@ reserved_tag tag) ;
@@ -1712,27 +1511,8 @@ module Encoding = struct
     in
     def "operation.alpha.contents" @@ union (List.map make contents_cases)
 
-  let contents_encoding_with_legacy_attestation_name =
-    let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
-      assert (not @@ reserved_tag tag) ;
-      case
-        (Tag tag)
-        name
-        encoding
-        (fun o -> match select o with None -> None | Some o -> Some (proj o))
-        (fun x -> Contents (inj x))
-    in
-    def "operation_with_legacy_attestation_name.alpha.contents"
-    @@ union (List.map make contents_cases_with_legacy_attestation_name)
-
   let contents_list_encoding =
     conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
-
-  let contents_list_encoding_with_legacy_attestation_name =
-    conv_with_guard
-      to_list
-      of_list_internal
-      (Variable.list contents_encoding_with_legacy_attestation_name)
 
   let protocol_data_json_encoding =
     conv
@@ -1742,18 +1522,6 @@ module Encoding = struct
         Operation_data {contents; signature})
       (obj2
          (req "contents" (dynamic_size contents_list_encoding))
-         (opt "signature" Signature.encoding))
-
-  let protocol_data_json_encoding_with_legacy_attestation_name =
-    conv
-      (fun (Operation_data {contents; signature}) ->
-        (Contents_list contents, signature))
-      (fun (Contents_list contents, signature) ->
-        Operation_data {contents; signature})
-      (obj2
-         (req
-            "contents"
-            (dynamic_size contents_list_encoding_with_legacy_attestation_name))
          (opt "signature" Signature.encoding))
 
   type contents_or_signature_prefix =
@@ -1903,64 +1671,28 @@ module Encoding = struct
          ~json:protocol_data_json_encoding
          ~binary:protocol_data_binary_encoding
 
-  let protocol_data_encoding_with_legacy_attestation_name =
-    def "operation_with_legacy_attestation_name.alpha.contents_and_signature"
-    @@ splitted
-         ~json:protocol_data_json_encoding_with_legacy_attestation_name
-         ~binary:protocol_data_binary_encoding
-
   let operation_encoding =
     conv
       (fun {shell; protocol_data} -> (shell, protocol_data))
       (fun (shell, protocol_data) -> {shell; protocol_data})
       (merge_objs Operation.shell_header_encoding protocol_data_encoding)
 
-  let operation_encoding_with_legacy_attestation_name =
-    conv
-      (fun {shell; protocol_data} -> (shell, protocol_data))
-      (fun (shell, protocol_data) -> {shell; protocol_data})
-      (merge_objs
-         Operation.shell_header_encoding
-         protocol_data_encoding_with_legacy_attestation_name)
-
   let unsigned_operation_encoding =
     def "operation.alpha.unsigned_operation"
     @@ merge_objs
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
-
-  let unsigned_operation_encoding_with_legacy_attestation_name =
-    def "operation_with_legacy_attestation_name.alpha.unsigned_operation"
-    @@ merge_objs
-         Operation.shell_header_encoding
-         (obj1
-            (req "contents" contents_list_encoding_with_legacy_attestation_name))
 end
 
 let encoding = Encoding.operation_encoding
 
-let encoding_with_legacy_attestation_name =
-  Encoding.operation_encoding_with_legacy_attestation_name
-
 let contents_encoding = Encoding.contents_encoding
-
-let contents_encoding_with_legacy_attestation_name =
-  Encoding.contents_encoding_with_legacy_attestation_name
 
 let contents_list_encoding = Encoding.contents_list_encoding
 
-let contents_list_encoding_with_legacy_attestation_name =
-  Encoding.contents_list_encoding_with_legacy_attestation_name
-
 let protocol_data_encoding = Encoding.protocol_data_encoding
 
-let protocol_data_encoding_with_legacy_attestation_name =
-  Encoding.protocol_data_encoding_with_legacy_attestation_name
-
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
-
-let unsigned_operation_encoding_with_legacy_attestation_name =
-  Encoding.unsigned_operation_encoding_with_legacy_attestation_name
 
 let raw ({shell; protocol_data} : _ operation) =
   let proto =

@@ -140,3 +140,6 @@ Internal
 
 - Encoding that supports ``endorsement`` kind in apply_result JSON has been
   removed. (MR :gl:`!13974`)
+
+- Encoding that supports ``endorsement`` kind in operation JSON has been
+  removed. (MR :gl:`!13976`)

@@ -4718,9 +4718,6 @@ module Operation : sig
 
   val contents_encoding : packed_contents Data_encoding.t
 
-  val contents_encoding_with_legacy_attestation_name :
-    packed_contents Data_encoding.t
-
   type nonrec 'kind protocol_data = 'kind protocol_data
 
   type nonrec packed_protocol_data = packed_protocol_data
@@ -4735,13 +4732,7 @@ module Operation : sig
 
   val protocol_data_encoding : packed_protocol_data Data_encoding.t
 
-  val protocol_data_encoding_with_legacy_attestation_name :
-    packed_protocol_data Data_encoding.t
-
   val unsigned_encoding :
-    (Operation.shell_header * packed_contents_list) Data_encoding.t
-
-  val unsigned_encoding_with_legacy_attestation_name :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
 
   type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -4749,9 +4740,6 @@ module Operation : sig
   val raw_encoding : raw Data_encoding.t
 
   val contents_list_encoding : packed_contents_list Data_encoding.t
-
-  val contents_list_encoding_with_legacy_attestation_name :
-    packed_contents_list Data_encoding.t
 
   type 'kind t = 'kind operation = {
     shell : Operation.shell_header;
@@ -4761,8 +4749,6 @@ module Operation : sig
   type nonrec packed = packed_operation
 
   val encoding : packed Data_encoding.t
-
-  val encoding_with_legacy_attestation_name : packed Data_encoding.t
 
   val raw : _ operation -> raw
 
@@ -4807,15 +4793,9 @@ module Operation : sig
         }
           -> 'b case
 
-    val preendorsement_case : Kind.preattestation case
-
     val preattestation_case : Kind.preattestation case
 
-    val endorsement_case : Kind.attestation case
-
     val attestation_case : Kind.attestation case
-
-    val endorsement_with_dal_case : Kind.attestation case
 
     val attestation_with_dal_case : Kind.attestation case
 
@@ -4823,13 +4803,8 @@ module Operation : sig
 
     val vdf_revelation_case : Kind.vdf_revelation case
 
-    val double_preendorsement_evidence_case :
-      Kind.double_preattestation_evidence case
-
     val double_preattestation_evidence_case :
       Kind.double_preattestation_evidence case
-
-    val double_endorsement_evidence_case : Kind.double_attestation_evidence case
 
     val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
