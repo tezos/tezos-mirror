@@ -495,9 +495,8 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     body sequencer_setup protocol
   in
   let tags =
-    (if threshold_encryption then ["threshold_encryption"; Tag.ci_disabled]
-     else [])
-    @ (if enable_dal then ["dal"; Tag.ci_disabled] else [])
+    (if threshold_encryption then ["threshold_encryption"] else [])
+    @ (if enable_dal then ["dal"] else [])
     @ tags
   in
   let title =
@@ -522,7 +521,14 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
 type feature_test_registration =
   | Register_with_feature
   | Register_without_feature
-  | Register_both
+  | Register_both of {
+      extra_tags_with : string list;
+      extra_tags_without : string list;
+    }
+    (* We want at most one variant of the test in the CI, the
+       [extra_tags_with] and [extra_tags_without] fields allow to select
+       which one by passing [Tag.ci_disabled] or [Tag.slow] to the case
+       which should not run in CI. *)
 [@@warning "-unused-constructor"]
 
 (* Register all variants of a test. *)
@@ -535,26 +541,33 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
     ?commitment_period ?challenge_window ?additional_uses
-    ?(use_threshold_encryption = Register_both) ?(use_dal = Register_both)
-    ~title ~tags body protocols =
+    ?(use_threshold_encryption =
+      Register_both
+        {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []})
+    ?(use_dal =
+      Register_both
+        {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}) ~title
+    ~tags body protocols =
   let dal_cases =
     match use_dal with
-    | Register_both -> [false; true]
-    | Register_with_feature -> [true]
-    | Register_without_feature -> [false]
+    | Register_both {extra_tags_with; extra_tags_without} ->
+        [(false, extra_tags_without); (true, extra_tags_with)]
+    | Register_with_feature -> [(true, [])]
+    | Register_without_feature -> [(false, [])]
   in
   let threshold_encryption_cases =
     match use_threshold_encryption with
-    | Register_both -> [false; true]
-    | Register_with_feature -> [true]
-    | Register_without_feature -> [false]
+    | Register_both {extra_tags_with; extra_tags_without} ->
+        [(false, extra_tags_without); (true, extra_tags_with)]
+    | Register_with_feature -> [(true, [])]
+    | Register_without_feature -> [(false, [])]
   in
   List.iter
-    (fun threshold_encryption ->
+    (fun (threshold_encryption, te_tags) ->
       List.iter
         (fun kernel ->
           List.iter
-            (fun enable_dal ->
+            (fun (enable_dal, dal_tags) ->
               register_test
                 ?sequencer_rpc_port
                 ?sequencer_private_rpc_port
@@ -586,7 +599,7 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
                 ?history_mode
                 ~enable_dal
                 ~title
-                ~tags
+                ~tags:(te_tags @ dal_tags @ tags)
                 body
                 protocols)
             dal_cases)
