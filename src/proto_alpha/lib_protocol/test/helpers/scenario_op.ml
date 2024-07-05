@@ -162,6 +162,8 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       let pred_level = block.header.shell.level in
       let level = Int32.(succ pred_level) in
       let activity_cycle =
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7362
+           Use delegate_parameters_activation_delay - Protocol.Constants_storage.tolerated_inactivity_period *)
         Cycle.add current_cycle state.State.constants.consensus_rights_delay
       in
       (* update delegate activation status *)
