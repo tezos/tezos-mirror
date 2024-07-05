@@ -7,7 +7,13 @@
 
 include Tezt_tezos_tezt_performance_regression.Grafana
 
-type t = {provisioning_file : string; dashboard_directory : string}
+type t = {
+  provisioning_file : string;
+  dashboard_directory : string;
+  password : string;
+}
+
+let generate_password () = "saucisse"
 
 let provisioning_file () =
   let provisioning_file =
@@ -55,6 +61,10 @@ let run () =
     Process.run "mkdir" ["-p"; dashboard_directory |> Filename.dirname]
   in
   let* provisioning_file = provisioning_file () in
+  (* We generate a password to use admin features. This is not completely
+     secured but this should prevent easy attacks if the grafana port is opened. *)
+  let password = generate_password () in
+  Log.info "Grafana admin password: %s" password ;
   let args =
     [
       "run";
@@ -70,6 +80,8 @@ let run () =
       "GF_AUTH_ANONYMOUS_ENABLED=true";
       "-e";
       "GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer";
+      "-e";
+      Format.asprintf "GF_SECURITY_ADMIN_PASSWORD=%s" password;
       "-v";
       Format.asprintf
         "%s:/etc/grafana/provisioning"
@@ -88,4 +100,4 @@ let run () =
         let* () = shutdown () in
         Process.run cmd args
   in
-  Lwt.return {provisioning_file; dashboard_directory}
+  Lwt.return {provisioning_file; dashboard_directory; password}
