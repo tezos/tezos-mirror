@@ -515,7 +515,7 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
     (fun threshold_encryption ->
       List.iter
         (fun kernel ->
-          let kernel_tag, _ = Kernel.to_uses_and_tags kernel in
+          let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
           let tags =
             (if threshold_encryption then
                [Tag.ci_disabled; "threshold_encryption"]
@@ -525,7 +525,6 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
           let sequencer_string =
             if threshold_encryption then "te_sequencer" else "sequencer"
           in
-          let _, kernel_use = Kernel.to_uses_and_tags kernel in
           List.iter
             (fun enable_dal ->
               register_test
