@@ -36,13 +36,14 @@ docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remo
 
 .PHONY: check
 check: all # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
-	@git status | grep "nothing to commit" > /dev/null || ( \
+	@if [ $$(git status --porcelain | wc -l) -ne 0 ]; then ( \
 	  echo "Repository not clean after 'make -C ci'."; \
 	  echo "You should not edit generated GitLab CI .yml files directly."; \
 	  echo "Edit the appropriate file(s) in ci/bin/ instead."; \
 	  echo "Then run 'make -C ci' and commit the difference."; \
+	  echo "Some new .yml files may have been created. If so, commit them as well."; \
 	  exit 1 \
-	)
+	); fi
 
 help: # Display this help.
 	@echo "GitLab CI configuration generator. Available targets:"
