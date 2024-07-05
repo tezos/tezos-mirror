@@ -39,25 +39,8 @@ module Of_core (S : Core) = struct
       (fun acc -> function k, `Node n -> (k, n) :: acc | _ -> acc)
       [] kvs
 
-  let merge = Merge.init Type.unit (fun ~old:_ () () -> Merge.ok ())
-
-  (* [Merge.alist] expects us to return an option. [C.merge] does
-       that, but we need to consider the metadata too... *)
-  let merge_metadata merge_contents =
-    (* This gets us [C.t option, S.Val.Metadata.t]. We want [(C.t *
-       S.Val.Metadata.t) option]. *)
-    let explode = function
-      | None -> (None, ())
-      | Some (c, ()) -> (Some c, ())
-    in
-    let implode = function None, _ -> None | Some c, () -> Some (c, ()) in
-    Merge.like [%typ: (S.contents_key * unit) option]
-      (Merge.pair merge_contents merge)
-      explode implode
-
   let merge_contents merge_key =
-    Merge.alist S.step_t (Type.pair S.contents_key_t Type.unit) (fun _step ->
-        merge_metadata merge_key)
+    Merge.alist S.step_t S.contents_key_t (fun _step -> merge_key)
 
   let merge_node merge_key =
     Merge.alist S.step_t S.node_key_t (fun _step -> merge_key)
@@ -108,12 +91,17 @@ struct
   type 'key contents_entry = { name : Path.step; contents : 'key }
   [@@deriving brassaia]
 
-  type 'key contents_m_entry = {
-    metadata : unit;
-    name : Path.step;
-    contents : 'key;
-  }
-  [@@deriving brassaia]
+  type 'key contents_m_entry = { name : Path.step; contents : 'key }
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let contents_m_entry_t key_t =
+    let open Type in
+    record "contents_m_entry" (fun () name contents -> { name; contents })
+    |+ field "metadata" unit (fun _ -> ())
+    |+ field "name" Path.step_t (fun cont -> cont.name)
+    |+ field "contents" key_t (fun cont -> cont.contents)
+    |> sealr
 
   module StepMap = struct
     include Map.Make (struct
@@ -151,7 +139,19 @@ struct
       (fun l -> List.to_seq l |> StepMap.of_seq)
       Data_encoding.(list (tup2 StepMap.key_encoding entry_encoding))
 
-  type value = [ `Node of node_key | `Contents of contents_key * unit ]
+  type value = [ `Node of node_key | `Contents of contents_key ]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let value_t =
+    let open Type in
+    variant "value" (fun n c _ -> function
+      | `Node h -> n h | `Contents h -> c (h, ()))
+    |~ case1 "node" node_key_t (fun k -> `Node k)
+    |~ case1 "contents" (pair contents_key_t unit) (fun (h, ()) -> `Contents h)
+    |~ case1 "contents-x" (pair contents_key_t unit) (fun (h, ()) ->
+           `Contents h)
+    |> sealv
 
   let value_encoding =
     let open Data_encoding in
@@ -162,12 +162,11 @@ struct
           (fun k -> `Node k);
         case (Tag 2) ~title:"`Contents"
           (tup2 contents_key_encoding unit)
-          (function `Contents k -> Some k | _ -> None)
-          (fun k -> `Contents k);
+          (function `Contents k -> Some (k, ()) | _ -> None)
+          (fun (k, ()) -> `Contents k);
       ]
 
-  type weak_value = [ `Contents of hash * unit | `Node of hash ]
-  [@@deriving brassaia]
+  type weak_value = [ `Contents of hash | `Node of hash ]
 
   let weak_value_encoding =
     let open Data_encoding in
@@ -177,30 +176,19 @@ struct
           (function `Node k -> Some k | _ -> None)
           (fun k -> `Node k);
         case (Tag 2) ~title:"`Contents" (tup2 hash_encoding unit)
-          (function `Contents k -> Some k | _ -> None)
-          (fun k -> `Contents k);
+          (function `Contents k -> Some (k, ()) | _ -> None)
+          (fun (k, ()) -> `Contents k);
       ]
-
-  (* FIXME:  special-case the default metadata in the default signature? *)
-  let value_t =
-    let open Type in
-    variant "value" (fun n c _ -> function
-      | `Node h -> n h | `Contents (h, ()) -> c h)
-    |~ case1 "node" node_key_t (fun k -> `Node k)
-    |~ case1 "contents" contents_key_t (fun h -> `Contents (h, ()))
-    |~ case1 "contents-x" (pair contents_key_t unit) (fun (h, ()) ->
-           `Contents (h, ()))
-    |> sealv
 
   let to_entry (k, (v : value)) =
     match v with
     | `Node h -> Node { name = k; node = h }
-    | `Contents (h, ()) -> Contents { name = k; contents = h }
+    | `Contents h -> Contents { name = k; contents = h }
 
   let inspect_nonportable_entry_exn : entry -> step * value = function
     | Node n -> (n.name, `Node n.node)
-    | Contents c -> (c.name, `Contents (c.contents, ()))
-    | Contents_m c -> (c.name, `Contents (c.contents, ()))
+    | Contents c -> (c.name, `Contents c.contents)
+    | Contents_m c -> (c.name, `Contents c.contents)
     | Node_hash _ | Contents_hash _ | Contents_m_hash _ ->
         (* Not reachable after [Portable.of_node]. See invariant on {!entry}. *)
         assert false
@@ -217,10 +205,10 @@ struct
   let weak_of_entry : entry -> step * weak_value = function
     | Node n -> (n.name, `Node (Node_key.to_hash n.node))
     | Node_hash n -> (n.name, `Node n.node)
-    | Contents c -> (c.name, `Contents (Contents_key.to_hash c.contents, ()))
-    | Contents_m c -> (c.name, `Contents (Contents_key.to_hash c.contents, ()))
-    | Contents_hash c -> (c.name, `Contents (c.contents, ()))
-    | Contents_m_hash c -> (c.name, `Contents (c.contents, ()))
+    | Contents c -> (c.name, `Contents (Contents_key.to_hash c.contents))
+    | Contents_m c -> (c.name, `Contents (Contents_key.to_hash c.contents))
+    | Contents_hash c -> (c.name, `Contents c.contents)
+    | Contents_m_hash c -> (c.name, `Contents c.contents)
 
   let of_seq l =
     Seq.fold_left
@@ -302,14 +290,14 @@ struct
              | Contents { name; contents } ->
                  Contents_hash
                    { name; contents = Contents_key.to_hash contents }
-             | Contents_m { metadata; name; contents } ->
+             | Contents_m { name; contents } ->
                  Contents_m_hash
-                   { metadata; name; contents = Contents_key.to_hash contents }
+                   { name; contents = Contents_key.to_hash contents }
              | Node_hash { name; node } -> Node_hash { name; node }
              | Contents_hash { name; contents } ->
                  Contents_hash { name; contents }
-             | Contents_m_hash { metadata; name; contents } ->
-                 Contents_m_hash { metadata; name; contents })
+             | Contents_m_hash { name; contents } ->
+                 Contents_m_hash { name; contents })
       |> Seq.fold_left (fun xs x -> x :: xs) []
     in
     pre_hash entries f
@@ -409,13 +397,23 @@ struct
 
       let node_key_encoding = hash_encoding
 
-      type value = weak_value [@@deriving brassaia]
+      type value = weak_value
+
+      (* Custom Repr encoding to be coherent with the previous binary
+         representation that included metadatas *)
+      let value_t =
+        let open Type in
+        variant "Portable.value" (fun c n -> function
+          | `Contents h -> c (h, ()) | `Node h -> n h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+        |~ case1 "node" hash_t (fun h -> `Node h)
+        |> sealv
 
       let value_encoding = weak_value_encoding
 
       let to_entry name = function
         | `Node node -> Node_hash { name; node }
-        | `Contents (contents, ()) -> Contents_hash { name; contents }
+        | `Contents contents -> Contents_hash { name; contents }
 
       let of_seq s =
         Seq.fold_left
@@ -584,7 +582,7 @@ module Graph (S : Store) = struct
 
   type path = Path.t [@@deriving brassaia]
   type 'a t = 'a S.t
-  type value = [ `Contents of contents_key * unit | `Node of node_key ]
+  type value = [ `Contents of contents_key | `Node of node_key ]
 
   let empty t = S.add t (S.Val.empty ())
 
@@ -602,7 +600,7 @@ module Graph (S : Store) = struct
 
   let edges t =
     List.rev_map
-      (function _, `Node n -> `Node n | _, `Contents (c, ()) -> `Contents c)
+      (function _, `Node n -> `Node n | _, `Contents c -> `Contents c)
       (S.Val.list t)
 
   let pp_key = Type.pp S.Key.t
@@ -843,11 +841,11 @@ module V1 (N : Generic_key.S with type step = string) = struct
     let open Type in
     record "node" (fun contents _ node ->
         match (contents, node) with
-        | Some c, None -> `Contents (c, ())
+        | Some c, None -> `Contents c
         | None, Some n -> `Node n
         | _ -> failwith "invalid node")
     |+ field "contents" (option Contents_key.t) (function
-         | `Contents (x, ()) -> Some x
+         | `Contents x -> Some x
          | _ -> None)
     |+ field "metadata" (option unit) (fun _ -> None)
     |+ field "node" (option Node_key.t) (function

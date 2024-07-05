@@ -75,10 +75,10 @@ module Make (B : Backend.S) = struct
               B.Node.index (B.Repo.node_t r) h >|= function
               | None -> None
               | Some k -> Some (`Node k))
-          | `Contents (h, ()) -> (
+          | `Contents h -> (
               B.Contents.index (B.Repo.contents_t r) h >|= function
               | None -> None
-              | Some k -> Some (`Contents (k, ()))))
+              | Some k -> Some (`Contents k)))
 
     let of_key r k = import r k
 
@@ -87,17 +87,17 @@ module Make (B : Backend.S) = struct
           B.Node.index (B.Repo.node_t r) h >>= function
           | None -> Lwt.return_none
           | Some k -> of_key r (`Node k))
-      | `Contents (h, ()) -> (
+      | `Contents h -> (
           B.Contents.index (B.Repo.contents_t r) h >>= function
           | None -> Lwt.return_none
-          | Some k -> of_key r (`Contents (k, ())))
+          | Some k -> of_key r (`Contents k))
 
     let shallow r h = import_no_check r h
     let kinded_hash = hash
 
     let hash : ?cache:bool -> t -> hash =
      fun ?cache tr ->
-      match hash ?cache tr with `Node h -> h | `Contents (h, ()) -> h
+      match hash ?cache tr with `Node h -> h | `Contents h -> h
 
     let pp = Type.pp t
   end
@@ -149,7 +149,7 @@ module Make (B : Backend.S) = struct
 
   let save_tree ?(clear = true) r x y (tr : Tree.t) =
     match Tree.destruct tr with
-    | `Contents (c, ()) ->
+    | `Contents c ->
         let* c = Tree.Contents.force_exn c in
         let+ k = save_contents x c in
         `Contents k
@@ -308,7 +308,7 @@ module Make (B : Backend.S) = struct
               | Some v ->
                   List.iter
                     (function
-                      | _, `Contents (c, ()) ->
+                      | _, `Contents c ->
                           contents := Contents_keys.add c !contents
                       | _ -> ())
                     (B.Node.Val.list v);
@@ -393,8 +393,7 @@ module Make (B : Backend.S) = struct
       | None -> []
       | Some v ->
           List.rev_map
-            (function
-              | _, `Node n -> `Node n | _, `Contents (c, ()) -> `Contents c)
+            (function _, `Node n -> `Node n | _, `Contents c -> `Contents c)
             (B.Node.Val.list v)
 
     let default_pred_commit t c =
@@ -953,7 +952,7 @@ module Make (B : Backend.S) = struct
     | None -> None
     | Some tree -> (
         match Tree.key tree with
-        | Some (`Contents (key, ())) -> Some (`Contents key)
+        | Some (`Contents key) -> Some (`Contents key)
         | Some (`Node key) -> Some (`Node key)
         | None -> None)
 
@@ -1259,9 +1258,7 @@ struct
           match Type.of_string Store.Path.step_t k with
           | Ok key -> obj l ((key, node v []) :: acc)
           | _ -> obj l acc)
-    and node j acc =
-      match j with `O j -> obj j acc | _ -> `Contents (j, ())
-    in
+    and node j acc = match j with `O j -> obj j acc | _ -> `Contents j in
     node j []
 
   let of_concrete_tree c : json =
@@ -1271,7 +1268,7 @@ struct
       | [] -> `O acc
       | (k, v) :: l -> tree l ((step k, contents v []) :: acc)
     and contents t acc =
-      match t with `Contents (c, ()) -> c | `Tree c -> tree c acc
+      match t with `Contents c -> c | `Tree c -> tree c acc
     in
     contents c []
 

@@ -31,9 +31,7 @@ module Store = Brassaia_mem.Make (Schema)
 module Tree = Store.Tree
 open Schema
 
-type diffs = (string list * (Contents.t * unit) Diff.t) list
-[@@deriving brassaia]
-
+type diffs = (string list * Contents.t Diff.t) list [@@deriving brassaia]
 type kind = [ `Contents | `Node ] [@@deriving brassaia]
 
 module Alcotest = struct
@@ -80,7 +78,7 @@ let ( let&* ) x f = Lwt_list.iter_s f x
 and ( and&* ) l m = List.concat_map (fun a -> List.map (fun b -> (a, b)) m) l
 
 let ( >> ) f g x = g (f x)
-let c blob = `Contents (blob, ())
+let c blob = `Contents blob
 
 let invalid_tree () =
   let+ repo = Store.Repo.init (Brassaia_mem.config ()) in
@@ -148,14 +146,14 @@ let test_diff _ () =
     Tree.diff empty single
     >|= Alcotest.(check diffs)
           "Added [k \226\134\146 v]"
-          [ ([ "k" ], `Added ("v", ())) ]
+          [ ([ "k" ], `Added "v") ]
   in
   (* Removing a single key *)
   let* () =
     Tree.diff single empty
     >|= Alcotest.(check diffs)
           "Removed [k \226\134\146 v]"
-          [ ([ "k" ], `Removed ("v", ())) ]
+          [ ([ "k" ], `Removed "v") ]
   in
   Lwt.return_unit
 
@@ -638,7 +636,7 @@ module Broken = struct
 
   let random_contents () =
     let value = Tree.of_concrete (c (random_string32 ())) in
-    let value_ptr = `Contents (Tree.hash value, ()) in
+    let value_ptr = `Contents (Tree.hash value) in
     (value, value_ptr)
 
   let random_node () =

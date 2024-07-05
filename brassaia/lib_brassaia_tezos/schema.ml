@@ -87,7 +87,7 @@ struct
     let hash_of_entry (_, t) =
       match t with
       | `Node h -> Node_key.to_hash h
-      | `Contents (h, ()) -> Contents_key.to_hash h
+      | `Contents h -> Contents_key.to_hash h
 
     let metadata_t =
       let some = "\255\000\000\000\000\000\000\000" in

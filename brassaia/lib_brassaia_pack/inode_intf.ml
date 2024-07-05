@@ -26,10 +26,7 @@ end
 
 module type Snapshot = sig
   type hash
-
-  type kinded_hash = Contents of hash * unit | Node of hash
-  [@@deriving brassaia]
-
+  type kinded_hash = Contents of hash | Node of hash [@@deriving brassaia]
   type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
   type inode_tree = { depth : int; length : int; pointers : (int * hash) list }
@@ -109,7 +106,7 @@ module type Compress = sig
   type address = Offset of pack_offset | Hash of hash
   type ptr = { index : dict_key; hash : address }
   type tree = { depth : dict_key; length : dict_key; entries : ptr list }
-  type value = Contents of name * address * unit | Node of name * address
+  type value = Contents of name * address | Node of name * address
   type v = Values of value list | Tree of tree
   type v1 = { mutable length : int; v : v }
 
@@ -160,7 +157,7 @@ module type Internal = sig
       (** The type for pointer kinds. *)
       type kinded_key =
         | Contents of contents_key
-        | Contents_x of unit * contents_key
+        | Contents_x of contents_key
         | Node of node_key
       [@@deriving brassaia]
 

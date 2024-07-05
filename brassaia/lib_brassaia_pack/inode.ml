@@ -99,11 +99,11 @@ struct
       raise (Dangling_hash { context; hash })
 
     let unsafe_keyvalue_of_hashvalue = function
-      | `Contents (h, ()) -> `Contents (Key.unfindable_of_hash h, ())
+      | `Contents h -> `Contents (Key.unfindable_of_hash h)
       | `Node h -> `Node (Key.unfindable_of_hash h)
 
     let hashvalue_of_keyvalue = function
-      | `Contents (k, ()) -> `Contents (Key.to_hash k, ())
+      | `Contents k -> `Contents (Key.to_hash k)
       | `Node k -> `Node (Key.to_hash k)
   end
 
@@ -397,7 +397,7 @@ struct
     type tree = { depth : int; length : int; entries : ptr list }
     [@@deriving brassaia]
 
-    type value = Contents of name * address * unit | Node of name * address
+    type value = Contents of name * address | Node of name * address
 
     (* We distribute products over sums in the type representation of [value]
        in order to pack many possible cases into a single tag character in the
@@ -435,22 +435,22 @@ struct
         | Node (Indirect n, Hash h)   -> node_ih (n, h)
         | Node (Direct n,   Offset o) -> node_do (n, o)
         | Node (Direct n,   Hash h)   -> node_dh (n, h)
-        | Contents (Indirect n, Offset o, ()) -> contents_io (n, o)
-        | Contents (Indirect n, Hash h, ())   -> contents_ih (n, h)
-        | Contents (Direct n,   Offset o, ()) -> contents_do (n, o)
-        | Contents (Direct n,   Hash h, ())   -> contents_dh (n, h) )
-      |~ case1 "contents-io"   Payload.io   (fun (n, o)    -> Contents (Indirect n, Offset o, ()))
-      |~ case1 "contents-x-io" Payload.x_io (fun (n, i, m) -> Contents (Indirect n, Offset i, m))
+        | Contents (Indirect n, Offset o) -> contents_io (n, o)
+        | Contents (Indirect n, Hash h)   -> contents_ih (n, h)
+        | Contents (Direct n,   Offset o) -> contents_do (n, o)
+        | Contents (Direct n,   Hash h)   -> contents_dh (n, h) )
+      |~ case1 "contents-io"   Payload.io   (fun (n, o)    -> Contents (Indirect n, Offset o))
+      |~ case1 "contents-x-io" Payload.x_io (fun (n, i, _) -> Contents (Indirect n, Offset i))
 
       |~ case1 "node-io"       Payload.io   (fun (n, i)    -> Node (Indirect n, Offset i))
-      |~ case1 "contents-ih"   Payload.ih   (fun (n, h)    -> Contents (Indirect n, Hash h, ()))
-      |~ case1 "contents-x-ih" Payload.x_ih (fun (n, h, m) -> Contents (Indirect n, Hash h, m))
+      |~ case1 "contents-ih"   Payload.ih   (fun (n, h)    -> Contents (Indirect n, Hash h))
+      |~ case1 "contents-x-ih" Payload.x_ih (fun (n, h, _) -> Contents (Indirect n, Hash h))
       |~ case1 "node-ih"       Payload.ih   (fun (n, h)    -> Node (Indirect n, Hash h))
-      |~ case1 "contents-do"   Payload.do_  (fun (n, i)    -> Contents (Direct n, Offset i, ()))
-      |~ case1 "contents-x-do" Payload.x_do (fun (n, i, m) -> Contents (Direct n, Offset i, m))
+      |~ case1 "contents-do"   Payload.do_  (fun (n, i)    -> Contents (Direct n, Offset i))
+      |~ case1 "contents-x-do" Payload.x_do (fun (n, i, _) -> Contents (Direct n, Offset i))
       |~ case1 "node-do"       Payload.do_  (fun (n, i)    -> Node (Direct n, Offset i))
-      |~ case1 "contents-dh"   Payload.dh   (fun (n, i)    -> Contents (Direct n, Hash i, ()))
-      |~ case1 "contents-x-dh" Payload.x_dh (fun (n, i, m) -> Contents (Direct n, Hash i, m))
+      |~ case1 "contents-dh"   Payload.dh   (fun (n, i)    -> Contents (Direct n, Hash i))
+      |~ case1 "contents-x-dh" Payload.x_dh (fun (n, i, _) -> Contents (Direct n, Hash i))
       |~ case1 "node-dd"       Payload.dh   (fun (n, i)    -> Node (Direct n, Hash i))
       |> sealv
 
@@ -868,7 +868,7 @@ struct
               let v =
                 match v with
                 | `Node _ as k -> (Some s, k)
-                | `Contents (k, ()) -> (Some s, `Contents k)
+                | `Contents k -> (Some s, `Contents k)
               in
               v :: acc)
             l []
@@ -1029,9 +1029,20 @@ struct
     module Concrete = struct
       type kinded_key =
         | Contents of contents_key
-        | Contents_x of unit * contents_key
+        | Contents_x of contents_key
         | Node of node_key
-      [@@deriving brassaia]
+
+      let kinded_key_t : kinded_key Repr.ty =
+        let open Repr in
+        variant "kinded_key" (fun contents contents_x node -> function
+          | Contents h -> contents h
+          | Contents_x c -> contents_x ((), c)
+          | Node h -> node h)
+        |~ case1 "contents" contents_key_t (fun ck -> Contents ck)
+        |~ case1 "contents-x" (pair unit contents_key_t) (fun ((), ck) ->
+               Contents_x ck)
+        |~ case1 "node" node_key_t (fun k -> Node k)
+        |> sealv
 
       type entry = { name : step; key : kinded_key } [@@deriving brassaia]
 
@@ -1046,14 +1057,14 @@ struct
 
       let to_entry (name, v) =
         match v with
-        | `Contents (contents_key, ()) -> { name; key = Contents contents_key }
+        | `Contents contents_key -> { name; key = Contents contents_key }
         | `Node node_key -> { name; key = Node node_key }
 
       let of_entry e =
         ( e.name,
           match e.key with
-          | Contents key -> `Contents (key, ())
-          | Contents_x ((), key) -> `Contents (key, ())
+          | Contents key -> `Contents key
+          | Contents_x key -> `Contents key
           | Node key -> `Node key )
 
       type error =
@@ -1638,8 +1649,15 @@ struct
     let is_tree t = match t.v with Tree _ -> true | Values _ -> false
 
     module Proof = struct
-      type value = [ `Contents of hash * unit | `Node of hash ]
-      [@@deriving brassaia]
+      type value = [ `Contents of hash | `Node of hash ]
+
+      let value_t : value Repr.ty =
+        let open Repr in
+        variant "Proof.value" (fun contents node -> function
+          | `Contents h -> contents (h, ()) | `Node h -> node h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+        |~ case1 "node" hash_t (fun h -> `Node h)
+        |> sealv
 
       type t =
         [ `Blinded of hash
@@ -1795,8 +1813,15 @@ struct
     module Snapshot = struct
       include T
 
-      type kinded_hash = Contents of hash * unit | Node of hash
-      [@@deriving brassaia]
+      type kinded_hash = Contents of hash | Node of hash
+
+      let kinded_hash_t : kinded_hash Repr.ty =
+        let open Repr in
+        variant "Proof.value" (fun contents node -> function
+          | Contents h -> contents (h, ()) | Node h -> node h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> Contents h)
+        |~ case1 "node" hash_t (fun h -> Node h)
+        |> sealv
 
       type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
@@ -1821,9 +1846,9 @@ struct
       in
       ( step,
         match e.hash with
-        | Snapshot.Contents (hash, ()) ->
+        | Snapshot.Contents hash ->
             let key = index hash in
-            `Contents (key, ())
+            `Contents key
         | Node hash ->
             let key = index hash in
             `Node key )
@@ -1933,10 +1958,10 @@ struct
         { index = n.index; hash }
       in
       let value : T.step * T.value -> Compress.value = function
-        | s, `Contents (c, ()) ->
+        | s, `Contents c ->
             let s = step s in
             let v = address_of_key c in
-            Compress.Contents (s, v, ())
+            Compress.Contents (s, v)
         | s, `Node n ->
             let s = step s in
             let v = address_of_key n in
@@ -1982,10 +2007,10 @@ struct
         { index = n.index; vref }
       in
       let value : Compress.value -> T.step * T.value = function
-        | Contents (n, h, ()) ->
+        | Contents (n, h) ->
             let name = step n in
             let hash = key h in
-            (name, `Contents (hash, ()))
+            (name, `Contents hash)
         | Node (n, h) ->
             let name = step n in
             let hash = key h in
@@ -2028,7 +2053,7 @@ struct
       | Values ls ->
           List.map
             (function
-              | Compress.Contents (_, address, ()) | Node (_, address) ->
+              | Compress.Contents (_, address) | Node (_, address) ->
                   entry_of_address address)
             ls
       | Tree { entries; _ } ->
@@ -2042,9 +2067,9 @@ struct
      fun (name, v) ->
       let step = step_to_bin name in
       match v with
-      | `Contents (contents_key, ()) ->
+      | `Contents contents_key ->
           let h = Key.to_hash contents_key in
-          { Snapshot.step; hash = Contents (h, ()) }
+          { Snapshot.step; hash = Contents h }
       | `Node node_key ->
           let h = Key.to_hash node_key in
           { step; hash = Node h }
@@ -2314,16 +2339,23 @@ struct
 
       let contents_key_encoding = hash_encoding
 
-      type value = [ `Contents of hash * unit | `Node of hash ]
-      [@@deriving brassaia]
+      type value = [ `Contents of hash | `Node of hash ]
+
+      let value_t : value Repr.ty =
+        let open Repr in
+        variant "Proof.value" (fun contents node -> function
+          | `Contents h -> contents (h, ()) | `Node h -> node h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+        |~ case1 "node" hash_t (fun h -> `Node h)
+        |> sealv
 
       let value_encoding =
         let open Data_encoding in
         union
           [
             case (Tag 1) ~title:"`Contents" (tup2 hash_encoding unit)
-              (function `Contents t -> Some t | _ -> None)
-              (fun t -> `Contents t);
+              (function `Contents t -> Some (t, ()) | _ -> None)
+              (fun (t, ()) -> `Contents t);
             case (Tag 2) ~title:"`Node" hash_encoding
               (function `Node h -> Some h | _ -> None)
               (fun h -> `Node h);

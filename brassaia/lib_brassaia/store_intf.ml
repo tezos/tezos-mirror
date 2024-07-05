@@ -433,7 +433,7 @@ module type S_generic_key = sig
 
     (** {1 Import/Export} *)
 
-    type kinded_key = [ `Contents of contents_key * unit | `Node of node_key ]
+    type kinded_key = [ `Contents of contents_key | `Node of node_key ]
     [@@deriving brassaia]
     (** Keys in the Brassaia store are tagged with the type of the value they
         reference (either {!contents} or {!node}). *)
@@ -459,7 +459,7 @@ module type S_generic_key = sig
     val hash : ?cache:bool -> tree -> hash
     (** [hash t] is the hash of tree [t]. *)
 
-    type kinded_hash = [ `Contents of hash * unit | `Node of hash ]
+    type kinded_hash = [ `Contents of hash | `Node of hash ]
     (** Like {!kinded_key}, but with hashes as value references rather than
         keys. *)
 
@@ -579,13 +579,13 @@ module type S_generic_key = sig
   val mem_tree : t -> path -> bool Lwt.t
   (** [mem_tree t] is {!Tree.mem_tree} applied to [t]'s root tree. *)
 
-  val find_all : t -> path -> (contents * unit) option Lwt.t
+  val find_all : t -> path -> contents option Lwt.t
   (** [find_all t] is {!Tree.find_all} applied to [t]'s root tree. *)
 
   val find : t -> path -> contents option Lwt.t
   (** [find t] is {!Tree.find} applied to [t]'s root tree. *)
 
-  val get_all : t -> path -> (contents * unit) Lwt.t
+  val get_all : t -> path -> contents Lwt.t
   (** [get_all t] is {!Tree.get_all} applied on [t]'s root tree. *)
 
   val get : t -> path -> contents Lwt.t

@@ -217,9 +217,7 @@ module type S = sig
   (** {1 Snapshots} *)
 
   module Snapshot : sig
-    type kinded_hash = Contents of hash * unit | Node of hash
-    [@@deriving brassaia]
-
+    type kinded_hash = Contents of hash | Node of hash [@@deriving brassaia]
     type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
     type inode_tree = {

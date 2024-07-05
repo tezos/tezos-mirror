@@ -33,11 +33,11 @@ module type DB = Brassaia.Generic_key.S with module Schema = Schema
 
 module Kinded_hash = struct
   let of_context_hash = function
-    | `Value h -> `Contents (Hash.of_context_hash h, ())
+    | `Value h -> `Contents (Hash.of_context_hash h)
     | `Node h -> `Node (Hash.of_context_hash h)
 
   let to_context_hash = function
-    | `Contents (h, ()) -> `Value (Hash.to_context_hash h)
+    | `Contents h -> `Value (Hash.to_context_hash h)
     | `Node h -> `Node (Hash.to_context_hash h)
 end
 
@@ -89,7 +89,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
   let to_value t =
     let open Lwt_syntax in
     match Store.Tree.destruct t with
-    | `Contents (c, _) ->
+    | `Contents c ->
         let+ v = Store.Tree.Contents.force_exn c in
         Some v
     | `Node _ -> Lwt.return_none
@@ -125,7 +125,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
   let rec raw_of_concrete : type a. (raw -> a) -> concrete -> a =
    fun k -> function
     | `Tree l -> raw_of_node (fun l -> k (`Tree (String.Map.of_seq l))) l
-    | `Contents (v, _) -> k (`Value v)
+    | `Contents v -> k (`Value v)
 
   and raw_of_node :
       type a. ((string * raw) Seq.t -> a) -> (string * concrete) list -> a =
@@ -144,7 +144,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
   let rec concrete_of_raw : type a. (concrete -> a) -> raw -> a =
    fun k -> function
     | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (String.Map.to_seq l)
-    | `Value v -> k (`Contents (v, ()))
+    | `Value v -> k (`Contents v)
 
   and concrete_of_node :
       type a. ((string * concrete) list -> a) -> (string * raw) Seq.t -> a =
@@ -208,7 +208,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
   let kinded_key t =
     match Store.Tree.key t with
     | (None | Some (`Node _)) as r -> r
-    | Some (`Contents (v, ())) -> Some (`Value v)
+    | Some (`Contents v) -> Some (`Value v)
 
   let is_shallow tree =
     match Store.Tree.inspect tree with
@@ -272,8 +272,8 @@ struct
         {length; proofs = List.map (fun (k, v) -> (k, f v)) proofs}
 
       and to_tree : DB_proof.tree -> tree = function
-        | Contents (c, ()) -> Value c
-        | Blinded_contents (h, ()) -> Blinded_value (Hash.to_context_hash h)
+        | Contents c -> Value c
+        | Blinded_contents h -> Blinded_value (Hash.to_context_hash h)
         | Node l -> Node (List.map (fun (k, v) -> (k, to_tree v)) l)
         | Blinded_node h -> Blinded_node (Hash.to_context_hash h)
         | Inode i -> Inode (to_inode to_inode_tree i)
@@ -296,8 +296,8 @@ struct
         {length; proofs = List.map (fun (k, v) -> (k, f v)) proofs}
 
       and of_tree : tree -> DB_proof.tree = function
-        | Value c -> Contents (c, ())
-        | Blinded_value h -> Blinded_contents (Hash.of_context_hash h, ())
+        | Value c -> Contents c
+        | Blinded_value h -> Blinded_contents (Hash.of_context_hash h)
         | Node l -> Node (List.map (fun (k, v) -> (k, of_tree v)) l)
         | Blinded_node h -> Blinded_node (Hash.of_context_hash h)
         | Inode i -> Inode (of_inode of_inode_tree i)
@@ -365,9 +365,7 @@ struct
 
   let produce_tree_proof repo key f =
     let open Lwt_syntax in
-    let key =
-      match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
-    in
+    let key = match key with `Node n -> `Node n | `Value v -> `Contents v in
     let+ p, r = Store.Tree.produce_proof repo key f in
     (Proof.to_tree p, r)
 
@@ -377,9 +375,7 @@ struct
 
   let produce_stream_proof repo key f =
     let open Lwt_syntax in
-    let key =
-      match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
-    in
+    let key = match key with `Node n -> `Node n | `Value v -> `Contents v in
     let+ p, r = Store.Tree.produce_stream repo key f in
     (Proof.to_stream p, r)
 

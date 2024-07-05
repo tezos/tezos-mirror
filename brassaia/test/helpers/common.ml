@@ -166,7 +166,7 @@ module Make_helpers (S : Generic_key) = struct
   let with_info repo n f = with_commit repo (fun h -> f h ~info:(info n))
   let kv1 ~repo = with_contents repo (fun t -> B.Contents.add t v1)
   let kv2 ~repo = with_contents repo (fun t -> B.Contents.add t v2)
-  let normal x = `Contents (x, ())
+  let normal x = `Contents x
   let b1 = "foo"
   let b2 = "bar/toto"
 
