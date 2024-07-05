@@ -122,6 +122,7 @@ module Request = struct
         l2_blocks : [`Read] Rollup_node_storage.L2_blocks.t;
       }
         -> (unit, tztrace) t
+    | Patch_kernel : {is_binary : bool; kernel : string} -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -279,6 +280,27 @@ module Request = struct
             assert false
             (* This case cannot be used to decode, which is acceptable because
                the only use case for the encoding is logging (so encoding). *));
+        case
+          (Tag 13)
+          ~title:"Patch_kernel_binary"
+          (obj2
+             (req "request" (constant "patch_kernel_binary"))
+             (req "kernel" Data_encoding.(string' Hex)))
+          (function
+            | View (Patch_kernel {is_binary = true; kernel}) -> Some ((), kernel)
+            | _ -> None)
+          (fun ((), kernel) -> View (Patch_kernel {is_binary = true; kernel}));
+        case
+          (Tag 14)
+          ~title:"Patch_kernel_hex"
+          (obj2
+             (req "request" (constant "patch_kernel_hex"))
+             (req "kernel" string))
+          (function
+            | View (Patch_kernel {is_binary = false; kernel}) ->
+                Some ((), kernel)
+            | _ -> None)
+          (fun ((), kernel) -> View (Patch_kernel {is_binary = false; kernel}));
       ]
 
   let pp ppf view =
@@ -1020,6 +1042,28 @@ module State = struct
       Evm_state.modify ~key:"/__at_most_one_block" ~value:"" evm_state
     in
     go ~current_block_number:Z.(pred zero) evm_state first_level
+
+  let patch_kernel (ctxt : t) ~is_binary kernel =
+    let open Lwt_result_syntax in
+    let*! version = Evm_state.wasm_pvm_version ctxt.session.evm_state in
+    let* () =
+      Wasm_debugger.check_kernel
+        ~binary:is_binary
+        ~name:"boot.wasm"
+        version
+        kernel
+    in
+    let*! evm_state =
+      Evm_state.modify
+        ~key:"/kernel/boot.wasm"
+        ~value:kernel
+        ctxt.session.evm_state
+    in
+    Evm_store.use ctxt.store @@ fun conn ->
+    let* commit = replace_current_commit ctxt conn evm_state in
+    on_modified_head ctxt evm_state commit ;
+    let*! () = Events.patched_kernel ctxt.session.next_blueprint_number in
+    return_unit
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -1157,6 +1201,9 @@ module Handlers = struct
           ~finalized_level
           ~levels_to_hashes
           ~l2_blocks
+    | Patch_kernel {is_binary; kernel} ->
+        let ctxt = Worker.state self in
+        State.patch_kernel ctxt ~is_binary kernel
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1588,6 +1635,11 @@ let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
         evm_state
         message
   | None -> failwith "Cannot read evm state"
+
+let patch_kernel path =
+  let open Lwt_result_syntax in
+  let* kernel, is_binary = Wasm_debugger.read_kernel_from_file path in
+  worker_wait_for_request (Patch_kernel {is_binary; kernel})
 
 let block_param_to_block_number
     (block_param : Ethereum_types.Block_parameter.extended) =

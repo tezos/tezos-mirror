@@ -272,12 +272,23 @@ let rollup_address_arg =
 
 let kernel_arg =
   Tezos_clic.arg
+    ~long:"kernel"
+    ~placeholder:"evm_kernel.wasm"
+    ~doc:
+      "Path to the EVM kernel used to launch the PVM, it will be loaded from \
+       storage afterward"
+    Params.string
+
+let initial_kernel_arg =
+  Tezos_clic.arg
     ~long:"initial-kernel"
     ~placeholder:"evm_installer.wasm"
     ~doc:
       "Path to the EVM kernel used to launch the PVM, it will be loaded from \
        storage afterward"
     Params.string
+
+let force_arg ~doc = Tezos_clic.switch ~long:"force" ~short:'f' ~doc ()
 
 let preimages_arg =
   Tezos_clic.arg
@@ -783,7 +794,7 @@ let sequencer_command =
     (merge_options
        common_config_args
        (args13
-          kernel_arg
+          initial_kernel_arg
           private_rpc_port_arg
           preimages_arg
           preimages_endpoint_arg
@@ -941,7 +952,7 @@ let observer_command =
     (merge_options
        common_config_args
        (args4
-          kernel_arg
+          initial_kernel_arg
           preimages_arg
           preimages_endpoint_arg
           bundler_node_endpoint_arg))
@@ -1275,13 +1286,10 @@ let reset_command =
     ~desc:"Reset evm node data-dir to a specific block level."
     (args2
        data_dir_arg
-       (Tezos_clic.switch
-          ~long:"force"
-          ~short:'f'
+       (force_arg
           ~doc:
             "force suppression of data to reset state of sequencer to a \
-             specified l2 level."
-          ()))
+             specified l2 level."))
     (prefixes ["reset"; "at"]
     @@ Tezos_clic.param
          ~name:"level"
@@ -1340,6 +1348,46 @@ let replay_command =
         ~preimages
         ~preimages_endpoint
         l2_level)
+
+let patch_kernel_command =
+  let open Tezos_clic in
+  command
+    ~desc:
+      "Patch the kernel used by the EVM node from its current HEAD. This is an \
+       unsafe command, which can lead to the EVM node diverging from the \
+       Etherlink main branch if the new kernel is not compatible with the one \
+       deployed on the network."
+    (args2 data_dir_arg (force_arg ~doc:"Force patching the kernel"))
+    (prefixes ["patch"; "kernel"; "with"]
+    @@ Tezos_clic.string ~name:"kernel_path" ~desc:"Path to the kernel"
+    @@ stop)
+    (fun (data_dir, force) kernel_path () ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config = make_with_defaults ~verbosity:Warning () in
+        init ~config ()
+      in
+      if force then
+        let* _status =
+          Evm_context.start
+            ~data_dir
+            ~preimages:Filename.Infix.(data_dir // "wasm_2_0_0")
+            ~sqlite_journal_mode:`Identity
+            ~store_perm:`Read_write
+              (* Since we won’t execute anything, we don’t care about the following
+                 argument. *)
+            ~preimages_endpoint:None
+            ~fail_on_missing_blueprint:true
+            ()
+        in
+        Evm_context.patch_kernel kernel_path
+      else
+        failwith
+          "You must add --force to your command-line to execute this command. \
+           As a reminder, patching the kernel is an advanced and unsafe \
+           procedure.")
 
 let init_config_command =
   let open Tezos_clic in
@@ -1628,7 +1676,7 @@ let sequencer_config_args =
     maximum_blueprints_catchup_arg
     catchup_cooldown_arg
     genesis_timestamp_arg
-    kernel_arg
+    initial_kernel_arg
     wallet_dir_arg
     (Client_config.password_filename_arg ())
 
@@ -1714,7 +1762,7 @@ let threshold_encryption_sequencer_config_args =
     maximum_blueprints_catchup_arg
     catchup_cooldown_arg
     genesis_timestamp_arg
-    kernel_arg
+    initial_kernel_arg
     wallet_dir_arg
     sequencer_sidecar_endpoint_arg
     (Client_config.password_filename_arg ())
@@ -1798,7 +1846,7 @@ let observer_run_args =
     bundler_node_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
-    kernel_arg
+    initial_kernel_arg
 
 let observer_simple_command =
   let open Tezos_clic in
@@ -1868,6 +1916,7 @@ let commands =
     dump_to_rlp_command;
     reset_command;
     replay_command;
+    patch_kernel_command;
     init_config_command;
     make_kernel_config_command;
   ]

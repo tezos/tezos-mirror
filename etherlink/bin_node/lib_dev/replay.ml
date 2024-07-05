@@ -5,28 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let read_kernel_from_file kernel_path =
-  let open Lwt_result_syntax in
-  if Filename.(check_suffix kernel_path ".hex") then
-    let*! content = Repl_helpers.read_file kernel_path in
-    let*? content =
-      match Hex.to_string (`Hex content) with
-      | Some content -> Ok (content, true)
-      | None -> error_with "%S is not a valid hexadecimal file" kernel_path
-    in
-    return content
-  else
-    let*! content = Repl_helpers.read_file kernel_path in
-    let*? binary =
-      if Filename.check_suffix kernel_path ".wasm" then Ok true
-      else if Filename.check_suffix kernel_path ".wast" then Ok false
-      else error_with "Kernels should have .wasm or .wast file extension"
-    in
-    return (content, binary)
-
 let patch_kernel ~kernel_path evm_state =
   let open Lwt_result_syntax in
-  let* content, binary = read_kernel_from_file kernel_path in
+  let* content, binary = Wasm_debugger.read_kernel_from_file kernel_path in
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils.wat2wasm content
   in

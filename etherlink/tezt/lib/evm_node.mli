@@ -371,6 +371,11 @@ val chunk_data :
   string list ->
   string list Lwt.t
 
+(** [patch_kernel evm_node path] modifies the kernel used by [evm_node] with
+    the kernel stored in the file [path]. This will fail if the node is
+    running. *)
+val patch_kernel : t -> string -> unit Lwt.t
+
 val wait_termination : t -> unit Lwt.t
 
 (** [make_kernel_installer_config ~output ()] create the config needed for the

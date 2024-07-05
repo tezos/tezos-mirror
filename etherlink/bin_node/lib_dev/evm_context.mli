@@ -140,6 +140,10 @@ val replay :
   Ethereum_types.quantity ->
   Evm_state.apply_result tzresult Lwt.t
 
+(** [patch_kernel path] modifies the state of the current head of the EVM node
+    to replace its kernel with the kernel file [path]. *)
+val patch_kernel : string -> unit tzresult Lwt.t
+
 val block_param_to_block_number :
   Ethereum_types.Block_parameter.extended ->
   Ethereum_types.quantity tzresult Lwt.t

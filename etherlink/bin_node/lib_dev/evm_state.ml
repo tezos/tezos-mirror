@@ -297,3 +297,5 @@ let clear_delayed_inbox evm_state =
     Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
     {pvm_state with durable}
     evm_state
+
+let wasm_pvm_version state = Wasm_utils.Wasm.get_wasm_version state

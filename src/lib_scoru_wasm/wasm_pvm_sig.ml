@@ -101,6 +101,8 @@ module type S = sig
       function may raise an exception. *)
   val get_output : output_info -> tree -> string option Lwt.t
 
+  val get_wasm_version : tree -> Wasm_pvm_state.version Lwt.t
+
   module Unsafe : Unsafe with type tree := tree
 
   module Internal_for_tests : Internal_for_tests with type tree := tree
