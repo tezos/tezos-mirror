@@ -16,14 +16,6 @@ depends: [
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "octez-proto-libs" { = version }
-  "octez-version" { = version }
-  "tezos-dal-node-services" { = version }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "lwt-exit"
-  "octez-protocol-compiler" { = version }
-  "tezos-dal-node-lib" { = version }
-  "tezos-dac-lib" { = version }
-  "tezos-dac-client-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
 ]

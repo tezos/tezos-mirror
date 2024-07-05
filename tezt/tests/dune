@@ -48,7 +48,6 @@
   src_proto_020_PsParisC_lib_dal_test_tezt_lib
   src_proto_020_PsParisC_lib_dac_plugin_test_tezt_lib
   src_proto_020_PsParisC_lib_client_test_tezt_lib
-  src_proto_019_PtParisB_lib_sc_rollup_node_test_tezt_lib
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
   src_lib_wasmer_test_tezt_lib

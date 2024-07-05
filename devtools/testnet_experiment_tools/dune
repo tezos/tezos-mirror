@@ -35,10 +35,6 @@
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-libs.tezos-context
-  octez-protocol-019-PtParisB-libs.baking
-  octez-protocol-019-PtParisB-libs.client
-  octez-protocol-019-PtParisB-libs.client.commands
-  tezos-protocol-019-PtParisB.protocol
   octez-protocol-020-PsParisC-libs.baking
   octez-protocol-020-PsParisC-libs.client
   octez-protocol-020-PsParisC-libs.client.commands
@@ -58,7 +54,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context)
- (modules sigs tool_019_PtParisB tool_020_PsParisC tool_alpha))
+ (modules sigs tool_020_PsParisC tool_alpha))
 
 (executable
  (name simulation_scenario)

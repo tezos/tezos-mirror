@@ -22,8 +22,6 @@ depends: [
   "lwt-exit"
   "uri" { >= "3.1.0" }
   "tezos-protocol-000-Ps9mPmXa" { = version }
-  "tezos-protocol-019-PtParisB" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
   "tezos-protocol-020-PsParisC" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
 ]
@@ -63,6 +61,8 @@ depopts: [
   "octez-protocol-017-PtNairob-libs"
   "tezos-protocol-018-Proxford"
   "octez-protocol-018-Proxford-libs"
+  "tezos-protocol-019-PtParisB"
+  "octez-protocol-019-PtParisB-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -102,6 +102,8 @@ conflicts: [
   "octez-protocol-017-PtNairob-libs" { != version }
   "tezos-protocol-018-Proxford" { != version }
   "octez-protocol-018-Proxford-libs" { != version }
+  "tezos-protocol-019-PtParisB" { != version }
+  "octez-protocol-019-PtParisB-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
