@@ -319,7 +319,7 @@ pub fn run_test(
         if output.log {
             write_out!(output_file, "Running unit test: {}", name);
         }
-        let precompiles = precompile_set::<EvalHost>();
+        let precompiles = precompile_set::<EvalHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let filler_source = prepare_filler_source(&host, &unit, opt)?;

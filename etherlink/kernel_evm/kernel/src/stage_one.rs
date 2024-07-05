@@ -25,13 +25,13 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
-    enable_fa_deposits: bool,
+    enable_fa_bridge: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
         smart_rollup_address,
         tezos_contracts,
-        enable_fa_deposits,
+        enable_fa_bridge,
     )? {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -103,7 +103,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
     _dal: Option<DalConfiguration>,
-    enable_fa_deposits: bool,
+    enable_fa_bridge: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
         host,
@@ -112,7 +112,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         delayed_bridge,
         sequencer,
         delayed_inbox,
-        enable_fa_deposits,
+        enable_fa_bridge,
     )? {
         StageOneStatus::Done => {
             // Check if there are timed-out transactions in the delayed inbox

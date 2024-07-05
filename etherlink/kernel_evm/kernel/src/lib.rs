@@ -369,8 +369,13 @@ mod tests {
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
+    use evm_execution::fa_bridge::test_utils::{
+        convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
+        ticket_id, SolCall,
+    };
     use evm_execution::handler::RouterInterface;
-    use evm_execution::utilities::keccak256_hash;
+    use evm_execution::precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS;
+    use evm_execution::utilities::{bigint_to_u256, keccak256_hash};
     use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
@@ -870,5 +875,126 @@ mod tests {
     #[test]
     fn test_fa_deposit_rejected_if_feature_disabled() {
         assert_eq!(send_fa_deposit(false), None);
+    }
+
+    fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
+        // init host
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut safe_storage = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
+
+        // enable FA bridge feature
+        if enable_fa_bridge {
+            safe_storage
+                .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
+                .unwrap();
+        }
+
+        // run level in order to initialize outbox counter (by SOL message)
+        let level = safe_storage.host.run_level(|_| ());
+
+        // provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender_initial_balance = U256::from(10000000000000000000u64);
+        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
+        set_balance(
+            &mut safe_storage,
+            &mut evm_account_storage,
+            &sender,
+            sender_initial_balance,
+        );
+
+        // construct ticket
+        let ticket = dummy_ticket();
+        let ticket_hash = ticket_hash(&ticket).unwrap();
+        let amount = bigint_to_u256(ticket.amount()).unwrap();
+
+        // patch ticket table
+        ticket_balance_add(
+            &mut safe_storage,
+            &mut evm_account_storage,
+            &ticket_hash,
+            &sender,
+            amount,
+        );
+
+        // construct withdraw calldata
+        let (ticketer, content) = ticket_id(&ticket);
+        let routing_info = hex::decode("0000000000000000000000000000000000000000000001000000000000000000000000000000000000000000").unwrap();
+
+        let data = kernel_wrapper::withdrawCall::new((
+            convert_h160(&sender),
+            routing_info.into(),
+            convert_u256(&amount),
+            ticketer.into(),
+            content.into(),
+        ))
+        .abi_encode();
+
+        // create and sign precompile call
+        let gas_price = U256::from(40000000000u64);
+        let to = FA_BRIDGE_PRECOMPILE_ADDRESS;
+        let tx = EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(U256::from(1337)),
+            0,
+            gas_price,
+            gas_price,
+            2000000,
+            Some(to),
+            U256::zero(),
+            data,
+            vec![],
+            None,
+        );
+
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+        let tx_payload = tx
+            .sign_transaction(
+                "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                    .to_string(),
+            )
+            .unwrap()
+            .to_bytes();
+
+        let tx_hash = keccak256_hash(&tx_payload);
+
+        // encode as external message and submit to inbox
+        let mut contents = Vec::new();
+        contents.push(0x00); // simple tx tag
+        contents.extend_from_slice(tx_hash.as_bytes());
+        contents.extend_from_slice(&tx_payload);
+
+        let message = ExternalMessageFrame::Targetted {
+            address: SmartRollupAddress::from_b58check(
+                "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57",
+            )
+            .unwrap(),
+            contents,
+        };
+
+        safe_storage.host.add_external(message);
+
+        // run kernel
+        main(&mut safe_storage).expect("Kernel error");
+        // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
+        main(&mut safe_storage).expect("Kernel error");
+
+        safe_storage.host.outbox_at(level + 1)
+    }
+
+    #[test]
+    fn test_fa_withdrawal_applied_if_feature_enabled() {
+        // verify outbox is not empty
+        assert_eq!(send_fa_withdrawal(true).len(), 1);
+    }
+
+    #[test]
+    fn test_fa_withdrawal_rejected_if_feature_disabled() {
+        // verify outbox is empty
+        assert!(send_fa_withdrawal(false).is_empty());
     }
 }

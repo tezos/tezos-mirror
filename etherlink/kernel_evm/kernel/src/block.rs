@@ -381,7 +381,8 @@ pub fn produce<Host: Runtime>(
         internal: &mut internal_storage,
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let precompiles = precompiles::precompile_set::<SafeStorage<&mut Host, _>>();
+    let precompiles =
+        precompiles::precompile_set::<SafeStorage<&mut Host, _>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     match storage::read_block_in_progress(&safe_host)? {
@@ -1324,7 +1325,7 @@ mod tests {
         let mut host = MockHost::default();
 
         let block_constants = first_block(&mut host);
-        let precompiles = precompiles::precompile_set();
+        let precompiles = precompiles::precompile_set(false);
         let mut accounts_index = init_account_index().unwrap();
 
         //provision sender account

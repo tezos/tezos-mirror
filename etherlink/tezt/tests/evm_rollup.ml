@@ -2275,69 +2275,6 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~evm_node ~sc_rollup_node
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
   unit
 
-let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
-    ~challenge_window ~evm_node ~sc_rollup_node ~sc_rollup_address ~client =
-  (* Bake enough levels to have a commitment and cement it. *)
-  let* _ =
-    repeat
-      ((commitment_period * challenge_window) + 3)
-      (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
-
-  (* Construct and execute the outbox proof. *)
-  let find_outbox level =
-    let rec aux level' =
-      if level' > level + 10 then
-        Test.fail "Looked for an outbox for 10 levels, stopping the loop"
-      else
-        let* outbox =
-          Sc_rollup_node.RPC.call sc_rollup_node
-          @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:level' ()
-        in
-        if
-          JSON.is_null outbox
-          || (JSON.is_list outbox && JSON.as_list outbox = [])
-        then aux (level' + 1)
-        else return (JSON.as_list outbox |> List.length, level')
-    in
-    aux level
-  in
-  let* size, withdrawal_level = find_outbox withdrawal_level in
-  let execute_withdrawal withdrawal_level message_index =
-    let* outbox_proof =
-      Sc_rollup_node.RPC.call sc_rollup_node
-      @@ Sc_rollup_rpc.outbox_proof_simple
-           ~message_index
-           ~outbox_level:withdrawal_level
-           ()
-    in
-    let Sc_rollup_rpc.{proof; commitment_hash} =
-      match outbox_proof with
-      | Some r -> r
-      | None -> Test.fail "No outbox proof found for the withdrawal"
-    in
-    let*! () =
-      Client.Sc_rollup.execute_outbox_message
-        ~hooks
-        ~burn_cap:(Tez.of_int 10)
-        ~rollup:sc_rollup_address
-        ~src:Constant.bootstrap1.alias
-        ~commitment_hash
-        ~proof
-        client
-    in
-    let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
-    unit
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun message_index -> execute_withdrawal withdrawal_level message_index)
-      (List.init size Fun.id)
-  in
-  return withdrawal_level
-
 let call_withdraw ?expect_failure ~sender ~endpoint ~value ~evm_node
     ~sc_rollup_node ~client ~receiver () =
   let* () =

@@ -29,7 +29,7 @@ let tezt_etherlink =
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         octez_crypto;
-        tezt_tezos |> open_;
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
       ]
     ~release_status:Unreleased
 

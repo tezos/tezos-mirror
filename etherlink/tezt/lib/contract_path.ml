@@ -16,6 +16,9 @@ let admin_path () = Base.(project_root // "etherlink/tezos_contracts/admin.tz")
 let withdrawal_abi_path () =
   Base.(project_root // "etherlink/tezos_contracts/withdrawal.abi")
 
+let fa_withdrawal_abi_path () =
+  Base.(project_root // "etherlink/tezos_contracts/fa_withdrawal.abi")
+
 let delayed_path () =
   Base.(
     project_root // "etherlink/tezos_contracts/delayed_transaction_bridge.tz")
