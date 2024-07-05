@@ -249,6 +249,36 @@ module Request = struct
           (obj1 (req "request" (constant "earliest_number")))
           (function View Earliest_number -> Some () | _ -> None)
           (fun () -> View Earliest_number);
+        case
+          (Tag 12)
+          ~title:"Reconstruct"
+          (obj5
+             (req "request" (constant "reconstruct"))
+             (req "reconstruct_from_boot_sector" string)
+             (req "rollup_node_data_dir" string)
+             (req "genesis_level" int32)
+             (req "finalized_level" int32))
+          (function
+            | View
+                (Reconstruct
+                  {
+                    reconstruct_from_boot_sector;
+                    rollup_node_data_dir;
+                    genesis_level;
+                    finalized_level;
+                    _;
+                  }) ->
+                Some
+                  ( (),
+                    reconstruct_from_boot_sector,
+                    rollup_node_data_dir,
+                    genesis_level,
+                    finalized_level )
+            | _ -> None)
+          (fun _ ->
+            assert false
+            (* This case cannot be used to decode, which is acceptable because
+               the only use case for the encoding is logging (so encoding). *));
       ]
 
   let pp ppf view =
