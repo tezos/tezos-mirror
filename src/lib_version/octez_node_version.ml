@@ -44,6 +44,9 @@ let commit_info_encoding =
 let commit_info_pp f ({commit_hash; _} : commit_info) =
   Format.fprintf f "%s" commit_hash
 
+let commit_info_pp_short f ({commit_hash; _} : commit_info) =
+  Format.fprintf f "%s" (String.sub commit_hash 0 8)
+
 (* Locally defined encoding for Version.additional_info *)
 let additional_info_encoding =
   let open Data_encoding in

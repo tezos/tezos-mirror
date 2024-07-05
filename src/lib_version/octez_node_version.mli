@@ -48,6 +48,8 @@ val commit_info_encoding : commit_info Data_encoding.t
 
 val commit_info_pp : Format.formatter -> commit_info -> unit
 
+val commit_info_pp_short : Format.formatter -> commit_info -> unit
+
 val encoding : t Data_encoding.t
 
 (** [partially_compare v1 c1 v2 c2] is similar to compare like function but
