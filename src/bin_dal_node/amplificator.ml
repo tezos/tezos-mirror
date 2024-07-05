@@ -181,14 +181,10 @@ module Reconstruction_process_worker = struct
     in
     return proto_parameters
 
-  let reconstruct cryptobox precomputation shards number_of_needed_shards =
+  let reconstruct cryptobox precomputation shards =
     let open Lwt_result_syntax in
     let* polynomial =
-      Slot_manager.polynomial_from_shards
-        ~number_of_needed_shards
-        cryptobox
-        shards
-      |> Errors.to_tzresult
+      Slot_manager.polynomial_from_shards cryptobox shards |> Errors.to_tzresult
     in
     let shards =
       Cryptobox.shards_from_polynomial cryptobox polynomial |> List.of_seq
@@ -220,13 +216,6 @@ module Reconstruction_process_worker = struct
       reconstruct_process_init_cryptobox proto_parameters
     in
     let*! () = Event.(emit crypto_process_started (Unix.getpid ())) in
-    let number_of_shards =
-      proto_parameters.cryptobox_parameters.number_of_shards
-    in
-    let redundancy_factor =
-      proto_parameters.cryptobox_parameters.redundancy_factor
-    in
-    let number_of_needed_shards = number_of_shards / redundancy_factor in
     let rec loop () =
       let*! query_id = Lwt_io.read_int ic in
       (* Read query from main dal process *)
@@ -251,11 +240,7 @@ module Reconstruction_process_worker = struct
 
       (* crypto computation *)
       let* proved_shards_encoded =
-        reconstruct
-          cryptobox
-          shards_proofs_precomputation
-          shards
-          number_of_needed_shards
+        reconstruct cryptobox shards_proofs_precomputation shards
       in
 
       (* Sends back the proved_shards_encoded to the main dal process *)
@@ -462,8 +447,8 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
   in
   return_unit
 
-let amplify node_store _cryptobox commitment _precomputation
-    (slot_id : Types.slot_id) ~number_of_already_stored_shards ~number_of_shards
+let amplify node_store commitment (slot_id : Types.slot_id)
+    ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
   match amplificator with
@@ -481,14 +466,18 @@ let amplify node_store _cryptobox commitment _precomputation
               number_of_already_stored_shards,
               number_of_shards ))
       in
-
       let shards =
         Store.(Shards.read_all node_store.shards slot_id ~number_of_shards)
         |> Seq_s.filter_map (function
                | _, index, Ok share -> Some Cryptobox.{index; share}
                | _ -> None)
       in
-
+      let*? shards =
+        Seq_s.take
+          ~when_negative_length:[error_of_exn (Invalid_argument "Seq_s.take")]
+          number_of_needed_shards
+          shards
+      in
       (* Enqueue this reconstruction in a query_pipe to be sent to a reconstruction process *)
       let* () =
         enqueue_job_shards_proof
@@ -519,13 +508,7 @@ let try_amplification (node_store : Store.t) commitment
             (slot_id.slot_level, slot_id.slot_index))
       in
       return_unit
-  | Ready
-      ({
-         cryptobox;
-         shards_proofs_precomputation = Some precomputation;
-         proto_parameters;
-         _;
-       } as ready_ctxt) ->
+  | Ready ({cryptobox; proto_parameters; _} as ready_ctxt) ->
       let dal_parameters = Cryptobox.parameters cryptobox in
       let number_of_shards = dal_parameters.number_of_shards in
       let redundancy_factor = dal_parameters.redundancy_factor in
@@ -589,11 +572,10 @@ let try_amplification (node_store : Store.t) commitment
         else
           amplify
             node_store
-            cryptobox
             commitment
-            precomputation
             slot_id
             ~number_of_already_stored_shards
             ~number_of_shards
+            ~number_of_needed_shards
             proto_parameters
             amplificator

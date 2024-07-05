@@ -59,11 +59,8 @@ val get_slot_pages :
   Types.slot_id ->
   (bytes list, [> Errors.not_found | Errors.other]) result Lwt.t
 
-(* Same as [Cryptobox.polynomial_from_shards] but wraps the error.
-   The argument [number_of_needed_shards] is used to cap the
-   number of Lwt promises resolved from the shard sequence. *)
+(* Same as [Cryptobox.polynomial_from_shards] but wraps the error. *)
 val polynomial_from_shards :
-  ?number_of_needed_shards:int ->
   Cryptobox.t ->
   Cryptobox.shard Seq.t ->
   (Cryptobox.polynomial, [> Errors.other]) result Lwt.t

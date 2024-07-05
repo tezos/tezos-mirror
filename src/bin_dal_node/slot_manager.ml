@@ -27,7 +27,6 @@ type error +=
   | Merging_failed of string
   | Missing_shards of {provided : int; required : int}
   | Illformed_pages
-  | Invalid_number_of_needed_shards of int
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
@@ -110,19 +109,7 @@ let () =
 
 type slot = bytes
 
-let polynomial_from_shards ?number_of_needed_shards cryptobox shards =
-  let open Lwt_result_syntax in
-  let*? shards =
-    match number_of_needed_shards with
-    | None -> Ok shards
-    | Some number_of_needed_shards ->
-        Seq.take
-          ~when_negative_length:
-            (Errors.other
-               [Invalid_number_of_needed_shards number_of_needed_shards])
-          number_of_needed_shards
-          shards
-  in
+let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Lwt.return_ok p
   | Error
