@@ -552,25 +552,26 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
       [false; true]
   in
   List.iter
-    (fun kernel ->
-      let kernel_tag, _ = Kernel.to_uses_and_tags kernel in
-      let tags = kernel_tag :: tags in
-      register
-        ~kernel
-        ~threshold_encryption:false
-        ~title:(sf "%s (sequencer, %s)" title kernel_tag)
-        ~tags)
-    kernels ;
-  List.iter
-    (fun kernel ->
-      let kernel_tag, _ = Kernel.to_uses_and_tags kernel in
-      let tags = kernel_tag :: tags in
-      register
-        ~kernel
-        ~threshold_encryption:true
-        ~title:(sf "%s (te_sequencer, %s)" title kernel_tag)
-        ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags))
-    kernels
+    (fun threshold_encryption ->
+      List.iter
+        (fun kernel ->
+          let kernel_tag, _ = Kernel.to_uses_and_tags kernel in
+          let tags =
+            (if threshold_encryption then
+               [Tag.ci_disabled; "threshold_encryption"]
+             else [])
+            @ (kernel_tag :: tags)
+          in
+          let sequencer_string =
+            if threshold_encryption then "te_sequencer" else "sequencer"
+          in
+          register
+            ~kernel
+            ~threshold_encryption
+            ~title:(sf "%s (%s, %s)" title sequencer_string kernel_tag)
+            ~tags)
+        kernels)
+    [false; true]
 
 let register_upgrade_both ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
