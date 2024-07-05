@@ -49,14 +49,16 @@ val start : parameters -> unit tzresult Lwt.t
 (** [shutdown ()] stops the events follower. *)
 val shutdown : unit -> unit Lwt.t
 
-(** [add_proposal_request timestamp force] Notifies the
+type proposal_request = {timestamp : Time.Protocol.t; force : bool}
+
+(** [add_proposal_request {timestamp; force}] Notifies the
     [Threshold_encryption_proposals_handler] tha a new proposal with the given
     [timestamp] should be processed. A proposal
     will be submitted only once it gets notified by the EVM node that it has
     finished processing the previous proposal, that is either it produced and applied
     a blueprint, or it determined that the proposal will not be turned into a blueprint
-    (for example if the [Tx_pool] is locked).  *)
-val add_proposal_request : Time.Protocol.t -> bool -> unit tzresult Lwt.t
+    (for example if the [Tx_pool] is locked). *)
+val add_proposal_request : proposal_request -> unit tzresult Lwt.t
 
 (** [notify_proposal_processed ()] Notifies the blueprint_producer that
     a proposal has been processed, and if it led to a blueprint to

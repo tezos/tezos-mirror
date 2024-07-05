@@ -51,23 +51,5 @@ val init : Uri.t -> (t * (unit -> unit)) tzresult Lwt.t
     be delivered, and it waits indefinitely if no [timeout] parameter is
     specified. If [timeout] is specified and no preblock is delivered before
     the timeout expires, this function fails with error
-    [Timeout (timeout, endpoint)].
-    Concurrent calls to [next t] are mutually exclusive, to guarantee that
-    the same preblock is not delivered to different components.  *)
+    [Timeout (timeout, endpoint)]. *)
 val next : ?timeout:float -> t -> preblock_notification tzresult Lwt.t
-
-(** [submit_and_fetch ~timeout ~force ~timestamp t] adds a new proposal request
-  with parameters [(timestamp, force)] to the the
-  [Threshold_encryption_proposals_handler], and waits for a preblock (or
-  [No_preblock] if the proposal results in a notification to [t] that no
-  preblock will be produced) to be delivered by [t]. This function is atomic in
-  the sense that, while it is executing, no call to [next t] will deliver a
-  preblock. This function can be used when there is the need to guarantee that
-  a proposal will lead to a preblock (or notification that no preblock has
-  been produced by the proposal) to be delivered. *)
-val submit_and_fetch :
-  ?timeout:float ->
-  force:bool ->
-  timestamp:Time.Protocol.t ->
-  t ->
-  preblock_notification tzresult Lwt.t

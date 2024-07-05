@@ -293,11 +293,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~rollup_node_endpoint
       ()
   in
-  let module Sequencer_rpc = struct
-    let produce_block = Block_producer.produce_block
-
-    let replay_block = Replay.rpc
-  end in
   let directory =
     Services.directory configuration ((module Rollup_rpc), smart_rollup_address)
   in
@@ -309,9 +304,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       (fun private_rpc_port ->
         let private_directory =
           Services.private_directory
+            ~threshold_encryption:false
             configuration
             ((module Rollup_rpc), smart_rollup_address)
-            (module Sequencer_rpc)
         in
         (private_directory, private_rpc_port))
       sequencer_config.private_rpc_port

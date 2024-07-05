@@ -37,13 +37,6 @@ type preblock_notification =
 type t = {
   endpoint : Uri.t;
   preblocks_stream : preblock_notification Lwt_stream.t;
-  (* https://gitlab.com/tezos/tezos/-/issues/7245.
-     Remove lock once the produceBlock RPC is made asynchronous. *)
-  (* The stream is going to be shared by the main threshold encryption
-     sequencer loop, and by the handler of the produce_block RPC. Therefore, we
-     need to ensure that only one of these components access the stream at any
-     given time.*)
-  preblocks_stream_lock : Lwt_mutex.t;
 }
 
 let init endpoint =
@@ -63,20 +56,9 @@ let init endpoint =
     Lwt_stream.choose [preblocks_from_sidecar_stream; no_preblocks_stream]
   in
   let notify_no_preblock () = notify_no_preblock @@ Some No_preblock in
-  let preblocks_stream_lock = Lwt_mutex.create () in
-  return
-    ({endpoint; preblocks_stream; preblocks_stream_lock}, notify_no_preblock)
+  return ({endpoint; preblocks_stream}, notify_no_preblock)
 
-(* We do not lock on the stream in this function, hence it is unsafe to use it
-   on its own as it is prone to data races. Rather, we require callers of
-   this function to handle locking and unlocking [t.preblocks_stream] before
-   and after accessing [t.preblocks_stream]. This gives users of the function
-   the freedom to decide wether they need fine-grained (e.g. as in [next]) or
-   coarse-grained access (e.g. as in [submit_and_fetch]) to the stream of
-   preblocks.
-   This function is intended to be used for internal use in this module only
-   and is not exposed outside of the module. *)
-let next_unsafe ?timeout t =
+let next ?timeout t =
   let open Lwt_result_syntax in
   let timeout =
     match timeout with
@@ -92,15 +74,3 @@ let next_unsafe ?timeout t =
     return preblock
   in
   Lwt.pick [next_preblock (); timeout]
-
-let next ?timeout t =
-  Lwt_mutex.with_lock t.preblocks_stream_lock @@ fun () ->
-  next_unsafe ?timeout t
-
-let submit_and_fetch ?timeout ~force ~timestamp t =
-  let open Lwt_result_syntax in
-  Lwt_mutex.with_lock t.preblocks_stream_lock @@ fun () ->
-  let* () =
-    Threshold_encryption_proposals_handler.add_proposal_request timestamp force
-  in
-  next_unsafe ?timeout t
