@@ -92,20 +92,20 @@ This section explains the whole semantics of an external transaction, including 
 
 The subset of blockchain operations that can be emitted by Michelson programs as internal operations are of the following kinds:
 
-  - Transaction transferring:
+- Transaction transferring:
 
-    * tokens and optionally tickets to a user account, or
-    * tokens and parameters to a smart contract (or, optionally, to a specified
-      entrypoint of a smart contract), or
-    * parameters to a smart rollup.
+  * tokens and optionally tickets to a user account, or
+  * tokens and parameters to a smart contract (or, optionally, to a specified
+    entrypoint of a smart contract), or
+  * parameters to a smart rollup.
 
-  - Origination creating a new smart contract from its Michelson
-    source code, an initial amount of tokens transferred from the
-    source, and an initial storage content.
-  - Delegation assigning the tokens of the sender account to the stake of
-    a user account (without transferring any tokens).
-  - :doc:`Contract event <./event>` delivering live information from a smart
-    contract to external applications.
+- Origination creating a new smart contract from its Michelson
+  source code, an initial amount of tokens transferred from the
+  source, and an initial storage content.
+- Delegation assigning the tokens of the sender account to the stake of
+  a user account (without transferring any tokens).
+- :doc:`Contract event <./event>` delivering live information from a smart
+  contract to external applications.
 
 Internal operations are not included in any block, and are not signed.
 
@@ -152,17 +152,17 @@ Failures
 
 All transactions can fail for a few reasons, mostly:
 
-  - Not enough tokens in the source to spend the specified amount.
-  - The script took too many execution steps.
-  - The script failed programmatically using the ``FAILWITH`` instruction.
+- Not enough tokens in the source to spend the specified amount.
+- The script took too many execution steps.
+- The script failed programmatically using the ``FAILWITH`` instruction.
 
 External transactions can also fail for these additional reasons:
 
-  - The signature of the external operations was wrong.
-  - The code or initial storage in an origination did not typecheck.
-  - The parameter in a transfer did not typecheck.
-  - The destination did not exist.
-  - The specified entrypoint did not exist.
+- The signature of the external operations was wrong.
+- The code or initial storage in an origination did not typecheck.
+- The parameter in a transfer did not typecheck.
+- The destination did not exist.
+- The specified entrypoint did not exist.
 
 All these errors cannot happen in internal transactions, as the type
 system catches them at operation creation time. In particular,
@@ -2051,19 +2051,19 @@ scripts, the allowed toplevel primitives are ``parameter``
 ``view`` (optional and repeated). For TZT unit tests, the toplevel
 primitives which can be used are:
 
- - ``input``,
- - ``code``,
- - ``output``,
- - ``now``,
- - ``sender``,
- - ``source``,
- - ``chain_id``,
- - ``self``,
- - ``parameter``,
- - ``amount``,
- - ``balance``,
- - ``other_contracts``, and
- - ``big_maps``.
+- ``input``,
+- ``code``,
+- ``output``,
+- ``now``,
+- ``sender``,
+- ``source``,
+- ``chain_id``,
+- ``self``,
+- ``parameter``,
+- ``amount``,
+- ``balance``,
+- ``other_contracts``, and
+- ``big_maps``.
 
 Mandatory primitives
 ~~~~~~~~~~~~~~~~~~~~
@@ -2143,60 +2143,60 @@ Optional primitives are used to set the execution context for the
 test. Each of the optional primitives can be used at most once, in no
 particular order.
 
- - ``amount`` (optional, defaults to 0): the amount, expressed in
-   mutez, that should be pushed by the `AMOUNT
-   <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__
-   instruction
+- ``amount`` (optional, defaults to 0): the amount, expressed in
+  mutez, that should be pushed by the `AMOUNT
+  <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__
+  instruction
 
- - ``balance`` (optional, defaults to 0): the balance, expressed in
-   mutez, that should be pushed by the `BALANCE
-   <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__
-   instruction
+- ``balance`` (optional, defaults to 0): the balance, expressed in
+  mutez, that should be pushed by the `BALANCE
+  <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__
+  instruction
 
- - ``now`` (optional, defaults to ``"1970-01-01T00:00:00Z"``): the
-   timestamp that should be pushed by the `NOW
-   <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
-   instruction
+- ``now`` (optional, defaults to ``"1970-01-01T00:00:00Z"``): the
+  timestamp that should be pushed by the `NOW
+  <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+  instruction
 
- - ``sender`` (optional, defaults to
-   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the sender address
-   that should be pushed by the `SENDER
-   <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__
-   instruction
+- ``sender`` (optional, defaults to
+  ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the sender address
+  that should be pushed by the `SENDER
+  <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__
+  instruction
 
- - ``source`` (optional, defaults to
-   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the source address
-   that should be pushed by the `SOURCE
-   <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__
-   instruction
+- ``source`` (optional, defaults to
+  ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the source address
+  that should be pushed by the `SOURCE
+  <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__
+  instruction
 
- - ``chain_id`` (optional, defaults to ``"NetXdQprcVkpaWU"``): the
-   chain identifier that should be pushed by the `CHAIN_ID
-   <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__
-   instruction
+- ``chain_id`` (optional, defaults to ``"NetXdQprcVkpaWU"``): the
+  chain identifier that should be pushed by the `CHAIN_ID
+  <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__
+  instruction
 
- - ``self`` (optional, defaults to
-   ``"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"``): the address that
-   should be pushed by the `SELF
-   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__ and
-   `SELF_ADDRESS
-   <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__
-   instructions
+- ``self`` (optional, defaults to
+  ``"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"``): the address that
+  should be pushed by the `SELF
+  <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__ and
+  `SELF_ADDRESS
+  <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__
+  instructions
 
- - ``parameter`` (optional, defaults to ``unit``): the type of the
-   parameter of the contract pushed by the `SELF
-   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__
-   instruction
+- ``parameter`` (optional, defaults to ``unit``): the type of the
+  parameter of the contract pushed by the `SELF
+  <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__
+  instruction
 
- - ``other_contracts`` (optional, defaults to ``{}``): mapping between
-   the contract addresses that are assumed to exist and their
-   parameter types (see the :ref:`syntax of other contracts
-   specifications <syntax_of_other_contracts_alpha>`)
+- ``other_contracts`` (optional, defaults to ``{}``): mapping between
+  the contract addresses that are assumed to exist and their
+  parameter types (see the :ref:`syntax of other contracts
+  specifications <syntax_of_other_contracts_alpha>`)
 
- - ``big_maps`` (optional, defaults to ``{}``): mapping between
-   integers representing ``big_map`` indices and descriptions of big
-   maps (see the :ref:`syntax of extra big maps specifications
-   <syntax_of_extra_big_maps_alpha>`)
+- ``big_maps`` (optional, defaults to ``{}``): mapping between
+  integers representing ``big_map`` indices and descriptions of big
+  maps (see the :ref:`syntax of extra big maps specifications
+  <syntax_of_extra_big_maps_alpha>`)
 
 The following test example asserts that the default value for the `NOW
 <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
@@ -2358,25 +2358,25 @@ syntaxes can be used instead of the output stack as the argument of the
 ``output`` toplevel primitive to specify which error the instruction is expected to
 raise:
 
- - ``(StaticError <error description>)``: an error occurred before the
-   instruction was executed; the error description format is
-   unspecified so consider using a :ref:`wildcard
-   <omitting_parts_of_the_output_alpha>` such as ``(StaticError _)``
-   to write portable tests;
+- ``(StaticError <error description>)``: an error occurred before the
+  instruction was executed; the error description format is
+  unspecified so consider using a :ref:`wildcard
+  <omitting_parts_of_the_output_alpha>` such as ``(StaticError _)``
+  to write portable tests;
 
- - ``(Failed <value>)``: the execution reached a ``FAILWITH``
-   instruction and the topmost element of the stack at this point was
-   ``<value>``;
+- ``(Failed <value>)``: the execution reached a ``FAILWITH``
+  instruction and the topmost element of the stack at this point was
+  ``<value>``;
 
- - ``MutezUnderflow``: a mutez subtraction resulted in a negative
-   value. This should only happen in the case of the deprecated
-   ``mutez`` case of the ``SUB`` instruction;
+- ``MutezUnderflow``: a mutez subtraction resulted in a negative
+  value. This should only happen in the case of the deprecated
+  ``mutez`` case of the ``SUB`` instruction;
 
- - ``Overflow``: an overflow was detected. This can happen when an
-   addition or multiplication on type ``mutez`` produces a result
-   which is too large to be represented as a value of type ``mutez``,
-   or when the number of bits to shift using the ``LSL`` or ``LSR``
-   instruction is too large.
+- ``Overflow``: an overflow was detected. This can happen when an
+  addition or multiplication on type ``mutez`` produces a result
+  which is too large to be represented as a value of type ``mutez``,
+  or when the number of bits to shift using the ``LSL`` or ``LSR``
+  instruction is too large.
 
 
 The following example shows how to test a runtime failure; it asserts
@@ -2428,18 +2428,18 @@ and `SET_DELEGATE
 <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ ,
 the following data constructors are added:
 
- - ``Transfer_tokens``,
- - ``Create_contract``, and
- - ``Set_delegate``.
+- ``Transfer_tokens``,
+- ``Create_contract``, and
+- ``Set_delegate``.
 
 They take as arguments the inputs of the corresponding operation
 forging instructions plus a cryptographic nonce represented as a byte
 sequence. The result of ``TRANSFER_TOKENS``, ``CREATE_CONTRACT``,
 and ``SET_DELEGATE`` have respectively the following shapes:
 
- - ``Transfer_tokens <argument> <amount in mutez> <address of destination> <nonce>``,
- - ``Create_contract { <script> } <optional delegate> <initial balance in mutez> <initial storage> <nonce>``, and
- - ``Set_delegate <optional delegate> <nonce>``.
+- ``Transfer_tokens <argument> <amount in mutez> <address of destination> <nonce>``,
+- ``Create_contract { <script> } <optional delegate> <initial balance in mutez> <initial storage> <nonce>``, and
+- ``Set_delegate <optional delegate> <nonce>``.
 
 The computation of the cryptographic nonce is not specified. To write
 portable tests, the nonces appearing in output stack expectations

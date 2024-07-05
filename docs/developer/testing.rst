@@ -13,17 +13,17 @@ The frameworks used in Octez can be categorized along two axes: the
 type of component they test, and the type of testing they perform. We
 distinguish the following components:
 
- - Node
+- Node
 
-   - Protocol
+  - Protocol
 
-     - Michelson interpreter
-     - Stitching
+    - Michelson interpreter
+    - Stitching
 
- - Networked nodes
- - Client
- - Ledger application
- - Baker
+- Networked nodes
+- Client
+- Ledger application
+- Baker
 
 Secondly, these components can be tested at different levels of
 granularity. Additionally, tests can verify functionality, but also
@@ -75,8 +75,8 @@ appropriate for the corresponding component and testing type. The frameworks
 are linked to a sub-section of this page where the framework is presented
 in more detail.
 
-                    ..
-                       MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
+..
+   MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
 
 .. csv-table:: Testing frameworks and their applications in Octez. EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotezt_section`, QC: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression","Performance"
@@ -353,20 +353,20 @@ through the ``./scripts/with_coverage.sh`` helper as described above.
 Exempted from this rule are the ``dune`` files that belong to tests,
 developer utilities and old protocols. In particular:
 
- - benchmarks, e.g. ``src/lib_shell/bench/dune``
- - bindings, e.g. ``src/lib_sapling/bindings/dune``
- - test frameworks, e.g. ``tezt/lib/dune``
- - test packages, e.g. ``src/*/test/dune``
- - old protocols, e.g. ``src/proto_00*/*/*dune``
- - helper utilities, e.g.:
+- benchmarks, e.g. ``src/lib_shell/bench/dune``
+- bindings, e.g. ``src/lib_sapling/bindings/dune``
+- test frameworks, e.g. ``tezt/lib/dune``
+- test packages, e.g. ``src/*/test/dune``
+- old protocols, e.g. ``src/proto_00*/*/*dune``
+- helper utilities, e.g.:
 
-   - ``src/openapi/dune``, (executable name ``openapi``)
-   - ``src/lib_client_base/gen/dune`` (executable name ``bip39_generator``)
-   - ``src/lib_protocol_compiler/dune`` (executable name ``replace``)
-   - ``src/proto_alpha/lib_parameters/dune`` (executable name ``gen``)
-   - ``src/proto_011_PtHangz2/lib_parameters/dune`` (executable name ``gen``)
-   - ``src/lib_protocol_environment/ppinclude/dune`` (executable name ``ppinclude``)
-   - ``src/lib_store/legacy_store/dune`` (executable name ``legacy_store_builder``)
+  - ``src/openapi/dune``, (executable name ``openapi``)
+  - ``src/lib_client_base/gen/dune`` (executable name ``bip39_generator``)
+  - ``src/lib_protocol_compiler/dune`` (executable name ``replace``)
+  - ``src/proto_alpha/lib_parameters/dune`` (executable name ``gen``)
+  - ``src/proto_011_PtHangz2/lib_parameters/dune`` (executable name ``gen``)
+  - ``src/lib_protocol_environment/ppinclude/dune`` (executable name ``ppinclude``)
+  - ``src/lib_store/legacy_store/dune`` (executable name ``legacy_store_builder``)
 
 
 
@@ -552,14 +552,14 @@ Known issues
 
 3. Occasionally, tests write corrupted coverage data. In this case, the job ``unified_coverage`` will fail. We've done our best to ensure this happens rarely. If it happens, you can either try:
 
-    - Re-running the full pipeline.
-    - Reading the log of the job ``unified_coverage``. It'll direct
-      you to the test job that produced the corrupted coverage file.  You can
-      then retry the test job, and once finished, retry the
-      ``unified_coverage`` job.
-    - Finally, if the problem persists, adding the label
-      ``ci--no-coverage`` will disable the ``unified_coverage``
-      job. You can add this as a last resort to merge the MR.
+   - Re-running the full pipeline.
+   - Reading the log of the job ``unified_coverage``. It'll direct
+     you to the test job that produced the corrupted coverage file.  You can
+     then retry the test job, and once finished, retry the
+     ``unified_coverage`` job.
+   - Finally, if the problem persists, adding the label
+     ``ci--no-coverage`` will disable the ``unified_coverage``
+     job. You can add this as a last resort to merge the MR.
 
 
 Test coverage on master

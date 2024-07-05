@@ -261,8 +261,8 @@ If the listening address is a network address, then a more restrictive policy
 applies. Its main purpose is to protect nodes from attacks. These attacks can
 take two main forms:
 
-  - spamming the node with costly requests (denial of service attack)
-  - breaking the node by forcing it to perform a risky operation
+- spamming the node with costly requests (denial of service attack)
+- breaking the node by forcing it to perform a risky operation
 
 Thus all costly or risky endpoints are blocked by default. This can be
 relaxed or tightened by modifying the configuration file. It's

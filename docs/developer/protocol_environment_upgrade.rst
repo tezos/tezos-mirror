@@ -69,11 +69,11 @@ The following steps are roughly the steps taken in the `V6 bootstrap MR <https:/
 
 8. Change the following files, adding references to ``V<N>`` to match the references to ``V<N-1>``:
 
-    * :src:`src/lib_protocol_environment/tezos_protocol_environment.ml`
+   * :src:`src/lib_protocol_environment/tezos_protocol_environment.ml`
 
-    * ``src/lib_protocol_updater/registered_protocol.ml[i]``
+   * ``src/lib_protocol_updater/registered_protocol.ml[i]``
 
-    * ``src/lib_protocol_compiler/registerer/tezos_protocol_registerer.ml[i]``
+   * ``src/lib_protocol_compiler/registerer/tezos_protocol_registerer.ml[i]``
 
 9. Commit all those changes and open an MR with your changes.
 

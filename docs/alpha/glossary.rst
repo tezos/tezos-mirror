@@ -89,9 +89,9 @@ _`Shell`
 _`Tezos`
     Used either as a noun or an adjective to designate:
 
-      * An open-source project and software (as in, "contributing to the Tezos protocol")
-      * A peer-to-peer network of nodes maintaining a blockchain (as in "a Tezos node")
-      * The specific Tezos chain with the most economic relevance (as in "the Tezos chain"). In particular, the chain whose millionth block had hash `BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7 <https://tzkt.io/BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7>`__
+    * An open-source project and software (as in, "contributing to the Tezos protocol")
+    * A peer-to-peer network of nodes maintaining a blockchain (as in "a Tezos node")
+    * The specific Tezos chain with the most economic relevance (as in "the Tezos chain"). In particular, the chain whose millionth block had hash `BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7 <https://tzkt.io/BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7>`__
 
 _`Weight`
     See fitness_.

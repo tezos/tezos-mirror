@@ -318,8 +318,8 @@ The attesting rewards are distributed at the end of the cycle.
 The attesting reward may be received even if not all of the validator's attestations are included in a block and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
 However, two conditions must be met:
 
- - the validator has revealed its nonce, and
- - the validator has been present during the cycle.
+- the validator has revealed its nonce, and
+- the validator has been present during the cycle.
 
 Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_alpha>`
 from Emmy*.
