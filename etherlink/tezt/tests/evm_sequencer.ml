@@ -449,9 +449,11 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
     protocols =
+  let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
+  let tags = kernel_tag :: tags in
   let additional_uses =
     (if threshold_encryption then [Constant.octez_dsn_node] else [])
-    @ [kernel]
+    @ [kernel_use]
     @ (if enable_dal then [Constant.octez_dal_node] else [])
     @ additional_uses
   in
@@ -475,7 +477,7 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
         ?bootstrap_accounts
         ?sequencer
         ?sequencer_pool_address
-        ~kernel
+        ~kernel:kernel_use
         ?da_fee
         ?minimum_base_fee_per_gas
         ?preimages_dir
@@ -497,13 +499,20 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     @ (if enable_dal then ["dal"; Tag.ci_disabled] else [])
     @ tags
   in
+  let title =
+    sf
+      "%s (%s, %s) (%s)"
+      title
+      (if threshold_encryption then "te_sequencer" else "sequencer")
+      kernel_tag
+      (if enable_dal then "with dal" else "without dal")
+  in
   Protocol.register_test
     ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
     ~__FILE__
     ~uses:(fun protocol -> uses protocol @ additional_uses)
     body
-    ~title:
-      (sf "%s (%s)" title (if enable_dal then "with dal" else "without dal"))
+    ~title
     ~tags
     protocols
 
@@ -521,11 +530,6 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
     (fun threshold_encryption ->
       List.iter
         (fun kernel ->
-          let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
-          let tags = kernel_tag :: tags in
-          let sequencer_string =
-            if threshold_encryption then "te_sequencer" else "sequencer"
-          in
           List.iter
             (fun enable_dal ->
               register_test
@@ -546,7 +550,7 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
                 ?bootstrap_accounts
                 ?sequencer
                 ?sequencer_pool_address
-                ~kernel:kernel_use
+                ~kernel
                 ?da_fee
                 ?minimum_base_fee_per_gas
                 ?preimages_dir
@@ -558,7 +562,7 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
                 ~threshold_encryption
                 ?history_mode
                 ~enable_dal
-                ~title:(sf "%s (%s, %s)" title sequencer_string kernel_tag)
+                ~title
                 ~tags
                 body
                 protocols)
