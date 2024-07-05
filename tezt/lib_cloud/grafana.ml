@@ -100,4 +100,18 @@ let run () =
         let* () = shutdown () in
         Process.run cmd args
   in
+  let is_ready output = String.trim output = "200" in
+  let run () =
+    Process.spawn
+      "curl"
+      [
+        "-s";
+        "-o";
+        "/dev/null";
+        "-w";
+        "%{http_code}";
+        "http://localhost:3000/api/health";
+      ]
+  in
+  let* _ = Env.wait_process ~is_ready ~run () in
   Lwt.return {provisioning_file; dashboard_directory; password}
