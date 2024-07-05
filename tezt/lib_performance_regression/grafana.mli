@@ -120,6 +120,11 @@ type dashboard = {
     @raise Invalid_arg if the dashboard UID is invalid. *)
 val update_dashboard : config -> dashboard -> unit Lwt.t
 
+(** Similar to update_dashboard, except it is provided as a raw JSON
+    represented as a string. *)
+val update_dashboard_from_json :
+  config -> json:string -> uid:string -> unit Lwt.t
+
 (** Make a simple SELECT query for a graph panel.
 
     Usage: [simple_query
