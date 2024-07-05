@@ -437,6 +437,7 @@ let send_fa_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
+(* Register a single variant of a test but for all protocols. *)
 let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
@@ -516,6 +517,15 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     ~tags
     protocols
 
+(* For each feature (threshold encryption, DAL, FA Bridge), tests may
+   registered with the feature enabled, with the feature disabled, or both. *)
+type feature_test_registration =
+  | Register_with_feature
+  | Register_without_feature
+  | Register_both
+[@@warning "-unused-constructor"]
+
+(* Register all variants of a test. *)
 let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
@@ -524,8 +534,21 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
-    ?commitment_period ?challenge_window ?additional_uses ~title ~tags body
-    protocols =
+    ?commitment_period ?challenge_window ?additional_uses
+    ?(use_threshold_encryption = Register_both) ?(use_dal = Register_both)
+    ~title ~tags body protocols =
+  let dal_cases =
+    match use_dal with
+    | Register_both -> [false; true]
+    | Register_with_feature -> [true]
+    | Register_without_feature -> [false]
+  in
+  let threshold_encryption_cases =
+    match use_threshold_encryption with
+    | Register_both -> [false; true]
+    | Register_with_feature -> [true]
+    | Register_without_feature -> [false]
+  in
   List.iter
     (fun threshold_encryption ->
       List.iter
@@ -566,9 +589,9 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
                 ~tags
                 body
                 protocols)
-            [false; true])
+            dal_cases)
         kernels)
-    [false; true]
+    threshold_encryption_cases
 
 let register_upgrade_both ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
