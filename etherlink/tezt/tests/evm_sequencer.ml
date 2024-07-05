@@ -513,74 +513,43 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
     protocols =
   let register ~kernel ~threshold_encryption ~title ~tags =
     let _, kernel_use = Kernel.to_uses_and_tags kernel in
-    register_test
-      ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
-      ?sequencer_rpc_port
-      ?sequencer_private_rpc_port
-      ?commitment_period
-      ?challenge_window
-      ?genesis_timestamp
-      ?time_between_blocks
-      ?max_blueprints_lag
-      ?max_blueprints_ahead
-      ?max_blueprints_catchup
-      ?catchup_cooldown
-      ?delayed_inbox_timeout
-      ?delayed_inbox_min_levels
-      ?max_number_of_chunks
-      ?bootstrap_accounts
-      ?sequencer
-      ?sequencer_pool_address
-      ~kernel:kernel_use
-      ?da_fee
-      ?minimum_base_fee_per_gas
-      ?preimages_dir
-      ?maximum_allowed_ticks
-      ?maximum_gas_per_transaction
-      ?max_blueprint_lookahead_in_seconds
-      ?enable_fa_bridge
-      ?additional_uses
-      ~threshold_encryption
-      ?history_mode
-      ~enable_dal:false
-      ~title
-      ~tags
-      body
-      protocols ;
-    register_test
-      ?sequencer_rpc_port
-      ?sequencer_private_rpc_port
-      ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
-      ?commitment_period
-      ?challenge_window
-      ?genesis_timestamp
-      ?time_between_blocks
-      ?max_blueprints_lag
-      ?max_blueprints_ahead
-      ?max_blueprints_catchup
-      ?catchup_cooldown
-      ?delayed_inbox_timeout
-      ?delayed_inbox_min_levels
-      ?max_number_of_chunks
-      ?bootstrap_accounts
-      ?sequencer
-      ?sequencer_pool_address
-      ~kernel:kernel_use
-      ?da_fee
-      ?minimum_base_fee_per_gas
-      ?preimages_dir
-      ?maximum_allowed_ticks
-      ?maximum_gas_per_transaction
-      ?max_blueprint_lookahead_in_seconds
-      ?enable_fa_bridge
-      ?additional_uses
-      ~threshold_encryption
-      ?history_mode
-      ~enable_dal:true
-      ~title
-      ~tags
-      body
-      protocols
+    List.iter
+      (fun enable_dal ->
+        register_test
+          ?sequencer_rpc_port
+          ?sequencer_private_rpc_port
+          ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
+          ?commitment_period
+          ?challenge_window
+          ?genesis_timestamp
+          ?time_between_blocks
+          ?max_blueprints_lag
+          ?max_blueprints_ahead
+          ?max_blueprints_catchup
+          ?catchup_cooldown
+          ?delayed_inbox_timeout
+          ?delayed_inbox_min_levels
+          ?max_number_of_chunks
+          ?bootstrap_accounts
+          ?sequencer
+          ?sequencer_pool_address
+          ~kernel:kernel_use
+          ?da_fee
+          ?minimum_base_fee_per_gas
+          ?preimages_dir
+          ?maximum_allowed_ticks
+          ?maximum_gas_per_transaction
+          ?max_blueprint_lookahead_in_seconds
+          ?enable_fa_bridge
+          ?additional_uses
+          ~threshold_encryption
+          ?history_mode
+          ~enable_dal
+          ~title
+          ~tags
+          body
+          protocols)
+      [false; true]
   in
   List.iter
     (fun kernel ->
