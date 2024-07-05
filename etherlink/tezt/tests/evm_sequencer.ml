@@ -491,6 +491,7 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     in
     body sequencer_setup protocol
   in
+  let tags = (if enable_dal then ["dal"; Tag.ci_disabled] else []) @ tags in
   Protocol.register_test
     ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
     ~__FILE__
@@ -498,7 +499,7 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     body
     ~title:
       (sf "%s (%s)" title (if enable_dal then "with dal" else "without dal"))
-    ~tags:((if enable_dal then ["dal"; Tag.ci_disabled] else []) @ tags)
+    ~tags
     protocols
 
 let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
