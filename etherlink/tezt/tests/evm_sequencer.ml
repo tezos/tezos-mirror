@@ -491,7 +491,12 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     in
     body sequencer_setup protocol
   in
-  let tags = (if enable_dal then ["dal"; Tag.ci_disabled] else []) @ tags in
+  let tags =
+    (if threshold_encryption then ["threshold_encryption"; Tag.ci_disabled]
+     else [])
+    @ (if enable_dal then ["dal"; Tag.ci_disabled] else [])
+    @ tags
+  in
   Protocol.register_test
     ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
     ~__FILE__
@@ -517,12 +522,7 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
       List.iter
         (fun kernel ->
           let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
-          let tags =
-            (if threshold_encryption then
-               [Tag.ci_disabled; "threshold_encryption"]
-             else [])
-            @ (kernel_tag :: tags)
-          in
+          let tags = kernel_tag :: tags in
           let sequencer_string =
             if threshold_encryption then "te_sequencer" else "sequencer"
           in
