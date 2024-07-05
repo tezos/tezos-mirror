@@ -261,7 +261,7 @@ let update_dashboard_from_json config ~json ~uid =
   let* () =
     let delete_request =
       {
-        uri = make_url config ("dashboards/uid/" ^ uid);
+        uri = make_url config ("api/dashboards/uid/" ^ uid);
         meth = `DELETE;
         headers = Cohttp.Header.of_list authorization;
         body = None;
@@ -277,7 +277,7 @@ let update_dashboard_from_json config ~json ~uid =
   let body = json in
   let create_request =
     {
-      uri = make_url config "dashboards/db";
+      uri = make_url config "api/dashboards/db";
       meth = `POST;
       headers =
         Cohttp.Header.of_list
