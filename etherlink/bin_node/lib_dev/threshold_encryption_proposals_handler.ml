@@ -47,9 +47,11 @@ module Name = struct
   let equal () () = true
 end
 
+type proposal_request = {timestamp : Time.Protocol.t; force : bool}
+
 module Request = struct
   type ('a, 'b) t =
-    | Add_proposal_request : (Time.Protocol.t * bool) -> (unit, tztrace) t
+    | Add_proposal_request : proposal_request -> (unit, tztrace) t
     | Notify_proposal_processed : unit -> (Time.Protocol.t, tztrace) t
 
   type view = View : _ t -> view
@@ -68,11 +70,11 @@ module Request = struct
              (req "timestamp" Time.Protocol.encoding)
              (req "force" bool))
           (function
-            | View (Add_proposal_request (timestamp, force)) ->
+            | View (Add_proposal_request {timestamp; force}) ->
                 Some ((), timestamp, force)
             | View _ -> None)
           (fun ((), timestamp, force) ->
-            View (Add_proposal_request (timestamp, force)));
+            View (Add_proposal_request {timestamp; force}));
         case
           (Tag 1)
           ~title:"Notify_proposal_processed"
@@ -263,10 +265,13 @@ let notify_proposal_processed state =
         } =
     state
   in
-  (* This function is executed once the EVM node has finished propcessing a
+  (* This function is executed once the EVM node has finished processing a
      proposal, either by applying the latest proposal, or if it determined
      that a proposal did not produce a preblock. *)
   let open Lwt_result_syntax in
+  let*! () =
+    Threshold_encryption_proposals_handler_events.proposal_processed ()
+  in
   let timestamp, _force = Queue.take pending_proposals in
   (* If the proposal queue is not empty, the blueprint_producer can start
      publishing the next proposal. *)
@@ -294,7 +299,7 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Add_proposal_request (timestamp, force) ->
+    | Request.Add_proposal_request {timestamp; force} ->
         protect @@ fun () -> add_proposal_request ~timestamp ~force state
     | Request.Notify_proposal_processed () ->
         protect @@ fun () -> notify_proposal_processed state
@@ -341,7 +346,7 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-type error += No_threshold_encryptioN_proposals_handler
+type error += No_threshold_encryption_proposals_handler
 
 type error += Threshold_encryption_proposals_handler_terminated
 
@@ -351,7 +356,7 @@ let worker =
     | Lwt.Return worker -> Ok worker
     | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
     | Lwt.Sleep ->
-        Error (TzTrace.make No_threshold_encryptioN_proposals_handler))
+        Error (TzTrace.make No_threshold_encryption_proposals_handler))
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -379,12 +384,12 @@ let shutdown () =
       let* () = Block_producer_events.shutdown () in
       Worker.shutdown w
 
-let add_proposal_request timestamp force =
+let add_proposal_request {timestamp; force} =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Add_proposal_request (timestamp, force))
+    (Request.Add_proposal_request {timestamp; force})
   |> handle_request_error
 
 let notify_proposal_processed () =

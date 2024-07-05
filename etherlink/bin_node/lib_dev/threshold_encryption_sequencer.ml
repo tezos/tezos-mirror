@@ -164,15 +164,15 @@ let loop_sequencer
     preblocks_monitor =
   let open Lwt_result_syntax in
   let time_between_blocks = sequencer_config.time_between_blocks in
-  let rec loop last_produced_block =
-    match time_between_blocks with
-    | Nothing ->
-        (* Bind on a never-resolved promise ensures this call never returns,
-           meaning no block will ever be produced. *)
-        let task, _resolver = Lwt.task () in
-        let*! () = task in
-        return_unit
-    | Time_between_blocks time_between_blocks ->
+  match time_between_blocks with
+  | Nothing ->
+      (* Bind on a never-resolved promise ensures this call never returns,
+         meaning no block will ever be produced. *)
+      let task, _resolver = Lwt.task () in
+      let*! () = task in
+      return_unit
+  | Time_between_blocks time_between_blocks ->
+      let rec loop last_produced_block =
         let now = Misc.now () in
         (* We force if the last produced block is older than [time_between_blocks]. *)
         let force =
@@ -181,7 +181,8 @@ let loop_sequencer
         in
         (* Submit a proposal request. *)
         let* () =
-          Threshold_encryption_proposals_handler.add_proposal_request now force
+          Threshold_encryption_proposals_handler.add_proposal_request
+            {timestamp = now; force}
         in
         (* Wait until a preblock is available, or a decision that no preblock will be produced
            has been made. *)
@@ -201,29 +202,9 @@ let loop_sequencer
         in
         if nb_transactions > 0 || force then loop timestamp
         else loop last_produced_block
-  in
-  let now = Misc.now () in
-  loop now
-
-let produce_block ~force ~timestamp preblocks_monitor =
-  let open Lwt_result_syntax in
-  let* preblock_opt =
-    Threshold_encryption_preblocks_monitor.submit_and_fetch
-      ~force
-      ~timestamp
-      preblocks_monitor
-  in
-  let* n =
-    match preblock_opt with
-    | No_preblock -> return 0
-    | Preblock preblock ->
-        let* n = Threshold_encryption_block_producer.produce_block preblock in
-        return n
-  in
-  let* _timestamp =
-    Threshold_encryption_proposals_handler.notify_proposal_processed ()
-  in
-  return n
+      in
+      let now = Misc.now () in
+      loop now
 
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
@@ -336,13 +317,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let () =
     Rollup_node_follower.start ~keep_alive ~proxy:false ~rollup_node_endpoint ()
   in
-  let module Sequencer_rpc : Services.Sequencer_backend = struct
-    (* https://gitlab.com/tezos/tezos/-/issues/7243.
-       Make the produceBlock RPC non-blocking. *)
-    let produce_block = produce_block preblocks_monitor
-
-    let replay_block = Replay.rpc
-  end in
   let directory =
     Services.directory configuration ((module Rollup_rpc), smart_rollup_address)
   in
@@ -354,9 +328,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       (fun private_rpc_port ->
         let private_directory =
           Services.private_directory
+            ~threshold_encryption:true
             configuration
             ((module Rollup_rpc), smart_rollup_address)
-            (module Sequencer_rpc)
         in
         (private_directory, private_rpc_port))
       threshold_encryption_sequencer_config.private_rpc_port

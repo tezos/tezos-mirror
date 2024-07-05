@@ -596,19 +596,20 @@ let dispatch_request (config : Configuration.t)
   in
   Lwt.return JSONRPC.{value; id}
 
-module type Sequencer_backend = sig
-  val produce_block :
-    force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t
-
-  val replay_block :
-    Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
-end
-
-let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
-    (_config : Configuration.t)
-    ((module Backend_rpc : Services_backend_sig.S), _)
+let dispatch_private_request (_config : Configuration.t)
+    ((module Backend_rpc : Services_backend_sig.S), _) ~threshold_encryption
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
+  let unsupported () =
+    return
+      (Error
+         JSONRPC.
+           {
+             code = -3200;
+             message = "Method not supported";
+             data = Some (`String method_);
+           })
+  in
   let* value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
@@ -622,24 +623,31 @@ let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
                  message = "Method not found";
                  data = Some (`String method_);
                })
-    | Unsupported ->
-        return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not supported";
-                 data = Some (`String method_);
-               })
+    | Unsupported -> unsupported ()
     | Disabled -> Lwt.return_error (Rpc_errors.method_disabled method_)
+    | Method (Produce_block.Method, _) when threshold_encryption ->
+        unsupported ()
     | Method (Produce_block.Method, module_) ->
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Misc.now ()) in
           let* nb_transactions =
-            Sequencer_rpc.produce_block ~force:true ~timestamp
+            Block_producer.produce_block ~force:true ~timestamp
           in
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
+        in
+        build ~f module_ parameters
+    | Method (Produce_proposal.Method, _) when not threshold_encryption ->
+        unsupported ()
+    | Method (Produce_proposal.Method, module_) ->
+        let f (timestamp : Time.Protocol.t option) =
+          let open Lwt_result_syntax in
+          let timestamp = Option.value timestamp ~default:(Misc.now ()) in
+          let* () =
+            Threshold_encryption_proposals_handler.add_proposal_request
+              {timestamp; force = true}
+          in
+          rpc_ok ()
         in
         build ~f module_ parameters
     | Method (Durable_state_value.Method, module_) ->
@@ -662,7 +670,7 @@ let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
               ~none:[error_of_fmt "missing block number"]
               block_number
           in
-          let* block = Sequencer_rpc.replay_block block_number in
+          let* block = Replay.rpc block_number in
           rpc_ok block
         in
         build ~f module_ parameters
@@ -684,13 +692,13 @@ let generic_dispatch config ctx dir path dispatch_request =
 let dispatch_public config ctx dir =
   generic_dispatch config ctx dir Path.root dispatch_request
 
-let dispatch_private config ctx sequencer_rpc dir =
+let dispatch_private ~threshold_encryption config ctx dir =
   generic_dispatch
     config
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request sequencer_rpc)
+    (dispatch_private_request ~threshold_encryption)
 
 let directory config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
@@ -700,13 +708,11 @@ let directory config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
 let private_directory config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
-    sequencer_rpc =
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Directory.empty |> version
   |> dispatch_private
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
-       sequencer_rpc
 
 let call (type input output)
     (module R : Rpc_encodings.METHOD
