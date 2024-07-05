@@ -501,7 +501,7 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
   in
   let title =
     sf
-      "%s (%s, %s) (%s)"
+      "%s (%s, %s, %s)"
       title
       (if threshold_encryption then "te_sequencer" else "sequencer")
       kernel_tag
