@@ -99,7 +99,63 @@ module "gce-container" {
   source  = "terraform-google-modules/container-vm/google"
   version = "~> 3.0"
 
-  container = { image = "${var.docker_image}" }
+  container = { image = "${var.docker_image}"
+
+    # Volume settings is only necessary for the proxy VM
+    volumeMounts = [
+      {
+        # Using the proxy mode, this is necessary if the docker image runs another docker image
+        mountPath = "/var/run/docker.sock"
+        name      = "docker-socket"
+        readOnly  = false
+      },
+      {
+        # Necessary to provide access from the image docker to the website
+        mountPath = "/tmp/website"
+        name      = "website"
+        readOnly  = false
+      },
+      {
+        # Same for Prometheus
+        mountPath = "/tmp/prometheus"
+        name      = "prometheus"
+        readOnly  = false
+      },
+      {
+        # Same for Grafana
+        mountPath = "/tmp/grafana"
+        name      = "grafana"
+        readOnly  = false
+      }
+    ]
+  }
+
+  volumes = [
+    {
+      name = "docker-socket"
+      hostPath = {
+        path = "/var/run/docker.sock"
+      }
+    },
+    {
+      name = "website"
+      hostPath = {
+        path = "/tmp/website"
+      }
+    },
+    {
+      name = "prometheus"
+      hostPath = {
+        path = "/tmp/prometheus"
+      }
+    },
+    {
+      name = "grafana"
+      hostPath = {
+        path = "/tmp/grafana"
+      }
+    }
+  ]
 }
 
 # When running a VM, it must be associated with a Virtual Private
