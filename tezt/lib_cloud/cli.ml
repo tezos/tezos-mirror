@@ -154,6 +154,14 @@ let dockerfile_alias =
        the environment variable `TEZT_CLOUD`)"
     ()
 
+let proxy =
+  Clap.flag
+    ~section
+    ~set_long:"proxy"
+    ~description:
+      "Enables to run the orchestrator on a VM instead of the host machine"
+    false
+
 let max_run_duration =
   Clap.default_int
     ~section
@@ -168,4 +176,6 @@ let no_max_run_duration =
     ~section
     ~set_long:"no-max-run-duration"
     ~description:"Ensure the VM can only be destroyed manually."
-    false
+    (* If the proxy mode is active, we don't want to use [max_run_duration]
+       since it aims to run long running tests. *)
+    proxy

@@ -82,3 +82,7 @@ val max_run_duration : int
 
 (** Deactivate the max run duration parameter. *)
 val no_max_run_duration : bool
+
+(** When [proxy] is [true], the scenario is run via a VM instead of the host
+  machine. *)
+val proxy : bool
