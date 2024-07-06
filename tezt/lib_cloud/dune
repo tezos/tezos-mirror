@@ -6,7 +6,8 @@
  (public_name tezt-tezos.tezt-cloud)
  (libraries
   tezt
-  tezt-tezos.tezt-performance-regression)
+  tezt-tezos.tezt-performance-regression
+  octez-libs.data-encoding)
  (flags
   (:standard)
   -open Tezt
