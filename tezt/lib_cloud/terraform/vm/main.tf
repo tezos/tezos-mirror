@@ -161,6 +161,24 @@ resource "google_compute_firewall" "default" {
     ports    = ["19999"]
   }
 
+  # Rule to enable static page web access
+  allow {
+    protocol = "tcp"
+    ports    = ["8080"]
+  }
+
+  # Rule to enable prometheus access
+  allow {
+    protocol = "tcp"
+    ports    = ["9090"]
+  }
+
+  # Rule to enable grafana access
+  allow {
+    protocol = "tcp"
+    ports    = ["3000"]
+  }
+
   # Anybody can contact the machine on the open ports.
   source_ranges = ["0.0.0.0/0"]
 }
