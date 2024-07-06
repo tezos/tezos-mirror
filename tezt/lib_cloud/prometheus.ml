@@ -96,7 +96,14 @@ let start agents =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
   in
-  let configuration_file = Temp.file "prometheus.yml" in
+  let* () =
+    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "prometheus"]
+  in
+  (* We do not use the Temp.dir so that the base directory is predictable and
+     can be mounted by the proxy VM if [--proxy] is used. *)
+  let configuration_file =
+    Filename.get_temp_dir_name () // "prometheus" // "prometheus.yml"
+  in
   let snapshot_filename = Env.prometheus_snapshot_filename in
   let port = Env.prometheus_port in
   let scrape_interval = Env.prometheus_scrape_interval in
