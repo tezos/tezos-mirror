@@ -15,6 +15,104 @@ type t = {
   configuration : Configuration.t;
 }
 
+let docker_image_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"gcp"
+        Json_only
+        string
+        (function Env.Gcp {alias} -> Some alias | _ -> None)
+        (fun alias -> Gcp {alias});
+      case
+        ~title:"octez_latest_release"
+        Json_only
+        (constant "octez-latest-release")
+        (function Env.Octez_latest_release -> Some () | _ -> None)
+        (fun () -> Octez_latest_release);
+    ]
+
+let configuration_encoding =
+  let open Data_encoding in
+  let open Configuration in
+  conv
+    (fun {machine_type; binaries_path; docker_image; max_run_duration = _} ->
+      (machine_type, binaries_path, docker_image))
+    (fun (machine_type, binaries_path, docker_image) ->
+      Configuration.make ~machine_type ~binaries_path ~docker_image ())
+    (obj3
+       (req "machine_type" Data_encoding.string)
+       (req "binaries_path" Data_encoding.string)
+       (req "docker_image" docker_image_encoding))
+
+let cmd_wrapper_encoding =
+  let open Data_encoding in
+  conv
+    (fun Gcloud.{cmd; args} -> (cmd, args))
+    (fun (cmd, args) -> {cmd; args})
+    (obj2
+       (req "cmd" Data_encoding.string)
+       (req "args" (Data_encoding.list Data_encoding.string)))
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           name;
+           vm_name;
+           cmd_wrapper;
+           point;
+           runner;
+           next_available_port;
+           configuration;
+         } ->
+      let ssh_id = runner.Runner.ssh_id |> Option.get in
+      ( name,
+        vm_name,
+        cmd_wrapper,
+        point,
+        ssh_id,
+        next_available_port (),
+        configuration ))
+    (fun ( name,
+           vm_name,
+           cmd_wrapper,
+           point,
+           ssh_id,
+           next_available_port,
+           configuration ) ->
+      let ssh_port = snd point in
+      let address = fst point in
+      let runner =
+        Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
+      in
+      let next_available_port =
+        let current_port = ref (next_available_port - 1) in
+        fun () ->
+          incr current_port ;
+          !current_port
+      in
+      {
+        name;
+        vm_name;
+        cmd_wrapper;
+        point;
+        runner;
+        next_available_port;
+        configuration;
+      })
+    (obj7
+       (req "name" Data_encoding.string)
+       (req "vm_name" Data_encoding.string)
+       (req "cmd_wrapper" (Data_encoding.option cmd_wrapper_encoding))
+       (req
+          "point"
+          (Data_encoding.tup2 Data_encoding.string Data_encoding.int31))
+       (req "ssh_id" Data_encoding.string)
+       (req "next_available_port" Data_encoding.int31)
+       (req "configuration" configuration_encoding))
+
 let make ?cmd_wrapper ~ssh_id ~point:((address, ssh_port) as point)
     ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in

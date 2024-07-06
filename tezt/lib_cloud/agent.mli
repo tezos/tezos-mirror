@@ -26,6 +26,9 @@ val make :
   unit ->
   t
 
+(** Encode an agent configuration. *)
+val encoding : t Data_encoding.t
+
 (** [name agent] returns the name of the agent. *)
 val name : t -> string
 
