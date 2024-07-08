@@ -176,7 +176,8 @@ let () =
     ~id:"implicit.empty_implicit_contract"
     ~title:"Empty implicit contract"
     ~description:
-      "No manager operations are allowed on an empty implicit contract."
+      "No manager operations are allowed on an empty implicit contract. This \
+       account has zero balance. Fund it before using."
     ~pp:(fun ppf implicit ->
       Format.fprintf
         ppf
