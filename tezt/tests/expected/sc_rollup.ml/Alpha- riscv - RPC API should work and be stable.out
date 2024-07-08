@@ -235,7 +235,7 @@ GET http://[HOST]:[PORT]/global/block/head/num_messages
 
 GET http://[HOST]:[PORT]/global/block/head/status
 200 OK
-"riscv_dummy_status"
+"Evaluating"
 
 GET http://[HOST]:[PORT]/global/block/head/ticks
 200 OK

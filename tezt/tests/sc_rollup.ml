@@ -1370,7 +1370,7 @@ let test_rollup_node_boots_into_initial_state ?supports ~kind =
     match kind with
     | "arith" -> "Halted"
     | "wasm_2_0_0" -> "Waiting for input message"
-    | "riscv" -> "riscv_dummy_status"
+    | "riscv" -> "Evaluating"
     | _ -> raise (Invalid_argument kind)
   in
   Check.(status = expected_status)
