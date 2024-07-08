@@ -24,7 +24,7 @@ activated in two different modes.
 
 - Local RPC server: this server operates in the same process as the
   Tezos node and serves data directly from the node.
-- External RPC server: this server operates in a separate process and
+- External RPC server (experimental feature): this server operates in a separate process and
   forwards requests to the Local RPC server. However, some RPC requests
   are handled directly by the External RPC server, which we refer to as
   being handled locally. This mode prevents the node from blocking.
@@ -73,7 +73,7 @@ just want to explore the RPC interface on your own, you would run::
 
     ./octez-node run --rpc-addr localhost
 
-To run an External RPC server, use instead ``--external-rpc-addr``
+To run an External RPC server (experimental feature), use instead ``--external-rpc-addr``
 in the command line. Then an External RPC server is started at port ``18731``.
 
 ::
@@ -133,8 +133,8 @@ the JSON input using command
     
 Don't forget to quote the JSON according to your shell rules.
 
-External RPC server
--------------------
+External RPC server (experimental feature)
+------------------------------------------
 
 Thanks to this feature, the node won't experience slowdowns on computationally
 intensive RPC calls. This significantly reduces the load on the Tezos node and
@@ -148,6 +148,10 @@ A benchmark framework, implemented in the
 allows to run performance evaluations easily. Along with
 this benchmark framework, former results are stored in the dedicated
 :src:`devtools/benchmarks-tools/bench_RPS/results.json` file.
+
+.. warning::
+   It is not recommended to use External RPC server yet, as
+   it is still an experimental feature.
 
 RPC versions
 ------------
