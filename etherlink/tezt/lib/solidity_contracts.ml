@@ -318,3 +318,10 @@ let callcode_withdrawal =
     abi = kernel_inputs_path ^ "/callcode_withdrawal.abi";
     bin = kernel_inputs_path ^ "/callcode_withdrawal.bin";
   }
+
+let gas_left () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gas_left.sol")
+    ~label:"gas_left"
+    ~contract:"GasLeft"
+    ~evm_version:"shanghai"

@@ -5263,39 +5263,47 @@ let test_limited_stack_depth =
   let* () = check_tx_failed ~endpoint ~tx in
   unit
 
-let test_check_estimate_gas_do_not_timeout =
+let test_check_estimateGas_enforces_limits =
   register_both
     ~kernels:[Latest]
-    ~tags:["evm"; "estimate_gas"; "timeout"]
-    ~title:"Check that the `eth_estimateGas` cannot timeout."
+    ~tags:["evm"; "estimate_gas"; "gas_limit"]
+    ~title:"Check that the eth_estimateGas enforces the kernel gas limit."
   @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* recursive_address, _tx = deploy ~contract:recursive ~sender evm_setup in
-  (* Parameters for call(5000). *)
+  let* gas_left_contract = Solidity_contracts.gas_left () in
+  let* gas_left_address, _tx =
+    deploy ~contract:gas_left_contract ~sender evm_setup
+  in
+  (* Let's call it without a gas limit. *)
   let* call_input =
-    Eth_cli.encode_method ~abi_label:recursive.label ~method_:"call(5000)"
+    Eth_cli.encode_method ~abi_label:gas_left_contract.label ~method_:"check()"
   in
   let call_params =
     [
       ("from", `String sender.address);
-      ("to", `String recursive_address);
+      ("to", `String gas_left_address);
       ("input", `String call_input);
     ]
   in
-  (* Without specifying gas limit it will default to the maximum allowed per transaction,
-     which will end up in an ouf of ticks error without provoking a timeout. *)
+  (* Without specifying gas limit it will default to the maximum allowed per
+     transaction, and the contract call will fail as it asks for more than 30M
+     gas. *)
   let*@? estimated = Rpc.estimate_gas call_params evm_node in
   Check.(
-    (estimated.message =~ rex "The transaction would exhaust all the ticks")
-      ~error_msg:"Expected an out of ticks error") ;
-  (* With a gas limit too high, the node will trunk the gas limit to the
-     maximum allowed and prevent a timeout. *)
+    (estimated.message =~ rex "execution reverted")
+      ~error_msg:
+        "Expected a revert, as the transaction shouldn't have more than 30M \
+         available") ;
+  (* With a gas limit too high, the node will enforce the gas limit to the
+     maximum allowed and prevent a timeout, and the call will fail. *)
   let*@? estimated =
     Rpc.estimate_gas (("gas", `String "100000000") :: call_params) evm_node
   in
   Check.(
-    (estimated.message =~ rex "The transaction would exhaust all the ticks")
-      ~error_msg:"Expected an out of ticks error") ;
+    (estimated.message =~ rex "execution reverted")
+      ~error_msg:
+        "Expected a revert, as the transaction shouldn't have more than 30M \
+         available") ;
   unit
 
 let test_transaction_exhausting_ticks_is_rejected =
@@ -6382,7 +6390,7 @@ let register_evm_node ~protocols =
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
   test_limited_stack_depth protocols ;
-  test_check_estimate_gas_do_not_timeout protocols ;
+  test_check_estimateGas_enforces_limits protocols ;
   test_blockhash_opcode protocols ;
   test_block_constants_opcode protocols ;
   test_revert_is_correctly_propagated protocols ;
