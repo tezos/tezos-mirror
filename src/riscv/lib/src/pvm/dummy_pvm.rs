@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::bus::main_memory::M100M,
+    machine_state::{bus::main_memory::M100M, mode::Mode},
+    program::Program,
     pvm::common::{Pvm, PvmLayout},
     state_backend::{
         self,
@@ -119,8 +120,16 @@ impl DummyPvm {
         self.with_backend(|state| state.message_counter.read())
     }
 
-    pub fn install_boot_sector(&self, _boot_sector: Vec<u8>) -> Self {
-        self.with_new_backend(|_state| ())
+    pub fn install_boot_sector(&self, loader: &[u8], kernel: &[u8]) -> Self {
+        self.with_new_backend(|state| {
+            let program =
+                Program::<M100M>::from_elf(loader).expect("Could not parse Hermit loader");
+            state
+                .pvm
+                .machine_state
+                .setup_boot(&program, Some(kernel), Mode::Supervisor)
+                .unwrap()
+        })
     }
 
     pub fn compute_step(&self) -> Self {
