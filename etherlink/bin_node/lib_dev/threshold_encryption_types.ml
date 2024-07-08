@@ -70,3 +70,8 @@ let proposal_encoding =
 type preblock = proposal
 
 let preblock_encoding = proposal_encoding
+
+type proposal_submission_outcome =
+  | Tx_pool_is_locked
+  | Proposal_is_early
+  | Proposal_submitted

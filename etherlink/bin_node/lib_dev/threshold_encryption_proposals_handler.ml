@@ -48,7 +48,9 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Submit_next_proposal : Time.Protocol.t -> (unit, tztrace) t
+    | Submit_next_proposal :
+        Time.Protocol.t
+        -> (Threshold_encryption_types.proposal_submission_outcome, tztrace) t
     | Unlock_next_proposal : (unit, tztrace) t
 
   type view = View : _ t -> view
@@ -82,7 +84,9 @@ end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
-type error += Threshold_encryption_proposals_handler_terminated
+type error +=
+  | Threshold_encryption_proposals_handler_terminated
+  | Threshold_encryption_proposals_handler_locked
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -158,38 +162,32 @@ let take_delayed_transactions maximum_number_of_chunks =
   in
   return (delayed_transactions, remaining_cumulative_size)
 
-let force_new_proposal (state : Types.state) timestamp =
-  match state.time_between_blocks with
-  | Time_between_blocks time_between_blocks -> (
-      match state.last_proposed_timestamp with
-      | Some last_proposed_timestamp ->
-          let diff = Time.Protocol.(diff timestamp last_proposed_timestamp) in
-          diff >= Int64.of_float time_between_blocks
-      | None -> true)
-  | Nothing -> true
+let should_submit_proposal (state : Types.state) timestamp =
+  match (state.time_between_blocks, state.last_proposed_timestamp) with
+  | Nothing, _ | _, None -> true
+  | Time_between_blocks time_between_blocks, Some last_proposal_timestamp ->
+      (* We force if the last produced block is older than [time_between_blocks]. *)
+      let diff = Time.Protocol.(diff timestamp last_proposal_timestamp) in
+      diff >= Int64.of_float time_between_blocks
 
-(* This function should be called only when pending_proposals is not empty,
-   otherwise it raises an exception.
-   It peeks the least recent pending_proposals, builds a proposal out of it,
-   and submits it to the sequencer sidecar. The proposal is not removed from
-   the queue until the corresponding preblock has been received from the
-   sequencer sidecar, and the blueprint originated from it is not applied on
-   top of the EVM state. *)
 let submit_proposal (state : Types.state) timestamp =
   let open Lwt_result_syntax in
+  let*! () =
+    Threshold_encryption_proposals_handler_events
+    .received_proposal_submission_request
+      ()
+  in
   let* tx_pool_is_locked = Tx_pool.is_locked () in
   if tx_pool_is_locked then
-    (* In this case the proposal will not make it into a preblock. We can
-       notify the preblock monitor that no proposal will be produced. *)
+    (* In this case the proposal will not make it into a preblock. *)
     let*! () = Block_producer_events.production_locked () in
-    return_unit
+    return Threshold_encryption_types.Tx_pool_is_locked
   else if state.locked then
-    (* In this case the proposal will not make it into a preblock. We can
-       notify the preblock monitor that no proposal will be produced. *)
+    (* In this case the proposal will not make it into a preblock. *)
     let*! () =
       Threshold_encryption_proposals_handler_events.proposal_is_locked ()
     in
-    return_unit
+    tzfail Threshold_encryption_proposals_handler_locked
   else
     let* delayed_transactions, remaining_cumulative_size =
       take_delayed_transactions state.maximum_number_of_chunks
@@ -204,7 +202,7 @@ let submit_proposal (state : Types.state) timestamp =
           ~maximum_cumulative_size:remaining_cumulative_size
     in
     let n = List.length transactions + List.length delayed_transactions in
-    if force_new_proposal state timestamp || n > 0 then (
+    if should_submit_proposal state timestamp || n > 0 then (
       let*! head_info = Evm_context.head_info () in
       let transactions =
         List.map
@@ -230,10 +228,10 @@ let submit_proposal (state : Types.state) timestamp =
           ~sidecar_endpoint:state.sidecar_endpoint
           proposal
       in
-      state.last_proposed_timestamp <- Some timestamp ;
       state.Types.locked <- true ;
-      return_unit)
-    else return_unit
+      state.Types.last_proposed_timestamp <- Some timestamp ;
+      return Threshold_encryption_types.Proposal_submitted)
+    else return Threshold_encryption_types.Proposal_is_early
 
 let unlock_next_proposal state = state.Types.locked <- false
 
@@ -306,7 +304,7 @@ let worker =
 
 let start parameters =
   let open Lwt_result_syntax in
-  let*! () = Block_producer_events.started () in
+  let*! () = Threshold_encryption_proposals_handler_events.started () in
   let+ worker = Worker.launch table () parameters (module Handlers) in
   Lwt.wakeup worker_waker worker
 
@@ -316,15 +314,15 @@ let shutdown () =
   match w with
   | Error _ -> Lwt.return_unit
   | Ok w ->
-      let* () = Block_producer_events.shutdown () in
+      let* () = Threshold_encryption_proposals_handler_events.shutdown () in
       Worker.shutdown w
 
-let submit_next_proposal proposal =
+let submit_next_proposal timestamp =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Submit_next_proposal proposal)
+    (Request.Submit_next_proposal timestamp)
   |> handle_request_error
 
 let unlock_next_proposal () =

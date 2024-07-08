@@ -169,34 +169,6 @@ let start_server
       return (server, private_server))
     (fun _ -> return (server, private_server))
 
-(* https://gitlab.com/tezos/tezos/-/issues/7244
-   Refactor this in a separate module to react to multiple
-   events simultaneously. *)
-let loop_sequencer
-    (Configuration.Threshold_encryption_sequencer sequencer_config) =
-  let open Lwt_result_syntax in
-  let time_between_blocks = sequencer_config.time_between_blocks in
-  match time_between_blocks with
-  | Nothing ->
-      (* Bind on a never-resolved promise ensures this call never returns,
-         meaning no block will ever be produced. *)
-      let task, _resolver = Lwt.task () in
-      let*! () = task in
-      return_unit
-  | Time_between_blocks _time_between_blocks ->
-      let rec loop () =
-        let now = Misc.now () in
-        let* () =
-          (* Try to Submit a new proposal. *)
-          let* () =
-            Threshold_encryption_proposals_handler.submit_next_proposal now
-          in
-          return_unit
-        and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
-        loop ()
-      in
-      loop ()
-
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
@@ -283,12 +255,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           threshold_encryption_sequencer_config.time_between_blocks;
       }
   in
-  let () =
-    Threshold_encryption_preblocks_monitor.start
-      ~sidecar_endpoint:threshold_encryption_sequencer_config.sidecar_endpoint
-      ~time_between_blocks:
-        threshold_encryption_sequencer_config.time_between_blocks
-  in
   let* () =
     Threshold_encryption_block_producer.start
       {
@@ -328,8 +294,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq server private_server
   in
-  let* () =
-    loop_sequencer
-      (Threshold_encryption_sequencer threshold_encryption_sequencer_config)
-  in
-  return_unit
+  Threshold_encryption_preblocks_monitor.start
+    ~sidecar_endpoint:threshold_encryption_sequencer_config.sidecar_endpoint
+    ~time_between_blocks:
+      threshold_encryption_sequencer_config.time_between_blocks

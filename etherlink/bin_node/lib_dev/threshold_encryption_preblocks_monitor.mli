@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start ~sidecar_endpoint ~time_between_blocks] starts the
-    threshold encryption preblocks monitor. *)
+(** [start ~sidecar_endpoint ~time_between_blocks]
+    starts the hreshold encryption preblocks monitor. *)
 val start :
   sidecar_endpoint:Uri.t ->
   time_between_blocks:Configuration.time_between_blocks ->
-  unit
+  unit tzresult Lwt.t
