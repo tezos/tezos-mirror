@@ -645,9 +645,6 @@ opam:prepare:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 1 minute
@@ -663,7 +660,6 @@ opam:prepare:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
   needs:
@@ -688,9 +684,6 @@ opam:all_6:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 6 minutes
@@ -706,9 +699,8 @@ opam:all_6:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 6 minutes
   needs:
@@ -773,9 +765,6 @@ opam:exec_6:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 6 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 6 minutes
@@ -791,7 +780,6 @@ opam:exec_6:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 6 minutes
   needs:
@@ -845,9 +833,6 @@ opam:all_2:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 2 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 2 minutes
@@ -863,9 +848,8 @@ opam:all_2:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 2 minutes
   needs:
@@ -932,9 +916,6 @@ opam:all_1:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 1 minute
@@ -950,9 +931,8 @@ opam:all_1:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 1 minute
   needs:
@@ -1007,9 +987,6 @@ opam:all_3:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 3 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 3 minutes
@@ -1025,9 +1002,8 @@ opam:all_3:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 3 minutes
   needs:
@@ -1094,9 +1070,6 @@ opam:exec_4:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 4 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 4 minutes
@@ -1112,7 +1085,6 @@ opam:exec_4:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 4 minutes
   needs:
@@ -1165,9 +1137,6 @@ opam:all_4:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 4 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 4 minutes
@@ -1183,9 +1152,8 @@ opam:all_4:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 4 minutes
   needs:
@@ -1251,9 +1219,6 @@ opam:exec_1:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 1 minute
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 1 minute
@@ -1269,7 +1234,6 @@ opam:exec_1:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
   needs:
@@ -1333,9 +1297,6 @@ opam:all_5:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 5 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 5 minutes
@@ -1351,9 +1312,8 @@ opam:all_5:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 5 minutes
   needs:
@@ -1420,9 +1380,6 @@ opam:all_7:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: delayed
-    start_in: 7 minutes
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
     when: delayed
     start_in: 7 minutes
@@ -1438,9 +1395,8 @@ opam:all_7:
     - manifest/**/*.ml*
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
-    if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($GITLAB_USER_LOGIN == "nomadic-margebot"
-      || $CI_MERGE_REQUEST_ASSIGNEES =~ /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE
-      == "merge_train")
+    if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
+      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: delayed
     start_in: 7 minutes
   needs:

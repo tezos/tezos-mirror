@@ -50,26 +50,27 @@ type opam_package = {
   batch_index : int;
 }
 
-let opam_rules ~only_final_pipeline ?batch_index () =
+let opam_rules pipeline_type ~only_final_pipeline ?batch_index () =
   let when_ =
     match batch_index with
     | Some batch_index -> Delayed (Minutes batch_index)
     | None -> On_success
   in
-  [
-    job_rule ~if_:Rules.schedule_extended_tests ~when_ ();
-    job_rule ~if_:(Rules.has_mr_label "ci--opam") ~when_ ();
-    job_rule
-      ~if_:
-        (if only_final_pipeline then
-           If.(Rules.merge_request && Rules.is_final_pipeline)
-         else Rules.merge_request)
-      ~changes:(Changeset.encode changeset_opam_jobs)
-      ~when_
-      ();
-  ]
+  match pipeline_type with
+  | Schedule_extended_test -> [job_rule ~when_ ()]
+  | Before_merging ->
+      [
+        job_rule ~if_:(Rules.has_mr_label "ci--opam") ~when_ ();
+        job_rule
+          ?if_:
+            (if only_final_pipeline then Some Rules.is_final_pipeline else None)
+          ~changes:(Changeset.encode changeset_opam_jobs)
+          ~when_
+          ();
+      ]
 
-let job_opam_packages ?dependencies group batch_index packages : tezos_job =
+let job_opam_packages ?dependencies pipeline_type group batch_index packages :
+    tezos_job =
   job
     ?dependencies
     ~__POS__
@@ -85,7 +86,12 @@ let job_opam_packages ?dependencies group batch_index packages : tezos_job =
          Therefore, a retry was added. This should be removed once the
          underlying tests have been fixed. *)
     ~retry:2
-    ~rules:(opam_rules ~only_final_pipeline:(group = All) ~batch_index ())
+    ~rules:
+      (opam_rules
+         pipeline_type
+         ~only_final_pipeline:(group = All)
+         ~batch_index
+         ())
     ~variables:
       [
         (* See [.gitlab-ci.yml] for details on [RUNTEZTALIAS] *)
@@ -119,7 +125,8 @@ let job_opam_packages ?dependencies group batch_index packages : tezos_job =
     ~path:"$CI_PROJECT_DIR/_build/_sccache"
   |> enable_cargo_cache
 
-let jobs_opam_packages ?dependencies opam_packages : tezos_job list =
+let jobs_opam_packages ?dependencies pipeline_type opam_packages :
+    tezos_job list =
   let package_by_group_index = Hashtbl.create 5 in
   List.iter
     (fun pkg ->
@@ -131,7 +138,7 @@ let jobs_opam_packages ?dependencies opam_packages : tezos_job list =
     opam_packages ;
   Hashtbl.fold
     (fun (group, index) packages jobs ->
-      job_opam_packages ?dependencies group index packages :: jobs)
+      job_opam_packages ?dependencies pipeline_type group index packages :: jobs)
     package_by_group_index
     []
 
@@ -732,7 +739,12 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~eval_opam:true [])
         ~artifacts:(artifacts ["_opam-repo-for-release/"])
-        ~rules:(opam_rules ~only_final_pipeline:false ~batch_index:1 ())
+        ~rules:
+          (opam_rules
+             pipeline_type
+             ~only_final_pipeline:false
+             ~batch_index:1
+             ())
         [
           "git init _opam-repo-for-release";
           "./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release";
@@ -743,6 +755,7 @@ let jobs pipeline_type =
     let (jobs_opam_packages : tezos_job list) =
       jobs_opam_packages
         ~dependencies:(Dependent [Artifacts job_opam_prepare])
+        pipeline_type
         read_opam_packages
     in
     job_opam_prepare :: jobs_opam_packages
