@@ -503,6 +503,8 @@ module Delegate = struct
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
 
+  let grace_period ctxt pkh = Delegate_services.grace_period rpc_ctxt ctxt pkh
+
   let info ctxt pkh = Plugin.RPC.Delegates.info rpc_ctxt ctxt pkh
 
   let full_balance ctxt pkh = Delegate_services.full_balance rpc_ctxt ctxt pkh

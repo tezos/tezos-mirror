@@ -31,6 +31,24 @@ let check_is_not_active ~loc src_name =
   let* b = Context.Delegate.deactivated (B block) src.pkh in
   Assert.is_true ~loc b
 
+let check_grace_period ~loc src_name =
+  let open Lwt_result_syntax in
+  exec_unit @@ fun (block, state) ->
+  let src = State.find_account src_name state in
+  let grace =
+    Cycle.add
+      src.last_active_cycle
+      (state.State.constants.consensus_rights_delay + 1)
+  in
+  let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in
+  Assert.equal
+    ( = )
+    "Grace period is not correct: expected vs RPC"
+    ~loc
+    Cycle.pp
+    grace
+    rpc_grace
+
 (** Test that a delegate gets deactivated after a set period of time if it is not baking.
     Test that with autostaking, the frozen funds are completely unstaked, which get
     finalizable (but not finalized) after a set period of time.
@@ -40,6 +58,7 @@ let test_simple_scenario_with_autostaking =
   --> set S.Adaptive_issuance.autostaking_enable true
   --> activate_ai `No
   --> begin_test ["delegate"; "baker"]
+  --> check_grace_period ~loc:__LOC__ "baker"
   --> set_baker "baker"
   --> wait_n_cycles_f (fun (_, state) ->
           (2 * state.State.constants.consensus_rights_delay) + 1)
@@ -48,12 +67,17 @@ let test_simple_scenario_with_autostaking =
   --> next_cycle
   --> check_is_not_active ~loc:__LOC__ "delegate"
   --> check_balance_field "delegate" `Staked Tez.zero
+  --> check_grace_period ~loc:__LOC__ "baker"
+  --> next_block
+  --> check_grace_period ~loc:__LOC__ "baker"
   --> check_balance_field
         "delegate"
         `Unstaked_frozen_total
         (Tez.of_mutez 200_000_000_000L)
   --> wait_n_cycles_f Test_scenario_stake.unstake_wait
   --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
+  --> check_grace_period ~loc:__LOC__ "delegate"
+  --> check_grace_period ~loc:__LOC__ "baker"
   --> check_balance_field
         "delegate"
         `Unstaked_finalizable

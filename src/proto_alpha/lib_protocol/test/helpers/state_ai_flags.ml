@@ -111,9 +111,10 @@ module Autostake = struct
        } :
         account_state) state =
     let open Lwt_result_syntax in
-    (* TODO: use Protocol.Constants_storage.tolerated_inactivity_period *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7362
+       Use Protocol.Constants_storage.tolerated_inactivity_period *)
     let tolerated_inactivity_period =
-      (2 * state.constants.consensus_rights_delay) + 1
+      state.constants.consensus_rights_delay + 1
     in
     if Some name <> delegate then (
       Log.debug

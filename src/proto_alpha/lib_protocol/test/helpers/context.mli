@@ -297,6 +297,8 @@ module Delegate : sig
 
   val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
 
+  val grace_period : t -> public_key_hash -> Cycle.t tzresult Lwt.t
+
   val voting_info : t -> public_key_hash -> Vote.delegate_info tzresult Lwt.t
 
   val consensus_key :
