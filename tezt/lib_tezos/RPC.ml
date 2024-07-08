@@ -45,6 +45,8 @@ let make = RPC_core.make
 
 let get_config = make GET ["config"] Fun.id
 
+let get_config_history_mode = make GET ["config"; "history_mode"] Fun.id
+
 let get_config_network_dal = make GET ["config"; "network"; "dal"] Fun.id
 
 let get_network_connections =

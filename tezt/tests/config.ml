@@ -163,6 +163,100 @@ let test_config_reset_network () =
   let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/store") in
   Node.config_reset node [Network "mainnet"]
 
+type history_mode = {
+  mode : string;
+  additional_cycles : int option;
+  blocks_preservation_cycles : int option;
+}
+
+let history_mode_of_json history_mode_json =
+  let blocks_preservation_cycles =
+    JSON.(history_mode_json |-> "blocks_preservation_cycles" |> as_int_opt)
+  in
+  match JSON.(history_mode_json |-> "history_mode" |> as_object_opt) with
+  | Some ((mode, additional_cycles_json) :: []) ->
+      let additional_cycles =
+        JSON.(additional_cycles_json |-> "additional_cycles" |> as_int_opt)
+      in
+      {mode; additional_cycles; blocks_preservation_cycles}
+  | None ->
+      let mode = JSON.(history_mode_json |-> "history_mode" |> as_string) in
+      {mode; additional_cycles = None; blocks_preservation_cycles}
+  | _ ->
+      Test.fail
+        "Unexpected JSON format for RPC /config/history_mode response : %s"
+        (JSON.encode history_mode_json)
+
+let get_history_mode client =
+  let* history_mode_json =
+    Client.RPC.call client @@ RPC.get_config_history_mode
+  in
+  return (history_mode_of_json history_mode_json)
+
+let check_history_mode ~expected_mode ?(blocks_preservation_cycles = None)
+    history_mode =
+  let mode, additional_cycles =
+    match expected_mode with
+    | Node.Archive -> ("archive", None)
+    | Node.Full additional_cycles -> ("full", additional_cycles)
+    | Node.Rolling additional_cycles -> ("rolling", additional_cycles)
+  in
+  Check.(
+    (history_mode.mode = mode) string ~error_msg:"Expected mode %R, got %L") ;
+  Check.(
+    (history_mode.additional_cycles = additional_cycles)
+      (option int)
+      ~error_msg:"Expected additional_cycles %R, got %L") ;
+  Check.(
+    (history_mode.blocks_preservation_cycles = blocks_preservation_cycles)
+      (option int)
+      ~error_msg:"Expected blocks_preservation_cycles %R, got %L")
+
+(** This test runs multiple nodes with different history_mode configurations to
+    check the results of the /config/history_mode RPC. *)
+let test_config_history_mode_RPC () =
+  let* _, client =
+    Client.init_with_node ~nodes_args:[History_mode Archive] `Client ()
+  in
+  let* history_mode = get_history_mode client in
+  check_history_mode ~expected_mode:Archive history_mode ;
+
+  (* mirrors [default_offset] from src/lib_shell_services/history_mode.ml *)
+  let default_additional_cycles = 1 in
+  let* _, client =
+    Client.init_with_node ~nodes_args:[History_mode (Full None)] `Client ()
+  in
+  let* history_mode = get_history_mode client in
+  check_history_mode
+    ~expected_mode:(Full (Some default_additional_cycles))
+    history_mode ;
+
+  let custom_additional_cycles = 8 in
+  let custom_blocks_preservation_cycles = 16 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (Protocol.Alpha, None))
+      [(["blocks_preservation_cycles"], `Int custom_blocks_preservation_cycles)]
+  in
+  let* _, client =
+    Client.init_with_node
+      ~nodes_args:[History_mode (Rolling (Some custom_additional_cycles))]
+      `Client
+      ()
+  in
+  let* () =
+    Client.activate_protocol_and_wait
+      ~protocol:Protocol.Alpha
+      ~parameter_file
+      client
+  in
+  let* history_mode = get_history_mode client in
+  check_history_mode
+    ~expected_mode:(Rolling (Some custom_additional_cycles))
+    ~blocks_preservation_cycles:(Some custom_blocks_preservation_cycles)
+    history_mode ;
+  unit
+
 let register () =
   Test.register
     ~__FILE__
@@ -201,4 +295,10 @@ let register () =
     ~__FILE__
     ~title:"config reset network"
     ~tags:["config"; "reset"; "network"]
-    test_config_reset_network
+    test_config_reset_network ;
+  Test.register
+    ~__FILE__
+    ~title:"history_mode RPC"
+    ~tags:["rpc"; "config"; "history_mode"]
+    ~uses_client:true
+    test_config_history_mode_RPC
