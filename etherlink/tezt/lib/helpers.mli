@@ -53,6 +53,14 @@ val hex_256_of_int : int -> string
 val next_rollup_node_level :
   sc_rollup_node:Sc_rollup_node.t -> client:Client.t -> int Lwt.t
 
+(** [produce_block timestampt ~sc_rollup_node ~client] moves
+    [evm_node] to the next L2 level. *)
+val produce_block :
+  ?wait_on_blueprint_applied:bool ->
+  ?timestamp:string ->
+  Evm_node.t ->
+  (int, Rpc.error) result Lwt.t
+
 (** [next_evm_level ~evm_node ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
 val next_evm_level :

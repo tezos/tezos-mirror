@@ -55,6 +55,24 @@ let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
 
+let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
+  match Evm_node.mode evm_node with
+  | Sequencer _ -> Rpc.produce_block ?timestamp evm_node
+  | Threshold_encryption_sequencer _ -> (
+      let open Rpc.Syntax in
+      let*@ current_number = Rpc.block_number evm_node in
+      let wait_blueprint =
+        if wait_on_blueprint_applied then
+          Evm_node.wait_for_blueprint_applied
+            evm_node
+            (Int32.to_int current_number + 1)
+        else unit
+      in
+      let* res = Rpc.produce_proposal ?timestamp evm_node
+      and* () = wait_blueprint in
+      match res with Ok () -> return (Ok 0) | Error res -> return (Error res))
+  | _ -> assert false
+
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
   | Proxy ->
@@ -62,7 +80,7 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
       unit
   | Sequencer _ | Threshold_encryption_sequencer _ ->
       let open Rpc.Syntax in
-      let*@ _l2_level = Rpc.produce_block evm_node in
+      let*@ _l2_level = produce_block evm_node in
       unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
   | Threshold_encryption_observer _ ->

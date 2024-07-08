@@ -38,9 +38,7 @@ type parameters = {
   maximum_number_of_chunks : int;
       (** The maximum number of chunks a blueprint can be split into. *)
   keep_alive : bool;
-  notify_no_preblock : unit -> unit;
-      (** A function to notify that a submission proposal request will not
-          lead to a preblock being published by the Dsn node. *)
+  time_between_blocks : Configuration.time_between_blocks;
 }
 
 (** [start parameters] starts the events follower. *)
@@ -49,19 +47,18 @@ val start : parameters -> unit tzresult Lwt.t
 (** [shutdown ()] stops the events follower. *)
 val shutdown : unit -> unit Lwt.t
 
-type proposal_request = {timestamp : Time.Protocol.t; force : bool}
+(** [submit_next_proposal timestamp)] request to submit a new proposal
+    at [timestamp].
 
-(** [add_proposal_request {timestamp; force}] Notifies the
-    [Threshold_encryption_proposals_handler] tha a new proposal with the given
-    [timestamp] should be processed. A proposal
-    will be submitted only once it gets notified by the EVM node that it has
-    finished processing the previous proposal, that is either it produced and applied
-    a blueprint, or it determined that the proposal will not be turned into a blueprint
-    (for example if the [Tx_pool] is locked). *)
-val add_proposal_request : proposal_request -> unit tzresult Lwt.t
+    If a proposal was already produced and no preblock is yet received
+    it does not submit a new proposal. Else if the sequencer is set
+    with no {!Configuration.time_between_blocks} then the proposal is
+    produced. Else it depends if the last preblock had a timestamp
+    older than time between blocks or if there is transaction to
+    inject from the tx_pool. *)
+val submit_next_proposal : Time.Protocol.t -> unit tzresult Lwt.t
 
-(** [notify_proposal_processed ()] Notifies the blueprint_producer that
-    a proposal has been processed, and if it led to a blueprint to
-    be produced, it has been applied on top of the EVM state. The
-    blueprint producer can start processing the next proposal, if any. *)
-val notify_proposal_processed : unit -> Time.Protocol.t tzresult Lwt.t
+(** [unlock_next_proposal ()] Notifies the blueprint_producer that a
+    preblock has been applied on top of the EVM state. The proposal
+    handler is allowed to submit a new proposal. *)
+val unlock_next_proposal : unit -> unit tzresult Lwt.t

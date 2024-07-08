@@ -5,72 +5,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Timeout of (float * Uri.t)
-
-let () =
-  register_error_kind
-    ~id:"preblocks_monitor.timeout"
-    ~title:"Timeout reached when waiting for the next preblock"
-    ~description:"Timeout reached when waiting for the next preblock"
-    ~pp:(fun ppf (duration, endpoint) ->
-      Format.fprintf
-        ppf
-        "Timeout reached when waiting for a preblock from: %a. No preblock was \
-         received after %1.2f ms"
-        Uri.pp
-        endpoint
-        duration)
-    `Temporary
-    Data_encoding.(
-      obj2
-        (req "duration" float)
-        (req "endpoint" (conv Uri.to_string Uri.of_string string)))
-    (function
-      | Timeout duration_with_endpoint -> Some duration_with_endpoint
-      | _ -> None)
-    (fun duration_with_endpoint -> Timeout duration_with_endpoint)
-
-type preblock_notification =
-  | No_preblock
-  | Preblock of Threshold_encryption_types.preblock
-
-type t = {
-  endpoint : Uri.t;
-  preblocks_stream : preblock_notification Lwt_stream.t;
-}
-
-let init endpoint =
+let[@tailrec] rec loop_on_preblocks_stream preblocks_stream ~time_between_blocks
+    =
   let open Lwt_result_syntax in
-  let* preblocks_from_sidecar_stream =
-    Threshold_encryption_services.monitor_preblocks
-      ~sidecar_endpoint:endpoint
-      ()
+  let*! preblock = Lwt_stream.next preblocks_stream in
+  let* () =
+    match time_between_blocks with
+    | Configuration.Nothing ->
+        (* [time_between_blocks = Nothing] is set for tests only.
+           Some tests trigger invalid blueprints on purpose so we
+           ignore errors during block production here. *)
+        let*! _res =
+          Threshold_encryption_block_producer.produce_block preblock
+        in
+        return_unit
+    | Time_between_blocks _time_between_blocks ->
+        let* _ntx =
+          Threshold_encryption_block_producer.produce_block preblock
+        in
+        return_unit
   in
-  let preblocks_from_sidecar_stream =
-    Lwt_stream.map
-      (fun preblock -> Preblock preblock)
-      preblocks_from_sidecar_stream
+  let* () = Threshold_encryption_proposals_handler.unlock_next_proposal () in
+  let* () =
+    match time_between_blocks with
+    | Configuration.Nothing -> return_unit
+    | Time_between_blocks _time_between_blocks ->
+        Threshold_encryption_proposals_handler.submit_next_proposal
+        @@ Misc.now ()
   in
-  let no_preblocks_stream, notify_no_preblock = Lwt_stream.create () in
-  let preblocks_stream =
-    Lwt_stream.choose [preblocks_from_sidecar_stream; no_preblocks_stream]
-  in
-  let notify_no_preblock () = notify_no_preblock @@ Some No_preblock in
-  return ({endpoint; preblocks_stream}, notify_no_preblock)
+  (loop_on_preblocks_stream [@tailcall]) preblocks_stream ~time_between_blocks
 
-let next ?timeout t =
+let start ~sidecar_endpoint ~time_between_blocks =
+  Lwt.async @@ fun () ->
+  Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let timeout =
-    match timeout with
-    | None ->
-        let p, _ = Lwt.task () in
-        p
-    | Some d ->
-        let*! () = Lwt_unix.sleep d in
-        tzfail @@ Timeout (d, t.endpoint)
+  let* preblocks_stream =
+    Threshold_encryption_services.monitor_preblocks ~sidecar_endpoint ()
   in
-  let next_preblock () =
-    let*! preblock = Lwt_stream.next t.preblocks_stream in
-    return preblock
-  in
-  Lwt.pick [next_preblock (); timeout]
+  loop_on_preblocks_stream preblocks_stream ~time_between_blocks

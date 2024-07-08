@@ -160,8 +160,7 @@ let start_server
    Refactor this in a separate module to react to multiple
    events simultaneously. *)
 let loop_sequencer
-    (Configuration.Threshold_encryption_sequencer sequencer_config)
-    preblocks_monitor =
+    (Configuration.Threshold_encryption_sequencer sequencer_config) =
   let open Lwt_result_syntax in
   let time_between_blocks = sequencer_config.time_between_blocks in
   match time_between_blocks with
@@ -171,40 +170,19 @@ let loop_sequencer
       let task, _resolver = Lwt.task () in
       let*! () = task in
       return_unit
-  | Time_between_blocks time_between_blocks ->
-      let rec loop last_produced_block =
+  | Time_between_blocks _time_between_blocks ->
+      let rec loop () =
         let now = Misc.now () in
-        (* We force if the last produced block is older than [time_between_blocks]. *)
-        let force =
-          let diff = Time.Protocol.(diff now last_produced_block) in
-          diff >= Int64.of_float time_between_blocks
-        in
-        (* Submit a proposal request. *)
         let* () =
-          Threshold_encryption_proposals_handler.add_proposal_request
-            {timestamp = now; force}
-        in
-        (* Wait until a preblock is available, or a decision that no preblock will be produced
-           has been made. *)
-        let* preblock_opt =
-          Threshold_encryption_preblocks_monitor.next preblocks_monitor
-        in
-        let* nb_transactions =
-          match preblock_opt with
-          | No_preblock ->
-              let*! () = Lwt_unix.sleep 0.5 in
-              return 0
-          | Preblock preblock ->
-              Threshold_encryption_block_producer.produce_block preblock
-        in
-        let* timestamp =
-          Threshold_encryption_proposals_handler.notify_proposal_processed ()
-        in
-        if nb_transactions > 0 || force then loop timestamp
-        else loop last_produced_block
+          (* Try to Submit a new proposal. *)
+          let* () =
+            Threshold_encryption_proposals_handler.submit_next_proposal now
+          in
+          return_unit
+        and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
+        loop ()
       in
-      let now = Misc.now () in
-      loop now
+      loop ()
 
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
@@ -283,15 +261,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           Some threshold_encryption_sequencer_config.max_number_of_chunks;
       }
   in
-  (* Start the preblocks monitor, and obtain a channel for notifying the
-     monitor when a proposal will not make it into a preblock.
-     This is necessary to avoid the threshold encryption sequencer loop to
-     hang waiting for a preblock, when none will ever be produced.
-  *)
-  let* preblocks_monitor, notify_no_preblock =
-    Threshold_encryption_preblocks_monitor.init
-      threshold_encryption_sequencer_config.sidecar_endpoint
-  in
   let* () =
     Threshold_encryption_proposals_handler.start
       {
@@ -299,8 +268,15 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         keep_alive = configuration.keep_alive;
         maximum_number_of_chunks =
           threshold_encryption_sequencer_config.max_number_of_chunks;
-        notify_no_preblock;
+        time_between_blocks =
+          threshold_encryption_sequencer_config.time_between_blocks;
       }
+  in
+  let () =
+    Threshold_encryption_preblocks_monitor.start
+      ~sidecar_endpoint:threshold_encryption_sequencer_config.sidecar_endpoint
+      ~time_between_blocks:
+        threshold_encryption_sequencer_config.time_between_blocks
   in
   let* () =
     Threshold_encryption_block_producer.start
@@ -344,6 +320,5 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* () =
     loop_sequencer
       (Threshold_encryption_sequencer threshold_encryption_sequencer_config)
-      preblocks_monitor
   in
   return_unit

@@ -26,6 +26,8 @@ module Request : sig
 
   val produceBlock : ?timestamp:string -> unit -> Evm_node.request
 
+  val produceProposal : ?timestamp:string -> unit -> Evm_node.request
+
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
 
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
@@ -95,6 +97,11 @@ end
 (** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
     provided the block will have timestamp [timestamp] (in RFC3339) format. *)
 val produce_block : ?timestamp:string -> Evm_node.t -> (int, error) result Lwt.t
+
+(** [produce_proposal ?timestamp evm_node] calls the private RPC [produceProposal].
+    If provided the block will have timestamp [timestamp] (in RFC3339) format. *)
+val produce_proposal :
+  ?timestamp:string -> Evm_node.t -> (unit, error) result Lwt.t
 
 (** [state_value evm_node path] calls the private RPC [stateValue]. *)
 val state_value : Evm_node.t -> string -> (string option, error) result Lwt.t

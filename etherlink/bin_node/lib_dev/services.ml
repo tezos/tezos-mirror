@@ -644,8 +644,8 @@ let dispatch_private_request (_config : Configuration.t)
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Misc.now ()) in
           let* () =
-            Threshold_encryption_proposals_handler.add_proposal_request
-              {timestamp; force = true}
+            Threshold_encryption_proposals_handler.submit_next_proposal
+              timestamp
           in
           rpc_ok ()
         in

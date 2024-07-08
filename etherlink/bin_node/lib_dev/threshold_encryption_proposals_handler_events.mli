@@ -5,4 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val proposal_is_locked : unit -> unit Lwt.t
+
 val proposal_processed : unit -> unit Lwt.t
