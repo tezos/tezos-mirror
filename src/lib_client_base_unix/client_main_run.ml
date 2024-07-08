@@ -462,9 +462,20 @@ let main (module C : M) ~select_commands =
           let require_auth = parsed.Client_config.require_auth in
           let*! () =
             let open Tezos_base_unix.Internal_event_unix in
+            (* Update config with color logging switch *)
+            let log_cfg =
+              match parsed_args with
+              | None -> Tezos_base_unix.Logs_simple_config.default_cfg
+              | Some parsed_args ->
+                  {
+                    Tezos_base_unix.Logs_simple_config.default_cfg with
+                    colors = Option.value parsed_args.log_coloring ~default:true;
+                  }
+            in
             let config =
               make_with_defaults
                 ?enable_default_daily_logs_at:daily_logs_path
+                ~log_cfg
                 ()
             in
             match parsed_config_file with
