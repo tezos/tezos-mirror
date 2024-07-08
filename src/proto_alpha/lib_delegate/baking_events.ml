@@ -503,6 +503,25 @@ module Node_rpc = struct
       ("trace", Error_monad.trace_encoding)
 end
 
+module Delegates = struct
+  include Internal_event.Simple
+
+  let section = section @ ["delegates"]
+
+  let delegates_used =
+    declare_1
+      ~section
+      ~alternative_color:Internal_event.Cyan
+      ~name:"delegates_used"
+      ~level:Notice
+      ~msg:"Baker will run with the following delegates:\n  {delegates}"
+      ~pp1:
+        (Format.pp_print_list
+           (fun fmt (delegate : Baking_state.consensus_key) ->
+             Format.fprintf fmt "%a" Baking_state.pp_consensus_key delegate))
+      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+end
+
 module Scheduling = struct
   include Internal_event.Simple
 

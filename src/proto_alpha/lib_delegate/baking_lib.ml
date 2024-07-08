@@ -79,6 +79,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
   let open State_transitions in
   let open Lwt_result_syntax in
+  let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
@@ -123,6 +124,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
 let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
   let open Lwt_result_syntax in
+  let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
@@ -362,6 +364,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?(force = false) ?(minimal_timestamp = false) ?extra_operations
     ?context_path ?state_recorder delegates =
   let open Lwt_result_syntax in
+  let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
   let config =
@@ -499,6 +502,7 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
     ?force_round delegates =
   let open Lwt_result_syntax in
   let open Baking_state in
+  let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
@@ -758,6 +762,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint ?(count = 1)
     ?votes ?state_recorder delegates =
   let open Lwt_result_syntax in
+  let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let config =
     Baking_configuration.make
       ?minimal_fees
