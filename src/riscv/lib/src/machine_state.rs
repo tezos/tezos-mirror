@@ -254,6 +254,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     pub fn reset(&mut self) {
         self.hart.reset(bus::start_of_main_memory::<ML>());
         self.bus.reset();
+        self.translation_cache.invalidate();
     }
 
     /// Translate an instruction address.
@@ -891,7 +892,6 @@ mod tests {
         bus::main_memory::tests::T1K,
         MachineState, MachineStateLayout,
     };
-    use crate::bits::u64;
     use crate::{
         backend_test, create_backend, create_state,
         machine_state::{
@@ -905,6 +905,7 @@ mod tests {
         state_backend::{CellRead, CellWrite},
         traps::{EnvironException, Exception, Interrupt, TrapContext},
     };
+    use crate::{bits::u64, machine_state::bus::main_memory::M1K};
     use proptest::{prop_assert_eq, proptest};
 
     backend_test!(test_machine_state_reset, F, {
@@ -1184,6 +1185,14 @@ mod tests {
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mtval), 0x333);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::stval), 0);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mip), mip ^ 1 << 9);
+        });
+    });
+
+    backend_test!(test_reset, F, {
+        test_determinism::<F, MachineStateLayout<M1K>, _>(|space| {
+            let mut machine_state: MachineState<M1K, ManagerFor<'_, F, MachineStateLayout<M1K>>> =
+                MachineState::bind(space);
+            machine_state.reset();
         });
     });
 }
