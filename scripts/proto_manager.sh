@@ -361,56 +361,6 @@ function copy_source() {
 
   cd "src/proto_${version}"/lib_protocol
 
-  # start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # start_predecessor="\(\* Start of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
-  # end_predecessor="\(\* End of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
-  # type_to_remove="\(\* ${capitalized_source} predecessor \*\)"
-  # type_to_add="\(\* ${capitalized_label} predecessor \*\)"
-
-  # start_remove="\(\* Start of code to remove at next automatic protocol snapshot \*\)"
-  # remove_comment="\(\* Please add here any code that should be removed at the next automatic protocol snapshot \*\)"
-  # end_remove="\(\* End of code to remove at next automatic protocol snapshot \*\)"
-
-  # start_typechecker="\(\* This line is only here to please the typechecker\,"
-  # end_typechecker="let\*\! c = get_previous_protocol_constants ctxt in"
-  # log_blue "fix prepare_first_block in ${capitalized_label}"
-  # prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "raw_context.ml")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed "s/${capitalized_source} stitching/alpha predecessor stitching/g" <<<"${prepare_first_block}")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed "s/${capitalized_source}/${capitalized_label}/g" <<<"${prepare_first_block_patched}")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed "s/let module Previous = Constants_parametric_repr in/let module Previous = Constants_parametric_previous_repr in/" <<<"${prepare_first_block_patched}")
-  # prepare_first_block_patched=$(perl -0777 -pe "s/${start_typechecker}.*${end_typechecker}//s" <<<"${prepare_first_block_patched}")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed -e "s/let\* c = get_constants ctxt in/let*! c = get_previous_protocol_constants ctxt in/" <<<"${prepare_first_block_patched}")
-  # escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
-  # #replace all multiline code between $start_predecessor and $end_predecessor with the content of prepare_first_block_patched in src/proto_${protocol_source}/lib_protocol/raw_context.ml using perl
-  # perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "raw_context.ml"
-  # # remove all code between $start_remove and $end_remove in src/proto_${protocol_source}/lib_protocol/raw_context.ml
-  # perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "raw_context.ml"
-  # #replace code between "$type_to_remove' and '$type_to_remove' with capitalized_label in src/proto_${protocol_source}/lib_protocol/raw_context.ml
-  # perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "raw_context.ml"
-  # perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "raw_context.mli"
-  # replace_string="Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
-  # #replace  code between "$type_to_remove' and '$type_to_remove' with $replace_string in src/proto_${protocol_source}/lib_protocol/raw_context.ml
-  # perl -0777 -pe "s/${type_to_remove}[ \t]+Compare.*${type_to_remove}/${type_to_remove}$replace_string${type_to_remove}/s" -i "raw_context.ml"
-
-  # #remove source as label predecessor and  remove line containing "return (${capitalized_source}, ctxt))
-  # sed -i.old -e "s/| ${capitalized_source}//" \
-  #   -e "/return (${capitalized_source}, ctxt)/d" raw_context.ml \
-  #   raw_context.ml
-
-  # sed -i.old -e "s/| ${capitalized_source}//" \
-  #   -e "/return (${capitalized_source}, ctxt)/d" raw_context.ml \
-  #   raw_context.mli
-
-  # start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # perl -0777 -pe "s/${start_source}.*${end_source}//s" -i raw_context.ml
-  # perl -0777 -pe "s/${start_source}.*${end_source}//s" -i init_storage.ml
-
   ### FIX ${capitalized_label} PREDECESSORS
   replace_line="else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
   # replace line containing "return (${capitalized_source}, ctxt)) with replace_line in raw_context.ml
@@ -441,7 +391,6 @@ function copy_source() {
   find . -name main_\*_"${protocol_source}".ml -or -name main_\*_"${protocol_source}".mli | while read -r file; do
     new_file=${file//_"${protocol_source}"/_"${new_protocol_name}"}
     git mv "${file}" "${new_file}"
-
   done
   commit "src: rename binaries main_*.ml{,i} files"
 
@@ -458,9 +407,11 @@ function copy_source() {
     sed -i.old -e "s/protocol_${protocol_source}/protocol_${new_protocol_name}/" \
     -e "s/protocol-${tezos_protocol_source}/protocol-${new_tezos_protocol}/" \
     -e "s/protocol-functor-${tezos-protocol-source}/protocol-functor-${new_tezos_protocol}/"
+  commit "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+
   # add this protocol to the immutable list
   printf "%s\n" "${long_hash}" >> ../../lib_protocol_compiler/final_protocol_versions
-  commit "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+  commit "src: add protocol to final_protocol_versions"
 
   cd ../../..
 
@@ -832,8 +783,10 @@ function generate_doc() {
 
   # update docs Makefile
   sed -i.old -r "s/(PROTOCOLS .*) ${protocol_source}/\1 ${protocol_source} ${label}/" docs/Makefile
-  sed "/${protocol_source}_long .*/i \ ${label}_long = ${long_hash}" -i docs/Makefile
-  sed "/${protocol_source}_short .*/i \ ${label}_short = ${label}" -i docs/Makefile
+  line=$(printf "%s_long%*s= %s" "${label}" $((10 - ${#label})) '' "$long_hash")
+  sed "/${protocol_source}_long .*/i${line}" -i docs/Makefile
+  line=$(printf "%s_short%*s= %s" "${label}" $((8 - ${#label})) '' "$label")
+  sed "/${protocol_source}_short .*/i${label}_short = ${label}" -i docs/Makefile
   sed -i.old -e "s/${protocol_source}\/rpc\.rst/${protocol_source}\/rpc.rst ${label}\/rpc.rst/g" docs/Makefile
   commit "docs: update docs Makefile"
 
