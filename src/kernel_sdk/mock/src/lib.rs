@@ -52,6 +52,7 @@ pub struct MockHost {
     state: RefCell<HostState>,
     info: inbox::InfoPerLevel,
     debug_log: Box<RefCell<dyn io::Write>>,
+    keep_going: bool,
 }
 
 impl fmt::Debug for MockHost {
@@ -59,6 +60,7 @@ impl fmt::Debug for MockHost {
         f.debug_struct("MockHost")
             .field("info", &self.info)
             .field("state", &self.state)
+            .field("keep_going", &self.keep_going)
             .finish()
     }
 }
@@ -134,6 +136,7 @@ impl MockHost {
             state: state.into(),
             info,
             debug_log: Box::new(RefCell::new(io::stderr())),
+            keep_going: true,
         };
 
         // Ensure inbox setup correctly
@@ -248,6 +251,24 @@ impl MockHost {
     /// Show the outbox at the given level
     pub fn outbox_at(&self, level: u32) -> Vec<Vec<u8>> {
         self.state.borrow().store.0.outbox_at(level).to_vec()
+    }
+
+    /// Whether execution using this host should quit.
+    ///
+    /// For example, if using `host.keep_going(false)`, `should_quit` will return
+    /// `false` once the inbox is drained.
+    pub fn should_quit(&self) -> bool {
+        if self.keep_going {
+            true
+        } else {
+            let state = self.state.borrow();
+            state.curr_input_id >= state.input.len()
+        }
+    }
+
+    /// Control whether execution should quit once inbox is drained.
+    pub fn keep_going(&mut self, keep_going: bool) {
+        self.keep_going = keep_going;
     }
 
     fn bump_level(&mut self) {
