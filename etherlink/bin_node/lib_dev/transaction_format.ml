@@ -30,7 +30,7 @@ let encode_transaction ~smart_rollup_address kind =
   in
   "\000" ^ smart_rollup_address ^ data
 
-let chunk_transaction ~tx_hash ~tx_raw =
+let chunk_transaction ~tx_hash_raw ~tx_raw =
   let open Result_syntax in
   let size_per_chunk =
     max_input_size - framing_protocol_tag_size - smart_rollup_address_size
@@ -41,19 +41,23 @@ let chunk_transaction ~tx_hash ~tx_raw =
   let all_chunk_hashes, chunks =
     List.fold_left_i
       (fun i (all_chunk_hashes, chunks) chunk ->
-        let chunk_hash = Ethereum_types.hash_raw_tx chunk in
+        let chunk_hash =
+          Tezos_crypto.Hacl.Hash.Keccak_256.digest (String.to_bytes chunk)
+          |> Bytes.to_string
+        in
         let all_chunk_hashes = all_chunk_hashes ^ chunk_hash in
         let chunk =
-          Chunk (tx_hash ^ Ethereum_types.u16_to_bytes i ^ chunk_hash ^ chunk)
+          Chunk
+            (tx_hash_raw ^ Ethereum_types.u16_to_bytes i ^ chunk_hash ^ chunk)
         in
         (all_chunk_hashes, chunk :: chunks))
       ("", [])
       chunks
   in
   let new_chunk_transaction =
-    NewChunked (tx_hash, List.length chunks, all_chunk_hashes)
+    NewChunked (tx_hash_raw, List.length chunks, all_chunk_hashes)
   in
-  return (tx_hash, new_chunk_transaction :: chunks)
+  return (new_chunk_transaction :: chunks)
 
 let make_evm_inbox_transactions tx_raw =
   let open Result_syntax in
@@ -63,12 +67,15 @@ let make_evm_inbox_transactions tx_raw =
     max_input_size - framing_protocol_tag_size - smart_rollup_address_size
     - transaction_tag_size - Ethereum_types.transaction_hash_size
   in
-  let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+  let tx_hash = Transaction.hash_raw_tx tx_raw in
+  let tx_hash_raw = Ethereum_types.hash_to_bytes tx_hash in
   if String.length tx_raw <= maximum_size then
     (* Simple transaction, fits in a single input. *)
-    let tx = Simple (tx_hash ^ tx_raw) in
+    let tx = Simple (tx_hash_raw ^ tx_raw) in
     return (tx_hash, [tx])
-  else chunk_transaction ~tx_hash ~tx_raw
+  else
+    let* chunked = chunk_transaction ~tx_hash_raw ~tx_raw in
+    return (tx_hash, chunked)
 
 (** [make_encoded_messages ~smart_rollup_address raw_tx] returns the
     hash of the transaction, and a list of transactions to include in the inbox.
@@ -80,8 +87,5 @@ let make_evm_inbox_transactions tx_raw =
 let make_encoded_messages ~smart_rollup_address tx_raw =
   let open Result_syntax in
   let* tx_hash, messages = make_evm_inbox_transactions tx_raw in
-  let tx_hash =
-    Ethereum_types.(Hash Hex.(of_string tx_hash |> show |> hex_of_string))
-  in
   let messages = List.map (encode_transaction ~smart_rollup_address) messages in
   return (tx_hash, messages)

@@ -26,14 +26,7 @@ end) : Services_backend_sig.Backend = struct
 
     let encode_transactions ~smart_rollup_address:_ ~transactions =
       let open Result_syntax in
-      let hashes =
-        List.map
-          (fun transaction ->
-            let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-            Ethereum_types.(
-              Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
-          transactions
-      in
+      let hashes = List.map Transaction.hash_raw_tx transactions in
       return (hashes, transactions)
   end
 
