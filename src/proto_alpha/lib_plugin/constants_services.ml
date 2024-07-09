@@ -23,45 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 
-val errors :
-  'a #RPC_context.simple -> 'a -> Data_encoding.json_schema shell_tzresult Lwt.t
+let custom_root =
+  (RPC_path.(open_root / "context" / "constants")
+    : RPC_context.t RPC_path.context)
 
-(** Returns all the constants of the protocol *)
-val all : 'a #RPC_context.simple -> 'a -> Constants.t shell_tzresult Lwt.t
+module S = struct
+  open Data_encoding
 
-(** Returns the parametric constants of the protocol *)
-val parametric :
-  'a #RPC_context.simple -> 'a -> Constants.Parametric.t shell_tzresult Lwt.t
+  let errors =
+    RPC_service.get_service
+      ~description:"Schema for all the RPC errors from this protocol version"
+      ~query:RPC_query.empty
+      ~output:json_schema
+      RPC_path.(custom_root / "errors")
 
-val register : unit -> unit
+  let all =
+    RPC_service.get_service
+      ~description:"All constants"
+      ~query:RPC_query.empty
+      ~output:Alpha_context.Constants.encoding
+      custom_root
 
-module S : sig
-  val errors :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Data_encoding.json_schema )
-    RPC_service.t
-
-  val all :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Constants.t )
-    RPC_service.t
-
-  val parametric :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Constants.Parametric.t )
-    RPC_service.t
+  let parametric =
+    RPC_service.get_service
+      ~description:"Parametric constants"
+      ~query:RPC_query.empty
+      ~output:Alpha_context.Constants.Parametric.encoding
+      RPC_path.(custom_root / "parametric")
 end
+
+let register () =
+  let open Services_registration in
+  register0_noctxt ~chunked:true S.errors (fun () () ->
+      return Data_encoding.Json.(schema error_encoding)) ;
+  register0 ~chunked:false S.all (fun ctxt () () ->
+      return @@ Constants.all ctxt) ;
+  register0 ~chunked:false S.parametric (fun ctxt () () ->
+      return @@ Constants.parametric ctxt)
+
+let errors ctxt block = RPC_context.make_call0 S.errors ctxt block () ()
+
+let all ctxt block = RPC_context.make_call0 S.all ctxt block () ()
+
+let parametric ctxt block = RPC_context.make_call0 S.parametric ctxt block () ()

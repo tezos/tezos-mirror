@@ -11,6 +11,10 @@ open Protocol
 open Environment
 open Alpha_context
 
+let rpc_services =
+  Alpha_services.register () ;
+  Services_registration.get_rpc_services ()
+
 type version = Version_1
 
 let string_of_version = function Version_1 -> "1"

@@ -610,7 +610,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
-  let open Protocol in
   let open Baking_state in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
   let* constants =
@@ -991,8 +990,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   let* constants =
     match constants with
     | Some c -> return c
-    | None ->
-        Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in

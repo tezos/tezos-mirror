@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,140 +23,122 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides RPC services that return voting-related information. *)
-
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 
-val ballots : 'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
+type expected_rewards = {
+  cycle : Cycle.t;
+  baking_reward_fixed_portion : Tez.t;
+  baking_reward_bonus_per_slot : Tez.t;
+  attesting_reward_per_slot : Tez.t;
+  dal_attesting_reward_per_shard : Tez.t;
+  seed_nonce_revelation_tip : Tez.t;
+  vdf_revelation_tip : Tez.t;
+}
 
-val ballot_list :
-  'a #RPC_context.simple ->
-  'a ->
-  (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
+val expected_rewards_encoding : expected_rewards Data_encoding.t
 
-val current_period :
-  'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
+val total_supply : 'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
-val successor_period :
-  'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
+val total_frozen_stake :
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
-val current_quorum :
-  'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
+val current_yearly_rate :
+  'a #RPC_context.simple -> 'a -> string shell_tzresult Lwt.t
 
-val listings :
-  'a #RPC_context.simple ->
-  'a ->
-  (Signature.Public_key_hash.t * int64) list shell_tzresult Lwt.t
+val current_yearly_rate_exact :
+  'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
 
-val proposals :
-  'a #RPC_context.simple ->
-  'a ->
-  Int64.t Protocol_hash.Map.t shell_tzresult Lwt.t
+val current_yearly_rate_details :
+  'a #RPC_context.simple -> 'a -> (Q.t * Q.t) shell_tzresult Lwt.t
 
-val current_proposal :
-  'a #RPC_context.simple -> 'a -> Protocol_hash.t option shell_tzresult Lwt.t
+val current_issuance_per_minute :
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val launch_cycle :
+  'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
+
+(** Returns the list of expected issued tez for the current cycle and for the next
+    [consensus_rights_delay] cycles. *)
+val expected_issuance :
+  'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
 
 val register : unit -> unit
 
-val total_voting_power :
-  'a #RPC_context.simple -> 'a -> Int64.t shell_tzresult Lwt.t
-
-val delegate_proposal_count :
-  'a #RPC_context.simple ->
-  'a ->
-  Signature.Public_key_hash.t ->
-  int shell_tzresult Lwt.t
-
 module S : sig
-  val path : (Updater.rpc_context, Updater.rpc_context) RPC_path.t
+  val q_encoding : Q.t Data_encoding.t
 
-  val ballots :
+  val total_supply :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      Vote.ballots )
+      Tez.t )
     RPC_service.t
 
-  val ballot_list :
+  val total_frozen_stake :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      (public_key_hash * Vote.ballot) list )
+      Tez.t )
     RPC_service.t
 
-  val current_period :
+  val current_yearly_rate :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      Voting_period.info )
+      string )
     RPC_service.t
 
-  val successor_period :
+  val current_yearly_rate_exact :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      Voting_period.info )
+      Q.t )
     RPC_service.t
 
-  val current_quorum :
+  val current_yearly_rate_details :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      int32 )
+      Q.t * Q.t )
     RPC_service.t
 
-  val listings :
+  val current_issuance_per_minute :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      (public_key_hash * int64) list )
+      Tez.t )
     RPC_service.t
 
-  val proposals :
+  val launch_cycle :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      int64 Protocol_hash.Map.t )
+      Cycle.t option )
     RPC_service.t
 
-  val current_proposal :
+  val expected_issuance :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      Protocol_hash.t option )
-    RPC_service.t
-
-  val total_voting_power :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      int64 )
-    RPC_service.t
-
-  val delegate_proposal_count :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context * public_key_hash,
-      unit,
-      unit,
-      int )
+      expected_rewards list )
     RPC_service.t
 end

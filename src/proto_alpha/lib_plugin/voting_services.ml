@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 
 module S = struct

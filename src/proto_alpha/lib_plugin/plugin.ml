@@ -28,13 +28,19 @@
 module Mempool = Mempool
 module View_helpers = View_helpers
 module RPC = RPC
+module Contract_services = Contract_services
+module Constants_services = Constants_services
+module Delegate_services = Delegate_services
+module Voting_services = Voting_services
+module Sapling_services = Sapling_services
+module Adaptive_issuance_services = Adaptive_issuance_services
 module Metrics = Metrics_plugin
 module Script_interpreter_logging = Script_interpreter_logging
 module Http_cache_headers = Http_cache_headers
 module Shell_helpers = Shell_helpers
 
 module Alpha_services = struct
-  include Protocol.Alpha_services
+  include Alpha_services
   module Contract = Contract_services
   module Delegate = Delegate_services
 end

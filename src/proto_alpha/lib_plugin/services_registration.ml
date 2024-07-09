@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
 open Alpha_context
 
 type rpc_context = {

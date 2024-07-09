@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,119 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 
-type expected_rewards = {
-  cycle : Cycle.t;
-  baking_reward_fixed_portion : Tez.t;
-  baking_reward_bonus_per_slot : Tez.t;
-  attesting_reward_per_slot : Tez.t;
-  dal_attesting_reward_per_shard : Tez.t;
-  seed_nonce_revelation_tip : Tez.t;
-  vdf_revelation_tip : Tez.t;
-}
+val errors :
+  'a #RPC_context.simple -> 'a -> Data_encoding.json_schema shell_tzresult Lwt.t
 
-val expected_rewards_encoding : expected_rewards Data_encoding.t
+(** Returns all the constants of the protocol *)
+val all : 'a #RPC_context.simple -> 'a -> Constants.t shell_tzresult Lwt.t
 
-val total_supply : 'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val total_frozen_stake :
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val current_yearly_rate :
-  'a #RPC_context.simple -> 'a -> string shell_tzresult Lwt.t
-
-val current_yearly_rate_exact :
-  'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
-
-val current_yearly_rate_details :
-  'a #RPC_context.simple -> 'a -> (Q.t * Q.t) shell_tzresult Lwt.t
-
-val current_issuance_per_minute :
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val launch_cycle :
-  'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
-
-(** Returns the list of expected issued tez for the current cycle and for the next
-    [consensus_rights_delay] cycles. *)
-val expected_issuance :
-  'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
+(** Returns the parametric constants of the protocol *)
+val parametric :
+  'a #RPC_context.simple -> 'a -> Constants.Parametric.t shell_tzresult Lwt.t
 
 val register : unit -> unit
 
 module S : sig
-  val q_encoding : Q.t Data_encoding.t
-
-  val total_supply :
+  val errors :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      Tez.t )
+      Data_encoding.json_schema )
     RPC_service.t
 
-  val total_frozen_stake :
+  val all :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      Tez.t )
+      Constants.t )
     RPC_service.t
 
-  val current_yearly_rate :
+  val parametric :
     ( [`GET],
       Updater.rpc_context,
       Updater.rpc_context,
       unit,
       unit,
-      string )
-    RPC_service.t
-
-  val current_yearly_rate_exact :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Q.t )
-    RPC_service.t
-
-  val current_yearly_rate_details :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Q.t * Q.t )
-    RPC_service.t
-
-  val current_issuance_per_minute :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Tez.t )
-    RPC_service.t
-
-  val launch_cycle :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      Cycle.t option )
-    RPC_service.t
-
-  val expected_issuance :
-    ( [`GET],
-      Updater.rpc_context,
-      Updater.rpc_context,
-      unit,
-      unit,
-      expected_rewards list )
+      Constants.Parametric.t )
     RPC_service.t
 end

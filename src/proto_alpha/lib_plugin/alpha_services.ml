@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 
 let custom_root = RPC_path.open_root

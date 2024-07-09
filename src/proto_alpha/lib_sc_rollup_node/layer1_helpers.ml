@@ -181,7 +181,7 @@ let retrieve_constants ?(block = `Head 0) cctxt =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
   in
   let+ {parametric; _} =
-    Protocol.Constants_services.all cctxt (cctxt#chain, block)
+    Plugin.Constants_services.all cctxt (cctxt#chain, block)
   in
   constants_of_parametric parametric
 
