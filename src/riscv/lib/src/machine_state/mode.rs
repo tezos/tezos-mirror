@@ -43,6 +43,7 @@ impl TryFrom<u8> for Mode {
 }
 
 impl Default for Mode {
+    #[inline(always)]
     fn default() -> Self {
         Self::Machine
     }
