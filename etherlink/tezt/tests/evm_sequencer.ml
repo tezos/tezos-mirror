@@ -508,14 +508,16 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
       kernel_tag
       (if enable_dal then "with dal" else "without dal")
   in
-  Protocol.register_test
-    ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
-    ~__FILE__
-    ~uses:(fun protocol -> uses protocol @ additional_uses)
-    body
-    ~title
-    ~tags
-    protocols
+  (* Only register DAL tests for supporting kernels *)
+  if (not enable_dal) || Kernel.supports_dal kernel then
+    Protocol.register_test
+      ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
+      ~__FILE__
+      ~uses:(fun protocol -> uses protocol @ additional_uses)
+      body
+      ~title
+      ~tags
+      protocols
 
 (* For each feature (threshold encryption, DAL, FA Bridge), tests may
    registered with the feature enabled, with the feature disabled, or both. *)
