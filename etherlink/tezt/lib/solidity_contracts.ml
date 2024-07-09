@@ -102,14 +102,13 @@ let simple_storage =
     bin = kernel_inputs_path ^ "/storage.bin";
   }
 
-(** The info for the "erc20tok.sol" contract.
-    See [etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*] *)
-let erc20 =
-  {
-    label = "erc20tok";
-    abi = kernel_inputs_path ^ "/erc20tok.abi";
-    bin = kernel_inputs_path ^ "/erc20tok.bin";
-  }
+(** The info for the "erc20tok.sol" contract. *)
+let erc20 () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/erc20tok.sol")
+    ~label:"erc20tok"
+    ~contract:"ERC20"
+    ~evm_version:"london"
 
 (** The info for the "loop.sol" contract.
     See [etherlink/tezt/tests/evm_kernel_inputs/loop.*] *)
