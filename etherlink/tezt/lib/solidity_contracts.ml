@@ -202,14 +202,13 @@ let ether_wallet () =
     ~contract:"SharedEtherWallet"
     ~evm_version:"london"
 
-(** The info for the "block_hash_gen.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/block_hash_gen.sol] *)
-let block_hash_gen =
-  {
-    label = "block_hash_gen";
-    abi = kernel_inputs_path ^ "/block_hash_gen.abi";
-    bin = kernel_inputs_path ^ "/block_hash_gen.bin";
-  }
+(** The info for the "block_hash_gen.sol" contract. *)
+let block_hash_gen () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/block_hash_gen.sol")
+    ~label:"block_hash_gen"
+    ~contract:"BlockHashGen"
+    ~evm_version:"london"
 
 (** The info for the "block_hash_gen.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/blockhash.sol] *)
