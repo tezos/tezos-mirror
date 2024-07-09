@@ -63,7 +63,7 @@ This sequence of operations was run:
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle":
-    { "amount": "3800001278724",
+    { "amount": "3800001668367",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } }, "deactivated": false,
