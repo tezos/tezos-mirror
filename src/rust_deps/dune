@@ -12,6 +12,7 @@
 (rule
  (targets liboctez_rust_deps.a dlloctez_rust_deps.so wasmer.h wasm.h)
  (deps
+  (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
   (file ../../rust-toolchain)
@@ -21,17 +22,4 @@
   (source_tree src)
   (source_tree ../riscv)
   (source_tree ../kernel_sdk))
- (action
-  (no-infer
-   (setenv
-    OCTEZ_RUST_DEPS_NO_WASMER_HEADERS
-    1
-    (progn
-     (run cargo build --release -p octez-rust-deps)
-     (copy target/release/liboctez_rust_deps.a liboctez_rust_deps.a)
-     (bash
-      "test -r target/release/liboctez_rust_deps.so && cp -f target/release/liboctez_rust_deps.so dlloctez_rust_deps.so || true")
-     (bash
-      "test -r target/release/liboctez_rust_deps.dylib && cp -f target/release/liboctez_rust_deps.dylib dlloctez_rust_deps.so || true")
-     (copy wasmer-3.3.0/lib/c-api/wasmer.h wasmer.h)
-     (copy wasmer-3.3.0/lib/c-api/wasm.h wasm.h))))))
+ (action (no-infer (bash ./build.sh))))
