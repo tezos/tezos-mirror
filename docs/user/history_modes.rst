@@ -80,7 +80,7 @@ History modes in a nutshell
 +---------+----------------+---------------------+--------------------+
 | Full    | Limited        | Yes                 | Complete           |
 +---------+----------------+---------------------+--------------------+
-| Rolling | Low            | Restricted*         | Restricted*        |
+| Rolling | Low            | Yes*                | Yes*               |
 +---------+----------------+---------------------+--------------------+
 
 (*) Suitable for delegation services if the number of additional
