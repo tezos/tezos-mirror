@@ -902,16 +902,16 @@ let run ~data_dir ~configuration_override =
       crawler
       last_processed_level_store
   in
+  (* Start RPC server. *)
   let* rpc_server = RPC_server.(start config ctxt) in
+  let _ = RPC_server.install_finalizer rpc_server in
+  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+  (* Activate the p2p instance. *)
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;
-  (* activate the p2p instance. *)
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
-  let _ = RPC_server.install_finalizer rpc_server in
-  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
-
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
   (* First wait for the L1 node to be bootstrapped. *)
