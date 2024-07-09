@@ -162,14 +162,13 @@ let events () =
     ~contract:"Events"
     ~evm_version:"london"
 
-(** The info for the "nested_create.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/nested_create.sol] *)
-let nested_create =
-  {
-    label = "nested_create";
-    abi = kernel_inputs_path ^ "/nested_create.abi";
-    bin = kernel_inputs_path ^ "/nested_create.bin";
-  }
+(** The info for the "nested_create.sol" contract. *)
+let nested_create () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_create.sol")
+    ~label:"nested_create"
+    ~contract:"Creator"
+    ~evm_version:"london"
 
 (** The info for the "revert.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/revert.sol] *)

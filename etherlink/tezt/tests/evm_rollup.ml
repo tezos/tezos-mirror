@@ -4348,15 +4348,16 @@ let test_l2_nested_create =
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* nested_create_resolved = nested_create () in
   let* nested_create_address, _tx =
-    deploy ~contract:nested_create ~sender evm_setup
+    deploy ~contract:nested_create_resolved ~sender evm_setup
   in
   let* tx1 =
     let call_create (sender : Eth_account.t) n =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:nested_create.label
+        ~abi_label:nested_create_resolved.label
         ~address:nested_create_address
         ~method_call:(Printf.sprintf "create(%d)" n)
     in
@@ -4371,7 +4372,7 @@ let test_l2_nested_create =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:nested_create.label
+        ~abi_label:nested_create_resolved.label
         ~address:nested_create_address
         ~method_call:(Printf.sprintf "create2(%d, \"%s\")" n salt)
     in
