@@ -142,7 +142,13 @@ let update_stake ~f ctxt delegate =
 
 let remove_delegated_stake ctxt delegate amount =
   let current_level = Raw_context.current_level ctxt in
-  let f = Full_staking_balance_repr.remove_delegated ~current_level ~amount in
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let f =
+    Full_staking_balance_repr.remove_delegated
+      ~cycle_eras
+      ~current_level
+      ~amount
+  in
   update_stake ctxt delegate ~f
 
 let remove_own_frozen_stake ctxt delegate amount =
@@ -166,7 +172,10 @@ let remove_frozen_stake_only_call_from_token ctxt staker amount =
 
 let add_delegated_stake ctxt delegate amount =
   let current_level = Raw_context.current_level ctxt in
-  let f = Full_staking_balance_repr.add_delegated ~current_level ~amount in
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let f =
+    Full_staking_balance_repr.add_delegated ~cycle_eras ~current_level ~amount
+  in
   update_stake ctxt delegate ~f
 
 let add_own_frozen_stake ctxt delegate amount =

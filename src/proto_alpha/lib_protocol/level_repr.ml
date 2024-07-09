@@ -210,6 +210,15 @@ let root_level cycle_eras =
     expected_commitment = false;
   }
 
+let level_zero_use_with_care =
+  {
+    level = Raw_level_repr.root;
+    level_position = 0l;
+    cycle = Cycle_repr.root;
+    cycle_position = 0l;
+    expected_commitment = false;
+  }
+
 (* This function returns the cycle era to which [level] belongs. *)
 let era_of_level ~cycle_eras level =
   let rec aux = function

@@ -25,7 +25,8 @@
 
 let apply_limits ctxt staking_parameters staking_balance =
   let open Result_syntax in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let current_level = Raw_context.current_level ctxt in
+  let cycle_eras = Raw_context.cycle_eras ctxt in
   let own_frozen = Full_staking_balance_repr.own_frozen staking_balance in
   let staked_frozen = Full_staking_balance_repr.staked_frozen staking_balance in
   let allowed_staked_frozen =
@@ -40,7 +41,8 @@ let apply_limits ctxt staking_parameters staking_balance =
   in
   let delegated =
     Full_staking_balance_repr.min_delegated_in_cycle
-      ~current_cycle
+      ~cycle_eras
+      ~current_level
       staking_balance
   in
   let limit_of_delegation_over_baking =
