@@ -881,6 +881,8 @@ let run ~data_dir ~configuration_override =
   let* last_notified_level =
     Last_processed_level.load_last_processed_level last_processed_level_store
   in
+  (* First wait for the L1 node to be bootstrapped. *)
+  let* () = wait_for_l1_bootstrapped cctxt in
   let*! crawler =
     let open Constants in
     Crawler.start
@@ -914,8 +916,6 @@ let run ~data_dir ~configuration_override =
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
-  (* First wait for the L1 node to be bootstrapped. *)
-  let* () = wait_for_l1_bootstrapped cctxt in
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize
