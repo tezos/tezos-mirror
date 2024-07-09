@@ -5,7 +5,7 @@
 use crate::{
     machine_state::{bus::main_memory::M100M, mode::Mode},
     program::Program,
-    pvm::common::{Pvm, PvmLayout, PvmStatus},
+    pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
         self,
         memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
@@ -128,18 +128,27 @@ impl DummyPvm {
         })
     }
 
-    pub fn compute_step(&self) -> Self {
+    pub fn compute_step(&self, pvm_hooks: &mut PvmHooks<'static>) -> Self {
         self.with_new_backend(|state| {
-            let tick = state.tick.read();
-            state.tick.write(tick + 1);
+            state.pvm.eval_one(pvm_hooks);
+            state.tick.write(state.tick.read() + 1);
         })
     }
 
-    pub fn compute_step_many(&self, max_steps: usize) -> (Self, i64) {
-        (0..max_steps).fold((self.clone(), 0), |(state, steps), _| {
-            let next_state = state.compute_step();
-            (next_state, steps + 1)
-        })
+    pub fn compute_step_many(
+        &self,
+        pvm_hooks: &mut PvmHooks<'static>,
+        max_steps: usize,
+    ) -> (Self, i64) {
+        let mut backend = self.backend.clone();
+        let placed = <StateLayout as Layout>::placed().into_location();
+        let space = backend.allocate(placed);
+        let mut state = State::bind(space);
+        let steps = state
+            .pvm
+            .eval_range_while(pvm_hooks, &(..=max_steps), |_| true);
+        state.tick.write(state.tick.read() + 1);
+        (Self { backend }, steps as i64)
     }
 
     pub fn hash(&self) -> Hash {
