@@ -211,7 +211,7 @@ let pp ppf = function
         slot_index
 
 let unique = function
-  | Add_messages _ | Cement _ | Publish_dal_commitment _ -> false
+  | Add_messages _ | Publish_dal_commitment _ -> false
   | Publish _ | Refute _ | Timeout _ | Recover_bond _ | Execute_outbox_message _
-    ->
+  | Cement _ ->
       true

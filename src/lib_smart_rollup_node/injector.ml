@@ -119,11 +119,11 @@ module Parameters :
     | Publish_dal_commitment _ ->
         true
 
-  let retry_unsuccessful_operation _state (op : Operation.t) status =
+  let retry_unsuccessful_operation _state (op : Operation.t) ?reason status =
     let open Lwt_syntax in
     match status with
-    | Backtracked | Skipped | Other_branch ->
-        (* Always retry backtracked or skipped operations, or operations that
+    | Backtracked | Other_branch ->
+        (* Always retry backtracked operations, or operations that
            are on another branch because of a reorg:
 
            - Messages posted to an inbox should be re-emitted (i.e. re-queued)
@@ -137,6 +137,12 @@ module Parameters :
              maybe check if game exists on other branch as well.
         *)
         return Retry
+    | Skipped -> (
+        match (op, reason) with
+        | Cement _, Some (Operation.Cement _, _) ->
+            (* Cementations following a failed cement are bound to fail *)
+            return Forget
+        | _ -> return Retry)
     | Failed error -> (
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
            Think about which operations should be retried and when. *)
