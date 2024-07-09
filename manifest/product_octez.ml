@@ -518,42 +518,45 @@ let octez_rust_deps =
               [
                 S "no-infer";
                 [
-                  S "progn";
-                  of_atom_list
-                    ["run"; "rm"; "-f"; "wasmer-3.3.0/lib/c-api/wasmer.h"];
-                  of_atom_list
-                    [
-                      "run";
-                      "cargo";
-                      "build";
-                      "--release";
-                      "-p";
-                      "octez-rust-deps";
-                    ];
-                  of_atom_list
-                    [
-                      "copy";
-                      "target/release/liboctez_rust_deps.a";
-                      "liboctez_rust_deps.a";
-                    ];
-                  of_atom_list
-                    [
-                      "bash";
-                      "test -r target/release/liboctez_rust_deps.so && cp -f \
-                       target/release/liboctez_rust_deps.so \
-                       dlloctez_rust_deps.so || true";
-                    ];
-                  of_atom_list
-                    [
-                      "bash";
-                      "test -r target/release/liboctez_rust_deps.dylib && cp \
-                       -f target/release/liboctez_rust_deps.dylib \
-                       dlloctez_rust_deps.so || true";
-                    ];
-                  of_atom_list
-                    ["copy"; "wasmer-3.3.0/lib/c-api/wasmer.h"; "wasmer.h"];
-                  of_atom_list
-                    ["copy"; "wasmer-3.3.0/lib/c-api/wasm.h"; "wasm.h"];
+                  S "setenv";
+                  S "OCTEZ_RUST_DEPS_NO_WASMER_HEADERS";
+                  S "1";
+                  [
+                    S "progn";
+                    of_atom_list
+                      [
+                        "run";
+                        "cargo";
+                        "build";
+                        "--release";
+                        "-p";
+                        "octez-rust-deps";
+                      ];
+                    of_atom_list
+                      [
+                        "copy";
+                        "target/release/liboctez_rust_deps.a";
+                        "liboctez_rust_deps.a";
+                      ];
+                    of_atom_list
+                      [
+                        "bash";
+                        "test -r target/release/liboctez_rust_deps.so && cp -f \
+                         target/release/liboctez_rust_deps.so \
+                         dlloctez_rust_deps.so || true";
+                      ];
+                    of_atom_list
+                      [
+                        "bash";
+                        "test -r target/release/liboctez_rust_deps.dylib && cp \
+                         -f target/release/liboctez_rust_deps.dylib \
+                         dlloctez_rust_deps.so || true";
+                      ];
+                    of_atom_list
+                      ["copy"; "wasmer-3.3.0/lib/c-api/wasmer.h"; "wasmer.h"];
+                    of_atom_list
+                      ["copy"; "wasmer-3.3.0/lib/c-api/wasm.h"; "wasm.h"];
+                  ];
                 ];
               ];
             ];

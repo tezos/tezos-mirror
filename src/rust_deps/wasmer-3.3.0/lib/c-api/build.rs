@@ -81,7 +81,10 @@ fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let out_dir = env::var("OUT_DIR").unwrap();
 
-    build_wasm_c_api_headers(&crate_dir, &out_dir);
+    if env::var("OCTEZ_RUST_DEPS_NO_WASMER_HEADERS").is_err() {
+        build_wasm_c_api_headers(&crate_dir, &out_dir);
+    }
+
     build_inline_c_env_vars();
     build_cdylib_link_arg();
 }
