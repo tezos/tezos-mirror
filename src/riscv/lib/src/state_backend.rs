@@ -405,12 +405,12 @@ pub mod tests {
         let mut backend2 = F::new::<L>();
 
         // Ensure both backends start off sufficiently different.
-        let data1 = read_backend(&backend1);
-        let mut data2 = vec![0; data1.len()];
+        let mut data = read_backend(&backend1);
 
         let mut rng = rand::thread_rng();
-        for (offset, val) in data1.iter().copied().enumerate() {
-            data2[offset] = loop {
+        for reff in data.iter_mut() {
+            let val = *reff;
+            *reff = loop {
                 let select: u8 = rng.gen();
                 if val != select {
                     break select;
@@ -418,7 +418,7 @@ pub mod tests {
             };
         }
 
-        backend2.write(0, &data2);
+        backend2.write(0, &data);
 
         // Trace the location allocation process in order to find where in the
         // backend storage we have placed regions.
