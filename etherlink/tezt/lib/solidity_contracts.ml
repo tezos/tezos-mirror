@@ -170,14 +170,13 @@ let nested_create () =
     ~contract:"Creator"
     ~evm_version:"london"
 
-(** The info for the "revert.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/revert.sol] *)
-let revert =
-  {
-    label = "revert";
-    abi = kernel_inputs_path ^ "/revert.abi";
-    bin = kernel_inputs_path ^ "/revert.bin";
-  }
+(** The info for the "revert.sol" contract. *)
+let revert () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/revert.sol")
+    ~label:"revert"
+    ~contract:"Revert"
+    ~evm_version:"london"
 
 (** The info for the "create2.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/create2.sol] *)

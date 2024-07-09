@@ -4423,14 +4423,17 @@ let test_block_hash_regression =
 
 let test_l2_revert_returns_unused_gas =
   register_both
-    ~tags:["evm"]
+    ~tags:["evm"; "revert"]
     ~title:"Check L2 revert returns unused gas"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* _revert_address, _tx = deploy ~contract:revert ~sender evm_setup in
+  let* revert_resolved = revert () in
+  let* _revert_address, _tx =
+    deploy ~contract:revert_resolved ~sender evm_setup
+  in
   (* Tx data is constructed by:
      cd src/kernel_evm/benchmarks/scripts
      node sign_tx.js ../../../../etherlink/tezt/tests/evm_kernel_inputs/call_revert.json "9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0"
