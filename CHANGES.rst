@@ -73,6 +73,12 @@ Node
   ../helpers/parse/operations``, ``POST ../helpers/scripts/run_operation`` and
   ``POST ../helpers/scripts/simulate_operation``. (MR :gl:`!13451`)
 
+- **Breaking change** Decommissioned deprecated
+  ``/chains/<chain_id>/checkpoint`` RPC endpoint. Use
+  ``/chains/<chain_id>/levels/{checkpoint, caboose, savepoint}``, or
+  ``/config/history_mode`` instead to obtain the current checkpoint
+  for this chain. (MR :gl:`!13880`)
+
 Client
 ------
 

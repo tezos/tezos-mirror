@@ -48,12 +48,6 @@ let get_chain_store_exn store chain =
   let chain_store = WithExceptions.Option.to_exn ~none:Not_found chain_store in
   Lwt.return chain_store
 
-let get_checkpoint store (chain : Chain_services.chain) =
-  let open Lwt_syntax in
-  let* chain_store = get_chain_store_exn store chain in
-  let* checkpoint_hash, _ = Store.Chain.checkpoint chain_store in
-  Lwt.return checkpoint_hash
-
 let predecessors chain_store ignored length head =
   let open Lwt_result_syntax in
   let rec loop acc length block =
@@ -170,14 +164,6 @@ let rpc_directory_without_validator dir =
   let open Lwt_result_syntax in
   register0 dir S.chain_id (fun chain_store () () ->
       return (Store.Chain.chain_id chain_store)) ;
-  register0 dir S.checkpoint (fun chain_store () () ->
-      let*! checkpoint_hash, _ = Store.Chain.checkpoint chain_store in
-      let* block = Store.Block.read_block chain_store checkpoint_hash in
-      let checkpoint_header = Store.Block.header block in
-      let*! _, savepoint_level = Store.Chain.savepoint chain_store in
-      let*! _, caboose_level = Store.Chain.caboose chain_store in
-      let history_mode = Store.Chain.history_mode chain_store in
-      return (checkpoint_header, savepoint_level, caboose_level, history_mode)) ;
   register0 dir S.Levels.checkpoint (fun chain_store () () ->
       let*! v = Store.Chain.checkpoint chain_store in
       return v) ;
