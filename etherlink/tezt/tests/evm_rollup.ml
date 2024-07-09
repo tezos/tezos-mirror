@@ -4512,18 +4512,21 @@ let test_l2_intermediate_OOG_call =
        that runs out of gas still succeeds."
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
+  let* oog_call_resolved = oog_call () in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* random_contract_address, _tx =
     deploy ~contract:simple_storage ~sender evm_setup
   in
-  let* oog_call_address, _tx = deploy ~contract:oog_call ~sender evm_setup in
+  let* oog_call_address, _tx =
+    deploy ~contract:oog_call_resolved ~sender evm_setup
+  in
   let call_oog (sender : Eth_account.t) ~expect_failure =
     Eth_cli.contract_send
       ~expect_failure
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:oog_call.label
+      ~abi_label:oog_call_resolved.label
       ~address:oog_call_address
       ~method_call:
         (Printf.sprintf "sendViaCall(\"%s\")" random_contract_address)

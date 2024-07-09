@@ -186,14 +186,13 @@ let create2 () =
     ~contract:"Create2"
     ~evm_version:"london"
 
-(** The info for the "oog_call.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/oog_call.sol] *)
-let oog_call =
-  {
-    label = "oog_call";
-    abi = kernel_inputs_path ^ "/oog_call.abi";
-    bin = kernel_inputs_path ^ "/oog_call.bin";
-  }
+(** The info for the "oog_call.sol" contract. *)
+let oog_call () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/oog_call.sol")
+    ~label:"oog_call"
+    ~contract:"OOGCall"
+    ~evm_version:"london"
 
 (** The info for the "ether_wallet.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/ether_wallet.sol] *)
