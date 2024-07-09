@@ -277,6 +277,21 @@ module Handler = struct
         let*! () = Node_context.set_profile_ctxt ctxt pctxt in
         return_unit
 
+  let init_skip_list_cells_store ~node_store_dir ~number_of_slots =
+    (* We support at most 64 back-pointers, each of which takes 32 bytes.
+       The cells content itself takes less than 64 bytes. *)
+    let padded_encoded_cell_size = 64 * (32 + 1) in
+    (* A pointer hash is 32 bytes length, but because of the double
+       encoding in Dal_proto_types and then in skip_list_cells_store, we
+       have an extra 4 bytes for encoding the size. *)
+    let encoded_hash_size = 32 + 4 in
+    Skip_list_cells_store.init
+      ~node_store_dir
+      ~skip_list_store_dir:"skip_list_store"
+      ~padded_encoded_cell_size
+      ~encoded_hash_size
+      ~number_of_slots
+
   let resolve_plugin_and_set_ready config ctxt cctxt ?last_notified_level
       amplificator () =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
@@ -305,20 +320,10 @@ module Handler = struct
       Store.Value_size_hooks.set_share_size
         (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
       let* () = set_profile_context ctxt config proto_parameters in
-      (* We support at most 64 back-pointers, each of which takes 32 bytes.
-         The cells content itself takes less than 64 bytes. *)
-      let padded_encoded_cell_size = 64 * (32 + 1) in
-      (* A pointer hash is 32 bytes length, but because of the double
-         encoding in Dal_proto_types and then in skip_list_cells_store, we
-         have an extra 4 bytes for encoding the size. *)
-      let encoded_hash_size = 32 + 4 in
       let* skip_list_cells_store =
-        Skip_list_cells_store.init
-          ~node_store_dir:(Configuration_file.store_path config)
-          ~skip_list_store_dir:"skip_list_store"
-          ~padded_encoded_cell_size
-          ~encoded_hash_size
-          ~number_of_slots:proto_parameters.number_of_slots
+        let node_store_dir = Configuration_file.store_path config in
+        let number_of_slots = proto_parameters.number_of_slots in
+        init_skip_list_cells_store ~node_store_dir ~number_of_slots
       in
       let level =
         match last_notified_level with None -> level | Some level -> level
