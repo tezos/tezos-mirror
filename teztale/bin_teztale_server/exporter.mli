@@ -13,4 +13,4 @@ val data_at_level_range :
   Caqti_lwt_unix.Pool.t
   (* DB connections pool *) ->
   Int32.t (* lowest included level *) * Int32.t (* highest included level *) ->
-  (Lib_teztale_base.Data.batch, 'a) result Lwt.t
+  (Data.batch, 'a) result Lwt.t

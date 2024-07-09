@@ -109,8 +109,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; first_slot; endorsing_power; operations} as delegate_ops)
-           ->
+             {delegate; first_slot; endorsing_power; operations} as delegate_ops) ->
         match
           List.partition
             (fun op ->

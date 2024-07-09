@@ -30,11 +30,11 @@ DEV_EXECUTABLES := $(shell cat script-inputs/dev-executables)
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
-#Define octez only executables by excluding the EVM-node.
-OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node,${ALL_EXECUTABLES})
+#Define octez only executables by excluding the EVM-node and teztale tools.
+OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node octez-teztale-archiver octez-teztale-server,${ALL_EXECUTABLES})
 
-#Define octez layer1 only executables by excluding the EVM-node.
-OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out octez-evm-node octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dac-client octez-dac-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
+#Define octez layer1 only executables by excluding the EVM-node and teztale tools.
+OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out octez-evm-node octez-teztale-archiver octez-teztale-server octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dac-client octez-dac-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
@@ -105,6 +105,10 @@ octez:
 .PHONY: octez-layer1
 octez-layer1:
 	@$(MAKE) build OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_LAYER1_EXECUTABLES)"
+
+.PHONY: teztale
+teztale:
+	@$(MAKE) build OCTEZ_EXECUTABLES?="octez-teztale-archiver octez-teztale-server"
 
 .PHONY: experimental-release
 experimental-release:

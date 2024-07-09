@@ -13,6 +13,7 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml tezos_protocol.m
        product_client_libs.mli product_client_libs.ml \
        product_tooling.mli product_tooling.ml \
        product_etherlink.ml \
+       product_teztale.ml \
        product_ciao.ml \
        main.mli main.ml
 

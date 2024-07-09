@@ -60,6 +60,9 @@ let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
 let caqti_sqlite = external_lib "caqti-driver-sqlite3" V.(at_least "2.0.1")
 
+let caqti_postgresql =
+  external_lib "caqti-driver-postgresql" V.(at_least "2.0.1")
+
 let caqti_dynload = external_lib "caqti-dynload" V.True
 
 (* Checkseum is an irmin-pack dependency. Version 0.5.0 is known to be
@@ -103,6 +106,8 @@ let dune_configurator = external_lib "dune-configurator" V.True
 let dynlink = external_lib "dynlink" V.True ~opam:""
 
 let eqaf = external_lib "eqaf" V.True
+
+let ezgzip = external_lib "ezgzip" V.True
 
 let ezjsonm = external_lib "ezjsonm" V.(at_least "1.3.0")
 
@@ -226,6 +231,8 @@ let aches = external_lib "aches" V.(at_least "1.0.0")
 
 let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
 
+let safepass = external_lib "safepass" V.True
+
 let secp256k1_internal =
   let version = V.(at_least "0.4.0") in
   external_lib "secp256k1-internal" version
@@ -286,6 +293,8 @@ let tezt_lib =
 
 let tezt_core_lib =
   external_sublib tezt_lib "tezt.core" ~main_module:"Tezt_core"
+
+let x509 = external_lib "x509" V.(less_than "1.0.0")
 
 let tezt_json_lib = external_sublib tezt_lib "tezt.json" ~main_module:"JSON"
 

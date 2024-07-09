@@ -24,6 +24,7 @@ depends: [
   "camlp-streams" { >= "5.0.1" }
   "camlzip" { >= "1.12" & < "1.13" }
   "caqti"
+  "caqti-driver-postgresql" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" }
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
@@ -43,6 +44,7 @@ depends: [
   "dmap"
   "dune-configurator"
   "eqaf"
+  "ezgzip"
   "ezjsonm" { >= "1.3.0" }
   "fmt" { >= "0.8.7" }
   "fpath"
@@ -91,6 +93,7 @@ depends: [
   "repr"
   "ringo" { >= "1.0.0" }
   "rusage"
+  "safepass"
   "secp256k1-internal" { >= "0.4.0" }
   "semaphore-compat" { >= "1.0.1" }
   "seqes" { >= "0.2" }
@@ -104,6 +107,7 @@ depends: [
   "uri" { >= "3.1.0" }
   "uutf"
   "vector"
+  "x509" { < "1.0.0" }
   "yaml" { >= "3.1.0" }
   "zarith" { >= "1.13" & < "1.14" }
 ]

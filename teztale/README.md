@@ -5,22 +5,19 @@ tezos blocks and consensus operations.
 
 It is splitted in 2 parts:
 
-- `teztale-archiver` that monitors an octez node
-- `teztale-server` which aggregates and delivers data gathered by
-  archivers
+- `octez-teztale-archiver` that monitors an octez node and feed the server
+- `octez-teztale-server` which aggregates and delivers data gathered by
+  archiver(s)
 
 ## Building
 
-- Install dependencies by doing `opam install octez caqti-lwt
-  caqti-driver-sqlite3 caqti-driver-postgresql safepass ezgzip`
-- clone this repo, `cd teztale` and do `make`
-
-(As an alternative to install dependencies, clone this repo at the
-root of an octez worktree)
+```
+$ make build-deps teztale
+```
 
 ## Running
 
-### Aggregator
+### Aggregator (aka octez-teztale-server)
 
 First, you need to write a configuration file. It is a json file
 folowing the schema:
@@ -73,31 +70,17 @@ curl -X DELETE 'http://admin:zzz@localhost:8080/user' -d '{ "login" : "michmuch"
 You can launch the server by giving your config file as argument like
 
 ```
-server/main.exe ./config.json
+octez-teztale-server ./config.json
 ```
-
-For testing purpose **only**, you can use `server/main.exe
-examples/config.json`
 
 ### Archiver
 
 Run an octez node, with a RPC server open on localhost:8732 and do
 
 ```
-archiver/main.exe feed <teztale-server-endpoint-including-login:password>
+octez-teztale-archiver feed <teztale-server-endpoint-including-login:password>
 ```
 
-`teztale-archiver` is an octez client, it thus accepts the same global
+`octez-teztale-archiver` is an octez client, it thus accepts the same global
 options as the client (especially the `--endpoint` option to specify
 where to reach octez node RPC endpoint).
-
-## Docker images
-
-Docker images containing the binaries are available in the docker
-image registry of the project on gitlab.
-
-You can take inspiration from the <./docker-compose.yml> file provided
-to set them up. You must at least edit the config.json file mounted in
-the teztale-server container to move away of the super unsecure
-<examples/config.json>! (and the login/password used by the
-teztale-archiver container accordingly).

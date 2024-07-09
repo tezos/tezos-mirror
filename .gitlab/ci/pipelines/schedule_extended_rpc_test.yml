@@ -404,6 +404,7 @@ oc.build_x86_64-released:
     expire_in: 1 day
     paths:
     - octez-*
+    - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe
@@ -449,6 +450,7 @@ oc.build_x86_64-exp-dev-extra:
     expire_in: 1 day
     paths:
     - octez-*
+    - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe

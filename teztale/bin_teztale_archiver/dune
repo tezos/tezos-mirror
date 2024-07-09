@@ -1,299 +1,133 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
- (name main)
- (package teztale)
- (public_name teztale-archiver)
- (promote (until-clean))
+ (name teztale_archiver_main)
+ (public_name octez-teztale-archiver)
+ (package octez-teztale)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
+  octez-libs.rpc-http-client-unix
+  octez-libs.rpc-http
+  octez-version.value
   lib_teztale_base
-  (select
-   PtCJ7pwo_machine.ml
-   from
+  x509
+  (select PtCJ7pwo_machine.ml from
    (octez-protocol-001-PtCJ7pwo-libs.client -> PtCJ7pwo_machine.real.ml)
    (-> PtCJ7pwo_machine.no.ml))
-  (select
-   PsYLVpVv_machine.ml
-   from
+  (select PsYLVpVv_machine.ml from
    (octez-protocol-002-PsYLVpVv-libs.client -> PsYLVpVv_machine.real.ml)
    (-> PsYLVpVv_machine.no.ml))
-  (select
-   PsddFKi3_machine.ml
-   from
+  (select PsddFKi3_machine.ml from
    (octez-protocol-003-PsddFKi3-libs.client -> PsddFKi3_machine.real.ml)
    (-> PsddFKi3_machine.no.ml))
-  (select
-   Pt24m4xi_machine.ml
-   from
+  (select Pt24m4xi_machine.ml from
    (octez-protocol-004-Pt24m4xi-libs.client -> Pt24m4xi_machine.real.ml)
    (-> Pt24m4xi_machine.no.ml))
-  (select
-   PsBabyM1_machine.ml
-   from
+  (select PsBabyM1_machine.ml from
    (octez-protocol-005-PsBabyM1-libs.client -> PsBabyM1_machine.real.ml)
    (-> PsBabyM1_machine.no.ml))
-  (select
-   PsCARTHA_machine.ml
-   from
+  (select PsCARTHA_machine.ml from
    (octez-protocol-006-PsCARTHA-libs.client -> PsCARTHA_machine.real.ml)
    (-> PsCARTHA_machine.no.ml))
-  (select
-   PsDELPH1_machine.ml
-   from
+  (select PsDELPH1_machine.ml from
    (octez-protocol-007-PsDELPH1-libs.client -> PsDELPH1_machine.real.ml)
    (-> PsDELPH1_machine.no.ml))
-  (select
-   PtEdo2Zk_machine.ml
-   from
+  (select PtEdo2Zk_machine.ml from
    (octez-protocol-008-PtEdo2Zk-libs.client -> PtEdo2Zk_machine.real.ml)
    (-> PtEdo2Zk_machine.no.ml))
-  (select
-   PsFLoren_machine.ml
-   from
+  (select PsFLoren_machine.ml from
    (octez-protocol-009-PsFLoren-libs.client -> PsFLoren_machine.real.ml)
    (-> PsFLoren_machine.no.ml))
-  (select
-   PtGRANAD_machine.ml
-   from
+  (select PtGRANAD_machine.ml from
    (octez-protocol-010-PtGRANAD-libs.client -> PtGRANAD_machine.real.ml)
    (-> PtGRANAD_machine.no.ml))
-  (select
-   PtHangz2_machine.ml
-   from
+  (select PtHangz2_machine.ml from
    (octez-protocol-011-PtHangz2-libs.client -> PtHangz2_machine.real.ml)
    (-> PtHangz2_machine.no.ml))
-  (select
-   Psithaca_machine.ml
-   from
+  (select Psithaca_machine.ml from
    (octez-protocol-012-Psithaca-libs.client -> Psithaca_machine.real.ml)
    (-> Psithaca_machine.no.ml))
-  (select
-   PtJakart_machine.ml
-   from
+  (select PtJakart_machine.ml from
    (octez-protocol-013-PtJakart-libs.client -> PtJakart_machine.real.ml)
    (-> PtJakart_machine.no.ml))
-  (select
-   PtKathma_machine.ml
-   from
+  (select PtKathma_machine.ml from
    (octez-protocol-014-PtKathma-libs.client -> PtKathma_machine.real.ml)
    (-> PtKathma_machine.no.ml))
-  (select
-   PtLimaPt_machine.ml
-   from
+  (select PtLimaPt_machine.ml from
    (octez-protocol-015-PtLimaPt-libs.client -> PtLimaPt_machine.real.ml)
    (-> PtLimaPt_machine.no.ml))
-  (select
-   PtMumbai_machine.ml
-   from
+  (select PtMumbai_machine.ml from
    (octez-protocol-016-PtMumbai-libs.client -> PtMumbai_machine.real.ml)
    (-> PtMumbai_machine.no.ml))
-  (select
-   PtNairob_machine.ml
-   from
+  (select PtNairob_machine.ml from
    (octez-protocol-017-PtNairob-libs.client -> PtNairob_machine.real.ml)
    (-> PtNairob_machine.no.ml))
-  (select
-   Proxford_machine.ml
-   from
+  (select Proxford_machine.ml from
    (octez-protocol-018-Proxford-libs.client -> Proxford_machine.real.ml)
    (-> Proxford_machine.no.ml))
-  (select
-   PtParisB_machine.ml
-   from
+  (select PtParisB_machine.ml from
    (octez-protocol-019-PtParisB-libs.client -> PtParisB_machine.real.ml)
    (-> PtParisB_machine.no.ml))
-  (select
-   PsParisC_machine.ml
-   from
+  (select PsParisC_machine.ml from
    (octez-protocol-020-PsParisC-libs.client -> PsParisC_machine.real.ml)
-   (-> PsParisC_machine.no.ml))
-  (select
-   ProtoALp_machine.ml
-   from
-   (octez-protocol-alpha-libs.client -> ProtoALp_machine.no.ml)
-   (-> ProtoALp_machine.no.ml)))
+   (-> PsParisC_machine.no.ml)))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (:include %{workspace_root}/static-link-flags-teztale.sexp))
  (flags
-  (:standard
-   -open
-   Tezos_base__TzPervasives
-   -open
-   Tezos_stdlib_unix
-   -open
-   Tezos_shell_services
-   -open
-   Tezos_client_base
-   -open
-   Tezos_client_base_unix
-   -open
-   Tezos_rpc_http_client_unix
-   -open
-   Tezos_rpc_http
-   -open
-   Lib_teztale_base)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_rpc_http_client_unix
+  -open Tezos_rpc_http
+  -open Lib_teztale_base))
 
-(rule
- (action
-  (write-file PtCJ7pwo_machine.mli "module M : sig end")))
+(rule (action (write-file PsParisC_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PtCJ7pwo_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtParisB_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsYLVpVv_machine.mli "module M : sig end")))
+(rule (action (write-file Proxford_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsYLVpVv_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtNairob_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsddFKi3_machine.mli "module M : sig end")))
+(rule (action (write-file PtMumbai_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsddFKi3_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtLimaPt_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file Pt24m4xi_machine.mli "module M : sig end")))
+(rule (action (write-file PtKathma_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file Pt24m4xi_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtJakart_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsBabyM1_machine.mli "module M : sig end")))
+(rule (action (write-file Psithaca_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsBabyM1_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtHangz2_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsCARTHA_machine.mli "module M : sig end")))
+(rule (action (write-file PtGRANAD_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsCARTHA_machine.no.ml "module M = struct end")))
+(rule (action (write-file PsFLoren_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsDELPH1_machine.mli "module M : sig end")))
+(rule (action (write-file PtEdo2Zk_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsDELPH1_machine.no.ml "module M = struct end")))
+(rule (action (write-file PsDELPH1_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PtEdo2Zk_machine.mli "module M : sig end")))
+(rule (action (write-file PsCARTHA_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PtEdo2Zk_machine.no.ml "module M = struct end")))
+(rule (action (write-file PsBabyM1_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsFLoren_machine.mli "module M : sig end")))
+(rule (action (write-file Pt24m4xi_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PsFLoren_machine.no.ml "module M = struct end")))
+(rule (action (write-file PsddFKi3_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PtGRANAD_machine.mli "module M : sig end")))
+(rule (action (write-file PsYLVpVv_machine.no.ml "module M = struct end")))
 
-(rule
- (action
-  (write-file PtGRANAD_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtHangz2_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtHangz2_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file Psithaca_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file Psithaca_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtJakart_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtJakart_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtKathma_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtKathma_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtLimaPt_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtLimaPt_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtMumbai_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtMumbai_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtNairob_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtNairob_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file Proxford_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file Proxford_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtParisB_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtParisB_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PsParisC_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PsParisC_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file ProtoALp_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file ProtoALp_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtCJ7pwo_machine.no.ml "module M = struct end")))

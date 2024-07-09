@@ -51,6 +51,8 @@ val octez_scoru_wasm_helpers : Manifest.target
 
 val octez_scoru_wasm : Manifest.target
 
+val octez_shell_services : Manifest.target
+
 val octez_signer_services : Manifest.target
 
 val octez_smart_rollup_lib : Manifest.target

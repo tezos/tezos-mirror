@@ -62,6 +62,8 @@ __pycache__
 /octogram
 /simulation-scenario
 /safety-checker
+/octez-teztale-archiver
+/octez-teztale-server
 
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
