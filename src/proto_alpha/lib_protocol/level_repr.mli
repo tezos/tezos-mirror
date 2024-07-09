@@ -130,6 +130,11 @@ module Internal_for_tests : sig
   val add_cycles : blocks_per_cycle:int -> t -> int -> t
 
   val root : t
+
+  val make_cycle_eras :
+    blocks_per_cycle:int32 -> blocks_per_commitment:int32 -> cycle_eras tzresult
+
+  val level_from_int32 : cycle_eras:cycle_eras -> int32 -> level tzresult
 end
 
 (**/**)

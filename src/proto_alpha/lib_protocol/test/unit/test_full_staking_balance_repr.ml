@@ -17,8 +17,20 @@ open Protocol
 open Alpha_context
 open Data_encoding
 
+let cycle_eras_init ~blocks_per_cycle =
+  Environment.wrap_tzresult
+  @@ Level_repr.Internal_for_tests.make_cycle_eras
+       ~blocks_per_cycle
+       ~blocks_per_commitment:
+         Default_parameters.constants_test.blocks_per_commitment
+
+let level_from_int ~cycle_eras l =
+  let open Lwt_result_wrap_syntax in
+  let*?@ level = Level_repr.Internal_for_tests.level_from_int32 ~cycle_eras l in
+  return level
+
 (* We duplicate the definition of the Full_staking_balance_repr module
-   from Oxford to test a None case in the current encoding *)
+   from Oxford to test encoding compatibility. *)
 module Full_staking_balance_repr_oxford = struct
   type t = {
     own_frozen : Tez_repr.t;
@@ -42,7 +54,61 @@ module Full_staking_balance_repr_oxford = struct
          (req "delegated" Tez_repr.encoding))
 end
 
-(* for [level_of_min_delegated], only [level] is checked *)
+(* We duplicate the definition of the Full_staking_balance_repr module
+   from Paris to test encoding compatibility. *)
+module Full_staking_balance_repr_paris = struct
+  type t = {
+    own_frozen : Tez_repr.t;
+    staked_frozen : Tez_repr.t;
+    delegated : Tez_repr.t;
+    min_delegated_in_cycle : Tez_repr.t;
+    level_of_min_delegated : Level_repr.t option;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    (* This encoding is backward-compatible with the encoding used in Oxford, so
+       as to avoid a stitching in P. It will act as a lazy migration.
+       The case in which [added_in_p] is [None] happen only for pre-existing
+       values in the storage.
+       For them, using [(delegated, None)] and using Cycle_repr.root when no level
+       is set will behave correctly. *)
+    let added_in_p =
+      obj2
+        (req "min_delegated_in_cycle" Tez_repr.encoding)
+        (req "level_of_min_delegated" (option Level_repr.encoding))
+    in
+    conv
+      (fun {
+             own_frozen;
+             staked_frozen;
+             delegated;
+             min_delegated_in_cycle;
+             level_of_min_delegated;
+           } ->
+        ( own_frozen,
+          staked_frozen,
+          delegated,
+          Some (min_delegated_in_cycle, level_of_min_delegated) ))
+      (fun (own_frozen, staked_frozen, delegated, added_in_p_opt) ->
+        let min_delegated_in_cycle, level_of_min_delegated =
+          added_in_p_opt |> Option.value ~default:(delegated, None)
+        in
+        {
+          own_frozen;
+          staked_frozen;
+          delegated;
+          min_delegated_in_cycle;
+          level_of_min_delegated;
+        })
+      (obj4
+         (req "own_frozen" Tez_repr.encoding)
+         (req "staked_frozen" Tez_repr.encoding)
+         (req "delegated" Tez_repr.encoding)
+         (varopt "min_delegated_in_cycle_and_level" added_in_p))
+end
+
+(* for [Level_repr.t], only [level] is checked *)
 let equal_full_staking_balance (a : Full_staking_balance_repr.t)
     (b : Full_staking_balance_repr.t) =
   let open Lwt_result_syntax in
@@ -59,97 +125,224 @@ let equal_full_staking_balance (a : Full_staking_balance_repr.t)
       (current_delegated b)
   in
   let* () =
-    Assert.equal_tez_repr
+    Assert.equal_level_repr
       ~loc:__LOC__
-      (min_delegated_in_cycle a)
-      (min_delegated_in_cycle b)
+      (last_modified_level a)
+      (last_modified_level b)
   in
   let* () =
-    (* compare for [Level_repr.t] only checks [level] *)
+    let is_equal =
+      Option.equal
+        (fun (a : Tez_repr.t * Level_repr.t) (b : Tez_repr.t * Level_repr.t) ->
+          Tez_repr.(fst a = fst b) && Level_repr.(snd a = snd b))
+    in
     Assert.equal
       ~loc:__LOC__
-      (Option.equal Level_repr.( = ))
-      "Level_repr aren't equal"
+      is_equal
+      "previous_min aren't equal"
       (fun ppf x ->
         match x with
-        | Some x -> Level_repr.pp ppf x
+        | Some (previous_min_value, previous_min_level) ->
+            Format.fprintf
+              ppf
+              "(%a, %a)"
+              Tez_repr.pp
+              previous_min_value
+              Level_repr.pp
+              previous_min_level
         | None -> Format.fprintf ppf "None")
-      (level_of_min_delegated a)
-      (level_of_min_delegated b)
+      (previous_min a)
+      (previous_min b)
   in
   return_unit
 
-let equal_full_staking_balance_with_cycle staking_balance
-    expected_staking_balance ~cycle_of_min_delegated =
+(* check post-condition after each add/remove delegated *)
+let check_staking_balance_invariant ~(current_level : Level_repr.t)
+    (staking_balance : Full_staking_balance_repr.t) =
   let open Lwt_result_wrap_syntax in
   let module F = Full_staking_balance_repr in
+  (* last_modified_level = current_level *)
+  let last_modified_level =
+    F.Internal_for_tests_and_RPCs.last_modified_level staking_balance
+  in
   let* () =
-    equal_full_staking_balance expected_staking_balance staking_balance
+    Assert.equal_level_repr ~loc:__LOC__ last_modified_level current_level
   in
 
-  (* Check a [cycle] field of [Level_repr.t] as well *)
-  let level_of_min_delegated_new =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ F.Internal_for_tests_and_RPCs.level_of_min_delegated staking_balance
-  in
-  let cycle_of_min_delegated = Cycle_repr.of_int32_exn cycle_of_min_delegated in
-  let* () =
-    Assert.equal_cycle_repr
-      ~loc:__LOC__
-      level_of_min_delegated_new.cycle
-      cycle_of_min_delegated
-  in
-  return_unit
+  (* if previous_min is Some, then
+     - previous_min_level.cycle = current_level.cycle
+     - previous_min_level.level < last_modified_level.level *)
+  match F.Internal_for_tests_and_RPCs.previous_min staking_balance with
+  | None -> return_unit
+  | Some (_previous_min_value, previous_min_level) ->
+      let* () =
+        Assert.equal_cycle_repr
+          ~loc:__LOC__
+          previous_min_level.cycle
+          current_level.cycle
+      in
+      let* () =
+        let lt a b =
+          Assert.lt
+            ~loc:__LOC__
+            Raw_level_repr.compare
+            "Raw_level_repr is not less"
+            Raw_level_repr.pp
+            a
+            b
+        in
+        lt previous_min_level.level last_modified_level.level
+      in
+      return_unit
 
-let equal_full_staking_balance_bytes sb_bytes
-    (sb_expected : Full_staking_balance_repr.t) =
+(** Encodes [staking_balance_to_serialize] using
+    [serialization_encoding], then decodes it using the current
+    {!Full_staking_balance_repr.encoding}, and check that we obtain
+    [expected]. *)
+let check_encoding_compatibility ~__LOC__ ~serialization_encoding
+    ~staking_balance_to_serialize ~expected =
   let open Lwt_result_syntax in
-  let encoding = Full_staking_balance_repr.encoding in
+  let bytes =
+    Binary.to_bytes_exn serialization_encoding staking_balance_to_serialize
+  in
   let* sb =
-    match Binary.of_bytes encoding sb_bytes with
+    match Binary.of_bytes Full_staking_balance_repr.encoding bytes with
     | Ok x -> return x
     | Error e ->
-        failwith
+        Test.fail
+          ~__LOC__
           "Data_encoding.Binary.read shouldn't have failed with \
            Full_staking_balance_repr.encoding: %a"
           Binary.pp_read_error
           e
   in
-  equal_full_staking_balance sb sb_expected
+  equal_full_staking_balance sb expected
 
 let test_encodings () =
   let open Lwt_result_syntax in
   let own_frozen = Tez_repr.(mul_exn one 1) in
   let staked_frozen = Tez_repr.(mul_exn one 2) in
   let delegated = Tez_repr.(mul_exn one 5) in
+  let*? cycle_eras = cycle_eras_init ~blocks_per_cycle:10l in
+  let* level_32 = level_from_int ~cycle_eras 32l in
+  let* level_52 = level_from_int ~cycle_eras 52l in
+  let* level_57 = level_from_int ~cycle_eras 57l in
 
-  (* Test a [Some] case for [added_in_p] *)
-  let staking_balance =
-    Full_staking_balance_repr.init
-      ~own_frozen
-      ~staked_frozen
-      ~delegated
-      ~current_level:Level_repr.Internal_for_tests.root
-  in
-  let encoding = Full_staking_balance_repr.encoding in
-  let sb_bytes = Binary.to_bytes_exn encoding staking_balance in
-  let* () = equal_full_staking_balance_bytes sb_bytes staking_balance in
-
-  (* Test a [None] case for [added_in_p] *)
-  let staking_balance =
+  let expected_when_reading_old_encodings =
     Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
       ~own_frozen
       ~staked_frozen
       ~delegated
-      ~min_delegated_in_cycle:delegated
-      ~level_of_min_delegated:None
+      ~last_modified_level:Level_repr.Internal_for_tests.root
+      ~previous_min:None
   in
-  let staking_balance_o =
+
+  (* Oxford encoding *)
+  let staking_balance_to_serialize =
     Full_staking_balance_repr_oxford.make ~own_frozen ~staked_frozen ~delegated
   in
-  let encoding_o = Full_staking_balance_repr_oxford.encoding in
-  let sb_o_bytes = Binary.to_bytes_exn encoding_o staking_balance_o in
-  let* () = equal_full_staking_balance_bytes sb_o_bytes staking_balance in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr_oxford.encoding
+      ~staking_balance_to_serialize
+      ~expected:expected_when_reading_old_encodings
+  in
+
+  (* Paris encoding when [level_of_min_delegated = Some _] *)
+  let staking_balance_to_serialize =
+    Full_staking_balance_repr_paris.
+      {
+        own_frozen;
+        staked_frozen;
+        delegated;
+        min_delegated_in_cycle = delegated;
+        level_of_min_delegated = Some level_52;
+      }
+  in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr_paris.encoding
+      ~staking_balance_to_serialize
+      ~expected:expected_when_reading_old_encodings
+  in
+
+  (* Paris encoding when [level_of_min_delegated = None]
+
+     Note that in practice, Paris never encodes a staking balance
+     where [min_delegated_in_cycle] is [None], but we might as well
+     test it anyway. *)
+  let staking_balance_to_serialize =
+    Full_staking_balance_repr_paris.
+      {
+        own_frozen;
+        staked_frozen;
+        delegated;
+        min_delegated_in_cycle = delegated;
+        level_of_min_delegated = None;
+      }
+  in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr_paris.encoding
+      ~staking_balance_to_serialize
+      ~expected:expected_when_reading_old_encodings
+  in
+
+  (* Protocol Q encoding when [previous_min = None] *)
+  let staking_balance_to_serialize =
+    Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~last_modified_level:level_52
+      ~previous_min:None
+  in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr.encoding
+      ~staking_balance_to_serialize
+      ~expected:staking_balance_to_serialize
+  in
+
+  (* Protocol Q encoding when [previous_min = Some _], when the levels
+     are in the same cycle. *)
+  let staking_balance_to_serialize =
+    Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~last_modified_level:level_57
+      ~previous_min:(Some (Tez_repr.(mul_exn one 100), level_52))
+  in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr.encoding
+      ~staking_balance_to_serialize
+      ~expected:staking_balance_to_serialize
+  in
+
+  (* Protocol Q encoding when [previous_min = Some _], when the levels
+     are in different cycles. *)
+  let staking_balance_to_serialize =
+    Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~last_modified_level:level_57
+      ~previous_min:(Some (Tez_repr.(mul_exn one 100), level_32))
+  in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr.encoding
+      ~staking_balance_to_serialize
+      ~expected:staking_balance_to_serialize
+  in
   return_unit
 
 (** Tests for add_delegated and remove_delegated *)
@@ -233,118 +426,73 @@ let get_staking_balance b ~(delegate : Contract.t) =
   return staking_balance
 
 let create_staking_balance ~own_frozen ~staked_frozen ~delegated
-    ?min_delegated_in_cycle ?level_of_min_delegated () =
+    ~last_modified_level ~previous_min =
   let open Lwt_result_wrap_syntax in
   let own_frozen = Tez_repr.(mul_exn one own_frozen) in
   let staked_frozen = Tez_repr.(mul_exn one staked_frozen) in
   let delegated = Tez_repr.(mul_exn one delegated) in
-  let min_delegated_in_cycle =
-    match min_delegated_in_cycle with
-    | Some x -> Tez_repr.(mul_exn one x)
-    | None -> delegated
-  in
   return
   @@ Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
        ~own_frozen
        ~staked_frozen
        ~delegated
-       ~min_delegated_in_cycle
-       ~level_of_min_delegated
+       ~last_modified_level
+       ~previous_min
 
-let cycle_eras_init ~blocks_per_cycle =
-  let cycle_era =
-    {
-      Level_repr.first_level = Raw_level_repr.root;
-      first_cycle = Cycle_repr.root;
-      blocks_per_cycle;
-      blocks_per_commitment =
-        Default_parameters.constants_test.blocks_per_commitment;
-    }
-  in
-  Level_repr.create_cycle_eras [cycle_era]
-
-let level_from_int ~cycle_eras l =
-  let open Lwt_result_wrap_syntax in
-  let*?@ raw_level = Raw_level_repr.of_int32 l in
-  return @@ Level_repr.level_from_raw ~cycle_eras raw_level
+let make_previous_min ?previous_min_value ?previous_min_level ~blocks_per_cycle
+    () =
+  let open Lwt_result_syntax in
+  let*? cycle_eras = cycle_eras_init ~blocks_per_cycle in
+  match (previous_min_value, previous_min_level) with
+  | Some previous_min_value, Some previous_min_level ->
+      let* previous_min_level = level_from_int ~cycle_eras previous_min_level in
+      let previous_min_value = Tez_repr.(mul_exn one previous_min_value) in
+      return @@ Some (previous_min_value, previous_min_level)
+  | _ -> return None
 
 let create_staking_balance_level ~own_frozen ~staked_frozen ~delegated
-    ?min_delegated_in_cycle ~level_of_min_delegated ~blocks_per_cycle () =
-  let open Lwt_result_wrap_syntax in
-  let*?@ cycle_eras = cycle_eras_init ~blocks_per_cycle in
-  let* level = level_from_int ~cycle_eras level_of_min_delegated in
+    ~last_modified_level ?previous_min_value ?previous_min_level
+    ~blocks_per_cycle () =
+  let open Lwt_result_syntax in
+  let*? cycle_eras = cycle_eras_init ~blocks_per_cycle in
+  let* last_modified_level = level_from_int ~cycle_eras last_modified_level in
+  let* previous_min =
+    make_previous_min
+      ?previous_min_value
+      ?previous_min_level
+      ~blocks_per_cycle
+      ()
+  in
   create_staking_balance
     ~own_frozen
     ~staked_frozen
     ~delegated
-    ?min_delegated_in_cycle
-    ~level_of_min_delegated:level
-    ()
+    ~last_modified_level
+    ~previous_min
 
-let check_min_delegated_in_cycle_rpc b ~(delegate : Contract.t) =
-  let open Lwt_result_wrap_syntax in
+let check_min_delegated_and_its_level ~blocks_per_cycle ~current_level
+    ~min_delegated ~min_delegated_level staking_balance =
+  let open Lwt_result_syntax in
   let module F = Full_staking_balance_repr in
-  let* ctxt = Block.get_alpha_ctxt b in
-  let*@ balance = Alpha_context.Contract.get_balance ctxt delegate in
-  let* liquid_balance = Context.Contract.balance (B b) delegate in
-  let* () = Assert.equal_tez ~loc:__LOC__ balance liquid_balance in
-
-  let* min_delegated_in_current_cycle =
-    get_min_delegated_in_current_cycle b ~delegate
+  let min_delegated = Tez_repr.(mul_exn one min_delegated) in
+  let*? cycle_eras = cycle_eras_init ~blocks_per_cycle in
+  let* min_delegated_level = level_from_int ~cycle_eras min_delegated_level in
+  let min_delegated_computed, min_delegated_level_computed =
+    F.Internal_for_tests_and_RPCs.min_delegated_and_level
+      ~cycle_eras
+      ~current_level
+      staking_balance
   in
-  let min_delegated_in_cycle_rpc, level_of_min_delegated_rpc =
-    min_delegated_in_current_cycle
+  let* () =
+    Assert.equal_tez_repr ~loc:__LOC__ min_delegated_computed min_delegated
   in
-
-  let* staking_balance = get_staking_balance b ~delegate in
-  let min_delegated_in_cycle =
-    F.Internal_for_tests_and_RPCs.min_delegated_in_cycle staking_balance
+  let* () =
+    Assert.equal_level_repr
+      ~loc:__LOC__
+      min_delegated_level_computed
+      min_delegated_level
   in
-  let level_of_min_delegated =
-    F.Internal_for_tests_and_RPCs.level_of_min_delegated staking_balance
-  in
-  let level_of_min_delegated =
-    Option.value
-      ~default:Level_repr.Internal_for_tests.root
-      level_of_min_delegated
-  in
-
-  let current_cycle = Block.current_cycle b in
-  match level_of_min_delegated_rpc with
-  | None ->
-      let* () =
-        Assert.equal_tez_repr
-          ~loc:__LOC__
-          (F.current_delegated staking_balance)
-          min_delegated_in_cycle_rpc
-      in
-      let* () =
-        Assert.not_equal_int32
-          ~loc:__LOC__
-          (Cycle.to_int32 current_cycle)
-          (Cycle_repr.to_int32 level_of_min_delegated.cycle)
-      in
-      return_unit
-  | Some level_of_min_delegated_rpc ->
-      let* () =
-        Assert.equal_tez_repr
-          ~loc:__LOC__
-          min_delegated_in_cycle
-          min_delegated_in_cycle_rpc
-      in
-      let* () =
-        Assert.equal_level_repr
-          ~loc:__LOC__
-          level_of_min_delegated_rpc
-          level_of_min_delegated
-      in
-      let* () =
-        Assert.equal_int32
-          ~loc:__LOC__
-          (Cycle.to_int32 current_cycle)
-          (Cycle_repr.to_int32 level_of_min_delegated.cycle)
-      in
-      return_unit
+  return_unit
 
 let print_min_delegated_in_cycle_rpc b ~(delegate : Contract.t) =
   let open Lwt_result_wrap_syntax in
@@ -370,14 +518,54 @@ let print_min_delegated_in_cycle_rpc b ~(delegate : Contract.t) =
   Log.info "level of last baked block = %a" Level.pp_full (Level.current ctxt) ;
   return_unit
 
+let check_staking_balance ~check_invariant ~current_level ~blocks_per_cycle
+    ~min_delegated ~min_delegated_level ~new_staking_balance
+    ~expected_staking_balance =
+  let open Lwt_result_wrap_syntax in
+  let* () =
+    equal_full_staking_balance expected_staking_balance new_staking_balance
+  in
+  let* () =
+    if check_invariant then
+      check_staking_balance_invariant ~current_level new_staking_balance
+    else return_unit
+  in
+  let* () =
+    check_min_delegated_and_its_level
+      ~blocks_per_cycle
+      ~current_level
+      ~min_delegated
+      ~min_delegated_level
+      new_staking_balance
+  in
+  return_unit
+
+let check_staking_balance_level ~check_invariant ~current_level
+    ~blocks_per_cycle ~min_delegated ~min_delegated_level ~new_staking_balance
+    ~expected_staking_balance =
+  let open Lwt_result_wrap_syntax in
+  let*? cycle_eras = cycle_eras_init ~blocks_per_cycle in
+  let* current_level = level_from_int ~cycle_eras current_level in
+  let* () =
+    check_staking_balance
+      ~check_invariant
+      ~current_level
+      ~blocks_per_cycle
+      ~min_delegated
+      ~min_delegated_level
+      ~new_staking_balance
+      ~expected_staking_balance
+  in
+  return_unit
+
 let test_min_delegated_in_cycle () =
   let open Lwt_result_wrap_syntax in
   let constants =
     constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
   in
-  let expected_staking_balance ~delegated ~min_delegated_in_cycle
-      ~level_of_min_delegated =
-    let blocks_per_cycle = constants.blocks_per_cycle in
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  let expected_staking_balance ~delegated ~last_modified_level
+      ~previous_min_value ~previous_min_level =
     (* [own_frozen] and [staked_frozen] are not changed *)
     let own_frozen = 200_000 in
     let staked_frozen = 0 in
@@ -385,18 +573,20 @@ let test_min_delegated_in_cycle () =
       ~own_frozen
       ~staked_frozen
       ~delegated
-      ~min_delegated_in_cycle
-      ~level_of_min_delegated
+      ~last_modified_level
+      ~previous_min_value
+      ~previous_min_level
       ~blocks_per_cycle
       ()
   in
+  let check_staking_balance_level =
+    check_staking_balance_level ~blocks_per_cycle
+  in
   let get_staking_balance b ~delegate =
     let* () = print_min_delegated_in_cycle_rpc b ~delegate in
-    let* () = check_min_delegated_in_cycle_rpc b ~delegate in
     let* staking_balance = get_staking_balance b ~delegate in
     return staking_balance
   in
-
   let* b, (delegate, contractor) = Context.init_with_constants2 constants in
   let amount_1000 = Tez_helpers.of_int 1_000 in
   let* b, delegator =
@@ -408,20 +598,26 @@ let test_min_delegated_in_cycle () =
   in
   let* b = Block.bake ~operation:set_delegate b in
   Log.info ~color:Log.Color.BG.blue "After setting delegate" ;
-  let* staking_balance = get_staking_balance b ~delegate in
 
+  let* staking_balance = get_staking_balance b ~delegate in
   let delegated_init = 3_801_000 in
+
+  let current_level_init = Block.current_level b in
   let* init_staking_balance =
     expected_staking_balance
-      ~delegated:delegated_init
-      ~min_delegated_in_cycle:3_800_000
-      ~level_of_min_delegated:0l
+      ~delegated:delegated_init (* 3_801_000 *)
+      ~last_modified_level:current_level_init
+      ~previous_min_value:3_800_000
+      ~previous_min_level:0l (* first level of the current cycle *)
   in
   let* () =
-    equal_full_staking_balance_with_cycle
-      staking_balance
-      init_staking_balance
-      ~cycle_of_min_delegated:0l
+    check_staking_balance_level
+      ~check_invariant:true
+      ~current_level:current_level_init
+      ~min_delegated:3_800_000
+      ~min_delegated_level:0l (* first level of the current cycle *)
+      ~new_staking_balance:staking_balance
+      ~expected_staking_balance:init_staking_balance
   in
 
   let* b = Block.bake_until_cycle_end b in
@@ -438,10 +634,13 @@ let test_min_delegated_in_cycle () =
   Log.info ~color:Log.Color.BG.blue "Before remove" ;
   let* staking_balance = get_staking_balance b ~delegate in
   let* () =
-    equal_full_staking_balance_with_cycle
-      staking_balance
-      init_staking_balance
-      ~cycle_of_min_delegated:0l
+    check_staking_balance_level
+      ~check_invariant:false
+      ~current_level:(Block.current_level b)
+      ~min_delegated:delegated_init
+      ~min_delegated_level:12l (* first level of the current cycle *)
+      ~new_staking_balance:staking_balance
+      ~expected_staking_balance:init_staking_balance
   in
 
   (* Remove 10 tez from delegated_balance *)
@@ -461,40 +660,48 @@ let test_min_delegated_in_cycle () =
   in
   Log.info ~color:Log.Color.BG.blue "After remove" ;
   let* staking_balance = get_staking_balance b ~delegate in
-  let cycle_of_min_delegated_minus_10 =
-    Cycle.to_int32 @@ Block.current_cycle b
-  in
+
+  let current_level_minus_10 = Block.current_level b in
   let* staking_balance_minus_10 =
     expected_staking_balance
-      ~delegated:delegated_minus_10
-      ~min_delegated_in_cycle:delegated_minus_10
-      ~level_of_min_delegated:(Block.current_level b)
+      ~delegated:delegated_minus_10 (* 3_800_990 *)
+      ~last_modified_level:current_level_minus_10
+      ~previous_min_value:delegated_init
+      ~previous_min_level:12l (* first level of the current cycle *)
   in
   let* () =
-    equal_full_staking_balance_with_cycle
-      staking_balance
-      staking_balance_minus_10
-      ~cycle_of_min_delegated:cycle_of_min_delegated_minus_10
+    check_staking_balance_level
+      ~check_invariant:true
+      ~current_level:current_level_minus_10
+      ~min_delegated:delegated_minus_10
+      ~min_delegated_level:current_level_minus_10
+      ~new_staking_balance:staking_balance
+      ~expected_staking_balance:staking_balance_minus_10
   in
-
   let* b = Block.bake_until_cycle_end b in
   Log.info ~color:Log.Color.BG.blue "Start of the new cycle" ;
+
   let* staking_balance = get_staking_balance b ~delegate in
   let* () =
-    equal_full_staking_balance_with_cycle
-      staking_balance
-      staking_balance_minus_10
-      ~cycle_of_min_delegated:cycle_of_min_delegated_minus_10
+    check_staking_balance_level
+      ~check_invariant:false
+      ~current_level:(Block.current_level b)
+      ~min_delegated:delegated_minus_10
+      ~min_delegated_level:24l (* first level of the current cycle *)
+      ~new_staking_balance:staking_balance
+      ~expected_staking_balance:staking_balance_minus_10
   in
-
   let* b = Block.bake_n 3 b in
   Log.info ~color:Log.Color.BG.blue "Before add" ;
   let* staking_balance = get_staking_balance b ~delegate in
   let* () =
-    equal_full_staking_balance_with_cycle
-      staking_balance
-      staking_balance_minus_10
-      ~cycle_of_min_delegated:cycle_of_min_delegated_minus_10
+    check_staking_balance_level
+      ~check_invariant:false
+      ~current_level:(Block.current_level b)
+      ~min_delegated:delegated_minus_10
+      ~min_delegated_level:24l (* first level of the current cycle *)
+      ~new_staking_balance:staking_balance
+      ~expected_staking_balance:staking_balance_minus_10
   in
 
   (* Add 20 tez to delegated_balance *)
@@ -514,18 +721,22 @@ let test_min_delegated_in_cycle () =
   in
   Log.info ~color:Log.Color.BG.blue "After add" ;
   let* staking_balance = get_staking_balance b ~delegate in
-  let cycle_of_min_delegated_add_20 = Cycle.to_int32 @@ Block.current_cycle b in
+  let current_level_add_20 = Block.current_level b in
   let* staking_balance_add_20 =
     expected_staking_balance
-      ~delegated:delegated_plus_20
-      ~min_delegated_in_cycle:delegated_minus_10
-      ~level_of_min_delegated:(Block.current_level b)
+      ~delegated:delegated_plus_20 (* 3_801_010 *)
+      ~last_modified_level:current_level_add_20
+      ~previous_min_value:delegated_minus_10
+      ~previous_min_level:24l (* first level of the current cycle *)
   in
   let* () =
-    equal_full_staking_balance_with_cycle
-      staking_balance
-      staking_balance_add_20
-      ~cycle_of_min_delegated:cycle_of_min_delegated_add_20
+    check_staking_balance_level
+      ~check_invariant:true
+      ~current_level:current_level_add_20
+      ~min_delegated:3_800_990
+      ~min_delegated_level:24l (* first level of the current cycle *)
+      ~new_staking_balance:staking_balance
+      ~expected_staking_balance:staking_balance_add_20
   in
   return_unit
 
@@ -535,23 +746,28 @@ let title_color = Log.Color.FG.yellow
 
 let info_color = Log.Color.BG.green
 
-let check_delegated_variation ~kind ~amount ~current_level
-    ~min_delegated_in_cycle ~level_of_min_delegated ~cycle_of_min_delegated
-    ~blocks_per_cycle staking_balance =
+let check_delegated_variation ~kind ~amount ~current_level ~last_modified_level
+    ?previous_min_value ?previous_min_level ~blocks_per_cycle ~min_delegated
+    ~min_delegated_level staking_balance () =
   let open Lwt_result_wrap_syntax in
   let module F = Full_staking_balance_repr in
-  let*?@ cycle_eras = cycle_eras_init ~blocks_per_cycle in
+  let*? cycle_eras = cycle_eras_init ~blocks_per_cycle in
   let* current_level = level_from_int ~cycle_eras current_level in
-  let* level_of_min_delegated =
-    level_from_int ~cycle_eras level_of_min_delegated
+  let* last_modified_level = level_from_int ~cycle_eras last_modified_level in
+  let* previous_min =
+    make_previous_min
+      ?previous_min_value
+      ?previous_min_level
+      ~blocks_per_cycle
+      ()
   in
-  let min_delegated_in_cycle = Tez_repr.(mul_exn one min_delegated_in_cycle) in
 
   let amount = Tez_repr.(mul_exn one amount) in
   let*?@ new_staking_balance =
     match kind with
-    | Add -> F.add_delegated ~current_level ~amount staking_balance
-    | Remove -> F.remove_delegated ~current_level ~amount staking_balance
+    | Add -> F.add_delegated ~cycle_eras ~current_level ~amount staking_balance
+    | Remove ->
+        F.remove_delegated ~cycle_eras ~current_level ~amount staking_balance
   in
   Log.info ~color:Log.Color.BG.blue "Before change" ;
   let () = pp_staking_balance staking_balance in
@@ -570,14 +786,18 @@ let check_delegated_variation ~kind ~amount ~current_level
       ~own_frozen:(F.own_frozen staking_balance)
       ~staked_frozen:(F.staked_frozen staking_balance)
       ~delegated:delegated_expected
-      ~min_delegated_in_cycle
-      ~level_of_min_delegated:(Some level_of_min_delegated)
+      ~last_modified_level
+      ~previous_min
   in
   let* () =
-    equal_full_staking_balance_with_cycle
-      expected_staking_balance
-      new_staking_balance
-      ~cycle_of_min_delegated
+    check_staking_balance
+      ~check_invariant:true
+      ~current_level
+      ~blocks_per_cycle
+      ~min_delegated
+      ~min_delegated_level
+      ~new_staking_balance
+      ~expected_staking_balance
   in
   return new_staking_balance
 
@@ -597,7 +817,9 @@ let test_add_delegated_different_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info ~color:title_color "Test add_delegated_different_cycle" ;
@@ -608,10 +830,13 @@ let test_add_delegated_different_cycle () =
       ~kind:Add
       ~amount:10
       ~current_level:50l
-      ~min_delegated_in_cycle:delegated
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:1000
+      ~min_delegated_level:40l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance *)
@@ -620,10 +845,13 @@ let test_add_delegated_different_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:51l
-      ~min_delegated_in_cycle:delegated
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:51l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:1000
+      ~min_delegated_level:40l
       staking_balance
+      ()
   in
   return_unit
 
@@ -643,7 +871,9 @@ let test_add_delegated_same_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info ~color:Log.Color.BG.yellow "Test add_delegated_same_cycle" ;
@@ -654,10 +884,13 @@ let test_add_delegated_same_cycle () =
       ~kind:Add
       ~amount:10
       ~current_level:11l
-      ~min_delegated_in_cycle:delegated
-      ~level_of_min_delegated:10l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:1000
+      ~min_delegated_level:8l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance *)
@@ -666,10 +899,13 @@ let test_add_delegated_same_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:12l
-      ~min_delegated_in_cycle:delegated
-      ~level_of_min_delegated:10l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:12l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:1000
+      ~min_delegated_level:8l
       staking_balance
+      ()
   in
   return_unit
 
@@ -689,7 +925,9 @@ let test_remove_delegated_different_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info ~color:Log.Color.BG.yellow "Test remove_delegated_different_cycle" ;
@@ -700,10 +938,13 @@ let test_remove_delegated_different_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:50l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:990
+      ~min_delegated_level:50l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance *)
@@ -712,10 +953,13 @@ let test_remove_delegated_different_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:51l
-      ~min_delegated_in_cycle:980
-      ~level_of_min_delegated:51l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:51l
+      ~previous_min_value:990
+      ~previous_min_level:50l
+      ~min_delegated:980
+      ~min_delegated_level:51l
       staking_balance
+      ()
   in
   return_unit
 
@@ -735,7 +979,9 @@ let test_remove_delegated_same_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info ~color:Log.Color.BG.yellow "Test remove_delegated_same_cycle" ;
@@ -746,10 +992,13 @@ let test_remove_delegated_same_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:11l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:990
+      ~min_delegated_level:11l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance *)
@@ -758,10 +1007,13 @@ let test_remove_delegated_same_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:12l
-      ~min_delegated_in_cycle:980
-      ~level_of_min_delegated:12l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:12l
+      ~previous_min_value:990
+      ~previous_min_level:11l
+      ~min_delegated:980
+      ~min_delegated_level:12l
       staking_balance
+      ()
   in
   return_unit
 
@@ -781,7 +1033,9 @@ let test_add_remove_delegated_no_global_change_different_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info
@@ -794,10 +1048,13 @@ let test_add_remove_delegated_no_global_change_different_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:50l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:990
+      ~min_delegated_level:50l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Same level" ;
   (* Add 100 tez to delegated_balance (= 1090) *)
@@ -806,10 +1063,13 @@ let test_add_remove_delegated_no_global_change_different_cycle () =
       ~kind:Add
       ~amount:100
       ~current_level:50l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:1000
+      ~min_delegated_level:40l
       staking_balance
+      ()
   in
   Log.info ~color:info_color "Same level" ;
   (* Remove 90 tez from delegated_balance (= 1000) *)
@@ -818,10 +1078,13 @@ let test_add_remove_delegated_no_global_change_different_cycle () =
       ~kind:Remove
       ~amount:90
       ~current_level:50l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:1000
+      ~min_delegated_level:40l
       staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance (= 990) *)
@@ -830,10 +1093,13 @@ let test_add_remove_delegated_no_global_change_different_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:51l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:51l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:990
+      ~min_delegated_level:51l
       staking_balance
+      ()
   in
   return_unit
 
@@ -853,7 +1119,9 @@ let test_add_remove_delegated_no_global_change_same_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info
@@ -866,10 +1134,13 @@ let test_add_remove_delegated_no_global_change_same_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:11l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:990
+      ~min_delegated_level:11l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Same level" ;
   (* Add 100 tez to delegated_balance (= 1090) *)
@@ -878,10 +1149,13 @@ let test_add_remove_delegated_no_global_change_same_cycle () =
       ~kind:Add
       ~amount:100
       ~current_level:11l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:1000
+      ~min_delegated_level:8l
       staking_balance
+      ()
   in
   Log.info ~color:info_color "Same level" ;
   (* Remove 90 tez from delegated_balance (= 1000) *)
@@ -890,10 +1164,13 @@ let test_add_remove_delegated_no_global_change_same_cycle () =
       ~kind:Remove
       ~amount:90
       ~current_level:11l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:1000
+      ~min_delegated_level:8l
       staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance (= 990) *)
@@ -902,10 +1179,13 @@ let test_add_remove_delegated_no_global_change_same_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:12l
-      ~min_delegated_in_cycle:990
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:12l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:990
+      ~min_delegated_level:12l
       staking_balance
+      ()
   in
   return_unit
 
@@ -925,7 +1205,9 @@ let test_add_remove_delegated_new_min_different_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info
@@ -938,10 +1220,13 @@ let test_add_remove_delegated_new_min_different_cycle () =
       ~kind:Remove
       ~amount:100
       ~current_level:50l
-      ~min_delegated_in_cycle:900
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:900
+      ~min_delegated_level:50l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Same level" ;
   (* Add 10 tez to delegated_balance (= 910) *)
@@ -950,10 +1235,13 @@ let test_add_remove_delegated_new_min_different_cycle () =
       ~kind:Add
       ~amount:10
       ~current_level:50l
-      ~min_delegated_in_cycle:900
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:50l
+      ~previous_min_value:delegated
+      ~previous_min_level:40l
+      ~min_delegated:910
+      ~min_delegated_level:50l
       staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance (= 900) *)
@@ -962,10 +1250,13 @@ let test_add_remove_delegated_new_min_different_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:51l
-      ~min_delegated_in_cycle:900
-      ~level_of_min_delegated:50l
-      ~cycle_of_min_delegated:2l
+      ~last_modified_level:51l
+      ~previous_min_value:910
+      ~previous_min_level:50l
+      ~min_delegated:900
+      ~min_delegated_level:51l
       staking_balance
+      ()
   in
   return_unit
 
@@ -985,7 +1276,9 @@ let test_add_remove_delegated_new_min_same_cycle () =
       ~own_frozen:50
       ~staked_frozen:100
       ~delegated
-      ~level_of_min_delegated:10l
+      ~last_modified_level:10l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
       ()
   in
   Log.info
@@ -998,10 +1291,13 @@ let test_add_remove_delegated_new_min_same_cycle () =
       ~kind:Remove
       ~amount:100
       ~current_level:11l
-      ~min_delegated_in_cycle:900
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:900
+      ~min_delegated_level:11l
       init_staking_balance
+      ()
   in
   Log.info ~color:info_color "Same level" ;
   (* Add 10 tez to delegated_balance (= 910) *)
@@ -1010,10 +1306,13 @@ let test_add_remove_delegated_new_min_same_cycle () =
       ~kind:Add
       ~amount:10
       ~current_level:11l
-      ~min_delegated_in_cycle:900
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:11l
+      ~previous_min_value:delegated
+      ~previous_min_level:8l
+      ~min_delegated:910
+      ~min_delegated_level:11l
       staking_balance
+      ()
   in
   Log.info ~color:info_color "Next level" ;
   (* Remove 10 tez from delegated_balance (= 900) *)
@@ -1022,10 +1321,13 @@ let test_add_remove_delegated_new_min_same_cycle () =
       ~kind:Remove
       ~amount:10
       ~current_level:12l
-      ~min_delegated_in_cycle:900
-      ~level_of_min_delegated:11l
-      ~cycle_of_min_delegated:0l
+      ~last_modified_level:12l
+      ~previous_min_value:910
+      ~previous_min_level:11l
+      ~min_delegated:900
+      ~min_delegated_level:12l
       staking_balance
+      ()
   in
   return_unit
 
