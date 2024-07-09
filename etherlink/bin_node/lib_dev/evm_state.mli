@@ -100,3 +100,5 @@ val flag_local_exec : t -> t Lwt.t
 (** [clear_delayed_inbox evm_state] removes the delayed inbox from the current
     EVM state. *)
 val clear_delayed_inbox : t -> t Lwt.t
+
+val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t

@@ -1008,6 +1008,24 @@ let chunk_data ~rollup_address ?sequencer_key ?timestamp ?parent_hash ?number
   let chunks = String.split_on_char '\n' (String.trim output) |> List.tl in
   return chunks
 
+let patch_kernel evm_node path =
+  match evm_node.status with
+  | Running _ -> Test.fail "Cannot patch the kernel of a running node"
+  | Not_running ->
+      let args =
+        [
+          "patch";
+          "kernel";
+          "with";
+          path;
+          "--force";
+          "--data-dir";
+          data_dir evm_node;
+        ]
+      in
+      let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
+      Process.check process
+
 let wait_termination (evm_node : t) =
   match evm_node.status with
   | Not_running -> unit

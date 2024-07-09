@@ -4592,6 +4592,37 @@ let test_trace_call =
 
   unit
 
+let test_patch_kernel =
+  register_both
+    ~kernels:[Mainnet]
+    ~tags:["evm"; "patch_kernel"; "experimental"]
+    ~title:"Can patch the kernel of an existing node"
+    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~da_fee:Wei.zero
+  @@ fun {sequencer; _} _protocol ->
+  let* _ =
+    check_kernel_version
+      ~evm_node:sequencer
+      ~equal:true
+      Constant.WASM.mainnet_evm_commit
+  in
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.patch_kernel
+      sequencer
+      Uses.(path Constant.WASM.ghostnet_evm_kernel)
+  in
+  let* () = Evm_node.run sequencer in
+  (* Produce a block so that the migration code is executed *)
+  let* _ = produce_block sequencer in
+  let* _ =
+    check_kernel_version
+      ~evm_node:sequencer
+      ~equal:true
+      Constant.WASM.ghostnet_evm_commit
+  in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -4653,4 +4684,5 @@ let () =
   test_trace_transaction_call protocols ;
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
-  test_trace_call protocols
+  test_trace_call protocols ;
+  test_patch_kernel protocols
