@@ -3933,11 +3933,12 @@ let test_rpc_gasPrice =
 
 let send_foo_mapping_storage contract_address sender
     {sc_rollup_node; client; endpoint; evm_node; _} =
+  let* mapping_storage_resolved = mapping_storage () in
   let call_foo (sender : Eth_account.t) =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:mapping_storage.label
+      ~abi_label:mapping_storage_resolved.label
       ~address:contract_address
       ~method_call:"foo()"
   in
@@ -3945,13 +3946,16 @@ let send_foo_mapping_storage contract_address sender
 
 let test_rpc_getStorageAt =
   register_both
-    ~tags:["evm"; "rpc"; "get_storage_at"]
+    ~tags:["evm"; "rpc"; "get_storage_at"; "mapping_storage"]
     ~title:"RPC methods eth_getStorageAt"
   @@ fun ~protocol:_ ~evm_setup ->
   let {endpoint; evm_node; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* mapping_storage_resolved = mapping_storage () in
   (* deploy contract *)
-  let* address, _tx = deploy ~contract:mapping_storage ~sender evm_setup in
+  let* address, _tx =
+    deploy ~contract:mapping_storage_resolved ~sender evm_setup
+  in
   (* Example from
       https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getstorageat
   *)
