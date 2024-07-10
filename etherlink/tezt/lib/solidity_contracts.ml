@@ -93,14 +93,13 @@ let compile_contract ~source ~label ~contract ~evm_version =
   Tezt.Base.write_file bin_file ~contents:bin ;
   return {label; abi = abi_file; bin = bin_file}
 
-(** The info for the "storage.sol" contract.
-    See [etherlink/tezt/tests/evm_kernel_inputs/storage.*] *)
-let simple_storage =
-  {
-    label = "simpleStorage";
-    abi = kernel_inputs_path ^ "/storage.abi";
-    bin = kernel_inputs_path ^ "/storage.bin";
-  }
+(** The info for the "storage.sol" contract. *)
+let simple_storage () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/storage.sol")
+    ~label:"simpleStorage"
+    ~contract:"SimpleStorage"
+    ~evm_version:"london"
 
 (** The info for the "erc20tok.sol" contract. *)
 let erc20 () =
