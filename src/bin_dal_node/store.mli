@@ -10,12 +10,6 @@
 
 open Cryptobox
 
-module Value_size_hooks : sig
-  (** [set_share_size size] sets the size of shard shares. This
-      function must be called once, before [init] is used. *)
-  val set_share_size : int -> unit
-end
-
 module Shards : sig
   (** A shard of some slot id consist in a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a

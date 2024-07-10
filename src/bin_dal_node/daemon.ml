@@ -317,7 +317,7 @@ module Handler = struct
       let* cryptobox, shards_proofs_precomputation =
         init_cryptobox config proto_parameters
       in
-      Store.Value_size_hooks.set_share_size
+      Value_size_hooks.set_share_size
         (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
       let* () = set_profile_context ctxt config proto_parameters in
       let* skip_list_cells_store =

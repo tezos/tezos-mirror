@@ -134,45 +134,6 @@ module Stores_dirs = struct
   let status = "status_store"
 end
 
-module Value_size_hooks = struct
-  (* The [value_size] required by [Tezos_key_value_store.directory] is known when
-     the daemon loads a protocol, after the store is activated. We use the closure
-     [value_size_fun] to perform delayed protocol-specific parameter passing.
-
-     Note that this mechanism is not sufficient to make the key-value store
-     robust to dynamic changes in [value_size]. For instance, there could be
-     concurrent writes for protocol P-1 and protocol P, if they define
-     distinct [value_size] this will make it so that [P-1] uses the [value_size]
-     of [P].
-
-     A potential solution would have a function [Cryptobox.share_encoding : t -> share encoding]
-     with the property that the produced encodings are of [`Fixed] class.
-     The [Key_value_store.t] type could be parameterized by an extra type parameter
-     corresponding to some dynamic state (corresponding to the cryptobox in our
-     use case), passed explicitly to the [write] and [read] functions.
-
-     Correcting this is left to future work.
-
-     TODO: https://gitlab.com/tezos/tezos/-/issues/6034 *)
-
-  (* We used the [share_size] callback to pass the share size to the store
-     in a delayed fashion, when the protocol becomes known to the daemon. *)
-  let share_size_ref = ref None
-
-  let set_share_size size =
-    match !share_size_ref with
-    | None -> share_size_ref := Some size
-    | Some previous_size ->
-        if Int.equal size previous_size then ()
-        else
-          Stdlib.failwith
-            "Store.set_share_size: new share size incompatible with current \
-             store"
-
-  let share_size () =
-    match !share_size_ref with None -> assert false | Some size -> size
-end
-
 module Shards = struct
   type nonrec t = (Types.slot_id, int, Cryptobox.share) KVS.t
 
