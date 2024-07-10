@@ -31,3 +31,9 @@ module RPC = RPC
 module Metrics = Metrics_plugin
 module Script_interpreter_logging = Script_interpreter_logging
 module Http_cache_headers = Http_cache_headers
+
+module Alpha_services = struct
+  include Protocol.Alpha_services
+  module Contract = Contract_services
+  module Delegate = Delegate_services
+end

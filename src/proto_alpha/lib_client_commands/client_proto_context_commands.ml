@@ -2567,7 +2567,7 @@ let commands_rw () =
         in
         let* has_voting_power =
           let*! r =
-            Alpha_services.Delegate.voting_power
+            Plugin.Alpha_services.Delegate.voting_power
               cctxt
               (cctxt#chain, cctxt#block)
               src_pkh
@@ -2770,7 +2770,7 @@ let commands_rw () =
         in
         let* has_voting_power =
           let*! r =
-            Alpha_services.Delegate.voting_power
+            Plugin.Alpha_services.Delegate.voting_power
               cctxt
               (cctxt#chain, cctxt#block)
               src_pkh

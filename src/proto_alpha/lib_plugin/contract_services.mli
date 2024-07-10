@@ -28,7 +28,10 @@
     contracts (balance, delegate, script, etc.).
 *)
 
-open Alpha_context
+open Environment
+open Environment.Error_monad
+open Protocol
+open Protocol.Alpha_context
 
 val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 

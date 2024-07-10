@@ -27,6 +27,7 @@
 
 open Protocol
 open Alpha_context
+open Plugin
 
 type t = B of Block.t | I of Incremental.t
 

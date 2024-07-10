@@ -1480,13 +1480,15 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     match counter with
     | None ->
         let* pcounter =
-          Alpha_services.Contract.counter cctxt (chain, block) source
+          Plugin.Alpha_services.Contract.counter cctxt (chain, block) source
         in
         let counter = Manager_counter.succ pcounter in
         return counter
     | Some counter -> return counter
   in
-  let* key = Alpha_services.Contract.manager_key cctxt (chain, block) source in
+  let* key =
+    Plugin.Alpha_services.Contract.manager_key cctxt (chain, block) source
+  in
   (* [has_reveal] assumes that a Reveal operation only appears as the first of a batch *)
   let has_reveal :
       type kind. kind Annotated_manager_operation.annotated_list -> bool =

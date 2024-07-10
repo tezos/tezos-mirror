@@ -25,7 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+open Environment
+open Environment.Error_monad
+open Protocol
+open Protocol.Alpha_context
 
 type error += Balance_rpc_non_delegate of public_key_hash
 

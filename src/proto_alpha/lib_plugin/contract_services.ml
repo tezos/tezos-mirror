@@ -24,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+open Environment
+open Environment.Error_monad
+open Protocol
+open Protocol.Alpha_context
 
 let custom_root =
   (RPC_path.(open_root / "context" / "contracts")

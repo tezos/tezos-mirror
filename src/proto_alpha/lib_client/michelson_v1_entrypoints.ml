@@ -70,7 +70,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     ~contract ~entrypoint ~normalize_types =
   let open Lwt_result_syntax in
   let*! ty_opt =
-    Alpha_services.Contract.entrypoint_type
+    Plugin.Alpha_services.Contract.entrypoint_type
       cctxt
       (chain, block)
       contract
@@ -123,7 +123,7 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
 
 let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
     ~normalize_types =
-  Alpha_services.Contract.list_entrypoints
+  Plugin.Alpha_services.Contract.list_entrypoints
     cctxt
     (chain, block)
     contract

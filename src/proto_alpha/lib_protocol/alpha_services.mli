@@ -53,9 +53,7 @@ module Nonce : sig
     'a #RPC_context.simple -> 'a -> Raw_level.t -> info shell_tzresult Lwt.t
 end
 
-module Contract = Contract_services
 module Constants = Constants_services
-module Delegate = Delegate_services
 module Voting = Voting_services
 module Sapling = Sapling_services
 

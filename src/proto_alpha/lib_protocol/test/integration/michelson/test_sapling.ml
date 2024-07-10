@@ -987,7 +987,7 @@ module Interpreter_tests = struct
     in
     let final_root = Tezos_sapling.Storage.get_root state_1 in
     let* _root, diff_1 =
-      Alpha_services.Contract.single_sapling_get_diff
+      Plugin.Alpha_services.Contract.single_sapling_get_diff
         Block.rpc_ctxt
         block_1
         dst
@@ -1033,7 +1033,7 @@ module Interpreter_tests = struct
     let* incr = Incremental.add_operation incr operation in
     let* block_2 = Incremental.finalize_block incr in
     let* _root, diff_2 =
-      Alpha_services.Contract.single_sapling_get_diff
+      Plugin.Alpha_services.Contract.single_sapling_get_diff
         Block.rpc_ctxt
         block_2
         dst
@@ -1046,7 +1046,9 @@ module Interpreter_tests = struct
     let is_root_in block dst root =
       let* incr = Incremental.begin_construction block in
       let ctx_2 = Incremental.alpha_ctxt incr in
-      let* script = Alpha_services.Contract.script Block.rpc_ctxt block dst in
+      let* script =
+        Plugin.Alpha_services.Contract.script Block.rpc_ctxt block dst
+      in
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       let*@ Ex_script (Script script), ctxt =
         Script_ir_translator.parse_script
@@ -1185,7 +1187,9 @@ module Interpreter_tests = struct
     let* incr = Incremental.begin_construction b in
     let ctx = Incremental.alpha_ctxt incr in
     let ctx_without_gas = Alpha_context.Gas.set_unlimited ctx in
-    let* storage = Alpha_services.Contract.storage Block.rpc_ctxt b dst in
+    let* storage =
+      Plugin.Alpha_services.Contract.storage Block.rpc_ctxt b dst
+    in
     let storage_lazy_expr = Alpha_context.Script.lazy_expr storage in
     let*?@ (Ty_ex_c tytype) =
       let memo_size = memo_size_of_int memo_size in
