@@ -252,15 +252,12 @@ module Make (E : MENV) = struct
       ~predecessor
       ~cache
 
-  let op_data_encoding =
-    E.Protocol.operation_data_encoding_with_legacy_attestation_name
-
   let op_encoding =
     Data_encoding.(
       dynamic_size
       @@ obj2
            (req "shell_header" Operation.shell_header_encoding)
-           (req "protocol_data" op_data_encoding))
+           (req "protocol_data" E.Protocol.operation_data_encoding))
 
   let ops_encoding = Data_encoding.Variable.list op_encoding
 
@@ -343,7 +340,11 @@ module Make (E : MENV) = struct
     let op =
       {E.Protocol.shell = shell_header; protocol_data = operation_data}
     in
-    match Data_encoding.Binary.to_bytes op_data_encoding operation_data with
+    match
+      Data_encoding.Binary.to_bytes
+        E.Protocol.operation_data_encoding
+        operation_data
+    with
     | Error _ -> failwith "mockup pending_operations"
     | Ok proto ->
         let operation_hash =
@@ -426,7 +427,9 @@ module Make (E : MENV) = struct
   let simulate_operation (state, preapply_result) op =
     let open Lwt_result_syntax in
     match
-      Data_encoding.Binary.to_bytes op_data_encoding op.E.Protocol.protocol_data
+      Data_encoding.Binary.to_bytes
+        E.Protocol.operation_data_encoding
+        op.E.Protocol.protocol_data
     with
     | Error _ -> failwith "mockup preapply_block: cannot deserialize operation"
     | Ok proto -> (
@@ -542,7 +545,9 @@ module Make (E : MENV) = struct
 
   let hash_protocol_operation op =
     match
-      Data_encoding.Binary.to_bytes op_data_encoding op.E.Protocol.protocol_data
+      Data_encoding.Binary.to_bytes
+        E.Protocol.operation_data_encoding
+        op.E.Protocol.protocol_data
     with
     | Error _ ->
         failwith "mockup preapply_operations: cannot deserialize operation"
@@ -590,7 +595,9 @@ module Make (E : MENV) = struct
                | Error errs -> Tezos_rpc.Answer.fail errs)))
 
   let hash_op (shell, proto) =
-    let proto = Data_encoding.Binary.to_bytes_exn op_data_encoding proto in
+    let proto =
+      Data_encoding.Binary.to_bytes_exn E.Protocol.operation_data_encoding proto
+    in
     Operation.hash {shell; proto}
 
   let equal_op (a_shell_header, a_operation_data)
@@ -635,7 +642,7 @@ module Make (E : MENV) = struct
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
         let operation_hash = Operation.hash op in
         let proto_op_opt =
-          Data_encoding.Binary.of_bytes op_data_encoding proto
+          Data_encoding.Binary.of_bytes E.Protocol.operation_data_encoding proto
         in
         match proto_op_opt with
         | Error _ -> Tezos_rpc.Answer.fail [Cannot_parse_op]
@@ -671,7 +678,7 @@ module Make (E : MENV) = struct
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
         let operation_hash = Operation.hash op in
         let proto_op_opt =
-          Data_encoding.Binary.of_bytes op_data_encoding proto
+          Data_encoding.Binary.of_bytes E.Protocol.operation_data_encoding proto
         in
         match proto_op_opt with
         | Error _ -> Tezos_rpc.Answer.fail [Cannot_parse_op]
@@ -728,7 +735,7 @@ module Make (E : MENV) = struct
               (List.fold_left_es (fun (proto_state, results) op ->
                    match
                      Data_encoding.Binary.of_bytes
-                       op_data_encoding
+                       E.Protocol.operation_data_encoding
                        op.Operation.proto
                    with
                    | Error _ -> failwith "Cannot parse"
@@ -794,7 +801,9 @@ module Make (E : MENV) = struct
           List.fold_left_es
             (fun map ((shell_header, operation_data) as v) ->
               match
-                Data_encoding.Binary.to_bytes op_data_encoding operation_data
+                Data_encoding.Binary.to_bytes
+                  E.Protocol.operation_data_encoding
+                  operation_data
               with
               | Error _ ->
                   failwith "mockup inject block: byte encoding operation failed"
