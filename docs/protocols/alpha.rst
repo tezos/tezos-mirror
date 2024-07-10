@@ -48,6 +48,10 @@ Adaptive Issuance
 - Added the Dynamic Maximum system, that changes the maximum issuance as a
   function of the stake ratio. (MR :gl:`!13519`)
 
+- Changed the semantics of ``min-delegated-in-cycle`` used to compute 
+  baking rights to only consider the minimum in between blocks instead of 
+  formerly used intra-transactions minimum. (MR :gl:`!13945`)
+
 Gas improvements
 ----------------
 
