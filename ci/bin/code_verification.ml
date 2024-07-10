@@ -1555,39 +1555,44 @@ let jobs pipeline_type =
         job_test_evm_compatibility;
       ]
     in
-    [
-      job_kaitai_checks;
-      job_kaitai_e2e_checks;
-      job_oc_check_lift_limits_patch;
-      job_oc_misc_checks;
-      job_oc_python_check;
-      job_oc_ocaml_fmt;
-      job_semgrep;
-      job_oc_integration_compiler_rejections;
-      job_oc_script_test_gen_genesis;
-      job_oc_script_snapshot_alpha_and_link;
-      job_oc_script_test_release_versions;
-      job_oc_script_b58_prefix;
-      job_oc_test_liquidity_baking_scripts;
-    ]
-    @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
-    @
-    match pipeline_type with
-    | Before_merging ->
-        let job_commit_titles : tezos_job =
-          job
-            ~__POS__
-            ~name:"commit_titles"
-            ~image:Images.CI.prebuild
-            ~stage:Stages.test
-            ~dependencies:dependencies_needs_start
-            (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
-               invalid commits titles in situations where that is allowed. *)
-            (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
-            ~allow_failure:(With_exit_codes [65])
-        in
-        [job_commit_titles]
-    | Schedule_extended_test -> []
+    let jobs_misc =
+      [
+        job_kaitai_checks;
+        job_kaitai_e2e_checks;
+        job_oc_check_lift_limits_patch;
+        job_oc_misc_checks;
+        job_oc_python_check;
+        job_oc_ocaml_fmt;
+        job_semgrep;
+        job_oc_integration_compiler_rejections;
+        job_oc_script_test_gen_genesis;
+        job_oc_script_snapshot_alpha_and_link;
+        job_oc_script_test_release_versions;
+        job_oc_script_b58_prefix;
+        job_oc_test_liquidity_baking_scripts;
+      ]
+    in
+    let job_commit_titles : tezos_job list =
+      match pipeline_type with
+      | Before_merging ->
+          let job_commit_titles : tezos_job =
+            job
+              ~__POS__
+              ~name:"commit_titles"
+              ~image:Images.CI.prebuild
+              ~stage:Stages.test
+              ~dependencies:dependencies_needs_start
+              (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
+                 invalid commits titles in situations where that is allowed. *)
+              (script_propagate_exit_code
+                 "./scripts/ci/check_commit_messages.sh")
+              ~allow_failure:(With_exit_codes [65])
+          in
+          [job_commit_titles]
+      | Schedule_extended_test -> []
+    in
+    jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
+    @ job_commit_titles
   in
 
   (*Coverage jobs *)
