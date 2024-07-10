@@ -249,14 +249,13 @@ let error () =
     ~contract:"Error"
     ~evm_version:"london"
 
-(** The info for the "block_hash_gen.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/spam_withdrawal.sol] *)
-let spam_withdrawal =
-  {
-    label = "spam_withdrawal";
-    abi = kernel_inputs_path ^ "/spam_withdrawal.abi";
-    bin = kernel_inputs_path ^ "/spam_withdrawal.bin";
-  }
+(** The info for the "block_hash_gen.sol" contract. *)
+let spam_withdrawal () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/spam_withdrawal.sol")
+    ~label:"spam_withdrawal"
+    ~contract:"SpamWithdrawals"
+    ~evm_version:"london"
 
 (** The info for the "gas_limit.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/gas_limit.sol] *)
