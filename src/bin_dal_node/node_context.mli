@@ -173,11 +173,20 @@ val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
 
-(** [level_to_gc ctxt ~current_level] returns the oldest level that should
-    have attested data (like shards and slots, skip list cells) stored; during
-    [current_level], such data for commitments published at the returned level
-    will be removed. The returned level is non-negative. *)
-val level_to_gc : t -> current_level:int32 -> int32
+(** [storage_period ctxt proto_parameters] returns for how many levels should
+    the node store data about attested slots. This depends on the node's profile
+    and its history mode.  *)
+val storage_period :
+  t -> Dal_plugin.proto_parameters -> [`Always | `Finite of int]
+
+(** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
+    that should have attested data (like shards and slots, skip list cells)
+    stored; during [current_level], such data for commitments published at the
+    returned level will be removed. The returned level is non-negative. In case
+    no removal is needed (either because the node is thus configured, or the
+    current_level is not big enough), the function returns [None]. *)
+val level_to_gc :
+  t -> Dal_plugin.proto_parameters -> current_level:int32 -> int32 option
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL

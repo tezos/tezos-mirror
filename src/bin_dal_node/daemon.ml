@@ -373,43 +373,49 @@ module Handler = struct
      cells attested at that level. *)
   let remove_old_level_stored_data proto_parameters ctxt current_level =
     let open Lwt_syntax in
-    let oldest_level = Node_context.level_to_gc ctxt ~current_level in
-    let store = Node_context.get_store ctxt in
-    let* () =
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
-         We may want to remove this check. *)
-      if should_store_skip_list_cells ctxt proto_parameters then
-        let* res =
-          Store.Skip_list_cells.remove
-            store.skip_list_cells
-            ~attested_level:oldest_level
-        in
-        match res with
-        | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
-        | Error err ->
-            Event.(emit removing_skip_list_cells_failed (oldest_level, err))
-      else return_unit
-    in
-    let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
-    let store = Node_context.get_store ctxt in
-    let* () =
-      let* res =
-        Store.Statuses.remove_level_status
-          ~level:oldest_level
-          store.slot_header_statuses
-      in
-      match res with
-      | Ok () -> Event.(emit removed_status oldest_level)
-      | Error err -> Event.(emit removing_status_failed (oldest_level, err))
-    in
-    List.iter_s
-      (fun slot_index ->
-        let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
-        remove_slots_and_shards
-          ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-          store
-          slot_id)
-      (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
+    Node_context.level_to_gc ctxt proto_parameters ~current_level
+    |> Option.iter_s (fun oldest_level ->
+           let store = Node_context.get_store ctxt in
+           let* () =
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
+                We may want to remove this check. *)
+             if should_store_skip_list_cells ctxt proto_parameters then
+               let* res =
+                 Skip_list_cells_store.remove
+                   store.skip_list_cells
+                   ~attested_level:oldest_level
+               in
+               match res with
+               | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
+               | Error err ->
+                   Event.(
+                     emit removing_skip_list_cells_failed (oldest_level, err))
+             else return_unit
+           in
+           let number_of_slots =
+             Dal_plugin.(proto_parameters.number_of_slots)
+           in
+           let* () =
+             let* res =
+               Store.Statuses.remove_level_status
+                 ~level:oldest_level
+                 store.slot_header_statuses
+             in
+             match res with
+             | Ok () -> Event.(emit removed_status oldest_level)
+             | Error err ->
+                 Event.(emit removing_status_failed (oldest_level, err))
+           in
+           List.iter_s
+             (fun slot_index ->
+               let slot_id : Types.slot_id =
+                 {slot_level = oldest_level; slot_index}
+               in
+               remove_slots_and_shards
+                 ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+                 store
+                 slot_id)
+             (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id))
 
   (* [attestation_lag] levels after the publication of a commitment,
      if it has not been attested it will never be so we can safely
