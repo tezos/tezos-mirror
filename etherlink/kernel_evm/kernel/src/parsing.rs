@@ -397,7 +397,7 @@ impl<Mode: Parsable> InputResult<Mode> {
     ///
     // External message structure :
     // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
-    fn parse_external(
+    pub fn parse_external(
         input: &[u8],
         smart_rollup_address: &[u8],
         context: &mut Mode::Context,

@@ -6,7 +6,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::store_sequencer_blueprint;
-use crate::configuration::{fetch_limits, TezosContracts};
+use crate::configuration::{fetch_limits, DalConfiguration, TezosContracts};
+use crate::dal::fetch_and_parse_sequencer_blueprints_from_dal;
 use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
     Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
@@ -620,6 +621,7 @@ pub enum StageOneStatus {
     Skipped,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn read_sequencer_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -628,6 +630,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     sequencer: PublicKey,
     delayed_inbox: &mut DelayedInbox,
     enable_fa_bridge: bool,
+    dal: Option<DalConfiguration>,
 ) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -641,6 +644,14 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         allocated_ticks: limits
             .maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
+    };
+    if let Some(dal_config) = dal {
+        fetch_and_parse_sequencer_blueprints_from_dal(
+            host,
+            smart_rollup_address,
+            dal_config,
+            &mut parsing_context,
+        )?;
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

@@ -45,6 +45,7 @@ mod block_in_progress;
 mod blueprint;
 mod blueprint_storage;
 mod configuration;
+mod dal;
 mod delayed_inbox;
 mod error;
 mod event;
