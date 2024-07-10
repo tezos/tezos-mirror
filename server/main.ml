@@ -242,8 +242,12 @@ let get_stats ~logger db_pool =
 let get_available_data ~logger ~conf db_pool boundaries =
   let select_available_data_request =
     Caqti_request.Infix.(
-      Caqti_type.(t2 int32 int32) ->* Caqti_type.(t2 int32 int32))
-      "SELECT level, round FROM blocks WHERE level >= ? AND level <= ?"
+      Caqti_type.(t2 int32 int32) ->* Caqti_type.(t3 int32 int32 bool))
+      "SELECT \n\
+      \  b.level,\n\
+      \  b.round,\n\
+      \  EXISTS (SELECT 1 FROM blocks s WHERE s.predecessor = b.id) \n\
+      \  FROM blocks b WHERE level >= ? AND level <= ?"
   in
   with_caqti_error
     ~logger
@@ -252,7 +256,7 @@ let get_available_data ~logger ~conf db_pool boundaries =
          maybe_with_metrics conf "select_available_data" @@ fun () ->
          Db.fold select_available_data_request List.cons boundaries [])
        db_pool)
-    (fun list -> reply_public_json Data_encoding.(list (tup2 int32 int32)) list)
+    (fun list -> reply_public_json Data_encoding.(list (tup3 int32 int32 bool)) list)
 
 let get_missing_data ~logger ~conf db_pool boundaries =
   let select_missing_data_request =
