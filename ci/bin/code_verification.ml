@@ -396,6 +396,7 @@ let jobs pipeline_type =
          (* Store merged .coverage files or [.corrupt.json] files. *)
          ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
   in
+
   (* Stages *)
   let start_stage, make_dependencies =
     match pipeline_type with
@@ -448,6 +449,8 @@ let jobs pipeline_type =
       ~before_merging:(fun job_start -> Dependent [Job job_start])
       ~schedule_extended_test:(fun () -> Staged [])
   in
+
+  (* Sanity jobs *)
   let sanity =
     let job_sanity_ci : tezos_job =
       job
@@ -655,6 +658,8 @@ let jobs pipeline_type =
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
   in
+
+  (*Build jobs *)
   let build =
     (* TODO: The code is a bit convulted here because these jobs are
        either in the build or in the manual stage depending on the
@@ -729,6 +734,8 @@ let jobs pipeline_type =
     ]
     @ bin_packages_jobs
   in
+
+  (*Packaging jobs *)
   let packaging =
     let job_opam_prepare : tezos_job =
       job
@@ -776,6 +783,8 @@ let jobs pipeline_type =
              ]))
       ~schedule_extended_test:(fun () -> Staged [])
   in
+
+  (*Test jobs*)
   let test =
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
@@ -1580,6 +1589,8 @@ let jobs pipeline_type =
         [job_commit_titles]
     | Schedule_extended_test -> []
   in
+
+  (*Coverage jobs *)
   let coverage =
     match pipeline_type with
     | Before_merging ->
@@ -1627,6 +1638,8 @@ let jobs pipeline_type =
         [job_unified_coverage]
     | Schedule_extended_test -> []
   in
+
+  (*Doc jobs*)
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
@@ -1821,6 +1834,8 @@ let jobs pipeline_type =
     in
     jobs_install_python @ jobs_documentation
   in
+
+  (*Manual jobs *)
   let manual =
     (* Debian packages are always built on scheduled pipelines, and
        can be built manually on the [Before_merging] pipelines. *)
