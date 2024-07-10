@@ -55,19 +55,17 @@
 type t
 
 (** [init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
-    ~encoded_hash_size ~number_of_slots] returns a new skip lists store under
+    ~encoded_hash_size] returns a new skip lists store under
     the path [node_store_dir/skip_list_store_dir]. The
     [padded_encoded_cell_size] parameter specifies the extended size of cells
     once encoded and stored as bytes in the key-value store. The
     [encoded_hash_size] parameter indicates the size of hashes once encoded as
-    fixed-size bytes. The provided [number_of_slots] is used to know the number
-    of expected cells (hashes) per attested level. *)
+    fixed-size bytes. *)
 val init :
   node_store_dir:string ->
   skip_list_store_dir:string ->
   padded_encoded_cell_size:int ->
   encoded_hash_size:int ->
-  number_of_slots:int ->
   t tzresult Lwt.t
 
 (** [insert store ~attested_level values] inserts the given list of [values]

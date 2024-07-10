@@ -27,8 +27,20 @@
 
     TODO: https://gitlab.com/tezos/tezos/-/issues/6034 *)
 
-(** [set_share_size size] sets the size of shard shares. This function must be
-    called once, before the [layout] function of the KVS instance is used. *)
+(** [set_share_size size] sets the size of shard shares. It fails if the size
+    was already set to a different value. This function must be called once,
+    before the [layout] function of the KVS instance is used. *)
 val set_share_size : int -> unit
 
+(** Get the share size. It fails if {!set_share_size} has not been called
+    before. *)
 val share_size : unit -> int
+
+(** [set_number_of_slots n] sets the number of slots to be used by the store. It
+    fails if the size was already set to a different value. This function must
+    be called once, before the [layout] function of the KVS instance is used. *)
+val set_number_of_slots : int -> unit
+
+(** Get the number of slots size. It fails if {!set_number_of_slots} has not
+    been called before. *)
+val number_of_slots : unit -> int

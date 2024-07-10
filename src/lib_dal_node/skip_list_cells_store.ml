@@ -141,7 +141,6 @@ module Hashes = struct
   type t = {
     store : (file, key, value) KVS.t;
     file_layout : (file, key, value) KVS.file_layout;
-    number_of_slots : int;
   }
 
   let fixed_size_hash_encoding ~encoded_hash_size =
@@ -155,7 +154,7 @@ module Hashes = struct
 
   (* For the Key-Value store of hashes, we store [number_of_slots] hashes per
      file, and a file is identified by the corresponding attested level. *)
-  let file_layout encoded_hash_size ~number_of_slots =
+  let file_layout encoded_hash_size =
     let encoding = fixed_size_hash_encoding ~encoded_hash_size in
     fun ~root_dir attested_level ->
       let attested_level_string = Int32.to_string attested_level in
@@ -165,16 +164,15 @@ module Hashes = struct
         ~filepath
         ~eq:Dal_proto_types.Skip_list_hash.equal
         ~index_of:Fun.id
-        ~number_of_keys_per_file:number_of_slots
+        ~number_of_keys_per_file:(Value_size_hooks.number_of_slots ())
         ()
 
-  let init ~node_store_dir ~skip_list_store_dir ~encoded_hash_size
-      ~number_of_slots =
+  let init ~node_store_dir ~skip_list_store_dir ~encoded_hash_size =
     let open Lwt_result_syntax in
     let root_dir = node_store_dir // skip_list_store_dir // "hashes" in
     let+ store = KVS.init ~lru_size:2 ~root_dir in
-    let file_layout = file_layout encoded_hash_size ~number_of_slots in
-    {store; file_layout; number_of_slots}
+    let file_layout = file_layout encoded_hash_size in
+    {store; file_layout}
 
   let write_values {store; file_layout; _} values =
     KVS.write_values ~override:true store file_layout values
@@ -191,17 +189,13 @@ end
 type t = {cells_store : Cells.t; hashes_store : Hashes.t}
 
 let init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
-    ~encoded_hash_size ~number_of_slots =
+    ~encoded_hash_size =
   let open Lwt_result_syntax in
   let* cells_store =
     Cells.init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
   in
   let* hashes_store =
-    Hashes.init
-      ~node_store_dir
-      ~skip_list_store_dir
-      ~encoded_hash_size
-      ~number_of_slots
+    Hashes.init ~node_store_dir ~skip_list_store_dir ~encoded_hash_size
   in
   return {cells_store; hashes_store}
 
@@ -223,6 +217,7 @@ let find {cells_store; hashes_store = _} hash =
 
 let remove {cells_store; hashes_store} ~attested_level =
   let open Lwt_result_syntax in
+  let number_of_slots = Value_size_hooks.number_of_slots () in
   let* () =
     List.iter_es
       (fun idx ->
@@ -230,6 +225,6 @@ let remove {cells_store; hashes_store} ~attested_level =
         match hash with
         | Error _ -> return_unit
         | Ok hash -> Cells.remove_file cells_store hash)
-      (0 -- (hashes_store.number_of_slots - 1))
+      (0 -- (number_of_slots - 1))
   in
   Hashes.remove_file hashes_store attested_level
