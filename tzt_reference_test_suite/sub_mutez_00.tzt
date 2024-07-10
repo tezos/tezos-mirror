@@ -1,0 +1,3 @@
+code { SUB_MUTEZ } ;
+input { Stack_elt mutez 5 ; Stack_elt mutez 3 } ;
+output { Stack_elt (option mutez) (Some 2) }

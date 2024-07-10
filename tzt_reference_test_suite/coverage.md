@@ -624,10 +624,9 @@ Missing edge cases:
 
 ### `SUB_MUTEZ`
 
-***None***, but there are tests for the deprecated `SUB: mutez : mutez`:
+- [sub_mutez_00.tzt](sub_mutez_00.tzt)
+- [sub_mutez_01.tzt](sub_mutez_01.tzt)
 
-- [sub_mutez-mutez_00.tzt](sub_mutez-mutez_00.tzt)
-- [sub_mutez-mutez_01.tzt](sub_mutez-mutez_01.tzt)
 
 ## Boolean operations
 
@@ -1366,7 +1365,6 @@ Instructions with no tests:
 - `SAPLING_VERIFY_UPDATE`
 - `SELF_ADDRESS`
 - `SPLIT_TICKET`
-- `SUB_MUTEZ`
 - `SUB: int : nat`
 - `SUB: nat : int`
 - `SUB: nat : nat`
