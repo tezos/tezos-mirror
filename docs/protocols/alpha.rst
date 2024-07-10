@@ -145,3 +145,7 @@ Internal
 
 - Encoding that supports ``endorsement`` kind in operation JSON has been
   removed. (MR :gl:`!13976`)
+
+- Moved the RPC files ``contract_services.ml*`` and
+  ``delegate_services.ml*`` from ``lib_protocol`` to
+  ``lib_plugin``. (MR :gl:`!14094`)
