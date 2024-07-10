@@ -785,16 +785,21 @@ module Stake_storage_tests = struct
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
+    let commitment_period_in_blocks =
+      Raw_context.(sc_rollup ctxt).commitment_period_in_blocks
+    in
+    let inbox_level = Raw_level_repr.of_int32_exn 42l in
+    let expected_inbox_level =
+      Raw_level_repr.(add root (commitment_period_in_blocks + 1))
+    in
     let commitment, _hash =
-      commitment
-        ~predecessor:genesis_hash
-        ~inbox_level:(Raw_level_repr.of_int32_exn 42l)
-        ()
+      commitment ~predecessor:genesis_hash ~inbox_level ()
     in
     assert_fails_with
       ~loc:__LOC__
       (publish_commitment ctxt rollup staker commitment)
-      Sc_rollup_errors.Sc_rollup_bad_inbox_level
+      (Sc_rollup_errors.Sc_rollup_bad_inbox_level
+         {expected = expected_inbox_level; provided = inbox_level})
 
   (** Test that two stakers can publish the same commitment. *)
   let test_publish_existing_commitment () =

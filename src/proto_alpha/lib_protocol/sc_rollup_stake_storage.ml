@@ -285,7 +285,8 @@ let assert_commitment_period ctxt rollup commitment =
   let* () =
     fail_unless
       Raw_level_repr.(commitment.inbox_level = expected_level)
-      Sc_rollup_bad_inbox_level
+      (Sc_rollup_bad_inbox_level
+         {expected = expected_level; provided = commitment.inbox_level})
   in
   return ctxt
 
