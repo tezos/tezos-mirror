@@ -599,16 +599,13 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         allocated_ticks: limits
             .maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
-        dal_configuration: dal.clone(),
+        dal_configuration: dal,
     };
-    if let Some(dal_config) = dal {
-        fetch_and_parse_sequencer_blueprints_from_dal(
-            host,
-            smart_rollup_address,
-            dal_config,
-            &mut parsing_context,
-        )?;
-    };
+    fetch_and_parse_sequencer_blueprints_from_dal(
+        host,
+        smart_rollup_address,
+        &mut parsing_context,
+    )?;
     loop {
         // Checks there will be enough ticks to handle at least another chunk of
         // full size. If it is not the case, asks for reboot.

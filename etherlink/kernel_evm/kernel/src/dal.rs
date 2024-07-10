@@ -1,4 +1,3 @@
-use crate::configuration::DalConfiguration;
 use crate::parsing::{
     Input::ModeSpecific, InputResult::Input, SequencerInput::SequencerBlueprint,
     SequencerParsingContext,
@@ -60,51 +59,54 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 pub fn fetch_and_parse_sequencer_blueprints_from_dal<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    dal: DalConfiguration,
     parsing_context: &mut SequencerParsingContext,
 ) -> anyhow::Result<()> {
-    let params = host.reveal_dal_parameters();
-    let attestation_lag = params.attestation_lag as i32;
-    let level = read_l1_level(host).unwrap_or_default() as i32;
-    let published_level = level - attestation_lag - 1;
-    for slot_index in dal.slot_indices {
-        if let Some(slot) = import_dal_slot(host, &params, published_level, slot_index) {
-            log!(
-                host,
-                Info,
-                "DAL slot at level {} and index {} successfully imported",
-                published_level,
-                slot_index
-            );
-
-            // DAL slots are padded with zeros to have a constant
-            // size, we need to remove this padding before parsing the
-            // slot as a blueprint chunk.
-
-            // The expected format is:
-
-            // 0 (1B) / rollup_address (RAW_ROLLUP_ADDRESS_SIZE B) / blueprint tag (1B) / blueprint chunk (variable) / padding
-
-            // To remove the padding we need to measure the length of
-            // the RLP-encoded blueprint chunk which starts at
-            // position 2 + RAW_ROLLUP_ADDRESS_SIZE
-            if let Result::Ok(chunk_length) =
-                rlp_length(&slot[2 + RAW_ROLLUP_ADDRESS_SIZE..])
+    if let Some(dal_config) = parsing_context.dal_configuration.clone() {
+        let params = host.reveal_dal_parameters();
+        let attestation_lag = params.attestation_lag as i32;
+        let level = read_l1_level(host).unwrap_or_default() as i32;
+        let published_level = level - attestation_lag - 1;
+        for slot_index in &dal_config.slot_indices {
+            if let Some(slot) =
+                import_dal_slot(host, &params, published_level, *slot_index)
             {
-                // Padding removal
-                let slot = &slot[0..2 + RAW_ROLLUP_ADDRESS_SIZE + chunk_length];
-                let res = crate::parsing::InputResult::parse_external(
-                    slot,
-                    &smart_rollup_address,
-                    parsing_context,
+                log!(
+                    host,
+                    Info,
+                    "DAL slot at level {} and index {} successfully imported",
+                    published_level,
+                    slot_index
                 );
-                if let Input(ModeSpecific(SequencerBlueprint(chunk))) = res {
-                    log!(
-                        host,
-                        Info,
-                        "DAL slot successfully parsed as a blueprint chunk"
+
+                // DAL slots are padded with zeros to have a constant
+                // size, we need to remove this padding before parsing the
+                // slot as a blueprint chunk.
+
+                // The expected format is:
+
+                // 0 (1B) / rollup_address (RAW_ROLLUP_ADDRESS_SIZE B) / blueprint tag (1B) / blueprint chunk (variable) / padding
+
+                // To remove the padding we need to measure the length of
+                // the RLP-encoded blueprint chunk which starts at
+                // position 2 + RAW_ROLLUP_ADDRESS_SIZE
+                if let Result::Ok(chunk_length) =
+                    rlp_length(&slot[2 + RAW_ROLLUP_ADDRESS_SIZE..])
+                {
+                    // Padding removal
+                    let slot = &slot[0..2 + RAW_ROLLUP_ADDRESS_SIZE + chunk_length];
+                    let res = crate::parsing::InputResult::parse_external(
+                        slot,
+                        &smart_rollup_address,
+                        parsing_context,
                     );
-                    crate::blueprint_storage::store_sequencer_blueprint(host, chunk)?
+                    if let Input(ModeSpecific(SequencerBlueprint(chunk))) = res {
+                        log!(
+                            host,
+                            Info,
+                            "DAL slot successfully parsed as a blueprint chunk"
+                        );
+                        crate::blueprint_storage::store_sequencer_blueprint(host, chunk)?
+                    }
                 }
             }
         }
