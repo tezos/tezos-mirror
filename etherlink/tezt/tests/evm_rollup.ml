@@ -5177,7 +5177,7 @@ let test_estimate_gas_out_of_ticks =
 let test_l2_call_selfdetruct_contract_in_same_transaction =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "l2_call"; "selfdestrcut"]
+    ~tags:["evm"; "l2_call"; "selfdestruct"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -5191,8 +5191,11 @@ let test_l2_call_selfdetruct_contract_in_same_transaction =
     setup_evm_kernel ~admin:None protocol
   in
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+  let* call_selfdestruct_resolved = call_selfdestruct () in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* _address, _tx = deploy ~contract:call_selfdestruct ~sender evm_setup in
+  let* _address, _tx =
+    deploy ~contract:call_selfdestruct_resolved ~sender evm_setup
+  in
   unit
 
 let test_call_recursive_contract_estimate_gas =
