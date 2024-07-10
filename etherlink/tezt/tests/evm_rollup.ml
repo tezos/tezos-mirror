@@ -4072,9 +4072,13 @@ let test_l2_call_inter_contract =
   in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
+  let* callee_resolved = callee () in
+  let* caller_resolved = caller () in
 
   (* deploy Callee contract *)
-  let* callee_address, _tx = deploy ~contract:callee ~sender evm_setup in
+  let* callee_address, _tx =
+    deploy ~contract:callee_resolved ~sender evm_setup
+  in
 
   (* set 20 directly in the Callee *)
   let* tx =
@@ -4082,7 +4086,7 @@ let test_l2_call_inter_contract =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:callee.label
+        ~abi_label:callee_resolved.label
         ~address:callee_address
         ~method_call:(Printf.sprintf "setX(%d)" n)
     in
@@ -4100,7 +4104,9 @@ let test_l2_call_inter_contract =
   in
 
   (* deploy caller contract *)
-  let* caller_address, _tx = deploy ~contract:caller ~sender evm_setup in
+  let* caller_address, _tx =
+    deploy ~contract:caller_resolved ~sender evm_setup
+  in
 
   (* set 10 through the caller *)
   let* tx =
@@ -4108,7 +4114,7 @@ let test_l2_call_inter_contract =
       Eth_cli.contract_send
         ~source_private_key:sender.private_key
         ~endpoint
-        ~abi_label:caller.label
+        ~abi_label:caller_resolved.label
         ~address:caller_address
         ~method_call:(Printf.sprintf "setX(\"%s\", %d)" callee_address n)
     in
