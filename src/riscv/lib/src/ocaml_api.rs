@@ -8,6 +8,7 @@ use crate::pvm::{
     PvmHooks, PvmStatus,
 };
 use crate::storage::{self, StorageError};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
 
 const HERMIT_LOADER: &[u8] =
@@ -23,16 +24,33 @@ pub struct State(DummyPvm);
 pub struct Id(storage::Hash);
 
 #[ocaml::sig]
-pub struct Status(PvmStatus);
-
-#[ocaml::sig]
 pub struct Hooks(PvmHooks<'static>);
 
 ocaml::custom!(Repo);
 ocaml::custom!(State);
 ocaml::custom!(Id);
-ocaml::custom!(Status);
 ocaml::custom!(Hooks);
+
+#[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive)]
+#[ocaml::sig("Evaluating | WaitingForInput | WaitingForMetadata")]
+#[repr(u8)]
+pub enum Status {
+    Evaluating,
+    WaitingForInput,
+    WaitingForMetadata,
+}
+
+impl From<PvmStatus> for Status {
+    fn from(item: PvmStatus) -> Self {
+        Status::try_from(item as u8).expect("Invalid conversion")
+    }
+}
+
+impl From<Status> for PvmStatus {
+    fn from(item: Status) -> Self {
+        PvmStatus::try_from(item as u8).expect("Invalid conversion")
+    }
+}
 
 #[ocaml::func]
 #[ocaml::sig("unit -> hooks")]
@@ -114,14 +132,14 @@ pub fn octez_riscv_storage_checkout(
 
 #[ocaml::func]
 #[ocaml::sig("state -> status")]
-pub fn octez_riscv_get_status(state: Pointer<State>) -> Pointer<Status> {
-    Status(state.as_ref().0.get_status()).into()
+pub fn octez_riscv_get_status(state: Pointer<State>) -> Status {
+    state.as_ref().0.get_status().into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("status -> string")]
-pub fn octez_riscv_string_of_status(status: Pointer<Status>) -> String {
-    status.as_ref().0.to_string()
+pub fn octez_riscv_string_of_status(status: Status) -> String {
+    PvmStatus::from(status).to_string()
 }
 
 #[ocaml::func]

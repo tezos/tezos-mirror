@@ -10,6 +10,7 @@ use crate::{
 };
 use std::{
     convert::Infallible,
+    fmt,
     io::{stdout, Write},
     ops::RangeBounds,
 };
@@ -48,7 +49,7 @@ pub type PvmLayout<ML> = (
 );
 
 /// PVM status
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::Display)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum PvmStatus {
     Evaluating,
@@ -60,6 +61,17 @@ impl Default for PvmStatus {
     #[inline(always)]
     fn default() -> Self {
         Self::Evaluating
+    }
+}
+
+impl fmt::Display for PvmStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = match self {
+            PvmStatus::Evaluating => "Evaluating",
+            PvmStatus::WaitingForInput => "Waiting for input message",
+            PvmStatus::WaitingForMetadata => "Waiting for metadata",
+        };
+        f.write_str(status)
     }
 }
 
