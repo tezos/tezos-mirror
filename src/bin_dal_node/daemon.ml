@@ -277,20 +277,6 @@ module Handler = struct
         let*! () = Node_context.set_profile_ctxt ctxt pctxt in
         return_unit
 
-  let init_skip_list_cells_store ~node_store_dir =
-    (* We support at most 64 back-pointers, each of which takes 32 bytes.
-       The cells content itself takes less than 64 bytes. *)
-    let padded_encoded_cell_size = 64 * (32 + 1) in
-    (* A pointer hash is 32 bytes length, but because of the double
-       encoding in Dal_proto_types and then in skip_list_cells_store, we
-       have an extra 4 bytes for encoding the size. *)
-    let encoded_hash_size = 32 + 4 in
-    Skip_list_cells_store.init
-      ~node_store_dir
-      ~skip_list_store_dir:"skip_list_store"
-      ~padded_encoded_cell_size
-      ~encoded_hash_size
-
   let resolve_plugin_and_set_ready config ctxt cctxt ?last_notified_level
       amplificator () =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
@@ -320,10 +306,6 @@ module Handler = struct
         (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
       Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
       let* () = set_profile_context ctxt config proto_parameters in
-      let* skip_list_cells_store =
-        let node_store_dir = Configuration_file.store_path config in
-        init_skip_list_cells_store ~node_store_dir
-      in
       let level =
         match last_notified_level with None -> level | Some level -> level
       in
@@ -331,7 +313,6 @@ module Handler = struct
         Node_context.set_ready
           ctxt
           cctxt
-          skip_list_cells_store
           cryptobox
           shards_proofs_precomputation
           proto_parameters
@@ -390,17 +371,17 @@ module Handler = struct
      their status) for commitments published at level exactly
      {!Node_context.level_to_gc ~current_level}. It also removes skip list
      cells attested at that level. *)
-  let remove_old_level_stored_data proto_parameters ctxt skip_list_cells_store
-      current_level =
+  let remove_old_level_stored_data proto_parameters ctxt current_level =
     let open Lwt_syntax in
     let oldest_level = Node_context.level_to_gc ctxt ~current_level in
+    let store = Node_context.get_store ctxt in
     let* () =
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
          We may want to remove this check. *)
       if should_store_skip_list_cells ctxt proto_parameters then
         let* res =
-          Skip_list_cells_store.remove
-            skip_list_cells_store
+          Store.Skip_list_cells.remove
+            store.skip_list_cells
             ~attested_level:oldest_level
         in
         match res with
@@ -483,8 +464,7 @@ module Handler = struct
       (Node_context.get_gs_worker ctxt)
       committee
 
-  let process_block ctxt cctxt proto_parameters skip_list_cells_store
-      finalized_shell_header =
+  let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
     let block_level = finalized_shell_header.Block_header.level in
     let block = `Level block_level in
@@ -529,8 +509,9 @@ module Handler = struct
                       cell ))
                 cells_of_level
             in
-            Skip_list_cells_store.insert
-              skip_list_cells_store
+            let store = Node_context.get_store ctxt in
+            Store.Skip_list_cells.insert
+              store.skip_list_cells
               ~attested_level:block_level
               cells_of_level
           else return_unit
@@ -602,15 +583,10 @@ module Handler = struct
       ~level:block_level
 
   let rec try_process_block ~retries ctxt cctxt proto_parameters
-      skip_list_cells_store finalized_shell_header =
+      finalized_shell_header =
     let open Lwt_syntax in
     let* res =
-      process_block
-        ctxt
-        cctxt
-        proto_parameters
-        skip_list_cells_store
-        finalized_shell_header
+      process_block ctxt cctxt proto_parameters finalized_shell_header
     in
     match res with
     | Error e when Layer_1.is_connection_error e && retries > 0 ->
@@ -620,7 +596,6 @@ module Handler = struct
           ctxt
           cctxt
           proto_parameters
-          skip_list_cells_store
           finalized_shell_header
     | _ -> return res
 
@@ -647,7 +622,6 @@ module Handler = struct
                   proto_parameters;
                   cryptobox;
                   shards_proofs_precomputation = _;
-                  skip_list_cells_store;
                   ongoing_amplifications = _;
                   slots_under_reconstruction = _;
                 } =
@@ -693,11 +667,7 @@ module Handler = struct
                    level
                    proto_parameters) ;
               let*! () =
-                remove_old_level_stored_data
-                  proto_parameters
-                  ctxt
-                  skip_list_cells_store
-                  level
+                remove_old_level_stored_data proto_parameters ctxt level
               in
               let* () =
                 if level = 1l then
@@ -710,7 +680,6 @@ module Handler = struct
                     ctxt
                     cctxt
                     proto_parameters
-                    skip_list_cells_store
                     finalized_shell_header
               in
               loop ())

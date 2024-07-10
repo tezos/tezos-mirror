@@ -36,7 +36,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
       (** The slot identifiers of the commitments currently being
      amplified. This set is used to prevent concurrent amplifications
@@ -77,7 +76,7 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt rpc_ctxt skip_list_cells_store cryptobox
+(** [set_ready ctxt rpc_ctxt cryptobox
     shards_proofs_precomputation proto_parameters ~level] updates in place the
     status value to [Ready], and initializes the inner [ready_ctxt] value with
     the given parameters, except [level] which should represent the current
@@ -87,7 +86,6 @@ exception Status_already_ready
 val set_ready :
   t ->
   Rpc_context.t ->
-  Skip_list_cells_store.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->

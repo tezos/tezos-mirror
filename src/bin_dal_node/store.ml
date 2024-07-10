@@ -132,6 +132,8 @@ module Stores_dirs = struct
   let slot = "slot_store"
 
   let status = "status_store"
+
+  let skip_list_cells = "skip_list_store"
 end
 
 module Shards = struct
@@ -386,6 +388,8 @@ module Statuses = struct
   let remove_level_status ~level t = KVS.remove_file t file_layout level
 end
 
+module Skip_list_cells = Skip_list_cells_store
+
 module Commitment_indexed_cache =
   (* The commitment-indexed cache is where slots, shards, and
      shard proofs are kept before being associated to some slot id. The
@@ -405,6 +409,7 @@ type t = {
   slot_header_statuses : Statuses.t;
   shards : Shards.t;
   slots : Slots.t;
+  skip_list_cells : Skip_list_cells.t;
   cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
@@ -537,6 +542,20 @@ let check_version_and_may_upgrade base_dir =
           (Version.Invalid_data_dir_version
              {actual = version; expected = Version.current_version})
 
+let init_skip_list_cells_store base_dir =
+  (* We support at most 64 back-pointers, each of which takes 32 bytes.
+     The cells content itself takes less than 64 bytes. *)
+  let padded_encoded_cell_size = 64 * (32 + 1) in
+  (* A pointer hash is 32 bytes length, but because of the double
+     encoding in Dal_proto_types and then in skip_list_cells_store, we
+     have an extra 4 bytes for encoding the size. *)
+  let encoded_hash_size = 32 + 4 in
+  Skip_list_cells_store.init
+    ~node_store_dir:base_dir
+    ~skip_list_store_dir:Stores_dirs.skip_list_cells
+    ~padded_encoded_cell_size
+    ~encoded_hash_size
+
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
 let init config =
@@ -546,12 +565,14 @@ let init config =
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
+  let* skip_list_cells = init_skip_list_cells_store base_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
       shards;
       slots;
       slot_header_statuses;
+      skip_list_cells;
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;

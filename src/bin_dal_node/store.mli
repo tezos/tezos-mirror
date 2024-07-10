@@ -117,6 +117,8 @@ module Statuses : sig
   val remove_level_status : level:int32 -> t -> unit tzresult Lwt.t
 end
 
+module Skip_list_cells : module type of Skip_list_cells_store
+
 module Commitment_indexed_cache : sig
   type 'a t
 
@@ -129,12 +131,15 @@ type t = private {
   slot_header_statuses : Statuses.t;  (** Statuses store *)
   shards : Shards.t;  (** Shards store *)
   slots : Slots.t;  (** Slots store *)
+  skip_list_cells : Skip_list_cells.t;  (** Skip list cells store *)
   cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
   finalized_commitments : Slot_id_cache.t;
-      (** Cache of commitments indexed by level and then by slot id. The maximum number of levels is given by {!Constants.slot_id_cache_size}. No more than [number_of_slots] commitments can be stored per level. *)
+      (** Cache of commitments indexed by level and then by slot id. The maximum
+          number of levels is given by {!Constants.slot_id_cache_size}. No more
+          than [number_of_slots] commitments can be stored per level. *)
 }
 
 (** [cache_entry store commitment entry] adds or replace an entry to
