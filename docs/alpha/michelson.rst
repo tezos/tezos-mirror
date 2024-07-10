@@ -2020,7 +2020,7 @@ The language is implemented in OCaml as follows:
    ``Prim ("If", ...)`` into an ``If``, a ``Prim ("Dup", ...)`` into a
    ``Dup``, etc.
 
-.. michelson_tzt_alpha:
+.. _michelson_tzt_alpha:
 
 TZT, a Syntax extension for writing unit tests
 ----------------------------------------------

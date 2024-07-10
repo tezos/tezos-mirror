@@ -1982,7 +1982,8 @@ The language is implemented in OCaml as follows:
    ``Prim ("If", ...)`` into an ``If``, a ``Prim ("Dup", ...)`` into a
    ``Dup``, etc.
 
-.. michelson_tzt_paris:
+.. _michelson_tzt:
+.. _michelson_tzt_paris:
 
 TZT, a Syntax extension for writing unit tests
 ----------------------------------------------
