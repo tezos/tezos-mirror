@@ -257,6 +257,8 @@ module For_snapshots = struct
                loser_mode;
                apply_unsafe_patches;
                unsafe_pvm_patches = [];
+               execute_outbox_messages_filter =
+                 Configuration.default_execute_outbox_filter;
                dal_node_endpoint = None;
                dac_observer_endpoint = None;
                dac_timeout = None;
@@ -369,6 +371,8 @@ module Internal_for_tests = struct
           loser_mode;
           apply_unsafe_patches = false;
           unsafe_pvm_patches = [];
+          execute_outbox_messages_filter =
+            Configuration.default_execute_outbox_filter;
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;

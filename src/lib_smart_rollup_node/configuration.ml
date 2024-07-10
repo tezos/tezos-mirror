@@ -53,6 +53,20 @@ type gc_parameters = {
 
 type history_mode = Archive | Full
 
+type outbox_destination_filter =
+  | Any_destination
+  | Destination_among of string list
+
+type outbox_entrypoint_filter =
+  | Any_entrypoint
+  | Entrypoint_among of string list
+
+type outbox_message_filter =
+  | Transaction of {
+      destination : outbox_destination_filter;
+      entrypoint : outbox_entrypoint_filter;
+    }
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -68,6 +82,7 @@ type t = {
   loser_mode : Loser_mode.t;
   apply_unsafe_patches : bool;
   unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
+  execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
@@ -234,6 +249,8 @@ let default_gc_parameters =
   {frequency_in_blocks = None; context_splitting_period = None}
 
 let default_history_mode = Full
+
+let default_execute_outbox_filter = []
 
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
@@ -411,6 +428,72 @@ let cors_encoding : Resto_cohttp.Cors.t Data_encoding.t =
        (req "allowed_headers" (list string))
        (req "allowed_origins" (list string))
 
+let outbox_destination_filter_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"any_destination"
+        ~description:"Accept any destination."
+        (Tag 0)
+        (constant "any")
+        (function Any_destination -> Some () | _ -> None)
+        (fun () -> Any_destination);
+      case
+        ~title:"destination_among"
+        ~description:
+          "Accept destination that matches the given list (in base58-check)."
+        (Tag 1)
+        (list string)
+        (function Destination_among l -> Some l | _ -> None)
+        (fun l -> Destination_among l);
+    ]
+
+let outbox_entrypoint_filter_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"any_entrypoint"
+        ~description:"Accept any entrypoint."
+        (Tag 0)
+        (constant "any")
+        (function Any_entrypoint -> Some () | _ -> None)
+        (fun () -> Any_entrypoint);
+      case
+        ~title:"entrypoint_among"
+        ~description:"Accept entrypoint of the given list."
+        (Tag 1)
+        (list string)
+        (function Entrypoint_among l -> Some l | _ -> None)
+        (fun l -> Entrypoint_among l);
+    ]
+
+let outbox_messages_filter_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"transaction_filter"
+        ~description:
+          "Accept transactions which match the filter on their destination and \
+           entrypoint."
+        (Tag 0)
+        (obj1
+           (req
+              "transaction"
+              (obj2
+                 (req "destination" outbox_destination_filter_encoding)
+                 (req "entrypoint" outbox_entrypoint_filter_encoding))))
+        (function
+          | Transaction {destination; entrypoint} ->
+              Some (destination, entrypoint))
+        (fun (destination, entrypoint) -> Transaction {destination; entrypoint});
+    ]
+
+let execute_outbox_messages_filter_encoding =
+  Data_encoding.list outbox_messages_filter_encoding
+
 let encoding default_display : t Data_encoding.t =
   let open Data_encoding in
   let dft =
@@ -435,6 +518,7 @@ let encoding default_display : t Data_encoding.t =
            mode;
            loser_mode;
            apply_unsafe_patches = _;
+           execute_outbox_messages_filter;
            unsafe_pvm_patches;
            dal_node_endpoint;
            dac_observer_endpoint;
@@ -468,7 +552,8 @@ let encoding default_display : t Data_encoding.t =
             fee_parameters,
             mode,
             loser_mode,
-            unsafe_pvm_patches ) ),
+            unsafe_pvm_patches,
+            execute_outbox_messages_filter ) ),
         ( ( dal_node_endpoint,
             dac_observer_endpoint,
             dac_timeout,
@@ -500,7 +585,8 @@ let encoding default_display : t Data_encoding.t =
                fee_parameters,
                mode,
                loser_mode,
-               unsafe_pvm_patches ) ),
+               unsafe_pvm_patches,
+               execute_outbox_messages_filter ) ),
            ( ( dal_node_endpoint,
                dac_observer_endpoint,
                dac_timeout,
@@ -538,6 +624,7 @@ let encoding default_display : t Data_encoding.t =
              line. *)
           false;
         unsafe_pvm_patches;
+        execute_outbox_messages_filter;
         dal_node_endpoint;
         dac_observer_endpoint;
         dac_timeout;
@@ -580,7 +667,7 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Access control list"
                 Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
                 default_acl))
-          (obj7
+          (obj8
              (opt "metrics-addr" ~description:"Metrics address" string)
              (dft "performance-metrics" bool false)
              (dft
@@ -613,7 +700,15 @@ let encoding default_display : t Data_encoding.t =
                   "Unsafe patches to apply to the PVM. For tests only, don't \
                    set this value in production."
                 (list Pvm_patches.unsafe_patch_encoding)
-                [])))
+                [])
+             (dft
+                "execute-outbox-messages-filter"
+                ~description:
+                  "A filter to select which outbox messages the rollup will \
+                   execute automatically (must be in maintenance or operator \
+                   mode)."
+                execute_outbox_messages_filter_encoding
+                default_execute_outbox_filter)))
        (merge_objs
           (obj9
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
@@ -788,6 +883,7 @@ module Cli = struct
         loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
         apply_unsafe_patches;
         unsafe_pvm_patches = [];
+        execute_outbox_messages_filter = default_execute_outbox_filter;
         batcher = default_batcher;
         injector =
           {

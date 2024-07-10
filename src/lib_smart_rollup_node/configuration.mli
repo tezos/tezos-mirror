@@ -83,6 +83,26 @@ type history_mode =
       (** Only the history necessary to play refutation games is kept
           (i.e. after the LCC only) *)
 
+(** Filter on destination of outbox message transactions. *)
+type outbox_destination_filter =
+  | Any_destination  (** Accept any destination.  *)
+  | Destination_among of string list
+      (** Accept destination which match the given list (in base58-check). *)
+
+(** Filter on entrypoints of outbox message transactions. *)
+type outbox_entrypoint_filter =
+  | Any_entrypoint  (** Accept any entrypoint. *)
+  | Entrypoint_among of string list  (** Accept entrypoints which are listed. *)
+
+(** Filter on outbox messages executed by the rollup node automatically. *)
+type outbox_message_filter =
+  | Transaction of {
+      destination : outbox_destination_filter;
+      entrypoint : outbox_entrypoint_filter;
+    }
+      (** Accept transactions which match the filter on their destination and
+          entrypoint. *)
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -102,6 +122,7 @@ type t = {
     Decide whether we want to handle connections to multiple
     Dal nodes for different slot indexes.
   *)
+  execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
@@ -193,6 +214,9 @@ val default_gc_parameters : gc_parameters
 (** [default_history_mode] is the default history mode for the rollup node
     ({!Full}).  *)
 val default_history_mode : history_mode
+
+(** Default filter for executing outbox messages is only whitelist updates.  *)
+val default_execute_outbox_filter : outbox_message_filter list
 
 val history_mode_encoding : history_mode Data_encoding.t
 
