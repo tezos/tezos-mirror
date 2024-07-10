@@ -149,6 +149,11 @@ impl HostState {
         &self.dal_parameters
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn set_dal_parameters(&mut self, params: RollupDalParameters) {
+        self.dal_parameters = params
+    }
+
     pub(crate) fn get_dal_slot(
         &self,
         published_level: i32,
