@@ -243,12 +243,60 @@ module Path : sig
   val prefix :
     ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
 
+  (** [subst0 p] is a path akin to [p] but with a different type for the prefix
+      parameter. This is useful when declaring a service in a part of the code
+      where the type of the prefix parameters are not available.
+
+      The typical use-case is with protocol services. A service is declared with
+      some dummy prefix parameters.
+
+      Later, the shell instantiates the protocol. The shell obtains this service
+      declaration from the instantiated protocol. The shell maintains a protocol
+      state (so called context), which is associated to a given chain (main,
+      testnet, etc.).
+
+      The shell registers the service by substituting the shell-side prefix
+      parameters.
+
+      For example, below is a commented excerpt from
+      [src/lib_shell/block_directory.ml].
+
+{[
+  (* new directory with concrete prefix parameters *)
+  let dir :
+      (Store.chain_store * Block_hash.t * Block_header.t) Tezos_rpc.Directory.t
+      ref =
+    ref Tezos_rpc.Directory.empty
+  in
+  (* function to add a service to the new directory
+     note the call to [subst0] which substitutes the dummy prefix parameters of
+     [s] to the concrete ones *)
+  let register0 s f =
+    dir :=
+      Tezos_rpc.Directory.register
+        !dir
+        (Tezos_rpc.Service.subst0 s) (* apply [subst0] to the path of [s] *)
+        (fun block p q -> f block p q)
+  in
+  (* get the service declarations from the [Proto]col *)
+  let module Block_services = Block_services.Make (Proto) (Proto) in
+  let module S = Block_services.S in
+  register0
+    S.hash (* service declared in the protocol used a dummy unit instead of
+              [(chain, hash, header)] *)
+    (fun (_, hash, _) () () -> return hash) ;
+  (* more registration with subst0 threaded in …*)
+]}
+      *)
   val subst0 : ('p, 'p) path -> ('p2, 'p2) path
 
+  (** See [subst0] for rationale. *)
   val subst1 : ('p, 'p * 'a) path -> ('p2, 'p2 * 'a) path
 
+  (** See [subst0] for rationale. *)
   val subst2 : ('p, ('p * 'a) * 'b) path -> ('p2, ('p2 * 'a) * 'b) path
 
+  (** See [subst0] for rationale. *)
   val subst3 :
     ('p, (('p * 'a) * 'b) * 'c) path -> ('p2, (('p2 * 'a) * 'b) * 'c) path
 
