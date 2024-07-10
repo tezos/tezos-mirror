@@ -81,11 +81,12 @@ let is_refutable_commitment node_ctxt
       return our_commitment_and_hash
   | _ -> return_none
 
-(** Publish a commitment when an accuser node sees a refutable commitment. *)
-let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
-    their_commitment their_commitment_hash =
+(** React to a commitment published by someone else:
+    - Publish a commitment when an accuser node sees a refutable commitment.
+    - Stop an observer rollup node if configured to bail. *)
+let check_other_commitment node_ctxt ~other rollup their_commitment
+    their_commitment_hash =
   let open Lwt_result_syntax in
-  when_ (Node_context.is_accuser node_ctxt) @@ fun () ->
   (* We are seeing a commitment from someone else. We check if we agree
      with it, otherwise the accuser publishes our commitment in order to
      play the refutation game. *)
@@ -94,7 +95,9 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
   in
   match refutable with
   | None -> return_unit
-  | Some (our_commitment, our_commitment_hash) ->
+  | Some (our_commitment, our_commitment_hash)
+    when Node_context.is_accuser node_ctxt ->
+      (* Accuser publishes commitment before starting refutation game. *)
       let*! () =
         Refutation_game_event.potential_conflict_detected
           ~our_commitment_hash
@@ -104,6 +107,27 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
       in
       assert (Sc_rollup.Address.(node_ctxt.config.sc_rollup_address = rollup)) ;
       Publisher.publish_single_commitment node_ctxt our_commitment
+  | Some _ when Publisher.worker_status () = `Running ->
+      (* Operator will have published commitment automatically. *)
+      return_unit
+  | Some (our_commitment, our_commitment_hash) ->
+      (* Rollup node has detected a bad commitment on chain but cannot refute
+         it. It stops and reports the problem. *)
+      let*! () =
+        Refutation_game_event.potential_conflict_detected
+          ~our_commitment_hash
+          ~their_commitment_hash
+          ~level:(Raw_level.to_int32 their_commitment.inbox_level)
+          ~other
+      in
+      fail_when
+        node_ctxt.config.bail_on_disagree
+        (Rollup_node_errors.Disagree_with_commitment
+           {
+             our_commitment;
+             their_commitment =
+               Sc_rollup_proto_types.Commitment.to_octez their_commitment;
+           })
 
 (** If in bailout mode and when the operator is not staked on any
     commitment, the bond is recovered. *)
@@ -172,7 +196,7 @@ let process_included_l1_operation (type kind) ~catching_up
       in
       (* An accuser node will publish its commitment if the other one is
          refutable. *)
-      accuser_publish_commitment_when_refutable
+      check_other_commitment
         node_ctxt
         ~other:source
         rollup

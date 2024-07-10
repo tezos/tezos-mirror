@@ -120,6 +120,7 @@ type t = {
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
+  bail_on_disagree : bool;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -292,6 +293,7 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    bail_on_disagree:bool ->
     t tzresult
 
   val create_or_read_config :
@@ -326,5 +328,6 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    bail_on_disagree:bool ->
     t tzresult Lwt.t
 end
