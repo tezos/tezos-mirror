@@ -797,6 +797,94 @@ let get_proto_plugins cctxt profile_ctxt last_processed_level
   in
   Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
 
+(* This function removes old data starting from [last_processed_level -
+   storage_period] to [target_level - storage_period], where [storage_period] is
+   the period for which the DAL node stores data related to attested slots and
+   [target_level] is the level at which we connect the P2P and switch to
+   processing blocks in sync with the L1. [target_level] is set to [head_level -
+   2]. It also inserts skip list cells if needed in the period [head_level -
+   storage_level].
+
+   FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
+   We don't call [may_add_plugin], so there is a chance the plugin changes
+   and we don't detect it if this code starts running just before the migration
+   level, and the head changes meanwhile to be above the migration level.
+*)
+let clean_up_store ctxt cctxt ~last_processed_level
+    (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
+  let open Lwt_result_syntax in
+  let store_skip_list_cells ~level =
+    let*? (module Plugin) =
+      Node_context.get_plugin_for_level ctxt ~level:(Int32.pred level)
+    in
+    let* block_info =
+      Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
+    in
+    let* dal_constants = Handler.get_constants ctxt cctxt ~level in
+    Handler.store_skip_list_cells
+      ctxt
+      cctxt
+      dal_constants
+      block_info
+      level
+      (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
+  in
+  let lpl_store = Node_context.get_last_processed_level_store ctxt in
+  let supports_refutations = Handler.supports_refutations ctxt in
+  (* [target_level] identifies the level wrt to head level at which we want to
+     start the P2P and process blocks as usual. *)
+  let target_level head_level = Int32.(sub head_level 2l) in
+  let first_level_for_skip_list_storage period head_level =
+    (* We consider that [period] refers to published levels (not attested
+       levels). The plus one comes from the technical details of
+       {store_skip_list_cells}. Note that behind this first level we do not have
+       the plugin. *)
+    Int32.(
+      sub
+        head_level
+        (of_int (period - (proto_parameters.Dal_plugin.attestation_lag + 1))))
+  in
+  let should_store_skip_list_cells ~head_level ~level =
+    let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+    let period =
+      Profile_manager.get_attested_data_default_store_period
+        profile_ctxt
+        proto_parameters
+    in
+    supports_refutations
+    && level >= first_level_for_skip_list_storage period head_level
+  in
+  let rec do_clean_up last_processed_level head_level =
+    let last_level = target_level head_level in
+    let rec clean_up_from_level level =
+      if level > last_level then return_unit
+      else
+        let*! () =
+          Handler.remove_old_level_stored_data proto_parameters ctxt level
+        in
+        let* () =
+          if should_store_skip_list_cells ~head_level ~level then
+            store_skip_list_cells ~level
+          else return_unit
+        in
+        let* () =
+          Last_processed_level.save_last_processed_level lpl_store ~level
+        in
+        clean_up_from_level (Int32.succ level)
+    in
+    (* Clean up from [last_processed_level] to [last_level]. *)
+    let* () = clean_up_from_level (Int32.succ last_processed_level) in
+    (* As this iteration may be slow, the head level might have advanced in the
+       meanwhile. *)
+    let* header =
+      Shell_services.Blocks.Header.shell_header cctxt ~block:(`Head 0) ()
+    in
+    let new_head_level = header.Block_header.level in
+    if new_head_level > head_level then do_clean_up last_level new_head_level
+    else return_unit
+  in
+  do_clean_up last_processed_level head_level
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -964,15 +1052,29 @@ let run ~data_dir ~configuration_override =
       metrics_server
       last_processed_level_store
   in
-  let*! crawler =
+  let* () =
+    match last_processed_level with
+    | None -> (* there's nothing to clean up *) return_unit
+    | Some last_processed_level ->
+        clean_up_store ctxt cctxt ~last_processed_level plugin_info
+  in
+  let* crawler =
+    (* We reload the last processed level because [clean_up_store] has likely
+       modified it. *)
+    let* last_notified_level =
+      Last_processed_level.load_last_processed_level last_processed_level_store
+    in
     let open Constants in
-    Crawler.start
-      ~name:"dal_node_crawler"
-      ~chain:`Main
-      ~reconnection_delay:initial_l1_crawler_reconnection_delay
-      ~l1_blocks_cache_size:crawler_l1_blocks_cache_size
-      ?last_notified_level:last_processed_level
-      cctxt
+    let*! crawler =
+      Crawler.start
+        ~name:"dal_node_crawler"
+        ~chain:`Main
+        ~reconnection_delay:initial_l1_crawler_reconnection_delay
+        ~l1_blocks_cache_size:crawler_l1_blocks_cache_size
+        ?last_notified_level
+        cctxt
+    in
+    return crawler
   in
   let* () =
     match amplificator with
