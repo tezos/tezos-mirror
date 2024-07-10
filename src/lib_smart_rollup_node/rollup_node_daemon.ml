@@ -454,6 +454,36 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
             return_unit)
   else return_unit
 
+let check_operator_balance state =
+  let open Lwt_result_syntax in
+  match Reference.get state.node_ctxt.lpc with
+  | Some _ ->
+      (* Operator has already published a commitment, so has staked. *)
+      return_unit
+  | None -> (
+      let publisher =
+        Purpose.find_operator Operating state.node_ctxt.config.operators
+      in
+      match publisher with
+      | None ->
+          (* Not operating the rollup, so no need to stake. *)
+          return_unit
+      | Some (Single publisher) ->
+          let (module Plugin) = state.plugin in
+          let* balance =
+            Plugin.Layer1_helpers.get_balance_mutez
+              state.node_ctxt.cctxt
+              publisher
+          in
+          if balance > 10_000_000_000L (* 10ktez *) then return_unit
+          else
+            failwith
+              "Operator %a only has %f tz but needs more than 10000 in order \
+               to stake on the rollup."
+              Signature.Public_key_hash.pp
+              publisher
+              (Int64.to_float balance /. 1_000_000.))
+
 let make_signers_for_injector operators =
   let update map (purpose, operator) =
     match operator with
@@ -837,5 +867,6 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       dir
   in
   let state = {node_ctxt; rpc_server; configuration; plugin} in
+  let* () = check_operator_balance state in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state

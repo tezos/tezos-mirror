@@ -178,6 +178,13 @@ module type LAYER1_HELPERS = sig
     Address.t ->
     Commitment.Hash.t ->
     Commitment.t tzresult Lwt.t
+
+  (** Retrieve the balance in mutez for a given public key hash. *)
+  val get_balance_mutez :
+    #Client_context.full ->
+    ?block:Block_hash.t ->
+    Signature.public_key_hash ->
+    int64 tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)
