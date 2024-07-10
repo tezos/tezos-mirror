@@ -256,7 +256,8 @@ let get_available_data ~logger ~conf db_pool boundaries =
          maybe_with_metrics conf "select_available_data" @@ fun () ->
          Db.fold select_available_data_request List.cons boundaries [])
        db_pool)
-    (fun list -> reply_public_json Data_encoding.(list (tup3 int32 int32 bool)) list)
+    (fun list ->
+      reply_public_json Data_encoding.(list (tup3 int32 int32 bool)) list)
 
 let get_missing_data ~logger ~conf db_pool boundaries =
   let select_missing_data_request =
