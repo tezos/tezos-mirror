@@ -333,6 +333,8 @@ pub enum InterpreterErrorExpectation<'a> {
     GeneralOverflow(BigInt, BigInt),
     /// MutezOverflow error, which can happen with mutez arithmetic.
     MutezOverflow(i64, i64),
+    /// Overflow error, which can happen with arithmetic operations.
+    Overflow,
     /// FailedWith error, which happens when execution reaches `FAILWITH`
     /// instruction.
     FailedWith(Micheline<'a>),
@@ -343,6 +345,7 @@ impl fmt::Display for InterpreterErrorExpectation<'_> {
         use InterpreterErrorExpectation::*;
         match self {
             GeneralOverflow(a1, a2) => write!(f, "General Overflow {} {}", a1, a2),
+            Overflow => write!(f, "Overflow"),
             MutezOverflow(a1, a2) => write!(f, "MutezOverflow {} {}", a1, a2),
             FailedWith(v) => write!(f, "FailedWith {:?}", v),
         }
