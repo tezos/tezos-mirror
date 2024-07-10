@@ -562,6 +562,8 @@ let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
     | Register_with_feature -> [(true, [])]
     | Register_without_feature -> [(false, [])]
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
+     Also register the tests with and without FA bridge feature flag. *)
   List.iter
     (fun (threshold_encryption, te_tags) ->
       List.iter
