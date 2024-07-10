@@ -246,8 +246,10 @@ let get_available_data ~logger ~conf db_pool boundaries =
       "SELECT \n\
       \  b.level,\n\
       \  b.round,\n\
-      \  EXISTS (SELECT 1 FROM blocks s WHERE s.predecessor = b.id) \n\
-      \  FROM blocks b WHERE level >= ? AND level <= ?"
+      \  n.id IS NOT NULL\n\
+      \  FROM blocks b\n\
+      \  LEFT JOIN blocks n ON b.id = n.predecessor\n\
+      \  WHERE b.level >= ? AND b.level <= ?"
   in
   with_caqti_error
     ~logger
