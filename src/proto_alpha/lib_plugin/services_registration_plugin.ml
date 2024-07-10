@@ -7,6 +7,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
+
 open Protocol
 open Environment
 
@@ -87,6 +89,21 @@ let register2_fullctxt ~chunked s f =
 
 let register2 ~chunked s f =
   register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
+      f context a1 a2 q i)
+
+let opt_register2_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
+  patched_services :=
+    RPC_directory.opt_register
+      ~chunked
+      !patched_services
+      s
+      (fun ((ctxt, arg1), arg2) q i ->
+        let* ctxt = Services_registration.rpc_init ctxt `Head_level in
+        f ctxt arg1 arg2 q i)
+
+let opt_register2 ~chunked s f =
+  opt_register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
       f context a1 a2 q i)
 
 let register3_fullctxt ~chunked s f =

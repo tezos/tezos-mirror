@@ -4388,6 +4388,9 @@ let () =
 
 let register () =
   let open Lwt_result_syntax in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
+  Contract_services.register () ;
+  Delegate_services.register () ;
   Scripts.register () ;
   Forge.register () ;
   Parse.register () ;
