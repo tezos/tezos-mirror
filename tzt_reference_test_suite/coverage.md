@@ -577,26 +577,38 @@ Missing edge cases:
 
 ### `SUB: nat : nat`
 
-***None***
+- [sub_nat-nat_00.tzt](sub_nat-nat_00.tzt)
+- [sub_nat-nat_01.tzt](sub_nat-nat_01.tzt)
+- [sub_nat-nat_02.tzt](sub_nat-nat_02.tzt)
+- [sub_nat-nat_03.tzt](sub_nat-nat_03.tzt)
+- [sub_nat-nat_04.tzt](sub_nat-nat_04.tzt)
 
 ### `SUB: nat : int`
 
-***None***
+- [sub_nat-int_00.tzt](sub_nat-int_00.tzt)
+- [sub_nat-int_01.tzt](sub_nat-int_01.tzt)
+- [sub_nat-int_02.tzt](sub_nat-int_02.tzt)
+- [sub_nat-int_03.tzt](sub_nat-int_03.tzt)
+- [sub_nat-int_04.tzt](sub_nat-int_04.tzt)
+- [sub_nat-int_05.tzt](sub_nat-int_05.tzt)
 
 ### `SUB: int : nat`
 
-***None***
+- [sub_int-nat_00.tzt](sub_int-nat_00.tzt)
+- [sub_int-nat_01.tzt](sub_int-nat_01.tzt)
+- [sub_int-nat_02.tzt](sub_int-nat_02.tzt)
+- [sub_int-nat_03.tzt](sub_int-nat_03.tzt)
+- [sub_int-nat_04.tzt](sub_int-nat_04.tzt)
+- [sub_int-nat_05.tzt](sub_int-nat_05.tzt)
 
 ### `SUB: int : int`
 
 - [sub_int-int_00.tzt](sub_int-int_00.tzt)
 - [sub_int-int_01.tzt](sub_int-int_01.tzt)
-
-Missing edge cases:
-
-- No subtraction of 0
-- No subtraction from 0
-- No subtraction of negative integers
+- [sub_int-int_02.tzt](sub_int-int_02.tzt)
+- [sub_int-int_03.tzt](sub_int-int_03.tzt)
+- [sub_int-int_04.tzt](sub_int-int_04.tzt)
+- [sub_int-int_05.tzt](sub_int-int_05.tzt)
 
 ### `SUB: timestamp : int`
 
@@ -606,21 +618,13 @@ Missing edge cases:
 - [sub_timestamp-int_03.tzt](sub_timestamp-int_03.tzt)
 - [sub_timestamp-int_04.tzt](sub_timestamp-int_04.tzt)
 
-Missing edge cases:
-
-- No subtraction of zero
-- No subtraction from zero
-
 ### `SUB: timestamp : timestamp`
 
 - [sub_timestamp-timestamp_00.tzt](sub_timestamp-timestamp_00.tzt)
 - [sub_timestamp-timestamp_01.tzt](sub_timestamp-timestamp_01.tzt)
 - [sub_timestamp-timestamp_02.tzt](sub_timestamp-timestamp_02.tzt)
 - [sub_timestamp-timestamp_03.tzt](sub_timestamp-timestamp_03.tzt)
-
-Missing edge cases:
-
-- No test for realistic timestamps producing negative difference
+- [sub_timestamp-timestamp_04.tzt](sub_timestamp-timestamp_04.tzt)
 
 ### `SUB_MUTEZ`
 
@@ -1365,9 +1369,6 @@ Instructions with no tests:
 - `SAPLING_VERIFY_UPDATE`
 - `SELF_ADDRESS`
 - `SPLIT_TICKET`
-- `SUB: int : nat`
-- `SUB: nat : int`
-- `SUB: nat : nat`
 - `SWAP`
 - `TICKET`
 - `TOTAL_VOTING_POWER`
@@ -1423,10 +1424,4 @@ Instructions with missing edge cases:
 - `PUSH` for more pushable types
 - `SENDER` when sender != source
 - `SET_DELEGATE` with `None`
-- `SUB: int : int` 0 - x
-- `SUB: int : int` x - 0
-- `SUB: int : int` x - negative
-- `SUB: timestamp : int` 0 - x
-- `SUB: timestamp : int` x - 0
-- `SUB: timestamp : timestamp` realistic timestamps with negative difference
 - `UNPACK` standalone tests (without `PACK`)
