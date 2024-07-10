@@ -29,6 +29,7 @@ type error +=
   | Decoding_failed of Types.Store.kind
   | Profile_incompatibility
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
+  | Cryptobox_initialisation_failed of string
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
 
@@ -77,7 +78,20 @@ let () =
           Some (slot_index, number_of_slots)
       | _ -> None)
     (fun (slot_index, number_of_slots) ->
-      Invalid_slot_index {slot_index; number_of_slots})
+      Invalid_slot_index {slot_index; number_of_slots}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.cryptobox.initialisation_failed"
+    ~title:"Cryptobox initialisation failed"
+    ~description:"Unable to initialise the cryptobox parameters"
+    ~pp:(fun ppf msg ->
+      Format.fprintf
+        ppf
+        "Unable to initialise the cryptobox parameters. Reason: %s"
+        msg)
+    Data_encoding.(obj1 (req "error" string))
+    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
+    (fun str -> Cryptobox_initialisation_failed str)
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 

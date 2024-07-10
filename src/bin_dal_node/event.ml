@@ -487,3 +487,60 @@ let store_upgraded =
     ~level:Notice
     ("old_version", Data_encoding.int31)
     ("new_version", Data_encoding.int31)
+
+let crypto_process_started =
+  declare_1
+    ~section:(section @ ["crypto"])
+    ~name:"crypto_process_started"
+    ~msg:"cryptographic child process started (pid: {pid})"
+    ~level:Notice
+    ("pid", Data_encoding.int31)
+
+let amplificator_uninitialized =
+  declare_0
+    ~section:(section @ ["crypto"])
+    ~name:"amplificator_uninitialized"
+    ~msg:"the amplificator process worker is not initialized"
+    ~level:Warning
+    ()
+
+let crypto_process_received_query =
+  declare_1
+    ~section:(section @ ["crypto"])
+    ~name:"crypto_process_received_query"
+    ~msg:"cryptographic child process: received query #{query_id}."
+    ~level:Notice
+    ("query_id", Data_encoding.int31)
+
+let crypto_process_sending_reply =
+  declare_1
+    ~section:(section @ ["crypto"])
+    ~name:"crypto_process_sending_reply"
+    ~msg:"cryptographic child process: sending reply #{query_id}."
+    ~level:Info
+    ("query_id", Data_encoding.int31)
+
+let main_process_sending_query =
+  declare_1
+    ~section:(section @ ["crypto"])
+    ~name:"main_process_sending_query"
+    ~msg:
+      "main process: sending query #{query_id} to cryptographic child process."
+    ~level:Info
+    ("query_id", Data_encoding.int31)
+
+let main_process_received_reply =
+  declare_1
+    ~section:(section @ ["crypto"])
+    ~name:"main_process_received_reply"
+    ~msg:"main process: received reply #{query_id}."
+    ~level:Info
+    ("query_id", Data_encoding.int31)
+
+let main_process_enqueue_query =
+  declare_1
+    ~section:(section @ ["crypto"])
+    ~name:"main_process_enqueue_query"
+    ~msg:"main process: enqueue query #{query_id}."
+    ~level:Info
+    ("query_id", Data_encoding.int31)

@@ -54,6 +54,8 @@ type proto_parameters = {
   dal_attested_slots_validity_lag : int;
 }
 
+val proto_parameters_encoding : proto_parameters Data_encoding.t
+
 module type T = sig
   module Proto : Registered_protocol.T
 

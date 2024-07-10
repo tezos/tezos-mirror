@@ -110,40 +110,26 @@ let () =
 
 type slot = bytes
 
-let polynomial_from_shards cryptobox shards =
+let polynomial_from_shards ?number_of_needed_shards cryptobox shards =
+  let open Lwt_result_syntax in
+  let*? shards =
+    match number_of_needed_shards with
+    | None -> Ok shards
+    | Some number_of_needed_shards ->
+        Seq.take
+          ~when_negative_length:
+            (Errors.other
+               [Invalid_number_of_needed_shards number_of_needed_shards])
+          number_of_needed_shards
+          shards
+  in
   match Cryptobox.polynomial_from_shards cryptobox shards with
-  | Ok p -> Ok p
+  | Ok p -> Lwt.return_ok p
   | Error
       ( `Not_enough_shards msg
       | `Shard_index_out_of_range msg
       | `Invalid_shard_length msg ) ->
-      Error (Errors.other [Merging_failed msg])
-
-let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
-  let open Lwt_result_syntax in
-  let*? shards =
-    Seq_s.take
-      ~when_negative_length:
-        (Errors.other [Invalid_number_of_needed_shards number_of_needed_shards])
-      number_of_needed_shards
-      shards
-  in
-  (* Note: this [seq_of_seq_s] function consumes the input sequence
-     and resolves all its promises. It's OK here because we capped the
-     size of the input to number_of_needed_shards which is reasonably
-     small. *)
-  let rec seq_of_seq_s (s : 'a Seq_s.t) : 'a Seq.t Lwt.t =
-    let open Lwt_syntax in
-    let* n = s () in
-    match n with
-    | Nil -> return (fun () -> Seq.Nil)
-    | Cons (x, s) ->
-        let* s = seq_of_seq_s s in
-        return (fun () -> Seq.Cons (x, s))
-  in
-  let*! shards = seq_of_seq_s shards in
-  let*? polynomial = polynomial_from_shards cryptobox shards in
-  return polynomial
+      Lwt.return_error (Errors.other [Merging_failed msg])
 
 let get_slot_content_from_shards cryptobox store slot_id =
   let open Lwt_result_syntax in
@@ -165,7 +151,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
       | Error _ -> loop acc (shard_id + 1) remaining
   in
   let* shards = loop Seq.empty 0 minimal_number_of_shards in
-  let*? polynomial = polynomial_from_shards cryptobox shards in
+  let* polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
   let* () = Store.Slots.add_slot store.Store.slots ~slot_size slot slot_id in

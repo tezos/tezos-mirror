@@ -23,23 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Cryptobox_initialisation_failed of string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.cryptobox.initialisation_failed"
-    ~title:"Cryptobox initialisation failed"
-    ~description:"Unable to initialise the cryptobox parameters"
-    ~pp:(fun ppf msg ->
-      Format.fprintf
-        ppf
-        "Unable to initialise the cryptobox parameters. Reason: %s"
-        msg)
-    Data_encoding.(obj1 (req "error" string))
-    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
-    (fun str -> Cryptobox_initialisation_failed str)
-
 let fetch_dal_config cctxt =
   let open Lwt_syntax in
   let* r = Config_services.dal_config cctxt in
@@ -67,7 +50,7 @@ let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
           ->
             fail
               [
-                Cryptobox_initialisation_failed
+                Errors.Cryptobox_initialisation_failed
                   (Printf.sprintf
                      "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
                       smaller than expected (= %d)"
@@ -75,7 +58,7 @@ let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
                      expected);
               ]
       else return (cryptobox, None)
-  | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
+  | Error (`Fail msg) -> fail [Errors.Cryptobox_initialisation_failed msg]
 
 module Handler = struct
   (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
@@ -294,7 +277,8 @@ module Handler = struct
         let*! () = Node_context.set_profile_ctxt ctxt pctxt in
         return_unit
 
-  let resolve_plugin_and_set_ready config ctxt cctxt ?last_notified_level () =
+  let resolve_plugin_and_set_ready config ctxt cctxt ?last_notified_level
+      amplificator () =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
     let open Lwt_result_syntax in
@@ -305,6 +289,13 @@ module Handler = struct
         Proto_plugins.resolve_plugin_for_level cctxt ~level
       in
       let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
+      (* Initialize the crypto process *)
+      let* () =
+        match amplificator with
+        | None -> return_unit
+        | Some amplificator ->
+            Amplificator.init amplificator ctxt proto_parameters
+      in
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
          Instead of recomputing these parameters, they could be stored
          (for a given cryptobox). *)
@@ -739,7 +730,8 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
-let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
+let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
+    amplificator =
   let open Gossipsub in
   let shards_handler ({shards; _} : Store.t) =
     let save_and_notify = Store.Shards.write_all shards in
@@ -760,8 +752,8 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
             node_store
             commitment
             slot_id
-            gs_worker
             node_ctxt
+            amplificator
       | _ -> return_unit
   in
   Lwt.dont_wait
@@ -832,6 +824,14 @@ let run ~data_dir ~configuration_override =
         return configuration
   in
   let*! () = Event.(emit configuration_loaded) () in
+
+  let* amplificator =
+    if Profile_manager.is_prover_profile config.Configuration_file.profile then
+      let* amplificator = Amplificator.make () in
+      return_some amplificator
+    else return_none
+  in
+
   let cctxt = Rpc_context.make endpoint in
   let* dal_config = fetch_dal_config cctxt in
   (* Resolve:
@@ -930,7 +930,7 @@ let run ~data_dir ~configuration_override =
       last_processed_level_store
   in
   let* rpc_server = RPC_server.(start config ctxt) in
-  connect_gossipsub_with_p2p gs_worker transport_layer store ctxt ;
+  connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;
   (* activate the p2p instance. *)
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
@@ -938,6 +938,7 @@ let run ~data_dir ~configuration_override =
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
   (* First wait for the L1 node to be bootstrapped. *)
@@ -951,6 +952,7 @@ let run ~data_dir ~configuration_override =
           ctxt
           cctxt
           ?last_notified_level
+          amplificator
           ();
       ]
   in

@@ -78,7 +78,7 @@ let run f args =
 
       let run = f ic_child oc_child args in
 
-      (* adds signal handlers in this child process *)
+      (* Adds signal handlers in this child process *)
       let (_ : Lwt_exit.clean_up_callback_id) =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
             let () = Lwt.cancel run in
