@@ -4415,7 +4415,7 @@ let test_miner =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade *)
     ~kernels:[Latest]
-    ~tags:["evm"; "miner"]
+    ~tags:["evm"; "miner"; "coinbase"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
   @@ fun {sequencer; _} _protocol ->
@@ -4425,11 +4425,9 @@ let test_miner =
       "Block miner should be the sequencer pool address, expected %R got %L" ;
   (* We deploy a contract that stores the block coinbase in its storage, and
      also has a view to get the block coinbase. *)
+  let* coinbase_resolved = Solidity_contracts.coinbase () in
   let* () =
-    Eth_cli.add_abi
-      ~label:Solidity_contracts.coinbase.label
-      ~abi:Solidity_contracts.coinbase.abi
-      ()
+    Eth_cli.add_abi ~label:coinbase_resolved.label ~abi:coinbase_resolved.abi ()
   in
   let* contract, _tx_hash =
     send_transaction
@@ -4437,14 +4435,14 @@ let test_miner =
         Eth_cli.deploy
           ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
           ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:Solidity_contracts.coinbase.abi
-          ~bin:Solidity_contracts.coinbase.bin)
+          ~abi:coinbase_resolved.abi
+          ~bin:coinbase_resolved.bin)
       sequencer
   in
   let* storage_coinbase =
     Eth_cli.contract_call
       ~endpoint:(Evm_node.endpoint sequencer)
-      ~abi_label:Solidity_contracts.coinbase.label
+      ~abi_label:coinbase_resolved.label
       ~address:contract
       ~method_call:"getStorageCoinbase()"
       ()
@@ -4458,7 +4456,7 @@ let test_miner =
   let* view_coinbase =
     Eth_cli.contract_call
       ~endpoint:(Evm_node.endpoint sequencer)
-      ~abi_label:Solidity_contracts.coinbase.label
+      ~abi_label:coinbase_resolved.label
       ~address:contract
       ~method_call:"getStorageCoinbase()"
       ()

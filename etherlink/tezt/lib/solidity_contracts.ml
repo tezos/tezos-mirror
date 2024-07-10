@@ -273,14 +273,13 @@ let counter () =
     ~contract:"TestCounter"
     ~evm_version:"london"
 
-(** The info for the "coinbase.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/coinbase.sol] *)
-let coinbase =
-  {
-    label = "coinbase";
-    abi = kernel_inputs_path ^ "/coinbase.abi";
-    bin = kernel_inputs_path ^ "/coinbase.bin";
-  }
+(** The info for the "coinbase.sol" contract. *)
+let coinbase () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/coinbase.sol")
+    ~label:"coinbase"
+    ~contract:"Coinbase"
+    ~evm_version:"london"
 
 (** The info for the "block_constants.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/block_constants.sol] *)
