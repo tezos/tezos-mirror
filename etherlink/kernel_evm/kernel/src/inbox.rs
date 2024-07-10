@@ -599,6 +599,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         allocated_ticks: limits
             .maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
+        dal_configuration: dal.clone(),
     };
     if let Some(dal_config) = dal {
         fetch_and_parse_sequencer_blueprints_from_dal(

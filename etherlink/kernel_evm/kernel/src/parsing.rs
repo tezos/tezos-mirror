@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS;
-use crate::configuration::TezosContracts;
+use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::delayed_inbox::DelayedInbox;
 use crate::tick_model::constants::{
     TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE, TICKS_FOR_DELAYED_MESSAGES,
@@ -282,6 +282,7 @@ pub struct SequencerParsingContext {
     pub sequencer: PublicKey,
     pub delayed_bridge: ContractKt1Hash,
     pub allocated_ticks: u64,
+    pub dal_configuration: Option<DalConfiguration>,
 }
 
 impl SequencerInput {
