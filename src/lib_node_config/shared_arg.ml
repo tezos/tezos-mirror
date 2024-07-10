@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -70,6 +71,7 @@ type t = {
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
+  enable_http_cache_headers : bool option;
 }
 
 type error +=
@@ -190,7 +192,8 @@ let wrap data_dir config_file network connections max_download_speed
     external_rpc_listen_addrs rpc_tls cors_origins cors_headers log_output
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
-    max_active_rpc_connections metrics_addr operation_metadata_size_limit =
+    max_active_rpc_connections metrics_addr operation_metadata_size_limit
+    enable_http_cache_headers =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -201,6 +204,9 @@ let wrap data_dir config_file network connections max_download_speed
   in
   let rpc_tls =
     Option.map (fun (cert, key) -> {Config_file.cert; key}) rpc_tls
+  in
+  let enable_http_cache_headers =
+    if enable_http_cache_headers then Some true else None
   in
   {
     disable_config_validation;
@@ -239,6 +245,7 @@ let wrap data_dir config_file network connections max_download_speed
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
+    enable_http_cache_headers;
   }
 
 let process_command run =
@@ -744,6 +751,10 @@ module Term = struct
           Config_file.default_max_active_rpc_connections
       & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
 
+  let enable_http_cache_headers =
+    let doc = "Enables HTTP cache headers in the RPC response" in
+    Arg.(value & flag & info ~docs ~doc ["enable-http-cache-headers"])
+
   (* Args. *)
 
   let args =
@@ -758,6 +769,7 @@ module Term = struct
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
     $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
+    $ enable_http_cache_headers
 end
 
 let read_config_file args =
@@ -905,6 +917,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
+    enable_http_cache_headers;
   } =
     args
   in
@@ -1062,6 +1075,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?synchronisation_threshold
     ?history_mode
     ?latency
+    ?enable_http_cache_headers
     cfg
 
 let read_and_patch_config_file ?may_override_network ?emit

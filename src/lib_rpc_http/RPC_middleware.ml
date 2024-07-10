@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -174,3 +175,78 @@ let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarding_endpoint
         ?forwarder_events
         forwarding_endpoint
   | None -> make_transform_callback ?ctx ?forwarder_events forwarding_endpoint
+
+module Http_cache_headers = struct
+  (* Using Regex to parse the url path is dirty. Instead, we want to re-use
+     [Block_services.path] to parse the prefix path. Ideally, we want to define
+     header features as part of a Resto.Service. Unfortunately, Resto needs
+     to be extended to support either use case.
+
+     TODO: https://gitlab.com/tezos/tezos/-/issues/7339
+     Parse URL using Resto path defined in Block_services.path
+
+     TODO: https://gitlab.com/tezos/tezos/-/issues/7297
+     Support headers in Resto Services
+  *)
+  (* Matches any path with the prefix /chains/<chain-id>/blocks/head<*> where
+     `head<*>` is a valid head alias eg. `head`, `head-10`,`head~123` *)
+  let block_pattern =
+    Re.Str.regexp {|/chains/[A-Za-z0-9]+/blocks/head\(\(-\|~\)[0-9]+\)?.*|}
+
+  let is_block_subpath uri =
+    let path = Uri.path uri in
+    Re.Str.string_match block_pattern path 0
+
+  let add_header field value response =
+    let add f v resp =
+      let headers =
+        let hs = Cohttp.Response.headers resp in
+        Cohttp.Header.add hs f v
+      in
+      Cohttp.Response.make
+        ~status:(Cohttp.Response.status resp)
+        ~encoding:(Cohttp.Response.encoding resp)
+        ~version:(Cohttp.Response.version resp)
+        ~flush:(Cohttp.Response.flush resp)
+        ~headers
+        ()
+    in
+    match response with
+    | `Response (response, body) -> `Response (add field value response, body)
+    | `Expert (response, body) -> `Expert (add field value response, body)
+
+  let may_add_max_age get_estimated_time_to_next_level resp =
+    let open Lwt_syntax in
+    let* seconds_to_round_end_opt = get_estimated_time_to_next_level () in
+    match seconds_to_round_end_opt with
+    | None -> return resp
+    | Some s ->
+        (* `floor` the value to ensure data stored in caches is always
+            correct. This means a potential increase in cache misses at
+            the end of a round. The value needs to be truncated because
+            max-age expects an integer. *)
+        let s = Float.floor (Ptime.Span.to_float_s s) in
+        if s = 0. then return resp
+        else
+          return
+          @@ add_header
+               "cache-control"
+               (Format.sprintf "public, max-age=%d" (int_of_float s))
+               resp
+
+  let make ~get_estimated_time_to_next_level callback conn req body =
+    let open Lwt_syntax in
+    let* (resp : Cohttp_lwt_unix.Server.response_action) =
+      callback conn req body
+    in
+    match resp with
+    | `Response (cohttp_response, _) ->
+        let status_code = Cohttp.Response.status cohttp_response in
+        if Cohttp.Code.(code_of_status status_code |> is_success) then
+          let uri = Cohttp.Request.uri req in
+          match is_block_subpath uri with
+          | true -> may_add_max_age get_estimated_time_to_next_level resp
+          | false -> return resp
+        else return resp
+    | `Expert _ -> return resp
+end

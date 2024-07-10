@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,3 +60,12 @@ val rpc_metrics_transform_callback :
   unit Tezos_rpc.Directory.t ->
   RPC_server.callback ->
   RPC_server.callback
+
+(** A Resto middleware that adds Http cache headers to responses of any block 
+    query. These headers can be used by Caches to invalidate responses. *)
+module Http_cache_headers : sig
+  val make :
+    get_estimated_time_to_next_level:(unit -> Ptime.span option Lwt.t) ->
+    RPC_server.callback ->
+    RPC_server.callback
+end

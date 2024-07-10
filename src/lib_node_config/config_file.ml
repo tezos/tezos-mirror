@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -381,6 +382,7 @@ and rpc = {
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
   max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
+  enable_http_cache_headers : bool;
 }
 
 and tls = {cert : string; key : string}
@@ -410,6 +412,7 @@ let default_rpc =
     acl = RPC_server.Acl.empty_policy;
     media_type = Media_type.Command_line.Any;
     max_active_rpc_connections = default_max_active_rpc_connections;
+    enable_http_cache_headers = false;
   }
 
 let default_disable_config_validation = false
@@ -581,6 +584,7 @@ let rpc : rpc Data_encoding.t =
            acl;
            media_type;
            max_active_rpc_connections;
+           enable_http_cache_headers;
          } ->
       let cert, key =
         match tls with
@@ -591,14 +595,24 @@ let rpc : rpc Data_encoding.t =
         match external_listen_addrs with [] -> None | v -> Some v
       in
       ( (Some listen_addrs, external_listen_addrs, None, cors_origins),
-        (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
-      ))
+        ( cors_headers,
+          cert,
+          key,
+          acl,
+          media_type,
+          max_active_rpc_connections,
+          enable_http_cache_headers ) ))
     (fun ( ( listen_addrs,
              external_listen_addrs,
              legacy_listen_addr,
              cors_origins ),
-           (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
-         ) ->
+           ( cors_headers,
+             cert,
+             key,
+             acl,
+             media_type,
+             max_active_rpc_connections,
+             enable_http_cache_headers ) ) ->
       let tls =
         match (cert, key) with
         | None, _ | _, None -> None
@@ -628,6 +642,7 @@ let rpc : rpc Data_encoding.t =
         acl;
         media_type;
         max_active_rpc_connections;
+        enable_http_cache_headers;
       })
     (merge_objs
        (obj4
@@ -654,7 +669,7 @@ let rpc : rpc Data_encoding.t =
                 https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
              (list string)
              default_rpc.cors_origins))
-       (obj6
+       (obj7
           (dft
              "cors-headers"
              ~description:
@@ -685,7 +700,23 @@ let rpc : rpc Data_encoding.t =
              ~description:
                "The maximum number of active connections per RPC endpoint."
              RPC_server.Max_active_rpc_connections.encoding
-             default_rpc.max_active_rpc_connections)))
+             default_rpc.max_active_rpc_connections)
+          (dft
+             "enable-http-cache-headers"
+             ~description:
+               "Enables HTTP cache headers in the RPC response. When enabled, \
+                'Cache-control' will be present with 'max-age' in the response \
+                header of relative queries (eg. head, head-n, head~n). The \
+                'max-age' value indicates the duration of which the returned \
+                response is cacheable. It is an estimate of the remaining \
+                duration of the current round based on when the block was \
+                forged. Enabling this feature adds a performance overhead to \
+                all queries hence you should only do so if you are running the \
+                RPC server behind a caching server. The feature is implemented \
+                based on RFC9111 hence useful for reverse proxies with \
+                auto-caching mechanism."
+             bool
+             default_rpc.enable_http_cache_headers)))
 
 let rpc_encoding = rpc
 
@@ -886,7 +917,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(disable_mempool = default_p2p.disable_mempool)
     ?(enable_testchain = default_p2p.enable_testchain) ?(cors_origins = [])
     ?(cors_headers = []) ?rpc_tls ?log_output ?log_coloring
-    ?synchronisation_threshold ?history_mode ?network ?latency cfg =
+    ?synchronisation_threshold ?history_mode ?network ?latency
+    ?enable_http_cache_headers cfg =
   let open Lwt_result_syntax in
   let disable_config_validation =
     cfg.disable_config_validation || disable_config_validation
@@ -969,6 +1001,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       acl;
       media_type;
       max_active_rpc_connections;
+      enable_http_cache_headers =
+        Option.value
+          ~default:cfg.rpc.enable_http_cache_headers
+          enable_http_cache_headers;
     }
   and metrics_addr = unopt_list ~default:cfg.metrics_addr metrics_addr
   and log : Logs_simple_config.cfg =

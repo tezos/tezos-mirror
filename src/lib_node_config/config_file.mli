@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,6 +83,7 @@ and rpc = {
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
   max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
+  enable_http_cache_headers : bool;
 }
 
 and tls = {cert : string; key : string}
@@ -140,6 +142,7 @@ val update :
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->
   ?latency:int ->
+  ?enable_http_cache_headers:bool ->
   t ->
   t tzresult Lwt.t
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -51,6 +52,8 @@ type 'result t = {
   decode : JSON.t -> 'result;
 }
 
+module HeaderMap = Map.Make (String)
+
 let make ?data ?(query_string = []) verb path decode =
   {verb; path; query_string; data; decode}
 
@@ -59,7 +62,7 @@ let decode_raw ?(origin = "RPC response") rpc raw =
 
 let decode rpc json = rpc.decode json
 
-type 'a response = {body : 'a; code : int}
+type 'a response = {body : 'a; code : int; headers : string HeaderMap.t}
 
 let check_string_response ?(body_rex = "") ~code (response : string response) =
   Check.(
@@ -159,7 +162,11 @@ let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
       rpc_hooks
   in
   if log_response_body then Log.debug ~prefix:"RPC" "%s" body ;
-  return {body; code = Cohttp.Code.code_of_status response.status}
+  let headers =
+    Cohttp.Header.to_list (Cohttp.Response.headers response)
+    |> List.to_seq |> HeaderMap.of_seq
+  in
+  return {body; code = Cohttp.Code.code_of_status response.status; headers}
 
 let call_json ?rpc_hooks ?log_request ?log_response_status
     ?(log_response_body = true) endpoint rpc =

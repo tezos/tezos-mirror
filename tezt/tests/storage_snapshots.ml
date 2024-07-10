@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -131,7 +132,7 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
       Node.RPC.(call node @@ get_chain_block_header ~block ())
     in
     (* Expects failure, as the metadata must not be stored. *)
-    let* {body; code} =
+    let* {body; code; headers = _} =
       Node.RPC.(call_json node @@ get_chain_block_metadata ~block ())
     in
     (* In the client, attempting to retrieve missing metadata outputs:

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -207,6 +208,14 @@ module Event = struct
          should be use with care. Please report encountered issues if any."
       ~level:Warning
       ()
+
+  let enable_http_cache_headers =
+    declare_0
+      ~section
+      ~name:"enable_http_cache_headers"
+      ~msg:"HTTP cache headers enabled"
+      ~level:Notice
+      ()
 end
 
 open Filename.Infix
@@ -399,8 +408,10 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-(* Launches an RPC server depending on the given server kind *)
-let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
+(* Launches an RPC server depending on the given server kind. [middleware] can
+   be provided to transform the callback. *)
+let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
+    addr =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let media_types = rpc_config.media_type in
@@ -457,6 +468,11 @@ let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
   let callback =
     RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
   in
+  let callback =
+    match middleware with
+    | Some middleware -> middleware callback
+    | None -> callback
+  in
   let mode = extract_mode rpc_server_kind in
   Lwt.catch
     (fun () ->
@@ -491,7 +507,7 @@ type rpc_server_kind =
   | No_server
 
 (* Initializes an RPC server handled by the node main process. *)
-let init_local_rpc_server (config : Config_file.t) dir =
+let init_local_rpc_server ?middleware (config : Config_file.t) dir =
   let open Lwt_result_syntax in
   let* servers =
     List.concat_map_es
@@ -512,7 +528,12 @@ let init_local_rpc_server (config : Config_file.t) dir =
                           `No_password,
                           `Port port )
                 in
-                launch_rpc_server config dir (Local (mode, port)) addr)
+                launch_rpc_server
+                  ?middleware
+                  config
+                  dir
+                  (Local (mode, port))
+                  addr)
               addrs)
       config.rpc.listen_addrs
   in
@@ -654,7 +675,21 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   in
   let* local_rpc_server =
     if config.rpc.listen_addrs = [] then return No_server
-    else init_local_rpc_server config dir
+    else
+      let* middleware =
+        if config.rpc.enable_http_cache_headers then
+          let*! () = Event.(emit enable_http_cache_headers ()) in
+          let http_cache_headers_middleware =
+            let Http_cache_headers.{get_estimated_time_to_next_level} =
+              Node.http_cache_header_tools node
+            in
+            RPC_middleware.Http_cache_headers.make
+              ~get_estimated_time_to_next_level
+          in
+          return_some http_cache_headers_middleware
+        else return_none
+      in
+      init_local_rpc_server ?middleware config dir
   in
   (* Start RPC process only when at least one listen addr is given. *)
   let* rpc_server =
