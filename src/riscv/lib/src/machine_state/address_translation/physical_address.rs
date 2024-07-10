@@ -23,19 +23,35 @@ use crate::{
 /// (i.e., the PPN field starts at bit 0).
 ///
 /// Example: `raw_range_PPN[0] = 8..=0`. This is because [`Twiddle`] expects the range in reverse
-pub(super) fn get_raw_ppn_i_range(sv_length: &SvLength, index: usize) -> Option<(usize, usize)> {
-    use SvLength::*;
-    let bit_range = match (index, sv_length) {
-        (0, Sv39 | Sv48 | Sv57) => (8, 0),
-        (1, Sv39 | Sv48 | Sv57) => (17, 9),
-        (2, Sv39) => (43, 18),
-        (2, Sv48 | Sv57) => (26, 18),
-        (3, Sv48) => (43, 27),
-        (3, Sv57) => (35, 27),
-        (4, Sv57) => (43, 36),
-        _ => return None,
-    };
-    Some(bit_range)
+#[inline(always)]
+pub(super) fn get_raw_ppn_i_range(sv_length: SvLength, index: usize) -> Option<(usize, usize)> {
+    // We use a jump table instead of a match statement to improve performance.
+    const JUMP_TABLE: [[Option<(usize, usize)>; 5]; 3] = [
+        // Sv39
+        [Some((8, 0)), Some((17, 9)), Some((43, 18)), None, None],
+        // Sv48
+        [
+            Some((8, 0)),
+            Some((17, 9)),
+            Some((26, 18)),
+            Some((43, 27)),
+            None,
+        ],
+        // Sv57
+        [
+            Some((8, 0)),
+            Some((17, 9)),
+            Some((26, 18)),
+            Some((35, 27)),
+            Some((43, 36)),
+        ],
+    ];
+
+    if index > 4 {
+        return None;
+    }
+
+    JUMP_TABLE[sv_length as usize][index]
 }
 
 // Get the page offset of a physical address.
@@ -50,7 +66,7 @@ pub fn set_page_offset(addr: u64, page_offset: u64) -> u64 {
 }
 
 /// Get `p_addr.PPN[index]` from a physical address specified by `sv_length` Standard.
-pub fn get_ppn_idx(p_addr: Address, sv_length: &SvLength, index: usize) -> Option<Address> {
+pub fn get_ppn_idx(p_addr: Address, sv_length: SvLength, index: usize) -> Option<Address> {
     let bit_range = get_raw_ppn_i_range(sv_length, index)?;
     Some(u64::bits_subset(
         p_addr,
@@ -62,7 +78,7 @@ pub fn get_ppn_idx(p_addr: Address, sv_length: &SvLength, index: usize) -> Optio
 /// Set `p_addr.PPN[index] = ppn_value` specified by `sv_length` Standard.
 pub fn set_ppn_idx(
     p_addr: Address,
-    sv_length: &SvLength,
+    sv_length: SvLength,
     index: usize,
     ppn_value: Address,
 ) -> Option<Address> {
@@ -104,7 +120,7 @@ mod tests {
                 assert_eq!(pa::get_page_offset(addr), offset);
             };
 
-            run_tests(&SvLength::Sv39,
+            run_tests(SvLength::Sv39,
                 [ppn_0, ppn_1, ppn_2 | ppn_4 << 18].to_vec(),
             [
                 (over_3, None),
@@ -114,7 +130,7 @@ mod tests {
             ].to_vec(),
             );
 
-            run_tests(&SvLength::Sv48,
+            run_tests(SvLength::Sv48,
                 [ppn_0, ppn_1, ppn_2, ppn_3 | ppn_4 << 9].to_vec(),
             [
                 (over_3 + 1, None),
@@ -124,7 +140,7 @@ mod tests {
                 (3, Some(ppn_3 | ppn_4 << 9)),
             ].to_vec());
 
-            run_tests(&SvLength::Sv57, [
+            run_tests(SvLength::Sv57, [
                 ppn_0, ppn_1, ppn_2, ppn_3, ppn_4].to_vec(),
             [
                 (over_3 + 2, None),

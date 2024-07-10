@@ -141,7 +141,7 @@ where
     //    raise a page-fault exception corresponding to the original access type.
     let pte_ppn = pte.ppn();
     for idx in (0..i).rev() {
-        if pte_ppn.ppn_i(&sv_length, idx) != Some(0) {
+        if pte_ppn.ppn_i(sv_length, idx) != Some(0) {
             return Err(access_type.exception(v_addr));
         }
     }
@@ -174,11 +174,11 @@ where
         let mut pa = p_addr::set_page_offset(0u64, va_page_offset);
         for idx in 0..i {
             let va_vpn_i = v_addr::get_vpn_idx(v_addr, &sv_length, idx)?;
-            pa = p_addr::set_ppn_idx(pa, &sv_length, idx, va_vpn_i)?;
+            pa = p_addr::set_ppn_idx(pa, sv_length, idx, va_vpn_i)?;
         }
         for idx in i..levels {
-            let pte_ppn_i = pte_ppn.ppn_i(&sv_length, idx)?;
-            pa = p_addr::set_ppn_idx(pa, &sv_length, idx, pte_ppn_i)?;
+            let pte_ppn_i = pte_ppn.ppn_i(sv_length, idx)?;
+            pa = p_addr::set_ppn_idx(pa, sv_length, idx, pte_ppn_i)?;
         }
         Some(pa)
     })();
