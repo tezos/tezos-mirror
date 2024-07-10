@@ -14,6 +14,7 @@ use crate::tick_model::constants::{
 };
 use crate::{
     bridge::Deposit,
+    dal_slot_import_signal::{DalSlotImportSignal, UnsignedDalSlotImportSignal},
     inbox::{Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
@@ -78,6 +79,8 @@ const TRANSACTION_CHUNK_TAG: u8 = 2;
 
 const SEQUENCER_BLUEPRINT_TAG: u8 = 3;
 
+const DAL_SLOT_IMPORT_SIGNAL_TAG: u8 = 4;
+
 const FORCE_KERNEL_UPGRADE_TAG: u8 = 0xff;
 
 pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
@@ -114,6 +117,7 @@ pub enum ProxyInput {
 pub enum SequencerInput {
     DelayedInput(Box<Transaction>),
     SequencerBlueprint(SequencerBlueprint),
+    DalSlotImportSignal(DalSlotImportSignal),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -321,6 +325,47 @@ impl SequencerInput {
             InputResult::Unparsable
         }
     }
+
+    pub fn parse_dal_slot_import_signal(
+        bytes: &[u8],
+        context: &mut SequencerParsingContext,
+    ) -> InputResult<Self> {
+        // Inputs are 4096 bytes longs at most, and even in the future they
+        // should be limited by the size of native words of the VM which is
+        // 32bits.
+        // TODO: Define the tick model as this is temporary.
+        // https://gitlab.com/tezos/tezos/-/issues/7455
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
+
+        let Some(dal) = &context.dal_configuration else {
+            return InputResult::Unparsable;
+        };
+
+        // Parse the signal
+        let signal: DalSlotImportSignal =
+            parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+
+        // Creates and encodes the unsigned signal:
+        let unsigned_signal: UnsignedDalSlotImportSignal = (&signal).into();
+        let bytes = unsigned_signal.rlp_bytes().to_vec();
+
+        if !dal.slot_indices.contains(&unsigned_signal.slot_index) {
+            return InputResult::Unparsable;
+        };
+
+        let correctly_signed = context
+            .sequencer
+            .verify_signature(&signal.signature.clone().into(), &bytes)
+            .unwrap_or(false);
+
+        if correctly_signed {
+            InputResult::Input(Input::ModeSpecific(Self::DalSlotImportSignal(signal)))
+        } else {
+            InputResult::Unparsable
+        }
+    }
 }
 
 impl Parsable for SequencerInput {
@@ -335,6 +380,9 @@ impl Parsable for SequencerInput {
         match *tag {
             SEQUENCER_BLUEPRINT_TAG => {
                 Self::parse_sequencer_blueprint_input(input, context)
+            }
+            DAL_SLOT_IMPORT_SIGNAL_TAG => {
+                Self::parse_dal_slot_import_signal(input, context)
             }
             _ => InputResult::Unparsable,
         }
