@@ -62,10 +62,15 @@ val rpc_metrics_transform_callback :
   RPC_server.callback
 
 (** A Resto middleware that adds Http cache headers to responses of any block 
-    query. These headers can be used by Caches to invalidate responses. *)
+    query. These headers can be used by Caches to invalidate responses. The 
+    supported headers are:
+    * `max-age`: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#response_directives
+    * `if-none-match`: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match
+*)
 module Http_cache_headers : sig
   val make :
     get_estimated_time_to_next_level:(unit -> Ptime.span option Lwt.t) ->
+    get_block_hash:(string -> Block_hash.t option Lwt.t) ->
     RPC_server.callback ->
     RPC_server.callback
 end

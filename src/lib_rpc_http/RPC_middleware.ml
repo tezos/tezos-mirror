@@ -191,11 +191,14 @@ module Http_cache_headers = struct
   (* Matches any path with the prefix /chains/<chain-id>/blocks/head<*> where
      `head<*>` is a valid head alias eg. `head`, `head-10`,`head~123` *)
   let block_pattern =
-    Re.Str.regexp {|/chains/[A-Za-z0-9]+/blocks/head\(\(-\|~\)[0-9]+\)?.*|}
+    Re.Str.regexp {|/chains/[A-Za-z0-9]+/blocks/\(head\(\(-\|~\)[0-9]+\)?\).*|}
 
-  let is_block_subpath uri =
+  let parse_block_subpath uri =
     let path = Uri.path uri in
-    Re.Str.string_match block_pattern path 0
+    if Re.Str.string_match block_pattern path 0 then
+      let block_alias = Re.Str.matched_group 1 path in
+      Some block_alias
+    else None
 
   let add_header field value response =
     let add f v resp =
@@ -234,19 +237,55 @@ module Http_cache_headers = struct
                (Format.sprintf "public, max-age=%d" (int_of_float s))
                resp
 
-  let make ~get_estimated_time_to_next_level callback conn req body =
+  (* [may_handle_if_none_match block_hash request] returns a response
+     with status `Not_modified` if the request contains an
+     `if-none-match` header with the block hash. *)
+  let may_handle_if_none_match (block_hash : string) req =
     let open Lwt_syntax in
-    let* (resp : Cohttp_lwt_unix.Server.response_action) =
-      callback conn req body
+    let if_none_match_field =
+      Cohttp.(Header.get (Request.headers req) "if-none-match")
     in
-    match resp with
-    | `Response (cohttp_response, _) ->
-        let status_code = Cohttp.Response.status cohttp_response in
-        if Cohttp.Code.(code_of_status status_code |> is_success) then
-          let uri = Cohttp.Request.uri req in
-          match is_block_subpath uri with
-          | true -> may_add_max_age get_estimated_time_to_next_level resp
-          | false -> return resp
+    match if_none_match_field with
+    | None -> return_none
+    | Some hashes ->
+        let hashes =
+          String.split_on_char ',' hashes |> List.map (fun s -> String.trim s)
+        in
+        if List.mem ~equal:String.equal block_hash hashes then
+          let* resp =
+            Cohttp_lwt_unix.Server.respond ~body:`Empty ~status:`Not_modified ()
+          in
+          Lwt.return_some (`Response resp)
+        else Lwt.return_none
+
+  let is_success_status_code resp =
+    let cohttp_response =
+      match resp with `Response (resp, _) -> resp | `Expert (resp, _) -> resp
+    in
+    let status = Cohttp.Response.status cohttp_response in
+    Cohttp.Code.code_of_status status |> Cohttp.Code.is_success
+
+  let make ~get_estimated_time_to_next_level ~get_block_hash callback conn req
+      body =
+    let open Lwt_syntax in
+    let uri = Cohttp.Request.uri req in
+    let* block_hash_opt =
+      match parse_block_subpath uri with
+      | Some block_alias -> get_block_hash block_alias
+      | None -> return_none
+    in
+    match block_hash_opt with
+    | None -> callback conn req body
+    | Some block_hash ->
+        let block_hash = Block_hash.to_b58check block_hash in
+        let* resp =
+          let* resp_opt = may_handle_if_none_match block_hash req in
+          match resp_opt with
+          | Some resp -> return resp
+          | None -> callback conn req body
+        in
+        if is_success_status_code resp then
+          let* resp = may_add_max_age get_estimated_time_to_next_level resp in
+          return (add_header "etag" block_hash resp)
         else return resp
-    | `Expert _ -> return resp
 end
