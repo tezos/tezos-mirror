@@ -131,6 +131,19 @@
 (* See description in mli. *)
 type error += Cannot_stake_on_fully_slashed_delegate
 
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"operations.cannot_stake_on_fully_slashed_delegate"
+    ~title:"Cannot stake on fully slashed delegate"
+    ~description:
+      "The delegate has been fully slashed, so its external stakers can no \
+       longer stake. This restriction is permanent. If they wish to be able to \
+       stake again, the stakers must change delegates."
+    Data_encoding.empty
+    (function Cannot_stake_on_fully_slashed_delegate -> Some () | _ -> None)
+    (fun () -> Cannot_stake_on_fully_slashed_delegate)
+
 (** These two types are not exported, they are views to the portions
     of the storage which are relevant in this module when a delegate
     or a staker are considered. *)
