@@ -281,33 +281,37 @@ let process_included_l1_operation (type kind) ~catching_up
             Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
       | _ -> return_unit)
   | ( Sc_rollup_execute_outbox_message {output_proof; _},
-      Sc_rollup_execute_outbox_message_result
-        {whitelist_update = Some whitelist_update; _} ) -> (
+      Sc_rollup_execute_outbox_message_result {whitelist_update; _} ) -> (
+      let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+      let output_proof =
+        Data_encoding.Binary.of_string_exn
+          PVM.output_proof_encoding
+          output_proof
+      in
+      let Sc_rollup.{outbox_level; message_index; _} =
+        PVM.output_of_output_proof output_proof
+      in
+      let outbox_level = Raw_level.to_int32 outbox_level in
+      let message_index = Z.to_int message_index in
+      let* () =
+        Node_context.set_outbox_message_executed
+          node_ctxt
+          ~outbox_level
+          ~index:message_index
+      in
       match whitelist_update with
-      | Public ->
+      | None -> return_unit
+      | Some Public ->
           let () = Reference.set node_ctxt.private_info None in
           return_unit
-      | Private whitelist_update ->
+      | Some (Private whitelist_update) ->
           let () =
             Reference.map
               (Option.map (fun private_info ->
-                   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-                   let output_proof =
-                     Data_encoding.Binary.of_string_exn
-                       PVM.output_proof_encoding
-                       output_proof
-                   in
-                   let Sc_rollup.{outbox_level; message_index; _} =
-                     PVM.output_of_output_proof output_proof
-                   in
                    Node_context.
                      {
                        private_info with
-                       last_whitelist_update =
-                         {
-                           outbox_level = Raw_level.to_int32 outbox_level;
-                           message_index = Z.to_int message_index;
-                         };
+                       last_whitelist_update = {outbox_level; message_index};
                      }))
               node_ctxt.private_info
           in
