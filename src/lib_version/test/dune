@@ -7,14 +7,15 @@
  (libraries
   tezt.core
   octez-libs.version
-  octez-libs.version.parser)
+  octez-libs.version.parser
+  octez-libs.qcheck-tezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_version)
- (modules test_parser))
+ (modules test_parser test_octez_node_version))
 
 (executable
  (name main)
