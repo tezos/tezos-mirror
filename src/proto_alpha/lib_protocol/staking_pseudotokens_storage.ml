@@ -128,11 +128,7 @@
     {3} Invariant 4: delegates have no staking pseudotokens.
 *)
 
-(** When a delegate gets totally slashed, the value of its
-    pseudotokens becomes 0 and before minting any new token we would
-    need to iterate over all stakers to empty their pseudotoken
-    balances. We want to avoid iterating over stakers so we forbid
-    {b stake} in this case. *)
+(* See description in mli. *)
 type error += Cannot_stake_on_fully_slashed_delegate
 
 (** These two types are not exported, they are views to the portions

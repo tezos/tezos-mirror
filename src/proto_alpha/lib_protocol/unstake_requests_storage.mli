@@ -71,6 +71,9 @@ val update :
   stored_requests ->
   Raw_context.t tzresult Lwt.t
 
+type error +=
+  | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
+
 (** [add ctxt ~contract ~delegate cycle amount] adds a request from [contract]
     to unstake [amount] from [delegate] at cycle [cycle].
 

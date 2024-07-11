@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Undetermined_issuance_coeff_for_cycle of Cycle_repr.t
+
 (** [set_adaptive_issuance_enable ctxt] sets the feature flag in the
    in-memory part of the context if the adaptive issuance feature has
    already launched. This means that the activation vote resulted in

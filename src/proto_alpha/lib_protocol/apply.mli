@@ -36,10 +36,25 @@
 open Alpha_context
 
 type error +=
+  | Faulty_validation_wrong_slot
+  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Set_deposits_limit_when_automated_staking_off
+  | Error_while_taking_fees
+  | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Empty_transaction of Contract.t
+  | Non_empty_transaction_from of Destination.t
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
-  | Empty_transaction of Contract.t
+  | Multiple_revelation
+  | Invalid_transfer_to_sc_rollup
+  | Invalid_sender of Destination.t
+  | Invalid_self_transaction_destination
+  | Staking_for_delegator_while_external_staking_disabled
   | Staking_to_delegate_that_refuses_external_staking
+  | Stake_modification_with_no_delegate_set
+  | Invalid_nonzero_transaction_amount of Tez.t
+  | Invalid_staking_parameters_sender
+  | Missing_shell_header
 
 type mode =
   | Application of {

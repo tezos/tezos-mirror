@@ -31,6 +31,8 @@ val encoding : t Data_encoding.t
 
 val max_bonus_encoding : max_bonus Data_encoding.t
 
+type error += Out_of_bounds_bonus
+
 (** Getting a bonus out of rational.
     It will fail if the decoding doesn't provide a value that is valid wrt
     protocol's parametric constants
