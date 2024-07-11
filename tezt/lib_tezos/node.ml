@@ -669,9 +669,14 @@ let wait_for_level node level =
       let promise, resolver = Lwt.task () in
       node.persistent_state.pending_level <-
         (level, resolver) :: node.persistent_state.pending_level ;
+      let event_name =
+        if node.persistent_state.rpc_external then
+          "store_synchronized_on_head.v0"
+        else "head_increment.v0 / branch_switch.v0"
+      in
       check_event
         node
-        "head_increment.v0 / branch_switch.v0"
+        event_name
         ~where:("level >= " ^ string_of_int level)
         promise
 
