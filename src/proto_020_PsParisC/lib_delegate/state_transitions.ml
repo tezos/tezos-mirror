@@ -1209,10 +1209,20 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
         preattestation_qc
   | Awaiting_attestations, Quorum_reached (candidate, attestation_qc) ->
       quorum_reached_when_waiting_attestations state candidate attestation_qc
-  (* Unreachable cases *)
-  | Idle, (Prequorum_reached _ | Quorum_reached _)
-  | Awaiting_preattestations, Quorum_reached _
-  | (Awaiting_application | Awaiting_attestations), Prequorum_reached _
-  | Awaiting_application, Quorum_reached _ ->
-      (* This cannot/should not happen *)
+  (* Unreachable cases modulo concurrency. *)
+  | ( (Idle | Awaiting_application | Awaiting_attestations),
+      Prequorum_reached (candidate, _operations_pqc) ) ->
+      (* Unexpected prequorum reached, we do not lock on it and discard it. *)
+      let* () =
+        Events.(
+          emit discarding_unexpected_prequorum_reached (candidate.hash, phase))
+      in
+      do_nothing state
+  | ( (Idle | Awaiting_preattestations | Awaiting_application),
+      Quorum_reached (candidate, _operations_qc) ) ->
+      (* Unexpected quorum reached, we discard it. *)
+      let* () =
+        Events.(
+          emit discarding_unexpected_quorum_reached (candidate.hash, phase))
+      in
       do_nothing state
