@@ -396,6 +396,7 @@ let jobs pipeline_type =
          (* Store merged .coverage files or [.corrupt.json] files. *)
          ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
   in
+
   (* Stages *)
   let start_stage, make_dependencies =
     match pipeline_type with
@@ -448,6 +449,8 @@ let jobs pipeline_type =
       ~before_merging:(fun job_start -> Dependent [Job job_start])
       ~schedule_extended_test:(fun () -> Staged [])
   in
+
+  (* Sanity jobs *)
   let sanity =
     let job_sanity_ci : tezos_job =
       job
@@ -655,6 +658,8 @@ let jobs pipeline_type =
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
   in
+
+  (*Build jobs *)
   let build =
     (* TODO: The code is a bit convulted here because these jobs are
        either in the build or in the manual stage depending on the
@@ -729,6 +734,8 @@ let jobs pipeline_type =
     ]
     @ bin_packages_jobs
   in
+
+  (*Packaging jobs *)
   let packaging =
     let job_opam_prepare : tezos_job =
       job
@@ -776,6 +783,8 @@ let jobs pipeline_type =
              ]))
       ~schedule_extended_test:(fun () -> Staged [])
   in
+
+  (*Test jobs*)
   let test =
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
@@ -1546,40 +1555,47 @@ let jobs pipeline_type =
         job_test_evm_compatibility;
       ]
     in
-    [
-      job_kaitai_checks;
-      job_kaitai_e2e_checks;
-      job_oc_check_lift_limits_patch;
-      job_oc_misc_checks;
-      job_oc_python_check;
-      job_oc_ocaml_fmt;
-      job_semgrep;
-      job_oc_integration_compiler_rejections;
-      job_oc_script_test_gen_genesis;
-      job_oc_script_snapshot_alpha_and_link;
-      job_oc_script_test_release_versions;
-      job_oc_script_b58_prefix;
-      job_oc_test_liquidity_baking_scripts;
-    ]
-    @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
-    @
-    match pipeline_type with
-    | Before_merging ->
-        let job_commit_titles : tezos_job =
-          job
-            ~__POS__
-            ~name:"commit_titles"
-            ~image:Images.CI.prebuild
-            ~stage:Stages.test
-            ~dependencies:dependencies_needs_start
-            (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
-               invalid commits titles in situations where that is allowed. *)
-            (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
-            ~allow_failure:(With_exit_codes [65])
-        in
-        [job_commit_titles]
-    | Schedule_extended_test -> []
+    let jobs_misc =
+      [
+        job_kaitai_checks;
+        job_kaitai_e2e_checks;
+        job_oc_check_lift_limits_patch;
+        job_oc_misc_checks;
+        job_oc_python_check;
+        job_oc_ocaml_fmt;
+        job_semgrep;
+        job_oc_integration_compiler_rejections;
+        job_oc_script_test_gen_genesis;
+        job_oc_script_snapshot_alpha_and_link;
+        job_oc_script_test_release_versions;
+        job_oc_script_b58_prefix;
+        job_oc_test_liquidity_baking_scripts;
+      ]
+    in
+    let job_commit_titles : tezos_job list =
+      match pipeline_type with
+      | Before_merging ->
+          let job_commit_titles : tezos_job =
+            job
+              ~__POS__
+              ~name:"commit_titles"
+              ~image:Images.CI.prebuild
+              ~stage:Stages.test
+              ~dependencies:dependencies_needs_start
+              (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
+                 invalid commits titles in situations where that is allowed. *)
+              (script_propagate_exit_code
+                 "./scripts/ci/check_commit_messages.sh")
+              ~allow_failure:(With_exit_codes [65])
+          in
+          [job_commit_titles]
+      | Schedule_extended_test -> []
+    in
+    jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
+    @ job_commit_titles
   in
+
+  (*Coverage jobs *)
   let coverage =
     match pipeline_type with
     | Before_merging ->
@@ -1627,6 +1643,8 @@ let jobs pipeline_type =
         [job_unified_coverage]
     | Schedule_extended_test -> []
   in
+
+  (*Doc jobs*)
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
@@ -1821,6 +1839,8 @@ let jobs pipeline_type =
     in
     jobs_install_python @ jobs_documentation
   in
+
+  (*Manual jobs *)
   let manual =
     (* Debian packages are always built on scheduled pipelines, and
        can be built manually on the [Before_merging] pipelines. *)
