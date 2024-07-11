@@ -111,6 +111,9 @@ Baker
   parent block. This is done to avoid having consensus operation branched on
   block that are not part of the canonical chain anymore.(MR :gl:`!13619`)
 
+- Remove ``preendorse for`` and ``endorse for`` deprecated commands from baker.
+  (MR :gl:`!14096`)
+
 Accuser
 -------
 
