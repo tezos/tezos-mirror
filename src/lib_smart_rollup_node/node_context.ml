@@ -723,6 +723,35 @@ let save_messages {store; _} key ~predecessor messages =
     ~header:predecessor
     ~value:(messages :> string list)
 
+let set_outbox_message_executed {store; _} ~outbox_level ~index =
+  Store.Outbox_messages.set_outbox_message_executed
+    store.outbox_messages
+    ~outbox_level
+    ~index
+
+let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
+  let max_level = (Reference.get lcc).level in
+  let constants = (Reference.get current_protocol).constants.sc_rollup in
+  let min_level =
+    Int32.sub
+      max_level
+      (Int32.of_int
+         (constants.max_number_of_stored_cemented_commitments
+        * constants.commitment_period_in_blocks))
+  in
+  Store.Outbox_messages.pending store.outbox_messages ~min_level ~max_level
+
+let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
+  let open Lwt_result_syntax in
+  let* head = last_processed_head_opt node_ctxt in
+  let*? max_level =
+    match head with
+    | None -> error_with "No L2 head"
+    | Some h -> Ok h.header.level
+  in
+  let min_level = Int32.succ (Reference.get lcc).level in
+  Store.Outbox_messages.pending store.outbox_messages ~min_level ~max_level
+
 let get_full_l2_block ?get_outbox_messages node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* block = get_l2_block node_ctxt block_hash in

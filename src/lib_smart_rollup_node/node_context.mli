@@ -463,6 +463,31 @@ type proto_info = {
       (** Hash of the {e current} protocol for this level. *)
 }
 
+(** {3 Outbox messages} *)
+
+(** Marks the outbox message at index for a given outbox level as executed in
+    the persistent storage. *)
+val set_outbox_message_executed :
+  rw -> outbox_level:int32 -> index:int -> unit tzresult Lwt.t
+
+(** [register_new_outbox_messages node_ctxt ~outbox_level ~indexes] registers
+    the messages indexes for the [outbox_level]. If messages were already
+    registered for this level, they are overwritten. Messages added are first
+    marked unexecuted. *)
+(** Returns the pending messages (i.e. unexecuted) that can now be executed.
+    The returned list contains outbox levels and indexes for each level (in
+    order). *)
+val get_executable_pending_outbox_messages :
+  _ t -> (int32 * int list) list tzresult Lwt.t
+
+(** Returns the pending messages (i.e. unexecuted) that cannot be executed yet.
+    The returned list contains outbox levels and indexes for each level (in
+    order). *)
+val get_unexecutable_pending_outbox_messages :
+  _ t -> (int32 * int list) list tzresult Lwt.t
+
+(** {3 Protocol} *)
+
 (** [protocol_of_level_with_store store level] returns the protocol of block level [level]. *)
 val protocol_of_level_with_store :
   _ Store.t -> int32 -> proto_info tzresult Lwt.t
