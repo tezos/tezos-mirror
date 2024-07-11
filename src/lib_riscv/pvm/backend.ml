@@ -54,3 +54,6 @@ let set_input state level message_counter payload =
        level
        message_counter
        (Bytes.of_string payload))
+
+let set_metadata state address origination_level =
+  Lwt.return (Api.octez_riscv_set_metadata state address origination_level)

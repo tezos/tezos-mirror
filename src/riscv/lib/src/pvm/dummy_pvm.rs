@@ -175,6 +175,19 @@ impl DummyPvm {
         })
     }
 
+    pub fn set_metadata(&self, rollup_address: &[u8; 20], origination_level: u32) -> Self {
+        self.with_new_backend(|state| {
+            assert!(
+                state
+                    .pvm
+                    .provide_metadata(rollup_address, origination_level),
+                "Cannot accept metadata in current state ({})",
+                state.pvm.status()
+            );
+            state.tick.write(state.tick.read() + 1);
+        })
+    }
+
     pub fn to_bytes(&self) -> &[u8] {
         self.backend.borrow()
     }

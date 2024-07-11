@@ -84,7 +84,12 @@ module PVM :
           (Raw_level.to_int32 inbox_level)
           (Z.to_int64 message_counter)
           (Sc_rollup.Inbox_message.unsafe_to_string payload)
-    | Sc_rollup.Reveal _ -> assert false
+    | Sc_rollup.(Reveal (Metadata {address; origination_level})) ->
+        Backend.set_metadata
+          state
+          (Sc_rollup.Address.to_bytes address)
+          (Raw_level.to_int32 origination_level)
+    | _ -> assert false
 
   let eval state = Backend.compute_step state
 

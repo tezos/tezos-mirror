@@ -255,6 +255,17 @@ pub fn octez_riscv_set_input_message(
 }
 
 #[ocaml::func]
+#[ocaml::sig("state -> bytes -> int32 -> state")]
+pub fn octez_riscv_set_metadata(
+    state: Pointer<State>,
+    address: &[u8],
+    origination_level: u32,
+) -> Pointer<State> {
+    let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
+    State(state.as_ref().0.set_metadata(address, origination_level)).into()
+}
+
+#[ocaml::func]
 #[ocaml::sig("state -> int64")]
 pub fn octez_riscv_get_message_counter(state: Pointer<State>) -> u64 {
     state.as_ref().0.get_message_counter()
