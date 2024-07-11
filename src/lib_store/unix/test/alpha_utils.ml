@@ -247,8 +247,6 @@ let dispatch_policy rpc_ctxt = function
 let get_next_baker chain_store ?(policy = By_round 0) =
   dispatch_policy chain_store policy
 
-let get_endorsing_power _chain_store _b = 0
-
 module Forge = struct
   type header = {
     baker : public_key_hash;

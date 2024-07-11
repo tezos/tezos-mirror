@@ -33,12 +33,12 @@ module type RPC_DIRECTORY = sig
     (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
 end
 
-(** Protocol specific functions to track endorsed DAL slots of L1 blocks. *)
+(** Protocol specific functions to track attested DAL slots of L1 blocks. *)
 module type DAL_SLOTS_TRACKER = sig
   (** [process_head node_ctxt head] performs the following operations for a
       given protocol:
       {ul
-        {li it reads the endorsements for headers published attestation_lag
+        {li it reads the attestations for headers published attestation_lag
         levels preceding [head] from the block metadata, determines which
         ones the rollup node will download, and stores the results in
         [Store.Dal_confirmed_slots].}
