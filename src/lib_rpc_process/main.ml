@@ -119,6 +119,22 @@ let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
   let callback =
     Forward_handler.callback ~acl server params.rpc_comm_socket_path
   in
+  let* callback =
+    if params.config.rpc.enable_http_cache_headers then
+      let Http_cache_headers.{get_estimated_time_to_next_level} =
+        Http_cache_headers.make_tools (fun () ->
+            let store_opt = !dynamic_store in
+            Option.map Store.main_chain_store store_opt)
+      in
+      let*! () =
+        Rpc_process_events.(emit enable_http_cache_headers_for_external ())
+      in
+      return
+        (RPC_middleware.Http_cache_headers.make
+           ~get_estimated_time_to_next_level
+           callback)
+    else return callback
+  in
   Lwt.catch
     (fun () ->
       let*! () =

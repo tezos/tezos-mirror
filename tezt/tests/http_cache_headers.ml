@@ -41,20 +41,26 @@ let check_max_age_in_headers ?(expects_missing_header = false) ~__LOC__ headers
     when the round duration has not yet elapsed and the absence
     of the header field when the round duration has elapsed and
     no new block has arrived. *)
-let test_max_age =
+let test_max_age ~rpc_external =
+  let title =
+    "max-age header for " ^ if rpc_external then "external rpc" else "local rpc"
+  in
   Protocol.register_test
     ~__FILE__
-    ~title:"max-age header"
+    ~title
     ~tags:["rpc"; "middleware"; "http_cache_headers"]
     ~supports:(From_protocol 19)
   @@ fun protocol ->
   Log.info "Initialize client, node and baker" ;
   let node =
     Node.create
+      ~rpc_external
       [Connections 0; Synchronisation_threshold 0; Enable_http_cache_headers]
   in
   let http_cache_headers_enabled_event =
-    Node.wait_for node "enable_http_cache_headers.v0" Option.some
+    if rpc_external then
+      Node.wait_for node "enable_http_cache_headers_for_external.v0" Option.some
+    else Node.wait_for node "enable_http_cache_headers_for_local.v0" Option.some
   in
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
@@ -90,4 +96,6 @@ let test_max_age =
   let* () = Node.terminate node in
   unit
 
-let register ~protocols = test_max_age protocols
+let register ~protocols =
+  test_max_age ~rpc_external:true protocols ;
+  test_max_age ~rpc_external:false protocols

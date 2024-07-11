@@ -106,3 +106,11 @@ let store_synchronized_on_head =
     ~pp1:Block_hash.pp_short
     ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
+
+let enable_http_cache_headers_for_external =
+  declare_0
+    ~section
+    ~name:"enable_http_cache_headers_for_external"
+    ~msg:"HTTP cache headers enabled for external rpc server"
+    ~level:Notice
+    ()

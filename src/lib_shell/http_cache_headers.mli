@@ -13,4 +13,4 @@ type tools = {
   get_estimated_time_to_next_level : unit -> Ptime.span option Lwt.t;
 }
 
-val make_tools : Store.chain_store -> tools
+val make_tools : (unit -> Store.chain_store option) -> tools
