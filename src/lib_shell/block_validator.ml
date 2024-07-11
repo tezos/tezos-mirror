@@ -358,14 +358,21 @@ let on_validation_request w
                   in
                   match r with
                   | Application_error errs ->
-                      (* If an error occurs at application, the block_hash is
-                         registered in [inapplicable_blocks_after_validation]
-                         to avoid validating and advertising it again in the
-                         future *)
-                      Block_hash_ring.replace
-                        bv.inapplicable_blocks_after_validation
-                        hash
-                        errs ;
+                      if
+                        List.exists
+                          (function
+                            | Exn Lwt.Canceled | Canceled -> false | _ -> true)
+                          errs
+                      then
+                        (* If an error occurs at application that is not a
+                           cancellation of the request, the block_hash is
+                           registered in [inapplicable_blocks_after_validation]
+                           to avoid validating and advertising it again in the
+                           future *)
+                        Block_hash_ring.replace
+                          bv.inapplicable_blocks_after_validation
+                          hash
+                          errs ;
                       return (Application_error_after_validation errs)
                   | Applied application_result ->
                       Shell_metrics.Block_validator
