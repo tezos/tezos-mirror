@@ -49,7 +49,7 @@ let state_hash state = Api.octez_riscv_state_hash state
 
 let set_input state level message_counter payload =
   Lwt.return
-    (Api.octez_riscv_set_input
+    (Api.octez_riscv_set_input_message
        state
        level
        message_counter
