@@ -30,9 +30,6 @@ _tezos-alphanet_complete() {
   baker)
     COMPREPLY=("$(compgen -W "start stop status log" -- "$cur_word")")
     ;;
-  endorser)
-    COMPREPLY=("$(compgen -W "start stop status log" -- "$cur_word")")
-    ;;
   client) ;;
     # prev_word="${COMP_WORDS[COMP_CWORD-1]}"
     # unset COMP_WORDS[0]
@@ -43,7 +40,7 @@ _tezos-alphanet_complete() {
     COMPREPLY=("$(compgen -W "start restart \
                              clear status stop kill head \
                              go_alpha_go shell client check_script update_script \
-                             container node baker endorser" -- "$cur_word")")
+                             container node baker" -- "$cur_word")")
     ;;
   esac
   return 0
