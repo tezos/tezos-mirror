@@ -1,3 +1,4 @@
+use crate::machine_state::bus::{main_memory::MainMemoryLayout, start_of_main_memory};
 use derive_more::{Error, From};
 use goblin::{
     elf,
@@ -5,8 +6,10 @@ use goblin::{
     elf::program_header::{ProgramHeader, PT_LOAD},
     elf::Elf,
 };
-use std::collections::HashMap;
-use std::io::{Cursor, Seek, SeekFrom, Write};
+use std::{
+    collections::HashMap,
+    io::{Cursor, Seek, SeekFrom, Write},
+};
 
 #[derive(Debug, From, Error, derive_more::Display)]
 pub enum Error {
@@ -146,16 +149,25 @@ pub fn load_elf(mem: &mut impl Memory, start: u64, contents: &[u8]) -> Result<Lo
     }
 }
 
-pub fn get_elf_symbols(contents: &[u8]) -> Result<HashMap<u64, &str>, Error> {
+pub fn get_elf_symbols<ML: MainMemoryLayout>(contents: &[u8]) -> Result<HashMap<u64, &str>, Error> {
     let mut symbols = HashMap::new();
     let elf = Elf::parse(contents)?;
+
+    let offset = if elf.header.e_type == ET_DYN {
+        // Symbol addresses in relocatable executables are relative addresses. We need to offset
+        // them by the start address of the main memory where the executable is loaded.
+        start_of_main_memory::<ML>()
+    } else {
+        0
+    };
+
     for symbol in elf.syms.iter() {
         let name = elf.strtab.get_at(symbol.st_name).expect("Symbol not found");
         if !name.is_empty()
             && u32::try_from(symbol.st_shndx).expect("Symbol not valid address")
                 != elf::section_header::SHN_UNDEF
         {
-            symbols.insert(symbol.st_value, name);
+            symbols.insert(symbol.st_value + offset, name);
         }
     }
     Ok(symbols)

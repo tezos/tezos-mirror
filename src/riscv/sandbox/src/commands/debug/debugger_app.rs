@@ -164,7 +164,7 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<'a, ML>> {
         let mut backend = TestStepper::<'_, ML>::create_backend();
         let (mut interpreter, prog) =
             TestStepper::new_with_parsed_program(&mut backend, program, initrd, exit_mode)?;
-        let symbols = kernel_loader::get_elf_symbols(program)?;
+        let symbols = kernel_loader::get_elf_symbols::<ML>(program)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
@@ -198,7 +198,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout>
             origination_level,
         )?;
 
-        let symbols = kernel_loader::get_elf_symbols(program)?;
+        let symbols = kernel_loader::get_elf_symbols::<ML>(program)?;
         let program = Program::<ML>::from_elf(program)?.parsed();
 
         errors::install_hooks()?;
