@@ -1,0 +1,228 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+workflow:
+  rules:
+  - if: $foo != "bar" || $foo == "bar"
+    when: always
+
+stages:
+- images
+- build
+- publishing
+- publishing_tests
+
+oc.docker-build-debian-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-debian-packages-dependencies.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-debian:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh
+  variables:
+    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-debian-current:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages_current.sh
+  variables:
+    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+apt_repo_debian_current:
+  image: debian:bookworm
+  stage: publishing
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian-current
+  dependencies:
+  - oc.build-debian-current
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh debian bookworm
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+oc.install_bin_debian_bookworm:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian_current
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
+
+oc.docker-build-ubuntu-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-debian-packages-dependencies.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-ubuntu:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh
+  variables:
+    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-ubuntu-current:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages_current.sh
+  variables:
+    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+apt_repo_ubuntu_current:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  stage: publishing
+  tags:
+  - gcp
+  needs:
+  - oc.build-ubuntu-current
+  dependencies:
+  - oc.build-ubuntu-current
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh ubuntu focal jammy
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+oc.install_bin_ubuntu_focal:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu_current
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh ubuntu focal
+
+oc.install_bin_ubuntu_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu_current
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh ubuntu jammy
