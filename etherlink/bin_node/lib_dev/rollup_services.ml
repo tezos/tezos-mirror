@@ -80,11 +80,12 @@ let gc_info :
 type state_value_query = {key : string}
 
 module Block_id = struct
-  type t = Head | Level of Int32.t
+  type t = Head | Level of Int32.t | Finalized
 
   let construct = function
     | Head -> "head"
     | Level level -> Int32.to_string level
+    | Finalized -> "finalized"
 
   let destruct id =
     match id with

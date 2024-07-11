@@ -37,6 +37,8 @@ module MakeBackend (Base : sig
   val drop_duplicate_on_injection : bool
 
   val smart_rollup_address : string
+
+  val finalized : bool
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
     let read ?block path =
@@ -47,11 +49,14 @@ end) : Services_backend_sig.Backend = struct
             "The EVM node in proxy mode support state requests only on latest \
              block."
       | _ ->
+          let level : Rollup_services.Block_id.t =
+            if Base.finalized then Finalized else Head
+          in
           call_service
             ~keep_alive:Base.keep_alive
             ~base:Base.base
             durable_state_value
-            ((), Block_id.Head)
+            ((), level)
             {key = path}
             ()
   end
@@ -179,5 +184,7 @@ module Make (Base : sig
   val drop_duplicate_on_injection : bool
 
   val smart_rollup_address : string
+
+  val finalized : bool
 end) =
   Services_backend_sig.Make (MakeBackend (Base))

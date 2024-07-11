@@ -36,5 +36,7 @@ module Make : functor
      val drop_duplicate_on_injection : bool
 
      val smart_rollup_address : string
+
+     val finalized : bool
    end)
   -> Services_backend_sig.S

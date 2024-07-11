@@ -105,7 +105,10 @@ type mode =
           (** --sequencer-sidecar-endpoint: Uri of the sidecar endpoints to which
               proposals are forwarded, and from where preblocks are fetched. *)
     }
-  | Proxy
+  | Proxy of {
+      finalized_view : bool;
+          (** Expose the latest final block of the rollup instead of its current head *)
+    }
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode

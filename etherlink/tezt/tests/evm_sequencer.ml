@@ -329,7 +329,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   let* proxy =
     Evm_node.init
       ~patch_config
-      ~mode:Proxy
+      ~mode:(Proxy {finalized_view = false})
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   return
@@ -2818,7 +2818,9 @@ let test_force_kernel_upgrade_too_early =
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~mode:(Proxy {finalized_view = false})
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -2880,7 +2882,9 @@ let test_force_kernel_upgrade =
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~mode:(Proxy {finalized_view = false})
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -4619,6 +4623,64 @@ let test_patch_kernel =
   in
   unit
 
+let test_proxy_finalized_view =
+  register_both
+    ~kernels:
+      [
+        Latest
+        (* This test focuses on a feature that purely relies on the node, it does not makes sense to register it for every protocols *);
+      ]
+    ~tags:["evm"; "finalized_view"]
+    ~time_between_blocks:Nothing
+    ~title:
+      "--finalized-view of the proxy node returns the latest final block of \
+       the sequencer"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
+  (* Start a proxy node with --finalized-view enabled *)
+  let* finalized_proxy =
+    Evm_node.init
+      ~mode:(Proxy {finalized_view = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  (* Produce a few EVM blocks *)
+  let* _ =
+    repeat 4 @@ fun () ->
+    let* _ = produce_block sequencer in
+    unit
+  in
+  (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
+  (* Check the heads of the various nodes *)
+  let*@ sequencer_head = Rpc.block_number sequencer in
+  let*@ proxy_head = Rpc.block_number proxy in
+
+  Check.((sequencer_head = 4l) int32)
+    ~error_msg:"Sequencer head should be %R, but is %L instead" ;
+  Check.((proxy_head = sequencer_head) int32)
+    ~error_msg:
+      "Regular proxy head should be equal to sequencer head (%R), but is %L \
+       instead" ;
+  (* While the blocks were posted onchain, they are not final wrt. the
+     consensus algorithm, so the finalized proxy does not have a head yet. *)
+  let*@? _ = Rpc.block_number finalized_proxy in
+
+  (* We produce two more L1 blocks to finalize the L2 blocks.
+     2 here is hardcoded because it’s Tenderbake magic number. *)
+  let* _ =
+    repeat 2 @@ fun () ->
+    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  in
+  let*@ _ = Rpc.block_number finalized_proxy in
+  Check.((proxy_head = sequencer_head) int32)
+    ~error_msg:
+      "Finalized proxy head should be equal to sequencer head (%R), but is %L \
+       instead" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -4681,4 +4743,5 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_trace_call protocols ;
-  test_patch_kernel protocols
+  test_patch_kernel protocols ;
+  test_proxy_finalized_view protocols

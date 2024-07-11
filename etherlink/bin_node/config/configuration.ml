@@ -57,7 +57,7 @@ type observer = {
   time_between_blocks : time_between_blocks option;
 }
 
-type proxy = unit
+type proxy = {finalized_view : bool}
 
 type fee_history = {max_count : int option; max_past : int option}
 
@@ -473,9 +473,14 @@ let experimental_features_encoding =
           bool
           default_enable_send_raw_transaction))
 
-let proxy_encoding = Data_encoding.unit
+let proxy_encoding =
+  let open Data_encoding in
+  conv
+    (fun {finalized_view} -> finalized_view)
+    (fun finalized_view -> {finalized_view})
+  @@ obj1 (dft "finalized_view" bool false)
 
-let default_proxy = ()
+let default_proxy ?(finalized_view = false) () = {finalized_view}
 
 let fee_history_encoding =
   let open Data_encoding in
@@ -618,7 +623,7 @@ let encoding data_dir : t Data_encoding.t =
              "experimental_features"
              experimental_features_encoding
              default_experimental_features)
-          (dft "proxy" proxy_encoding default_proxy)
+          (dft "proxy" proxy_encoding (default_proxy ()))
           (dft "fee_history" fee_history_encoding default_fee_history)
           (opt "restricted_rpcs" string)))
 
@@ -663,7 +668,8 @@ module Cli = struct
       ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs () =
+      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
+      ?proxy_finalized_view () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -714,7 +720,7 @@ module Cli = struct
             ())
         evm_node_endpoint
     in
-    let proxy = () in
+    let proxy = default_proxy ?finalized_view:proxy_finalized_view () in
     let log_filter =
       default_filter_config
         ?max_nb_blocks:log_filter_max_nb_blocks
@@ -760,7 +766,8 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs configuration =
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
+      configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -951,7 +958,7 @@ module Cli = struct
                 ())
             evm_node_endpoint
     in
-    let proxy = () in
+    let proxy = default_proxy ?finalized_view:proxy_finalized_view () in
     let log_filter =
       {
         max_nb_blocks =
@@ -1017,7 +1024,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint ?restricted_rpcs () =
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1068,6 +1075,7 @@ module Cli = struct
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
+          ?proxy_finalized_view
           configuration
       in
       return configuration
@@ -1107,6 +1115,7 @@ module Cli = struct
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
+          ?proxy_finalized_view
           ()
       in
       return config

@@ -87,6 +87,8 @@ let main
     let drop_duplicate_on_injection = drop_duplicate_on_injection
 
     let smart_rollup_address = smart_rollup_address
+
+    let finalized = config.proxy.finalized_view
   end) in
   let* () =
     if not config.experimental_features.enable_send_raw_transaction then

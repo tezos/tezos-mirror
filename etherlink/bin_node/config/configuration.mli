@@ -84,7 +84,11 @@ type observer = {
       (** See {!time_between_blocks}. *)
 }
 
-type proxy = unit
+type proxy = {
+  finalized_view : bool;
+      (** Provide a view on the latest final state of the rollup, not its
+          current HEAD. *)
+}
 
 type fee_history = {max_count : int option; max_past : int option}
 
@@ -218,6 +222,7 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:string ->
+    ?proxy_finalized_view:bool ->
     unit ->
     t
 
@@ -250,6 +255,7 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:string ->
+    ?proxy_finalized_view:bool ->
     unit ->
     t tzresult Lwt.t
 end
