@@ -43,10 +43,6 @@ features = ["utils"]
 version = "0.5.2"
 default-features = false
 
-[workspace.dependencies.rvemu]
-git = "https://github.com/vapourismo/rvemu.git"
-rev = "1b81d60fa849ba06fc0fe0a1e2613b53c3354026"
-
 [workspace.dependencies.strum]
 version = "0.26.1"
 features = ["derive"]

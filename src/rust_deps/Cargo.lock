@@ -2232,7 +2232,6 @@ dependencies = [
  "ocaml-build",
  "paste",
  "rustc_apfloat",
- "rvemu",
  "serde",
  "strum 0.26.2",
  "tezos-smart-rollup-constants",
@@ -3031,17 +3030,6 @@ name = "rustversion"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80af6f9131f277a45a3fba6ce8e2258037bb0477a67e610d3c1fe046ab31de47"
-
-[[package]]
-name = "rvemu"
-version = "0.0.11"
-source = "git+https://github.com/vapourismo/rvemu.git?rev=1b81d60fa849ba06fc0fe0a1e2613b53c3354026#1b81d60fa849ba06fc0fe0a1e2613b53c3354026"
-dependencies = [
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
 
 [[package]]
 name = "ryu"
@@ -3919,18 +3907,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "wasm-bindgen-futures"
-version = "0.4.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76bc14366121efc8dbb487ab05bcc9d346b3b5ec0eaa76e46594cabbe51762c0"
-dependencies = [
- "cfg-if",
- "js-sys",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]

@@ -37,10 +37,9 @@ fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    use commands::{bench, debug, run, rvemu};
+    use commands::{bench, debug, run};
     let cli = cli::parse();
     match cli.command {
-        cli::Mode::Rvemu(opts) => rvemu(opts),
         cli::Mode::Run(opts) => run(opts),
         cli::Mode::Debug(opts) => debug(opts),
         cli::Mode::Bench(opts) => bench(opts),

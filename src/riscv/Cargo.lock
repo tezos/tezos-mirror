@@ -1338,7 +1338,6 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "rustc_apfloat",
- "rvemu",
  "serde",
  "strum 0.26.2",
  "tempfile",
@@ -1793,7 +1792,6 @@ dependencies = [
  "octez-riscv",
  "quanta",
  "ratatui",
- "rvemu",
  "serde",
  "serde_json",
  "strum 0.26.2",
@@ -1880,17 +1878,6 @@ dependencies = [
  "quick-error",
  "tempfile",
  "wait-timeout",
-]
-
-[[package]]
-name = "rvemu"
-version = "0.0.11"
-source = "git+https://github.com/vapourismo/rvemu.git?rev=1b81d60fa849ba06fc0fe0a1e2613b53c3354026#1b81d60fa849ba06fc0fe0a1e2613b53c3354026"
-dependencies = [
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
@@ -2709,18 +2696,6 @@ dependencies = [
  "quote",
  "syn 2.0.65",
  "wasm-bindgen-shared",
-]
-
-[[package]]
-name = "wasm-bindgen-futures"
-version = "0.4.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76bc14366121efc8dbb487ab05bcc9d346b3b5ec0eaa76e46594cabbe51762c0"
-dependencies = [
- "cfg-if",
- "js-sys",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
