@@ -52,16 +52,15 @@ val create :
 
 val shutdown : t -> unit Lwt.t
 
-(** [build_rpc_directory ~node_version ~commit_info node] builds a Tezos RPC
-    directory for the node by gathering all the subdirectories. [node_version],
-    [commit_info] and [node] contain all informations required to build such a
-    directory. *)
+(** [build_rpc_directory ~node_version node] builds a Tezos RPC
+    directory for the node by gathering all the
+    subdirectories. [node_version], and [node] contain all
+    informations required to build such a directory. *)
 val build_rpc_directory :
   node_version:Tezos_version.Octez_node_version.t ->
-  commit_info:Octez_node_version.commit_info ->
   t ->
   unit Tezos_rpc.Directory.t
 
-(** [http_cache_header_tools] builds the tools required to expose the node 
+(** [http_cache_header_tools] builds the tools required to expose the node
     internals in an abstract way to the http cache header middleware. *)
 val http_cache_header_tools : t -> Http_cache_headers.tools

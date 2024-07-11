@@ -114,10 +114,14 @@ and in the changelog of Octez versions.
 Sunset Dates
 """"""""""""
 
+.. When RPCs are set as deprecated, use the following template to
+   announce their sunset dates:
+   `/path/to/rpc_name <../shell/rpc.html#get-path-to-rpc_name>`__
+   <blank line>
+   - Deprecated: vX.X, Month 20xx
+   - Planned Sunset: vX.0 (not before Qx 20xx)
+   - Comment: Use `/new/path/new_name <../shell/rpc.html#get-new-path-new_name>`__ instead..
+
 Currently, the following RPCs are subject to the deprecation policy.
 
-`/monitor/commit_hash <../shell/rpc.html#get-monitor-commit-hash>`__
-
-- Deprecated: v8.0, January 2021
-- Planned Sunset: v21.0 (not before Q3 2024)
-- Comment: Use `/version <../shell/rpc.html#get-version>`__ instead.
+- None

@@ -45,7 +45,4 @@ val applied_blocks :
   Lwt.t
 
 val build_rpc_directory :
-  commit_info:Octez_node_version.commit_info ->
-  Validator.t ->
-  Chain_validator.t ->
-  unit Tezos_rpc.Directory.t
+  Validator.t -> Chain_validator.t -> unit Tezos_rpc.Directory.t

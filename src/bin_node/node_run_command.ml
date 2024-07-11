@@ -657,16 +657,8 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   let open Lwt_result_syntax in
   (* Start local RPC server (handled by the node main process) only
      when at least one local listen addr is given. *)
-  let commit_info =
-    ({
-       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
-       commit_date = Tezos_version_value.Current_git_info.committer_date;
-     }
-      : Tezos_version.Octez_node_version.commit_info)
-  in
   let node_version = Node.get_version node in
-
-  let dir = Node.build_rpc_directory ~node_version ~commit_info node in
+  let dir = Node.build_rpc_directory ~node_version node in
   let dir = Node_directory.build_node_directory config dir in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
