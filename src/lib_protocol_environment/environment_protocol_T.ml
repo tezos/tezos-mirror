@@ -49,11 +49,11 @@ open Environment_context
    environment ([module type Vx_T]).
 
    If you want to mock this module type, see {!Environment_protocol_T_test}. *)
-module type T = Environment_protocol_T_V10.T
+module type T = Environment_protocol_T_V13.T
 (* Documentation for this interface may be found in
    module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
-module V0toV10
+module V0toV13
     (E : Environment_protocol_T_V0.T
            with type context := Context.t
             and type quota := quota

@@ -120,6 +120,9 @@ Protocol Compiler And Environment
 
 - Added a new version of the protocol environment (V13). (MR :gl:`!12966`)
 
+- Remove with_legacy_attestation_name encodings from the protocol environment.
+  (MR :gl:`!14046`)
+
 Codec
 -----
 

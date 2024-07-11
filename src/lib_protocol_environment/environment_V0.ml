@@ -833,7 +833,7 @@ struct
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
-    include IgnoreCaches (Environment_protocol_T.V0toV10 (LiftV0 (P)))
+    include IgnoreCaches (Environment_protocol_T.V0toV13 (LiftV0 (P)))
 
     let set_log_message_consumer _ = ()
 

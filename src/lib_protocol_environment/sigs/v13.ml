@@ -11427,11 +11427,6 @@ module type PROTOCOL = sig
       validation. *)
   type block_header_metadata
 
-  (** Encoding for economic protocol-specific block metadata. This encoding uses
-      the attestation legacy name: endorsement. *)
-  val block_header_metadata_encoding_with_legacy_attestation_name :
-    block_header_metadata Data_encoding.t
-
   (** Encoding for economic protocol-specific block metadata. *)
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 
@@ -11452,26 +11447,11 @@ module type PROTOCOL = sig
   (** Encoding for protocol-specific operation data. *)
   val operation_data_encoding : operation_data Data_encoding.t
 
-  (** Encoding for protocol-specific operation data. This encoding uses the
-      attestation legacy name: endorsement. *)
-  val operation_data_encoding_with_legacy_attestation_name :
-    operation_data Data_encoding.t
-
   (** Encoding for protocol-specific operation receipts. *)
   val operation_receipt_encoding : operation_receipt Data_encoding.t
 
-  (** Encoding for protocol-specific operation receipts. This encoding uses the
-      attestation legacy name: endorsement. *)
-  val operation_receipt_encoding_with_legacy_attestation_name :
-    operation_receipt Data_encoding.t
-
   (** Encoding that mixes an operation data and its receipt. *)
   val operation_data_and_receipt_encoding :
-    (operation_data * operation_receipt) Data_encoding.t
-
-  (** Encoding that mixes an operation data and its receipt. This encoding uses
-      the attestation legacy name: endorsement. *)
-  val operation_data_and_receipt_encoding_with_legacy_attestation_name :
     (operation_data * operation_receipt) Data_encoding.t
 
   (** [acceptable_pass op] gives the validation pass in which the
