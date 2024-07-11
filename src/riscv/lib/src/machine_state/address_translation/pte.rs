@@ -28,7 +28,7 @@ pub struct PPNField {
 
 impl PPNField {
     /// Obtain `PPN[index]` from a PPN field of a page table entry.
-    pub fn ppn_i(&self, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
+    pub fn ppn_i(&self, sv_length: SvLength, index: usize) -> Option<CSRRepr> {
         let (start, end) = physical_address::get_raw_ppn_i_range(sv_length, index)?;
         Some(u64::bits_subset(self.raw_bits, start, end))
     }
@@ -99,25 +99,25 @@ mod tests {
 
             // Sv39
             let ppn = pte.ppn();
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv39, over_3), None);
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv39, 0), Some(ppn_0));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv39, 1), Some(ppn_1));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv39, 2), Some(ppn_2 | ppn_3 << 9 | ppn_4 << 18));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, over_3), None);
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 0), Some(ppn_0));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 1), Some(ppn_1));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 2), Some(ppn_2 | ppn_3 << 9 | ppn_4 << 18));
 
             // Sv48
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv48, over_3 + 1), None);
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv48, 0), Some(ppn_0));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv48, 1), Some(ppn_1));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv48, 2), Some(ppn_2));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv48, 3), Some(ppn_3 | ppn_4 << 9));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, over_3 + 1), None);
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 0), Some(ppn_0));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 1), Some(ppn_1));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 2), Some(ppn_2));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 3), Some(ppn_3 | ppn_4 << 9));
 
             // Sv57
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv57, over_3 + 2), None);
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv57, 0), Some(ppn_0));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv57, 1), Some(ppn_1));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv57, 2), Some(ppn_2));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv57, 3), Some(ppn_3));
-            prop_assert_eq!(ppn.ppn_i(&SvLength::Sv57, 4), Some(ppn_4));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, over_3 + 2), None);
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, 0), Some(ppn_0));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, 1), Some(ppn_1));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, 2), Some(ppn_2));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, 3), Some(ppn_3));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, 4), Some(ppn_4));
 
             // Flags
             prop_assert_eq!(pte.r(), flag_R != 0);

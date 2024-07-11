@@ -28,11 +28,12 @@ pub const DEFAULT_VALUE: CSRRepr = MODE_BARE << SATP_MODE_OFFSET;
 /// Which flavour of the address virtualization is used.
 ///
 /// `SvXY` represents a virtualization where the virtual address is `XY` bits wide.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
+#[repr(usize)]
 pub enum SvLength {
-    Sv39,
-    Sv48,
-    Sv57,
+    Sv39 = 0,
+    Sv48 = 1,
+    Sv57 = 2,
 }
 
 /// `MODE` field of the `satp` register. See table 5.4
