@@ -9,6 +9,7 @@ type init_status = Loaded | Created
 
 type head = {
   current_block_hash : Ethereum_types.block_hash;
+  finalized_number : Ethereum_types.quantity;
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
 }
@@ -25,6 +26,7 @@ type parameters = {
 
 type session_state = {
   mutable context : Irmin_context.rw;
+  mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
   mutable pending_upgrade : Ethereum_types.Upgrade.t option;
@@ -48,6 +50,7 @@ let blueprint_watcher : Blueprint_types.with_events Lwt_watcher.input =
 let session_to_head_info session =
   {
     evm_state = session.evm_state;
+    finalized_number = session.finalized_number;
     next_blueprint_number = session.next_blueprint_number;
     current_block_hash = session.current_block_hash;
   }
@@ -109,6 +112,7 @@ module Request = struct
     | New_last_known_L1_level : int32 -> (unit, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Evm_state_after : block_request -> (Evm_state.t option, tztrace) t
+    | Finalized_state : (Evm_state.t option, tztrace) t
     | Earliest_state : (Evm_state.t option, tztrace) t
     | Earliest_number : (Ethereum_types.quantity option, tztrace) t
     | Reconstruct : {
@@ -403,7 +407,16 @@ module State = struct
         in
         return (evm_state, on_success)
     | Blueprint_applied {number = Qty number; hash = expected_block_hash} -> (
-        Metrics.set_confirmed_level ~level:number ;
+        let on_success session =
+          let (Qty finalized) = session.finalized_number in
+          (* We use [max] to not rely on the order of the EVM events (because
+             it is possible to see several blueprints applied during on L1
+             level). *)
+          let new_finalized = Z.(max number finalized) in
+          session.finalized_number <- Qty new_finalized ;
+          Metrics.set_confirmed_level ~level:new_finalized ;
+          on_success session
+        in
         let* block_hash_opt =
           let*! bytes =
             Evm_state.inspect
@@ -489,8 +502,10 @@ module State = struct
       let* ctxt = replace_current_commit ctxt conn evm_state in
       return (ctxt, evm_state, on_success)
     in
-    on_modified_head ctxt evm_state context ;
     on_success ctxt.session ;
+    on_modified_head ctxt evm_state context ;
+    let*! head_info in
+    head_info := session_to_head_info ctxt.session ;
     return_unit
 
   type error += Cannot_apply_blueprint of {local_state_level : Z.t}
@@ -799,6 +814,7 @@ module State = struct
         session =
           {
             context;
+            finalized_number = Ethereum_types.quantity_of_z Z.zero;
             next_blueprint_number;
             current_block_hash;
             pending_upgrade;
@@ -1149,6 +1165,18 @@ module Handlers = struct
         in
         Evm_store.use ctxt.store @@ fun conn ->
         let* checkpoint = Evm_store.Context_hashes.find conn number in
+        match checkpoint with
+        | Some checkpoint ->
+            let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+            let*! evm_state = Irmin_context.PVMState.get context in
+            return_some evm_state
+        | None -> return_none)
+    | Finalized_state -> (
+        let ctxt = Worker.state self in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* checkpoint =
+          Evm_store.Context_hashes.find conn ctxt.session.finalized_number
+        in
         match checkpoint with
         | Some checkpoint ->
             let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
@@ -1517,6 +1545,7 @@ let find_evm_state block =
       let*! {evm_state; _} = head_info () in
       return_some evm_state
   | Block_parameter Earliest -> worker_wait_for_request Earliest_state
+  | Block_parameter Finalized -> worker_wait_for_request Finalized_state
   | Block_parameter (Number number) ->
       worker_wait_for_request (Evm_state_after (Number number))
   | Block_hash {hash; require_canonical = _} ->
@@ -1633,6 +1662,9 @@ let block_param_to_block_number
   | Block_parameter (Latest | Pending) ->
       let*! {next_blueprint_number = Qty next_number; _} = head_info () in
       return Ethereum_types.(Qty Z.(pred next_number))
+  | Block_parameter Finalized ->
+      let*! {finalized_number; _} = head_info () in
+      return finalized_number
   | Block_parameter Earliest -> (
       let* res = worker_wait_for_request Earliest_number in
       match res with

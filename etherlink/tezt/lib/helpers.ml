@@ -142,7 +142,10 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
 let check_block_consistency ~left ~right ?error_msg ~block () =
   let open Rpc.Syntax in
   let block =
-    match block with `Latest -> "latest" | `Level l -> Int32.to_string l
+    match block with
+    | `Latest -> "latest"
+    | `Level l -> Int32.to_string l
+    | `Finalized -> "finalized"
   in
   let error_msg =
     Option.value

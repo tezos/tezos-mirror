@@ -234,7 +234,7 @@ val block_from_rlp : bytes -> block
 
 module Block_parameter : sig
   (** Ethereum block params in RPCs. *)
-  type t = Number of quantity | Earliest | Latest | Pending
+  type t = Number of quantity | Earliest | Latest | Pending | Finalized
 
   val encoding : t Data_encoding.t
 

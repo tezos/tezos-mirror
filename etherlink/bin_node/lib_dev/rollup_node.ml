@@ -42,23 +42,27 @@ module MakeBackend (Base : sig
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
     let read ?block path =
-      match block with
-      | Some param
-        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
-          failwith
-            "The EVM node in proxy mode support state requests only on latest \
-             block."
-      | _ ->
-          let level : Rollup_services.Block_id.t =
-            if Base.finalized then Finalized else Head
-          in
-          call_service
-            ~keep_alive:Base.keep_alive
-            ~base:Base.base
-            durable_state_value
-            ((), level)
-            {key = path}
-            ()
+      let open Lwt_result_syntax in
+      let* block_id =
+        match block with
+        | Some Ethereum_types.Block_parameter.(Block_parameter Latest) | None ->
+            let level : Rollup_services.Block_id.t =
+              if Base.finalized then Finalized else Head
+            in
+            return level
+        | Some (Block_parameter Finalized) -> return Block_id.Finalized
+        | Some _ ->
+            failwith
+              "The EVM node in proxy mode support state requests only on \
+               latest or finalized block."
+      in
+      call_service
+        ~keep_alive:Base.keep_alive
+        ~base:Base.base
+        durable_state_value
+        ((), block_id)
+        {key = path}
+        ()
   end
 
   module TxEncoder = struct
@@ -135,20 +139,19 @@ end) : Services_backend_sig.Backend = struct
   let block_param_to_block_number
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
+    let read_from_block_parameter param =
+      let* value =
+        Reader.read
+          ~block:(Block_parameter param)
+          Durable_storage_path.Block.current_number
+      in
+      match value with
+      | Some value ->
+          return (Ethereum_types.Qty (Bytes.to_string value |> Z.of_bits))
+      | None -> failwith "Cannot fetch the requested block"
+    in
     match block_param with
     | Block_parameter (Number n) -> return n
-    | Block_parameter (Earliest | Latest) -> (
-        let* value =
-          Reader.read
-            ~block:(Block_parameter Latest)
-            Durable_storage_path.Block.current_number
-        in
-        match value with
-        | Some value ->
-            return (Ethereum_types.Qty (Bytes.to_string value |> Z.of_bits))
-        | None -> failwith "Cannot read current number")
-    | Block_parameter Pending ->
-        failwith "Pending block parameter is not supported"
     | Block_hash {hash; _} -> (
         let* value =
           Reader.read
@@ -164,6 +167,12 @@ end) : Services_backend_sig.Backend = struct
               "Missing state for block %a"
               Ethereum_types.pp_block_hash
               hash)
+    | Block_parameter Latest -> read_from_block_parameter Latest
+    | Block_parameter Finalized -> read_from_block_parameter Finalized
+    | Block_parameter Pending ->
+        failwith "Pending block parameter is not supported"
+    | Block_parameter Earliest ->
+        failwith "Earliest block parameter is not supported"
 
   module Tracer = struct
     let trace_transaction ~block_number:_ ~transaction_hash:_ ~config:_ =

@@ -106,7 +106,7 @@ val check_block_consistency :
   left:Evm_node.t ->
   right:Evm_node.t ->
   ?error_msg:string ->
-  block:[< `Latest | `Level of int32] ->
+  block:[< `Latest | `Level of int32 | `Finalized] ->
   unit ->
   unit Lwt.t
 
