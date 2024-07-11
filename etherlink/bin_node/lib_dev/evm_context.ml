@@ -504,7 +504,7 @@ module State = struct
         Option.map_es
           (fun l1_level ->
             let l2_level = current_blueprint_number ctxt in
-            Evm_store.L1_latest_known_level.store conn l2_level l1_level)
+            Evm_store.L1_l2_levels_relationships.store conn l2_level l1_level)
           finalized_level
       in
       let* ctxt = replace_current_commit ctxt conn evm_state in
@@ -1142,16 +1142,16 @@ module Handlers = struct
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         Evm_store.Blueprints.find_range conn ~from ~to_
-    | Last_known_L1_level ->
+    | Last_known_L1_level -> (
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
-        let* level = Evm_store.L1_latest_known_level.find conn in
-        return @@ Option.map snd level
+        let+ level = Evm_store.L1_l2_levels_relationships.find conn in
+        match level with Some {l1_level; _} -> Some l1_level | None -> None)
     | New_last_known_L1_level l1_level ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let l2_level = State.current_blueprint_number ctxt in
-        Evm_store.L1_latest_known_level.store conn l2_level l1_level
+        Evm_store.L1_l2_levels_relationships.store conn l2_level l1_level
     | Delayed_inbox_hashes ->
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in

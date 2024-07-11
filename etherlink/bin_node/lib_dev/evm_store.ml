@@ -16,6 +16,8 @@ type pool =
 
 type sqlite_journal_mode = Wal | Other
 
+type levels = {l1_level : int32; current_number : Ethereum_types.quantity}
+
 module Db = struct
   let caqti (p : ('a, Caqti_error.t) result Lwt.t) : 'a tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -170,6 +172,12 @@ module Q = struct
         @@ Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt bytes)
       string
 
+  let levels =
+    custom
+      ~encode:(fun {current_number; l1_level} -> Ok (current_number, l1_level))
+      ~decode:(fun (current_number, l1_level) -> Ok {current_number; l1_level})
+      (t2 level l1_level)
+
   let journal_mode =
     custom
       ~encode:(function Wal -> Ok "wal" | Other -> Ok "delete")
@@ -212,7 +220,7 @@ module Q = struct
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
         - Increment [version]
     *)
-    let version = 7
+    let version = 8
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -315,18 +323,19 @@ module Q = struct
       @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
   end
 
-  module L1_latest_level = struct
+  module L1_l2_levels_relationships = struct
     let insert =
       (t2 level l1_level ->. unit)
-      @@ {|INSERT INTO l1_latest_level_with_l2_level (l2_level, l1_level) VALUES (?, ?)|}
+      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level) VALUES (?, ?)|}
 
     let get =
-      (unit ->! t2 level l1_level)
-      @@ {|SELECT l2_level, l1_level  FROM l1_latest_level_with_l2_level ORDER BY l2_level DESC LIMIT 1|}
+      (unit ->! levels)
+      @@ {|SELECT latest_l2_level, l1_level  FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
       (level ->. unit)
-      @@ {|DELETE FROM l1_latest_level_with_l2_level WHERE l2_level > ?|}
+      @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level > ?|}
+
   end
 
   module Metadata = struct
@@ -553,18 +562,20 @@ module Delayed_transactions = struct
     Db.exec conn Q.Delayed_transactions.clear_after l2_level
 end
 
-module L1_latest_known_level = struct
+module L1_l2_levels_relationships = struct
+  type t = levels = {l1_level : int32; current_number : Ethereum_types.quantity}
+
   let store store l1_level l2_level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.L1_latest_level.insert (l1_level, l2_level)
+    Db.exec conn Q.L1_l2_levels_relationships.insert (l1_level, l2_level)
 
   let find store =
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.L1_latest_level.get ()
+    Db.find_opt conn Q.L1_l2_levels_relationships.get ()
 
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.L1_latest_level.clear_after l2_level
+    Db.exec conn Q.L1_l2_levels_relationships.clear_after l2_level
 end
 
 module Metadata = struct
@@ -583,7 +594,7 @@ let reset store ~l2_level =
   let open Lwt_result_syntax in
   let* () = Blueprints.clear_after store l2_level in
   let* () = Context_hashes.clear_after store l2_level in
-  let* () = L1_latest_known_level.clear_after store l2_level in
+  let* () = L1_l2_levels_relationships.clear_after store l2_level in
   let* () = Kernel_upgrades.clear_after store l2_level in
   let* () = Delayed_transactions.clear_after store l2_level in
   return_unit
