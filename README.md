@@ -81,3 +81,33 @@ Grafana dashboards (JSON files) are automatically released on git tags to [GitLa
 
 They are also manually released to [Grafana.com](https://grafana.com/grafana/dashboards/)
 so they can insealy imported via ID.
+
+### Dashboards built with the new version of Grafonnet
+
+The current dashboards are built we a vendored old version of `grafonnet`.
+
+New dashboard are being introduced. These dashboards use the latest version of `grafonnet` that is introduced as a dependency.
+
+#### Dependencies
+
+To built the new dashboard, you need to install `jsonnet` with version `0.18.0` minimum.
+We recommend to use https://github.com/google/go-jsonnet.
+
+Grafonnet should be installed using `jsonnet-bundler` (https://github.com/jsonnet-bundler/jsonnet-bundler/).
+Once `jsonnet-bundler` installed you can import dependencies (here `grafonnet`) by running the following:
+
+```sh
+jb install
+```
+
+#### Build
+
+For now the new dashboards are built seperatly with specific rules in the `Makefile`.
+
+For instance, to build the new `octez-compact` dashboard you need to run:
+
+```sh
+make octez-compact-new
+```
+
+Note that environment variables available for the old dashboards can still be used.
