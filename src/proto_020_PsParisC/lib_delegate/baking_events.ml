@@ -365,6 +365,21 @@ module State_transitions = struct
       ~pp2:Baking_state.pp_event
       ("event", Baking_state.event_encoding)
 
+  let discarding_preattestation =
+    declare_3
+      ~section
+      ~name:"discarding_preattestation"
+      ~level:Info
+      ~msg:
+        "discarding outdated preattestation for {delegate} at level {level}, \
+         round {round}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
+
   let discarding_attestation =
     declare_3
       ~section
@@ -379,6 +394,26 @@ module State_transitions = struct
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
       ("round", Round.encoding)
+
+  let discarding_unexpected_preattestation_with_different_payload =
+    declare_5
+      ~section
+      ~name:"discarding_unexpected_preattestation_with_different_payload"
+      ~level:Warning
+      ~msg:
+        "discarding preattestation for {delegate} with payload {payload} at \
+         level {level}, round {round} where the prequorum was locked on a \
+         different payload {state_payload}."
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Block_payload_hash.pp
+      ("payload", Block_payload_hash.encoding)
+      ~pp3:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp4:Round.pp
+      ("round", Round.encoding)
+      ~pp5:Block_payload_hash.pp
+      ("state_payload", Block_payload_hash.encoding)
 
   let discarding_unexpected_attestation_without_prequorum_payload =
     declare_3

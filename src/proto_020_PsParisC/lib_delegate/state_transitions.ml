@@ -988,6 +988,54 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   let new_state = update_current_phase new_state Idle in
   do_nothing new_state
 
+let handle_forged_preattestation state signed_preattestation =
+  let open Lwt_syntax in
+  let {
+    vote_consensus_content =
+      {
+        level;
+        round = att_round;
+        block_payload_hash = att_payload_hash;
+        slot = _;
+      };
+    delegate;
+    _;
+  } =
+    signed_preattestation.unsigned_consensus_vote
+  in
+  let att_level = Raw_level.to_int32 level in
+  let check_payload state preattestation do_action =
+    match state.level_state.attestable_payload with
+    | None ->
+        (* No attestable payload set, we are free to inject the
+           preattestations *)
+        do_action
+    | Some payload ->
+        if
+          not
+            Block_payload_hash.(
+              payload.proposal.block.payload_hash
+              = preattestation.unsigned_consensus_vote.vote_consensus_content
+                  .block_payload_hash)
+        then
+          (* The preattestation payload does not match the one set in the
+             state, we cannot inject the preattestation. *)
+          let* () =
+            Events.(
+              emit
+                discarding_unexpected_preattestation_with_different_payload
+                ( delegate,
+                  att_payload_hash,
+                  att_level,
+                  att_round,
+                  payload.proposal.block.payload_hash ))
+          in
+          do_nothing state
+        else do_action
+  in
+  check_payload state signed_preattestation
+  @@ Lwt.return (state, Inject_preattestation {signed_preattestation})
+
 let handle_forged_attestation state signed_attestation =
   let open Lwt_syntax in
   let {
@@ -1047,7 +1095,7 @@ let handle_forge_event state forge_event =
           Inject_block
             {prepared_block; force_injection = false; asynchronous = true} )
   | Preattestation_ready signed_preattestation ->
-      Lwt.return (state, Inject_preattestation {signed_preattestation})
+      handle_forged_preattestation state signed_preattestation
   | Attestation_ready signed_attestation ->
       handle_forged_attestation state signed_attestation
 
