@@ -11,8 +11,7 @@ use crate::storage::{self, StorageError};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
 
-const HERMIT_LOADER: &[u8] =
-    include_bytes!("../../../../../../tezt/tests/riscv-tests/hermit-loader");
+const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 
 #[ocaml::sig]
 pub struct Repo(PvmStorage);
@@ -187,7 +186,7 @@ pub fn octez_riscv_install_boot_sector(
         state
             .as_ref()
             .0
-            .install_boot_sector(&HERMIT_LOADER, boot_sector),
+            .install_boot_sector(HERMIT_LOADER, boot_sector),
     )
     .into()
 }

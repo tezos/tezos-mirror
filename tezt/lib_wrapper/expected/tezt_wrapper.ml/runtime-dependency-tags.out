@@ -29,10 +29,10 @@ snoop: octez-snoop
 smart_rollup_installer: smart-rollup-installer
 echo: src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm
 riscv_sandbox: src/riscv
+riscv: src/riscv/assets/hermit-loader
 riscv: src/riscv/riscv-dummy.elf
 riscv_sandbox: src/riscv/riscv-sandbox
 riscv: src/riscv/tests/inline_asm/rv64-inline-asm-tests
 riscv: tezt/tests/riscv-tests/dummy-kernel-inbox.json
-riscv: tezt/tests/riscv-tests/hermit-loader
 tx_kernel: tx_kernel.wasm
 tx_kernel_dal: tx_kernel_dal.wasm
