@@ -169,8 +169,12 @@ let genesis_commitment (module Plugin : Protocol_plugin_sig.S)
   let commitment_hash = Octez_smart_rollup.Commitment.hash commitment in
   let+ () =
     fail_unless
-      Octez_smart_rollup.Commitment.Hash.(
-        commitment_hash = node_ctxt.genesis_info.commitment_hash)
+      (* The protocol part of the RISC-V PVM is not yet synchronised with the
+       * node implementation. Re-enable once solved:
+       * https://linear.app/tezos/issue/RV-98/re-enable-genesis-commitment-hash-check *)
+      (node_ctxt.kind = Kind.Riscv
+      || Octez_smart_rollup.Commitment.Hash.(
+           commitment_hash = node_ctxt.genesis_info.commitment_hash))
       (Rollup_node_errors.Invalid_genesis_state
          {
            expected = node_ctxt.genesis_info.commitment_hash;
