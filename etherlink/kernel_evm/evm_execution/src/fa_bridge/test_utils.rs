@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -226,7 +227,9 @@ pub fn set_balance(
 
 /// Create ticket with dummy creator and content
 pub fn dummy_ticket() -> FA2_1Ticket {
-    let ticketer = ContractKt1Hash([1u8; 20].to_vec());
+    use tezos_crypto_rs::hash::HashTrait;
+
+    let ticketer = ContractKt1Hash::try_from_bytes(&[1u8; 20]).unwrap();
     FA2_1Ticket::new(
         Contract::from_b58check(&ticketer.to_base58_check()).unwrap(),
         MichelsonPair(0.into(), MichelsonOption(None)),

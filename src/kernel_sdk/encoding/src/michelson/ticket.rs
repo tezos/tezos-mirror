@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023-2024 Marigold <contact@marigold.dev>
 //
@@ -161,7 +161,7 @@ fn get_ticket_arguments(input: &[u8]) -> NomResult<[Node; 4]> {
     Ok((fst, ([arg0, arg1, arg2, arg3])))
 }
 
-impl<Contents: MichelsonTicketContent> NomReader for TypedTicket<Contents> {
+impl<Contents: MichelsonTicketContent> NomReader<'_> for TypedTicket<Contents> {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         // 1st: extract each field of the input
         let (fst, [arg0, arg1, arg2, arg3]) = get_ticket_arguments(input)?;
@@ -255,7 +255,7 @@ pub struct Ticket<Expr: MichelsonTicketContent>(pub(crate) LegacyTicketRepr<Expr
 
 impl<Expr> Michelson for Ticket<Expr> where Expr: MichelsonTicketContent {}
 
-impl<Expr> NomReader for Ticket<Expr>
+impl<Expr> NomReader<'_> for Ticket<Expr>
 where
     Expr: MichelsonTicketContent,
 {
@@ -317,7 +317,7 @@ impl<Expr: MichelsonTicketContent> Ticket<Expr> {
         self.creator().bin_write(&mut bytes)?;
         self.contents().bin_write(&mut bytes)?;
 
-        let digest = digest_256(bytes.as_slice())?;
+        let digest = digest_256(bytes.as_slice());
         let digest: [u8; TICKET_HASH_SIZE] = digest.try_into().unwrap();
 
         Ok(TicketHash {

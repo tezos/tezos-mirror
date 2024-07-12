@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -76,12 +76,12 @@ pub enum Signer {
 
 impl Signer {
     /// Return the tz1 account-address of the signer.
-    pub fn address(&self) -> Result<ContractTz1Hash, crypto::hash::TryFromPKError> {
+    pub fn address(&self) -> ContractTz1Hash {
         use crypto::PublicKeyWithHash;
 
         match self {
             Signer::PublicKey(pk) => pk.pk_hash(),
-            Signer::Tz1(address) => Ok(address.clone()),
+            Signer::Tz1(address) => address.clone(),
         }
     }
 }
@@ -90,6 +90,7 @@ impl Signer {
 mod test {
     use super::*;
     use crypto::hash::BlsSignature;
+    use crypto::hash::HashTrait;
     use proptest::prelude::*;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
@@ -136,7 +137,7 @@ mod test {
 
         let expected = V0Certificate {
             root_hash: PreimageHash::from(&root_hash),
-            aggregated_signature: BlsSignature(aggregated_signature.to_vec()),
+            aggregated_signature: BlsSignature::try_from_bytes(&aggregated_signature).unwrap(),
             witnesses: make_witnesses(witnesses as usize),
         };
         let (_remaining, actual_message) = ParsedExternalInboxMessage::parse(&valid_bytes)

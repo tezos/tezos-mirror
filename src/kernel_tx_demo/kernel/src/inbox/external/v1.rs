@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -12,7 +12,6 @@
 use self::verifiable::TransactionError;
 
 use super::Signer;
-use crypto::hash::TryFromPKError;
 use crypto::hash::{ContractKt1Hash, ContractTz1Hash};
 use crypto::CryptoError;
 use nom::combinator::map;
@@ -91,7 +90,7 @@ impl HasEncoding for TicketAmount {
     }
 }
 
-impl NomReader for TicketAmount {
+impl NomReader<'_> for TicketAmount {
     fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
         nom::combinator::map(nom::number::complete::le_u64, |amount| Self { amount })(input)
     }
@@ -110,7 +109,7 @@ impl HasEncoding for TicketIndex {
     }
 }
 
-impl NomReader for TicketIndex {
+impl NomReader<'_> for TicketIndex {
     fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
         nom::combinator::map(nom::number::complete::le_u64, |index| Self { index })(input)
     }
@@ -200,9 +199,6 @@ pub enum ToBytesError {
     /// Bls signing/aggregation error
     #[error("Bls error in signatures {0}")]
     Bls(#[from] CryptoError),
-    /// Unable to convert pk to hash.
-    #[error("Failed to convert pk to hash: {0}")]
-    FromPk(#[from] TryFromPKError),
     /// Serialization error
     #[error("Unable to serialize operation: {0}")]
     Binary(#[from] BinError),

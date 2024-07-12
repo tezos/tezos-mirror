@@ -12,6 +12,7 @@ mod state;
 extern crate tezos_crypto_rs as crypto;
 
 use crypto::hash::ContractKt1Hash;
+use crypto::hash::HashTrait;
 use crypto::hash::HashType;
 use crypto::hash::SmartRollupHash;
 use tezos_data_encoding::enc::BinWriter;
@@ -67,11 +68,10 @@ impl fmt::Debug for MockHost {
 
 impl Default for MockHost {
     fn default() -> Self {
-        let address = SmartRollupAddress::new(SmartRollupHash(vec![
-                0;
-                HashType::SmartRollupHash
-                    .size()
-            ]));
+        let address = SmartRollupAddress::new(
+            SmartRollupHash::try_from_bytes(&[0; HashType::SmartRollupHash.size()])
+                .unwrap(),
+        );
 
         Self::with_address(&address)
     }
@@ -112,8 +112,7 @@ impl MockHost {
     pub fn with_address(address: &SmartRollupAddress) -> Self {
         let raw_rollup_address = address
             .hash()
-            .0
-            .as_slice()
+            .as_ref()
             .try_into()
             .expect("Incorrect length for SmartRollupHash");
 
@@ -315,10 +314,10 @@ fn info_for_level(level: i32) -> inbox::InfoPerLevel {
         * NAIROBI_BLOCK_TIME
         + NAIROBI_ACTIVATION_TIMESTAMP;
 
-    let hash = crypto::blake2b::digest_256(&timestamp.to_le_bytes()).unwrap();
+    let hash = crypto::blake2b::digest_256(&timestamp.to_le_bytes());
 
     inbox::InfoPerLevel {
-        predecessor: crypto::hash::BlockHash(hash),
+        predecessor: crypto::hash::BlockHash::try_from_bytes(&hash).unwrap(),
         predecessor_timestamp: Timestamp::from(timestamp),
     }
 }

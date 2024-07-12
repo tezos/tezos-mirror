@@ -44,15 +44,15 @@ features = [
 
 [workspace.dependencies.jstz_kernel]
 git = "https://github.com/jstz-dev/jstz.git"
-rev = "5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
+branch = "emturner-rv-57"
 
 [workspace.dependencies.jstz_crypto]
 git = "https://github.com/jstz-dev/jstz.git"
-rev = "5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
+branch = "emturner-rv-57"
 
 [workspace.dependencies.jstz_proto]
 git = "https://github.com/jstz-dev/jstz.git"
-rev = "5d3fc13e004ce2c23eb13fe7f0ea08571e1b8a70"
+branch = "emturner-rv-57"
 
 [workspace.dependencies.serde]
 version = "1.0.197"
@@ -67,9 +67,9 @@ version = "4.4.6"
 features = ["derive"]
 
 [workspace.dependencies.tezos_crypto_rs]
-version = "0.5.2"
+version = "0.6.0"
 default-features = false
 
 [workspace.dependencies.tezos_data_encoding]
-version = "0.5.2"
+version = "0.6.0"
 default-features = false

@@ -79,7 +79,7 @@ impl TryFrom<String> for Entrypoint {
 
 has_encoding!(Entrypoint, ENTRYPOINT_SIMPLE_ENCODING, { Encoding::Custom });
 
-impl NomReader for Entrypoint {
+impl NomReader<'_> for Entrypoint {
     fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
         map(
             // Can't use tezos_data_encoding 'bounded_string' here, as we have an
