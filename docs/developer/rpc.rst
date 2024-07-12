@@ -171,7 +171,9 @@ for HTTP communication in both the Local and External RPC servers.
 :src:`Resto<resto>` is a library for declaratively defining services,
 binding them to given paths, and then either starting an RPC server
 to serve the RPCs on these paths or making RPC calls to these services.
-It is responsible for the following:
+For monitoring requests, a stream is created and updates are sent out
+as soon as new data is available.
+Resto is responsible for the following:
 
 - Providing primitives to describe services.
 - Assembling the services into directories which are essentially maps of paths
