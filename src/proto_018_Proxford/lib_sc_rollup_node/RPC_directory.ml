@@ -71,8 +71,11 @@ end)
 module Common = struct
   let () =
     Block_directory.register0 Sc_rollup_services.Block.block
-    @@ fun (node_ctxt, block) () () ->
-    Node_context.get_full_l2_block node_ctxt block
+    @@ fun (node_ctxt, block) outbox () ->
+    let get_outbox_messages =
+      if not outbox then None else Some Pvm_plugin.get_outbox_messages
+    in
+    Node_context.get_full_l2_block ?get_outbox_messages node_ctxt block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Block.num_messages
