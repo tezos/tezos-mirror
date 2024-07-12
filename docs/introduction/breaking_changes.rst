@@ -6,7 +6,7 @@ different Protocols or Octez versions. It complements the "Breaking changes"
 sections in the development changelogs by providing more context and/or less
 fragmented mentions.
 
-For each change, there may be subsections ``deprecation`` and ``breaking
+For each change, there may be subsections ``Deprecation`` and ``Breaking
 changes``. The former subsection will explain what changes can be made during a
 deprecation phase to adapt smoothly to the new changes. The latter subsection
 will present the changes that can not be done by the deprecation mechanism and
