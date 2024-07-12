@@ -5,14 +5,14 @@ The Tezos ledger currently supports two types of accounts that can hold
 tokens (and be the destinations of transactions), identified by distinct
 addresses:
 
-  - A user account (or implicit account) is a non-programmable account, whose tokens
-    are spendable and delegatable by the owner of a private key. Its address is
-    the hash of the public key, prefixed by ``tz1``, ``tz2``,
-    ``tz3`` or ``tz4``.
-  - A smart contract is a programmable account, associated with some Michelson code and a piece of data storage.
-    The address of a smart contract is a unique hash that depends on
-    the operation that led to its creation, called origination, prefixed by ``KT1``.
-    This is why smart contracts are also called originated accounts.
+- A user account (or implicit account) is a non-programmable account, whose tokens
+  are spendable and delegatable by the owner of a private key. Its address is
+  the hash of the public key, prefixed by ``tz1``, ``tz2``,
+  ``tz3`` or ``tz4``.
+- A smart contract is a programmable account, associated with some Michelson code and a piece of data storage.
+  The address of a smart contract is a unique hash that depends on
+  the operation that led to its creation, called origination, prefixed by ``KT1``.
+  This is why smart contracts are also called originated accounts.
 
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.

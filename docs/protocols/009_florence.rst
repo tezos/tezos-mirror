@@ -11,8 +11,6 @@ This page documents the changes brought by protocol Florence with respect
 to Edo.
 
 
-.. contents:: Summary of changes
-
 Smart Contracts/Michelson
 -------------------------
 

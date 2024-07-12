@@ -20,8 +20,6 @@ full hash is ``PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo``.
 Developers are particularly encouraged to carefully read this page and
 to monitor it for updates.
 
-.. contents:: Summary of changes
-
 Performance Improvements
 ------------------------
 

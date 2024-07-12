@@ -22,8 +22,6 @@ full hash is ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``.
 Developers are particularly encouraged to carefully read this page and
 to monitor it for updates.
 
-.. contents:: Summary of changes
-
 Baking Daemon
 -------------
 

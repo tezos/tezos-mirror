@@ -145,9 +145,9 @@ For each dependency:
 
 For instance, if your software depends on ``tezos-rpc`` which is now a sub-library of  :package-api:`octez-libs <octez-libs/index.html>` and has been renamed to ``rpc``:
 
-  - Update the opam file content to rename the ``tezos-rpc`` dependency to ``octez-libs``. If ``octez-libs`` is already present, only remove the dependency on ``tezos-rpc``.
-  - Update the dune file to rename occurences of ``tezos-rpc``, e.g. in ``libraries`` clauses of ``executable`` stanzas to ``octez-libs.rpc``.
-  - In your code, update all references to the ``Tezos_rpc`` module (e.g. ``open Tezos_rpc``) to ``Octez-libs.Rpc`` (e.g. ``open Octez-libs.Rpc``).
+- Update the opam file content to rename the ``tezos-rpc`` dependency to ``octez-libs``. If ``octez-libs`` is already present, only remove the dependency on ``tezos-rpc``.
+- Update the dune file to rename occurences of ``tezos-rpc``, e.g. in ``libraries`` clauses of ``executable`` stanzas to ``octez-libs.rpc``.
+- In your code, update all references to the ``Tezos_rpc`` module (e.g. ``open Tezos_rpc``) to ``Octez-libs.Rpc`` (e.g. ``open Octez-libs.Rpc``).
 
 The same method applies to each dependency that is now a sub-library of a new package. Check the :doc:`API <../api/api-inline>` to see the new packages.
 

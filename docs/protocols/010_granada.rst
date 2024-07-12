@@ -15,8 +15,6 @@ The main novelties in the Granada protocol are:
 - a 2.5 tez per block subsidy to a CPMM contract to generate liquidity between tez and tzBTC
 - gas improvements leading to a 3x to 6x decrease in gas consumption of typical contracts
 
-.. contents:: Here is the complete list of changes:
-
 Emmy*
 -----
 

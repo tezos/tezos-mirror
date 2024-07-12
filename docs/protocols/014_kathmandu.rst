@@ -10,8 +10,6 @@ The code can be found in the :src:`src/proto_014_PtKathma` directory of the
 This page documents the changes brought by protocol Kathmandu with respect
 to Jakarta.
 
-.. contents::
-
 New Environment Version (V6)
 ----------------------------
 

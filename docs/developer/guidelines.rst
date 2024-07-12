@@ -288,10 +288,11 @@ They complement the code with details at a *different level of abstraction*, thu
   Such comments are written at a higher level of discourse than the code, and provide a basis to understand the provided asbtractions and underlying concepts, and to reason about them.
   For example:
 
-    * An implementation comment inside a module or function body may explain the overall goal and provide a conceptual framework in which the details of the code may be easily understood.
-      Typically, the comment will explain *what* the code is doing, and possibly *why* (e.g., in which context the code is called), rather than *how* it is done --  this can be usually seen in the code itself.
+  * An implementation comment inside a module or function body may explain the overall goal and provide a conceptual framework in which the details of the code may be easily understood.
 
-    * A comment on the interface provided by a library may describe the solution provided for the given problem domain, how the different functions may be combined together, some limitations of the library (e.g. in terms of concurrency), etc.
+    Typically, the comment will explain *what* the code is doing, and possibly *why* (e.g., in which context the code is called), rather than *how* it is done --  this can be usually seen in the code itself.
+
+  * A comment on the interface provided by a library may describe the solution provided for the given problem domain, how the different functions may be combined together, some limitations of the library (e.g. in terms of concurrency), etc.
 
 Comments maintainability
 ~~~~~~~~~~~~~~~~~~~~~~~~
