@@ -39,6 +39,9 @@ type t = {
 
 type block = t
 
+(** Not the same as [Context.get_alpha_ctxt] as it does not construct a new block *)
+val get_alpha_ctxt : t -> context tzresult Lwt.t
+
 val rpc_ctxt : t Environment.RPC_context.simple
 
 (** Policies to select the next baker:
@@ -352,6 +355,8 @@ val bake_while_with_metadata :
 
 val current_cycle_of_level :
   blocks_per_cycle:int32 -> current_level:int32 -> Cycle.t
+
+val current_level : block -> int32
 
 val current_cycle : block -> Cycle.t
 

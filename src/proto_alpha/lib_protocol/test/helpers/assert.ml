@@ -156,6 +156,9 @@ let leq_int ~loc (a : int) (b : int) =
 let equal_int32 ~loc (a : int32) (b : int32) =
   equal ~loc Int32.equal "Int32 aren't equal" Int32.pp a b
 
+let not_equal_int32 ~loc (a : int32) (b : int32) =
+  not_equal ~loc Int32.equal "Int32 are equal" Int32.pp a b
+
 let leq_int32 ~loc (a : int32) (b : int32) =
   leq ~loc Compare.Int32.compare "Int32 comparison" Int32.pp a b
 
@@ -203,6 +206,18 @@ let equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
 let not_equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
   let open Alpha_context in
   not_equal ~loc Tez.( = ) "Tez are equal" Tez.pp a b
+
+(* tez_repr *)
+let equal_tez_repr ~loc (a : Tez_repr.t) (b : Tez_repr.t) =
+  equal ~loc Tez_repr.( = ) "Tez_repr aren't equal" Tez_repr.pp a b
+
+(* level_repr *)
+let equal_level_repr ~loc (a : Level_repr.t) (b : Level_repr.t) =
+  equal ~loc Level_repr.( = ) "Level_repr aren't equal" Level_repr.pp a b
+
+(* cycle_repr *)
+let equal_cycle_repr ~loc (a : Cycle_repr.t) (b : Cycle_repr.t) =
+  equal ~loc Cycle_repr.( = ) "Cycle_repr aren't equal" Cycle_repr.pp a b
 
 (* pkh *)
 let equal_pkh ~loc (a : Signature.Public_key_hash.t)

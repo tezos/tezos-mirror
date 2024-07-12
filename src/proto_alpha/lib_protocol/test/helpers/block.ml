@@ -41,6 +41,17 @@ type t = {
 
 type block = t
 
+let get_alpha_ctxt b =
+  let open Lwt_result_wrap_syntax in
+  let*@ ctxt, _migration_balance_updates, _migration_operation_results =
+    prepare
+      b.context
+      ~level:b.header.shell.level
+      ~predecessor_timestamp:b.header.shell.timestamp
+      ~timestamp:b.header.shell.timestamp
+  in
+  return ctxt
+
 let rpc_context block =
   {
     Environment.Updater.block_hash = block.hash;
@@ -1250,6 +1261,8 @@ let current_cycle_of_level ~blocks_per_cycle ~current_level =
   let current_cycle = Int32.div current_level blocks_per_cycle in
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
   current_cycle
+
+let current_level b = b.header.shell.level
 
 let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in

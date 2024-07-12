@@ -410,4 +410,14 @@ module Internal_for_tests_and_RPCs = struct
         level_of_min_delegated;
       } =
     level_of_min_delegated
+
+  let init_raw ~own_frozen ~staked_frozen ~delegated ~min_delegated_in_cycle
+      ~level_of_min_delegated =
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle;
+      level_of_min_delegated;
+    }
 end
