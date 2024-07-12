@@ -27,6 +27,13 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Staking_pseudotokens} tables. *)
 
+(** When a delegate gets totally slashed, the value of its
+    pseudotokens becomes 0 and before minting any new token we would
+    need to iterate over all stakers to empty their pseudotoken
+    balances. We want to avoid iterating over stakers so we forbid
+    {!stake} in this case. *)
+type error += Cannot_stake_on_fully_slashed_delegate
+
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s
