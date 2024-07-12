@@ -42,6 +42,38 @@ module Utils = struct
     do_slashes [] 0
 
   let decode_split_path path = path |> split_path |> List.map Uri.pct_decode
+
+  (* Configure the log reporter based on the source names *)
+  let configure_cohttp_log_reporter () =
+    (* Create a reporter that adds the PID to logs *)
+    let create_reporter ppf =
+      let report src level ~over k msgf =
+        let k _ =
+          over () ;
+          k ()
+        in
+        let with_metadata header _tags k ppf fmt =
+          Format.kfprintf
+            k
+            ppf
+            ("%a[pid:%d][%a] : " ^^ fmt ^^ "\n%!")
+            Logs_fmt.pp_header
+            (level, header)
+            (Unix.getpid ())
+            Fmt.(styled `Magenta string)
+            (Logs.Src.name src)
+        in
+        msgf @@ fun ?header ?tags fmt -> with_metadata header tags k ppf fmt
+      in
+      {Logs.report}
+    in
+    List.iter (fun src ->
+        match Logs.Src.name src with
+        | "cohttp.lwt.io" | "cohttp.lwt.client" | "cohttp.lwt.server" ->
+            Fmt_tty.setup_std_outputs ~style_renderer:`Ansi_tty ~utf_8:true () ;
+            Logs.set_reporter (create_reporter Fmt.stderr)
+        | _ -> ())
+    @@ Logs.Src.list ()
 end
 
 let bool_of_string s =

@@ -214,13 +214,13 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       match answer with
       | `Ok o ->
           let body = output o in
-          Log.debug "(%s) response code:200" con_string ;
-          Log.debug "(%s) response body: %s" con_string body ;
+          Log.debug "server (%s) response code:200" con_string ;
+          Log.debug "server (%s) response body: %s" con_string body ;
           let encoding = Transfer.Fixed (Int64.of_int (String.length body)) in
           ( Response.make ~status:`OK ~encoding ?headers (),
             Cohttp_lwt.Body.of_string body )
       | `No_content ->
-          Log.debug "(%s) response code:204 (no content)" con_string ;
+          Log.debug "server (%s) response code:204 (no content)" con_string ;
           (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
       | `Created s ->
           let headers = Header.init () in
@@ -229,38 +229,38 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             | None -> headers
             | Some s -> Header.add headers "location" s
           in
-          Log.debug "(%s) response code:201 (created)" con_string ;
+          Log.debug "server (%s) response code:201 (created)" con_string ;
           (Response.make ~status:`Created ~headers (), Cohttp_lwt.Body.empty)
 
     let handle_rpc_answer_error con_string ?headers error answer =
       match answer with
       | `Unauthorized e ->
-          Log.log_info "(%s) response code: 401" con_string ;
+          Log.log_info "server (%s) response code: 401" con_string ;
           let body, encoding = error e in
           let status = `Unauthorized in
           (Response.make ~status ~encoding ?headers (), body)
       | `Forbidden e ->
-          Log.log_info "(%s) response code: 403" con_string ;
+          Log.log_info "server (%s) response code: 403" con_string ;
           let body, encoding = error e in
           let status = `Forbidden in
           (Response.make ~status ~encoding ?headers (), body)
       | `Gone e ->
-          Log.log_info "(%s) response code: 410" con_string ;
+          Log.log_info "server (%s) response code: 410" con_string ;
           let body, encoding = error e in
           let status = `Gone in
           (Response.make ~status ~encoding ?headers (), body)
       | `Not_found e ->
-          Log.log_info "(%s) response code: 404" con_string ;
+          Log.log_info "server (%s) response code: 404" con_string ;
           let body, encoding = error e in
           let status = `Not_found in
           (Response.make ~status ~encoding ?headers (), body)
       | `Conflict e ->
-          Log.log_info "(%s) response code: 409" con_string ;
+          Log.log_info "server (%s) response code: 409" con_string ;
           let body, encoding = error e in
           let status = `Conflict in
           (Response.make ~status ~encoding ?headers (), body)
       | `Error e ->
-          Log.log_info "(%s) response code: 500" con_string ;
+          Log.log_info "server (%s) response code: 500" con_string ;
           let body, encoding = error e in
           let status = `Internal_server_error in
           (Response.make ~status ~encoding ?headers (), body)
@@ -355,11 +355,12 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           Lwt.pick [stopped; elt] >|= Option.map to_string)
     in
     let shutdown () =
-      Log.log_info "streamed connection closed %s" con_string ;
+      Log.log_info "server (%s) closing bound streamed connection" con_string ;
       Lwt.wakeup_later stopper None ;
       s.shutdown () ;
       server.streams <- ConnectionMap.remove con server.streams
     in
+    Log.log_info "server (%s) created bound streamed connection" con_string ;
     server.streams <- ConnectionMap.add con shutdown server.streams ;
     stream
 
@@ -368,16 +369,19 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     let con_string = Connection.to_string con in
     let uri = Request.uri req in
     let path_and_query = Uri.path_and_query uri in
-    Log.lwt_log_info "(%s) received request %s" con_string path_and_query
+    Log.lwt_log_info
+      "server (%s) resto_callback accepted connection: request %s"
+      con_string
+      path_and_query
     >>= fun () ->
     let req_headers = Request.headers req in
     Log.lwt_debug
-      "(%s) request headers: %s"
+      "server (%s) request headers: %s"
       con_string
       (Header.to_string req_headers)
     >>= fun () ->
     Cohttp_lwt.Body.to_string body >>= fun body ->
-    Log.lwt_debug "(%s) request body: %s" con_string body >>= fun () ->
+    Log.lwt_debug "server (%s) request body: %s" con_string body >>= fun () ->
     let path = Uri.path uri in
     let path = Resto.Utils.decode_split_path path in
     (match Request.meth req with
@@ -389,7 +393,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         Media.input_media_type ~headers:req_headers server.medias
         >>? fun input_media_type ->
         Log.lwt_debug
-          "(%s) input media type %s"
+          "server (%s) input media type %s"
           con_string
           (Media_type.name input_media_type)
         >>= fun () ->
@@ -405,7 +409,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         | query -> Lwt.return_ok query)
         >>=? fun query ->
         Log.lwt_debug
-          "(%s) ouput media type %s"
+          "server (%s) ouput media type %s"
           con_string
           (Media_type.name output_media_type)
         >>= fun () ->
@@ -437,7 +441,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         | `OkChunk _ as a ->
             let output_seq = output_media_type.construct_seq s.types.output in
             Log.lwt_debug
-              "(%s) response code:200 (with chunk transfer\n\
+              "server (%s) response code:200 (with chunk transfer\n\
               \            encoding)"
               con_string
             >>= fun () ->
@@ -447,7 +451,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             let output = output_media_type.construct s.types.output in
             let body = create_stream server con output o in
             let encoding = Transfer.Chunked in
-            Log.lwt_debug "(%s) response code:200 (streamed)" con_string
+            Log.lwt_debug "server (%s) response code:200 (streamed)" con_string
             >>= fun () ->
             lwt_return_ok_response
               ( Response.make ~status:`OK ~encoding ~headers (),
@@ -456,11 +460,16 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           | `Conflict _ | `Error _ ) as a ->
             let error = function
               | None ->
-                  Log.log_info "(%s) response body (empty)" con_string ;
+                  Log.log_info
+                    "server (%s) error: response body (empty)"
+                    con_string ;
                   (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
               | Some e ->
                   let s = output_media_type.construct s.types.error e in
-                  Log.log_info "(%s) response body: %s" con_string s ;
+                  Log.log_info
+                    "server (%s) error: response body: %s"
+                    con_string
+                    s ;
                   ( Cohttp_lwt.Body.of_string s,
                     Transfer.Fixed (Int64.of_int (String.length s)) )
             in
@@ -474,7 +483,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     | `OPTIONS -> (
         Handlers.handle_options server.root server.cors req_headers path
         >>= fun res ->
-        Log.lwt_log_info "(%s) RPC preflight" con_string >>= fun () ->
+        Log.lwt_log_info "server (%s) RPC preflight" con_string >>= fun () ->
         match res with
         | Ok res -> lwt_return_ok_response res
         | Error _ as e -> Lwt.return e)
@@ -501,7 +510,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       (let conn_closed ((_, con) as c) =
          let () = conn_closed c in
          let con_string = Connection.to_string con in
-         Log.debug "connection closed %s" con_string ;
+         Log.debug "server (%s) got conn closed" con_string ;
          try ConnectionMap.find con server.streams () with Not_found -> ()
        and on_exn = function
          | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
@@ -516,14 +525,20 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                (Printexc.to_string exn)
                (Printexc.get_backtrace ())
        and callback (io, con) req body =
+         let con_string = Connection.to_string con in
+         Log.log_info "server (%s) connection accepted" con_string ;
          Lwt.catch
            (fun () -> callback (io, con) req body)
            (function
              | Not_found ->
                  let status = `Not_found in
                  let body = Cohttp_lwt.Body.empty in
+                 Log.log_info
+                   "server (%s) callback returned Not_found"
+                   con_string ;
                  lwt_return_response (Response.make ~status (), body)
              | exn ->
+                 Log.log_info "server (%s) callback got exn" con_string ;
                  let headers = Header.init () in
                  let headers =
                    Header.add headers "content-type" "text/ocaml.exception"
@@ -534,6 +549,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                  in
                  lwt_return_response (Response.make ~status ~headers (), body))
        in
+       Resto.Utils.configure_cohttp_log_reporter () ;
        Cohttp_lwt_unix.Server.create
          ~stop:server.stop
          ~ctx

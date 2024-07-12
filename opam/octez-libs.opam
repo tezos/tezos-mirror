@@ -20,12 +20,13 @@ depends: [
   "zarith" { >= "1.13" & < "1.14" }
   "bigstringaf" { >= "0.5.0" }
   "ppx_expect"
+  "logs"
+  "fmt" { >= "0.8.7" }
   "lwt" { >= "5.7.0" }
   "cohttp-lwt" { >= "5.2.0" }
   "cohttp-lwt-unix" { >= "5.2.0" }
   "conduit-lwt-unix" { = "6.2.2" }
   "alcotest-lwt" { >= "1.5.0" }
-  "fmt" { >= "0.8.7" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "qcheck-core"
   "qcheck-alcotest" { >= "0.20" }
@@ -45,7 +46,6 @@ depends: [
   "ppx_deriving"
   "repr"
   "stdint"
-  "logs"
   "octez-distributed-lwt-internal" { = version }
   "octez-alcotezt" { = version }
   "aches-lwt" { >= "1.0.0" }

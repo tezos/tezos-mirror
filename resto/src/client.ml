@@ -239,6 +239,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
       | Some ranges ->
           Header.add headers "accept" (Media_type.accept_header ranges)
     in
+    Resto.Utils.configure_cohttp_log_reporter () ;
     Lwt.catch
       (fun () ->
         Call.call ~headers (meth :> Code.meth) ~body uri

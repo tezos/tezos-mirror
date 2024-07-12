@@ -5,7 +5,9 @@
  (name resto)
  (public_name octez-libs.resto)
  (libraries
-  uri)
+  uri
+  logs.fmt
+  fmt.tty)
  (wrapped false)
  (modules resto))
 
@@ -44,8 +46,7 @@
   octez-libs.resto-acl
   octez-libs.resto-cohttp
   cohttp-lwt-unix
-  conduit-lwt-unix
-  lwt)
+  conduit-lwt-unix)
  (flags
   (:standard)
   -open Resto_acl

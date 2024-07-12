@@ -27,6 +27,8 @@ module Utils : sig
   val split_path : string -> string list
 
   val decode_split_path : string -> string list
+
+  val configure_cohttp_log_reporter : unit -> unit
 end
 
 (** {1 Resto}
