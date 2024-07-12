@@ -206,15 +206,21 @@ module Query = struct
     |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
            Some (Raw_level.to_int32 o))
     |> seal
+
+  type simulate_query = {fuel : int64 option}
+
+  let simulate_query : simulate_query Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun fuel -> {fuel})
+    |+ opt_field "fuel" Tezos_rpc.Arg.int64 (fun t -> t.fuel)
+    |> seal
+
+  let outbox_query : bool Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun b -> b)
+    |+ field "outbox" Tezos_rpc.Arg.bool false (fun b -> b)
+    |> seal
 end
-
-type simulate_query = {fuel : int64 option}
-
-let simulate_query : simulate_query Tezos_rpc.Query.t =
-  let open Tezos_rpc.Query in
-  query (fun fuel -> {fuel})
-  |+ opt_field "fuel" Tezos_rpc.Arg.int64 (fun t -> t.fuel)
-  |> seal
 
 module Block = struct
   open Tezos_rpc.Path
@@ -230,7 +236,7 @@ module Block = struct
       ~description:
         "Layer-2 block of the layer-2 chain with respect to a Layer 1 block \
          identifier"
-      ~query:Tezos_rpc.Query.empty
+      ~query:Query.outbox_query
       ~output:Sc_rollup_block.full_encoding
       path
 
