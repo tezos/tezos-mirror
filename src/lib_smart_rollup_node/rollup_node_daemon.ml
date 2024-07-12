@@ -112,6 +112,26 @@ let maybe_split_context node_ctxt commitment_hash head_level =
     Node_context.save_context_split_level node_ctxt head_level)
   else return_unit
 
+(** Register outbox messages if any. *)
+let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
+    ctxt level =
+  let open Lwt_result_syntax in
+  let*! outbox_messages =
+    let*! pvm_state = Context.PVMState.find ctxt in
+    match pvm_state with
+    | None -> Lwt.return_nil
+    | Some pvm_state ->
+        Plugin.Pvm.get_outbox_messages node_ctxt pvm_state ~outbox_level:level
+  in
+  match outbox_messages with
+  | [] -> return_unit
+  | _ ->
+      let indexes = List.map fst outbox_messages in
+      Node_context.register_new_outbox_messages
+        node_ctxt
+        ~outbox_level:level
+        ~indexes
+
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
@@ -172,6 +192,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
       Sc_rollup_block.most_recent_commitment pred.header
   in
+  let* () = register_outbox_messages state.plugin node_ctxt ctxt level in
   let header =
     Sc_rollup_block.
       {
@@ -728,6 +749,7 @@ module Internal_for_tests = struct
         let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
         Sc_rollup_block.most_recent_commitment pred.header
     in
+    let* () = register_outbox_messages (module Plugin) node_ctxt ctxt level in
     let header =
       Sc_rollup_block.
         {

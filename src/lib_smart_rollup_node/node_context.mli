@@ -474,6 +474,9 @@ val set_outbox_message_executed :
     the messages indexes for the [outbox_level]. If messages were already
     registered for this level, they are overwritten. Messages added are first
     marked unexecuted. *)
+val register_new_outbox_messages :
+  rw -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
+
 (** Returns the pending messages (i.e. unexecuted) that can now be executed.
     The returned list contains outbox levels and indexes for each level (in
     order). *)
