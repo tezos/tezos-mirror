@@ -239,11 +239,24 @@ val get_l2_block_by_level : _ t -> int32 -> Sc_rollup_block.t tzresult Lwt.t
 val find_l2_block_by_level :
   _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
 
-(** [get_full_l2_block node_ctxt hash] returns the full L2 block for L1 block
-    hash [hash]. The result contains the L2 block and its content (inbox,
-    messages, commitment). *)
+(** [get_full_l2_block ?get_outbox_messages node_ctxt hash] returns the full L2
+    block for L1 block hash [hash]. The result contains the L2 block and its
+    content (inbox, messages, commitment). If a function to retrieve outbox
+    messages is provided, the result also contains the outbox for this block.
+
+    NOTE: When given, [get_outbox_messages] is always instantiated with the
+    appropriate [Pvm_plugin.get_outbox_messages] function which is dependent on
+    the protocol. Passing this function around allows to break a dependency
+    cycle between {!Node_context} and {!Protocol_plugins}. *)
 val get_full_l2_block :
-  _ t -> Block_hash.t -> Sc_rollup_block.full tzresult Lwt.t
+  ?get_outbox_messages:
+    ('a t ->
+    Context.pvmstate ->
+    outbox_level:int32 ->
+    (int * Outbox_message.summary) list Lwt.t) ->
+  'a t ->
+  Block_hash.t ->
+  Sc_rollup_block.full tzresult Lwt.t
 
 (** [save_level t head] registers the correspondences [head.level |->
     head.hash] in the store. *)

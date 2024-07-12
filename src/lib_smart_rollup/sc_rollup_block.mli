@@ -57,9 +57,11 @@ type content = {
   commitment : Commitment.t option;
       (** Commitment, if any is computed for this block. [header.commitment =
           Some h] iff [commitment = Some c] and [hash c = h]. *)
+  outbox : (int * Outbox_message.summary) list option;
+      (** Outbox messages produced by execution of inbox *)
 }
 
-(** Block parameterized by a header and content. The parameters are here to
+(** block parameterized by a header and content. The parameters are here to
     allow to split the header and rest of the block.  *)
 type ('header, 'content) block = {
   header : 'header;  (** Header of this block. *)
