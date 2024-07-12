@@ -161,30 +161,6 @@ pub fn get_elf_symbols(contents: &[u8]) -> Result<HashMap<u64, &str>, Error> {
     Ok(symbols)
 }
 
-impl Memory for rvemu::bus::Bus {
-    fn write_bytes(&mut self, paddr: u64, bytes: &[u8]) -> Result<(), Error> {
-        for (i, b) in bytes.iter().enumerate() {
-            let addr = paddr + i as u64;
-            self.write(addr, *b as u64, rvemu::cpu::BYTE)
-                .map_err(|exn| {
-                    let msg = Some(format!("{:?}", exn));
-                    Error::Write { msg, addr }
-                })?
-        }
-        Ok(())
-    }
-
-    fn set_zero(&mut self, paddr: u64, len: u64) -> Result<(), Error> {
-        for addr in paddr..paddr + len {
-            self.write(addr, 0, rvemu::cpu::BYTE).map_err(|exn| {
-                let msg = Some(format!("{:?}", exn));
-                Error::Write { msg, addr }
-            })?
-        }
-        Ok(())
-    }
-}
-
 impl<T> Memory for Cursor<T>
 where
     Cursor<T>: Write + Seek,

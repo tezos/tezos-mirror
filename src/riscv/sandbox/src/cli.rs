@@ -12,8 +12,6 @@ pub enum Mode {
     Run(RunOptions),
     /// Launch a program in the debugger
     Debug(DebugOptions),
-    /// Run a program using rvemu
-    Rvemu(RvemuOptions),
     /// Benchmark a program
     Bench(BenchOptions),
 }
@@ -57,24 +55,6 @@ pub struct DebugOptions {
     /// Path to the initrd
     #[arg(long)]
     pub initrd: Option<Box<Path>>,
-}
-
-#[derive(Debug, Clone, Parser)]
-pub struct RvemuOptions {
-    #[command(flatten)]
-    pub common: CommonOptions,
-
-    /// Path to the input ELF executable
-    #[arg(long, short)]
-    pub input: Box<Path>,
-
-    /// Path to the initrd
-    #[arg(long)]
-    pub initrd: Option<String>,
-
-    /// Support some POSIX-style system calls
-    #[arg(long)]
-    pub posix: bool,
 }
 
 #[derive(Clone, ValueEnum, Debug)]
