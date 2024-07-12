@@ -107,6 +107,12 @@ module type S = sig
     outbox_level:int32 ->
     int option Lwt.t
 
+  val get_outbox_messages :
+    _ Node_context.t ->
+    Context.pvmstate ->
+    outbox_level:int32 ->
+    (int * Outbox_message.summary) list Lwt.t
+
   val produce_serialized_output_proof :
     Node_context.rw ->
     Context.pvmstate ->
