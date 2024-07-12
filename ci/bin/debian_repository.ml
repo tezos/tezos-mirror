@@ -242,14 +242,15 @@ let jobs pipeline_type =
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
   (* These test the installability of the current packages *)
-  let job_install_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
-      =
+  let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
+      ?allow_failure script =
     job
       ?allow_failure
       ~__POS__
       ~name
       ~image
       ~dependencies
+      ~variables
       ~stage:Stages.publishing_tests
       script
   in
@@ -283,14 +284,28 @@ let jobs pipeline_type =
         ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_ubuntu_noble"
+        ~name:"oc.install_bin_ubuntu_noble_current"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
         ~image:Images.ubuntu_noble
         ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_ubuntu_jammy"
+        ~name:"oc.install_bin_ubuntu_jammy_current"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
+        ~image:Images.ubuntu_jammy
+        ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubuntu_noble"
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~variables:[("PREFIX", "next")]
+        ~image:Images.ubuntu_noble
+        ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubuntu_jammy"
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~variables:[("PREFIX", "next")]
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
     ]
@@ -305,8 +320,15 @@ let jobs pipeline_type =
         ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_debian_bookworm"
+        ~name:"oc.install_bin_debian_bookworm_current"
         ~dependencies:(Dependent [Job job_apt_repo_debian_current])
+        ~image:Images.debian_bookworm
+        ["./docs/introduction/install-bin-deb.sh debian bookworm"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_debian_bookworm"
+        ~dependencies:(Dependent [Job job_apt_repo_debian])
+        ~variables:[("PREFIX", "next")]
         ~image:Images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
     ]

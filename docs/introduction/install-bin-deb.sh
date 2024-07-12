@@ -18,6 +18,13 @@ protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 # This logic must be kept in sync with the script in
 # ./scripts/ci/create_debian_repo.sh
 
+# The prefix used for these packages in the repository. E.g. 'next'
+if [ -n "$PREFIX" ]; then
+  PREFIX=${PREFIX}/
+else
+  PREFIX=
+fi
+
 # if it's a release tag, then it can be a RC release
 # or a final release. This can be on a protected branch or not.
 if [ -n "${gitlab_release_no_v:-}" ]; then
@@ -25,7 +32,7 @@ if [ -n "${gitlab_release_no_v:-}" ]; then
   # candidate
   if [ -n "${gitlab_release_rc_version}" ]; then
     # Release candidate
-    distribution="RC/$distribution"
+    distribution="${PREFIX}RC/$distribution"
   fi
   # else we just that $distribution as it is
 else
@@ -34,7 +41,7 @@ else
     # this is not a release, but it's a protected branch.
     # We allow this only for the master branch.
     if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
-      distribution="master/$distribution"
+      distribution="${PREFIX}master/$distribution"
     else
       echo "Cannot test for a protected branch that \
         is not associated with a release tag or it's master"
@@ -46,7 +53,7 @@ else
       echo "Cannot test a repository for a branch named 'RC'"
       exit 1
     else
-      distribution="$CI_COMMIT_REF_NAME/$distribution"
+      distribution="${PREFIX}$CI_COMMIT_REF_NAME/$distribution"
     fi
   fi
 fi
@@ -67,9 +74,16 @@ sudo apt-get update
 sudo apt-get install -y octez-client
 sudo apt-get install -y octez-node
 sudo apt-get install -y octez-baker
-sudo apt-get install -y octez-smartrollup
-sudo apt-get install -y octez-evmnode
 sudo apt-get install -y octez-dal-node
+
+if [ -n "$PREFIX" ]; then
+  # [install octez NEXT packages]
+  sudo apt-get install -y octez-smart-rollup-node
+else
+  # [install octez current packages]
+  sudo apt-get install -y octez-smartrollup
+  sudo apt-get install -y octez-evmnode
+fi
 
 # [test executables]
 octez-client --version

@@ -163,7 +163,7 @@ oc.lintian_debian:
   script:
   - ./scripts/ci/lintian_debian_packages.sh debian bookworm
 
-oc.install_bin_debian_bookworm:
+oc.install_bin_debian_bookworm_current:
   image: debian:bookworm
   stage: publishing_tests
   tags:
@@ -173,3 +173,17 @@ oc.install_bin_debian_bookworm:
   dependencies: []
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
+  variables: {}
+
+oc.install_bin_debian_bookworm:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
+  variables:
+    PREFIX: next
