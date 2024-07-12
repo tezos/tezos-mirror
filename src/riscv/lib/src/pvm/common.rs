@@ -57,6 +57,7 @@ pub enum PvmStatus {
 }
 
 impl Default for PvmStatus {
+    #[inline(always)]
     fn default() -> Self {
         Self::Evaluating
     }
