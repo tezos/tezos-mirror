@@ -470,6 +470,47 @@ module Handler = struct
       (Node_context.get_gs_worker ctxt)
       committee
 
+  let get_constants ctxt cctxt ~level =
+    let open Lwt_result_syntax in
+    let*? (module Plugin) = Node_context.get_plugin_for_level ctxt ~level in
+    Plugin.get_constants `Main (`Level level) cctxt
+
+  let store_skip_list_cells (type block_info) ctxt cctxt dal_constants
+      (block_info : block_info) block_level
+      (module Plugin : Dal_plugin.T with type block_info = block_info) =
+    let open Lwt_result_syntax in
+    if should_store_skip_list_cells ctxt dal_constants then
+      let* cells_of_level =
+        let pred_published_level =
+          Int32.sub
+            block_level
+            (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
+        in
+        Plugin.Skip_list.cells_of_level
+          block_info
+          cctxt
+          ~dal_constants
+          ~pred_publication_level_dal_constants:
+            (lazy (get_constants ctxt cctxt ~level:pred_published_level))
+      in
+      let cells_of_level =
+        List.map
+          (fun (hash, cell) ->
+            ( Dal_proto_types.Skip_list_hash.of_proto
+                Plugin.Skip_list.hash_encoding
+                hash,
+              Dal_proto_types.Skip_list_cell.of_proto
+                Plugin.Skip_list.cell_encoding
+                cell ))
+          cells_of_level
+      in
+      let store = Node_context.get_store ctxt in
+      Store.Skip_list_cells.insert
+        store.skip_list_cells
+        ~attested_level:block_level
+        cells_of_level
+    else return_unit
+
   let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
     let block_level = finalized_shell_header.Block_header.level in
@@ -479,48 +520,19 @@ module Handler = struct
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let get_constants ~level =
-      let*? (module PluginCurr) =
-        Node_context.get_plugin_for_level ctxt ~level
-      in
-      PluginCurr.get_constants `Main (`Level level) cctxt
-    in
-    let* dal_constants = get_constants ~level:block_level in
+    let* dal_constants = get_constants ctxt cctxt ~level:block_level in
     let* () =
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
-          if should_store_skip_list_cells ctxt dal_constants then
-            let* cells_of_level =
-              let pred_published_level =
-                Int32.sub
-                  block_level
-                  (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
-              in
-              Plugin.Skip_list.cells_of_level
-                block_info
-                cctxt
-                ~dal_constants
-                ~pred_publication_level_dal_constants:
-                  (lazy (get_constants ~level:pred_published_level))
-            in
-            let cells_of_level =
-              List.map
-                (fun (hash, cell) ->
-                  ( Dal_proto_types.Skip_list_hash.of_proto
-                      Plugin.Skip_list.hash_encoding
-                      hash,
-                    Dal_proto_types.Skip_list_cell.of_proto
-                      Plugin.Skip_list.cell_encoding
-                      cell ))
-                cells_of_level
-            in
-            let store = Node_context.get_store ctxt in
-            Store.Skip_list_cells.insert
-              store.skip_list_cells
-              ~attested_level:block_level
-              cells_of_level
-          else return_unit
+          store_skip_list_cells
+            ctxt
+            cctxt
+            dal_constants
+            block_info
+            block_level
+            (module Plugin : Dal_plugin.T
+              with type block_info = Plugin.block_info)
         in
         let* () =
           if not (is_bootstrap_node ctxt) then
