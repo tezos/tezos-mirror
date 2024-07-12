@@ -135,6 +135,8 @@ the JSON input using command
 
 Don't forget to quote the JSON according to your shell rules.
 
+.. _external_rpc_server:
+
 External RPC server
 -------------------
 
@@ -156,52 +158,7 @@ RPC versions
 
 See :doc:`../introduction/versioning` and :ref:`RPC-versioning-dev`.
 
-Architecture
-------------
+See also
+--------
 
-.. figure:: images/rpc_components.png
-   :alt: Components of Local and External RPC servers
-
-The Cohttp library is a vendored component responsible
-for handling HTTP requests and responses, providing the core functionality
-for HTTP communication in both the Local and External RPC servers.
-
-:src:`Resto<resto>` is a library for declaratively defining services,
-binding them to given paths, and then either starting an RPC server
-to serve the RPCs on these paths or making RPC calls to these services.
-For monitoring requests, a stream is created and updates are sent out
-as soon as new data is available.
-Resto is responsible for the following:
-
-- Providing primitives to describe services.
-- Assembling the services into directories which are essentially maps of paths
-  and methods to services.
-- Spinning up a Cohttp server that serves the chosen directory.
-- Making requests to services as a client. The client automatically builds
-  paths based on parameters to the service, assembles other HTTP details,
-  and parses the response.
-
-Additionally, Resto provides features for configuring ACL and for serving
-a self-description service - a service that describes all services of a directory.
-
-The :src:`RPC middleware<src/lib_rpc_http/RPC_middleware.ml>` module in
-the External RPC server receives accepted connections
-from the Resto server. Depending on the RPC type, it either handles the
-underlying RPC request locally or forwards it to the Local RPC server next to the Tezos
-node (they share the same PID) by initiating a connection to it. When forwarding, the RPC middleware
-maintains a mapping between the accepted and the initiated connections. If
-the client of the initial RPC request dies or closes a connection, the RPC middleware is notified by
-Resto and then closes the corresponding initiated connection to the Local
-RPC server.
-
-Debugging
----------
-
-If you want to learn more about the exchange of RPCs between node and
-client you can pass the option ``-l`` and the client will print all the
-calls with their input/output.
-
-A useful tool to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.
-
-To enable the logs for RPC-related components, prepend Tezos scripts
-with ``TEZOS_LOG="*->debug"`` and ``COHTTP_DEBUG=true``.
+-  :doc:`rpc_architecture`
