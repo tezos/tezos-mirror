@@ -195,6 +195,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
         let* ctxt = Adaptive_issuance_storage.init ctxt in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
+    | Alpha ->
+        (* TODO (#2704): possibly handle attestations for migration block (in bakers);
+           if that is done, do not set Storage.Tenderbake.First_level_of_protocol.
+           /!\ this storage is also use to add the smart rollup
+               inbox migration message. see `sc_rollup_inbox_storage`. *)
+        let* ctxt =
+          Storage.Tenderbake.First_level_of_protocol.update ctxt level
+        in
+        (* Migration of refutation games needs to be kept for each protocol. *)
+        let* ctxt =
+          Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
+        in
+        return (ctxt, [])
     | ParisC_020
     (* Please update [next_protocol] and [previous_protocol] in
        [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
