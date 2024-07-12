@@ -11,7 +11,19 @@ Consult the :ref:`Tezos community <tezos_community>` (e.g. the Tezos Stack Excha
 Generic issues
 --------------
 
-N/A
+Case-sensitive file paths
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+On case-insensitive file systems, which is the default on Windows and MacOS, beware of some related problems.
+
+In the Octez repository, there are no conflicting file paths differing only in case.
+However, depending on how Git extracts your clone, the case of some file paths in your clone may differ from the expected one.
+
+For example, file :src:`script-inputs/slim-mode-dune` contains a list of source directories (belonging to old protocols) to ignore when building the documentation locally.
+If the case of your extracted files does not match the case in that file, you may encounter unexpected behaviors, such as errors when building the documentation on those parts.
+(Note that these documentation errors cannot be fixed in old protocols whose code is frozen.)
+
+If you run into such errors, simply rename your file paths to match the case in the source repository.
 
 .. _mixing_llvm_gnu_binutils:
 

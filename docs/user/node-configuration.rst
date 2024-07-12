@@ -185,7 +185,7 @@ modifying the file.
    Rules are always searched from the beginning of the list to the end and
    the first matching address is returned. Therefore if one wants to put one
    rule on a specific port on a given host and another rule for all other ports
-   on the same host, then more specific rules should always be written *first*
+   on the same host, then more specific rules should always be written *first*.
    Otherwise they'll be shadowed by the more general rule.
 
 Examples
