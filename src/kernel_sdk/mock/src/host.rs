@@ -26,6 +26,7 @@ impl From<HostState> for MockHost {
             info: super::info_for_level(state.curr_level as i32),
             state: RefCell::new(state),
             debug_log: Box::new(RefCell::new(std::io::stderr())),
+            keep_going: true,
         }
     }
 }

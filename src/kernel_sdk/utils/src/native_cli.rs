@@ -20,11 +20,18 @@ struct NativeCli {
     /// Whether the debug log is printed as is, or with timestamp information.
     #[arg(long, default_value_t = false)]
     pub timings: bool,
+
+    /// Keep going after the inbox has been drained.
+    #[arg(long, default_value_t = false)]
+    pub keep_going: bool,
 }
 
 /// Apply cli options to the mock host.
 pub fn apply_cli_opts(host: &mut MockHost) {
-    let NativeCli { timings } = NativeCli::parse();
+    let NativeCli {
+        timings,
+        keep_going,
+    } = NativeCli::parse();
 
     let console = if timings {
         Console::with_timings()
@@ -33,4 +40,5 @@ pub fn apply_cli_opts(host: &mut MockHost) {
     };
 
     host.set_debug_handler(console);
+    host.keep_going(keep_going);
 }

@@ -12,6 +12,10 @@ INBOX_FILE ?= $(shell mktemp)
 .PHONY: all
 all: build test check inbox-bench
 
+.PHONY: print-native-target
+print-native-target:
+	$(info $(NATIVE_TARGET))
+
 .PHONY: build-deps
 build-deps:
 	@exec ../scripts/install-rust-std-hermit.sh
@@ -40,6 +44,7 @@ test:
 	@cargo test --no-default-features $(NATIVE_OPT)
 	@../scripts/jstz-bench.sh -t 1
 	@../scripts/jstz-bench.sh -t 1 -s
+	@../scripts/jstz-bench.sh -t 1 -sn
 
 .PHONY: run
 run:
