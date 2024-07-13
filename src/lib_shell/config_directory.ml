@@ -59,7 +59,20 @@ let build_rpc_directory ~user_activated_upgrades
            | Rolling None ->
                Rolling (Some History_mode.default_additional_cycles)
          in
-         return history_mode)
+         let*! head = Store.Chain.current_head chain_store in
+         let*! protocol = Store.Block.protocol_hash_exn chain_store head in
+         let*! blocks_preservation_cycles =
+           let open Lwt_syntax in
+           match history_mode with
+           | Archive -> return_none
+           | Rolling _ | Full _ -> (
+               match Protocol_plugin.find_rpc protocol with
+               | None -> return_none
+               | Some (module RPC) ->
+                   RPC.get_blocks_preservation_cycles ~get_context:(fun () ->
+                       Store.Block.context_exn chain_store head))
+         in
+         return (history_mode, blocks_preservation_cycles))
   |> register Config_services.Logging.configure (fun () () configuration ->
          let open Lwt_result_syntax in
          let* () = Internal_event_unix.Configuration.reapply configuration in
