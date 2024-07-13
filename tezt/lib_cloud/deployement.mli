@@ -8,7 +8,7 @@
 (** Type for resources managed by a deployment. *)
 type t
 
-(** [deploy ?base_port ?ports_per_vm ~number_of_vms ~machine_type ()] deploys the
+(** [deploy ?base_port ?ports_per_vm ~max_run_duration ~configuration ~localhost ()] deploys the
       expected number of vms. For each vm, we can specify a [base_port]
       which is the first port to be opened and [ports_per_vm] specify the
       number of opened port from the [base_port]. The promise returned by this

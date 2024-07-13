@@ -14,7 +14,11 @@ let string_of_docker_image ~project_id = function
       Env.custom_docker_image ~docker_image_name:tezt_cloud ~project_id ()
   | Image {docker_image} -> docker_image
 
-type t = {machine_type : string; docker_image : docker_image}
+type t = {
+  machine_type : string;
+  docker_image : docker_image;
+  max_run_duration : int option;
+}
 
 let default_docker_image =
   match (Cli.dockerfile, Cli.localhost) with
@@ -30,6 +34,12 @@ let default_docker_image =
       let docker_image = Format.asprintf "%s:latest" tezt_cloud in
       Image {docker_image}
 
-let make ?(machine_type = Cli.machine_type) ?docker_image () =
+let make ?max_run_duration ?(machine_type = Cli.machine_type) ?docker_image () =
   let docker_image = Option.value ~default:default_docker_image docker_image in
-  {machine_type; docker_image}
+  let max_run_duration =
+    match max_run_duration with
+    | None ->
+        if Cli.no_max_run_duration then None else Some Cli.max_run_duration
+    | Some max_run_duration -> Some max_run_duration
+  in
+  {machine_type; docker_image; max_run_duration}

@@ -70,7 +70,8 @@ module Remote = struct
         wait_docker_running ~zone ~vm_name
 
   let workspace_deploy ?(base_port = 30_000) ?(ports_per_vm = 50)
-      ~workspace_name ~machine_type ~number_of_vms ~docker_image () =
+      ~max_run_duration ~workspace_name ~machine_type ~number_of_vms
+      ~docker_image () =
     let* () = Terraform.VM.Workspace.select workspace_name in
     let* project_id = Gcloud.project_id () in
     let docker_image =
@@ -78,6 +79,7 @@ module Remote = struct
     in
     let* () =
       Terraform.VM.deploy
+        ~max_run_duration
         ~machine_type
         ~base_port
         ~ports_per_vm
@@ -171,7 +173,10 @@ module Remote = struct
       |> Lwt_list.map_s
            (fun
              ( workspace_name,
-               {configuration = {machine_type; docker_image}; number_of_vms} )
+               {
+                 configuration = {machine_type; docker_image; max_run_duration};
+                 number_of_vms;
+               } )
            ->
              let* () = Terraform.VM.Workspace.select workspace_name in
              let* () = Terraform.VM.init () in
@@ -180,6 +185,7 @@ module Remote = struct
                  ~base_port
                  ~ports_per_vm
                  ~workspace_name
+                 ~max_run_duration
                  ~machine_type
                  ~number_of_vms
                  ~docker_image

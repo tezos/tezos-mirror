@@ -139,24 +139,30 @@ module VM = struct
   let init () =
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
-  let deploy ~machine_type ~base_port ~ports_per_vm ~number_of_vms ~docker_image
-      =
+  let deploy ~max_run_duration ~machine_type ~base_port ~ports_per_vm
+      ~number_of_vms ~docker_image =
     let* project_id = Gcloud.project_id () in
+    let max_run_duration =
+      match max_run_duration with
+      | None -> []
+      | Some value -> ["--var"; Format.asprintf "max_run_duration=%d" value]
+    in
     let args =
-      [
-        "--var";
-        Format.asprintf "base_port=%d" base_port;
-        "--var";
-        Format.asprintf "ports_per_vm=%d" ports_per_vm;
-        "--var";
-        Format.asprintf "number_of_vms=%d" number_of_vms;
-        "--var";
-        Format.asprintf "project_id=%s" project_id;
-        "--var";
-        Format.asprintf "machine_type=%s" machine_type;
-        "--var";
-        Format.asprintf "docker_image=%s" docker_image;
-      ]
+      max_run_duration
+      @ [
+          "--var";
+          Format.asprintf "base_port=%d" base_port;
+          "--var";
+          Format.asprintf "ports_per_vm=%d" ports_per_vm;
+          "--var";
+          Format.asprintf "number_of_vms=%d" number_of_vms;
+          "--var";
+          Format.asprintf "project_id=%s" project_id;
+          "--var";
+          Format.asprintf "machine_type=%s" machine_type;
+          "--var";
+          Format.asprintf "docker_image=%s" docker_image;
+        ]
     in
     Process.run
       ~name
@@ -206,24 +212,34 @@ module VM = struct
 
   let destroy workspaces =
     let* project_id = Gcloud.project_id () in
-    let* machine_type = machine_type () in
     (* let docker_image = Env.custom_docker_image ~project_id in *)
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
            let* () = Workspace.select workspace in
+           let* machine_type = machine_type () in
+           let vars =
+             [
+               "--var";
+               Format.asprintf "project_id=%s" project_id;
+               "--var";
+               Format.asprintf "machine_type=%s" machine_type;
+             ]
+           in
+           let* () =
+             (* Remote machines could have been destroyed
+                automatically. We synchronize the state to see whether
+                they still exist or not. *)
+             Process.run
+               ~name
+               ~color
+               "terraform"
+               (chdir Path.terraform_vm @ ["refresh"] @ vars)
+           in
            Process.run
              ~name
              ~color
              "terraform"
-             (chdir Path.terraform_vm
-             @ [
-                 "destroy";
-                 "--auto-approve";
-                 "--var";
-                 Format.asprintf "project_id=%s" project_id;
-                 "--var";
-                 Format.asprintf "machine_type=%s" machine_type;
-               ]))
+             (chdir Path.terraform_vm @ ["destroy"; "--auto-approve"] @ vars))
 end
 
 module State_bucket = struct

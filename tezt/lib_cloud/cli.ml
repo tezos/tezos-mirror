@@ -131,3 +131,19 @@ let dockerfile =
       "Specify the name of the dockerfile to use (default is given by the \
        environment variable `TEZT_CLOUD`)"
     ()
+
+let max_run_duration =
+  Clap.default_int
+    ~section
+    ~long:"max-run-duration"
+    ~description:
+      "Specify the maximum time (in second) of a VM (from the first time it \
+       was created)."
+    7200
+
+let no_max_run_duration =
+  Clap.flag
+    ~section
+    ~set_long:"no-max-run-duration"
+    ~description:"Ensure the VM can only be destroyed manually."
+    false

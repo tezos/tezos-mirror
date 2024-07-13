@@ -29,6 +29,7 @@ module VM : sig
   val init : unit -> unit Lwt.t
 
   val deploy :
+    max_run_duration:int option ->
     machine_type:string ->
     base_port:int ->
     ports_per_vm:int ->
