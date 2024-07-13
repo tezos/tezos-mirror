@@ -4430,6 +4430,16 @@ module Staking = struct
     RPC_context.make_call1 S.is_forbidden ctxt block pkh () ()
 end
 
+let get_blocks_preservation_cycles ~get_context =
+  let open Lwt_option_syntax in
+  let constants_key = [Constants_repr.version; "constants"] in
+  let* ctxt = Lwt.map Option.some (get_context ()) in
+  let* bytes = Tezos_protocol_environment.Context.find ctxt constants_key in
+  let*? constants_parametrics =
+    Data_encoding.Binary.of_bytes_opt Constants_parametric_repr.encoding bytes
+  in
+  return constants_parametrics.blocks_preservation_cycles
+
 module S = struct
   open Data_encoding
 

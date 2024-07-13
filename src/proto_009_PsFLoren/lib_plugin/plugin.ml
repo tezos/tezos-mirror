@@ -1010,4 +1010,6 @@ module RPC = struct
       block
       ()
       (contract, entrypoint, input, chain_id, source, payer, gas, unparsing_mode)
+
+  let get_blocks_preservation_cycles ~get_context:_ = Lwt.return_none
 end
