@@ -51,7 +51,15 @@ let build_rpc_directory ~user_activated_upgrades
     Tezos_rpc.Directory.empty
   |> register Config_services.history_mode (fun () () () ->
          let chain_store = Store.main_chain_store store in
-         return (Store.Chain.history_mode chain_store))
+         let history_mode =
+           match Store.Chain.history_mode chain_store with
+           | (Full (Some _) | Rolling (Some _) | Archive) as history_mode ->
+               history_mode
+           | Full None -> Full (Some History_mode.default_additional_cycles)
+           | Rolling None ->
+               Rolling (Some History_mode.default_additional_cycles)
+         in
+         return history_mode)
   |> register Config_services.Logging.configure (fun () () configuration ->
          let open Lwt_result_syntax in
          let* () = Internal_event_unix.Configuration.reapply configuration in
