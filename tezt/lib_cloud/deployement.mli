@@ -23,3 +23,5 @@ val agents : t -> Agent.t list
       that this call may or may not destroy the machine depending on
       what the user has chosen (see [Cli.destroy].*)
 val terminate : ?exn:exn -> t -> unit Lwt.t
+
+val of_agents : Agent.t list -> t

@@ -33,3 +33,9 @@ val default_binaries_path : unit -> string
 
 (** Path to the current binary. *)
 val self : string
+
+(** Path where to find the encoding of tezt cloud deployement. *)
+val proxy_deployement : tezt_cloud:string -> string
+
+(** Path where are stored grafana dashboards. *)
+val grafana_dashboards : string

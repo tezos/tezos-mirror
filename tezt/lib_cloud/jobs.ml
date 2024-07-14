@@ -16,20 +16,20 @@ let docker_build =
     if Hashtbl.mem cache docker_image then (
       Log.info "Docker image is already built. Nothing to do" ;
       Lwt.return_unit)
-    else (
+    else
+      let ssh_public_key_filename = Env.ssh_public_key_filename () in
       Hashtbl.replace cache docker_image () ;
       Log.info
         "Checking the existence of ssh public key '%s'..."
-        Env.ssh_public_key_filename ;
+        ssh_public_key_filename ;
       let* ssh_public_key =
-        let ssh_public_key_file = Env.ssh_public_key_filename in
         let* () =
-          if not (Sys.file_exists ssh_public_key_file) then (
-            Log.info "SSh public key not found, creating it..." ;
+          if not (Sys.file_exists ssh_public_key_filename) then (
+            Log.info "SSH public key not found, creating it..." ;
             Ssh.generate_key ())
           else Lwt.return_unit
         in
-        Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_file]
+        Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_filename]
       in
       let alias =
         match docker_image with
@@ -68,7 +68,7 @@ let docker_build =
             ]
         | Octez_latest_release -> [("SSH_PUBLIC_KEY", ssh_public_key)]
       in
-      Log.info "Building image from %s.Dockerfile..." Env.tezt_cloud ;
+      Log.info "Building image from %s..." Env.tezt_cloud ;
       let* () = Docker.build ~alias ~args () |> Process.check in
       let* () =
         if push then (
@@ -81,7 +81,7 @@ let docker_build =
           Lwt.return_unit)
         else Lwt.return_unit
       in
-      unit)
+      unit
 
 let deploy_docker_registry () =
   Log.info "Tezt_Cloud found with value: %s" Env.tezt_cloud ;
@@ -93,7 +93,7 @@ let deploy_docker_registry () =
 let clean_up_vms () =
   let tezt_cloud = Env.tezt_cloud in
   let* workspaces = Terraform.VM.Workspace.list ~tezt_cloud in
-  let ssh_private_key_filename = Env.ssh_private_key_filename in
+  let ssh_private_key_filename = Env.ssh_private_key_filename () in
   workspaces
   |> Lwt_list.iter_s (fun workspace ->
          let* () = Terraform.VM.Workspace.select workspace in
@@ -124,7 +124,11 @@ let clean_up_vms () =
                     |> List.filter (fun str -> str <> "")
                   in
                   let main_image, other_images =
-                    List.partition (fun str -> str <> "netdata") images_name
+                    List.partition
+                      (fun str ->
+                        str <> "netdata" && str <> "grafana"
+                        && str <> "prometheus")
+                      images_name
                   in
                   if List.length main_image <> 1 then
                     Test.fail
@@ -161,15 +165,6 @@ let clean_up_vms () =
                                ~ssh_private_key_filename
                                "docker"
                                ["kill"; image]
-                             |> Process.check
-                           in
-                           let* _ =
-                             Gcloud.compute_ssh
-                               ~zone
-                               ~vm_name
-                               ~ssh_private_key_filename
-                               "docker"
-                               ["rm"; image]
                              |> Process.check
                            in
                            Lwt.return_unit)

@@ -25,6 +25,7 @@ let monitoring =
   Clap.flag
     ~section
     ~set_long:"monitoring"
+    ~unset_long:"no-monitoring"
     ~description:
       "If set, all the VMs are monitored with netdata. The monitoring \
        dashboard is accessible on port 13999 of the monitored VM."
@@ -34,6 +35,7 @@ let destroy =
   Clap.flag
     ~section
     ~set_long:"destroy"
+    ~unset_long:"no-destroy"
     ~description:"If set, the machines are destroyed at the end of the test"
     false
 
@@ -76,17 +78,27 @@ let ports_per_vm =
     ~description:"Number of opened port per VM (default is 50)"
     50
 
+let proxy =
+  Clap.flag
+    ~section
+    ~set_long:"proxy"
+    ~description:
+      "Enables to run the orchestrator on a VM instead of the host machine"
+    false
+
 let grafana =
   Clap.flag
     ~section
     ~set_long:"grafana"
+    ~unset_long:"no-grafana"
     ~description:"Flag to set whether to run grafana"
-    true
+    ((not localhost) || proxy)
 
 let prometheus =
   Clap.flag
     ~section
     ~set_long:"prometheus"
+    ~unset_long:"no-prometheus"
     ~description:"Flag to set whether metrics are exported into prometheus"
     grafana
 
@@ -94,6 +106,7 @@ let prometheus_export =
   Clap.flag
     ~section
     ~set_long:"prometheus-export"
+    ~unset_long:"no-prometheus-export"
     ~description:"Export a Prometheus snapshot at the end of the scenario"
     true
 
@@ -124,17 +137,11 @@ let website =
   Clap.flag
     ~section
     ~set_long:"website"
+    ~unset_long:"no-website"
     ~description:
       "A webpage is up on localhost to summarize various informations related \
        to the experiment"
     prometheus
-
-let website_port =
-  Clap.default_int
-    ~section
-    ~long:"website-port"
-    ~description:"Set the port used for the website. Default is 8080"
-    8080
 
 let machine_type =
   Clap.default_string
@@ -154,13 +161,15 @@ let dockerfile_alias =
        the environment variable `TEZT_CLOUD`)"
     ()
 
-let proxy =
-  Clap.flag
+let website_port =
+  Clap.default_int
     ~section
-    ~set_long:"proxy"
-    ~description:
-      "Enables to run the orchestrator on a VM instead of the host machine"
-    false
+    ~long:"website-port"
+    ~description:"Set the port used for the website. Default is 8080"
+    (* When the website is run by the orchestrator, it is easier to
+       use port 80. We could decide in the future to use 80 by
+       default. *)
+    (if proxy && localhost then 80 else 8080)
 
 let max_run_duration =
   Clap.default_int
@@ -179,3 +188,10 @@ let no_max_run_duration =
     (* If the proxy mode is active, we don't want to use [max_run_duration]
        since it aims to run long running tests. *)
     proxy
+
+let tezt_cloud =
+  Clap.optional_string
+    ~section
+    ~long:"tezt-cloud"
+    ~description:"Overwrite the TEZT_CLOUD variable"
+    ()

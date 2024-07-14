@@ -29,3 +29,9 @@ let dal_trusted_setup = "_opam" // "share" // "dal-trusted-setup"
 let default_binaries_path () = Filename.get_temp_dir_name () // "tezt-runners"
 
 let self = Sys.argv.(0)
+
+let proxy_deployement ~tezt_cloud =
+  Filename.get_temp_dir_name ()
+  // Format.asprintf "%s-tezt-cloud-deployement" tezt_cloud
+
+let grafana_dashboards = project // "grafana" // "dashboards"

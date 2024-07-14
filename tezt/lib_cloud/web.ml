@@ -113,20 +113,34 @@ let monitoring ~agents =
   else
     "# Monitoring\n Monitoring disabled. Use `--monitoring` to activate it.\n"
 
-let prometheus =
+let prometheus ~agents =
+  let domain =
+    match Env.mode with
+    | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> fst
+    | `Host | `Localhost | `Cloud -> "localhost"
+  in
   if Env.prometheus then
-    "# Prometheus\n [Prometheus dashboard](http://localhost:9090)\n"
+    Format.asprintf
+      "# Prometheus\n [Prometheus dashboard](http://%s:%d)\n"
+      domain
+      Env.prometheus_port
   else "Prometheus disabled. Use `--prometheus` to activate it.\n"
 
-let grafana =
-  if Env.grafana then "# Grafana\n [Grafana dashboard](http://localhost:3000)\n"
+let grafana ~agents =
+  let domain =
+    match Env.mode with
+    | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> fst
+    | `Host | `Localhost | `Cloud -> "localhost"
+  in
+  if Env.grafana then
+    Format.asprintf "# Grafana\n [Grafana dashboard](http://%s:3000)\n" domain
   else "Grafana disabled. Use `--grafana` to activate it.\n"
 
 let markdown_content ~agents =
   [
     configuration ~agents;
-    grafana;
-    prometheus;
+    grafana ~agents;
+    prometheus ~agents;
     monitoring ~agents;
     debugging ~agents;
   ]
@@ -156,7 +170,10 @@ let write t ~agents =
     ]
 
 let run () =
-  let dir = Temp.dir "website" in
+  let* () =
+    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "website"]
+  in
+  let dir = Filename.get_temp_dir_name () // "website" in
   let index = index dir in
   let port = Env.website_port in
   let prometheus = Env.prometheus in
@@ -172,10 +189,10 @@ let run () =
         Filename.dirname index;
       ]
   in
-  {process; dir; monitoring; prometheus}
+  Lwt.return {process; dir; monitoring; prometheus}
 
 let start ~agents =
-  let t = run () in
+  let* t = run () in
   let* () = write t ~agents in
   Lwt.return t
 

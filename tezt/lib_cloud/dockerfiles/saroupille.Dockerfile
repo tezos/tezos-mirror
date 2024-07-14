@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     # Tezos dependencies
     libgmp-dev curl libev-dev libhidapi-dev \
     # With the proxy mode we may want to run docker inside docker
-    docker.io \
+    docker.io screen \
     # Necessary certificates for mirages dependencies
     ca-certificates \
     # DL3015: Use --no-install-recommends

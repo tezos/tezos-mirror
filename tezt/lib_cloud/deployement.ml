@@ -11,7 +11,7 @@ module Remote = struct
   type t = {agents : Agent.t list}
 
   let wait_docker_running ~vm_name () =
-    let ssh_private_key_filename = Env.ssh_private_key_filename in
+    let ssh_private_key_filename = Env.ssh_private_key_filename () in
     let* zone = Env.zone () in
     let is_ready _output = true in
     let run () =
@@ -72,7 +72,7 @@ module Remote = struct
       List.map (fun vm_name -> wait_docker_running ~vm_name ()) names
       |> Lwt.join
     in
-    let ssh_private_key_filename = Env.ssh_private_key_filename in
+    let ssh_private_key_filename = Env.ssh_private_key_filename () in
     let make_agent vm_name =
       let* ip = Gcloud.get_ip_address_from_name ~zone vm_name in
       let point = (ip, base_port) in
@@ -83,7 +83,7 @@ module Remote = struct
           !port
       in
       let cmd_wrapper =
-        Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename
+        Gcloud.cmd_wrapper ~zone ~ssh_private_key_filename ~vm_name
       in
       let* () =
         if Env.monitoring then Monitoring.run ~cmd_wrapper ()
@@ -91,7 +91,7 @@ module Remote = struct
       in
       Agent.make
         ~ssh_id:ssh_private_key_filename
-        ~cmd_wrapper
+        ~zone
         ~point
         ~configuration
         ~next_available_port
@@ -119,11 +119,21 @@ module Remote = struct
     in
     order configurations bindings
 
+  let deploy_proxy () =
+    let workspace_name = Format.asprintf "%s-proxy" Env.tezt_cloud in
+    let configuration = Configuration.make () in
+    let tezt_cloud = Env.tezt_cloud in
+    let* () = Terraform.VM.Workspace.init ~tezt_cloud [workspace_name] in
+    let* agents =
+      workspace_deploy ~workspace_name ~configuration ~number_of_vms:1
+    in
+    match agents with [agent] -> Lwt.return agent | _ -> assert false
+
   (*
       Deployement requires to create new VMs and organizing them per group of
       configuration. Each configuration leads to one terraform workspace.
     *)
-  let deploy ~configurations =
+  let deploy ~proxy ~configurations =
     let agents_info = Hashtbl.create 11 in
     let workspaces_info =
       (* VMs are grouped per group of configuration. Each group leads to one workspace. *)
@@ -169,7 +179,10 @@ module Remote = struct
          configurations. *)
       order_agents (List.concat agents) configurations
     in
-    Lwt.return {agents}
+    if proxy then
+      let* agent = deploy_proxy () in
+      Lwt.return {agents = agent :: agents}
+    else Lwt.return {agents}
 
   let agents t = t.agents
 
@@ -249,7 +262,7 @@ module Localhost = struct
     |> Seq.iter (fun i ->
            let port = base_port + (i * ports_per_vm) in
            Hashtbl.replace next_port ("localhost", port) (port + 1)) ;
-    let ssh_id = Env.ssh_private_key_filename in
+    let ssh_id = Env.ssh_private_key_filename () in
     let get_point i =
       let port = base_port + (i * ports_per_vm) in
       ("localhost", port)
@@ -308,8 +321,12 @@ let deploy ~configurations =
       let* localhost = Localhost.deploy ~configurations () in
       Lwt.return (Localhost localhost)
   | `Cloud ->
-      let* remote = Remote.deploy ~configurations in
+      let* remote = Remote.deploy ~proxy:false ~configurations in
       Lwt.return (Remote remote)
+  | `Host ->
+      let* remote = Remote.deploy ~proxy:true ~configurations in
+      Lwt.return (Remote remote)
+  | `Orchestrator -> assert false
 
 let agents t =
   match t with
@@ -320,3 +337,5 @@ let terminate ?exn t =
   match t with
   | Remote remote -> Remote.terminate ?exn remote
   | Localhost localhost -> Localhost.terminate ?exn localhost
+
+let of_agents agents = Remote {agents}

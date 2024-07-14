@@ -220,7 +220,7 @@ resource "google_compute_firewall" "default" {
   # Rule to enable static page web access
   allow {
     protocol = "tcp"
-    ports    = ["8080"]
+    ports    = ["80", "8080"]
   }
 
   # Rule to enable prometheus access
@@ -252,7 +252,7 @@ resource "google_compute_instance_template" "default" {
 
   project = var.project_id
 
-  name = "instance-template"
+  name_prefix = "instance-template-${terraform.workspace}"
 
   service_account {
     # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.

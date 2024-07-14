@@ -47,6 +47,7 @@ module Cloud : sig
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module. *)
   val register :
+    ?proxy_files:string list ->
     ?vms:Configuration.t list ->
     __FILE__:string ->
     title:string ->

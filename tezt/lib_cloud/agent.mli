@@ -17,7 +17,7 @@ type t
     the agent. [ssh_id] is a path to the private key that will be used for
     the ssh connection. *)
 val make :
-  ?cmd_wrapper:Gcloud.cmd_wrapper ->
+  ?zone:string ->
   ssh_id:string ->
   point:string * int ->
   configuration:Configuration.t ->
@@ -32,14 +32,17 @@ val encoding : t Data_encoding.t
 (** [name agent] returns the name of the agent. *)
 val name : t -> string
 
+(** [vm_name agent] returns the vm name of the agent. *)
+val vm_name : t -> string
+
 (** [set_name agent name] sets the name of the agent to [name]. *)
 val set_name : t -> string -> unit
 
-(** [copy agent ~source] copy the file into the [agent] directory and
+(** [copy ?destination agent ~source] copy the file into the [agent] directory and
     returned the directory where the file can be found. It is assumed
     the [source] file does not exist on the agent machine. If the
     parent directory does not exist, it will be created. *)
-val copy : t -> source:string -> string Lwt.t
+val copy : ?destination:string -> t -> source:string -> string Lwt.t
 
 (** [next_available_port agent] returns the next available port for
     this agent. Raises [Not_found] if no port is available. *)
@@ -56,3 +59,9 @@ val configuration : t -> Configuration.t
 
 (** A wrapper to run a command on the VM of the agent. *)
 val cmd_wrapper : t -> Gcloud.cmd_wrapper option
+
+(** Run a command on the host machine of the VM. *)
+val host_run_command : t -> string -> string list -> Process.t
+
+(** Run a command on the docker image run by the agent. *)
+val docker_run_command : t -> string -> string list -> Process.t

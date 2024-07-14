@@ -12,7 +12,20 @@ type docker_image = Gcp of {alias : string} | Octez_latest_release
 
 val tezt_cloud : string
 
-val mode : [`Localhost | `Cloud]
+(**
+
+  - [Localhost]: Agents and the orchestrator are run on the host machine
+
+  - [Cloud]: The orchestrator is on the host machine. The agents are run onto
+    the cloud 
+
+    - [`Orchestrator]: The orchestrator is run on a VM. This is mode used by the
+      proxy from the orchestrator point of view.
+
+    - [`Host]: This mode is run by the host machine that initializes the
+      orchestrator running an a VM.    
+*)
+val mode : [`Localhost | `Cloud | `Orchestrator | `Host]
 
 val prometheus : bool
 
@@ -36,9 +49,9 @@ val monitoring : bool
 
 val keep_alive : bool
 
-val ssh_private_key_filename : string
+val ssh_private_key_filename : ?home:string -> unit -> string
 
-val ssh_public_key_filename : string
+val ssh_public_key_filename : ?home:string -> unit -> string
 
 val dockerfile_alias : string
 

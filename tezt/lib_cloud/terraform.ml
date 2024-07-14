@@ -104,7 +104,8 @@ module VM = struct
       String.split_on_char '\n' output
       |> List.map String.trim
       |> List.filter (fun workspace ->
-             String.starts_with ~prefix:tezt_cloud workspace
+             let prefix = Format.asprintf "%s-" tezt_cloud in
+             String.starts_with ~prefix workspace
              (* The workspace named "tezt-cloud" is used for the docker
                 registry, it does not need to be listed. *)
              && workspace <> tezt_cloud)

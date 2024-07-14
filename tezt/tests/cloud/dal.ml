@@ -1518,7 +1518,8 @@ let benchmark () =
     vms
     |> List.map (function
            | `Bootstrap ->
-               Configuration.make ~docker_image:Octez_latest_release ()
+               (* Configuration.make ~docker_image:Octez_latest_release () *)
+               default_vm_configuration
            | `Baker i -> (
                match configuration.stake_machine_type with
                | None -> default_vm_configuration
@@ -1537,6 +1538,12 @@ let benchmark () =
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms
+    ~proxy_files:
+      [
+        Format.asprintf
+          "src/%s/parameters/mainnet-parameters.json"
+          (Protocol.directory configuration.protocol);
+      ]
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]

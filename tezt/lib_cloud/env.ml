@@ -8,25 +8,27 @@
 type docker_image = Gcp of {alias : string} | Octez_latest_release
 
 let tezt_cloud =
-  (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
-  match Sys.getenv_opt "TEZT_CLOUD" with
-  | None ->
-      Stdlib.failwith
-        "The environment variable 'TEZT_CLOUD' is not defined. See README for \
-         more information why this variable must be defined."
-  | Some value -> value
+  match Cli.tezt_cloud with
+  | Some tezt_cloud -> tezt_cloud
+  | None -> (
+      (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
+      match Sys.getenv_opt "TEZT_CLOUD" with None -> "" | Some value -> value)
 
-let ssh_private_key_filename =
-  let home = Sys.getenv "HOME" in
+let ssh_private_key_filename ?(home = Sys.getenv "HOME") () =
   home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
 
-let ssh_public_key_filename =
-  let ssh_key = ssh_private_key_filename in
+let ssh_public_key_filename ?home () =
+  let ssh_key = ssh_private_key_filename ?home () in
   Format.asprintf "%s.pub" ssh_key
 
 let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
 
-let mode = if Cli.localhost then `Localhost else `Cloud
+let mode =
+  match (Cli.localhost, Cli.proxy) with
+  | true, true -> `Orchestrator
+  | true, false -> `Localhost
+  | false, true -> `Host
+  | false, false -> `Cloud
 
 let prometheus = Cli.prometheus
 
@@ -76,15 +78,20 @@ let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 let project_id = Gcloud.project_id
 
 let init () =
-  if mode = `Localhost then unit
-  else
-    let tezt_cloud = tezt_cloud in
-    let* project_id = project_id () in
-    Log.info "Initializing docker registry..." ;
-    let* () = Terraform.Docker_registry.init () in
-    Log.info "Deploying docker registry..." ;
-    let* () = Terraform.Docker_registry.deploy ~tezt_cloud ~project_id in
-    Lwt.return_unit
+  if tezt_cloud = "" then
+    Test.fail
+      "The tezt-cloud value should be set. Either via the CLI or via the \
+       environement variable 'TEZT_CLOUD'" ;
+  match mode with
+  | `Localhost | `Orchestrator -> Lwt.return_unit
+  | `Host | `Cloud ->
+      let tezt_cloud = tezt_cloud in
+      let* project_id = project_id () in
+      Log.info "Initializing docker registry..." ;
+      let* () = Terraform.Docker_registry.init () in
+      Log.info "Deploying docker registry..." ;
+      let* () = Terraform.Docker_registry.deploy ~tezt_cloud ~project_id in
+      Lwt.return_unit
 
 (* Even though we could get this information locally, it is interesting to fetch
    it through terraform to get the correct value if a scenario was launch with
@@ -117,11 +124,11 @@ let registry_uri () =
 
 let uri_of_docker_image docker_image =
   match (docker_image, mode) with
-  | Gcp {alias}, `Cloud ->
+  | Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
       let* registry_uri = registry_uri () in
       Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
   | Gcp {alias}, `Localhost -> Lwt.return alias
-  | Octez_latest_release, `Cloud ->
+  | Octez_latest_release, (`Cloud | `Host | `Orchestrator) ->
       let* registry_uri = registry_uri () in
       Lwt.return (Format.asprintf "%s/octez" registry_uri)
   | Octez_latest_release, `Localhost -> Lwt.return "octez"

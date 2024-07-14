@@ -11,6 +11,7 @@ type t
     enables to run a test that can use machines deployed onto the
     cloud. *)
 val register :
+  ?proxy_files:string list ->
   ?vms:Configuration.t list ->
   __FILE__:string ->
   title:string ->

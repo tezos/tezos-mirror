@@ -5,12 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Tezt_tezos_tezt_performance_regression.Grafana
+(** [get_agent agents] returns the proxy agent. It raises [Not_found] if the
+    proxy agent was not found. This function should be safe to call when
+    [Env.mode] is [`Orchestrator] or [`Host]. *)
+val get_agent : Agent.t list -> Agent.t
 
-type t
-
-val run : unit -> t Lwt.t
-
-val shutdown : t -> unit Lwt.t
-
-val dashboards_filepaths : unit -> string list Lwt.t
+(** [copy_files agent] copies all the necessary files for the proxy orchestrator
+  to run correctly. *)
+val copy_files :
+  Agent.t ->
+  scenario_files:string list ->
+  proxy_deployement:string ->
+  unit Lwt.t
