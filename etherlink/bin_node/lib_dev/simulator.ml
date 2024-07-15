@@ -21,15 +21,22 @@ module Make
     (Reader : Durable_storage.READER)
     (SimulationBackend : SimulationBackend) =
 struct
-  let get_kernel_version () =
+  let get_kernel_version ?block () =
     let open Lwt_result_syntax in
-    let* bytes = Reader.read Durable_storage_path.kernel_version in
+    let* bytes = Reader.read ?block Durable_storage_path.kernel_version in
     let result =
       match bytes with
       | Some bytes -> Bytes.to_string bytes
       | None -> "KERNEL_VERSION_NOT_INITIALISED"
     in
     return result
+
+  let get_storage_version ?block () =
+    let open Lwt_result_syntax in
+    let+ bytes = Reader.read ?block Durable_storage_path.storage_version in
+    match bytes with
+    | Some bytes -> Z.of_bits (Bytes.unsafe_to_string bytes) |> Z.to_int
+    | None -> 0
 
   let call_simulation ?block ~log_file ~input_encoder ~input () =
     let open Lwt_result_syntax in
@@ -48,24 +55,31 @@ struct
         }
       ()
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7328
-     The few following lines should be removed as soon as possible when
-     the next kernel is released on production. *)
-  let enabled_with_da_fees () =
+  (* The feature DA fees has been added later in the kernel. The node must
+     decide whether it wants to activate it or not.
+
+     As the simulation can be performed on past states, including past kernels,
+     we cannot consider it enabled even if it's supported by all latest
+     kernels on ghostnet and mainnet.
+  *)
+  let enabled_with_da_fees ?block () =
     let open Lwt_result_syntax in
-    let+ kernel_version = get_kernel_version () in
-    match kernel_version with
-    | "b9f6c9138719220db83086f0548e49c5c4c8421f"
-      (* Mainnet before security ugprade *)
-    | "4d98081699595b57512ffeff35bca320f281c806" (* Mainnet *)
-    | "ec7c3b349624896b269e179384d0a45cf39e1145" (* Ghostnet *)
-    | "KERNEL_VERSION_NOT_INITIALISED" ->
-        false
-    | _ -> true
+    let* storage_version = get_storage_version ?block () in
+    if storage_version < 12 then return_false
+    else if storage_version > 12 then return_true
+    else
+      (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
+         the features, some do not. *)
+      let* kernel_version = get_kernel_version ?block () in
+      (* This is supposed to be the only version where STORAGE_VERSION is 12,
+         but with_da_fees isn't enabled. *)
+      if kernel_version = "ec7c3b349624896b269e179384d0a45cf39e1145" then
+        return_false
+      else return_true
 
   let simulate_call call block_param =
     let open Lwt_result_syntax in
-    let* enabled_with_da_fees = enabled_with_da_fees () in
+    let* enabled_with_da_fees = enabled_with_da_fees ~block:block_param () in
     let* bytes =
       call_simulation
         ~block:block_param
@@ -128,6 +142,11 @@ struct
 
   let estimate_gas call =
     let open Lwt_result_syntax in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7376
+
+       Gas estimation currently ignores the block parameter. When this is fixed,
+       we need to give the block parameter to the call to
+       {!enabled_with_da_fees}. *)
     let* enabled_with_da_fees = enabled_with_da_fees () in
     let* res =
       call_estimate_gas
