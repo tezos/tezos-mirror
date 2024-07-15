@@ -47,8 +47,7 @@
     {}
     ''
       mkdir -p $out/share/zcash-params
-      cp ${./images/ci/zcash-params/sapling-output.params} $out/share/zcash-params
-      cp ${./images/ci/zcash-params/sapling-spend.params} $out/share/zcash-params
+      cp ${./images/ci/zcash-params}/* $out/share/zcash-params
     '';
 
   mkFrameworkFlags = frameworks:
