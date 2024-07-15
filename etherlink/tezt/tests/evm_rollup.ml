@@ -3863,7 +3863,8 @@ let test_simulation_eip2200 =
   @@ fun ~protocol:_ ~evm_setup ->
   let {sc_rollup_node; client; endpoint; evm_node; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* loop_address, _tx = deploy ~contract:loop ~sender evm_setup in
+  let* loop_resolved = loop () in
+  let* loop_address, _tx = deploy ~contract:loop_resolved ~sender evm_setup in
   (* If we support EIP-2200, the simulation gives an amount of gas
      insufficient for the execution. As we do the simulation with an
      enormous gas limit, we never trigger EIP-2200. *)
@@ -3871,7 +3872,7 @@ let test_simulation_eip2200 =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
       ~endpoint
-      ~abi_label:loop.label
+      ~abi_label:loop_resolved.label
       ~address:loop_address
       ~method_call:"loop(5)"
   in
@@ -5177,11 +5178,12 @@ let test_ghostnet_kernel =
 
 let test_estimate_gas_out_of_ticks =
   register_both
-    ~tags:["evm"; "estimate_gas"; "out_of_ticks"; "simulate"]
+    ~tags:["evm"; "estimate_gas"; "out_of_ticks"; "simulate"; "loop"]
     ~title:"estimateGas works with out of ticks"
   @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* loop_address, _tx = deploy ~contract:loop ~sender evm_setup in
+  let* loop_resolved = loop () in
+  let* loop_address, _tx = deploy ~contract:loop_resolved ~sender evm_setup in
   (* Call estimateGas with an out of ticks transaction. *)
   let estimateGas =
     [
