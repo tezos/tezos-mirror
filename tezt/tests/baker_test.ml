@@ -34,6 +34,25 @@ let team = Tag.layer1
 
 let hooks = Tezos_regression.hooks
 
+let check_node_version_check_bypass_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"baker node version check bypass test"
+    ~tags:[team; "node"; "baker"]
+    ~supports:Protocol.(From_protocol 021)
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let baker =
+    Baker.create ~protocol ~node_version_check_bypass:true node client
+  in
+  let check_bypassed_event_promise =
+    Baker.wait_for baker "node_version_check_bypass.v0" (fun _ -> Some ())
+  in
+  let* () = Baker.run baker in
+  let* () = check_bypassed_event_promise in
+  unit
+
 let baker_reward_test =
   Protocol.register_regression_test
     ~__FILE__
@@ -241,6 +260,7 @@ let baker_check_consensus_branch =
     ops
 
 let register ~protocols =
+  check_node_version_check_bypass_test protocols ;
   baker_simple_test protocols ;
   baker_reward_test protocols ;
   baker_stresstest protocols ;
