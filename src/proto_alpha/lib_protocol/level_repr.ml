@@ -210,6 +210,15 @@ let root_level cycle_eras =
     expected_commitment = false;
   }
 
+let level_zero_use_with_care =
+  {
+    level = Raw_level_repr.root;
+    level_position = 0l;
+    cycle = Cycle_repr.root;
+    cycle_position = 0l;
+    expected_commitment = false;
+  }
+
 (* This function returns the cycle era to which [level] belongs. *)
 let era_of_level ~cycle_eras level =
   let rec aux = function
@@ -371,4 +380,20 @@ module Internal_for_tests = struct
       cycle_position = 0l;
       expected_commitment = false;
     }
+
+  let make_cycle_eras ~blocks_per_cycle ~blocks_per_commitment =
+    let cycle_era =
+      {
+        first_level = Raw_level_repr.root;
+        first_cycle = Cycle_repr.root;
+        blocks_per_cycle;
+        blocks_per_commitment;
+      }
+    in
+    create_cycle_eras [cycle_era]
+
+  let level_from_int32 ~cycle_eras l =
+    let open Result_syntax in
+    let* raw_level = Raw_level_repr.of_int32 l in
+    return @@ level_from_raw ~cycle_eras raw_level
 end

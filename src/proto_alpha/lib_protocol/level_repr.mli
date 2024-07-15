@@ -94,6 +94,15 @@ val current_era : cycle_eras -> cycle_era
 (** Returns the first level of the oldest era *)
 val root_level : cycle_eras -> level
 
+(** Level zero, that belongs to cycle zero. This level representation
+    is hardcoded and might not verify properties of properly built
+    levels. Only use this if you need a default value and know that
+    it's going to be handled properly.
+
+    Currently used in {!Full_staking_balance_repr.encoding} to signal
+    a decoded value from an old protocol. *)
+val level_zero_use_with_care : level
+
 (** Returns the cycle corresponding to a raw level *)
 val cycle_from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> Cycle_repr.t
 
@@ -121,6 +130,11 @@ module Internal_for_tests : sig
   val add_cycles : blocks_per_cycle:int -> t -> int -> t
 
   val root : t
+
+  val make_cycle_eras :
+    blocks_per_cycle:int32 -> blocks_per_commitment:int32 -> cycle_eras tzresult
+
+  val level_from_int32 : cycle_eras:cycle_eras -> int32 -> level tzresult
 end
 
 (**/**)

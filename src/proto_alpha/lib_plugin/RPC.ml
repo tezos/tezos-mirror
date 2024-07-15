@@ -4222,9 +4222,18 @@ module Delegates = struct
     let min_delegated_in_current_cycle =
       RPC_service.get_service
         ~description:
-          "Returns the minimum of delegated tez (in mutez) over the current \
-           cycle and the block level where this value was last updated (Level \
-           is `None` when decoding values from protocol O)."
+          "Returns the minimum of delegated tez (in mutez) during the current \
+           cycle and the block level at the end of which the minimum was \
+           reached. This only takes into account the value of \
+           `total_delegated` at the end of each block, not in the middle of \
+           applying operations. This is the delegated amount that would be \
+           used to compute the delegate's future baking rights if the cycle \
+           ended at the current block. If the minimum was reached multiple \
+           times, the returned level is the earliest level of the current \
+           cycle that reached this minimum. For instance, if `total_delegated` \
+           hasn't changed at all since the beginning of the current cycle, \
+           returns the first level of the current cycle. (If the contract is \
+           not registered as a delegate, returns 0 mutez and omits the level.)"
         ~query:RPC_query.empty
         ~output:min_delegated_in_current_cycle_encoding
         RPC_path.(path / "min_delegated_in_current_cycle")
