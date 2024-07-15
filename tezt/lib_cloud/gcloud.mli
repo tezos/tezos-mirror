@@ -43,3 +43,9 @@ val cmd_wrapper :
 val get_ip_address_from_name : zone:string -> string -> string Lwt.t
 
 val list_vms : prefix:string -> string Lwt.t
+
+module DNS : sig
+  val create_zone : domain:string -> zone:string -> unit -> unit Lwt.t
+
+  val describe : zone:string -> unit -> string Lwt.t
+end

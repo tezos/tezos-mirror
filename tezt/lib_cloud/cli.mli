@@ -88,3 +88,6 @@ val no_max_run_duration : bool
 val proxy : bool
 
 val tezt_cloud : string option
+
+(** DNS domain to use for the website. *)
+val dns_domain : string option

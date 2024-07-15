@@ -195,3 +195,10 @@ let tezt_cloud =
     ~long:"tezt-cloud"
     ~description:"Overwrite the TEZT_CLOUD variable"
     ()
+
+let dns_domain =
+  Clap.optional_string
+    ~section
+    ~long:"dns-domain"
+    ~description:"DNS domain to use for the website"
+    ()

@@ -79,3 +79,28 @@ let list_vms ~prefix =
       ["compute"; "instances"; "list"; "--filter"; filter]
   in
   Lwt.return (String.trim output)
+
+module DNS = struct
+  let create_zone ~domain ~zone () =
+    let dns_name = Format.asprintf "%s.%s" zone domain in
+    let description =
+      Format.asprintf "Managed zone for tezt-cloud for %s project" zone
+    in
+    Process.run
+      "gcloud"
+      [
+        "dns";
+        "managed-zones";
+        "create";
+        zone;
+        "--dns-name";
+        dns_name;
+        "--description";
+        description;
+      ]
+
+  let describe ~zone () =
+    Process.run_and_read_stdout
+      "gcloud"
+      ["dns"; "managed-zones"; "describe"; zone]
+end

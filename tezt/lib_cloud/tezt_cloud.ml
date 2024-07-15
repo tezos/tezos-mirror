@@ -80,6 +80,33 @@ let register_list_vms ~tags =
   let* _ = Gcloud.list_vms ~prefix:Env.tezt_cloud in
   Lwt.return_unit
 
+let register_create_dns_zone ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"Create a new DNS zone"
+    ~tags:("create" :: "dns" :: "zone" :: tags)
+  @@ fun _cloud ->
+  let domain =
+    match Env.dns_domain with
+    | None ->
+        Test.fail "You must specify the domain to use via --dns-domain option."
+    | Some domain -> domain
+  in
+  let* () = Gcloud.DNS.create_zone ~domain ~zone:"tezt-cloud" () in
+  let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
+  unit
+
+let register_describe_dns_zone ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"Describe a new DNS zone"
+    ~tags:("describe" :: "dns" :: "zone" :: tags)
+  @@ fun _cloud ->
+  let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
+  unit
+
 let register ~tags =
   register_docker_push ~tags ;
   register_docker_build ~tags ;
@@ -87,4 +114,6 @@ let register ~tags =
   register_destroy_vms ~tags ;
   register_prometheus_import ~tags ;
   register_clean_up_vms ~tags ;
-  register_list_vms ~tags
+  register_list_vms ~tags ;
+  register_create_dns_zone ~tags ;
+  register_describe_dns_zone ~tags
