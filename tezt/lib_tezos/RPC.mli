@@ -60,6 +60,9 @@ type data = RPC_core.data
 (** RPC: [GET /config] *)
 val get_config : JSON.t t
 
+(** RPC: [GET /config/history_mode] *)
+val get_config_history_mode : JSON.t t
+
 (** RPC: [GET /config/network/dal] *)
 val get_config_network_dal : JSON.t t
 

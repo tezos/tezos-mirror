@@ -128,7 +128,7 @@ You can then verify that your history mode is set to full by using the following
 
 .. code-block:: json
 
-   { "history_mode": "full" }
+   { "history_mode": { "full": { "additional_cycles": 1 } } }
 
 In full mode, the savepoint is the last block which contains its
 context and metadata. The caboose is the last known block which is pruned (that

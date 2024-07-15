@@ -150,6 +150,11 @@ module type RPC = sig
 
   val rpc_services :
     Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
+
+  (** Return the number of blocks preservation cycles from protocol constants. *)
+  val get_blocks_preservation_cycles :
+    get_context:(unit -> Tezos_protocol_environment.Context.t Lwt.t) ->
+    int option Lwt.t
 end
 
 (** To use when no registered plugin is found. This module is

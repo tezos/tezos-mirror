@@ -49,11 +49,18 @@ module Network = struct
 end
 
 let history_mode_encoding =
-  Data_encoding.(obj1 (req "history_mode" History_mode.encoding))
+  Data_encoding.(
+    obj2
+      (req "history_mode" History_mode.encoding)
+      (opt "blocks_preservation_cycles" (ranged_int 0 255)))
 
 let history_mode =
   Tezos_rpc.Service.get_service
-    ~description:"Returns the history mode of the node's underlying storage."
+    ~description:
+      "Returns the history mode of the node's underlying storage. In full or \
+       rolling mode, it provides the values of `additional_cycles` and \
+       `blocks_preservation_cycles`. The sum of these values is the total \
+       number of stored cycles."
     ~query:Tezos_rpc.Query.empty
     ~output:history_mode_encoding
     Tezos_rpc.Path.(path / "history_mode")

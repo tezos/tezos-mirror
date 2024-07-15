@@ -1044,4 +1044,6 @@ module RPC = struct
       key
       ()
       unparsing_mode
+
+  let get_blocks_preservation_cycles ~get_context:_ = Lwt.return_none
 end

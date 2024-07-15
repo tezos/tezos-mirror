@@ -2590,4 +2590,6 @@ module RPC = struct
   let rpc_services =
     register () ;
     RPC_directory.merge rpc_services !Registration.patched_services
+
+  let get_blocks_preservation_cycles ~get_context:_ = Lwt.return_none
 end

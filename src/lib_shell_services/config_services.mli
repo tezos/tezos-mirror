@@ -61,7 +61,7 @@ val history_mode :
     unit,
     unit,
     unit,
-    History_mode.t,
+    History_mode.t * int option,
     error trace )
   Tezos_rpc.Service.raw
 
