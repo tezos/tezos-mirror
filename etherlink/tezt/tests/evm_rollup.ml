@@ -4663,7 +4663,11 @@ let test_regression_block_hash_gen =
      This test checks regression for the fix *)
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"; Tag.flaky]
+    ~tags:
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/7375
+         Remove the `Tag.ci_disabled` tag to re-enable the test in the
+         CI. *)
+      ["evm"; "l2_call"; "block_hash"; "timestamp"; Tag.flaky; Tag.ci_disabled]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
