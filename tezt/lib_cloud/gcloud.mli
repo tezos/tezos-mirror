@@ -48,4 +48,10 @@ module DNS : sig
   val create_zone : domain:string -> zone:string -> unit -> unit Lwt.t
 
   val describe : zone:string -> unit -> string Lwt.t
+
+  val get_domain : tezt_cloud:string -> zone:string -> string Lwt.t
+
+  val add : tezt_cloud:string -> zone:string -> ip:string -> unit Lwt.t
+
+  val remove : tezt_cloud:string -> zone:string -> ip:string -> unit Lwt.t
 end

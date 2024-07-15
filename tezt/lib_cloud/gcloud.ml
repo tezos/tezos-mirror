@@ -103,4 +103,65 @@ module DNS = struct
     Process.run_and_read_stdout
       "gcloud"
       ["dns"; "managed-zones"; "describe"; zone]
+
+  module Transaction = struct
+    let start ~zone () =
+      Process.run
+        "gcloud"
+        ["dns"; "record-sets"; "transaction"; "start"; "--zone"; zone]
+
+    let add ?(ttl = 300) ?(typ = "A") ~domain ~zone ~ip () =
+      let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
+      let typ = ["--type"; Format.asprintf "%s" typ] in
+      let domain = ["--name"; domain] in
+      let zone = ["--zone"; zone] in
+      Process.run
+        "gcloud"
+        (["dns"; "record-sets"; "transaction"; "add"]
+        @ zone @ ttl @ typ @ domain @ [ip])
+
+    let remove ?(ttl = 300) ?(typ = "A") ~domain ~zone ~ip () =
+      let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
+      let typ = ["--type"; Format.asprintf "%s" typ] in
+      let domain = ["--name"; domain] in
+      let zone = ["--zone"; zone] in
+      Process.run
+        "gcloud"
+        (["dns"; "record-sets"; "transaction"; "remove"]
+        @ zone @ ttl @ typ @ domain @ [ip])
+
+    let execute ~zone () =
+      Process.run
+        "gcloud"
+        ["dns"; "record-sets"; "transaction"; "execute"; "--zone"; zone]
+  end
+
+  let get_domain ~tezt_cloud ~zone =
+    let* output = describe ~zone () in
+    let line =
+      String.trim output |> String.split_on_char '\n'
+      |> List.find_opt (String.starts_with ~prefix:"dnsName:")
+    in
+    match line with
+    | None -> Test.fail "Unable to find a managed zone. Have you create it?"
+    | Some line ->
+        Lwt.return
+          (Format.asprintf
+             "%s.%s"
+             tezt_cloud
+             (String.split_on_char ' ' line |> Fun.flip List.nth 1))
+
+  let add ~tezt_cloud ~zone ~ip =
+    let* domain = get_domain ~tezt_cloud ~zone in
+    let* () = Transaction.start ~zone () in
+    let* () = Transaction.add ~domain ~zone ~ip () in
+    let* () = Transaction.execute ~zone () in
+    unit
+
+  let remove ~tezt_cloud ~zone ~ip =
+    let* domain = get_domain ~tezt_cloud ~zone in
+    let* () = Transaction.start ~zone () in
+    let* () = Transaction.remove ~domain ~zone ~ip () in
+    let* () = Transaction.execute ~zone () in
+    unit
 end

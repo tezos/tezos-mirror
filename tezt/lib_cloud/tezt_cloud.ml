@@ -107,6 +107,36 @@ let register_describe_dns_zone ~tags =
   let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
   unit
 
+let register_dns_add ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"Register a new DNS entry"
+    ~tags:("dns" :: "add" :: tags)
+  @@ fun _cloud ->
+  let tezt_cloud = Env.tezt_cloud in
+  let ip = Cli.get_string_opt "ip" in
+  match ip with
+  | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
+  | Some ip ->
+      let* () = Gcloud.DNS.add ~tezt_cloud ~zone:"tezt-cloud" ~ip in
+      unit
+
+let register_dns_remove ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"Remove a DNS entry"
+    ~tags:("dns" :: "remove" :: tags)
+  @@ fun _cloud ->
+  let tezt_cloud = Env.tezt_cloud in
+  let ip = Cli.get_string_opt "ip" in
+  match ip with
+  | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
+  | Some ip ->
+      let* () = Gcloud.DNS.remove ~tezt_cloud ~zone:"tezt-cloud" ~ip in
+      unit
+
 let register ~tags =
   register_docker_push ~tags ;
   register_docker_build ~tags ;
@@ -116,4 +146,6 @@ let register ~tags =
   register_clean_up_vms ~tags ;
   register_list_vms ~tags ;
   register_create_dns_zone ~tags ;
-  register_describe_dns_zone ~tags
+  register_describe_dns_zone ~tags ;
+  register_dns_add ~tags ;
+  register_dns_remove ~tags
