@@ -75,6 +75,8 @@ val no_max_run_duration : bool
 
 val dns_domain : string option
 
+val dns : bool
+
 val init : unit -> unit Lwt.t
 
 val project_id : unit -> string Lwt.t

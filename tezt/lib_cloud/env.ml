@@ -66,6 +66,8 @@ let no_max_run_duration = Cli.no_max_run_duration
 
 let dns_domain = Cli.dns_domain
 
+let dns = Cli.dns
+
 let docker_image =
   (* In localhost mode, we don't want to interact with GCP. The image is taken
      locally. *)

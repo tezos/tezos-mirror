@@ -66,7 +66,14 @@ let tezt_source =
   {
     job_name = "tezt_metrics";
     metric_path = "/metrics.txt";
-    targets = [{address = "localhost"; port = 8080; app_name = "tezt"}];
+    targets =
+      [
+        {
+          address = "localhost";
+          port = (if Env.mode = `Orchestrator then 80 else 8080);
+          app_name = "tezt";
+        };
+      ];
   }
 
 let config ~scrape_interval sources =

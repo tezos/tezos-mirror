@@ -93,6 +93,14 @@ let shutdown ?exn t =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
   in
   let* () =
+    if Env.dns then
+      Gcloud.DNS.remove
+        ~tezt_cloud:Env.tezt_cloud
+        ~zone:"tezt-cloud"
+        ~ip:(Proxy.get_agent t.agents |> Agent.point |> fst)
+    else Lwt.return_unit
+  in
+  let* () =
     Option.fold
       ~none:Lwt.return_unit
       ~some:(Deployement.terminate ?exn)
@@ -223,11 +231,17 @@ let attach agent =
     let* () = eof in
     Log.info "Detach from the proxy process." ;
     if !has_sigint then on_sigint
-    else (
-      Log.info
-        "Deployement website can be accessed here: http://%s:8080"
-        (Agent.point agent |> fst) ;
-      Lwt.return_unit)
+    else
+      let* uri =
+        if Env.dns then
+          let* domain =
+            Gcloud.DNS.get_domain ~tezt_cloud:Env.tezt_cloud ~zone:"tezt-cloud"
+          in
+          Lwt.return (Format.asprintf "http://%s" domain)
+        else Lwt.return (Format.asprintf "http://%s" (Agent.point agent |> fst))
+      in
+      Log.info "Deployement website can be accessed here: %s" uri ;
+      Lwt.return_unit
   in
   Log.Style.set_prefix Log.Style.Hidden ;
   Log.Style.set_timestamp Log.Style.Hidden ;

@@ -134,6 +134,11 @@ module DNS = struct
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "execute"; "--zone"; zone]
+
+    let abort ~zone () =
+      Process.run
+        "gcloud"
+        ["dns"; "record-sets"; "transaction"; "abort"; "--zone"; zone]
   end
 
   let get_domain ~tezt_cloud ~zone =
@@ -153,15 +158,21 @@ module DNS = struct
 
   let add ~tezt_cloud ~zone ~ip =
     let* domain = get_domain ~tezt_cloud ~zone in
-    let* () = Transaction.start ~zone () in
-    let* () = Transaction.add ~domain ~zone ~ip () in
-    let* () = Transaction.execute ~zone () in
-    unit
+    Lwt.catch
+      (fun () ->
+        let* () = Transaction.start ~zone () in
+        let* () = Transaction.add ~domain ~zone ~ip () in
+        let* () = Transaction.execute ~zone () in
+        unit)
+      (fun _ -> Transaction.abort ~zone ())
 
   let remove ~tezt_cloud ~zone ~ip =
     let* domain = get_domain ~tezt_cloud ~zone in
-    let* () = Transaction.start ~zone () in
-    let* () = Transaction.remove ~domain ~zone ~ip () in
-    let* () = Transaction.execute ~zone () in
-    unit
+    Lwt.catch
+      (fun () ->
+        let* () = Transaction.start ~zone () in
+        let* () = Transaction.remove ~domain ~zone ~ip () in
+        let* () = Transaction.execute ~zone () in
+        unit)
+      (fun _ -> Transaction.abort ~zone ())
 end

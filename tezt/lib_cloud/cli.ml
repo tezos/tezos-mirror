@@ -202,3 +202,11 @@ let dns_domain =
     ~long:"dns-domain"
     ~description:"DNS domain to use for the website"
     ()
+
+let dns =
+  Clap.flag
+    ~section
+    ~set_long:"dns"
+    ~unset_long:"no-dns"
+    ~description:"Associate a domain name with the website"
+    (proxy && website)

@@ -1543,6 +1543,7 @@ let benchmark () =
         Format.asprintf
           "src/%s/parameters/mainnet-parameters.json"
           (Protocol.directory configuration.protocol);
+        "evm_kernel.wasm";
       ]
     ~__FILE__
     ~title:"DAL node benchmark"

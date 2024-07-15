@@ -91,3 +91,6 @@ val tezt_cloud : string option
 
 (** DNS domain to use for the website. *)
 val dns_domain : string option
+
+(** Associate a DNS domain to the website when the proxy mode is used. *)
+val dns : bool

@@ -179,10 +179,21 @@ module Remote = struct
          configurations. *)
       order_agents (List.concat agents) configurations
     in
-    if proxy then
-      let* agent = deploy_proxy () in
-      Lwt.return {agents = agent :: agents}
-    else Lwt.return {agents}
+    let* t =
+      if proxy then
+        let* agent = deploy_proxy () in
+        let* () =
+          if Env.dns then
+            Gcloud.DNS.add
+              ~tezt_cloud:Env.tezt_cloud
+              ~zone:"tezt-cloud"
+              ~ip:(Agent.point agent |> fst)
+          else Lwt.return_unit
+        in
+        Lwt.return {agents = agent :: agents}
+      else Lwt.return {agents}
+    in
+    Lwt.return t
 
   let agents t = t.agents
 
