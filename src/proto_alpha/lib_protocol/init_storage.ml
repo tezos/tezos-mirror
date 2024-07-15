@@ -209,14 +209,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        (* Adaptive Issuance-related migrations from Oxford to P. *)
-        (* We usually clear the table at the end of the cycle but the migration
-           can happen in the middle of the cycle, so we clear it here.
-           Possible consequence: the slashing history could be inconsistent with
-           the pending denunciations, i.e., there could be unstaked_frozen_deposits
-           that are not slashed whereas unstake_requests are slashed. *)
-        let*! ctxt = Pending_denunciations_storage.clear ctxt in
-        let*! ctxt = Raw_context.remove ctxt ["last_snapshot"] in
         return (ctxt, [])
   in
   let* ctxt =
