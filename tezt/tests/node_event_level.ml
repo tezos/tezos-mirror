@@ -235,7 +235,12 @@ let test_debug_level_misc =
    Note: this event has level "info", so the node needs to have event
    level set to either "debug" or "info" for such an event to exist.
 *)
-let wait_for_set_head node = Node.wait_for node "set_head.v0" (fun _ -> Some ())
+let wait_for_set_head node =
+  let event =
+    if Node.rpc_external node then "store_synchronized_on_head.v0"
+    else "set_head.v0"
+  in
+  Node.wait_for node event (fun _ -> Some ())
 
 (* Event handler that ensures there is no "set_head.v0" event (this event has
    level "info", so should not happen for nodes of event level "notice").

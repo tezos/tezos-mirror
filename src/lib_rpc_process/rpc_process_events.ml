@@ -102,7 +102,7 @@ let store_synchronized_on_head =
     ~section
     ~name:"store_synchronized_on_head"
     ~msg:"Store synchronized on head {hash} ({level})"
-    ~level:Info
+    ~level:Notice
     ~pp1:Block_hash.pp_short
     ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
