@@ -13,6 +13,7 @@ members = [
     "crates/sequencer",
     "crates/bundler",
     "crates/types",
+    "crates/keyholder"
 ]
 
 [workspace.package]
