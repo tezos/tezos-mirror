@@ -365,7 +365,10 @@ let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
         ~hooks
         ~burn_cap:(Tez.of_int 10)
         ~rollup:sc_rollup_address
-        ~src:Constant.bootstrap1.alias
+          (* Execute with bootstrap5 as tests in general use bootstrap1 for the
+             rollup node operators. We might break the 1M rule if we use
+             the same key. *)
+        ~src:Constant.bootstrap5.alias
         ~commitment_hash
         ~proof
         client
