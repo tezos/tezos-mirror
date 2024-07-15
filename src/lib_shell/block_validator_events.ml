@@ -149,6 +149,17 @@ let validation_failure =
     ("worker_status", Worker_types.request_status_encoding)
     ("errors", Tezos_rpc.Error.encoding)
 
+let validation_canceled =
+  declare_2
+    ~section
+    ~name:"validation_canceled"
+    ~level:Info
+    ~msg:"validation of block {block} canceled, {worker_status}"
+    ~pp1:Block_hash.pp
+    ~pp2:Worker_types.pp_status
+    ("block", Block_hash.encoding)
+    ("worker_status", Worker_types.request_status_encoding)
+
 let commit_block_failure =
   declare_3
     ~section

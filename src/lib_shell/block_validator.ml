@@ -459,7 +459,7 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
         match errs with
         | [Canceled] ->
             (* Ignore requests cancelation *)
-            Lwt.return_unit
+            Events.(emit validation_canceled) (view.block, st)
         | errs -> Events.(emit validation_failure) (view.block, st, errs)
       in
       (* Keep the worker alive. *)
@@ -533,7 +533,7 @@ let on_completion :
           match errs with
           | [Canceled] ->
               (* Ignore requests cancellation *)
-              Lwt.return_unit
+              Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () =
                 Events.(emit application_failure_after_validation)
@@ -550,7 +550,7 @@ let on_completion :
           match errs with
           | [Canceled] ->
               (* Ignore requests cancellation *)
-              Lwt.return_unit
+              Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () = Events.(emit validation_failure) (v.block, st, errs) in
               let* () = check_and_quit_on_irmin_errors errs in
@@ -564,7 +564,7 @@ let on_completion :
           match errs with
           | [Canceled] ->
               (* Ignore requests cancellation *)
-              Lwt.return_unit
+              Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () =
                 Events.(emit commit_block_failure) (v.block, st, errs)
