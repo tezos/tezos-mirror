@@ -205,6 +205,16 @@ module Encodings = struct
       (opt "first_published_at_level" int32)
       (opt "published_at_level" int32)
 
+  let outbox =
+    obj2
+      (req "outbox_level" int32)
+      (req
+         "messages"
+         (list
+            (obj2
+               (req "message_index" int31)
+               (opt "message" Outbox_message.summary_encoding))))
+
   let queued_message =
     obj2 (req "id" L2_message.Id.encoding) (req "message" L2_message.encoding)
 
@@ -765,6 +775,20 @@ module Local = struct
       ~output:
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "commitments" /: Arg.commitment_hash)
+
+  let outbox_pending_executable =
+    Tezos_rpc.Service.get_service
+      ~description:"Pending outbox messages which can be executed"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.list Encodings.outbox)
+      (path / "outbox" / "pending" / "executable")
+
+  let outbox_pending_unexecutable =
+    Tezos_rpc.Service.get_service
+      ~description:"Pending outbox messages which cannot yet be executed"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.list Encodings.outbox)
+      (path / "outbox" / "pending" / "unexecutable")
 
   let gc_info =
     Tezos_rpc.Service.get_service
