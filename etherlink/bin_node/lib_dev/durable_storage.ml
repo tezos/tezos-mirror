@@ -12,6 +12,11 @@ module type READER = sig
     ?block:Ethereum_types.Block_parameter.extended ->
     Durable_storage_path.path ->
     bytes option tzresult Lwt.t
+
+  val subkeys :
+    ?block:Ethereum_types.Block_parameter.extended ->
+    Durable_storage_path.path ->
+    string list tzresult Lwt.t
 end
 
 module Make (Reader : READER) = struct

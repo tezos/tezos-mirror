@@ -688,6 +688,20 @@ module Durable_state_value = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Durable_state_subkeys = struct
+  type input = Durable_storage_path.path
+
+  type output = string list
+
+  let input_encoding = Data_encoding.string
+
+  let output_encoding = Data_encoding.(list string)
+
+  let method_ = "stateSubkeys"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_max_priority_fee_per_gas = struct
   open Ethereum_types
 
@@ -827,6 +841,7 @@ let supported_methods : (module METHOD) list =
     (module Produce_block);
     (module Produce_proposal);
     (module Durable_state_value);
+    (module Durable_state_subkeys);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
     (module Trace_transaction);

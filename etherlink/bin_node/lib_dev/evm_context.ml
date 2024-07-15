@@ -1583,6 +1583,13 @@ let inspect ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest))
   let*! res = Evm_state.inspect evm_state path in
   return res
 
+let inspect_subkeys
+    ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) path =
+  let open Lwt_result_syntax in
+  let* evm_state = get_evm_state block in
+  let*! res = Evm_state.subkeys evm_state path in
+  return res
+
 let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
 let blueprint level = worker_wait_for_request (Blueprint {level})

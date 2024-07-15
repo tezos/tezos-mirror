@@ -272,6 +272,11 @@ module Durable_state_value :
     with type input = Durable_storage_path.path
      and type output = Bytes.t option
 
+module Durable_state_subkeys :
+  METHOD
+    with type input = Durable_storage_path.path
+     and type output = string list
+
 module Eth_max_priority_fee_per_gas :
   METHOD with type input = unit and type output = Ethereum_types.quantity
 

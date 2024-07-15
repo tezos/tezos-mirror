@@ -17,6 +17,8 @@ module MakeBackend (Ctxt : sig
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
     let read ?block path = Evm_context.inspect ?block path
+
+    let subkeys ?block path = Evm_context.inspect_subkeys ?block path
   end
 
   module TxEncoder = struct
