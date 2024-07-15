@@ -64,6 +64,10 @@ let of_mutez x =
 
 let to_mutez = Tez.to_mutez
 
+let to_repr x = Tez_repr.of_mutez_exn @@ to_mutez x
+
+let of_repr x = of_mutez @@ Tez_repr.to_mutez x
+
 (* Should be the same as Tez.max_mutez *)
 let max_tez =
   match Tez.of_mutez Int64.max_int with None -> assert false | Some p -> p
