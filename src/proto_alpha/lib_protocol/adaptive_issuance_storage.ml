@@ -62,13 +62,20 @@ let () =
 
 let launch_cycle ctxt = Storage.Adaptive_issuance.Activation.get ctxt
 
+(* Doesn't fail when [i < 0]. In practice, this will always be called
+   with a non-negative [i] anyway, but if we ever have negative
+   constants somehow, it's better to treat e.g. a negative delay or
+   transition period as null than outright fail. *)
+let safe_cycle_add c i = if Compare.Int.(i >= 0) then Cycle_repr.add c i else c
+
 let check_determined_cycle ctxt cycle =
   let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
     let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
     let cycles_delay = Constants_storage.issuance_modification_delay ctxt in
     fail_unless
-      Cycle_repr.(ctxt_cycle <= cycle && cycle <= add ctxt_cycle cycles_delay)
+      Cycle_repr.(
+        ctxt_cycle <= cycle && cycle <= safe_cycle_add ctxt_cycle cycles_delay)
       (Undetermined_issuance_coeff_for_cycle cycle)
   else return_unit
 
@@ -115,11 +122,12 @@ let compute_extremum ~launch_cycle ~new_cycle ~initial_period ~transition_period
       initial
   | Some launch_cycle ->
       let transition_period = transition_period + 1 in
-      assert (Compare.Int.(transition_period > 0)) ;
-      let t1 = Cycle_repr.add launch_cycle initial_period in
-      let t2 = Cycle_repr.add t1 transition_period in
+      let t1 = safe_cycle_add launch_cycle initial_period in
+      let t2 = safe_cycle_add t1 transition_period in
       if Cycle_repr.(new_cycle <= t1) then initial
-      else if Cycle_repr.(new_cycle >= t2) then final
+      else if
+        Compare.Int.(transition_period <= 0) || Cycle_repr.(new_cycle >= t2)
+      then final
       else
         let t = Cycle_repr.diff new_cycle t1 |> Q.of_int32 in
         Q.(((final - initial) * t / of_int transition_period) + initial)
@@ -271,7 +279,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let modification_delay =
       Constants_storage.issuance_modification_delay ctxt
     in
-    let for_cycle = Cycle_repr.add new_cycle modification_delay in
+    let for_cycle = safe_cycle_add new_cycle modification_delay in
     let before_for_cycle = Cycle_repr.pred for_cycle in
     let* total_supply = Storage.Contract.Total_supply.get ctxt in
     let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
@@ -410,7 +418,7 @@ let update_ema ctxt ~vote =
           (* set the feature to activate in a few cycles *)
           let current_cycle = (Level_storage.current ctxt).cycle in
           let delay = adaptive_issuance_activation_delay ctxt in
-          let cycle = Cycle_repr.add current_cycle delay in
+          let cycle = safe_cycle_add current_cycle delay in
           let+ ctxt = activate ctxt ~cycle in
           (ctxt, Some cycle)
   in
