@@ -49,7 +49,9 @@ let build_rpc_directory ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~dal_config
     Tezos_rpc.Directory.empty
-  |> register Config_services.history_mode (fun () () () ->
+  |> register
+       Config_services.History_mode_services.history_mode
+       (fun () () () ->
          let chain_store = Store.main_chain_store store in
          let history_mode =
            match Store.Chain.history_mode chain_store with

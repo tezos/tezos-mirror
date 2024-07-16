@@ -55,15 +55,17 @@ module Network : sig
     ([`GET], unit, unit, unit, unit, Dal_config.t) Tezos_rpc.Service.t
 end
 
-val history_mode :
-  ( [`GET],
-    unit,
-    unit,
-    unit,
-    unit,
-    History_mode.t * int option,
-    error trace )
-  Tezos_rpc.Service.raw
+module History_mode_services : sig
+  val history_mode :
+    ( [`GET],
+      unit,
+      unit,
+      unit,
+      unit,
+      History_mode.t * int option,
+      error trace )
+    Tezos_rpc.Service.raw
+end
 
 module Logging : sig
   val configure :
@@ -80,3 +82,6 @@ val user_activated_upgrades :
   #Tezos_rpc.Context.simple -> User_activated.upgrades tzresult Lwt.t
 
 val dal_config : #Tezos_rpc.Context.simple -> Dal_config.t tzresult Lwt.t
+
+val history_mode :
+  #Tezos_rpc.Context.simple -> (History_mode.t * int option) tzresult Lwt.t
