@@ -39,6 +39,18 @@ let kernel_cache = Kernel_cache.create 2
 let load_parse_module store key durable =
   let open Lwt.Syntax in
   let* kernel = Durable.find_value_exn durable key in
+  (* We use the WASM PVM to decode the kernel, not for using the result,
+     but to ensure the absence of floats.
+
+     If the call fails, an exception is raised, which is later catch by the
+     Fast Exec. This effectively ensures WASMER will never be used with
+     kernels including floats. *)
+  let* _ast =
+    Tezos_webassembly_interpreter.Decode.decode
+      ~allow_floats:false
+      ~name:"boot.wasm"
+      ~bytes:kernel
+  in
   let+ kernel = Lazy_containers.Chunked_byte_vector.to_string kernel in
   Wasmer.Module.(create store Binary kernel)
 
