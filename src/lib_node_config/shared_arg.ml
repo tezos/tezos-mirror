@@ -71,6 +71,7 @@ type t = {
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
   context_pruning : Storage_maintenance.context_pruning option;
+  storage_maintenance_delay : Storage_maintenance.delay;
 }
 
 type error +=
@@ -192,7 +193,7 @@ let wrap data_dir config_file network connections max_download_speed
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
     max_active_rpc_connections metrics_addr operation_metadata_size_limit
-    context_pruning =
+    context_pruning storage_maintenance_delay =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -242,6 +243,7 @@ let wrap data_dir config_file network connections max_download_speed
     metrics_addr;
     operation_metadata_size_limit;
     context_pruning;
+    storage_maintenance_delay;
   }
 
 let process_command run =
@@ -758,7 +760,7 @@ module Term = struct
     in
     let parse str =
       match str with
-      | "disabled" -> `Ok Disabled
+      | "disabled" -> `Ok (Disabled : Storage_maintenance.context_pruning)
       | "enabled" -> `Ok Enabled
       | _ ->
           `Error
@@ -768,6 +770,19 @@ module Term = struct
       value
       & opt (some (parse, pp_context_pruning)) None
       & info ~docs ~doc ["context-pruning"])
+
+  let storage_maintenance_delay =
+    let open Storage_maintenance in
+    let doc = "Configures the storage maintenance delays" in
+    let get_storage_maintenance_delay_arg str =
+      match str with
+      | "disabled" -> `Ok Disabled
+      | _ -> `Error "storage-maintenance-delay only supports \"disabled\" mode"
+    in
+    Arg.(
+      value
+      & opt (get_storage_maintenance_delay_arg, pp_delay) Disabled
+      & info ~docs ~doc ["storage-maintenance-delay"])
 
   (* Args. *)
 
@@ -783,7 +798,7 @@ module Term = struct
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
     $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
-    $ context_pruning
+    $ context_pruning $ storage_maintenance_delay
 end
 
 let read_config_file args =
@@ -932,6 +947,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     metrics_addr;
     operation_metadata_size_limit;
     context_pruning;
+    storage_maintenance_delay;
   } =
     args
   in
@@ -1090,6 +1106,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?history_mode
     ?latency
     ?context_pruning
+    ~storage_maintenance_delay
     cfg
 
 let read_and_patch_config_file ?may_override_network ?emit

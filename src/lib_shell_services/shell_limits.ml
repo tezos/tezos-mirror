@@ -247,6 +247,8 @@ let chain_validator_limits_encoding =
 
 let default_storage_maintenance_context_pruning = Storage_maintenance.Enabled
 
+let default_storage_maintenance_delay = Storage_maintenance.Disabled
+
 type limits = {
   block_validator_limits : block_validator_limits;
   prevalidator_limits : prevalidator_limits;
@@ -254,6 +256,7 @@ type limits = {
   chain_validator_limits : chain_validator_limits;
   history_mode : History_mode.t option;
   context_pruning : Storage_maintenance.context_pruning option;
+  storage_maintenance_delay : Storage_maintenance.delay option;
 }
 
 let default_limits =
@@ -264,6 +267,7 @@ let default_limits =
     chain_validator_limits = default_chain_validator_limits;
     history_mode = None;
     context_pruning = Some Enabled;
+    storage_maintenance_delay = Some Disabled;
   }
 
 let limits_encoding =
@@ -276,19 +280,22 @@ let limits_encoding =
            chain_validator_limits;
            history_mode;
            context_pruning;
+           storage_maintenance_delay;
          } ->
       ( peer_validator_limits,
         block_validator_limits,
         prevalidator_limits,
         chain_validator_limits,
         history_mode,
-        context_pruning ))
+        context_pruning,
+        storage_maintenance_delay ))
     (fun ( peer_validator_limits,
            block_validator_limits,
            prevalidator_limits,
            chain_validator_limits,
            history_mode,
-           context_pruning ) ->
+           context_pruning,
+           storage_maintenance_delay ) ->
       {
         peer_validator_limits;
         block_validator_limits;
@@ -296,8 +303,9 @@ let limits_encoding =
         chain_validator_limits;
         history_mode;
         context_pruning;
+        storage_maintenance_delay;
       })
-    (obj6
+    (obj7
        (dft
           "peer_validator"
           peer_validator_limits_encoding
@@ -315,4 +323,5 @@ let limits_encoding =
           chain_validator_limits_encoding
           default_chain_validator_limits)
        (opt "history_mode" History_mode.encoding)
-       (opt "context_pruning" Storage_maintenance.context_pruning_encoding))
+       (opt "context_pruning" Storage_maintenance.context_pruning_encoding)
+       (opt "storage_maintenance_delay" Storage_maintenance.delay_encoding))
