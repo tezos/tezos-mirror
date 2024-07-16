@@ -31,6 +31,7 @@ type error +=
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
   | Cryptobox_initialisation_failed of string
   | Not_enough_history of {stored_levels : int; minimal_levels : int}
+  | Not_enough_l1_history of {stored_cycles : int; minimal_cycles : int}
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
 
@@ -113,6 +114,29 @@ let () =
       | _ -> None)
     (fun (stored_levels, minimal_levels) ->
       Not_enough_history {stored_levels; minimal_levels}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.not_enough_l1_history"
+    ~title:"Not enough L1 history"
+    ~description:"The L1 node does not store sufficiently many cycles"
+    ~pp:(fun ppf (stored_cycles, minimal_cycles) ->
+      Format.fprintf
+        ppf
+        "The L1 node's history mode stores block data for %d cycles, but the \
+         minimum required by the DAL node is %d cycles. Increase the number of \
+         cycles the L1 node stores using the CLI argument `--history-mode \
+         rolling:%d`."
+        stored_cycles
+        minimal_cycles
+        minimal_cycles)
+    Data_encoding.(
+      obj2 (req "stored_cycles" int31) (req "minimal_cycles" int31))
+    (function
+      | Not_enough_l1_history {stored_cycles; minimal_cycles} ->
+          Some (stored_cycles, minimal_cycles)
+      | _ -> None)
+    (fun (stored_cycles, minimal_cycles) ->
+      Not_enough_l1_history {stored_cycles; minimal_cycles})
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 

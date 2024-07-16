@@ -816,6 +816,54 @@ let check_history_mode config profile_ctxt proto_parameters =
       else return_unit
   | Rolling {blocks = `Auto} | Full -> return_unit
 
+(* This function checks the L1 node stores enough block data for the DAL node to
+   function correctly. *)
+let check_l1_history_mode profile_ctxt cctxt proto_parameters =
+  let open Lwt_result_syntax in
+  let* l1_history_mode =
+    let* l1_mode, bpc_opt = Config_services.history_mode cctxt in
+    (* Note: For the DAL node it does not matter if the L1 node is in Full or
+       Rolling mode, because the DAL node is not interested in blocks outside of
+       a certain time window. *)
+    return
+    @@
+    match (l1_mode, bpc_opt) with
+    | Archive, _ -> `L1_archive
+    | Full None, None
+    | Rolling None, None
+    | Full (Some _), None
+    | Rolling (Some _), None
+    | Full None, Some _
+    | Rolling None, Some _ ->
+        (* unreachable cases, at least for now *) assert false
+    | Full (Some additional_cycles), Some blocks_preservation_cycles
+    | Rolling (Some additional_cycles), Some blocks_preservation_cycles ->
+        `L1_rolling (additional_cycles.offset + blocks_preservation_cycles)
+  in
+  let handle ~dal_blocks ~l1_cycles =
+    let blocks_per_cycle =
+      Int32.to_int proto_parameters.Dal_plugin.blocks_per_cycle
+    in
+    let dal_cycles = dal_blocks / blocks_per_cycle in
+    let minimal_cycles =
+      if dal_blocks mod blocks_per_cycle = 0 then dal_cycles else 1 + dal_cycles
+    in
+    if l1_cycles < minimal_cycles then
+      tzfail
+      @@ Errors.Not_enough_l1_history
+           {stored_cycles = l1_cycles; minimal_cycles}
+    else return_unit
+  in
+  match l1_history_mode with
+  | `L1_archive -> return_unit
+  | `L1_rolling c ->
+      let b =
+        Profile_manager.get_attested_data_default_store_period
+          profile_ctxt
+          proto_parameters
+      in
+      handle ~dal_blocks:b ~l1_cycles:c
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -942,10 +990,11 @@ let run ~data_dir ~configuration_override =
   in
   (* First wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
-  (* Check the DAL node's history mode. *)
+  (* Check the DAL node's and L1 node's history mode. *)
   let* ((_, _, proto_parameters) as _plugin_info) = get_head_plugin cctxt in
   let* profile_ctxt = Handler.build_profile_context config in
   let* () = check_history_mode config profile_ctxt proto_parameters in
+  let* () = check_l1_history_mode profile_ctxt cctxt proto_parameters in
   let*! crawler =
     let open Constants in
     Crawler.start
