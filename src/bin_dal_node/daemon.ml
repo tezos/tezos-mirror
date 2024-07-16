@@ -332,9 +332,9 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  let should_store_skip_list_cells ctxt dal_constants =
+  let supports_refutations ctxt =
     let profile = Node_context.get_profile_ctxt ctxt in
-    Profile_manager.should_store_skip_list_cells profile dal_constants
+    Profile_manager.supports_refutations profile
 
   (* This function removes from the store the given slot and its
      shards. In case of error, this function emits a warning instead
@@ -379,7 +379,7 @@ module Handler = struct
            let* () =
              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
                 We may want to remove this check. *)
-             if should_store_skip_list_cells ctxt proto_parameters then
+             if supports_refutations ctxt then
                let* res =
                  Skip_list_cells_store.remove
                    store.skip_list_cells
@@ -479,7 +479,7 @@ module Handler = struct
       (block_info : block_info) block_level
       (module Plugin : Dal_plugin.T with type block_info = block_info) =
     let open Lwt_result_syntax in
-    if should_store_skip_list_cells ctxt dal_constants then
+    if supports_refutations ctxt then
       let* cells_of_level =
         let pred_published_level =
           Int32.sub

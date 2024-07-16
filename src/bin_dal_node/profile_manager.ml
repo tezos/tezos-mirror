@@ -163,6 +163,12 @@ let get_profiles t =
         "Profile_manager.add_operator_profiles: random observer should have a \
          slot index assigned at this point"
 
+let supports_refutations t =
+  match get_profiles t with
+  | Random_observer -> true
+  | Operator op -> Operator_profile.(has_producer op || has_observer op)
+  | Bootstrap -> false
+
 (* Returns the period relevant for a refutation game. With a block time of 10
    seconds, this corresponds to about 42 days. *)
 let get_refutation_game_period proto_parameters =
@@ -180,7 +186,7 @@ let get_attested_data_default_store_period t proto_parameters =
     2 * get_refutation_game_period proto_parameters
   in
   let attestation_period = 2 * proto_parameters.attestation_lag in
-  let should_store_skip_list_cells, period =
+  let supports_refutations_bis, period =
     match get_profiles t with
     (* For observer & Producer, we keep the data long enough for rollups to work
        correctly; for attester & other profiles, we only want to keep the data
@@ -197,13 +203,12 @@ let get_attested_data_default_store_period t proto_parameters =
         (is_not_attester_only, period)
     | Bootstrap -> (false, attestation_period)
   in
-  (should_store_skip_list_cells, period)
+  (* This is just to keep this function synced with {!supports_refutations}. *)
+  assert (supports_refutations_bis = supports_refutations t) ;
+  period
 
 let get_attested_data_default_store_period t proto_parameters =
-  snd @@ get_attested_data_default_store_period t proto_parameters
-
-and should_store_skip_list_cells t proto_parameters =
-  fst @@ get_attested_data_default_store_period t proto_parameters
+  get_attested_data_default_store_period t proto_parameters
 
 let profiles_filename = "profiles.json"
 
