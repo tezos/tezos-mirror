@@ -27,6 +27,8 @@ open Protocol
 open Alpha_context
 open Baking_state
 
+(** {2 Action types}  *)
+
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
@@ -66,24 +68,10 @@ type t = action
 
 val pp_action : Format.formatter -> action -> unit
 
-val generate_seed_nonce_hash :
-  Baking_configuration.nonce_config ->
-  consensus_key ->
-  Level.t ->
-  (Nonce_hash.t * Nonce.t) option tzresult Lwt.t
+(** {2 Functions used by the baker} *)
 
 val prepare_block :
   global_state -> block_to_bake -> prepared_block tzresult Lwt.t
-
-val inject_block :
-  ?force_injection:bool ->
-  ?asynchronous:bool ->
-  state ->
-  prepared_block ->
-  state tzresult Lwt.t
-
-val may_get_dal_content :
-  state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
 
 val authorized_consensus_votes :
   global_state ->
@@ -96,6 +84,12 @@ val forge_and_sign_consensus_vote :
   unsigned_consensus_vote ->
   signed_consensus_vote tzresult Lwt.t
 
+val compute_round : proposal -> Round.round_durations -> Round.t tzresult
+
+val perform_action : state -> t -> state tzresult Lwt.t
+
+(** {2 Functions only needed for the baking_lib}  *)
+
 val sign_consensus_votes :
   global_state ->
   unsigned_consensus_vote_batch ->
@@ -104,15 +98,7 @@ val sign_consensus_votes :
 val inject_consensus_votes :
   state -> signed_consensus_vote_batch -> unit tzresult Lwt.t
 
-val prepare_waiting_for_quorum :
-  state -> int * (slot:Slot.t -> int option) * Operation_worker.candidate
-
-val start_waiting_for_preattestation_quorum : state -> unit Lwt.t
-
-val start_waiting_for_attestation_quorum : state -> unit Lwt.t
-
 val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 
-val compute_round : proposal -> Round.round_durations -> Round.t tzresult
-
-val perform_action : state -> t -> state tzresult Lwt.t
+val may_get_dal_content :
+  state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
