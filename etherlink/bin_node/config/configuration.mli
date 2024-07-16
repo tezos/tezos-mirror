@@ -39,20 +39,9 @@ type blueprints_publisher_config = {
           again. *)
 }
 
-type sqlite_journal_mode =
-  | Delete
-      (** Default journal mode of SQLite3. Slightly better performances, but not
-          concurrent friendly. *)
-  | Wal
-      (** Write-ahead log. Concurrent friendly way to implement transactions
-          and rollbacks. *)
-
-val sqlite_journal_mode_encoding : sqlite_journal_mode Data_encoding.t
-
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
-  sqlite_journal_mode : sqlite_journal_mode;
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
 }

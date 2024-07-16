@@ -347,8 +347,6 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~fail_on_missing_blueprint:false
-      ~sqlite_journal_mode:
-        (`Force config.experimental_features.sqlite_journal_mode)
       ~store_perm:`Read_write
       ()
   in

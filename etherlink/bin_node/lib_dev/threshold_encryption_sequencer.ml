@@ -206,8 +206,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         threshold_encryption_sequencer_config.preimages_endpoint
       ~smart_rollup_address
       ~fail_on_missing_blueprint:true
-      ~sqlite_journal_mode:
-        (`Force configuration.experimental_features.sqlite_journal_mode)
       ~store_perm:`Read_write
       ()
   in

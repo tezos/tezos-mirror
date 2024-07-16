@@ -176,9 +176,8 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
-    ?(drop_duplicate_when_injection = true) ?history_mode ~enable_dal ?dal_slots
-    protocol =
+    ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
+    ?history_mode ~enable_dal ?dal_slots protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -241,7 +240,6 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   let private_rpc_port = Some (Port.fresh ()) in
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
-      ~wal_sqlite_journal_mode
       ~drop_duplicate_when_injection
     (* When adding new experimental feature please make sure it's a
        good idea to activate it for all test or not. *)

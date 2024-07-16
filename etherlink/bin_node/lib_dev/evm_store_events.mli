@@ -22,5 +22,3 @@ val migrations_from_the_future : applied:int -> known:int -> unit Lwt.t
     is missing l1 latest level in its store. This means the evm node
     can't catch up on evm events and might misses some. *)
 val no_l1_latest_level_to_catch_up : unit -> unit Lwt.t
-
-val journal_mode_updated : Configuration.sqlite_journal_mode -> unit Lwt.t

@@ -46,14 +46,6 @@ let no_l1_latest_level_to_catch_up =
     ~level:Warning
     ()
 
-let journal_mode_updated =
-  declare_1
-    ~section
-    ~name:"journal_mode_updated"
-    ~msg:"SQLite journal mode updated to match configuration ({mode})"
-    ~level:Notice
-    ("mode", Configuration.sqlite_journal_mode_encoding)
-
 let init_store () = emit init_store ()
 
 let applied_migration name = emit applied_migration name
@@ -62,5 +54,3 @@ let migrations_from_the_future ~applied ~known =
   emit migrations_from_the_future (applied, known)
 
 let no_l1_latest_level_to_catch_up () = emit no_l1_latest_level_to_catch_up ()
-
-let journal_mode_updated mode = emit journal_mode_updated mode
