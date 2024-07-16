@@ -109,9 +109,6 @@ Baker
   parent block. This is done to avoid having consensus operation branched on
   block that are not part of the canonical chain anymore.(MR :gl:`!13619`)
 
-- Enforce some Tenderbake invariant's at consensus operations injection. (MR
-  :gl:`!`)
-
 Accuser
 -------
 

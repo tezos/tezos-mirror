@@ -3,6 +3,14 @@
 Changelog
 '''''''''
 
+Version 20.2
+============
+
+Baker
+-----
+
+- Fixes a corner-case implementation bug. In an unlikely but plausible scenario, the baker binary did not behave as expected by the Tenderbake algorithm, and the Tezos protocol. This bugfix reinforces Tenderbake invariants when injecting consensus operations (MR :gl:`!14134`)
+
 Version 20.1
 ============
 

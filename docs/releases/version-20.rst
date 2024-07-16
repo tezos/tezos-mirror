@@ -1,4 +1,4 @@
-Version 20.1
+Version 20.2
 ============
 
 Version 20 contains a new version (V12) of the protocol environment,
@@ -28,7 +28,11 @@ Octez v20.1 also includes minor fixes to Smart Rollup nodes addressing issues ob
 - correctly handles constant updates at protocol activation;
 - features a new command ``repair commitments`` to recompute commitments with the correct period if necessary.
 
-Version 20.0 introduced the following changes or new features:
+Octez v20.2 fixes an implementation bug in the baker binary. We found that, under fringe degraded network health conditions, the baker might not behave as expected by the Tenderbake consensus algorithm.
+
+**Even though this scenario is highly unlikely, we still recommend Tezos bakers to upgrade to v20.2.**
+
+Version 20 introduced the following changes or new features:
 
 Node
 ~~~~
@@ -72,14 +76,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v20.1
+  git checkout octez-v20.2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v20.1`` Docker images of Octez.
+If you are using Docker instead, use the ``v20.2`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -108,6 +112,7 @@ For more details, see :ref:`the installation instructions <installing_binaries>`
 Changelog
 ---------
 
+- `Version 20.2 <../CHANGES.html#version-20-2>`_
 - `Version 20.1 <../CHANGES.html#version-20-1>`_
 - `Version 20.0 <../CHANGES.html#version-20-0>`_
 - `Version 20.0~rc1 <../CHANGES.html#version-20-0-rc1>`_
