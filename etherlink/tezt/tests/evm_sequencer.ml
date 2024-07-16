@@ -4681,6 +4681,85 @@ let test_proxy_finalized_view =
        instead" ;
   unit
 
+let test_finalized_block_param =
+  register_both
+    ~time_between_blocks:Nothing
+    ~kernels:
+      [
+        Latest
+        (* This test focuses on a feature that purely relies on the node, it does not makes sense to register it for every protocols *);
+      ]
+    ~tags:["evm"; "finalized_block_param"]
+    ~title:
+      "The finalized block parameter is correctly interpreted by the EVM node"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
+  (* Produce a few EVM blocks *)
+  let* () =
+    repeat 4 @@ fun () ->
+    let* _ = produce_block sequencer in
+    unit
+  in
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
+  in
+  (* Check that the L2 blocks where indeed posted onchain. *)
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+  Check.((sequencer_head.number = 4l) int32)
+    ~error_msg:"Sequencer head should be %R, but is %L instead" ;
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"Sequencer and proxy should have the same head"
+      ()
+  in
+  (* While the blocks were posted onchain, they are not final wrt. the
+     consensus algorithm, so the finalized proxy does not have a head yet.
+
+     We produce both two more L2 blocks and two L1 blocks; the latter will
+     allow to finalized the first four blocks posted earlier. *)
+  let* () =
+    repeat 2 @@ fun () ->
+    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    let* _ = produce_block sequencer in
+    unit
+  in
+  (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
+  in
+  (* We can check the consistency of the various nodes. *)
+  let*@ sequencer_new_head =
+    Rpc.get_block_by_number ~block:"latest" sequencer
+  in
+  let*@ sequencer_finalized_head =
+    Rpc.get_block_by_number ~block:"finalized" sequencer
+  in
+
+  Check.((sequencer_new_head.number = 6l) int32)
+    ~error_msg:"Sequencer head should be %R, but is %L instead" ;
+  Check.((sequencer_finalized_head.number = 4l) int32)
+    ~error_msg:"Sequencer finalized head should be %R, but is %L instead" ;
+
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"Sequencer and proxy should have the same head"
+      ()
+  in
+  let* () =
+    check_block_consistency
+      ~block:`Finalized
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"Sequencer and proxy should have the same head"
+      ()
+  in
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -4744,4 +4823,5 @@ let () =
   test_fa_bridge_feature_flag protocols ;
   test_trace_call protocols ;
   test_patch_kernel protocols ;
-  test_proxy_finalized_view protocols
+  test_proxy_finalized_view protocols ;
+  test_finalized_block_param protocols

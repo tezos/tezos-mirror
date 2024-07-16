@@ -9,6 +9,7 @@ type init_status = Loaded | Created
 
 type head = {
   current_block_hash : Ethereum_types.block_hash;
+  finalized_number : Ethereum_types.quantity;
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
 }

@@ -105,13 +105,14 @@ let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
 let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
 module Block_parameter = struct
-  type t = Number of quantity | Earliest | Latest | Pending
+  type t = Number of quantity | Earliest | Latest | Pending | Finalized
 
   let pp fmt = function
     | Number quantity -> pp_quantity fmt quantity
     | Earliest -> Format.pp_print_string fmt "earliest"
     | Latest -> Format.pp_print_string fmt "latest"
     | Pending -> Format.pp_print_string fmt "pending"
+    | Finalized -> Format.pp_print_string fmt "finalized"
 
   let encoding =
     let open Data_encoding in
@@ -145,6 +146,13 @@ module Block_parameter = struct
            (constant tag)
            (function Pending -> Some () | _ -> None)
            (fun () -> Pending));
+        (let tag = "finalized" in
+         case
+           ~title:tag
+           (Tag 4)
+           (constant tag)
+           (function Finalized -> Some () | _ -> None)
+           (fun () -> Finalized));
       ]
 
   type extended =
