@@ -1102,7 +1102,10 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap_node
       }
   in
   let endpoint = Sc_rollup_node.endpoint sc_rollup_node in
-  let mode = if is_sequencer then sequencer_mode else Evm_node.Proxy in
+  let mode =
+    if is_sequencer then sequencer_mode
+    else Evm_node.Proxy {finalized_view = false}
+  in
   let* evm_node =
     Evm_node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)

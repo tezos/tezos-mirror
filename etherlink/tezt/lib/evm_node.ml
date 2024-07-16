@@ -77,7 +77,7 @@ type mode =
       tx_pool_tx_per_addr_limit : int option;
       sequencer_sidecar_endpoint : string;
     }
-  | Proxy
+  | Proxy of {finalized_view : bool}
 
 module Per_level_map = Map.Make (Int)
 
@@ -113,7 +113,7 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Threshold_encryption_sequencer _ -> true
-  | Observer _ | Threshold_encryption_observer _ | Proxy -> false
+  | Observer _ | Threshold_encryption_observer _ | Proxy _ -> false
 
 let initial_kernel t =
   match t.persistent_state.mode with
@@ -122,7 +122,7 @@ let initial_kernel t =
   | Observer {initial_kernel; _}
   | Threshold_encryption_observer {initial_kernel; _} ->
       initial_kernel
-  | Proxy ->
+  | Proxy _ ->
       Test.fail
         "Wrong argument: [initial_kernel] does not support the proxy node"
 
@@ -131,7 +131,7 @@ let can_apply_blueprint t =
   | Sequencer _ | Threshold_encryption_sequencer _ | Observer _
   | Threshold_encryption_observer _ ->
       true
-  | Proxy -> false
+  | Proxy _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
   let rpc_port =
@@ -430,13 +430,14 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   @@ JSON.as_string_opt
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
+    ?(mode = Proxy {finalized_view = false}) ?data_dir ?rpc_addr ?rpc_port
+    ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
   let new_name () =
     match mode with
-    | Proxy -> "proxy_" ^ fresh_name ()
+    | Proxy _ -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Threshold_encryption_sequencer _ -> "te_sequencer_" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
@@ -488,7 +489,9 @@ let run_args evm_node =
   in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy -> ["run"; "proxy"]
+    | Proxy {finalized_view} ->
+        ["run"; "proxy"]
+        @ Cli_arg.optional_switch "finalized-view" finalized_view
     | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
         ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
         @ Cli_arg.optional_arg
@@ -619,7 +622,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
   in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
+    | Proxy _ -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
     | Sequencer
         {
           initial_kernel = _;
@@ -812,7 +815,7 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
       | Threshold_encryption_sequencer {private_rpc_port = None; _} ->
           Test.fail
             "Threshold encryption sequencer doesn't have a private RPC server"
-      | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
+      | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
       | Threshold_encryption_observer _ ->
           Test.fail

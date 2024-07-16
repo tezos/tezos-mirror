@@ -472,6 +472,14 @@ let read_only_arg =
     ~long:"read-only"
     ()
 
+let finalized_view_arg =
+  Tezos_clic.switch
+    ~doc:
+      "If the flag is set, the node exposes a view of the latest final state \
+       of the rollup, not its current HEAD."
+    ~long:"finalized-view"
+    ()
+
 let restricted_rpcs_arg =
   Tezos_clic.arg
     ~doc:"Restrict methods that matches the given Perl regular expression."
@@ -514,7 +522,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose
-    ~read_only () =
+    ~read_only ~finalized_view () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -532,6 +540,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
       ?restricted_rpcs
+      ~proxy_finalized_view:finalized_view
       ~verbose
       ()
   in
@@ -619,6 +628,7 @@ let proxy_command =
         ?restricted_rpcs
         ~verbose
         ~read_only
+        ~finalized_view:false
         ())
 
 let register_wallet ?password_filename ~wallet_dir () =
@@ -1623,7 +1633,7 @@ let proxy_simple_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in proxy mode."
-    (merge_options common_config_args (args1 read_only_arg))
+    (merge_options common_config_args (args2 read_only_arg finalized_view_arg))
     (prefixes ["run"; "proxy"] @@ stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1641,7 +1651,7 @@ let proxy_simple_command =
              tx_pool_tx_per_addr_limit,
              verbose,
              restricted_rpcs ),
-           read_only )
+           (read_only, finalized_view) )
          () ->
       start_proxy
         ~data_dir
@@ -1660,6 +1670,7 @@ let proxy_simple_command =
         ?restricted_rpcs
         ~verbose
         ~read_only
+        ~finalized_view
         ())
 
 let sequencer_config_args =
