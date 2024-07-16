@@ -102,7 +102,7 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
           inputs_map
       in
       let evaluated_ids = identities evaluations in
-      let ids_keys = Kzg.SMap.bindings evaluated_ids |> List.map fst in
+      let ids_keys = Kzg.SMap.keys evaluated_ids in
       let* _transcript =
         handle_request
           main_pid

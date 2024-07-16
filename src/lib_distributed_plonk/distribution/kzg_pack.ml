@@ -110,7 +110,7 @@ module Kzg_pack_impl = struct
         (fun _ m acc -> SMap.union (fun _ _ x -> Some x) m acc)
         map_map
         SMap.empty
-      |> SMap.bindings |> List.map fst
+      |> SMap.keys
     in
     let poly_keys_list = List.map get_keys answer_list in
     let worker_message = (r, poly_keys_list) in
@@ -136,8 +136,7 @@ module Kzg_pack_impl = struct
        every polynomial (note that PC.Commitment.t = Bls12_381.G1.t SMap.t) *)
     let cmts_list =
       List.map
-        (fun (cmts, _prover_aux) ->
-          List.map snd @@ SMap.bindings cmts |> Array.of_list)
+        (fun (cmts, _prover_aux) -> SMap.values cmts |> Array.of_list)
         prover_aux_list
     in
     (* [packed_values] has type [G1.t list] and it is the result of batching
