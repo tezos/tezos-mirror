@@ -1062,8 +1062,7 @@ struct PossibleInterruptsCache {
 
     // value: possible interrupts
     possible_interrupts: CSRRepr,
-    // TODO: @AC https://app.asana.com/0/1206655199123740/1207617988249893/f
-    // extend this cache to include MIP.
+    // TODO: RV-66: Extend this cache to include MIP (possible interrupts).
 }
 
 impl Default for PossibleInterruptsCache {
@@ -1192,9 +1191,6 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Write to a CSR.
     #[inline(always)]
     pub fn write<V: Bits64>(&mut self, reg: CSRegister, value: V) {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
-        // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        // extra function to read mstatus if needed
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let (reg, value) = self.transform_write(reg, value);
             self.registers.write(reg as usize, value);
@@ -1207,9 +1203,6 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Read from a CSR.
     #[inline(always)]
     pub fn read<V: Bits64>(&self, reg: CSRegister) -> V {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
-        // Respect field specifications (e.g. WPRI, WLRL, WARL)
-
         // sstatus is just a restricted view of mstatus.
         // to maintain consistency, when reading sstatus
         // just return mstatus with only the sstatus fields, making the other fields 0
@@ -1219,9 +1212,6 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Replace the CSR value, returning the previous value.
     #[inline(always)]
     pub fn replace<V: Bits64>(&mut self, reg: CSRegister, value: V) -> V {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
-        // Respect field specifications (e.g. WPRI, WLRL, WARL)
-
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let (upd_reg, value) = self.transform_write(reg, value);
             let old_value = self.registers.replace(upd_reg as usize, value);
@@ -1236,8 +1226,6 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Set bits in the CSR.
     #[inline(always)]
     pub fn set_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
-        // Respect field specifications (e.g. WPRI, WLRL, WARL)
         let old_value: CSRValue = self.read(reg);
         let new_value = old_value.repr() | bits;
         self.write(reg, new_value);
@@ -1247,8 +1235,6 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Clear bits in the CSR.
     #[inline(always)]
     pub fn clear_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
-        // Respect field specifications (e.g. WPRI, WLRL, WARL)
         let old_value: CSRValue = self.read(reg);
         let new_value = old_value.repr() & !bits;
         self.write(reg, new_value);

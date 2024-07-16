@@ -94,8 +94,8 @@ where
     let mut pte: PageTableEntry;
     loop {
         // 2. Let pte be the value of the PTE at address a + va.vpn[i] × PTESIZE.
-        // TODO: If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding
-        // to the original access type.
+        // TODO: RV-103: If accessing PTE violates a PMA or PMP check, raise an access-fault
+        // exception corresponding to the original access type.
         let vpn_i =
             v_addr::get_vpn_idx(v_addr, &sv_length, i).ok_or(access_type.exception(v_addr))?;
         let addr = a + vpn_i * pte_size;
@@ -130,7 +130,8 @@ where
         a = pte.ppn().to_bits() * PAGE_SIZE;
     }
 
-    // TODO: implement step 5 (MXR & SUM aware translation)
+    // TODO: RV-101: MXR aware translation
+    // TODO: RV-100: SUM aware translation
     // 5. A leaf PTE has been found. Determine if the requested memory access is
     //    allowed by the pte.r, pte.w, pte.x, and pte.u bits, given the current
     //    privilege mode and the value of the SUM and MXR fields of the mstatus
