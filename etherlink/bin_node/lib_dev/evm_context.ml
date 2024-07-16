@@ -1553,8 +1553,7 @@ let find_evm_state block =
       if hash = current_block_hash then return_some evm_state
       else worker_wait_for_request (Evm_state_after (Hash hash))
 
-let execute_and_inspect ?wasm_entrypoint
-    ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) input =
+let get_evm_state block =
   let open Lwt_result_syntax in
   let* evm_state = find_evm_state block in
   match evm_state with
@@ -1563,28 +1562,26 @@ let execute_and_inspect ?wasm_entrypoint
         "EVM state was not found on block %a"
         Ethereum_types.Block_parameter.pp_extended
         block
-  | Some evm_state ->
-      let*! data_dir, config = execution_config in
-      Evm_state.execute_and_inspect
-        ~data_dir
-        ?wasm_entrypoint
-        ~config
-        ~input
-        evm_state
+  | Some evm_state -> return evm_state
+
+let execute_and_inspect ?wasm_entrypoint
+    ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) input =
+  let open Lwt_result_syntax in
+  let* evm_state = get_evm_state block in
+  let*! data_dir, config = execution_config in
+  Evm_state.execute_and_inspect
+    ~data_dir
+    ?wasm_entrypoint
+    ~config
+    ~input
+    evm_state
 
 let inspect ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest))
     path =
   let open Lwt_result_syntax in
-  let* evm_state = find_evm_state block in
-  match evm_state with
-  | None ->
-      failwith
-        "EVM state was not found on block %a"
-        Ethereum_types.Block_parameter.pp_extended
-        block
-  | Some evm_state ->
-      let*! res = Evm_state.inspect evm_state path in
-      return res
+  let* evm_state = get_evm_state block in
+  let*! res = Evm_state.inspect evm_state path in
+  return res
 
 let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
