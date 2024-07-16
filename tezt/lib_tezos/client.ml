@@ -906,30 +906,19 @@ let bake_until_level ~target_level ?keys ?node client =
 (* Handle attesting and preattesting similarly *)
 type tenderbake_action = Preattest | Attest | Propose
 
-let tenderbake_action_to_string ~use_legacy_attestation_name = function
-  | Preattest ->
-      if use_legacy_attestation_name then "preendorse" else "preattest"
-  | Attest -> if use_legacy_attestation_name then "endorse" else "attest"
+let tenderbake_action_to_string = function
+  | Preattest -> "preattest"
+  | Attest -> "attest"
   | Propose -> "propose"
 
 let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false)
     ?(force = false) client =
-  let use_legacy_attestation_name =
-    match protocol with
-    | None -> false
-    | Some protocol -> Protocol.(number protocol < 018)
-  in
   spawn_command
     ?endpoint
     client
     (optional_arg "protocol" Protocol.hash protocol
-    @ [
-        tenderbake_action_to_string
-          ~use_legacy_attestation_name
-          tenderbake_action;
-        "for";
-      ]
+    @ [tenderbake_action_to_string tenderbake_action; "for"]
     @ key
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ if force then ["--force"] else [])

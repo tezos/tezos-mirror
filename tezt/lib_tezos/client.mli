@@ -671,8 +671,7 @@ val bake_until_cycle :
 val bake_until_cycle_end :
   target_cycle:int -> ?keys:string list -> ?node:Node.t -> t -> unit Lwt.t
 
-(** Run [octez-client attest for]. Run [octez-client endorse for] for protocol
-    older than 018.
+(** Run [octez-client attest for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val attest_for :
@@ -692,8 +691,7 @@ val spawn_attest_for :
   t ->
   Process.t
 
-(** Run [octez-client preattest for]. Run [octez-client preendorse for] for
-    protocol older than 018.
+(** Run [octez-client preattest for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val preattest_for :

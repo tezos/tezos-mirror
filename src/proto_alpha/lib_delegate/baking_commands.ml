@@ -455,29 +455,9 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
         Baking_lib.attest ~force cctxt delegates);
     command
       ~group
-      ~desc:
-        "Deprecated, use **attest for** instead. Forge and inject an \
-         attestation operation."
-      (args1 attestation_force_switch_arg)
-      (prefixes ["endorse"; "for"] @@ sources_param)
-      (fun force pkhs cctxt ->
-        let* delegates = get_delegates cctxt pkhs in
-        Baking_lib.attest ~force cctxt delegates);
-    command
-      ~group
       ~desc:"Forge and inject a preattestation operation."
       (args1 attestation_force_switch_arg)
       (prefixes ["preattest"; "for"] @@ sources_param)
-      (fun force pkhs cctxt ->
-        let* delegates = get_delegates cctxt pkhs in
-        Baking_lib.preattest ~force cctxt delegates);
-    command
-      ~group
-      ~desc:
-        "Deprecated, use **preattest for** instead. Forge and inject a \
-         preattestation operation."
-      (args1 attestation_force_switch_arg)
-      (prefixes ["preendorse"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         let* delegates = get_delegates cctxt pkhs in
         Baking_lib.preattest ~force cctxt delegates);
