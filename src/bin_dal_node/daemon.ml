@@ -249,21 +249,27 @@ module Handler = struct
             (* 4. In the case the message id is not Valid. *)
             other
 
+  let build_profile_context config =
+    let open Lwt_result_syntax in
+    let base_dir = Configuration_file.store_path config in
+    let*! res = Profile_manager.load_profile_ctxt ~base_dir in
+    match res with
+    | Ok loaded_profile ->
+        (* The profiles from the loaded context are prioritized over the
+             profiles provided in the config file. *)
+        Profile_manager.merge_profiles
+          ~lower_prio:config.Configuration_file.profile
+          ~higher_prio:loaded_profile
+        |> return
+    | Error err ->
+        let*! () = Event.(emit loading_profiles_failed err) in
+        return config.Configuration_file.profile
+
   (* Set the profile context once we have the protocol plugin. This is supposed
      to be called only once. *)
   let set_profile_context ctxt config proto_parameters =
     let open Lwt_result_syntax in
-    let*! pctxt_opt = Node_context.load_profile_ctxt ctxt in
-    let profile =
-      match pctxt_opt with
-      | None -> config.Configuration_file.profile
-      | Some loaded_profile ->
-          (* The profiles from the loaded context are prioritized over the
-             profiles provided in the config file. *)
-          Profile_manager.merge_profiles
-            ~lower_prio:config.Configuration_file.profile
-            ~higher_prio:loaded_profile
-    in
+    let* profile = build_profile_context config in
     let pctxt_opt =
       Profile_manager.add_profiles
         Profile_manager.empty
