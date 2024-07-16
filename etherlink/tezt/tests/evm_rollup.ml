@@ -6355,6 +6355,25 @@ let test_rpcs_can_be_disabled =
   let*@ _block_number = Rpc.block_number evm_setup.evm_node in
   unit
 
+let test_simulation_out_of_funds =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "simulation"; "funds"]
+    ~title:"Simulation works with no from"
+  @@ fun ~protocol:_ ~evm_setup ->
+  (* If a simulation doesn't provide the `from` field, the source is
+     0x00..00. But the simulation checks if the source has sufficient
+     funds, which is not the case for the zero address. *)
+  let eth_call =
+    [
+      ("to", `String "0xce8a69B73034588BA81fB89A3533C6aB9934F117");
+      ("data", `String "0x0000");
+      ("value", `String (Wei.of_eth_int 1 |> Wei.to_string));
+    ]
+  in
+  let*@ _res = Rpc.estimate_gas eth_call evm_setup.evm_node in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -6472,7 +6491,8 @@ let register_evm_node ~protocols =
   test_rpc_feeHistory_past protocols ;
   test_rpc_feeHistory_future protocols ;
   test_rpc_feeHistory_long protocols ;
-  test_rpcs_can_be_disabled protocols
+  test_rpcs_can_be_disabled protocols ;
+  test_simulation_out_of_funds protocols
 
 let protocols = Protocol.all
 
