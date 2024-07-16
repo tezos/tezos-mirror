@@ -112,6 +112,7 @@ For more details, see :ref:`the installation instructions <installing_binaries>`
 Changelog
 ---------
 
+- `Version 20.2 <../CHANGES.html#version-20-2>`_
 - `Version 20.1 <../CHANGES.html#version-20-1>`_
 - `Version 20.0 <../CHANGES.html#version-20-0>`_
 - `Version 20.0~rc1 <../CHANGES.html#version-20-0-rc1>`_
