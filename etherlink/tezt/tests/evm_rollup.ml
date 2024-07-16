@@ -1172,8 +1172,7 @@ let test_l2_deploy_simple_storage =
       expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
       (* The same deployment has been reproduced on the Sepolia testnet, resulting
          on this specific code. *)
-      expected_code =
-        "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80634e70b1dc14604157806360fe47b114605b5780636d4ce63c14606d575b600080fd5b604960005481565b60405190815260200160405180910390f35b606b60663660046074565b600055565b005b6000546049565b600060208284031215608557600080fd5b503591905056fea2646970667358221220c8bccd31314e5f73f97adfeb24c3a1836e3b134cdee11da72c6b9608ee0bad5464736f6c634300081a0033";
+      expected_code = simple_storage_code;
     }
     evm_setup
 
@@ -1189,6 +1188,33 @@ let send_call_set_storage_simple contract_address sender n
       ~method_call:(Printf.sprintf "set(%d)" n)
   in
   wait_for_application ~produce_block (call_set sender n)
+
+let send_call_get_storage_simple contract_address {endpoint; _} =
+  let* simple_storage_resolved = simple_storage () in
+  let* nb =
+    Eth_cli.contract_call
+      ~endpoint
+      ~abi_label:simple_storage_resolved.label
+      ~address:contract_address
+      ~method_call:"get()"
+      ()
+  in
+  return @@ int_of_string (String.trim nb)
+
+let set_and_get_simple_storage_check ~sender ~number ~address ~error_prefix
+    evm_setup =
+  let*@ code = Rpc.get_code ~address evm_setup.evm_node in
+  Check.((code = simple_storage_code) string)
+    ~error_msg:(sf "%s, expected code is %%R, but got %%L" error_prefix) ;
+  let* tx = send_call_set_storage_simple address sender number evm_setup in
+  let* () = check_tx_succeeded ~endpoint:evm_setup.endpoint ~tx in
+  let* found_nb = send_call_get_storage_simple address evm_setup in
+  Check.((number = found_nb) int)
+    ~error_msg:
+      (sf
+         "%s, storage of simple storage contract: Expected %%L, found %%R"
+         error_prefix) ;
+  unit
 
 (** Test that a contract can be called,
     and that the call can modify the storage.  *)
@@ -3021,9 +3047,7 @@ let test_rpc_getCode =
     deploy ~contract:simple_storage_resolved ~sender evm_setup
   in
   let*@ code = Rpc.get_code ~address evm_setup.evm_node in
-  let expected_code =
-    "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80634e70b1dc14604157806360fe47b114605b5780636d4ce63c14606d575b600080fd5b604960005481565b60405190815260200160405180910390f35b606b60663660046074565b600055565b005b6000546049565b600060208284031215608557600080fd5b503591905056fea2646970667358221220c8bccd31314e5f73f97adfeb24c3a1836e3b134cdee11da72c6b9608ee0bad5464736f6c634300081a0033"
-  in
+  let expected_code = simple_storage_code in
   Check.((code = expected_code) string)
     ~error_msg:"Expected code is %R, but got %L" ;
   unit
@@ -3096,6 +3120,7 @@ type storage_migration_results = {
   transfer_result : transfer_result;
   block_result : Block.t;
   config_result : config_result;
+  simple_storage_address : string;
 }
 
 (* This is the test generator that will trigger the sanity checks for migration
@@ -3165,10 +3190,12 @@ let test_mainnet_ghostnet_kernel_migration =
       "Ensures EVM kernel's upgrade succeeds with potential migration(s). \
        (mainnet -> ghostnet)"
   @@ fun protocol ->
-  let sender, receiver =
-    (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
+  let sender, receiver, deployer =
+    ( Eth_account.bootstrap_accounts.(0),
+      Eth_account.bootstrap_accounts.(1),
+      Eth_account.bootstrap_accounts.(2) )
   in
-
+  let* simple_storage = simple_storage () in
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
@@ -3179,7 +3206,19 @@ let test_mainnet_ghostnet_kernel_migration =
     in
     let*@ block_result = latest_block evm_setup.evm_node in
     let* config_result = config_setup evm_setup in
-    return {transfer_result; block_result; config_result}
+    let* simple_storage_address, _ =
+      deploy ~contract:simple_storage ~sender:deployer evm_setup
+    in
+    let* () =
+      set_and_get_simple_storage_check
+        ~sender:deployer
+        ~number:42
+        ~address:simple_storage_address
+        ~error_prefix:"Prior migration"
+        evm_setup
+    in
+    return
+      {transfer_result; block_result; config_result; simple_storage_address}
   in
   let scenario_after ~evm_setup ~sanity_check =
     let* () =
@@ -3192,6 +3231,26 @@ let test_mainnet_ghostnet_kernel_migration =
     let* () =
       ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
     in
+    let* () =
+      set_and_get_simple_storage_check
+        ~sender:deployer
+        ~number:24
+        ~address:sanity_check.simple_storage_address
+        ~error_prefix:"After migration"
+        evm_setup
+    in
+    let* seconde_simple_storage_address, _ =
+      deploy ~contract:simple_storage ~sender:deployer evm_setup
+    in
+    let* () =
+      set_and_get_simple_storage_check
+        ~sender:deployer
+        ~number:42
+        ~address:seconde_simple_storage_address
+        ~error_prefix:"After migration"
+        evm_setup
+    in
+
     ensure_config_setup_integrity
       ~config_result:sanity_check.config_result
       evm_setup
@@ -3224,10 +3283,12 @@ let test_latest_kernel_migration protocols =
              (%s -> latest)."
             from_tag)
     @@ fun protocol ->
-    let sender, receiver =
-      (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
+    let sender, receiver, deployer =
+      ( Eth_account.bootstrap_accounts.(0),
+        Eth_account.bootstrap_accounts.(1),
+        Eth_account.bootstrap_accounts.(2) )
     in
-
+    let* simple_storage = simple_storage () in
     let scenario_prior ~evm_setup =
       let* transfer_result =
         make_transfer
@@ -3248,10 +3309,22 @@ let test_latest_kernel_migration protocols =
              ~key:Durable_storage_path.indexes
              ()
       in
+      let* simple_storage_address, _ =
+        deploy ~contract:simple_storage ~sender:deployer evm_setup
+      in
+      let* () =
+        set_and_get_simple_storage_check
+          ~sender:deployer
+          ~number:42
+          ~address:simple_storage_address
+          ~error_prefix:"Prior migration"
+          evm_setup
+      in
       let indexes = List.sort compare indexes in
       Check.((indexes = ["accounts"; "blocks"; "transactions"]) (list string))
         ~error_msg:"Expected indexes to be %R, got %L" ;
-      return {transfer_result; block_result; config_result}
+      return
+        {transfer_result; block_result; config_result; simple_storage_address}
     in
     let scenario_after ~evm_setup ~sanity_check =
       let* indexes =
@@ -3275,6 +3348,25 @@ let test_latest_kernel_migration protocols =
       in
       let* () =
         ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
+      in
+      let* () =
+        set_and_get_simple_storage_check
+          ~sender:deployer
+          ~number:24
+          ~address:sanity_check.simple_storage_address
+          ~error_prefix:"After migration"
+          evm_setup
+      in
+      let* seconde_simple_storage_address, _ =
+        deploy ~contract:simple_storage ~sender:deployer evm_setup
+      in
+      let* () =
+        set_and_get_simple_storage_check
+          ~sender:deployer
+          ~number:42
+          ~address:seconde_simple_storage_address
+          ~error_prefix:"After migration"
+          evm_setup
       in
       ensure_config_setup_integrity
         ~config_result:sanity_check.config_result
@@ -3408,7 +3500,7 @@ let test_deposit_before_and_after_migration =
   let scenario_after
       ~evm_setup:
         {l1_contracts; sc_rollup_address; client; endpoint; produce_block; _}
-      ~sanity_check:_ =
+      ~sanity_check:() =
     let {bridge; _} =
       match l1_contracts with Some x -> x | None -> assert false
     in

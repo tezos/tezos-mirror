@@ -32,6 +32,8 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
   block hash. Uses the existing indexing table instead. (!14704)
 - A generic storage crate was introduced so that every component of the kernel
   benefits from the same implementation to read/write primitives. (!14735)
+- Adds a storage for account's code. Code are referenced by their code
+  hash. (!14369)
 
 ### Bug fixes
 

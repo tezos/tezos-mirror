@@ -53,12 +53,35 @@ let nonce read address =
     decode_number_le
 
 let code read address =
-  inspect_durable_and_decode_default
-    ~default:(Ethereum_types.Hex "")
-    read
-    (Durable_storage_path.Accounts.code address)
-    (fun bytes ->
-      bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string)
+  let open Lwt_result_syntax in
+  let default = Ethereum_types.Hex "" in
+  let decode bytes =
+    bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
+  in
+  let* answer =
+    inspect_durable_and_decode_opt
+      read
+      (Durable_storage_path.Accounts.code address)
+      decode
+  in
+  match answer with
+  | Some code -> return code
+  | None -> (
+      let* hash_opt =
+        inspect_durable_and_decode_opt
+          read
+          (Durable_storage_path.Accounts.code_hash address)
+          (fun bytes ->
+            Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string)
+      in
+      match hash_opt with
+      | None -> return default
+      | Some hash ->
+          inspect_durable_and_decode_default
+            ~default
+            read
+            (Durable_storage_path.Code.code hash)
+            decode)
 
 exception Invalid_block_structure of string
 
