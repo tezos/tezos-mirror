@@ -16,6 +16,9 @@
 
 ## Bug fixes
 
+- Simulation with parameter `from` no longer return `OutOfFunds` if the
+  value is greater than zero. (!14150)
+
 ## Internal
 
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
