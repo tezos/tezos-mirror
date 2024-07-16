@@ -1,0 +1,4 @@
+(test
+ (name test)
+ (package prometheus-app)
+ (libraries prometheus prometheus-app alcotest alcotest-lwt))

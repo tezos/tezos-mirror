@@ -1,0 +1,4 @@
+(executable
+  (name         example)
+  (enabled_if   (>= %{ocaml_version} 4.08)) ; Work-around for dune bug #5621
+  (libraries    prometheus prometheus-app.unix cmdliner cohttp-lwt cohttp-lwt-unix))

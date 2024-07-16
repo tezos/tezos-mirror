@@ -1,0 +1,13 @@
+(library
+ (name prometheus_app)
+ (public_name prometheus-app)
+ (libraries prometheus lwt cohttp-lwt astring asetmap fmt re)
+ (modules Prometheus_app)
+ (wrapped false))
+
+(library
+ (name prometheus_app_unix)
+ (public_name prometheus-app.unix)
+ (libraries prometheus prometheus-app cmdliner cohttp-lwt cohttp-lwt-unix logs.fmt fmt.tty)
+ (modules Prometheus_unix)
+ (wrapped false))
