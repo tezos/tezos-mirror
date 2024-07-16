@@ -70,35 +70,76 @@ val pp_action : Format.formatter -> action -> unit
 
 (** {2 Functions used by the baker} *)
 
+(** [prepare_block global_state block_to_bake] prepares a block by:
+    - inferring the block timestamp
+
+    - recovering the operations from the mempool if the block is a new proposal,
+    or reusing the operations from [block_to_bake]'s payload if the block is a
+    reproposal
+
+    - generating the seed nonce hash if needed
+
+    - setting the votes for liquidity baking and adaptive issuance according to the
+    per_block_vote_file
+
+    - calling [Block_forge.forge] to forge the block
+
+    - signing the block header
+
+    - registering the seed nonce if needed
+*)
 val prepare_block :
   global_state -> block_to_bake -> prepared_block tzresult Lwt.t
 
+(** [authorized_consensus_votes global_state unsigned_consensus_vote_batch]
+    records and returns the list of unsigned_consensus_vote authorized according
+    to the [Baking_highwatermarks]. This function emits an event for each
+    unauthorized consensus vote.*)
 val authorized_consensus_votes :
   global_state ->
   unsigned_consensus_vote_batch ->
   unsigned_consensus_vote list tzresult Lwt.t
 
+(** [forge_and_sign_consensus_vote global_state branch unsigned_consensus_vote]
+    forges a consensus operation by encoding the operation consensus content
+    from [unsigned_consensus_vote] with the [branch] and then sign it. *)
 val forge_and_sign_consensus_vote :
   global_state ->
   branch:Block_hash.t ->
   unsigned_consensus_vote ->
   signed_consensus_vote tzresult Lwt.t
 
+(** [compute_round proposal round_durations] computes the round from the current
+    timestamp, the [proposal]'s timestamp and the [round_durations]. *)
 val compute_round : proposal -> Round.round_durations -> Round.t tzresult
 
+(** [perform_action state action] performs the given [action] using the
+    [state] *)
 val perform_action : state -> t -> state tzresult Lwt.t
 
 (** {2 Functions only needed for the baking_lib}  *)
 
+(** [sign_consensus_votes global_state unsigned_consensus_vote_batch] recovers
+    the authorized consensus votes by calling [authorized_consensus_votes], then
+    signs these operation by calling [forge_and_sign_consensus_vote], and then
+    creates a batch with [Baking_state.make_signed_consensus_vote_batch]. *)
 val sign_consensus_votes :
   global_state ->
   unsigned_consensus_vote_batch ->
   signed_consensus_vote_batch tzresult Lwt.t
 
+(** [inject_consensus_votes state signed_consensus_vote_batch] injects consensus
+    votes from [signed_consensus_vote_batch]. *)
 val inject_consensus_votes :
   state -> signed_consensus_vote_batch -> unit tzresult Lwt.t
 
+(** [update_to_level state level_update] computes the delegate slots for the given
+    level and the next one, computes round information by calling [compute_round]
+    and updates the state accordingly. *)
 val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 
+(** [may_get_dal_content state unsigned_consensus_vote], if the DAL feature is
+    enabled, recovers the attestable slots by calling
+    [Node_rpc.get_attestable_slots] and computes the corresponding [dal_content]. *)
 val may_get_dal_content :
   state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
