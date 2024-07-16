@@ -84,7 +84,7 @@ val tezt_wrapper : Manifest.target
 module Protocol : sig
   type t
 
-  type number = Alpha | V of int | Other
+  type number = Dev | V of int | Other
 
   (** Status of the protocol on Mainnet.
 

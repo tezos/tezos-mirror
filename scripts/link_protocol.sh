@@ -25,7 +25,7 @@ if [ -z "${new_hash}" ]; then
   exit 1
 fi
 
-sed "/let alpha = active Name.alpha/i \  let _${new_version}_${new_hash} = active (Name.v \"${new_hash}\" ${new_version})\n" -i manifest/product_octez.ml
+sed "/let alpha = active (Name.dev \"alpha\")/i \  let _${new_version}_${new_hash} = active (Name.v \"${new_hash}\" ${new_version})\n" -i manifest/product_octez.ml
 
 # Generate everything from the manifest.
 echo "Updating manifest: generate dune and opam files..."

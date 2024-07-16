@@ -161,7 +161,7 @@ let () =
 let () =
   let write_protocol fmt protocol =
     match Protocol.number protocol with
-    | Alpha | V _ -> Format.fprintf fmt "%s\n" (Protocol.name_dash protocol)
+    | Dev | V _ -> Format.fprintf fmt "%s\n" (Protocol.name_dash protocol)
     | Other -> ()
   in
   write "script-inputs/active_protocol_versions" @@ fun fmt ->
@@ -171,7 +171,7 @@ let () =
 let () =
   let write_protocol fmt protocol =
     match Protocol.number protocol with
-    | Alpha | V _ -> Format.fprintf fmt "%s\n" (Protocol.short_hash protocol)
+    | Dev | V _ -> Format.fprintf fmt "%s\n" (Protocol.short_hash protocol)
     | Other -> ()
   in
   write "script-inputs/active_protocol_versions_without_number" @@ fun fmt ->

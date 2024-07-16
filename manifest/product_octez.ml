@@ -4869,7 +4869,7 @@ let _octez_scoru_wasm_fast_tests =
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
-  type number = Alpha | V of int | Other
+  type number = Dev | V of int | Other
 
   type status = Active | Frozen | Overridden | Not_mainnet
 
@@ -4941,13 +4941,13 @@ module Protocol : sig
 
   val all_optionally : (t -> target option) list -> target list
 end = struct
-  type number = Alpha | V of int | Other
+  type number = Dev | V of int | Other
 
   module Name : sig
     type t
 
-    (** [alpha] is a protocol name with protocol number [Alpha] *)
-    val alpha : t
+    (** [dev] is a named protocol name with protocol number [Dev] *)
+    val dev : string -> t
 
     (** [v name num] constuct a protocol name with protocol number [V num] *)
     val v : string -> int -> t
@@ -4987,7 +4987,7 @@ end = struct
              name) ;
       let make_full_name sep name =
         match number with
-        | Alpha | Other -> name
+        | Dev | Other -> name
         | V number -> sf "%03d%c%s" number sep name
       in
       let name_dash = make_full_name '-' name in
@@ -4998,7 +4998,7 @@ end = struct
 
     let v name number = make name (V number)
 
-    let alpha = make "alpha" Alpha
+    let dev name = make name Dev
 
     let other name = make name Other
 
@@ -5130,10 +5130,10 @@ end = struct
 
   let test_helpers_exn p = mandatory "test_helpers" p p.test_helpers
 
-  (* N as in "protocol number in the Alpha family". *)
+  (* N as in "protocol number in the Dev family". *)
   module N = struct
     (* This function is asymmetrical on purpose: we don't want to compare
-       numbers with [Alpha] because such comparisons would break when snapshotting.
+       numbers with [Dev] because such comparisons would break when snapshotting.
        So the left-hand side is the number of the protocol being built,
        but the right-hand side is an integer.
 
@@ -5145,7 +5145,7 @@ end = struct
        meaning the opposite? *)
     let compare_asymmetric a b =
       match a with
-      | Alpha -> 1
+      | Dev -> 1
       | V a -> Int.compare a b
       | Other ->
           invalid_arg "cannot use N.compare_asymmetric on Other protocols"
@@ -5605,10 +5605,10 @@ end = struct
       in
       let disable_warnings =
         match number with
-        (* [Other] and [Alpha] protocols can be edited and should be
+        (* [Other] and [Dev] protocols can be edited and should be
            fixed whenever a warning that we care about triggers. We
            only want to disable a limited set of warnings *)
-        | Other | Alpha -> []
+        | Other | Dev -> []
         (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
         | V _ as number ->
             if N.(number >= 014) then []
@@ -5677,7 +5677,7 @@ include Tezos_protocol_environment.V%d.Make(Name)()
                 sf
                   "Tezos/Protocol: %s economic-protocol definition"
                   name_underscore
-            | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
+            | Dev | V _ -> "Tezos/Protocol: economic-protocol definition")
           ~modules:["Protocol"; sf "Tezos_protocol_%s" name_underscore]
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~deps:
@@ -5800,7 +5800,7 @@ let hash = Protocol.hash
                   "Tezos/Protocol: %s (economic-protocol definition \
                    parameterized by its environment implementation)"
                   name_underscore
-            | Alpha | V _ ->
+            | Dev | V _ ->
                 "Tezos/Protocol: economic-protocol definition parameterized by \
                  its environment implementation")
           ~modules:["Functor"]
@@ -5850,7 +5850,7 @@ let hash = Protocol.hash
                   "Tezos/Protocol: %s (economic-protocol definition, embedded \
                    in `octez-node`)"
                   name_underscore
-            | Alpha | V _ ->
+            | Dev | V _ ->
                 "Tezos/Protocol: economic-protocol definition, embedded in \
                  `octez-node`")
           ~modules:["Registerer"]
@@ -5862,7 +5862,7 @@ let hash = Protocol.hash
                 (* Contrary to client libs and protocol plugin registerers,
                    embedded protocols are useful even when the protocol was overridden. *)
                 Released
-            | V _, Not_mainnet | (Alpha | Other), _ ->
+            | V _, Not_mainnet | (Dev | Other), _ ->
                 (* Ideally we would not release the opam packages but this would require
                    removing the dependencies when releasing, both from .opam files
                    and dune files. *)
@@ -5980,7 +5980,7 @@ let hash = Protocol.hash
       match (number, status) with
       | V _, (Active | Frozen) -> Released
       | V _, (Overridden | Not_mainnet) -> Unreleased
-      | Alpha, _ -> Experimental
+      | Dev, _ -> Experimental
       | Other, _ -> Unreleased
     in
     let optional_library_release_status =
@@ -5989,7 +5989,7 @@ let hash = Protocol.hash
           (* Put explicit dependency in meta-package octez.opam to force the optional
              dependency to be installed. *)
           Released
-      | V _, (Overridden | Not_mainnet) | (Alpha | Other), _ ->
+      | V _, (Overridden | Not_mainnet) | (Dev | Other), _ ->
           (* Ideally we would not release the opam packages but this would require
              removing the dependencies when releasing, both from .opam files
              and dune files. *)
@@ -7007,7 +7007,7 @@ let hash = Protocol.hash
 
   let _020_PsParisC = active (Name.v "PsParisC" 020)
 
-  let alpha = active Name.alpha
+  let alpha = active (Name.dev "alpha")
 
   let all = List.rev !all_rev
 
@@ -7584,7 +7584,7 @@ let _octez_node =
                that results in inconsistent hashes. Once this bug is fixed,
                this exception can be removed. *)
             false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
             (* Other protocols are optional. *)
             true
       in
@@ -7650,8 +7650,7 @@ let _octez_client =
       let is_optional =
         match (Protocol.status protocol, Protocol.number protocol) with
         | Active, V _ -> false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
-            true
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) -> true
       in
       let targets =
         List.filter_map
@@ -7745,7 +7744,7 @@ let _octez_codec =
            (fun protocol ->
              let link =
                match Protocol.number protocol with
-               | Alpha -> true
+               | Dev -> true
                | V number -> number >= 005
                | Other -> false
              in
@@ -7972,7 +7971,7 @@ let _octez_dal_node =
                that results in inconsistent hashes. Once this bug is fixed,
                this exception can be removed. *)
             false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
             (* Other protocols are optional. *)
             true
       in
@@ -8036,7 +8035,7 @@ let _octez_dac_node =
                that results in inconsistent hashes. Once this bug is fixed,
                this exception can be removed. *)
             false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
             (* Other protocols are optional. *)
             true
       in
@@ -8089,7 +8088,7 @@ let _octez_dac_client =
                that results in inconsistent hashes. Once this bug is fixed,
                this exception can be removed. *)
             false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
             (* Other protocols are optional. *)
             true
       in
@@ -8126,8 +8125,7 @@ let _octez_smart_rollup_node =
       let is_optional =
         match (Protocol.status protocol, Protocol.number protocol) with
         | Active, V _ -> false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
-            true
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) -> true
       in
       let targets =
         List.filter_map Fun.id [Protocol.octez_sc_rollup_node protocol]
@@ -8164,8 +8162,7 @@ let _octez_smart_rollup_node_lib_tests =
       let is_optional =
         match (Protocol.status protocol, Protocol.number protocol) with
         | Active, V _ -> false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
-            true
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) -> true
       in
       let targets =
         List.filter_map Fun.id [Protocol.octez_sc_rollup_node protocol]

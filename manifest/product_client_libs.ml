@@ -89,7 +89,7 @@ let _octez_codec_kaitai =
            (fun protocol ->
              let link =
                match Protocol.number protocol with
-               | Alpha -> true
+               | Dev -> true
                | V number -> number >= 005
                | Other -> false
              in

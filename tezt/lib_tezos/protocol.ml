@@ -57,6 +57,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | ParisC -> "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
+(* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -321,7 +322,16 @@ let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
 let add_to_test_parameters ?(additional_tags = fun _ -> []) protocol title tags
     uses =
   let uses = match uses with None -> [] | Some uses -> uses protocol in
-  ( name protocol ^ ": " ^ title,
+  (* To help automatic generation of regression files during stabilisation we ensure
+     protocol_name is always of at least size of "alpha" by adding '-' trailing
+     chars to it if needed *)
+  let protocol_name =
+    name protocol
+    ^ String.make
+        (max 0 (String.length (name Alpha) - String.length (name protocol)))
+        '-'
+  in
+  ( protocol_name ^ ": " ^ title,
     (tag protocol :: tags) @ additional_tags protocol,
     uses )
 

@@ -1,9 +1,11 @@
-
 ## /!\ /!\ Update .dockerignore accordingly /!\ /!\
 
 .DS_Store
 __pycache__
 *.pyc
+
+# temporary files created during snapshotting
+*.old
 
 **/_build
 /_build_rust
