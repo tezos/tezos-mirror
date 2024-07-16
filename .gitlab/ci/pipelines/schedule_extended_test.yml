@@ -2066,6 +2066,7 @@ oc.install_opam_jammy:
   - when: always
   dependencies: []
   allow_failure: true
+  timeout: 2 hours
   script:
   - ./docs/introduction/install-opam.sh
   variables:

@@ -1248,6 +1248,9 @@ let jobs pipeline_type =
                parallelism. This returns the number of CPU of the "host" CI runner
                instead of the number of cores a single CI job can reasonably use. *)
           ~variables:[("OPAMJOBS", "4")]
+            (* As this job is long, we override the default timeout to
+               2 hours. *)
+          ~timeout:(Hours 2)
           ["./docs/introduction/install-opam.sh"]
       in
       let job_compile_sources ~__POS__ ~name ~image ~project ~branch =
