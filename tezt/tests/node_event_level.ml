@@ -231,9 +231,13 @@ let test_debug_level_misc =
   | _ -> Test.fail "RPC.operations should return a list of length 4.") ;
   unit
 
-(* Wait for an event of name "set_head.v0".
-   Note: this event has level "info", so the node needs to have event
-   level set to either "debug" or "info" for such an event to exist.
+(* Wait for an event of name "set_head.v0" when the node's RPC server
+   is local (rpc_external=false) or "store_synchronized_on_head.v0"
+   when the external RPC server is enabled (rpc_external=true).
+   Note: the "set_head.v0" event has level "info", so the node needs
+   to have event level set to either "debug" or "info" for such an
+   event to exist. Regarding "store_synchronized_on_head.v0" it
+   requires to be set to "notice" at least.
 *)
 let wait_for_set_head node =
   let event =

@@ -498,9 +498,11 @@ val wait_for_ready : t -> unit Lwt.t
 
 (** Wait for a given chain level.
 
-    More precisely, wait until a [head_increment] or [branch_switch] with a
-    [level] greater or equal to the requested level occurs. If such an event
-    already occurred, return immediately. *)
+    More precisely, wait until a [head_increment] or [branch_switch]
+    (or [store_synchronized_on_head] when the node is running with
+    [rpc_external] set to true) with a [level] greater or equal to the
+    requested level occurs. If such an event already occurred, return
+    immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
 (** Get the current known level of the node.
