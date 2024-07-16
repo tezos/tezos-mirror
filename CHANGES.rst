@@ -83,6 +83,8 @@ Node
   ``/monitor/commit_hash`` RPC endpoint. Use ``/version`` instead. (MR
   :gl:`!13879`)
 
+- Removed ParisB mempool plugin. (MR :gl:`!14031`)
+
 Client
 ------
 
