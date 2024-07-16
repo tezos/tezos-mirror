@@ -10,7 +10,9 @@ use crypto::hash::SmartRollupHash;
 use tezos_smart_rollup_core::{
     MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
 };
-use tezos_smart_rollup_host::{metadata::RollupMetadata, Error};
+use tezos_smart_rollup_host::{
+    dal_parameters::RollupDalParameters, metadata::RollupMetadata, Error,
+};
 
 pub(crate) mod in_memory_store;
 pub(crate) mod store;
@@ -32,6 +34,7 @@ pub(crate) struct HostState {
     /// Key-value store of runtime state.
     pub store: InMemoryStore,
     pub metadata: RollupMetadata,
+    pub dal_parameters: RollupDalParameters,
     // Inbox metadata
     pub(crate) curr_level: u32,
     pub(crate) curr_input_id: usize,
@@ -52,9 +55,17 @@ impl Default for HostState {
             raw_rollup_address,
             origination_level: crate::NAIROBI_ACTIVATION_LEVEL,
         };
+
+        let dal_parameters = RollupDalParameters {
+            number_of_slots: 16,
+            attestation_lag: 8,
+            slot_size: 126944,
+            page_size: 3967,
+        };
         Self {
             store,
             metadata,
+            dal_parameters,
             curr_level: crate::NAIROBI_ACTIVATION_LEVEL,
             curr_input_id: 0,
             input: vec![],
@@ -132,6 +143,23 @@ impl HostState {
 
     pub(crate) fn get_metadata(&self) -> &RollupMetadata {
         &self.metadata
+    }
+
+    pub(crate) fn get_dal_parameters(&self) -> &RollupDalParameters {
+        &self.dal_parameters
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn set_dal_parameters(&mut self, params: RollupDalParameters) {
+        self.dal_parameters = params
+    }
+
+    pub(crate) fn get_dal_slot(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+    ) -> Option<&Vec<u8>> {
+        self.store.0.retrieve_dal_slot(published_level, slot_index)
     }
 }
 

@@ -12,11 +12,14 @@ use crate::state::{HostState, NextInput};
 use crate::MockHost;
 use core::{
     cell::RefCell,
+    cmp::min,
+    mem::size_of,
     ptr,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::dal_parameters::DAL_PARAMETERS_SIZE;
 use tezos_smart_rollup_host::metadata::METADATA_SIZE;
 use tezos_smart_rollup_host::Error;
 
@@ -35,6 +38,40 @@ impl AsMut<HostState> for MockHost {
     fn as_mut(&mut self) -> &mut HostState {
         self.state.get_mut()
     }
+}
+
+unsafe fn reveal_dal_parameters(
+    host: &MockHost,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let params: [u8; DAL_PARAMETERS_SIZE] =
+        host.state.borrow().get_dal_parameters().into();
+    let len = min(max_bytes, params.len());
+    let slice = from_raw_parts_mut(destination_addr, len);
+    slice.copy_from_slice(&params[..len]);
+    len as i32
+}
+
+unsafe fn reveal_dal_page(
+    host: &MockHost,
+    published_level: i32,
+    slot_index: u8,
+    page_index: i16,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let state = host.state.borrow();
+    let params = state.get_dal_parameters();
+    let page_size = params.page_size as usize;
+    let len = min(max_bytes, page_size);
+    let start = ((page_index as u64) * params.page_size) as usize;
+    let Some(slot) = state.get_dal_slot(published_level, slot_index) else {
+        return 0;
+    };
+    let slice = from_raw_parts_mut(destination_addr, len);
+    slice.copy_from_slice(&slot[start..start + len]);
+    len as i32
 }
 
 unsafe impl SmartRollupCore for MockHost {
@@ -183,6 +220,8 @@ unsafe impl SmartRollupCore for MockHost {
         self.state.borrow().store.store_value_size(path, path_len)
     }
 
+    // TODO adapt reveal_metadata
+    // https://gitlab.com/tezos/tezos/-/issues/7378
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
         assert!(METADATA_SIZE <= max_bytes);
         let metadata: [u8; METADATA_SIZE] =
@@ -192,15 +231,60 @@ unsafe impl SmartRollupCore for MockHost {
         metadata.len().try_into().unwrap()
     }
 
+    // TODO turn payload.split_at into a read or error code helper function.
+    // https://gitlab.com/tezos/tezos/-/issues/7377
     unsafe fn reveal(
         &self,
-        _payload_addr: *const u8,
-        _payload_len: usize,
-        _destination_addr: *mut u8,
-        _max_bytes: usize,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
     ) -> i32 {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6171
-        unimplemented!("The `reveal` host function is not yet mocked.")
+        let payload: &[u8] = from_raw_parts(payload_addr, payload_len);
+        let (tag, payload) = payload.split_at(size_of::<u8>());
+        match tag[0] {
+            0 => {
+                // Reveal_raw_data
+                self.reveal_preimage(
+                    payload_addr.add(1),
+                    payload_len.saturating_sub(1),
+                    destination_addr,
+                    max_bytes,
+                )
+            }
+            1 => {
+                // Reveal_metadata
+                self.reveal_metadata(destination_addr, max_bytes)
+            }
+            2 => {
+                // Reveal_dal_page
+                let (published_level, remaining) = payload.split_at(size_of::<i32>());
+                let (slot_index, remaining) = remaining.split_at(size_of::<u8>());
+                let (page_index, _) = remaining.split_at(size_of::<i16>());
+
+                let published_level =
+                    i32::from_be_bytes(published_level.try_into().unwrap());
+                let slot_index = slot_index[0];
+                let page_index = i16::from_be_bytes(page_index.try_into().unwrap());
+
+                reveal_dal_page(
+                    self,
+                    published_level,
+                    slot_index,
+                    page_index,
+                    destination_addr,
+                    max_bytes,
+                )
+            }
+            3 => {
+                // Reveal_dal_parameters
+                reveal_dal_parameters(self, destination_addr, max_bytes)
+            }
+            tag => unimplemented!(
+                "The `reveal` host function is not yet mocked for tag {}.",
+                tag
+            ),
+        }
     }
 }
 
