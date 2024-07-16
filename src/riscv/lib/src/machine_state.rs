@@ -17,7 +17,7 @@ pub mod reservation_set;
 extern crate proptest;
 
 use self::{
-    address_translation::PAGE_SIZE,
+    address_translation::{translation_cache::InstructionFetchTransCacheLayout, PAGE_SIZE},
     csregisters::{values::CSRValue, CSRRepr},
 };
 use crate::{
@@ -40,13 +40,17 @@ use mode::Mode;
 use std::{cmp, ops::RangeBounds};
 
 /// Layout for the machine state
-pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>);
+pub type MachineStateLayout<ML> = (
+    HartStateLayout,
+    bus::BusLayout<ML>,
+    InstructionFetchTransCacheLayout,
+);
 
 /// Machine state
 pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
     pub hart: HartState<M>,
     pub bus: Bus<ML, M>,
-    pub translation_cache: InstructionFetchTranslationCache,
+    pub translation_cache: InstructionFetchTranslationCache<M>,
 }
 
 /// How to modify the program counter
@@ -246,7 +250,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         Self {
             hart: HartState::bind(space.0),
             bus: Bus::bind(space.1),
-            translation_cache: InstructionFetchTranslationCache::new(),
+            translation_cache: InstructionFetchTranslationCache::bind(space.2),
         }
     }
 
@@ -254,7 +258,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     pub fn reset(&mut self) {
         self.hart.reset(bus::start_of_main_memory::<ML>());
         self.bus.reset();
-        self.translation_cache.invalidate();
+        self.translation_cache.reset();
     }
 
     /// Translate an instruction address.
