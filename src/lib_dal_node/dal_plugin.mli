@@ -52,6 +52,7 @@ type proto_parameters = {
   sc_rollup_challenge_window_in_blocks : int;
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
+  blocks_per_cycle : int32;
 }
 
 val proto_parameters_encoding : proto_parameters Data_encoding.t
