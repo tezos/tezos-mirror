@@ -1851,7 +1851,7 @@ let observer_run_args =
 let observer_simple_command =
   let open Tezos_clic in
   command
-    ~desc:"Start the EVM node in sequencer mode"
+    ~desc:"Start the EVM node in observer mode"
     (merge_options common_config_args observer_run_args)
     (prefixes ["run"; "observer"] stop)
     (fun ( ( data_dir,
