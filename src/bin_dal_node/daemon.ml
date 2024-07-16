@@ -781,6 +781,41 @@ let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
   let*! () = Event.(emit l1_node_bootstrapped) () in
   return_unit
 
+let get_head_plugin cctxt =
+  let open Lwt_result_syntax in
+  let* header = Shell_services.Blocks.Header.shell_header cctxt () in
+  let head_level = header.Block_header.level in
+  let* (module Plugin : Dal_plugin.T) =
+    Proto_plugins.resolve_plugin_for_level cctxt ~level:head_level
+  in
+  let* proto_parameters =
+    Plugin.get_constants `Main (`Level head_level) cctxt
+  in
+  return (head_level, (module Plugin : Dal_plugin.T), proto_parameters)
+
+(* This function checks that in case the history mode is Rolling with a custom
+   number of blocks, these number of blocks are sufficient. *)
+let check_history_mode config profile_ctxt proto_parameters =
+  let open Lwt_result_syntax in
+  let supports_refutations =
+    Profile_manager.supports_refutations profile_ctxt
+  in
+  let storage_period =
+    Profile_manager.get_attested_data_default_store_period
+      profile_ctxt
+      proto_parameters
+  in
+  match config.Configuration_file.history_mode with
+  | Rolling {blocks = `Some b} ->
+      let minimal_levels =
+        if supports_refutations then storage_period
+        else proto_parameters.attestation_lag
+      in
+      if b < minimal_levels then
+        tzfail @@ Errors.Not_enough_history {stored_levels = b; minimal_levels}
+      else return_unit
+  | Rolling {blocks = `Auto} | Full -> return_unit
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -907,6 +942,10 @@ let run ~data_dir ~configuration_override =
   in
   (* First wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
+  (* Check the DAL node's history mode. *)
+  let* ((_, _, proto_parameters) as _plugin_info) = get_head_plugin cctxt in
+  let* profile_ctxt = Handler.build_profile_context config in
+  let* () = check_history_mode config profile_ctxt proto_parameters in
   let*! crawler =
     let open Constants in
     Crawler.start

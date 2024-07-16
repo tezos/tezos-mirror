@@ -30,6 +30,7 @@ type error +=
   | Profile_incompatibility
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
   | Cryptobox_initialisation_failed of string
+  | Not_enough_history of {stored_levels : int; minimal_levels : int}
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)

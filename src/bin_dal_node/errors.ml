@@ -30,6 +30,7 @@ type error +=
   | Profile_incompatibility
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
   | Cryptobox_initialisation_failed of string
+  | Not_enough_history of {stored_levels : int; minimal_levels : int}
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
 
@@ -91,7 +92,27 @@ let () =
         msg)
     Data_encoding.(obj1 (req "error" string))
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
-    (fun str -> Cryptobox_initialisation_failed str)
+    (fun str -> Cryptobox_initialisation_failed str) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.not_enough_history"
+    ~title:"Not enough history"
+    ~description:"The node does not store sufficiently many levels"
+    ~pp:(fun ppf (stored_levels, minimal_levels) ->
+      Format.fprintf
+        ppf
+        "The node's history mode specifies that data for %d levels should be \
+         stored, but the minimum required is %d levels."
+        stored_levels
+        minimal_levels)
+    Data_encoding.(
+      obj2 (req "stored_levels" int31) (req "minimal_levels" int31))
+    (function
+      | Not_enough_history {stored_levels; minimal_levels} ->
+          Some (stored_levels, minimal_levels)
+      | _ -> None)
+    (fun (stored_levels, minimal_levels) ->
+      Not_enough_history {stored_levels; minimal_levels}) ;
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 

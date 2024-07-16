@@ -193,6 +193,18 @@ let failed_to_fetch_block =
     ("last_notified", Data_encoding.int32)
     ("error", Error_monad.trace_encoding)
 
+let history_mode_warning =
+  declare_2
+    ~section
+    ~name:"dal_node_history_mode_warning"
+    ~msg:
+      "The node will only store data related to the last {stored_levels} \
+       levels, but it should store data for {storage_period} levels in order \
+       to be able to participate in refutation games"
+    ~level:Warning
+    ("stored_levels", Data_encoding.int31)
+    ("storage_period", Data_encoding.int31)
+
 let configuration_loaded =
   declare_0
     ~section
