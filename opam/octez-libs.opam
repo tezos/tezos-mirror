@@ -49,8 +49,8 @@ depends: [
   "eqaf"
   "ppx_repr" { >= "0.6.0" }
   "base-unix"
-  "ppx_deriving"
   "repr"
+  "ppx_deriving"
   "stdint"
   "octez-distributed-lwt-internal" { = version }
   "aches-lwt" { >= "1.1.0" }
