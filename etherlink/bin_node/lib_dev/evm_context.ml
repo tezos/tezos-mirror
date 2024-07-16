@@ -1564,10 +1564,8 @@ let get_evm_state block =
         block
   | Some evm_state -> return evm_state
 
-let execute_and_inspect ?wasm_entrypoint
-    ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) input =
+let execute_and_inspect ?wasm_entrypoint evm_state input =
   let open Lwt_result_syntax in
-  let* evm_state = get_evm_state block in
   let*! data_dir, config = execution_config in
   Evm_state.execute_and_inspect
     ~data_dir

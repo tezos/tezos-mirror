@@ -30,12 +30,25 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module SimulatorBackend = struct
-    let simulate_and_read ?block ~input () =
+    type simulation_state = Evm_state.t
+
+    let simulation_state
+        ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) () =
+      Evm_context.get_evm_state block
+
+    let simulate_and_read simulation_state ~input =
       let open Lwt_result_syntax in
-      let* raw_insights = Evm_context.execute_and_inspect ?block input in
+      let* raw_insights =
+        Evm_context.execute_and_inspect simulation_state input
+      in
       match raw_insights with
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
+
+    let read simulation_state ~path =
+      let open Lwt_result_syntax in
+      let*! res = Evm_state.inspect simulation_state path in
+      return res
   end
 
   let block_param_to_block_number = Evm_context.block_param_to_block_number
