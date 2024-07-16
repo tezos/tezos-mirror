@@ -152,8 +152,10 @@ module S = struct
   let full_balance =
     RPC_service.get_service
       ~description:
-        "Access the full balance of a contract, including staked tez, unstake \
-         requests, and frozen bonds."
+        "The full balance (in mutez) of the contract. Includes its spendable \
+         balance, staked tez, unstake requests, and frozen bonds. Even if the \
+         contract is a delegate, it does not include any staked or delegated \
+         tez owned by external delegators."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "full_balance")
