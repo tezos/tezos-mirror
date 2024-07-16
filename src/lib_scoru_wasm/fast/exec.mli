@@ -30,6 +30,7 @@ open Tezos_webassembly_interpreter
     {!Constants.wasm_entrypoint} when omitted. *)
 val compute :
   ?wasm_entrypoint:string ->
+  hooks:Hooks.t ->
   version:Wasm_pvm_state.version ->
   reveal_builtins:Builtins.reveals ->
   write_debug:Builtins.write_debug ->

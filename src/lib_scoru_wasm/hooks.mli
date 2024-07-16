@@ -8,6 +8,7 @@
 (** A collection of hooks to personalize the execution of the WASM Fast
     Execution. *)
 type t = {
+  fast_exec_invalid_kernel : (unit -> unit Lwt.t) option;
   fast_exec_panicked : (unit -> unit Lwt.t) option;
   fast_exec_completed : (unit -> unit Lwt.t) option;
   fast_exec_fallback : bool;
@@ -16,6 +17,11 @@ type t = {
 (** [no_hooks] is the empty collection of hooks, which can be used as a
     baseline to build hooks collection. *)
 val no_hooks : t
+
+(** [on_fast_exec_invalid_kernel k hooks] {b replaces b} the hook executed
+    when the Fast Execution engine is requested to run a kernel not satisfying
+    the WASM PVM constraints. *)
+val on_fast_exec_invalid_kernel : (unit -> unit Lwt.t) -> t -> t
 
 (** [on_fast_exec_panicked k hooks] {b replaces b} the hook executed when
     the Fast Execution engine panics by [k] in [hooks]. *)
