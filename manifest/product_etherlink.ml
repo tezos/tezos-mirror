@@ -11,6 +11,7 @@ open Manifest
 open Externals
 open Internals
 open Product_octez
+open Product_prometheus
 
 include Product (struct
   let name = "etherlink"

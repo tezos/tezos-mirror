@@ -6,6 +6,7 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml tezos_protocol.m
        externals.ml \
        internals.ml \
        product_data_encoding.mli product_data_encoding.ml \
+       product_prometheus.mli product_prometheus.ml \
        product_resto.mli product_resto.ml \
        product_octez.mli product_octez.ml \
        product_client_libs.mli product_client_libs.ml \

@@ -204,12 +204,6 @@ let pringo = external_lib "pringo" V.(at_least "1.3" && less_than "1.4")
 
 let progress = external_lib "progress" V.(at_least "0.1.0")
 
-let prometheus = external_lib "prometheus" V.(at_least "1.2")
-
-let prometheus_app = external_lib "prometheus-app" V.(at_least "1.2")
-
-let prometheus_app_unix = external_sublib prometheus_app "prometheus-app.unix"
-
 let pyml = external_lib "pyml" V.(at_least "20220905")
 
 let qcheck_alcotest = external_lib "qcheck-alcotest" V.(at_least "0.20")

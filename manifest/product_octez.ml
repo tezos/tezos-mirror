@@ -11,6 +11,7 @@ open Manifest
 open Externals
 open Internals
 open Product_data_encoding
+open Product_prometheus
 open Product_resto
 
 include Product (struct
