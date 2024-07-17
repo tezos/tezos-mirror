@@ -112,7 +112,8 @@ let terminated =
 
 let rec wait_next_event ~timeout loop_state =
   let open Lwt_result_syntax in
-  (* TODO? should we prioritize head events/timeouts to resynchronize if needs be ? *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7388
+     should we prioritize head events/timeouts to resynchronize if needs be ? *)
   let get_head_event () =
     (* n.b. we should also consume the available elements in the
        block_stream before starting baking. *)
@@ -313,9 +314,10 @@ let first_potential_round_at_next_level state ~earliest_round =
    searching, because baking slots repeat themselves modulo the
    [committee_size]. *)
 
-(** From the current [state], the function returns an optional
-    association pair, which consists of the next baking timestamp and
-    its baking round. In that case, an elected block must exist. *)
+(** [compute_next_potential_baking_time state] From the current [state], the
+    function returns an optional association pair, which consists of the next
+    baking timestamp and its baking round. In that case, an elected block must
+    exist. *)
 let compute_next_potential_baking_time_at_next_level state =
   let open Lwt_syntax in
   let open Protocol.Alpha_context in
@@ -478,7 +480,8 @@ let compute_next_potential_baking_time_at_next_level state =
 let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     =
   let open Lwt_result_syntax in
-  (* FIXME: this function (may) try to instantly repropose a block *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7389
+     this function (may) try to instantly repropose a block *)
   let open Baking_state in
   let wait_end_of_round ?(delta = 0L) (next_round_time, next_round) =
     let next_time = Time.Protocol.add next_round_time delta in
@@ -575,7 +578,8 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
            Lwt.return
              (Time_to_prepare_next_level_block {at_round = next_baking_round}))
   in
-  (* TODO: re-use what has been done in round_synchronizer.ml *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7390
+     re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)
   let next_round = compute_next_round_time state in
   let*! next_baking = compute_next_potential_baking_time_at_next_level state in
@@ -677,7 +681,8 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     operation_worker ~(current_proposal : Baking_state.proposal) ?constants
     delegates =
   let open Lwt_result_syntax in
-  (* FIXME? consider saved attestable value *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
+     consider saved attestable value *)
   let open Protocol in
   let open Baking_state in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
@@ -992,11 +997,6 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
           let*! _ = Lwt_canceler.cancel revelation_worker_canceler in
           Lwt.return_unit))
     canceler ;
-  (* FIXME: currently, the client streamed RPC call will hold until at
-     least one element is present in the stream. This is fixed by:
-     https://gitlab.com/nomadic-labs/resto/-/merge_requests/50. Until
-     then, we await the promise completion of the RPC call later
-     on. *)
   let get_valid_blocks_stream =
     let*! vbs = Node_rpc.monitor_valid_proposals cctxt ~cache ~chain () in
     match vbs with
@@ -1015,7 +1015,8 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
   in
   let on_error err =
     let*! () = Events.(emit error_while_baking err) in
-    (* TODO? retry a bounded number of time *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7393
+       retry a bounded number of time *)
     (* let retries = config.Baking_configuration.retries_on_failure in *)
     on_error err
   in
