@@ -30,12 +30,16 @@ let section = ["node"; "store"]
 
 (* Info *)
 let init_store =
-  declare_1
+  declare_2
     ~section
     ~level:Info
     ~name:"init_store"
-    ~msg:"initializing the store (readonly:{ro})"
+    ~msg:
+      "initializing the store (readonly:{ro}, \
+       context_pruning:{context_pruning})"
     ("ro", Data_encoding.bool)
+    ~pp2:Storage_maintenance.pp_context_pruning
+    ("context_pruning", Storage_maintenance.context_pruning_encoding)
 
 let end_init_store =
   declare_0

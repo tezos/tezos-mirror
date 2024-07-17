@@ -91,6 +91,7 @@ and chain_store = {
     Protocol_hash.Table.t;
   lockfile : Lwt_unix.file_descr;
   stored_data_lockfile : Lwt_unix.file_descr;
+  context_pruning : Storage_maintenance.context_pruning;
 }
 
 and chain_state = {
@@ -1647,24 +1648,30 @@ module Chain = struct
      created chunk will be ended by a commit that will be the target
      of a future gc call as reorganization may occur above the last
      preserved block level. Most of the time, and as reorganization
-     are often short, this will lead to the optimal behaviour. *)
-  let may_split_context chain_store new_head_lpbl previous_head =
+     are often short, this will lead to the optimal behaviour.
+
+     As the split is necessary in the scope of the context pruning
+     only, it may be discarded depending on [context_pruning]. *)
+  let may_split_context ~context_pruning chain_store new_head_lpbl previous_head
+      =
     let open Lwt_result_syntax in
-    match history_mode chain_store with
-    | Archive -> return_unit
-    | Full _ | Rolling _ ->
-        let* previous_head_metadata =
-          Block.get_block_metadata chain_store previous_head
-        in
-        if
-          not
-            (Int32.equal
-               new_head_lpbl
-               (Block.last_preserved_block_level previous_head_metadata))
-        then
-          let block_store = chain_store.block_store in
-          Block_store.split_context block_store new_head_lpbl
-        else return_unit
+    if context_pruning = Storage_maintenance.Enabled then
+      match history_mode chain_store with
+      | Archive -> return_unit
+      | Full _ | Rolling _ ->
+          let* previous_head_metadata =
+            Block.get_block_metadata chain_store previous_head
+          in
+          if
+            not
+              (Int32.equal
+                 new_head_lpbl
+                 (Block.last_preserved_block_level previous_head_metadata))
+          then
+            let block_store = chain_store.block_store in
+            Block_store.split_context block_store new_head_lpbl
+          else return_unit
+    else return_unit
 
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
@@ -1716,7 +1723,13 @@ module Chain = struct
         let new_head_lpbl =
           Block.last_preserved_block_level new_head_metadata
         in
-        let* () = may_split_context chain_store new_head_lpbl previous_head in
+        let* () =
+          may_split_context
+            ~context_pruning:chain_store.context_pruning
+            chain_store
+            new_head_lpbl
+            previous_head
+        in
         let*! cementing_highwatermark =
           locked_determine_cementing_highwatermark
             chain_store
@@ -1812,6 +1825,7 @@ module Chain = struct
                       (WithExceptions.Option.get
                          ~loc:__LOC__
                          cementing_highwatermark)
+                    ~context_pruning:chain_store.context_pruning
                 in
                 (* The new memory highwatermark is new_head_lpbl, the disk
                    value will be updated after the merge completion. *)
@@ -2166,8 +2180,8 @@ module Chain = struct
           }
 
   let create_chain_store ?block_cache_limit global_store chain_dir ?target
-      ~chain_id ?(expiration = None) ?genesis_block ~genesis ~genesis_context
-      history_mode =
+      ~chain_id ?(expiration = None) ~context_pruning ?genesis_block ~genesis
+      ~genesis_context history_mode =
     let open Lwt_result_syntax in
     (* Chain directory *)
     let genesis_block =
@@ -2216,12 +2230,13 @@ module Chain = struct
         block_rpc_directories;
         lockfile;
         stored_data_lockfile;
+        context_pruning;
       }
     in
     return chain_store
 
   let load_chain_store ?block_cache_limit global_store chain_dir ~chain_id
-      ~readonly =
+      ~readonly ~context_pruning =
     let open Lwt_result_syntax in
     let* chain_config_data =
       Stored_data.load (Naming.chain_config_file chain_dir)
@@ -2263,6 +2278,7 @@ module Chain = struct
             block_rpc_directories;
             lockfile;
             stored_data_lockfile;
+            context_pruning;
           }
         in
         (* Also initalize the live blocks *)
@@ -2340,6 +2356,7 @@ module Chain = struct
                 testchain_dir
                 ~chain_id
                 ~readonly:false
+                ~context_pruning:Enabled
             in
             let testchain = {forked_block; testchain_store} in
             return_some testchain)
@@ -2409,6 +2426,7 @@ module Chain = struct
                   testchain_dir
                   ~chain_id:testchain_id
                   ~expiration:(Some expiration)
+                  ~context_pruning:Enabled
                   ~genesis_block
                   ~genesis
                   ~genesis_context
@@ -2670,7 +2688,7 @@ end
 
 let create_store ?block_cache_limit ~context_index ~chain_id ~genesis
     ~genesis_context ?(history_mode = History_mode.default) ~allow_testchains
-    store_dir =
+    ~context_pruning store_dir =
   let open Lwt_result_syntax in
   let store_dir_path = Naming.dir_path store_dir in
   let*! () = Lwt_utils_unix.create_dir store_dir_path in
@@ -2696,6 +2714,7 @@ let create_store ?block_cache_limit ~context_index ~chain_id ~genesis
       chain_dir
       ~chain_id
       ~expiration:None
+      ~context_pruning
       ~genesis
       ~genesis_context
       history_mode
@@ -2704,7 +2723,7 @@ let create_store ?block_cache_limit ~context_index ~chain_id ~genesis
   return global_store
 
 let load_store ?history_mode ?block_cache_limit store_dir ~context_index
-    ~genesis ~chain_id ~allow_testchains ~readonly () =
+    ~genesis ~chain_id ~allow_testchains ~readonly ~context_pruning () =
   let open Lwt_result_syntax in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let* () =
@@ -2757,6 +2776,7 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
       chain_dir
       ~chain_id
       ~readonly
+      ~context_pruning
   in
   let stored_genesis = Chain.genesis main_chain_store in
   let* () =
@@ -2795,9 +2815,10 @@ let check_history_mode_consistency chain_dir history_mode =
       else (* Store is not yet initialized. *) return_unit
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
-    ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
+    ?block_cache_limit ?(context_pruning = Storage_maintenance.Enabled)
+    ~store_dir ~context_dir ~allow_testchains genesis =
   let open Lwt_result_syntax in
-  let*! () = Store_events.(emit init_store) readonly in
+  let*! () = Store_events.(emit init_store) (readonly, context_pruning) in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
@@ -2837,6 +2858,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
         ~chain_id
         ~allow_testchains
         ~readonly
+        ~context_pruning
         ()
     else
       (* Fresh store *)
@@ -2846,6 +2868,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
         store_dir
         ~context_index
         ~chain_id
+        ~context_pruning
         ~genesis
         ~genesis_context
         ?history_mode
@@ -2988,6 +3011,7 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
         ~chain_id
         ~allow_testchains:true
         ~readonly:false
+        ~context_pruning:Enabled
         ()
     in
     let chain_store = main_chain_store store in
@@ -3369,6 +3393,7 @@ module Unsafe = struct
             ~chain_id
             ~allow_testchains:false
             ~readonly:true
+            ~context_pruning:Disabled
             ()
         in
         let chain_store = main_chain_store store in
