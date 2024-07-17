@@ -1029,7 +1029,9 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
       | Some {context; _} ->
           let start_timestamp = Time.System.now () in
           let* gc_lockfile =
-            Utils.lock (gc_lockfile_path ~data_dir:node_ctxt.data_dir)
+            Lwt_lock_file.lock
+              ~when_locked:`Block
+              ~filename:(gc_lockfile_path ~data_dir:node_ctxt.data_dir)
           in
           let*! () = Event.calling_gc ~gc_level ~head_level:level in
           let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
@@ -1047,7 +1049,7 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
                 Metrics.GC.set_process_time
                 @@ Ptime.diff stop_timestamp start_timestamp) ;
             let* () = Event.gc_finished ~gc_level ~head_level:level in
-            Utils.unlock gc_lockfile
+            Lwt_lock_file.unlock gc_lockfile
           in
           if wait_finished then
             let*! () = gc_waiter () in

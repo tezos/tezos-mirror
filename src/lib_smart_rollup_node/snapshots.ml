@@ -661,9 +661,15 @@ let snapshotable_files_regexp =
 let with_locks ~data_dir f =
   Format.eprintf "Acquiring GC lock@." ;
   (* Take GC lock first in order to not prevent progression of rollup node. *)
-  Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
+  Lwt_lock_file.with_lock
+    ~when_locked:`Block
+    ~filename:(Node_context.gc_lockfile_path ~data_dir)
+  @@ fun () ->
   Format.eprintf "Acquiring process lock@." ;
-  Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir) f
+  Lwt_lock_file.with_lock
+    ~when_locked:`Block
+    ~filename:(Node_context.processing_lockfile_path ~data_dir)
+    f
 
 let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
@@ -801,7 +807,9 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   in
   Format.eprintf "Acquiring process lock@." ;
   let* () =
-    Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
+    Lwt_lock_file.with_lock
+      ~when_locked:`Block
+      ~filename:(Node_context.processing_lockfile_path ~data_dir)
     @@ fun () ->
     Format.eprintf "Copying data@." ;
     Tezos_stdlib_unix.Utils.copy_dir store_dir tmp_store_dir ;
@@ -949,9 +957,10 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
   let* () = unless force (check_data_dir_unpopulated data_dir) in
   let*! () = Lwt_utils_unix.create_dir data_dir in
   let*! () = Event.acquiring_lock () in
-  Utils.with_lockfile
-    ~when_locked:`Fail
-    (Node_context.global_lockfile_path ~data_dir)
+  let lockfile = Node_context.global_lockfile_path ~data_dir in
+  Lwt_lock_file.with_lock
+    ~when_locked:(`Fail (Rollup_node_errors.Could_not_acquire_lock lockfile))
+    ~filename:lockfile
   @@ fun () ->
   let reader =
     if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
