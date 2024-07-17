@@ -90,8 +90,10 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   in
   let job_build_rpm_amd64 = job_build_rpm_amd64 () in
   let ( jobs_debian_repository,
-        job_build_ubuntu_package_current,
-        job_build_debian_package_current ) =
+        job_build_ubuntu_package_current_a,
+        job_build_debian_package_current_a,
+        job_build_ubuntu_package_current_b,
+        job_build_debian_package_current_b ) =
     Debian_repository.jobs Release
   in
   let job_gitlab_release_or_publish =
@@ -101,8 +103,10 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
           Artifacts job_static_x86_64_release;
           Artifacts job_static_arm64_release;
           Artifacts job_build_rpm_amd64;
-          Artifacts job_build_ubuntu_package_current;
-          Artifacts job_build_debian_package_current;
+          Artifacts job_build_ubuntu_package_current_a;
+          Artifacts job_build_debian_package_current_a;
+          Artifacts job_build_ubuntu_package_current_b;
+          Artifacts job_build_debian_package_current_b;
         ]
     in
     match release_tag_pipeline_type with

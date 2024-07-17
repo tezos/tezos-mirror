@@ -134,22 +134,41 @@ let jobs pipeline_type =
 
   (* These jobs build the current packages in a matrix using the
      build dependencies images *)
-  let job_build_debian_package_current : tezos_job =
+  let job_build_debian_package_current_a : tezos_job =
     make_job_build_debian_packages
       ~__POS__
-      ~name:"oc.build-debian-current"
+      ~name:"oc.build-debian-current_a"
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_current.sh"
+      ~script:"./scripts/ci/build-debian-packages_current.sh A"
       ~matrix:(debian_package_release_matrix pipeline_type)
   in
-  let job_build_ubuntu_package_current : tezos_job =
+  let job_build_ubuntu_package_current_a : tezos_job =
     make_job_build_debian_packages
       ~__POS__
-      ~name:"oc.build-ubuntu-current"
+      ~name:"oc.build-ubuntu-current_a"
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_current.sh"
+      ~script:"./scripts/ci/build-debian-packages_current.sh A"
+      ~matrix:(ubuntu_package_release_matrix pipeline_type)
+  in
+
+  let job_build_debian_package_current_b : tezos_job =
+    make_job_build_debian_packages
+      ~__POS__
+      ~name:"oc.build-debian-current_b"
+      ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
+      ~script:"./scripts/ci/build-debian-packages_current.sh B"
+      ~matrix:(debian_package_release_matrix pipeline_type)
+  in
+  let job_build_ubuntu_package_current_b : tezos_job =
+    make_job_build_debian_packages
+      ~__POS__
+      ~name:"oc.build-ubuntu-current_b"
+      ~distribution:"ubuntu"
+      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
+      ~script:"./scripts/ci/build-debian-packages_current.sh B"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
@@ -179,7 +198,12 @@ let jobs pipeline_type =
     job_apt_repo
       ~__POS__
       ~name:"apt_repo_debian_current"
-      ~dependencies:(Dependent [Artifacts job_build_debian_package_current])
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_build_debian_package_current_a;
+             Artifacts job_build_debian_package_current_b;
+           ])
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
@@ -187,7 +211,12 @@ let jobs pipeline_type =
     job_apt_repo
       ~__POS__
       ~name:"apt_repo_ubuntu_current"
-      ~dependencies:(Dependent [Artifacts job_build_ubuntu_package_current])
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_build_ubuntu_package_current_a;
+             Artifacts job_build_ubuntu_package_current_b;
+           ])
       ~image:Images.ubuntu_focal
       ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
   in
@@ -236,7 +265,8 @@ let jobs pipeline_type =
     [
       job_docker_build_debian_dependencies;
       job_build_debian_package;
-      job_build_debian_package_current;
+      job_build_debian_package_current_a;
+      job_build_debian_package_current_b;
       job_apt_repo_debian_current;
     ]
   in
@@ -244,24 +274,31 @@ let jobs pipeline_type =
     [
       job_docker_build_ubuntu_dependencies;
       job_build_ubuntu_package;
-      job_build_ubuntu_package_current;
+      job_build_ubuntu_package_current_a;
+      job_build_ubuntu_package_current_b;
       job_apt_repo_ubuntu_current;
     ]
   in
   match pipeline_type with
   | Partial ->
       ( debian_jobs @ test_current_debian_packages_jobs,
-        job_build_ubuntu_package_current,
-        job_build_debian_package_current )
+        job_build_ubuntu_package_current_a,
+        job_build_debian_package_current_a,
+        job_build_ubuntu_package_current_b,
+        job_build_debian_package_current_b )
   | Full ->
       ( debian_jobs @ ubuntu_jobs @ test_current_debian_packages_jobs
         @ test_current_ubuntu_packages_jobs,
-        job_build_ubuntu_package_current,
-        job_build_debian_package_current )
+        job_build_ubuntu_package_current_a,
+        job_build_debian_package_current_a,
+        job_build_ubuntu_package_current_b,
+        job_build_debian_package_current_b )
   | Release ->
       ( debian_jobs @ ubuntu_jobs,
-        job_build_ubuntu_package_current,
-        job_build_debian_package_current )
+        job_build_ubuntu_package_current_a,
+        job_build_debian_package_current_a,
+        job_build_ubuntu_package_current_b,
+        job_build_debian_package_current_b )
 
 let debian_repository_child_pipeline pipeline_type =
   let pipeline_name =
@@ -270,5 +307,5 @@ let debian_repository_child_pipeline pipeline_type =
     | Full -> "debian_repository_full"
     | Release -> "debian_repository_release"
   in
-  let jobs, _, _ = jobs pipeline_type in
+  let jobs, _, _, _, _ = jobs pipeline_type in
   Pipeline.register_child pipeline_name ~jobs
