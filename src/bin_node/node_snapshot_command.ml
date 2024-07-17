@@ -187,9 +187,9 @@ module Term = struct
       in
       let* () = Data_version.ensure_data_dir ~mode:Is_bare genesis data_dir in
       (* Lock only on snapshot import *)
-      Lwt_lock_file.try_with_lock
-        ~when_locked:(fun () ->
-          failwith "Data directory is locked by another process")
+      Lwt_lock_file.with_lock
+        ~when_locked:
+          (`Fail (Exn (Failure "Data directory is locked by another process")))
         ~filename:(Data_version.lock_file data_dir)
       @@ fun () ->
       let* sandbox_parameters =

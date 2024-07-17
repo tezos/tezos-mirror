@@ -478,9 +478,9 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
       config.blockchain_network.genesis
       config.data_dir
   in
-  Lwt_lock_file.try_with_lock
-    ~when_locked:(fun () ->
-      failwith "Data directory is locked by another process")
+  Lwt_lock_file.with_lock
+    ~when_locked:
+      (`Fail (Exn (Failure "Data directory is locked by another process")))
     ~filename:(Data_version.lock_file config.data_dir)
   @@ fun () ->
   (* Main loop *)
