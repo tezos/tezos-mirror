@@ -842,7 +842,9 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
       client
   in
   let* etherlink_rollup_operator_key =
-    Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
+    if configuration.etherlink then
+      Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
+    else Lwt.return []
   in
   let* parameter_file =
     let base =
@@ -864,6 +866,9 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
       ~additional_bootstrap_accounts
       ~base
       []
+  in
+  let etherlink_rollup_operator_key =
+    match etherlink_rollup_operator_key with [key] -> Some key | _ -> None
   in
   let* () =
     Client.activate_protocol_and_wait
@@ -891,10 +896,7 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     {node = bootstrap_node; dal_node = dal_bootstrap_node; client}
   in
   Lwt.return
-    ( bootstrap,
-      baker_accounts,
-      producer_accounts,
-      List.hd etherlink_rollup_operator_key )
+    (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
 let init_baker cloud (configuration : configuration) ~bootstrap_node
     ~dal_bootstrap_node account i agent =
@@ -1356,6 +1358,9 @@ let init ~(configuration : configuration) cloud next_agent =
   in
   let* etherlink =
     if Cli.etherlink then
+      let etherlink_rollup_operator_key =
+        Option.get etherlink_rollup_operator_key
+      in
       let* etherlink =
         init_etherlink
           cloud
