@@ -32,7 +32,7 @@ module Parameters = struct
         (** The TCP address and port at which this instance can be reached. *)
     public_addr : string option;
     metrics_addr : string;
-    l1_node_endpoint : Client.endpoint;
+    l1_node_endpoint : Endpoint.t;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
   }
@@ -296,13 +296,10 @@ let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?listen_addr
     ?public_addr
     ?metrics_addr
-    ~l1_node_endpoint:(Client.Node node)
+    ~l1_node_endpoint:(Node.as_rpc_endpoint node)
     ()
 
 let make_arguments node =
-  let l1_endpoint =
-    Client.as_foreign_endpoint node.persistent_state.l1_node_endpoint
-  in
   let rpc_host =
     match node.persistent_state.runner with
     | Some _ -> Unix.(string_of_inet_addr inet_addr_any)
@@ -310,7 +307,7 @@ let make_arguments node =
   in
   [
     "--endpoint";
-    Endpoint.as_string l1_endpoint;
+    Endpoint.as_string node.persistent_state.l1_node_endpoint;
     "--rpc-addr";
     Format.asprintf "%s:%d" rpc_host (rpc_port node);
     "--net-addr";

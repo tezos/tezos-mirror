@@ -64,7 +64,7 @@ val create_from_endpoint :
   ?listen_addr:string ->
   ?public_addr:string ->
   ?metrics_addr:string ->
-  l1_node_endpoint:Client.endpoint ->
+  l1_node_endpoint:Endpoint.t ->
   unit ->
   t
 
