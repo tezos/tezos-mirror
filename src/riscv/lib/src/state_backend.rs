@@ -252,7 +252,7 @@ pub mod test_helpers {
 
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
-        type Backend<L: Layout>: Backend<Layout = L>;
+        type Backend<L: Layout>: Backend<Layout = L> + Clone;
 
         /// Construct a backend for the given layout `L`.
         fn new<L: Layout>() -> Self::Backend<L>;

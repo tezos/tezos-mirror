@@ -893,16 +893,25 @@ mod tests {
         MachineState, MachineStateLayout,
     };
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test,
+        bits::{Bits64, FixedWidthBits},
+        create_backend, create_state,
         machine_state::{
+            address_translation::pte::{PPNField, PageTableEntry},
+            bus::{main_memory::M1M, start_of_main_memory, Addressable},
             csregisters::{
+                satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},
                 CSRRepr, CSRegister,
             },
             mode::Mode,
-            registers::{a1, a2, t0, t2},
+            registers::{a0, a1, a2, t0, t1, t2, zero},
         },
-        state_backend::{CellRead, CellWrite},
+        parser::{
+            instruction::{CIBTypeArgs, ITypeArgs, Instr, SBTypeArgs},
+            parse_block,
+        },
+        state_backend::{tests::read_backend, CellRead, CellWrite},
         traps::{EnvironException, Exception, Interrupt, TrapContext},
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
@@ -1194,5 +1203,307 @@ mod tests {
                 MachineState::bind(space);
             machine_state.reset();
         });
+    });
+
+    // Test that the machine state does not behave differently when potential ephermeral state is
+    // reset that may impact instruction caching.
+    backend_test!(test_instruction_cache, F, {
+        // Instruction that writes the value in t1 to the address t0.
+        const I_WRITE_T1_TO_ADDRESS_T0: u32 = 0b0011000101010000000100011;
+        assert_eq!(
+            parse_block(&I_WRITE_T1_TO_ADDRESS_T0.to_le_bytes()),
+            [Instr::Sw(SBTypeArgs {
+                rs1: t0,
+                rs2: t1,
+                imm: 0
+            })]
+        );
+
+        // Instruction that loads 6 into t2.
+        const I_LOAD_6_INTO_T2: u32 = 0b11000000000001110010011;
+        assert_eq!(
+            parse_block(&I_LOAD_6_INTO_T2.to_le_bytes()),
+            [Instr::Addi(ITypeArgs {
+                rd: t2,
+                rs1: zero,
+                imm: 6
+            })]
+        );
+
+        // Instruction that loads 5 into t2.
+        const I_LOAD_5_INTO_T2: u32 = 0b10100000000001110010011;
+        assert_eq!(
+            parse_block(&I_LOAD_5_INTO_T2.to_le_bytes()),
+            [Instr::Addi(ITypeArgs {
+                rd: t2,
+                rs1: zero,
+                imm: 5
+            })]
+        );
+
+        let mut backend = create_backend!(MachineStateLayout<M1K>, F);
+
+        // Configure the machine state.
+        {
+            let mut state = create_state!(MachineState, MachineStateLayout<M1K>, F, backend, M1K);
+            state.reset();
+
+            let start_ram = start_of_main_memory::<M1K>();
+
+            // Write the instructions to the beginning of the main memory and point the program
+            // counter at the first instruction.
+            state.hart.pc.write(start_ram);
+            let instrs: [u8; 8] = [I_WRITE_T1_TO_ADDRESS_T0, I_LOAD_5_INTO_T2]
+                .into_iter()
+                .flat_map(u32::to_le_bytes)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+            state.bus.write_all(start_ram, &instrs).unwrap();
+
+            // Configure the machine in such a way that the first instruction will override the
+            // second instruction. The second instruction behaves differently.
+            let address_to_write = start_ram + 4;
+            state.hart.xregisters.write(t0, address_to_write);
+            state.hart.xregisters.write(t1, I_LOAD_6_INTO_T2 as u64);
+        }
+
+        let mut alt_backend = backend.clone();
+
+        // Perform 2 steps consecutively in one backend.
+        let result = {
+            let mut state = create_state!(MachineState, MachineStateLayout<M1K>, F, backend, M1K);
+            state.step().unwrap();
+            state.step().unwrap();
+            state.hart.xregisters.read(t2)
+        };
+
+        // Perform 2 steps separately in another backend by re-binding the state between steps.
+        let alt_result = {
+            {
+                let mut state =
+                    create_state!(MachineState, MachineStateLayout<M1K>, F, alt_backend, M1K);
+                state.step().unwrap();
+            }
+
+            {
+                let mut state =
+                    create_state!(MachineState, MachineStateLayout<M1K>, F, alt_backend, M1K);
+                state.step().unwrap();
+                state.hart.xregisters.read(t2)
+            }
+        };
+
+        // The two backends should have the same state.
+        assert_eq!(result, alt_result);
+        assert_eq!(read_backend(&backend), read_backend(&alt_backend));
+    });
+
+    // Test that the machine state does not behave differently when potential ephermeral state is
+    // reset that may impact instruction address translation caching.
+    backend_test!(test_instruction_address_cache, F, {
+        let mut backend = create_backend!(MachineStateLayout<M1M>, F);
+
+        // Specify the physcal memory layout.
+        let main_mem_addr = start_of_main_memory::<M1M>();
+        let code0_addr = main_mem_addr;
+        let code1_addr = code0_addr + 4096;
+        let root_page_table_addr = main_mem_addr + 16384;
+
+        // Initially we'll map the instructions to virtual address 4096.
+        let code_virt_addr = 4096;
+
+        // The root page table will be mapped to virtual address 16384.
+        let root_page_table_virt_addr = 16384;
+
+        // We will use Sv39 translation.
+        let satp = Satp::new(
+            FixedWidthBits::from_bits(root_page_table_addr >> 12),
+            FixedWidthBits::from_bits(0),
+            TranslationAlgorithm::Sv39,
+        );
+
+        // Generate the initial page table.
+        let init_page_table = {
+            let mut root_pt = vec![0u8; 4096];
+
+            // Generate the first page table entry which is used to loop back to the root page
+            // table for addresses where vpn[2] = 0 or vpn[1] = 0. This effectively disables
+            // translation for all VPN indices but the first (index 0).
+            let pte = PageTableEntry::new(
+                true,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                crate::bits::ConstantBits,
+                PPNField::from_bits(root_page_table_addr >> 12),
+                crate::bits::ConstantBits,
+                crate::bits::ConstantBits,
+                crate::bits::ConstantBits,
+            );
+            let pte_bytes = pte.to_bits().to_le_bytes();
+            root_pt[..8].copy_from_slice(&pte_bytes);
+
+            // Generate the page table entry for code block. This maps [code_virt_addr] to
+            // [code0_addr] initially.
+            let pte = PageTableEntry::new(
+                true,
+                true,
+                false,
+                true,
+                false,
+                true,
+                true,
+                true,
+                crate::bits::ConstantBits,
+                PPNField::from_bits(code0_addr >> 12),
+                crate::bits::ConstantBits,
+                crate::bits::ConstantBits,
+                crate::bits::ConstantBits,
+            );
+            let vpn = code_virt_addr >> 12;
+            let pte_offset = (8 * vpn) as usize;
+            let pte_bytes = pte.to_bits().to_le_bytes();
+            root_pt[pte_offset..pte_offset + 8].copy_from_slice(&pte_bytes);
+
+            // Generate the page table entry for the page table itself so we can modify it from
+            // user space. Maps [root_page_table_virt_addr] to [root_page_table_addr].
+            let pte = PageTableEntry::new(
+                true,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                true,
+                crate::bits::ConstantBits,
+                PPNField::from_bits(root_page_table_addr >> 12),
+                crate::bits::ConstantBits,
+                crate::bits::ConstantBits,
+                crate::bits::ConstantBits,
+            );
+            let vpn = root_page_table_virt_addr >> 12;
+            let pte_offset = (8 * vpn) as usize;
+            let pte_bytes = pte.to_bits().to_le_bytes();
+            root_pt[pte_offset..pte_offset + 8].copy_from_slice(&pte_bytes);
+
+            root_pt
+        };
+
+        // Generate a new PTE that will be used to override the root page table at index 1.
+        // It'll effectively remap [code_virt_addr] from [code0_addr] to [code1_addr].
+        let new_pte = PageTableEntry::new(
+            true,
+            true,
+            false,
+            true,
+            false,
+            true,
+            true,
+            true,
+            crate::bits::ConstantBits,
+            PPNField::from_bits(code1_addr >> 12),
+            crate::bits::ConstantBits,
+            crate::bits::ConstantBits,
+            crate::bits::ConstantBits,
+        );
+
+        // Instructions at [code0_addr].
+        let instrs0 = [
+            0x00533423, // sd t0, 8(t1); change the root page table
+            0x4505,     // c.li a0, 1;   "return" 1
+        ]
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect::<Vec<_>>();
+        assert_eq!(
+            parse_block(instrs0.as_slice()),
+            [
+                Instr::Sd(SBTypeArgs {
+                    rs1: t1,
+                    rs2: t0,
+                    imm: 8
+                }),
+                Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 }),
+                Instr::UnknownCompressed { instr: 0 }
+            ]
+        );
+
+        // Instructions at [code1_addr].
+        let instrs1 = [
+            0x00533423, // sd t0, 8(t1); change the root page table
+            0x4509,     // c.li a0, 2;   "return" 2
+        ]
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect::<Vec<_>>();
+        assert_eq!(
+            parse_block(instrs1.as_slice()),
+            [
+                Instr::Sd(SBTypeArgs {
+                    rs1: t1,
+                    rs2: t0,
+                    imm: 8
+                }),
+                Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 2 }),
+                Instr::UnknownCompressed { instr: 0 }
+            ]
+        );
+
+        // Configure the state backend.
+        {
+            let mut state = create_state!(MachineState, MachineStateLayout<M1M>, F, backend, M1M);
+            state.reset();
+
+            state
+                .bus
+                .write_all(root_page_table_addr, &init_page_table)
+                .unwrap();
+            state.bus.write_all(code0_addr, &instrs0).unwrap();
+            state.bus.write_all(code1_addr, &instrs1).unwrap();
+
+            state.hart.pc.write(code_virt_addr);
+
+            state.hart.mode.write(Mode::User);
+            state.hart.csregisters.write(CSRegister::satp, satp);
+
+            state.hart.xregisters.write(t0, new_pte.to_bits());
+            state.hart.xregisters.write(t1, root_page_table_virt_addr);
+        }
+
+        let mut alt_backend = backend.clone();
+
+        // Run 2 steps consecutively against one backend.
+        let result = {
+            let mut state = create_state!(MachineState, MachineStateLayout<M1M>, F, backend, M1M);
+            state.step().unwrap();
+            state.step().unwrap();
+            state.hart.xregisters.read(a0)
+        };
+
+        // Perform 2 steps separately in another backend by re-binding the state between steps.
+        let alt_result = {
+            {
+                let mut state =
+                    create_state!(MachineState, MachineStateLayout<M1M>, F, alt_backend, M1M);
+                state.step().unwrap();
+            }
+            {
+                let mut state =
+                    create_state!(MachineState, MachineStateLayout<M1M>, F, alt_backend, M1M);
+                state.step().unwrap();
+                state.hart.xregisters.read(a0)
+            }
+        };
+
+        // Both backends should have transitioned to the same state.
+        assert_eq!(result, 1);
+        assert_eq!(result, alt_result);
+        assert_eq!(read_backend(&backend), read_backend(&alt_backend));
     });
 }

@@ -18,7 +18,7 @@ use crate::{
 };
 
 mod physical_address;
-mod pte;
+pub mod pte;
 pub mod translation_cache;
 mod virtual_address;
 
@@ -246,7 +246,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Sv57 => SvLength::Sv57,
         };
 
-        let satp = self.hart.csregisters.read(CSRegister::satp);
+        let satp = Satp::from_bits(satp);
         sv_translate_impl(&self.bus, virt_addr, satp, sv_length, access_type)
             .map_err(|_e| access_type.exception(virt_addr))
     }
