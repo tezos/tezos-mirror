@@ -279,6 +279,22 @@ let end_merging_stores =
     ~pp1:Time.System.Span.pp_hum
     ("time", Time.System.Span.encoding)
 
+let delay_store_merging =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"start_delayed_maintenance"
+    ~msg:"delaying storage maintenance (target {level})"
+    ("level", Data_encoding.int32)
+
+let delayed_store_merging_countdown =
+  declare_1
+    ~section
+    ~level:Debug
+    ~name:"delayed_store_merging_countdown"
+    ~msg:"merging storage after {count} blocks scheduled delay"
+    ("count", Data_encoding.int32)
+
 let start_context_gc =
   declare_1
     ~section

@@ -201,7 +201,7 @@ let check_context_consistency store =
 
 let create ?(sandboxed = false) ?sandbox_parameters
     ?(context_pruning = Storage_maintenance.Enabled) ?history_mode
-    ~singleprocess ~version ~commit_info
+    ?maintenance_delay ~singleprocess ~version ~commit_info
     {
       genesis;
       chain_name;
@@ -254,6 +254,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ~allow_testchains:start_testchain
           ~readonly:false
           ~context_pruning
+          ?maintenance_delay
           genesis
       in
       let main_chain_store = Store.main_chain_store store in
@@ -295,6 +296,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ~allow_testchains:start_testchain
           ~readonly:false
           ~context_pruning
+          ?maintenance_delay
           genesis
       in
       return (validator_process, store)

@@ -73,7 +73,7 @@ type t = {
     Shell_limits.operation_metadata_size_limit option;
   enable_http_cache_headers : bool option;
   context_pruning : Storage_maintenance.context_pruning option;
-  storage_maintenance_delay : Storage_maintenance.delay;
+  storage_maintenance_delay : Storage_maintenance.delay option;
 }
 
 type error +=
@@ -781,14 +781,23 @@ module Term = struct
   let storage_maintenance_delay =
     let open Storage_maintenance in
     let doc = "Configures the storage maintenance delays" in
-    let get_storage_maintenance_delay_arg str =
-      match str with
-      | "disabled" -> `Ok Disabled
-      | _ -> `Error "storage-maintenance-delay only supports \"disabled\" mode"
+    let delay_converter =
+      let parse_storage_maintenance_delay_arg str =
+        match str with
+        | "disabled" -> `Ok Disabled
+        | _ -> (
+            match Int32.of_string_opt str with
+            | Some delay -> `Ok (Custom delay)
+            | None ->
+                `Error
+                  "delayed-storage-maintenance only supports \"disabled\" or \
+                   \"<int>\" mode")
+      in
+      (parse_storage_maintenance_delay_arg, pp_delay)
     in
     Arg.(
       value
-      & opt (get_storage_maintenance_delay_arg, pp_delay) Disabled
+      & opt (some delay_converter) None
       & info ~docs ~doc ["storage-maintenance-delay"])
 
   (* Args. *)
@@ -1115,7 +1124,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?latency
     ?enable_http_cache_headers
     ?context_pruning
-    ~storage_maintenance_delay
+    ?storage_maintenance_delay
     cfg
 
 let read_and_patch_config_file ?may_override_network ?emit

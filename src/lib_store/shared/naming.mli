@@ -139,6 +139,9 @@ val legacy_block_store_status_file :
   [`Chain_dir] directory ->
   ([`Status], Block_store_status.Legacy.t) encoded_file
 
+val scheduled_maintenance :
+  [`Chain_dir] directory -> int32 option Stored_data.file
+
 val cemented_blocks_dir :
   [< `Chain_dir | `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
   [`Cemented_blocks_dir] directory
