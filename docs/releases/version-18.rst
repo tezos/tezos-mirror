@@ -28,7 +28,7 @@ Octez version 18 improves performance, notably to the block validation process: 
 
 v18 also fixes a concurrency issue in the logging infrastructure which can cause the node to become temporarily unresponsive.
 
-As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_alpha>` for more details.
+As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_paris>` for more details.
 
 Version 18.1 fixes an issue that would result in corrupted full and rolling snapshots being exported.
 Thus, the snapshots version is bumped from ``6`` to ``7``.
@@ -52,7 +52,7 @@ Instead, these are guarded behind a *single* per-block vote mechanism, where bak
 Specifically, the Octez v18.0 Oxford baker executable introduces a dedicated option ``--adaptive-issuance-vote``, to allow bakers to manifest their choice.
 The use of this flag is *optional*, and defaults to **Pass** if not present.
 
-See :ref:`here <feature_activation_alpha>` for further details on this additional activation vote mechanism.
+See :ref:`here <feature_activation_paris>` for further details on this additional activation vote mechanism.
 
 
 Update Instructions
