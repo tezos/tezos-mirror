@@ -4670,46 +4670,6 @@ let test_keep_alive =
       let*@ _block_number = Rpc.block_number evm_node in
       unit)
 
-let test_regression_block_hash_gen =
-  (* This test is created because of bug in blockConstant in simulation,
-     which caused the simulation to return a wrong estimate of gas limit,
-     leading to failed contract deployment for block_hash_gen.
-     This test checks regression for the fix *)
-  Protocol.register_test
-    ~__FILE__
-    ~tags:
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/7375
-         Remove the `Tag.ci_disabled` tag to re-enable the test in the
-         CI. *)
-      ["evm"; "l2_call"; "block_hash"; "timestamp"; Tag.flaky; Tag.ci_disabled]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-      ])
-    ~title:"Random generation based on block hash and timestamp"
-  @@ fun protocol ->
-  (* Ok this one is tricky. As far as I understand the test can be
-     flaky because the estimateGas does not provide enough
-     gas. However, all estimateGas are run on the same block but do
-     not provide the same response, as the block number is constant I
-     make the timestamp constant as well to make the test more
-     predictible. I am not sure about the fix. In the worst case it
-     does not change the test semantics. *)
-  let timestamp = Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z")) in
-  let* ({evm_node; sc_rollup_node; client; _} as evm_setup) =
-    setup_evm_kernel ~admin:None ~timestamp protocol
-  in
-  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* block_hash_gen_resolved = block_hash_gen () in
-  let* _address, _tx =
-    deploy ~contract:block_hash_gen_resolved ~sender evm_setup
-  in
-  unit
-
 let test_reboot_out_of_ticks =
   register_proxy
     ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"; Tag.flaky]
@@ -6466,7 +6426,6 @@ let register_evm_node ~protocols =
   test_l2_intermediate_OOG_call protocols ;
   test_l2_ether_wallet protocols ;
   test_keep_alive protocols ;
-  test_regression_block_hash_gen protocols ;
   test_reboot_out_of_ticks protocols ;
   test_l2_timestamp_opcode protocols ;
   test_migrate_proxy_to_sequencer_past protocols ;

@@ -4784,6 +4784,36 @@ let test_finalized_block_param =
 
   unit
 
+let test_regression_block_hash_gen =
+  (* This test is created because of bug in blockConstant in simulation,
+     which caused the simulation to return a wrong estimate of gas limit,
+     leading to failed contract deployment for block_hash_gen.
+     This test checks regression for the fix *)
+  let timestamp = "2020-01-01T00:00:05Z" in
+  register_both
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"]
+    ~title:"Random generation based on block hash and timestamp"
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn timestamp))
+  @@ fun {sequencer; _} _protocol ->
+  let* () =
+    repeat 3 (fun _ ->
+        let*@ _ = produce_block sequencer ~timestamp in
+        unit)
+  in
+  let* {abi; bin; _} = Solidity_contracts.block_hash_gen () in
+  let* _contract, _tx_hash =
+    send_transaction
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi
+          ~bin)
+      sequencer
+  in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -4848,4 +4878,5 @@ let () =
   test_trace_call protocols ;
   test_patch_kernel protocols ;
   test_proxy_finalized_view protocols ;
-  test_finalized_block_param protocols
+  test_finalized_block_param protocols ;
+  test_regression_block_hash_gen protocols
