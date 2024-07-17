@@ -80,6 +80,40 @@ module Parameters = struct
       Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
     in
     from_protocol_parameters json |> return
+
+  let storage_period_with_refutation_in_cycles ~proto_parameters =
+    let blocks_per_cycle =
+      JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
+    in
+    let challenge_window =
+      JSON.(
+        proto_parameters |-> "smart_rollup_challenge_window_in_blocks" |> as_int)
+    in
+    let commitment_period =
+      JSON.(
+        proto_parameters |-> "smart_rollup_commitment_period_in_blocks"
+        |> as_int)
+    in
+    let validity_lag =
+      JSON.(
+        proto_parameters |-> "smart_rollup_reveal_activation_level"
+        |-> "dal_attested_slots_validity_lag" |> as_int)
+    in
+    let blocks = 2 * (challenge_window + commitment_period + validity_lag) in
+    if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
+    else 1 + (blocks / blocks_per_cycle)
+
+  let storage_period_without_refutation_in_cycles ~proto_parameters =
+    let blocks_per_cycle =
+      JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
+    in
+    let attestation_lag =
+      JSON.(
+        proto_parameters |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    in
+    let blocks = 2 * attestation_lag in
+    if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
+    else 1 + (blocks / blocks_per_cycle)
 end
 
 module Committee = struct

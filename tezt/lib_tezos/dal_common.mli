@@ -42,6 +42,11 @@ module Parameters : sig
   val from_protocol_parameters : JSON.t -> t
 
   val from_client : Client.t -> t Lwt.t
+
+  val storage_period_with_refutation_in_cycles : proto_parameters:JSON.t -> int
+
+  val storage_period_without_refutation_in_cycles :
+    proto_parameters:JSON.t -> int
 end
 
 module Helpers : sig
