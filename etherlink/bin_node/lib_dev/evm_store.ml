@@ -16,7 +16,11 @@ type pool =
 
 type sqlite_journal_mode = Wal | Other
 
-type levels = {l1_level : int32; current_number : Ethereum_types.quantity}
+type levels = {
+  l1_level : int32;
+  current_number : Ethereum_types.quantity;
+  finalized : Ethereum_types.quantity;
+}
 
 module Db = struct
   let caqti (p : ('a, Caqti_error.t) result Lwt.t) : 'a tzresult Lwt.t =
@@ -174,9 +178,11 @@ module Q = struct
 
   let levels =
     custom
-      ~encode:(fun {current_number; l1_level} -> Ok (current_number, l1_level))
-      ~decode:(fun (current_number, l1_level) -> Ok {current_number; l1_level})
-      (t2 level l1_level)
+      ~encode:(fun {current_number; l1_level; finalized} ->
+        Ok (current_number, l1_level, finalized))
+      ~decode:(fun (current_number, l1_level, finalized) ->
+        Ok {current_number; l1_level; finalized})
+      (t3 level l1_level level)
 
   let journal_mode =
     custom
@@ -325,17 +331,16 @@ module Q = struct
 
   module L1_l2_levels_relationships = struct
     let insert =
-      (t2 level l1_level ->. unit)
-      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level) VALUES (?, ?)|}
+      (t3 level l1_level level ->. unit)
+      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level, finalized_l2_level) VALUES (?, ?, ?)|}
 
     let get =
       (unit ->! levels)
-      @@ {|SELECT latest_l2_level, l1_level  FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
+      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level  FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level > ?|}
-
   end
 
   module Metadata = struct
@@ -563,11 +568,18 @@ module Delayed_transactions = struct
 end
 
 module L1_l2_levels_relationships = struct
-  type t = levels = {l1_level : int32; current_number : Ethereum_types.quantity}
+  type t = levels = {
+    l1_level : int32;
+    current_number : Ethereum_types.quantity;
+    finalized : Ethereum_types.quantity;
+  }
 
-  let store store l1_level l2_level =
+  let store store ~l1_level ~latest_l2_level ~finalized_l2_level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.L1_l2_levels_relationships.insert (l1_level, l2_level)
+    Db.exec
+      conn
+      Q.L1_l2_levels_relationships.insert
+      (latest_l2_level, l1_level, finalized_l2_level)
 
   let find store =
     with_connection store @@ fun conn ->

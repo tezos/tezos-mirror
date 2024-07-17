@@ -504,7 +504,11 @@ module State = struct
         Option.map_es
           (fun l1_level ->
             let l2_level = current_blueprint_number ctxt in
-            Evm_store.L1_l2_levels_relationships.store conn l2_level l1_level)
+            Evm_store.L1_l2_levels_relationships.store
+              conn
+              ~latest_l2_level:l2_level
+              ~l1_level
+              ~finalized_l2_level:ctxt.session.finalized_number)
           finalized_level
       in
       let* ctxt = replace_current_commit ctxt conn evm_state in
@@ -1151,7 +1155,11 @@ module Handlers = struct
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let l2_level = State.current_blueprint_number ctxt in
-        Evm_store.L1_l2_levels_relationships.store conn l2_level l1_level
+        Evm_store.L1_l2_levels_relationships.store
+          conn
+          ~latest_l2_level:l2_level
+          ~l1_level
+          ~finalized_l2_level:ctxt.session.finalized_number
     | Delayed_inbox_hashes ->
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in

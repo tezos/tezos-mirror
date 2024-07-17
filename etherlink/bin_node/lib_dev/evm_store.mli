@@ -113,9 +113,18 @@ module Delayed_transactions : sig
 end
 
 module L1_l2_levels_relationships : sig
-  type t = {l1_level : int32; current_number : Ethereum_types.quantity}
+  type t = {
+    l1_level : int32;
+    current_number : Ethereum_types.quantity;
+    finalized : Ethereum_types.quantity;
+  }
 
-  val store : conn -> Ethereum_types.quantity -> int32 -> unit tzresult Lwt.t
+  val store :
+    conn ->
+    l1_level:int32 ->
+    latest_l2_level:Ethereum_types.quantity ->
+    finalized_l2_level:Ethereum_types.quantity ->
+    unit tzresult Lwt.t
 
   val find : conn -> t option tzresult Lwt.t
 
