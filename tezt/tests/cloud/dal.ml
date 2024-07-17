@@ -1426,10 +1426,7 @@ let on_new_level t level =
             let baker_to_reconnect =
               (List.nth t.bakers (b mod nb_bakers)).dal_node
             in
-            Dal_common.Helpers.connect_nodes_via_p2p
-              (* TODO: Fix this! *)
-              (Option.get t.bootstrap.dal_node)
-              baker_to_reconnect)
+            Dal_node.run baker_to_reconnect)
       in
       Lwt.return {t with disconnection_state = Some disconnection_state}
 
