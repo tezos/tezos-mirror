@@ -7397,6 +7397,12 @@ let simulation_scenario_lib =
                      ( Str.regexp_string "open Tezos_protocol_alpha",
                        "open Tezos_protocol_" ^ Protocol.name_underscore proto
                      );
+                     ( Str.regexp_string
+                         "module Alpha_services = \
+                          Tezos_protocol_plugin_alpha.Plugin.Alpha_services",
+                       "module Alpha_services = Tezos_protocol_plugin_"
+                       ^ Protocol.name_underscore proto
+                       ^ ".Plugin.Alpha_services" );
                    ]
                in
                write tool_path (fun fmt -> Format.pp_print_string fmt contents)) ;
