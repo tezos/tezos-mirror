@@ -49,6 +49,9 @@ let scheduled = pipeline_source_eq Schedule
 let schedule_extended_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_TESTS"
 
+let schedule_extended_rpc_tests =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
+
 let on_master = Predefined_vars.ci_commit_branch == str "master"
 
 let on_branch branch = Predefined_vars.ci_commit_branch == str branch

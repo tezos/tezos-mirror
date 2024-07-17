@@ -1096,7 +1096,12 @@ let jobs pipeline_type =
        meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
        do not run in the CI.
 
-       For more information on tags, see [src/lib_test/tag.mli]. *)
+       For more information on tags, see [src/lib_test/tag.mli].
+
+       Important: the [Rpc_pipeline.jobs] function declares a set of
+       jobs that must match the ones defined below. Please update the
+       jobs accordingly.
+    *)
     let jobs_tezt =
       let dependencies =
         Dependent

@@ -51,6 +51,12 @@ val merge_train : If.t
     [TZ_SCHEDULE_KIND] set to [EXTENDED_TESTS]. *)
 val schedule_extended_tests : If.t
 
+(** A rule that is true for scheduled extended RPC test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_RPC_TESTS]. *)
+val schedule_extended_rpc_tests : If.t
+
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 
