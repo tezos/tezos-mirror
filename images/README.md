@@ -134,8 +134,18 @@ see `./scripts/create_docker_image.sh --help`.
 
 Like the Octez Docker distribution, the CI images are also built in
 the tezos/tezos CI. By default, `./scripts/create_docker_image.sh` is
-configured to pull the CI images from the CI if they cannot be found
-locally.
+configured to pull the CI images from the CI's protected Docker
+registry if they cannot be found locally.
+
+Note that if the image you want to use is from a branch that has not
+yet been merged to `master`, then it will not be in the protected
+Docker registry, but in the public one. To configure the script to use
+the public registry:
+
+```
+$ ./scripts/create_docker_image.sh \
+    --ci-image-name $(. ./scripts/version.sh; echo $GCP_PUBLIC_REGISTRY)/tezos/tezos/ci
+```
 
 ## Using local CI images
 
