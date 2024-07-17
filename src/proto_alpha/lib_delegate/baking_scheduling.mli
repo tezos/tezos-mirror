@@ -26,16 +26,11 @@
 open Baking_state
 open Protocol.Alpha_context
 
+(** {2 Scheduler state type}  *)
+
 type loop_state
 
-val create_loop_state :
-  ?get_valid_blocks_stream:proposal Lwt_stream.t Lwt.t ->
-  heads_stream:proposal Lwt_stream.t ->
-  forge_event_stream:forge_event Lwt_stream.t ->
-  Operation_worker.t ->
-  loop_state
-
-val sleep_until : Time.Protocol.t -> unit Lwt.t option
+(** {2 Functions used by the baker} *)
 
 (** [retry ctxt ~delay ?max_delay ~factor ~tries ?msg f x] retries applying [f
     x] [tries] until it succeeds or returns an error different from
@@ -55,13 +50,20 @@ val retry :
   'a ->
   'b tzresult Lwt.t
 
-(** An event monitor using the streams in [loop_state] (to create
-    promises) and a timeout promise [timeout]. The function reacts to a
-    promise being fulfilled by firing an event [Baking_state.event]. *)
-val wait_next_event :
-  timeout:[`Timeout of timeout_kind] Lwt.t ->
-  loop_state ->
-  (event option, error trace) result Lwt.t
+val run :
+  Protocol_client_context.full ->
+  ?canceler:Lwt_canceler.t ->
+  ?stop_on_event:(event -> bool) ->
+  ?on_error:(tztrace -> unit tzresult Lwt.t) ->
+  ?constants:Constants.t ->
+  chain:Chain_services.chain ->
+  Baking_configuration.t ->
+  consensus_key list ->
+  unit tzresult Lwt.t
+
+(** {2 Functions only needed for the baking_lib}  *)
+
+val sleep_until : Time.Protocol.t -> unit Lwt.t option
 
 (** Returns the first round at the next level, at or after
     [earliest_round], whose baking slot belongs to one of our own
@@ -75,7 +77,14 @@ val first_potential_round_at_next_level :
 val compute_next_potential_baking_time_at_next_level :
   state -> (Time.Protocol.t * Round.t) option Lwt.t
 
-val compute_next_timeout : state -> timeout_kind Lwt.t tzresult Lwt.t
+val compute_bootstrap_event : state -> event tzresult
+
+val create_loop_state :
+  ?get_valid_blocks_stream:proposal Lwt_stream.t Lwt.t ->
+  heads_stream:proposal Lwt_stream.t ->
+  forge_event_stream:forge_event Lwt_stream.t ->
+  Operation_worker.t ->
+  loop_state
 
 val create_initial_state :
   Protocol_client_context.full ->
@@ -88,8 +97,6 @@ val create_initial_state :
   consensus_key list ->
   state tzresult Lwt.t
 
-val compute_bootstrap_event : state -> event tzresult
-
 val automaton_loop :
   ?stop_on_event:(event -> bool) ->
   config:Baking_configuration.t ->
@@ -98,14 +105,3 @@ val automaton_loop :
   state ->
   event ->
   event option tzresult Lwt.t
-
-val run :
-  Protocol_client_context.full ->
-  ?canceler:Lwt_canceler.t ->
-  ?stop_on_event:(event -> bool) ->
-  ?on_error:(tztrace -> unit tzresult Lwt.t) ->
-  ?constants:Constants.t ->
-  chain:Chain_services.chain ->
-  Baking_configuration.t ->
-  consensus_key list ->
-  unit tzresult Lwt.t
