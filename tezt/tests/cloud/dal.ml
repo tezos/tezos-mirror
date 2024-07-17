@@ -73,12 +73,35 @@ module Disconnect = struct
     Lwt.return {t with disconnected_bakers = bakers_to_keep_disconnected}
 end
 
+module Network = struct
+  type t = Ghostnet | Sandbox
+
+  let to_string = function Ghostnet -> "ghostnet" | Sandbox -> "sandbox"
+end
+
 module Cli = struct
   let section =
     Clap.section
       ~description:
         "All the options related to running DAL scenarions onto the cloud"
       "Cloud DAL"
+
+  let network_typ =
+    Clap.typ
+      ~name:"network"
+      ~dummy:Network.Ghostnet
+      ~parse:(function
+        | "ghostnet" -> Some Ghostnet | "sandbox" -> Some Sandbox | _ -> None)
+      ~show:Network.to_string
+
+  let network =
+    Clap.default
+      ~section
+      ~long:"network"
+      ~placeholder:"<network> (sandbox,ghostnet,...)"
+      ~description:"Allow to specify a network to use for the scenario"
+      network_typ
+      Sandbox
 
   let stake =
     let stake_typ =
@@ -100,7 +123,7 @@ module Cli = struct
          shares old by one baker. The total stake is given by the sum of all \
          shares."
       stake_typ
-      [100]
+      (match network with Sandbox -> [100] | Ghostnet -> [])
 
   let stake_machine_type =
     let stake_machine_type_typ =
@@ -229,6 +252,7 @@ type configuration = {
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
   disconnect : (int * int) option;
+  network : Network.t;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -1285,7 +1309,9 @@ let init ~(configuration : configuration) cloud next_agent =
          baker_accounts,
          producer_accounts,
          etherlink_rollup_operator_key ) =
-    init_bootstrap cloud configuration bootstrap_agent
+    match configuration.network with
+    | Network.Sandbox -> init_bootstrap cloud configuration bootstrap_agent
+    | Ghostnet -> assert false
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -1487,6 +1513,7 @@ let configuration =
   let etherlink_sequencer = Cli.etherlink_sequencer in
   let etherlink_producers = Cli.etherlink_producers in
   let disconnect = Cli.disconnect in
+  let network = Cli.network in
   {
     stake;
     stake_machine_type;
@@ -1498,6 +1525,7 @@ let configuration =
     etherlink_sequencer;
     etherlink_producers;
     disconnect;
+    network;
   }
 
 let benchmark () =
