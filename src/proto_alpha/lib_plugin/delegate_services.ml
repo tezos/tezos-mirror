@@ -239,6 +239,22 @@ module S = struct
       ~output:(Data_encoding.list deposit_per_cycle_encoding)
       RPC_path.(path / "unstaked_frozen_deposits")
 
+  let total_delegated =
+    RPC_service.get_service
+      ~description:
+        "All tokens (in mutez) that currently count as delegated for the \
+         purpose of computing the baker's rights; they weigh half as much as \
+         staked tez in the rights. Limits such as overstaking and \
+         overdelegation have not been applied yet. This corresponds to all \
+         non-staked tez owned by the baker's delegators (including the baker \
+         itself): spendable balances, frozen bonds, and unstaked requests, \
+         except for any unstake requests that have been created before the \
+         delegator changed its delegate to the current baker (because they \
+         still count as delegated for the old delegate instead)."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "total_delegated")
+
   let staking_balance =
     RPC_service.get_service
       ~description:
@@ -421,6 +437,21 @@ let f_total_staked ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   total_staked ctxt pkh
 
+let total_staked_and_delegated ctxt pkh =
+  Delegate.For_RPC.staking_balance ctxt pkh
+
+let total_delegated ctxt pkh =
+  let open Lwt_result_syntax in
+  let* total_staked = total_staked ctxt pkh in
+  let* total_staked_and_delegated = total_staked_and_delegated ctxt pkh in
+  let*? total_delegated = Tez.(total_staked_and_delegated -? total_staked) in
+  return total_delegated
+
+let f_total_delegated ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  total_delegated ctxt pkh
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -489,6 +520,7 @@ let register () =
           let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
           return {cycle; deposit})
         cycles) ;
+  register1 ~chunked:false S.total_delegated f_total_delegated ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.staking_balance ctxt pkh) ;
