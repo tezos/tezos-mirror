@@ -166,7 +166,7 @@ The following figure describes the progressive maximum and minimum
 values of Adaptive Issuance.
 
 
-.. figure:: ai-min-max-new.jpeg
+.. figure:: ai-min-max.jpeg
 
  Figure 1. A gradual widening of the range ensures a smooth transition
  to Adaptive Issuance.
