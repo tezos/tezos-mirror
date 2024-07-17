@@ -1,27 +1,12 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2018-2024 Nomadic Labs <contact@nomadic-labs.com> *)
+(* SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>              *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** {2 Displaying progress} *)
 
 (** Print over the current [stdout] line. Takes a message formatting function of
     the form [(fun m -> m <format_string>)]. Message formatting occurs only when
@@ -29,7 +14,7 @@
     refresh_rate) = 0]). [refresh_rate] defaults to always printing the supplied
     message.
 
-    {2 Examples:}
+    {3 Examples:}
 
     - [display_progress (fun m -> m "Loading... %d/100" percent)].
 
@@ -44,3 +29,32 @@ val display_progress :
 
 (** Finalizes progress display *)
 val display_progress_end : unit -> unit
+
+(** {2 Files manipulation} *)
+
+(** [list_files dir ~include_file f] lists the files in directory [dir] which
+    satisfy predicate [include_file] (by default all files) and applies [f] on
+    each element. The result is returned as a stream.  *)
+val list_files :
+  string ->
+  ?include_file:(relative_path:string -> bool) ->
+  (full_path:string -> relative_path:string -> 'a) ->
+  'a Stream.t
+
+(** [directory_contents_size ~include_file] returns the total size of contents
+    of directory [dir] which satisfy the predicate [include_file].  *)
+val directory_contents_size :
+  ?include_file:(relative_path:string -> bool) -> string -> int
+
+(** [create_dir ~perm path] creates directory [path] with permissions [perm] if
+    it does not exist. All directories in [path] are created if necessary, à la
+    [mkdir -p]. *)
+val create_dir : ?perm:int -> string -> unit
+
+(** [copy_file ~src ~dst] copies the file [src] to [dst]. *)
+val copy_file : src:string -> dst:string -> unit
+
+(** [copy_dir ?perm src dst] copies the content of
+    directory [src] in the directory [dst] (created with [perm], [0o755] by
+    default). *)
+val copy_dir : ?perm:int -> string -> string -> unit

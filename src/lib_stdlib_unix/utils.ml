@@ -1,25 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2018-2024 Nomadic Labs <contact@nomadic-labs.com> *)
+(* SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>              *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -38,3 +21,87 @@ let display_progress ?(refresh_rate = (1, 1)) msgf =
 
 let display_progress_end () =
   if Unix.isatty Unix.stderr then Format.eprintf "@."
+
+let list_files dir ?(include_file = fun ~relative_path:_ -> true) f =
+  let rec list_files_in_dir stream
+      ((dir, relative_dir, dir_handle) as current_dir_info) =
+    match Unix.readdir dir_handle with
+    | "." | ".." -> list_files_in_dir stream current_dir_info
+    | basename ->
+        let full_path = Filename.concat dir basename in
+        let relative_path = Filename.concat relative_dir basename in
+        let stream =
+          if Sys.is_directory full_path then
+            let sub_dir_handle = Unix.opendir full_path in
+            list_files_in_dir stream (full_path, relative_path, sub_dir_handle)
+          else if include_file ~relative_path then
+            Stream.icons (f ~full_path ~relative_path) stream
+          else stream
+        in
+        list_files_in_dir stream current_dir_info
+    | exception End_of_file ->
+        Unix.closedir dir_handle ;
+        stream
+  in
+  let dir_handle = Unix.opendir dir in
+  list_files_in_dir Stream.sempty (dir, "", dir_handle)
+
+let directory_contents_size ?include_file dir =
+  let file_stream =
+    list_files dir ?include_file @@ fun ~full_path ~relative_path:_ ->
+    let {Unix.st_size; _} = Unix.lstat full_path in
+    st_size
+  in
+  let total = ref 0 in
+  Stream.iter (fun size -> total := !total + size) file_stream ;
+  !total
+
+let rec create_dir ?(perm = 0o755) dir =
+  let stat =
+    try Some (Unix.stat dir) with Unix.Unix_error (ENOENT, _, _) -> None
+  in
+  match stat with
+  | Some {st_kind = S_DIR; _} -> ()
+  | Some _ -> Stdlib.failwith "Not a directory"
+  | None -> (
+      create_dir ~perm (Filename.dirname dir) ;
+      try Unix.mkdir dir perm
+      with Unix.Unix_error (EEXIST, _, _) ->
+        (* This is the case where the directory has been created at the same
+           time. *)
+        ())
+
+let copy_file ~src ~dst =
+  let in_chan = open_in src in
+  let out_chan = open_out dst in
+  try
+    let buffer_size = 64 * 1024 in
+    let buf = Bytes.create buffer_size in
+    let rec copy () =
+      let read_bytes = input in_chan buf 0 buffer_size in
+      output out_chan buf 0 read_bytes ;
+      if read_bytes > 0 then copy ()
+    in
+    copy () ;
+    flush out_chan ;
+    close_in in_chan ;
+    close_out out_chan
+  with e ->
+    close_in in_chan ;
+    close_out out_chan ;
+    raise e
+
+let copy_dir ?(perm = 0o755) src dst =
+  create_dir ~perm dst ;
+  let files =
+    list_files src ~include_file:(fun ~relative_path:_ -> true)
+    @@ fun ~full_path ~relative_path ->
+    let dst_file = Filename.concat dst relative_path in
+    (full_path, dst_file)
+  in
+  Stream.iter
+    (fun (src, dst) ->
+      let dst_dir = Filename.dirname dst in
+      create_dir ~perm dst_dir ;
+      copy_file ~src ~dst)
+    files

@@ -787,21 +787,24 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     @@ Context.export_snapshot context first_block.context ~path:tmp_context_dir
   in
   let ( // ) = Filename.concat in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6857
+     Use Lwt_utils_unix.copy_dir instead when file descriptors issue is fixed. *)
   let copy_dir a =
     let dir = data_dir // a in
     if Sys.file_exists dir && Sys.is_directory dir then
-      copy_dir dir (tmp_dir // a)
+      Tezos_stdlib_unix.Utils.copy_dir dir (tmp_dir // a)
   in
   let copy_file a =
     let path = data_dir // a in
-    if Sys.file_exists path then copy_file ~src:path ~dst:(tmp_dir // a)
+    if Sys.file_exists path then
+      Tezos_stdlib_unix.Utils.copy_file ~src:path ~dst:(tmp_dir // a)
   in
   Format.eprintf "Acquiring process lock@." ;
   let* () =
     Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
     @@ fun () ->
     Format.eprintf "Copying data@." ;
-    Snapshot_utils.copy_dir store_dir tmp_store_dir ;
+    Tezos_stdlib_unix.Utils.copy_dir store_dir tmp_store_dir ;
     copy_file "metadata" ;
     return_unit
   in
