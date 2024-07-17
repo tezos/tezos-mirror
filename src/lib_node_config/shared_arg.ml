@@ -70,6 +70,7 @@ type t = {
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
+  context_pruning : Storage_maintenance.context_pruning option;
 }
 
 type error +=
@@ -190,7 +191,8 @@ let wrap data_dir config_file network connections max_download_speed
     external_rpc_listen_addrs rpc_tls cors_origins cors_headers log_output
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
-    max_active_rpc_connections metrics_addr operation_metadata_size_limit =
+    max_active_rpc_connections metrics_addr operation_metadata_size_limit
+    context_pruning =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -239,6 +241,7 @@ let wrap data_dir config_file network connections max_download_speed
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
+    context_pruning;
   }
 
 let process_command run =
@@ -747,6 +750,25 @@ module Term = struct
           Config_file.default_max_active_rpc_connections
       & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
 
+  let context_pruning =
+    let open Storage_maintenance in
+    let doc =
+      "Configures whether or not the storage maintenance of the context should \
+       be enabled"
+    in
+    let parse str =
+      match str with
+      | "disabled" -> `Ok Disabled
+      | "enabled" -> `Ok Enabled
+      | _ ->
+          `Error
+            "context-pruning only supports \"disabled\" and \"enabled\" modes"
+    in
+    Arg.(
+      value
+      & opt (some (parse, pp_context_pruning)) None
+      & info ~docs ~doc ["context-pruning"])
+
   (* Args. *)
 
   let args =
@@ -761,6 +783,7 @@ module Term = struct
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
     $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
+    $ context_pruning
 end
 
 let read_config_file args =
@@ -908,6 +931,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
+    context_pruning;
   } =
     args
   in
@@ -1065,6 +1089,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?synchronisation_threshold
     ?history_mode
     ?latency
+    ?context_pruning
     cfg
 
 let read_and_patch_config_file ?may_override_network ?emit
