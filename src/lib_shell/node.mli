@@ -56,6 +56,7 @@ type config = {
 val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
+  ?context_pruning:Storage_maintenance.context_pruning ->
   singleprocess:bool ->
   version:string ->
   commit_info:Octez_node_version.commit_info ->

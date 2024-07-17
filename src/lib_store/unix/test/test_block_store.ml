@@ -259,6 +259,7 @@ let test_simple_merge block_store =
       ~new_head:head
       ~new_head_metadata:head_metadata
       ~cementing_highwatermark:0l
+      ~context_pruning:Enabled
   in
   let*! () = Block_store.await_merging block_store in
   assert_cemented_bound
@@ -314,6 +315,7 @@ let test_consecutive_concurrent_merges block_store =
       ~new_head
       ~new_head_metadata
       ~cementing_highwatermark:previous_cycle_lpbl
+      ~context_pruning:Enabled
   in
   let threads = List.map merge_cycle cycles_to_merge in
   let*! res = Lwt.all threads in
@@ -358,6 +360,7 @@ let test_ten_cycles_merge block_store =
         (head |> Block_repr.metadata
         |> WithExceptions.Option.to_exn ~none:Not_found)
       ~cementing_highwatermark:0l
+      ~context_pruning:Enabled
   in
   let* () =
     assert_presence_in_block_store ~with_metadata:true block_store all_blocks
@@ -459,6 +462,7 @@ let test_merge_with_branches block_store =
         (head |> Block_repr.metadata
         |> WithExceptions.Option.to_exn ~none:Not_found)
       ~cementing_highwatermark:0l
+      ~context_pruning:Enabled
   in
   let*! () = Block_store.await_merging block_store in
   let* () =
@@ -497,6 +501,7 @@ let perform_n_cycles_merge ?(cycle_length = 10)
         (head |> Block_repr.metadata
         |> WithExceptions.Option.to_exn ~none:Not_found)
       ~cementing_highwatermark:0l
+      ~context_pruning:Enabled
   in
   let*! () = Block_store.await_merging block_store in
   return cycles

@@ -1345,19 +1345,22 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
   in
   return (new_ro_store, new_savepoint, new_caboose)
 
-let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
+let may_trigger_gc ~context_pruning block_store history_mode ~previous_savepoint
+    ~new_savepoint =
   let open Lwt_result_syntax in
-  let savepoint_hash = fst new_savepoint in
-  if
-    History_mode.(equal history_mode Archive)
-    || Block_hash.(savepoint_hash = fst previous_savepoint)
-  then (* No GC required *) return_unit
-  else
-    match block_store.gc_callback with
-    | None -> return_unit
-    | Some gc ->
-        let*! () = Store_events.(emit start_context_gc new_savepoint) in
-        gc savepoint_hash
+  if context_pruning = Storage_maintenance.Enabled then
+    let savepoint_hash = fst new_savepoint in
+    if
+      History_mode.(equal history_mode Archive)
+      || Block_hash.(savepoint_hash = fst previous_savepoint)
+    then (* No GC required *) return_unit
+    else
+      match block_store.gc_callback with
+      | None -> return_unit
+      | Some gc ->
+          let*! () = Store_events.(emit start_context_gc new_savepoint) in
+          gc savepoint_hash
+  else return_unit
 
 let split_context block_store new_head_lpbl =
   let open Lwt_result_syntax in
@@ -1369,7 +1372,7 @@ let split_context block_store new_head_lpbl =
 
 let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
     ~(on_error : tztrace -> unit tzresult Lwt.t) ~finalizer ~history_mode
-    ~new_head ~new_head_metadata ~cementing_highwatermark =
+    ~new_head ~new_head_metadata ~cementing_highwatermark ~context_pruning =
   let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
@@ -1460,6 +1463,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                            its end. *)
                         let* () =
                           may_trigger_gc
+                            ~context_pruning
                             block_store
                             history_mode
                             ~previous_savepoint
