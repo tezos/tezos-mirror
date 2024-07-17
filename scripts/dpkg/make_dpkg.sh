@@ -9,7 +9,7 @@ set -eu
 
 # Setup
 #
-myhome=scripts/dpkg
+myhome=${1:-scripts/dpkg}
 common=scripts/pkg-common
 dieonwarn=${dieonwarn:-1}
 

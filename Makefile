@@ -433,7 +433,8 @@ fmt-python:
 
 .PHONY: dpkg
 dpkg:	all
-	@./scripts/dpkg/make_dpkg.sh
+	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
+	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/B
 
 .PHONY: rpm
 rpm:	all
