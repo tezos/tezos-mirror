@@ -93,12 +93,16 @@ val default_chain_validator_limits : chain_validator_limits
 
 val chain_validator_limits_encoding : chain_validator_limits Data_encoding.t
 
+val default_storage_maintenance_context_pruning :
+  Storage_maintenance.context_pruning
+
 type limits = {
   block_validator_limits : block_validator_limits;
   prevalidator_limits : prevalidator_limits;
   peer_validator_limits : peer_validator_limits;
   chain_validator_limits : chain_validator_limits;
   history_mode : History_mode.t option;
+  context_pruning : Storage_maintenance.context_pruning option;
 }
 
 val default_limits : limits
