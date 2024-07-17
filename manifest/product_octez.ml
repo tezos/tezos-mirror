@@ -1421,6 +1421,7 @@ let octez_stdlib_unix =
         conf_libev;
         uri;
         progress;
+        camlp_streams;
       ]
 
 let _octez_stdlib_unix_test =
