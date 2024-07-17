@@ -71,7 +71,7 @@ let rec create_dir ?(perm = 0o755) dir =
            time. *)
         ())
 
-let copy_file ~src ~dst =
+let copy_file ~count_progress ~src ~dst =
   let in_chan = open_in src in
   let out_chan = open_out dst in
   try
@@ -80,6 +80,7 @@ let copy_file ~src ~dst =
     let rec copy () =
       let read_bytes = input in_chan buf 0 buffer_size in
       output out_chan buf 0 read_bytes ;
+      count_progress read_bytes ;
       if read_bytes > 0 then copy ()
     in
     copy () ;
@@ -91,8 +92,22 @@ let copy_file ~src ~dst =
     close_out out_chan ;
     raise e
 
-let copy_dir ?(perm = 0o755) src dst =
+let copy_dir ?(perm = 0o755) ?progress src dst =
   create_dir ~perm dst ;
+  let maybe_report_progress =
+    match progress with
+    | None -> fun f -> f (fun _ -> ())
+    | Some (message, color) ->
+        let total =
+          directory_contents_size src ~include_file:(fun ~relative_path:_ ->
+              true)
+        in
+        let progress_bar =
+          Progress_bar.progress_bar ~counter:`Bytes ~message ~color total
+        in
+        fun f -> Progress_bar.with_reporter progress_bar f
+  in
+  maybe_report_progress @@ fun count_progress ->
   let files =
     list_files src ~include_file:(fun ~relative_path:_ -> true)
     @@ fun ~full_path ~relative_path ->
@@ -103,5 +118,7 @@ let copy_dir ?(perm = 0o755) src dst =
     (fun (src, dst) ->
       let dst_dir = Filename.dirname dst in
       create_dir ~perm dst_dir ;
-      copy_file ~src ~dst)
+      copy_file ~count_progress ~src ~dst)
     files
+
+let copy_file = copy_file ~count_progress:(fun _ -> ())

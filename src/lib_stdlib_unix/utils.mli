@@ -54,7 +54,9 @@ val create_dir : ?perm:int -> string -> unit
 (** [copy_file ~src ~dst] copies the file [src] to [dst]. *)
 val copy_file : src:string -> dst:string -> unit
 
-(** [copy_dir ?perm src dst] copies the content of
+(** [copy_dir ?perm ~progress:(message, color) src dst] copies the content of
     directory [src] in the directory [dst] (created with [perm], [0o755] by
-    default). *)
-val copy_dir : ?perm:int -> string -> string -> unit
+    default). If [progress] is provided, a progress bar is displayed on terminal
+    outputs with the given message and color. *)
+val copy_dir :
+  ?perm:int -> ?progress:string * Terminal.Color.t -> string -> string -> unit
