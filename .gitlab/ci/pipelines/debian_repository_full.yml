@@ -402,6 +402,19 @@ oc.install_bin_debian_bookworm:
   variables:
     PREFIX: next
 
+oc.upgrade_bin_debian_bookworm:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian_current
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./docs/introduction/upgrade-bin-deb.sh debian bookworm
+
 oc.lintian_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publishing_tests
@@ -446,30 +459,15 @@ oc.install_bin_ubuntu_jammy_current:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
   variables: {}
 
-oc.install_bin_ubuntu_noble:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_ubuntu
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./docs/introduction/install-bin-deb.sh ubuntu noble
-  variables:
-    PREFIX: next
-
-oc.install_bin_ubuntu_jammy:
+oc.upgrade_bin_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu
+  - apt_repo_ubuntu_current
+  - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
   script:
-  - ./docs/introduction/install-bin-deb.sh ubuntu jammy
-  variables:
-    PREFIX: next
+  - ./docs/introduction/upgrade-bin-deb.sh ubuntu jammy
