@@ -150,9 +150,7 @@ module Nonce = struct
   let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end
 
-module Contract = Contract_services
 module Constants = Constants_services
-module Delegate = Delegate_services
 module Voting = Voting_services
 module Sapling = Sapling_services
 module Adaptive_issuance = Adaptive_issuance_services
@@ -270,9 +268,7 @@ module Denunciations = struct
 end
 
 let register () =
-  Contract.register () ;
   Constants.register () ;
-  Delegate.register () ;
   Nonce.register () ;
   Voting.register () ;
   Sapling.register () ;

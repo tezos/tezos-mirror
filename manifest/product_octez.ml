@@ -7365,6 +7365,7 @@ let _testnet_experiment_tools =
         octez_stdlib_unix |> open_;
         Protocol.(client_exn alpha);
         Protocol.(main alpha);
+        Protocol.(plugin alpha) |> if_some;
       ]
     ~modules:["testnet_experiment_tools"; "format_baker_accounts"]
 

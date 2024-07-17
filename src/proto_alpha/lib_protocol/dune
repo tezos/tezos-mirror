@@ -285,8 +285,6 @@
   Services_registration
   Constants_services
   Sapling_services
-  Contract_services
-  Delegate_services
   Voting_services
   Dal_services
   Adaptive_issuance_services
@@ -585,8 +583,6 @@
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
   sapling_services.ml
-  contract_services.ml contract_services.mli
-  delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
   adaptive_issuance_services.ml adaptive_issuance_services.mli
@@ -886,8 +882,6 @@
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
   sapling_services.ml
-  contract_services.ml contract_services.mli
-  delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
   adaptive_issuance_services.ml adaptive_issuance_services.mli
@@ -1171,8 +1165,6 @@
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
   sapling_services.ml
-  contract_services.ml contract_services.mli
-  delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
   adaptive_issuance_services.ml adaptive_issuance_services.mli

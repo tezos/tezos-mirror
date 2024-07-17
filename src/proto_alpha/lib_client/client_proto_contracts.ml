@@ -260,4 +260,4 @@ let list_contracts cctxt =
   return (contracts @ accounts)
 
 let get_delegate cctxt ~chain ~block source =
-  Alpha_services.Contract.delegate_opt cctxt (chain, block) source
+  Plugin.Alpha_services.Contract.delegate_opt cctxt (chain, block) source

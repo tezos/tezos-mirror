@@ -12,7 +12,8 @@
   octez-libs.base.unix
   octez-libs.stdlib-unix
   octez-protocol-alpha-libs.client
-  tezos-protocol-alpha.protocol)
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.plugin)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))

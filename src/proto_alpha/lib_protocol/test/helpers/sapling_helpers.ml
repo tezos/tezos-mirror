@@ -436,7 +436,7 @@ module Interpreter_helpers = struct
     let* incr = Incremental.add_operation incr operation in
     let* block = Incremental.finalize_block incr in
     let+ diff =
-      Alpha_services.Contract.single_sapling_get_diff
+      Plugin.Alpha_services.Contract.single_sapling_get_diff
         Block.rpc_ctxt
         block
         dst

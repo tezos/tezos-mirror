@@ -288,7 +288,7 @@ module Delegate : sig
   val unstaked_frozen_deposits :
     t ->
     public_key_hash ->
-    Protocol.Delegate_services.deposit_per_cycle list tzresult Lwt.t
+    Plugin.Alpha_services.Delegate.deposit_per_cycle list tzresult Lwt.t
 
   val staking_denominator : t -> public_key_hash -> Z.t tzresult Lwt.t
 

@@ -276,6 +276,9 @@ let get_balance_mutez cctxt ?block pkh =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
   in
   let+ balance =
-    Protocol.Contract_services.balance cctxt (cctxt#chain, block) (Implicit pkh)
+    Plugin.Alpha_services.Contract.balance
+      cctxt
+      (cctxt#chain, block)
+      (Implicit pkh)
   in
   Protocol.Alpha_context.Tez.to_mutez balance

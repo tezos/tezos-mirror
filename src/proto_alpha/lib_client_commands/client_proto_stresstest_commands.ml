@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 module Smart_contracts = Client_proto_stresstest_contracts
+module Alpha_services = Plugin.Alpha_services
 
 type transfer_strategy =
   | Fixed_amount of {mutez : Tez.t}  (** Amount to transfer *)

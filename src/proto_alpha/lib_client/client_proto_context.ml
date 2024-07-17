@@ -30,6 +30,7 @@ open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
+module Alpha_services = Plugin.Alpha_services
 
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract

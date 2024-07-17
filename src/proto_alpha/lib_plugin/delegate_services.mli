@@ -29,7 +29,10 @@
     delegates (who they are, their delegators, their different kinds of balances, their activity, etc.).
 *)
 
-open Alpha_context
+open Environment
+open Environment.Error_monad
+open Protocol
+open Protocol.Alpha_context
 
 type error += (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 

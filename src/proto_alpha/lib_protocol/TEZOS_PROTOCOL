@@ -283,8 +283,6 @@
         "Services_registration",
         "Constants_services",
         "Sapling_services",
-        "Contract_services",
-        "Delegate_services",
         "Voting_services",
         "Dal_services",
         "Adaptive_issuance_services",

@@ -99,7 +99,7 @@ val list_contracts :
   #Client_context.wallet ->
   (string * string * Raw_contract_alias.t) list tzresult Lwt.t
 
-(** Calls {!Alpha_services.Contract.delegate_opt} *)
+(** Calls {!Plugin.Alpha_services.Contract.delegate_opt} *)
 val get_delegate :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
