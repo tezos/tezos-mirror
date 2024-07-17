@@ -58,6 +58,7 @@ val create :
   ?sandbox_parameters:Data_encoding.json ->
   ?context_pruning:Storage_maintenance.context_pruning ->
   ?history_mode:History_mode.t ->
+  ?maintenance_delay:Storage_maintenance.delay ->
   singleprocess:bool ->
   version:string ->
   commit_info:Octez_node_version.commit_info ->

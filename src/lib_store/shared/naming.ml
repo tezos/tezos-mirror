@@ -165,6 +165,13 @@ let legacy_block_store_status_file dir =
     Block_store_status.Legacy.encoding
     Block_store_status.Legacy.equal
 
+let scheduled_maintenance dir =
+  make_encoded_file
+    dir
+    ~filename:"scheduled_maintenance"
+    Data_encoding.(option int32)
+    (Option.equal Int32.equal)
+
 let cemented_blocks_dir dir = mk_dir dir "cemented"
 
 let cemented_blocks_level_index_dir dir = mk_dir dir "level_index"
