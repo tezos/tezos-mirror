@@ -31,7 +31,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
     (bytes, Errors.other) result Lwt.t Types.Slot_id.Map.t;
@@ -115,8 +114,8 @@ let wait_for_ready_state ctxt =
   | Ready _ -> return_unit
   | Starting s -> s.started_promise
 
-let set_ready ctxt cctxt skip_list_cells_store cryptobox
-    shards_proofs_precomputation proto_parameters ~level =
+let set_ready ctxt cctxt cryptobox shards_proofs_precomputation proto_parameters
+    ~level =
   let open Lwt_result_syntax in
   match ctxt.status with
   | Starting starting_status ->
@@ -149,7 +148,6 @@ let set_ready ctxt cctxt skip_list_cells_store cryptobox
             cryptobox;
             proto_parameters;
             shards_proofs_precomputation;
-            skip_list_cells_store;
             ongoing_amplifications = Types.Slot_id.Set.empty;
             slots_under_reconstruction = Types.Slot_id.Map.empty;
           } ;
