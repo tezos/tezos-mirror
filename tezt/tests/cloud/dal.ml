@@ -103,6 +103,12 @@ module Cli = struct
       network_typ
       Sandbox
 
+  let bootstrap =
+    Clap.flag
+      ~section
+      ~set_long:"bootstrap"
+      (match network with Sandbox -> true | Ghostnet -> false)
+
   let stake =
     let stake_typ =
       let parse string =
@@ -253,6 +259,7 @@ type configuration = {
      reconnection delay *)
   disconnect : (int * int) option;
   network : Network.t;
+  bootstrap : bool;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -797,7 +804,8 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     ~job_name
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
-let init_bootstrap cloud (configuration : configuration) agent =
+let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
+    agent =
   let* bootstrap_node = Node.Agent.create ~name:"bootstrap-node" agent in
   let* dal_bootstrap_node =
     Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node:bootstrap_node
@@ -1310,7 +1318,8 @@ let init ~(configuration : configuration) cloud next_agent =
          producer_accounts,
          etherlink_rollup_operator_key ) =
     match configuration.network with
-    | Network.Sandbox -> init_bootstrap cloud configuration bootstrap_agent
+    | Network.Sandbox ->
+        init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
     | Ghostnet -> assert false
   in
   let* bakers =
@@ -1514,6 +1523,7 @@ let configuration =
   let etherlink_producers = Cli.etherlink_producers in
   let disconnect = Cli.disconnect in
   let network = Cli.network in
+  let bootstrap = Cli.bootstrap in
   {
     stake;
     stake_machine_type;
@@ -1526,12 +1536,13 @@ let configuration =
     etherlink_producers;
     disconnect;
     network;
+    bootstrap;
   }
 
 let benchmark () =
   let vms =
     [
-      [`Bootstrap];
+      (if configuration.bootstrap then [`Bootstrap] else []);
       List.map (fun i -> `Baker i) configuration.stake;
       List.init configuration.dal_node_producer (fun _ -> `Producer);
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
