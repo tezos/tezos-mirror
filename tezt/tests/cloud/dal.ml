@@ -844,12 +844,6 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
   let* etherlink_rollup_operator_key =
     Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
   in
-  let* etherlink_rollup_producers_key =
-    Client.stresstest_gen_keys
-      ~alias_prefix:"etherlink_producer"
-      Cli.etherlink_producers
-      client
-  in
   let* parameter_file =
     let base =
       Either.right (configuration.protocol, Some Protocol.Constants_mainnet)
@@ -863,8 +857,7 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     let additional_bootstrap_accounts =
       List.map
         (fun key -> (key, Some 1_000_000_000_000, false))
-        (producer_accounts @ etherlink_rollup_operator_key
-       @ etherlink_rollup_producers_key)
+        (producer_accounts @ etherlink_rollup_operator_key)
     in
     Protocol.write_parameter_file
       ~bootstrap_accounts
