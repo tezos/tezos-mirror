@@ -153,51 +153,6 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
 
-oc.build:dpkg:amd64:
-  image: $DISTRIBUTION
-  stage: build
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  before_script:
-  - . ./scripts/version.sh
-  - ./scripts/ci/bin_packages_deb_dependencies.sh
-  script:
-  - wget https://sh.rustup.rs/rustup-init.sh
-  - chmod +x rustup-init.sh
-  - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version
-    -y
-  - . $HOME/.cargo/env
-  - export OPAMYES="true"
-  - opam init --bare --disable-sandboxing
-  - make build-deps
-  - eval $(opam env)
-  - make $TARGET
-  - DISTRO=$(echo "$DISTRIBUTION" | cut -d':' -f1)
-  - RELEASE=$(echo "$DISTRIBUTION" | cut -d':' -f2)
-  - mkdir -p packages/$DISTRO/$RELEASE
-  - mv octez-*.* packages/$DISTRO/$RELEASE/
-  variables:
-    TARGET: dpkg
-    OCTEZ_PKGMAINTAINER: nomadic-labs
-    BLST_PORTABLE: "yes"
-    ARCH: amd64
-    CARGO_HOME: /root/.cargo
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - packages/
-    when: on_success
-  parallel:
-    matrix:
-    - DISTRIBUTION:
-      - debian:bookworm
-      - ubuntu:focal
-      - ubuntu:jammy
-
 oc.build:rpm:amd64:
   image: $DISTRIBUTION
   stage: build
@@ -269,12 +224,10 @@ gitlab:publish:
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.build:dpkg:amd64
   - oc.build:rpm:amd64
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.build:dpkg:amd64
   - oc.build:rpm:amd64
   interruptible: false
   script:

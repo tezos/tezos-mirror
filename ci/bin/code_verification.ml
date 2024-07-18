@@ -659,9 +659,8 @@ let jobs pipeline_type =
     let bin_packages_jobs =
       match pipeline_type with
       | Schedule_extended_test ->
-          let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
           let job_build_rpm_amd64 = job_build_rpm_amd64 () in
-          [job_build_dpkg_amd64; job_build_rpm_amd64]
+          [job_build_rpm_amd64]
       | Before_merging -> []
     in
     let job_ocaml_check : tezos_job =
@@ -1878,17 +1877,6 @@ let jobs pipeline_type =
             ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
-        let job_build_dpkg_amd64_manual =
-          job_build_bin_package
-            ~__POS__
-            ~name:"oc.build:dpkg:amd64"
-            ~target:Dpkg
-            ~arch:Tezos_ci.Amd64
-            ~rules:(make_rules ~manual:Yes ())
-            ~dependencies:(Dependent [])
-            ~stage:Stages.manual
-            ()
-        in
         let job_build_rpm_amd64_manual =
           job_build_bin_package
             ~__POS__
@@ -1912,7 +1900,6 @@ let jobs pipeline_type =
         [
           job_docker_amd64_test_manual;
           job_docker_arm64_test_manual;
-          job_build_dpkg_amd64_manual;
           job_build_rpm_amd64_manual;
           job_build_homebrew_manual;
           job_debian_repository_trigger;
