@@ -247,6 +247,16 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "frozen_deposits")
+
+    let frozen_deposits_limit =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; the frozen deposits limit has no effects since the \
+           activation of Adaptive Issuance and Staking during the Paris \
+           protocol."
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.option Tez.encoding)
+        RPC_path.(path / "frozen_deposits_limit")
   end
 
   let total_staked =
@@ -285,15 +295,6 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "total_delegated")
-
-  let frozen_deposits_limit =
-    RPC_service.get_service
-      ~description:
-        "Returns the frozen deposits limit for the given delegate or none if \
-         no limit is set."
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Tez.encoding)
-      RPC_path.(path / "frozen_deposits_limit")
 
   let delegated_contracts =
     RPC_service.get_service
@@ -638,7 +639,10 @@ let register () =
   register1 ~chunked:false S.Deprecated.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.staking_balance ctxt pkh) ;
-  register1 ~chunked:false S.frozen_deposits_limit (fun ctxt pkh () () ->
+  register1
+    ~chunked:false
+    S.Deprecated.frozen_deposits_limit
+    (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.frozen_deposits_limit ctxt pkh) ;
   register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
@@ -731,7 +735,7 @@ let staking_balance ctxt block pkh =
   RPC_context.make_call1 S.Deprecated.staking_balance ctxt block pkh () ()
 
 let frozen_deposits_limit ctxt block pkh =
-  RPC_context.make_call1 S.frozen_deposits_limit ctxt block pkh () ()
+  RPC_context.make_call1 S.Deprecated.frozen_deposits_limit ctxt block pkh () ()
 
 let delegated_contracts ctxt block pkh =
   RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
