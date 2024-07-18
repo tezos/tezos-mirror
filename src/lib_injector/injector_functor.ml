@@ -645,39 +645,51 @@ module Make (Parameters : PARAMETERS) = struct
             operations
     in
     let*? operations_results, raw_op = simulation_result in
-    let failure = ref false in
+    let failure = ref None in
     let* rev_non_failing_operations =
       List.fold_left_es
         (fun acc (op, {status; _}) ->
           match status with
           | Unsuccessful (Failed error) ->
-              failure := true ;
+              failure := Some (op.Inj_operation.operation, error) ;
               let+ () = register_error state ~signers:[signer] op error in
               acc
-          | Successful
-          | Unsuccessful (Backtracked | Skipped | Other_branch | Never_included)
-            ->
+          | Successful -> return (op :: acc)
+          | Unsuccessful
+              ((Backtracked | Skipped | Other_branch | Never_included) as
+              err_status) -> (
               (* Not known to be failing *)
-              return (op :: acc))
+              let*! retry =
+                Parameters.retry_unsuccessful_operation
+                  state.state
+                  op.operation
+                  err_status
+                  ?reason:!failure
+              in
+              match retry with
+              | Retry -> return (op :: acc)
+              | Abort _ | Forget -> return acc))
         []
         operations_results
     in
-    if !failure then
-      (* We try to inject without the failing operation. *)
-      let operations = List.rev rev_non_failing_operations in
-      inject_operations_for_signer state signer operations
-    else
-      (* Inject on node for real *)
-      let+ oph =
-        trace (Step_failed "injection")
-        @@ inject_on_node ~nb:(List.length operations) state signer raw_op
-      in
-      let operations =
-        List.map
-          (fun (op, {index_in_batch; _}) -> (index_in_batch, op))
-          operations_results
-      in
-      (oph, operations)
+    match !failure with
+    | Some (_, err) ->
+        (* We try to inject without the failing operation. *)
+        let operations = List.rev rev_non_failing_operations in
+        if operations = [] then fail err
+        else inject_operations_for_signer state signer operations
+    | None ->
+        (* Inject on node for real *)
+        let+ oph =
+          trace (Step_failed "injection")
+          @@ inject_on_node ~nb:(List.length operations) state signer raw_op
+        in
+        let operations =
+          List.map
+            (fun (op, {index_in_batch; _}) -> (index_in_batch, op))
+            operations_results
+        in
+        (oph, operations)
 
   (** Retrieve as many batch of operations from the queue while batch
       size remains below the size limit. *)

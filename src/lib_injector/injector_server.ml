@@ -86,7 +86,8 @@ module Parameters :
 
   let persist_operation _ = true
 
-  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
+  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) ?reason:_
+      status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->

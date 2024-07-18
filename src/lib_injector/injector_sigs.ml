@@ -147,7 +147,11 @@ module type PARAMETERS = sig
   (** Action (see {!retry_action}) to be taken on unsuccessful operation (see
       {!unsuccessful_status}). *)
   val retry_unsuccessful_operation :
-    state -> Operation.t -> unsuccessful_status -> retry_action Lwt.t
+    state ->
+    Operation.t ->
+    ?reason:Operation.t * error trace ->
+    unsuccessful_status ->
+    retry_action Lwt.t
 
   (** The tag of a manager operation. This is used to send operations to the
       correct queue automatically (when signer is not provided) and to recover
