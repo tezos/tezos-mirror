@@ -66,7 +66,9 @@ let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     script
 
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
-   we test only on Debian stable. *)
+   we test only on Debian stable. Returns a triplet, the first element is
+   the list of all jobs, the second is the job building ubuntu packages artifats
+   and the third debian packages artifacts *)
 let jobs pipeline_type =
   let variables add =
     ( "DEP_IMAGE",
@@ -232,7 +234,6 @@ let jobs pipeline_type =
       job_build_debian_package_current;
       job_apt_repo_debian_current;
     ]
-    @ test_current_debian_packages_jobs
   in
   let ubuntu_jobs =
     [
@@ -241,8 +242,28 @@ let jobs pipeline_type =
       job_build_ubuntu_package_current;
       job_apt_repo_ubuntu_current;
     ]
-    @ test_current_ubuntu_packages_jobs
   in
   match pipeline_type with
-  | Partial -> debian_jobs
-  | Full | Release -> debian_jobs @ ubuntu_jobs
+  | Partial ->
+      ( debian_jobs @ test_current_debian_packages_jobs,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current )
+  | Full ->
+      ( debian_jobs @ ubuntu_jobs @ test_current_debian_packages_jobs
+        @ test_current_ubuntu_packages_jobs,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current )
+  | Release ->
+      ( debian_jobs @ ubuntu_jobs,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current )
+
+let debian_repository_child_pipeline pipeline_type =
+  let pipeline_name =
+    match pipeline_type with
+    | Partial -> "debian_repository_partial"
+    | Full -> "debian_repository_full"
+    | Release -> "debian_repository_release"
+  in
+  let jobs, _, _ = jobs pipeline_type in
+  Pipeline.register_child pipeline_name ~jobs

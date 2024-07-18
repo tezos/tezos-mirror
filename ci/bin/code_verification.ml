@@ -315,17 +315,6 @@ let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
 
-let debian_repository_child_pipeline pipeline_type =
-  let pipeline_name =
-    match pipeline_type with
-    | Partial -> "debian_repository_partial"
-    | Full -> "debian_repository_full"
-    | Release -> "debian_repository_release"
-  in
-  Pipeline.register_child
-    pipeline_name
-    ~jobs:(Debian_repository.jobs pipeline_type)
-
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -1846,8 +1835,9 @@ let jobs pipeline_type =
 
   (*Manual jobs *)
   let manual =
-    (* Debian packages are always built on scheduled pipelines, and
-       can be built manually on the [Before_merging] pipelines. *)
+    (* On scheduled pipelines we build and test the full test matrix.
+       On [Before_merging] pipelines only a subset of the packages are built
+       and tested *)
     let job_debian_repository_trigger : tezos_job =
       let debian_pipeline_type =
         match pipeline_type with
@@ -1859,7 +1849,8 @@ let jobs pipeline_type =
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
-        (debian_repository_child_pipeline debian_pipeline_type)
+        (Debian_repository.debian_repository_child_pipeline
+           debian_pipeline_type)
     in
     match pipeline_type with
     | Before_merging ->
