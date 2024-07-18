@@ -690,13 +690,10 @@ let get_metrics t infos_per_level metrics =
 
 let get_infos_per_level client ~level =
   let block = string_of_int level in
-  let* header =
-    Client.RPC.call client @@ RPC.get_chain_block_header ~block ()
-  in
-  let* metadata =
+  let* header = Client.RPC.call client @@ RPC.get_chain_block_header ~block ()
+  and* metadata =
     Client.RPC.call client @@ RPC.get_chain_block_metadata_raw ~block ()
-  in
-  let* operations =
+  and* operations =
     Client.RPC.call client @@ RPC.get_chain_block_operations ~block ()
   in
   let level = JSON.(header |-> "level" |> as_int) in
