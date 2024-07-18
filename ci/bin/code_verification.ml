@@ -318,8 +318,9 @@ let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
 let debian_repository_child_pipeline pipeline_type =
   let pipeline_name =
     match pipeline_type with
-    | Before_merging -> "debian_repository"
-    | Schedule_extended_test -> "debian_repository_scheduled"
+    | Partial -> "debian_repository_partial"
+    | Full -> "debian_repository_full"
+    | Release -> "debian_repository_release"
   in
   Pipeline.register_child
     pipeline_name
@@ -1848,12 +1849,17 @@ let jobs pipeline_type =
     (* Debian packages are always built on scheduled pipelines, and
        can be built manually on the [Before_merging] pipelines. *)
     let job_debian_repository_trigger : tezos_job =
+      let debian_pipeline_type =
+        match pipeline_type with
+        | Before_merging -> Partial
+        | Schedule_extended_test -> Full
+      in
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
-        (debian_repository_child_pipeline pipeline_type)
+        (debian_repository_child_pipeline debian_pipeline_type)
     in
     match pipeline_type with
     | Before_merging ->

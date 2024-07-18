@@ -19,6 +19,13 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+(* types for the debian repository pipelines.
+   - Release: we run all the release jobs, but no tests
+   - Partial: we run only a subset of the tests jobs
+   - Full: we run the complete test matrix
+*)
+type debian_repository_pipeline = Full | Partial | Release
+
 (* Encodes the conditional [before_merging] pipeline and its
    unconditional variant [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test

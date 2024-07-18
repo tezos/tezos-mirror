@@ -3584,11 +3584,11 @@ oc.build:homebrew:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-trigger:debian_repository:
+trigger:debian_repository_partial:
   stage: manual
   rules:
   - when: manual
     allow_failure: true
   needs: []
   trigger:
-    include: .gitlab/ci/pipelines/debian_repository.yml
+    include: .gitlab/ci/pipelines/debian_repository_partial.yml

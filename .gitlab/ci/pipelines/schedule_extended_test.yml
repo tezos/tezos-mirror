@@ -2697,10 +2697,10 @@ documentation:linkcheck:
   - make -C docs redirectcheck
   - make -C docs linkcheck
 
-trigger:debian_repository_scheduled:
+trigger:debian_repository_full:
   stage: manual
   rules:
   - when: always
   needs: []
   trigger:
-    include: .gitlab/ci/pipelines/debian_repository_scheduled.yml
+    include: .gitlab/ci/pipelines/debian_repository_full.yml

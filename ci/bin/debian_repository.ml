@@ -27,8 +27,8 @@ let build_debian_packages_image =
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let debian_package_release_matrix = function
-  | Before_merging -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
-  | Schedule_extended_test ->
+  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
+  | Full | Release ->
       [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (** These are the set of Ubuntu release-architecture combinations for
@@ -39,8 +39,8 @@ let debian_package_release_matrix = function
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let ubuntu_package_release_matrix = function
-  | Before_merging -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
-  | Schedule_extended_test ->
+  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
+  | Full | Release ->
       [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
@@ -242,5 +242,5 @@ let jobs pipeline_type =
     @ test_current_ubuntu_packages_jobs
   in
   match pipeline_type with
-  | Before_merging -> debian_jobs
-  | Schedule_extended_test -> debian_jobs @ ubuntu_jobs
+  | Partial -> debian_jobs
+  | Full | Release -> debian_jobs @ ubuntu_jobs
