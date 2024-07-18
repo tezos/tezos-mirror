@@ -40,6 +40,8 @@ oc.build-debian:
   stage: build
   tags:
   - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
@@ -62,6 +64,8 @@ oc.build-debian-current:
   stage: build
   tags:
   - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false

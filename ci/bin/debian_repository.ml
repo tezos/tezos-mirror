@@ -102,7 +102,7 @@ let jobs pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
   let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution
-      ~script =
+      ~script ~dependencies =
     job
       ~__POS__
       ~name
@@ -110,6 +110,7 @@ let jobs pipeline_type =
       ~stage:Stages.build
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
+      ~dependencies
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
@@ -138,6 +139,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-debian-current"
       ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh"
       ~matrix:(debian_package_release_matrix pipeline_type)
   in
@@ -146,6 +148,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-ubuntu-current"
       ~distribution:"ubuntu"
+      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
@@ -157,6 +160,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh"
       ~matrix:(debian_package_release_matrix pipeline_type)
   in
@@ -165,6 +169,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
+      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
