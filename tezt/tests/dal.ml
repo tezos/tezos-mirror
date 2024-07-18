@@ -181,14 +181,21 @@ let slot_size_param slot_size =
   make_int_parameter ["dal_parametric"; "slot_size"] slot_size
 
 (* Some initialization functions to start needed nodes. *)
+let generate_protocol_parameters base protocol parameter_overrides =
+  let* parameter_file =
+    Protocol.write_parameter_file ~base parameter_overrides
+  in
+  let* client = Client.init_mockup ~parameter_file ~protocol () in
+  Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
 
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
-    ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
-    ?(node_arguments = []) ?(dal_bootstrap_peers = []) () =
-  (* Temporary setup to initialise the node. *)
+    ~parameter_overrides ~protocol ?activation_timestamp
+    ?(event_sections_levels = []) ?(node_arguments = [])
+    ?(dal_bootstrap_peers = []) () =
   let base = Either.right (protocol, custom_constants) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
-  let* client = Client.init_mockup ~parameter_file ~protocol () in
+  let* proto_parameters =
+    generate_protocol_parameters base protocol parameter_overrides
+  in
   let nodes_args =
     Node.
       [
@@ -197,7 +204,9 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   in
   let node = Node.create nodes_args in
   let* () = Node.config_init node [] in
-  let* dal_parameters = Dal.Parameters.from_client client in
+  let dal_parameters =
+    Dal.Parameters.from_protocol_parameters proto_parameters
+  in
   let config : Cryptobox.Config.t =
     {activated = true; bootstrap_peers = dal_bootstrap_peers}
   in
@@ -221,7 +230,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     Protocol.write_parameter_file
       ~additional_bootstrap_accounts
       ~base
-      parameters
+      parameter_overrides
   in
   let* () =
     Client.activate_protocol_and_wait
@@ -240,7 +249,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
     ?(parameters = []) ?(prover = true) ?smart_rollup_timeout_period_in_blocks f
     ~protocol =
-  let parameters =
+  let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
@@ -285,7 +294,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ?node_arguments
       ?activation_timestamp
       ?dal_bootstrap_peers
-      ~parameters
+      ~parameter_overrides
       ~protocol
       ()
   in
@@ -3750,12 +3759,12 @@ let make_invalid_dal_node protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
-    let parameters =
+    let parameter_overrides =
       dal_enable_param (Some true)
       @ redundancy_factor_param (Some (crypto_params.redundancy_factor / 2))
       @ slot_size_param (Some (crypto_params.slot_size / 2))
     in
-    setup_node ~protocol ~parameters ()
+    setup_node ~protocol ~parameter_overrides ()
   in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
@@ -4117,7 +4126,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
          (Protocol.name migrate_to)
          description)
   @@ fun () ->
-  let parameters =
+  let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
@@ -4129,7 +4138,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
   in
   let* node, client, dal_parameters =
-    setup_node ~parameters ~protocol:migrate_from ()
+    setup_node ~parameter_overrides ~protocol:migrate_from ()
   in
 
   Log.info "Set user-activated-upgrade at level %d" migration_level ;
@@ -4768,7 +4777,7 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
   let slot_size = Some 126944 in
   let redundancy_factor = Some 8 in
   let page_size = Some 3967 in
-  let parameters =
+  let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
@@ -4780,7 +4789,7 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
   in
   let* node, client, dal_parameters =
-    setup_node ~parameters ~protocol:migrate_from ()
+    setup_node ~parameter_overrides ~protocol:migrate_from ()
   in
 
   (* The [+2] here is a bit arbitrary. We just want to avoid possible corner
@@ -6073,7 +6082,7 @@ module Garbage_collection = struct
         (* The period in blocks for which cells are kept. *)
         let non_gc_period = 2 * (a + b + c) in
         Log.info "The \"non-GC period\" is %d" non_gc_period ;
-        let parameters =
+        let parameter_overrides =
           make_int_parameter
             ["smart_rollup_commitment_period_in_blocks"]
             (Some a)
@@ -6088,7 +6097,7 @@ module Garbage_collection = struct
               (Some c)
         in
         let* node, client, dal_parameters =
-          setup_node ~parameters ~protocol ()
+          setup_node ~parameter_overrides ~protocol ()
         in
         let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
         let lag = dal_parameters.attestation_lag in
