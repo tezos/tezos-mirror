@@ -881,10 +881,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
       };
   }
 
-type previous_protocol =
-  | Genesis of Parameters_repr.t
-  | Alpha
-  | (* Alpha predecessor *) ParisC_020 (* Alpha predecessor *)
+type previous_protocol = Genesis of Parameters_repr.t | Alpha | Beta
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -901,8 +898,7 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "paris_020") then
-          return (ParisC_020, ctxt) (* Alpha predecessor *)
+        else if Compare.String.(s = "beta") then return (Beta, ctxt)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -931,66 +927,9 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
       | Some constants -> return constants)
 
 (* Start of code to remove at next automatic protocol snapshot *)
-let update_block_time_related_constants (c : Constants_parametric_repr.t) =
-  let divide_period p =
-    Period_repr.of_seconds_exn
-      Int64.(div (mul (Period_repr.to_seconds p) 4L) 5L)
-  in
-  let minimal_block_delay = divide_period c.minimal_block_delay in
-  let delay_increment_per_round = divide_period c.delay_increment_per_round in
-  let hard_gas_limit_per_block =
-    let four = Z.of_int 4 in
-    let five = Z.(succ four) in
-    Gas_limit_repr.Arith.(
-      integral_exn
-        (Z.div (Z.mul (integral_to_z c.hard_gas_limit_per_block) four) five))
-  in
-  let quarter_more x = Int32.(div (mul 5l x) 4l) in
-  let blocks_per_cycle = quarter_more c.blocks_per_cycle in
-  let blocks_per_commitment = quarter_more c.blocks_per_commitment in
-  let nonce_revelation_threshold = quarter_more c.nonce_revelation_threshold in
-  let max_operations_time_to_live = 5 * c.max_operations_time_to_live / 4 in
-  let sc_rollup =
-    Constants_parametric_repr.update_sc_rollup_parameter
-      quarter_more
-      c.sc_rollup
-  in
-  {
-    c with
-    sc_rollup;
-    blocks_per_cycle;
-    blocks_per_commitment;
-    nonce_revelation_threshold;
-    max_operations_time_to_live;
-    minimal_block_delay;
-    delay_increment_per_round;
-    hard_gas_limit_per_block;
-  }
 
-let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
-    ~blocks_per_commitment =
-  let open Lwt_result_syntax in
-  let* cycle_eras = get_cycle_eras ctxt in
-  let current_era = Level_repr.current_era cycle_eras in
-  let current_cycle =
-    let level_position =
-      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
-    in
-    Cycle_repr.add
-      current_era.first_cycle
-      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
-  in
-  let new_cycle_era =
-    Level_repr.
-      {
-        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
-        first_cycle = Cycle_repr.succ current_cycle;
-        blocks_per_cycle;
-        blocks_per_commitment;
-      }
-  in
-  let*? new_cycle_eras = Level_repr.add_cycle_era new_cycle_era cycle_eras in
-  set_cycle_eras ctxt new_cycle_eras
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
+
 (* End of code to remove at next automatic protocol snapshot *)
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
@@ -1307,113 +1246,166 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
            it should be removed in beta when stabilising *)
         let*! c = get_previous_protocol_constants ctxt in
         return (ctxt, Some c)
-    (* End of Alpha stitching. Comment used for automatic snapshot *)
-    (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | ParisC_020 ->
+        (* End of Alpha stitching. Comment used for automatic snapshot *)
+        (* Start of Beta stitching. Comment used for automatic snapshot *)
+    | Beta ->
+        let module Previous = Constants_parametric_previous_repr in
         let*! c = get_previous_protocol_constants ctxt in
-
         let dal =
-          Constants_parametric_repr.
-            {
-              feature_enable = c.dal.feature_enable;
-              incentives_enable = c.dal.incentives_enable;
-              number_of_slots = c.dal.number_of_slots;
-              attestation_lag = c.dal.attestation_lag;
-              attestation_threshold = c.dal.attestation_threshold;
-              cryptobox_parameters = c.dal.cryptobox_parameters;
-            }
-        in
-        let reveal_activation_level :
-            Constants_parametric_repr.sc_rollup_reveal_activation_level =
-          let prev = c.sc_rollup.reveal_activation_level in
-          let raw_data =
-            Constants_parametric_repr.{blake2B = prev.raw_data.blake2B}
+          let ({
+                 feature_enable;
+                 incentives_enable;
+                 number_of_slots;
+                 attestation_lag;
+                 attestation_threshold;
+                 cryptobox_parameters;
+               }
+                : Previous.dal) =
+            c.dal
           in
           {
-            raw_data;
-            metadata = prev.metadata;
-            dal_page = prev.dal_page;
-            dal_parameters = prev.dal_parameters;
-            dal_attested_slots_validity_lag =
-              prev.dal_attested_slots_validity_lag;
+            Constants_parametric_repr.feature_enable;
+            incentives_enable;
+            number_of_slots;
+            attestation_lag;
+            attestation_threshold;
+            cryptobox_parameters;
+          }
+        in
+        let reveal_activation_level =
+          let ({
+                 raw_data;
+                 metadata;
+                 dal_page;
+                 dal_parameters;
+                 dal_attested_slots_validity_lag;
+               }
+                : Previous.sc_rollup_reveal_activation_level) =
+            c.sc_rollup.reveal_activation_level
+          in
+          let raw_data =
+            Constants_parametric_repr.{blake2B = raw_data.blake2B}
+          in
+          {
+            Constants_parametric_repr.raw_data;
+            metadata;
+            dal_page;
+            dal_parameters;
+            dal_attested_slots_validity_lag;
           }
         in
         let sc_rollup =
+          let ({
+                 arith_pvm_enable;
+                 origination_size;
+                 challenge_window_in_blocks;
+                 stake_amount;
+                 commitment_period_in_blocks;
+                 max_lookahead_in_blocks;
+                 max_active_outbox_levels;
+                 max_outbox_messages_per_level;
+                 number_of_sections_in_dissection;
+                 timeout_period_in_blocks;
+                 max_number_of_stored_cemented_commitments;
+                 max_number_of_parallel_games;
+                 reveal_activation_level = _;
+                 private_enable;
+                 riscv_pvm_enable;
+               }
+                : Previous.sc_rollup) =
+            c.sc_rollup
+          in
           Constants_parametric_repr.
             {
-              arith_pvm_enable = c.sc_rollup.arith_pvm_enable;
-              origination_size = c.sc_rollup.origination_size;
-              challenge_window_in_blocks =
-                c.sc_rollup.challenge_window_in_blocks;
-              stake_amount = c.sc_rollup.stake_amount;
-              commitment_period_in_blocks =
-                c.sc_rollup.commitment_period_in_blocks;
-              max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
-              max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
-              max_outbox_messages_per_level =
-                c.sc_rollup.max_outbox_messages_per_level;
-              number_of_sections_in_dissection =
-                c.sc_rollup.number_of_sections_in_dissection;
-              timeout_period_in_blocks = c.sc_rollup.timeout_period_in_blocks;
-              max_number_of_stored_cemented_commitments =
-                c.sc_rollup.max_number_of_stored_cemented_commitments;
-              max_number_of_parallel_games =
-                c.sc_rollup.max_number_of_parallel_games;
+              arith_pvm_enable;
+              origination_size;
+              challenge_window_in_blocks;
+              stake_amount;
+              commitment_period_in_blocks;
+              max_lookahead_in_blocks;
+              max_active_outbox_levels;
+              max_outbox_messages_per_level;
+              number_of_sections_in_dissection;
+              timeout_period_in_blocks;
+              max_number_of_stored_cemented_commitments;
+              max_number_of_parallel_games;
               reveal_activation_level;
-              private_enable = c.sc_rollup.private_enable;
-              riscv_pvm_enable = c.sc_rollup.riscv_pvm_enable;
+              private_enable;
+              riscv_pvm_enable;
             }
         in
         let zk_rollup =
+          let ({
+                 enable;
+                 origination_size;
+                 min_pending_to_process;
+                 max_ticket_payload_size;
+               }
+                : Previous.zk_rollup) =
+            c.zk_rollup
+          in
           Constants_parametric_repr.
             {
-              enable = c.zk_rollup.enable;
-              origination_size = c.zk_rollup.origination_size;
-              min_pending_to_process = c.zk_rollup.min_pending_to_process;
-              max_ticket_payload_size = c.zk_rollup.max_ticket_payload_size;
+              enable;
+              origination_size;
+              min_pending_to_process;
+              max_ticket_payload_size;
             }
         in
-
         let adaptive_rewards_params =
+          let ({
+                 issuance_ratio_final_min;
+                 issuance_ratio_final_max;
+                 issuance_ratio_initial_min;
+                 issuance_ratio_initial_max;
+                 initial_period;
+                 transition_period;
+                 max_bonus;
+                 growth_rate;
+                 center_dz;
+                 radius_dz;
+               }
+                : Previous.adaptive_rewards_params) =
+            c.adaptive_issuance.adaptive_rewards_params
+          in
           Constants_parametric_repr.
             {
-              issuance_ratio_final_min =
-                c.adaptive_issuance.adaptive_rewards_params
-                  .issuance_ratio_final_min;
-              issuance_ratio_final_max =
-                c.adaptive_issuance.adaptive_rewards_params
-                  .issuance_ratio_final_max;
-              issuance_ratio_initial_min =
-                c.adaptive_issuance.adaptive_rewards_params
-                  .issuance_ratio_initial_min;
-              issuance_ratio_initial_max =
-                c.adaptive_issuance.adaptive_rewards_params
-                  .issuance_ratio_initial_max;
-              initial_period =
-                c.adaptive_issuance.adaptive_rewards_params.initial_period;
-              transition_period =
-                c.adaptive_issuance.adaptive_rewards_params.transition_period;
-              max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
-              growth_rate =
-                c.adaptive_issuance.adaptive_rewards_params.growth_rate;
-              center_dz = c.adaptive_issuance.adaptive_rewards_params.center_dz;
-              radius_dz = c.adaptive_issuance.adaptive_rewards_params.radius_dz;
+              issuance_ratio_final_min;
+              issuance_ratio_final_max;
+              issuance_ratio_initial_min;
+              issuance_ratio_initial_max;
+              initial_period;
+              transition_period;
+              max_bonus;
+              growth_rate;
+              center_dz;
+              radius_dz;
             }
         in
         let adaptive_issuance =
+          let ({
+                 global_limit_of_staking_over_baking;
+                 edge_of_staking_over_delegation;
+                 launch_ema_threshold;
+                 adaptive_rewards_params = _;
+                 activation_vote_enable;
+                 autostaking_enable;
+                 force_activation;
+                 ns_enable;
+               }
+                : Previous.adaptive_issuance) =
+            c.adaptive_issuance
+          in
           Constants_parametric_repr.
             {
-              global_limit_of_staking_over_baking =
-                c.adaptive_issuance.global_limit_of_staking_over_baking;
-              edge_of_staking_over_delegation =
-                c.adaptive_issuance.edge_of_staking_over_delegation;
-              launch_ema_threshold = 0l;
+              global_limit_of_staking_over_baking;
+              edge_of_staking_over_delegation;
+              launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable =
-                c.adaptive_issuance.activation_vote_enable;
-              autostaking_enable = c.adaptive_issuance.autostaking_enable;
-              force_activation = c.adaptive_issuance.force_activation;
-              ns_enable = c.adaptive_issuance.ns_enable;
+              activation_vote_enable;
+              autostaking_enable;
+              force_activation;
+              ns_enable;
             }
         in
         let issuance_weights =
@@ -1425,7 +1417,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
                }
-                : Constants_parametric_previous_repr.issuance_weights) =
+                : Previous.issuance_weights) =
             c.issuance_weights
           in
           {
@@ -1437,98 +1429,107 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             vdf_revelation_tip_weight;
           }
         in
-        let consensus_rights_delay =
-          (* Any network should now use 2 cycle for the consensus_rights_delay *)
-          if Compare.Int.(c.consensus_rights_delay >= 2) then 2
-          else c.consensus_rights_delay
-        in
-
-        let direct_ticket_spending_enable = false in
-        let Constants_repr.Generated.{max_slashing_threshold; _} =
-          Constants_repr.Generated.generate
-            ~consensus_committee_size:c.consensus_committee_size
-        in
         let constants =
-          Constants_parametric_repr.
-            {
-              consensus_rights_delay;
-              blocks_preservation_cycles = 1;
-              delegate_parameters_activation_delay =
-                c.delegate_parameters_activation_delay;
-              blocks_per_cycle = c.blocks_per_cycle;
-              blocks_per_commitment = c.blocks_per_commitment;
-              nonce_revelation_threshold = c.nonce_revelation_threshold;
-              cycles_per_voting_period = c.cycles_per_voting_period;
-              hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
-              hard_gas_limit_per_block = c.hard_gas_limit_per_block;
-              proof_of_work_threshold = c.proof_of_work_threshold;
-              minimal_stake = c.minimal_stake;
-              minimal_frozen_stake = c.minimal_frozen_stake;
-              vdf_difficulty = c.vdf_difficulty;
-              origination_size = c.origination_size;
-              max_operations_time_to_live = c.max_operations_time_to_live;
-              issuance_weights;
-              cost_per_byte = c.cost_per_byte;
-              hard_storage_limit_per_operation =
-                c.hard_storage_limit_per_operation;
-              quorum_min = c.quorum_min;
-              quorum_max = c.quorum_max;
-              min_proposal_quorum = c.min_proposal_quorum;
-              liquidity_baking_subsidy = c.liquidity_baking_subsidy;
-              liquidity_baking_toggle_ema_threshold =
-                c.liquidity_baking_toggle_ema_threshold;
-              minimal_block_delay = c.minimal_block_delay;
-              delay_increment_per_round = c.delay_increment_per_round;
-              consensus_committee_size = c.consensus_committee_size;
-              consensus_threshold = c.consensus_threshold;
-              minimal_participation_ratio = c.minimal_participation_ratio;
-              limit_of_delegation_over_baking =
-                c.limit_of_delegation_over_baking;
-              percentage_of_frozen_deposits_slashed_per_double_baking =
-                c.percentage_of_frozen_deposits_slashed_per_double_baking;
-              percentage_of_frozen_deposits_slashed_per_double_attestation =
-                c.percentage_of_frozen_deposits_slashed_per_double_attestation;
-              max_slashing_per_block = Percentage.p100;
-              max_slashing_threshold;
-              (* The `testnet_dictator` should absolutely be None on mainnet *)
-              testnet_dictator = c.testnet_dictator;
-              initial_seed = c.initial_seed;
-              cache_script_size = c.cache_script_size;
-              cache_stake_distribution_cycles =
-                c.cache_stake_distribution_cycles;
-              cache_sampler_state_cycles = c.cache_sampler_state_cycles;
-              dal;
-              sc_rollup;
-              zk_rollup;
-              adaptive_issuance;
-              direct_ticket_spending_enable;
-            }
-        in
-        let block_time_is_at_least_5s =
-          (* This check is used to trigger the constants changes at migration on
-             this protocol for network that have block time strictly greater
-             than 4s such as mainnet and ghostnet *)
-          Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay >= 5L)
-        in
-        let* ctxt, constants =
-          if block_time_is_at_least_5s then
-            let new_constants : Constants_parametric_repr.t =
-              update_block_time_related_constants constants
-            in
-            let* ctxt =
-              update_cycle_eras
-                ctxt
-                level
-                ~prev_blocks_per_cycle:constants.blocks_per_cycle
-                ~blocks_per_cycle:new_constants.blocks_per_cycle
-                ~blocks_per_commitment:new_constants.blocks_per_commitment
-            in
-            return (ctxt, new_constants)
-          else return (ctxt, constants)
+          let ({
+                 consensus_rights_delay;
+                 blocks_preservation_cycles;
+                 delegate_parameters_activation_delay;
+                 blocks_per_cycle;
+                 blocks_per_commitment;
+                 nonce_revelation_threshold;
+                 cycles_per_voting_period;
+                 hard_gas_limit_per_operation;
+                 hard_gas_limit_per_block;
+                 proof_of_work_threshold;
+                 minimal_stake;
+                 minimal_frozen_stake;
+                 vdf_difficulty;
+                 origination_size;
+                 max_operations_time_to_live;
+                 issuance_weights = _;
+                 cost_per_byte;
+                 hard_storage_limit_per_operation;
+                 quorum_min;
+                 quorum_max;
+                 min_proposal_quorum;
+                 liquidity_baking_subsidy;
+                 liquidity_baking_toggle_ema_threshold;
+                 minimal_block_delay;
+                 delay_increment_per_round;
+                 consensus_committee_size;
+                 consensus_threshold;
+                 minimal_participation_ratio;
+                 limit_of_delegation_over_baking;
+                 percentage_of_frozen_deposits_slashed_per_double_baking;
+                 percentage_of_frozen_deposits_slashed_per_double_attestation;
+                 max_slashing_per_block;
+                 max_slashing_threshold;
+                 (* The `testnet_dictator` should absolutely be None on mainnet *)
+                 testnet_dictator;
+                 initial_seed;
+                 cache_script_size;
+                 cache_stake_distribution_cycles;
+                 cache_sampler_state_cycles;
+                 dal = _;
+                 sc_rollup = _;
+                 zk_rollup = _;
+                 adaptive_issuance = _;
+                 direct_ticket_spending_enable;
+               }
+                : Previous.t) =
+            c
+          in
+          {
+            Constants_parametric_repr.consensus_rights_delay;
+            blocks_preservation_cycles;
+            delegate_parameters_activation_delay;
+            blocks_per_cycle;
+            blocks_per_commitment;
+            nonce_revelation_threshold;
+            cycles_per_voting_period;
+            hard_gas_limit_per_operation;
+            hard_gas_limit_per_block;
+            proof_of_work_threshold;
+            minimal_stake;
+            minimal_frozen_stake;
+            vdf_difficulty;
+            origination_size;
+            max_operations_time_to_live;
+            issuance_weights;
+            cost_per_byte;
+            hard_storage_limit_per_operation;
+            quorum_min;
+            quorum_max;
+            min_proposal_quorum;
+            liquidity_baking_subsidy;
+            liquidity_baking_toggle_ema_threshold;
+            minimal_block_delay;
+            delay_increment_per_round;
+            consensus_committee_size;
+            consensus_threshold;
+            minimal_participation_ratio;
+            limit_of_delegation_over_baking;
+            percentage_of_frozen_deposits_slashed_per_double_baking;
+            percentage_of_frozen_deposits_slashed_per_double_attestation;
+            max_slashing_per_block;
+            max_slashing_threshold;
+            (* The `testnet_dictator` should absolutely be None on mainnet *)
+            testnet_dictator;
+            initial_seed;
+            cache_script_size;
+            cache_stake_distribution_cycles;
+            cache_sampler_state_cycles;
+            dal;
+            sc_rollup;
+            zk_rollup;
+            adaptive_issuance;
+            direct_ticket_spending_enable;
+          }
         in
         let*! ctxt = add_constants ctxt constants in
+
         return (ctxt, Some c)
-    (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
+    (* End of Beta stitching. Comment used for automatic snapshot *)
   in
   let+ ctxt =
     prepare
