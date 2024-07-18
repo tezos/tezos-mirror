@@ -12,7 +12,7 @@
 // Allow non snake case for setters & getters
 #![allow(non_snake_case)]
 
-use super::fields::NormaliseFields;
+use super::bits::NormaliseFields;
 use crate::{
     bits::{Bits64, ConstantBits},
     csr,

@@ -253,6 +253,9 @@ impl<E: CellRead> CellRead for &mut E {
 pub trait CellWrite: CellRead {
     /// Write the value managed by the cell.
     fn write(&mut self, value: Self::Value);
+
+    /// Replace the value managed by the cell.
+    fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
 impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
@@ -260,11 +263,21 @@ impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
     fn write(&mut self, value: E) {
         self.region.write(0, value)
     }
+
+    #[inline(always)]
+    fn replace(&mut self, value: E) -> E {
+        self.region.replace(0, value)
+    }
 }
 
 impl<E: CellWrite> CellWrite for &mut E {
     fn write(&mut self, value: Self::Value) {
         E::write(self, value)
+    }
+
+    #[inline(always)]
+    fn replace(&mut self, value: Self::Value) -> Self::Value {
+        E::replace(self, value)
     }
 }
 

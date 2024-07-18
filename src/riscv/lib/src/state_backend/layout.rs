@@ -71,6 +71,69 @@ impl<T: super::Elem, const LEN: usize> Layout for Array<T, LEN> {
     }
 }
 
+/// Usage: Provide a struct with each field holding a layout.
+///
+/// ```
+/// use octez_riscv::*;
+/// use octez_riscv::state_backend::*;
+/// use octez_riscv::machine_state::csregisters::CSRRepr;
+/// use octez_riscv::machine_state::mode::Mode;
+/// use octez_riscv::struct_layout;
+///
+/// struct_layout!(
+///     pub struct ExampleLayout {
+///         satp_ppn: Atom<CSRRepr>,
+///         mode: EnumCellLayout<u8>,
+///         cached: BoolCellLayout,
+///     }
+/// );
+/// ```
+#[macro_export]
+macro_rules! struct_layout {
+    ($vis:vis struct $layout_t:ident {
+        $($field_name:ident: $cell_repr:ty),+
+        $( , )?
+    }) => {
+        paste::paste! {
+
+            $vis struct $layout_t {
+                $( [<_$field_name>]: $cell_repr ),+
+            }
+
+            pub struct [<$layout_t Placed>] {
+                $( $field_name: PlacedOf<$cell_repr> ),+
+            }
+
+            pub struct [<$layout_t Allocated>]<M: Manager>
+            {
+                $( $field_name: AllocatedOf<$cell_repr, M> ),+
+            }
+
+            impl Layout for $layout_t {
+                type Placed = [<$layout_t Placed>];
+                type Allocated<Back: Manager> = [<$layout_t Allocated>]<Back>;
+
+                fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+                    [<$layout_t Placed>] {
+                        $($field_name: alloc.alloc()),+
+                    }
+                }
+
+                fn allocate<B: $crate::state_backend::Manager>(
+                    backend: &mut B,
+                    placed: Self::Placed
+                ) -> Self::Allocated<B> {
+                    Self::Allocated {
+                        $($field_name: <$cell_repr as Layout>::allocate(
+                            backend, placed.$field_name
+                        )),+
+                    }
+                }
+            }
+        }
+    };
+}
+
 impl<A, B> Layout for (A, B)
 where
     A: Layout,
