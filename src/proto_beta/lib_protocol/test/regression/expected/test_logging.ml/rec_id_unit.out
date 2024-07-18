@@ -1,0 +1,56 @@
+
+trace
+  - CAR (interp) @ location: 7
+    [ (Pair Unit Unit) ]
+  - CAR (entry) @ location: 7
+    [ (Pair Unit Unit) ]
+    - log/LAMBDA_REC (exit) @ location: 7
+      [ Unit ]
+  - LAMBDA_REC (entry) @ location: 8
+    [ Unit ]
+    - log/SWAP (exit) @ location: 8
+      [ (Lambda_rec { DIP { DROP } })
+        Unit ]
+  - SWAP (entry) @ location: 15
+    [ (Lambda_rec { DIP { DROP } })
+      Unit ]
+    - log/EXEC (exit) @ location: 15
+      [ Unit
+        (Lambda_rec { DIP { DROP } }) ]
+  - EXEC (entry) @ location: 16
+    [ Unit
+      (Lambda_rec { DIP { DROP } }) ]
+    - DIP (entry) @ location: 12
+      [ Unit
+        (Lambda_rec { DIP { DROP } }) ]
+      - log/DROP (exit) @ location: 12
+        [ (Lambda_rec { DIP { DROP } }) ]
+    - DROP (entry) @ location: 14
+      [ (Lambda_rec { DIP { DROP } }) ]
+      - log/[halt] (exit) @ location: 14
+        [  ]
+    - [halt] (entry) @ location: 14
+      [  ]
+      - control: KUndip
+      - control: KCons
+      - log/[halt] (exit) @ location: 12
+        [ Unit ]
+    - [halt] (entry) @ location: 12
+      [ Unit ]
+      - control: KReturn
+      - control: KCons
+      - log/NIL (exit) @ location: 16
+        [ Unit ]
+    - NIL (entry) @ location: 17
+      [ Unit ]
+      - log/PAIR (exit) @ location: 17
+        [ {}
+          Unit ]
+    - PAIR (entry) @ location: 19
+      [ {}
+        Unit ]
+      - log/[halt] (exit) @ location: 19
+        [ (Pair {} Unit) ]
+    - [halt] (entry) @ location: 6
+      [ (Pair {} Unit) ]
+      - control: KNil

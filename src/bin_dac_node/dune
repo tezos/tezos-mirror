@@ -26,6 +26,9 @@
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin
   octez-protocol-020-PsParisC-libs.dac
+  (select void_for_linking-octez-protocol-beta-libs-dac from
+   (octez-protocol-beta-libs.dac -> void_for_linking-octez-protocol-beta-libs-dac.empty)
+   (-> void_for_linking-octez-protocol-beta-libs-dac.empty))
   (select void_for_linking-octez-protocol-alpha-libs-dac from
    (octez-protocol-alpha-libs.dac -> void_for_linking-octez-protocol-alpha-libs-dac.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dac.empty)))
@@ -48,4 +51,6 @@
 
 (rule
  (action
-  (progn (write-file void_for_linking-octez-protocol-alpha-libs-dac.empty ""))))
+  (progn
+   (write-file void_for_linking-octez-protocol-beta-libs-dac.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-dac.empty ""))))

@@ -25,6 +25,7 @@ depopts: [
   "octez-smart-rollup-node-PtNairob" {with-test}
   "octez-smart-rollup-node-Proxford" {with-test}
   "octez-smart-rollup-node-PtParisB" {with-test}
+  "octez-smart-rollup-node-beta" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [

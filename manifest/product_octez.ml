@@ -7017,6 +7017,8 @@ let hash = Protocol.hash
 
   let _020_PsParisC = active (Name.v "PsParisC" 020)
 
+  let _beta = active (Name.dev "beta")
+
   let alpha = active (Name.dev "alpha")
 
   let all = List.rev !all_rev

@@ -17,9 +17,11 @@ depends: [
   "octez-protocol-020-PsParisC-libs" { = version }
 ]
 depopts: [
+  "octez-protocol-beta-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
+  "octez-protocol-beta-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

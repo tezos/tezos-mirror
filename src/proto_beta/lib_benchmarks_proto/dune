@@ -1,0 +1,44 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_beta)
+ (public_name tezos-benchmarks-proto-beta)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  tezos-protocol-beta.parameters
+  octez-libs.lazy-containers
+  tezos-benchmark
+  tezos-benchmark-beta
+  tezos-benchmark-type-inference-beta
+  tezos-protocol-beta.protocol
+  octez-libs.crypto
+  octez-shell-libs.shell-benchmarks
+  octez-libs.micheline
+  octez-protocol-beta-libs.test-helpers
+  octez-libs.tezos-sapling
+  octez-protocol-beta-libs.client
+  octez-protocol-beta-libs.plugin
+  octez-proto-libs.protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_protocol_beta_parameters
+  -open Tezos_lazy_containers
+  -open Tezos_benchmark
+  -open Tezos_benchmark_beta
+  -open Tezos_benchmark_type_inference_beta
+  -open Tezos_protocol_beta
+  -open Tezos_protocol_beta.Protocol
+  -open Tezos_micheline
+  -open Tezos_beta_test_helpers
+  -open Tezos_client_beta
+  -open Tezos_protocol_plugin_beta))

@@ -1,0 +1,33 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_beta)
+ (public_name tezos-benchmark-beta)
+ (libraries
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-beta
+  tezos-protocol-beta.protocol
+  octez-libs.crypto
+  tezos-protocol-beta.parameters
+  hashcons
+  octez-protocol-beta-libs.test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_beta
+  -open Tezos_protocol_beta
+  -open Tezos_beta_test_helpers)
+ (private_modules kernel rules state_space))

@@ -1,0 +1,21 @@
+
+./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint save --arg 'Pair "[CONTRACT_HASH]" (Pair "Ticket" 1)'
+Node is bootstrapped.
+This simulation failed:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0
+    Expected counter: 4
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: save
+      Parameter: (Pair "[CONTRACT_HASH]" (Pair "Ticket" 1))
+      This operation FAILED.
+
+At (unshown) location 0, invalid primitive Pair, only Ticket can be used here.
+Fatal error:
+  transfer simulation failed

@@ -16,14 +16,16 @@ RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
 NAMED_PROTOS  = paris
-PROTOCOLS     = $(NAMED_PROTOS) alpha
+PROTOCOLS     = $(NAMED_PROTOS) alpha beta
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 paris_long    = PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ
+beta_long     = PtRU6wuXeNfhzbbbNbZNbaahu2eKBDztN5cqG8LbvLspdUnPGVX
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 paris_short   = PtParisB
+beta_short    = beta
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -159,7 +161,7 @@ user/default-acl.json: $(RPCDOCEXE)
 	$(RPCDOCEXE) acl > $@
 
 rpc: user/default-acl.json shell/rpc.rst \
-	alpha/rpc.rst
+	alpha/rpc.rst beta/rpc.rst
 
 # To be triggered manually when needed
 rpc-protocols: $(NAMED_PROTOS:%=%/rpc.rst)
@@ -243,5 +245,5 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst beta/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html alpha/octez-*.html
