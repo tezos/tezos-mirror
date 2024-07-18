@@ -7,9 +7,11 @@ mainnet_evm_kernel: etherlink/kernel_evm/kernel/tests/resources/mainnet_evm_kern
 evm_kernel: evm_kernel.wasm
 accuser_psparisc: octez-accuser-PsParisC
 accuser_alpha: octez-accuser-alpha
+accuser_beta: octez-accuser-beta
 admin_client: octez-admin-client
 baker_psparisc: octez-baker-PsParisC
 baker_alpha: octez-baker-alpha
+baker_beta: octez-baker-beta
 client: octez-client
 codec: octez-codec
 dac_client: octez-dac-client
