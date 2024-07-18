@@ -26,7 +26,7 @@ oc.docker-build-debian-dependencies:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.6
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   parallel:
     matrix:
@@ -45,7 +45,7 @@ oc.build-debian:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh
   variables:
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:
@@ -67,7 +67,7 @@ oc.build-debian-current:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh
   variables:
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:

@@ -69,7 +69,9 @@ let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
    we test only on Debian stable. *)
 let jobs pipeline_type =
   let variables add =
-    ("DEP_IMAGE", "registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE")
+    ( "DEP_IMAGE",
+      "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE"
+    )
     :: add
   in
   let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
