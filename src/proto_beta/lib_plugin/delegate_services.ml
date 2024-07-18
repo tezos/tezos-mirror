@@ -216,6 +216,25 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "staking_balance")
+
+    let total_delegated_stake =
+      RPC_service.get_service
+        ~description:
+          "Returns the sum (in mutez) of all tokens staked by the delegators \
+           of a given delegate. This excludes the delegate's own staked \
+           tokens."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "total_delegated_stake")
+
+    let delegated_balance =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; to get this value, you can call RPCs external_staked \
+           and external_delegated, and add their outputs together."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "delegated_balance")
   end
 
   let total_staked =
@@ -281,14 +300,32 @@ module S = struct
       ~output:(list Contract.encoding)
       RPC_path.(path / "delegated_contracts")
 
-  let total_delegated_stake =
+  let external_staked =
     RPC_service.get_service
       ~description:
-        "Returns the sum (in mutez) of all tokens staked by the delegators of \
-         a given delegate. This excludes the delegate's own staked tokens."
+        "The sum (in mutez) of all tokens currently staked by the baker's \
+         external delegators. This excludes the baker's own staked tokens."
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "total_delegated_stake")
+      RPC_path.(path / "external_staked")
+
+  let external_delegated =
+    RPC_service.get_service
+      ~description:
+        "The sum (in mutez) of non-staked tokens that currently count as \
+         delegated to the baker, excluding those owned by the baker iself. \
+         Does not take limits such as overstaking or overdelegation into \
+         account. This includes the spendable balances and frozen bonds of all \
+         the baker's external delegators. It also includes unstake requests of \
+         contracts other than the baker, on the condition that the contract \
+         was delegating to the baker at the time of the unstake operation. So \
+         this includes most but not all unstake requests from current \
+         delegators, and might include some unstake requests from old \
+         delegators. Limits such as overstaking and overdelegation have not \
+         been applied yet."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "external_delegated")
 
   let staking_denominator =
     RPC_service.get_service
@@ -450,6 +487,82 @@ let f_total_delegated ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   total_delegated ctxt pkh
 
+let external_staked ctxt pkh =
+  Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez ctxt ~delegate:pkh
+
+let f_external_staked ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  external_staked ctxt pkh
+
+let unstake_requests ctxt pkh =
+  let open Lwt_result_syntax in
+  let* result =
+    (* This function applies slashing to finalizable requests. *)
+    Unstake_requests.prepare_finalize_unstake ctxt pkh
+  in
+  match result with
+  | None -> return_none
+  | Some {finalizable; unfinalizable} ->
+      let* unfinalizable =
+        (* Apply slashing to unfinalizable requests too. *)
+        Unstake_requests.For_RPC
+        .apply_slash_to_unstaked_unfinalizable_stored_requests
+          ctxt
+          unfinalizable
+      in
+      return_some Unstake_requests.{finalizable; unfinalizable}
+
+let external_staked_and_delegated ctxt pkh =
+  let open Lwt_result_syntax in
+  let* own_full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+  let* own_unstake_requests = unstake_requests ctxt (Implicit pkh) in
+  let* own_unstaked_from_other_delegates =
+    match own_unstake_requests with
+    | None -> return Tez.zero
+    | Some {finalizable; unfinalizable} ->
+        let* finalizable_sum =
+          List.fold_left_es
+            (fun acc (delegate, _, (amount : Tez.t)) ->
+              if Signature.Public_key_hash.(delegate <> pkh) then
+                Lwt.return Tez.(acc +? amount)
+              else return acc)
+            Tez.zero
+            finalizable
+        in
+        let* unfinalizable_sum =
+          if Signature.Public_key_hash.(unfinalizable.delegate <> pkh) then
+            List.fold_left_es
+              (fun acc (_, (amount : Tez.t)) -> Lwt.return Tez.(acc +? amount))
+              Tez.zero
+              unfinalizable.requests
+          else return Tez.zero
+        in
+        Lwt.return Tez.(finalizable_sum +? unfinalizable_sum)
+  in
+  let* total_staked_and_delegated = total_staked_and_delegated ctxt pkh in
+  let*? own_staked_and_delegated =
+    Tez.(own_full_balance -? own_unstaked_from_other_delegates)
+  in
+  let*? external_staked_and_delegated =
+    Tez.(total_staked_and_delegated -? own_staked_and_delegated)
+  in
+  return external_staked_and_delegated
+
+let external_delegated ctxt pkh : Tez.t Environment.Error_monad.tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* external_staked_and_delegated = external_staked_and_delegated ctxt pkh in
+  let* external_staked = external_staked ctxt pkh in
+  let*? external_delegated =
+    Tez.(external_staked_and_delegated -? external_staked)
+  in
+  return external_delegated
+
+let f_external_delegated ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  external_delegated ctxt pkh
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -529,11 +642,12 @@ let register () =
       let* () = check_delegate_registered ctxt pkh in
       let*! contracts = Delegate.delegated_contracts ctxt pkh in
       return contracts) ;
-  register1 ~chunked:false S.total_delegated_stake (fun ctxt pkh () () ->
+  register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
+  register1 ~chunked:false S.external_staked f_external_staked ;
+  register1 ~chunked:false S.external_delegated f_external_delegated ;
+  register1 ~chunked:false S.Deprecated.delegated_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
-        ctxt
-        ~delegate:pkh) ;
+      external_staked_and_delegated ctxt pkh) ;
   register1 ~chunked:false S.staking_denominator (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
@@ -620,7 +734,7 @@ let delegated_contracts ctxt block pkh =
   RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
 
 let total_delegated_stake ctxt block pkh =
-  RPC_context.make_call1 S.total_delegated_stake ctxt block pkh () ()
+  RPC_context.make_call1 S.external_staked ctxt block pkh () ()
 
 let staking_denominator ctxt block pkh =
   RPC_context.make_call1 S.staking_denominator ctxt block pkh () ()
