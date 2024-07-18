@@ -67,18 +67,23 @@ module Make (SimulationBackend : SimulationBackend) = struct
           log_kernel_debug_file = Some log_file;
         }
 
-  (* The feature DA fees has been added later in the kernel. The node must
-     decide whether it wants to activate it or not.
+  let simulation_input ~simulation_version ~with_da_fees call =
+    match simulation_version with
+    | `V0 -> Simulation.V0 call
+    | `V1 -> V1 {call; with_da_fees}
+
+  (* Simulation have different versions in the kernel, the inputs change
+     between the different versions.
 
      As the simulation can be performed on past states, including past kernels,
-     we cannot consider it enabled even if it's supported by all latest
+     we cannot consider only latest version if it's supported by all latest
      kernels on ghostnet and mainnet.
   *)
-  let enabled_with_da_fees simulation_state =
+  let simulation_version simulation_state =
     let open Lwt_result_syntax in
     let* storage_version = get_storage_version simulation_state in
-    if storage_version < 12 then return_false
-    else if storage_version > 12 then return_true
+    if storage_version < 12 then return `V0
+    else if storage_version > 12 then return `V1
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
@@ -86,25 +91,21 @@ module Make (SimulationBackend : SimulationBackend) = struct
       (* This is supposed to be the only version where STORAGE_VERSION is 12,
          but with_da_fees isn't enabled. *)
       if kernel_version = "ec7c3b349624896b269e179384d0a45cf39e1145" then
-        return_false
-      else return_true
+        return `V0
+      else return `V1
 
   let simulate_call call block_param =
     let open Lwt_result_syntax in
     let* simulation_state =
       SimulationBackend.simulation_state ~block:block_param ()
     in
-    let* enabled_with_da_fees = enabled_with_da_fees simulation_state in
+    let* simulation_version = simulation_version simulation_state in
     let* bytes =
       call_simulation
         simulation_state
         ~log_file:"simulate_call"
         ~input_encoder:Simulation.encode
-        ~input:
-          {
-            call;
-            with_da_fees = (if enabled_with_da_fees then Some true else None);
-          }
+        ~input:(simulation_input ~simulation_version ~with_da_fees:true call)
     in
     Lwt.return (Simulation.simulation_result bytes)
 
@@ -119,7 +120,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     Lwt.return (Simulation.gas_estimation bytes)
 
-  let rec confirm_gas ~enabled_with_da_fees (call : Ethereum_types.call) gas
+  let rec confirm_gas ~simulation_version (call : Ethereum_types.call) gas
       simulation_state =
     let open Ethereum_types in
     let open Lwt_result_syntax in
@@ -128,10 +129,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
-        {
-          call = new_call;
-          with_da_fees = (if enabled_with_da_fees then Some false else None);
-        }
+        (simulation_input ~simulation_version ~with_da_fees:false new_call)
         simulation_state
     in
     match result with
@@ -141,16 +139,13 @@ module Make (SimulationBackend : SimulationBackend) = struct
         let new_gas = double gas in
         if reached_max new_gas then
           failwith "Gas estimate reached max gas limit."
-        else confirm_gas ~enabled_with_da_fees call new_gas simulation_state
+        else confirm_gas ~simulation_version call new_gas simulation_state
     | Ok (Ok _) -> (
         (* Since the gas computation related to execution is fine. We can
            call the estimation with the da fees taken into account. *)
         let* res =
           call_estimate_gas
-            {
-              call;
-              with_da_fees = (if enabled_with_da_fees then Some true else None);
-            }
+            (simulation_input ~simulation_version ~with_da_fees:true call)
             simulation_state
         in
         match res with
@@ -163,21 +158,18 @@ module Make (SimulationBackend : SimulationBackend) = struct
 
        Gas estimation currently ignores the block parameter. When this is fixed,
        we need to give the block parameter to the call to
-       {!enabled_with_da_fees}. *)
+       {!simulation_version}. *)
     let* simulation_state = SimulationBackend.simulation_state () in
-    let* enabled_with_da_fees = enabled_with_da_fees simulation_state in
+    let* simulation_version = simulation_version simulation_state in
     let* res =
       call_estimate_gas
-        {
-          call;
-          with_da_fees = (if enabled_with_da_fees then Some false else None);
-        }
+        (simulation_input ~simulation_version ~with_da_fees:false call)
         simulation_state
     in
     match res with
     | Ok (Ok {gas_used = Some gas; value}) ->
         let+ gas_used =
-          confirm_gas ~enabled_with_da_fees call gas simulation_state
+          confirm_gas ~simulation_version call gas simulation_state
         in
         Ok (Ok {Simulation.gas_used = Some gas_used; value})
     | _ -> return res

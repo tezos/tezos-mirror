@@ -87,7 +87,7 @@ let trace_call ~call ~block ~config =
     return state
   in
 
-  let*? messages = Simulation.encode {call; with_da_fees = Some false} in
+  let*? messages = Simulation.(encode (V1 {call; with_da_fees = false})) in
 
   let simulation_input =
     Simulation.Encodings.
