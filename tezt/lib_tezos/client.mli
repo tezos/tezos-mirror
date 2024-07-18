@@ -158,6 +158,13 @@ val get_mode : t -> mode
     a new client from scratch. *)
 val set_mode : mode -> t -> unit
 
+(** Get a client's Dal node. *)
+val get_dal_node : t -> Dal_node.t option
+
+(** [with_dal_node t dal_node] returns the client [t] with its
+    Dal node updated to [dal_node]. *)
+val with_dal_node : ?dal_node:Dal_node.t -> t -> t
+
 (** Write the [--sources] file used by the light mode. *)
 val write_sources_file :
   min_agreement:float -> uris:string list -> t -> unit Lwt.t

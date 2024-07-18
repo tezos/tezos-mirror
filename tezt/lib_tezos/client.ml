@@ -91,6 +91,10 @@ let get_mode t = t.mode
 
 let set_mode mode t = t.mode <- mode
 
+let get_dal_node t = t.dal_node
+
+let with_dal_node ?dal_node t = {t with dal_node}
+
 let endpoint_wait_for ?where endpoint event filter =
   match endpoint with
   | Node node -> Node.wait_for ?where node event filter
