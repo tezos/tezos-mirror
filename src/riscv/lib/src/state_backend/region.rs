@@ -254,7 +254,7 @@ pub trait CellWrite: CellRead {
     /// Write the value managed by the cell.
     fn write(&mut self, value: Self::Value);
 
-    /// Replace the value managed by the cell.
+    /// Replace the value managed by the cell, returning the old value.
     fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
