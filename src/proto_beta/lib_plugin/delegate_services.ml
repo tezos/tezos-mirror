@@ -264,6 +264,13 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.int64
         RPC_path.(path / "current_baking_power")
+
+    let delegated_contracts =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use delegators instead."
+        ~query:RPC_query.empty
+        ~output:(list Contract.encoding)
+        RPC_path.(path / "delegated_contracts")
   end
 
   let total_staked =
@@ -303,13 +310,15 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "total_delegated")
 
-  let delegated_contracts =
+  let delegators =
     RPC_service.get_service
       ~description:
-        "Returns the list of contracts that delegate to a given delegate."
+        "The list of all contracts that are currently delegating to the \
+         delegate. Includes both user accounts and smart contracts. Includes \
+         the delegate itself."
       ~query:RPC_query.empty
       ~output:(list Contract.encoding)
-      RPC_path.(path / "delegated_contracts")
+      RPC_path.(path / "delegators")
 
   let external_staked =
     RPC_service.get_service
@@ -579,6 +588,12 @@ let f_baking_power ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh
 
+let f_delegators ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  let*! contracts = Delegate.delegated_contracts ctxt pkh in
+  return contracts
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -657,10 +672,8 @@ let register () =
     (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.frozen_deposits_limit ctxt pkh) ;
-  register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      let*! contracts = Delegate.delegated_contracts ctxt pkh in
-      return contracts) ;
+  register1 ~chunked:true S.Deprecated.delegated_contracts f_delegators ;
+  register1 ~chunked:true S.delegators f_delegators ;
   register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
   register1 ~chunked:false S.external_staked f_external_staked ;
   register1 ~chunked:false S.external_delegated f_external_delegated ;
@@ -749,7 +762,7 @@ let frozen_deposits_limit ctxt block pkh =
   RPC_context.make_call1 S.Deprecated.frozen_deposits_limit ctxt block pkh () ()
 
 let delegated_contracts ctxt block pkh =
-  RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
+  RPC_context.make_call1 S.delegators ctxt block pkh () ()
 
 let total_delegated_stake ctxt block pkh =
   RPC_context.make_call1 S.external_staked ctxt block pkh () ()
