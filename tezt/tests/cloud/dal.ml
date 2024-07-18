@@ -817,6 +817,30 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     ~job_name
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
+let init_ghostnet cloud (configuration : configuration) agent =
+  if configuration.bootstrap then assert false
+  else
+    let node = None in
+    let dal_node = None in
+    (* Taken from ghostnet configuration. *)
+    let node_p2p_endpoint = "ghostnet.tzinit.org" in
+    let dal_node_p2p_endpoint = "dalboot.ghostnet.tzinit.org" in
+    let node_rpc_endpoint =
+      Endpoint.{scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 80}
+    in
+    let client =
+      Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
+    in
+    Lwt.return
+      {
+        node;
+        dal_node;
+        node_p2p_endpoint;
+        node_rpc_endpoint;
+        dal_node_p2p_endpoint;
+        client;
+      }
+
 let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     agent =
   let* bootstrap_node = Node.Agent.create ~name:"bootstrap-node" agent in
