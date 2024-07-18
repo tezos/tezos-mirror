@@ -309,6 +309,17 @@ module Committee : sig
 
   val at_level :
     Node.t -> ?level:int -> ?delegates:string list -> unit -> t Lwt.t
+
+  (* [check_is_in ~__LOC__ node ?inside ?level delegate] checks that [delegate]
+     is part of the DAL committee at the given [level] if and only if [inside]
+     is [true] (which is the default). The test fails if not. *)
+  val check_is_in :
+    __LOC__:string ->
+    Node.t ->
+    ?inside:bool ->
+    ?level:int ->
+    string ->
+    unit Lwt.t
 end
 
 module Check : sig

@@ -108,6 +108,18 @@ module Committee = struct
            in
            {attester; indexes})
          (JSON.as_list json)
+
+  let check_is_in ~__LOC__ node ?(inside = true) ?level pkh =
+    let* committee = at_level node ?level ~delegates:[pkh] () in
+    let in_committee =
+      List.exists (fun member -> String.equal member.attester pkh) committee
+    in
+    Check.(
+      (in_committee = inside)
+        ~__LOC__
+        bool
+        ~error_msg:"The account is in the DAL committee? Expected %R, got %L") ;
+    unit
 end
 
 module Dal_RPC = struct
