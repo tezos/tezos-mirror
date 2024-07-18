@@ -4830,7 +4830,23 @@ let test_finalized_block_param =
       ~block:`Finalized
       ~left:proxy
       ~right:sequencer
-      ~error_msg:"Sequencer and proxy should have the same head"
+      ~error_msg:"Sequencer and proxy should have the same last finalized"
+      ()
+  in
+
+  (* Terminate the sequencer. *)
+  let* () = Evm_node.terminate sequencer in
+  (* Restart it. *)
+  let* () = Evm_node.run sequencer in
+
+  let* () =
+    check_block_consistency
+      ~block:`Finalized
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:
+        "Sequencer and proxy should have the same last finalized after \
+         sequencer reboot"
       ()
   in
 
