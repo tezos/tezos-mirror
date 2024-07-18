@@ -216,6 +216,16 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "staking_balance")
+
+    let total_delegated_stake =
+      RPC_service.get_service
+        ~description:
+          "Returns the sum (in mutez) of all tokens staked by the delegators \
+           of a given delegate. This excludes the delegate's own staked \
+           tokens."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "total_delegated_stake")
   end
 
   let total_staked =
@@ -281,14 +291,14 @@ module S = struct
       ~output:(list Contract.encoding)
       RPC_path.(path / "delegated_contracts")
 
-  let total_delegated_stake =
+  let external_staked =
     RPC_service.get_service
       ~description:
-        "Returns the sum (in mutez) of all tokens staked by the delegators of \
-         a given delegate. This excludes the delegate's own staked tokens."
+        "The sum (in mutez) of all tokens currently staked by the baker's \
+         external delegators. This excludes the baker's own staked tokens."
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "total_delegated_stake")
+      RPC_path.(path / "external_staked")
 
   let staking_denominator =
     RPC_service.get_service
@@ -450,6 +460,14 @@ let f_total_delegated ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   total_delegated ctxt pkh
 
+let external_staked ctxt pkh =
+  Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez ctxt ~delegate:pkh
+
+let f_external_staked ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  external_staked ctxt pkh
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -529,11 +547,8 @@ let register () =
       let* () = check_delegate_registered ctxt pkh in
       let*! contracts = Delegate.delegated_contracts ctxt pkh in
       return contracts) ;
-  register1 ~chunked:false S.total_delegated_stake (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
-        ctxt
-        ~delegate:pkh) ;
+  register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
+  register1 ~chunked:false S.external_staked f_external_staked ;
   register1 ~chunked:false S.staking_denominator (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
@@ -620,7 +635,7 @@ let delegated_contracts ctxt block pkh =
   RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
 
 let total_delegated_stake ctxt block pkh =
-  RPC_context.make_call1 S.total_delegated_stake ctxt block pkh () ()
+  RPC_context.make_call1 S.external_staked ctxt block pkh () ()
 
 let staking_denominator ctxt block pkh =
   RPC_context.make_call1 S.staking_denominator ctxt block pkh () ()
