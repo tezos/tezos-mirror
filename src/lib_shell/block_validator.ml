@@ -358,14 +358,21 @@ let on_validation_request w
                   in
                   match r with
                   | Application_error errs ->
-                      (* If an error occurs at application, the block_hash is
-                         registered in [inapplicable_blocks_after_validation]
-                         to avoid validating and advertising it again in the
-                         future *)
-                      Block_hash_ring.replace
-                        bv.inapplicable_blocks_after_validation
-                        hash
-                        errs ;
+                      if
+                        List.exists
+                          (function
+                            | Exn Lwt.Canceled | Canceled -> false | _ -> true)
+                          errs
+                      then
+                        (* If an error occurs at application that is not a
+                           cancellation of the request, the block_hash is
+                           registered in [inapplicable_blocks_after_validation]
+                           to avoid validating and advertising it again in the
+                           future *)
+                        Block_hash_ring.replace
+                          bv.inapplicable_blocks_after_validation
+                          hash
+                          errs ;
                       return (Application_error_after_validation errs)
                   | Applied application_result ->
                       Shell_metrics.Block_validator
@@ -452,7 +459,7 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
         match errs with
         | [Canceled] ->
             (* Ignore requests cancelation *)
-            Lwt.return_unit
+            Events.(emit validation_canceled) (view.block, st)
         | errs -> Events.(emit validation_failure) (view.block, st, errs)
       in
       (* Keep the worker alive. *)
@@ -526,7 +533,7 @@ let on_completion :
           match errs with
           | [Canceled] ->
               (* Ignore requests cancellation *)
-              Lwt.return_unit
+              Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () =
                 Events.(emit application_failure_after_validation)
@@ -543,7 +550,7 @@ let on_completion :
           match errs with
           | [Canceled] ->
               (* Ignore requests cancellation *)
-              Lwt.return_unit
+              Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () = Events.(emit validation_failure) (v.block, st, errs) in
               let* () = check_and_quit_on_irmin_errors errs in
@@ -557,7 +564,7 @@ let on_completion :
           match errs with
           | [Canceled] ->
               (* Ignore requests cancellation *)
-              Lwt.return_unit
+              Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () =
                 Events.(emit commit_block_failure) (v.block, st, errs)
