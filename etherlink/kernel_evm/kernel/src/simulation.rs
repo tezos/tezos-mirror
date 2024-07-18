@@ -20,6 +20,7 @@ use crate::{
 };
 
 use evm::ExitReason;
+use evm_execution::account_storage::account_path;
 use evm_execution::handler::ExtendedExitReason;
 use evm_execution::trace::{get_tracer_config, TracerConfig};
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
@@ -320,6 +321,24 @@ impl Evaluation {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
+        let mut evm_account_storage = account_storage::init_account_storage()
+            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
+
+        // If the simulation is performed with the zero address and has a non
+        // null value, the simulation will fail with out of funds.
+        // This can be problematic as some tools doesn't provide the `from`
+        // field but provide a non null `value`.
+        //
+        // We solve the issue by giving funds before the simulation to the
+        // zero address if necessary.
+        let from = self.from.unwrap_or(H160::zero());
+        if let Some(value) = self.value {
+            if from.is_zero() {
+                let mut account =
+                    evm_account_storage.get_or_create(host, &account_path(&from)?)?;
+                account.balance_add(host, value)?;
+            }
+        }
 
         let constants = match storage::read_current_block(host) {
             Ok(block) => BlockConstants {
@@ -347,10 +366,7 @@ impl Evaluation {
             }
         };
 
-        let mut evm_account_storage = account_storage::init_account_storage()
-            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
-        let default_caller = H160::zero();
         let tx_data_size = self.data.len() as u64;
         let limits = fetch_limits(host);
         let allocated_ticks =
@@ -373,7 +389,7 @@ impl Evaluation {
             &precompiles,
             CONFIG,
             self.to,
-            self.from.unwrap_or(default_caller),
+            from,
             self.data.clone(),
             self.gas.map_or(Some(MAXIMUM_GAS_LIMIT), |gas| {
                 Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
