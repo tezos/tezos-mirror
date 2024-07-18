@@ -13,4 +13,5 @@ irmin
 brassaia
 rust-toolchain
 data-encoding
+prometheus
 resto

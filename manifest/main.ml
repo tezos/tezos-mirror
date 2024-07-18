@@ -72,8 +72,6 @@ let exclude filename =
   | ["opam"; "mandatory-for-make.opam"] -> true
   (* opam-repository is used by scripts/opam-release.sh *)
   | "opam-repository" :: _ -> true
-  (* prometheus is imported as data-only for now to ease review of its monorepotisation. *)
-  | "prometheus" :: _ -> true
   (* We need to tell Dune about excluding directories without defining targets
      in those directories. Therefore we hand write some Dune in these. *)
   | "src" :: "riscv" :: _ -> true

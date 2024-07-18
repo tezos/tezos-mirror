@@ -29,7 +29,7 @@
   fmt.cli
   fmt.tty
   tls-lwt
-  prometheus-app.unix
+  octez-libs.prometheus-app.unix
   lwt-exit
   uri
   octez-libs.base.p2p-identity-file

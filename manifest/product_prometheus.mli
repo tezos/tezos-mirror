@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val product_source : string list
+
 val prometheus : Manifest.target
 
 val prometheus_app : Manifest.target

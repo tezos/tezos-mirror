@@ -10,6 +10,7 @@ module Metrics = struct
   open Prometheus
 
   let namespace = "MyProg"
+
   let subsystem = "main"
 
   let ticks_counted_total =
@@ -19,8 +20,8 @@ end
 
 let rec counter () =
   Lwt_unix.sleep 1.0 >>= fun () ->
-  print_endline "Tick!";
-  Prometheus.Counter.inc_one Metrics.ticks_counted_total;
+  print_endline "Tick!" ;
+  Prometheus.Counter.inc_one Metrics.ticks_counted_total ;
   counter ()
 
 let main prometheus_config =
@@ -31,16 +32,17 @@ open Cmdliner
 
 (* Optional: configure logging *)
 let () =
-  Prometheus_unix.Logging.init ()
+  Prometheus_unix.Logging.init
+    ()
     ~default_level:Logs.Debug
-    ~levels:[
-      "cohttp.lwt.io", Logs.Info;
-    ]
+    ~levels:[("cohttp.lwt.io", Logs.Info)]
 
 let () =
-  Logs.info (fun f -> f "Logging initialised.");
-  print_endline "If run with the option --listen-prometheus=9090, this program serves metrics at\n\
-                 http://localhost:9090/metrics";
+  Logs.info (fun f -> f "Logging initialised.") ;
+  print_endline
+    "If run with the option --listen-prometheus=9090, this program serves \
+     metrics at\n\
+     http://localhost:9090/metrics" ;
   let info = Cmd.info "example" in
   let cmd = Cmd.v info Term.(const main $ Prometheus_unix.opts) in
   exit @@ Cmd.eval cmd

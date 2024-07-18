@@ -23,7 +23,6 @@ depends: [
   "caqti-driver-sqlite3" { >= "2.0.1" }
   "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
-  "prometheus-app" { = "1.2" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

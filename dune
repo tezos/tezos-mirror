@@ -1,6 +1,6 @@
 (vendored_dirs vendors)
 
-(data_only_dirs _opam-repo-for-release prometheus)
+(data_only_dirs _opam-repo-for-release)
 
 (env
  (_

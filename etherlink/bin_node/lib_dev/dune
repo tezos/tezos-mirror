@@ -31,7 +31,7 @@
   octez-l2-libs.layer2_store
   octez-l2-libs.smart-rollup
   octez-evm-node-libs.evm_node_migrations
-  prometheus-app)
+  octez-libs.prometheus-app)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

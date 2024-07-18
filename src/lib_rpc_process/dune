@@ -21,7 +21,7 @@
   octez-shell-libs.store.shared
   lwt.unix
   lwt-exit
-  prometheus-app)
+  octez-libs.prometheus-app)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

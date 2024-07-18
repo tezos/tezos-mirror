@@ -12,15 +12,16 @@
     - This module does not depend on [Unix], and so can be used in unikernels.
  *)
 
+(** Format a snapshot in Prometheus's text format, version 0.0.4. *)
 module TextFormat_0_0_4 : sig
   val output : Prometheus.CollectorRegistry.snapshot Fmt.t
 end
-(** Format a snapshot in Prometheus's text format, version 0.0.4. *)
 
+(** A Cohttp callback for a web-server that exposes the Prometheus metrics. *)
 module Cohttp (S : Cohttp_lwt.S.Server) : sig
   val callback :
     S.conn ->
     Cohttp.Request.t ->
-    Cohttp_lwt.Body.t -> (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
+    Cohttp_lwt.Body.t ->
+    (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
 end
-(** A Cohttp callback for a web-server that exposes the Prometheus metrics. *)
