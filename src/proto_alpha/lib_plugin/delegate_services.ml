@@ -235,6 +235,18 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "delegated_balance")
+
+    let frozen_deposits =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; call RPC total_staked on the last block of \
+           (current_cycle - 3) instead. Returns the total amount (in mutez) \
+           that was staked for the baker by all stakers (including the baker \
+           itself) at the time the staking rights for the current cycle were \
+           computed."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "frozen_deposits")
   end
 
   let total_staked =
@@ -247,15 +259,6 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "total_staked")
-
-  let frozen_deposits =
-    RPC_service.get_service
-      ~description:
-        "Returns the amount (in mutez) frozen as a deposit at the time the \
-         staking rights for the current cycle were computed."
-      ~query:RPC_query.empty
-      ~output:Tez.encoding
-      RPC_path.(path / "frozen_deposits")
 
   let unstaked_frozen_deposits =
     RPC_service.get_service
@@ -612,7 +615,7 @@ let register () =
       Delegate.For_RPC.full_balance ctxt pkh) ;
   register1 ~chunked:false S.Deprecated.current_frozen_deposits f_total_staked ;
   register1 ~chunked:false S.total_staked f_total_staked ;
-  register1 ~chunked:false S.frozen_deposits (fun ctxt pkh () () ->
+  register1 ~chunked:false S.Deprecated.frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.initial_frozen_deposits ctxt pkh) ;
   register1 ~chunked:false S.unstaked_frozen_deposits (fun ctxt pkh () () ->
@@ -719,7 +722,7 @@ let current_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.total_staked ctxt block pkh () ()
 
 let frozen_deposits ctxt block pkh =
-  RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()
+  RPC_context.make_call1 S.Deprecated.frozen_deposits ctxt block pkh () ()
 
 let unstaked_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
