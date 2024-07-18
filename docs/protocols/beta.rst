@@ -61,6 +61,25 @@ Breaking Changes
 RPC Changes
 -----------
 
+- In the following paths, ``../`` is short for
+  ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``
+
+  * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET
+    ../total_staked``. This RPC still returns the total amount staked
+    for the baker by all stakers (including the baker itself). The old
+    path is now **deprecated**. (MR :gl:`!14176`)
+
+  * Added RPC ``GET ../total_delegated``, which returns the amount
+    that counts as delegated to the baker for the purpose of computing
+    its baking rights. This includes tez owned by all delegators
+    including the baker itself, but excludes staked tez. (MR
+    :gl:`!14176`)
+
+  * **Deprecated** RPC ``GET ../staking_balance``. To get its value,
+    you can call RPCs ``GET ../total_staked`` and ``GET
+    ../total_delegated``, and add their outputs together. (MR
+    :gl:`!14176`)
+
 Operation receipts
 ------------------
 
