@@ -696,11 +696,19 @@ let map_manager_op_from_block node ~block ~find_map_op_content =
   in
   List.map map_op_contents manager_ops |> List.flatten |> return
 
-let wait_for_included_and_map_ops_content rollup_node node ~find_map_op_content
-    =
-  let* block =
+let wait_for_included_and_map_ops_content rollup_node node ~timeout
+    ~find_map_op_content =
+  let block =
     Sc_rollup_node.wait_for rollup_node "included.v0" @@ fun json ->
     Some JSON.(json |-> "block" |> as_string)
+  in
+  let* block =
+    Lwt.catch
+      (fun () -> Lwt.pick [Lwt_unix.timeout timeout; block])
+      (function
+        | Lwt_unix.Timeout ->
+            Test.fail "Timeout %fs waiting for included operations." timeout
+        | e -> raise e)
   in
   map_manager_op_from_block node ~block ~find_map_op_content
 
@@ -5505,6 +5513,7 @@ let test_multiple_batcher_key ~kind =
     wait_for_included_and_map_ops_content
       sc_rollup_node
       tezos_node
+      ~timeout:30.
       ~find_map_op_content
   in
   let check_against_operators_pkhs =
@@ -5524,15 +5533,41 @@ let test_multiple_batcher_key ~kind =
     unit
   in
   Log.info "Baking to include all previous batches and the new injection salvo" ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* pkhs_first_salvo = wait_for_included_check_batches_and_returns_pkhs ()
+  let* pkhs_first_salvo = wait_for_included_check_batches_and_returns_pkhs ()
+  and* () = Client.bake_for_and_wait client
   and* () =
     wait_until_n_batches_are_injected sc_rollup_node ~nb_batches:nb_of_batcher
   in
   let () = check_against_operators_pkhs pkhs_first_salvo in
-  let* _lvl = Client.bake_for_and_wait client
-  and* pkhs_snd_salvo = wait_for_included_check_batches_and_returns_pkhs () in
+  let* pkhs_snd_salvo = wait_for_included_check_batches_and_returns_pkhs ()
+  and* () = Client.bake_for_and_wait client in
   let () = check_against_operators_pkhs pkhs_snd_salvo in
+  Log.info "Injecting a non full batches to check for keys rotation" ;
+  let* _lvl = Client.bake_for_and_wait client in
+  let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:10. in
+  let nb_round_1 = nb_of_batcher / 2 in
+  let nb_round_2 = nb_of_batcher - nb_round_1 in
+  let* () = inject_n_msgs_batches nb_round_1 in
+  let* () = Client.bake_for_and_wait client
+  and* () =
+    wait_until_n_batches_are_injected sc_rollup_node ~nb_batches:nb_round_1
+  in
+  let* pkhs1 = wait_for_included_check_batches_and_returns_pkhs ()
+  and* () = Client.bake_for_and_wait client in
+  let* () = inject_n_msgs_batches nb_round_2 in
+  let* () = Client.bake_for_and_wait client
+  and* () =
+    wait_until_n_batches_are_injected sc_rollup_node ~nb_batches:nb_round_2
+  in
+  let* pkhs2 = wait_for_included_check_batches_and_returns_pkhs ()
+  and* () = Client.bake_for_and_wait client in
+  let pkhs_used_twice = List.filter (fun s -> List.mem s pkhs2) pkhs1 in
+  Log.debug "%d Keys used 1:" (List.length pkhs1) ;
+  List.iter (Log.debug "- %s") pkhs1 ;
+  Log.debug "%d Keys used 2:" (List.length pkhs2) ;
+  List.iter (Log.debug "- %s") pkhs2 ;
+  Check.((List.length pkhs_used_twice = 0) int)
+    ~error_msg:"Reused %L keys but should have rotated not reused any." ;
   unit
 
 (** Injector only uses key that have no operation in the mempool
@@ -5638,7 +5673,11 @@ let test_injector_uses_available_keys ~kind =
       ~find_map_op_content
   in
   let wait_for_included_and_get_batches_pkhs () =
-    wait_for_included_and_map_ops_content rollup_node node ~find_map_op_content
+    wait_for_included_and_map_ops_content
+      rollup_node
+      node
+      ~timeout:30.
+      ~find_map_op_content
   in
   Log.info "Checking that the batcher keys received are correct." ;
   let check_keys ~received ~expected =
