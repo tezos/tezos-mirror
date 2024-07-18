@@ -1,0 +1,108 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_baking_beta)
+ (public_name octez-protocol-beta-libs.baking)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-version.value
+  tezos-protocol-beta.protocol
+  tezos-protocol-beta.protocol.lifted
+  octez-protocol-beta-libs.plugin
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-beta-libs.client
+  octez-shell-libs.client-commands
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-libs.tezos-context
+  octez-libs.rpc-http-client-unix
+  octez-shell-libs.context-ops
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.crypto-dal
+  tezos-dal-node-services
+  lwt-canceler
+  lwt-exit
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_beta
+  -open Tezos_protocol_beta_lifted
+  -open Tezos_protocol_plugin_beta
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_beta
+  -open Tezos_client_commands
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_context
+  -open Tezos_context_ops
+  -open Tezos_rpc_http
+  -open Tezos_crypto_dal)
+ (modules (:standard \ Baking_commands Baking_commands_registration)))
+
+(library
+ (name tezos_baking_beta_commands)
+ (public_name octez-protocol-beta-libs.baking-commands)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-beta.protocol
+  tezos-protocol-beta.parameters
+  octez-libs.stdlib-unix
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-beta-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-beta-libs.baking
+  octez-libs.rpc
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_beta
+  -open Tezos_protocol_beta_parameters
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_beta
+  -open Tezos_client_commands
+  -open Tezos_baking_beta)
+ (modules Baking_commands))
+
+(library
+ (name tezos_baking_beta_commands_registration)
+ (public_name octez-protocol-beta-libs.baking-commands.registration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-beta.protocol
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-beta-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-beta-libs.baking
+  octez-protocol-beta-libs.baking-commands
+  octez-libs.rpc)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_beta
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_beta
+  -open Tezos_client_commands
+  -open Tezos_baking_beta
+  -open Tezos_baking_beta_commands)
+ (modules Baking_commands_registration))

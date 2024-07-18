@@ -1,17 +1,17 @@
-{0 Octez-protocol-alpha-libs: octez protocol alpha libraries}
+{0 Octez-protocol-beta-libs: octez protocol beta libraries}
 
-This is a package containing some libraries related to the Tezos alpha protocol.
+This is a package containing some libraries related to the Tezos beta protocol.
 
 It contains the following libraries:
 
-- {{!module-Tezos_alpha_test_helpers}Tezos_alpha_test_helpers}: Protocol testing framework
-- {{!module-Tezos_baking_alpha}Tezos_baking_alpha}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_alpha_commands}Tezos_baking_alpha_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_alpha}Tezos_client_alpha}: Protocol specific library for `octez-client`
-- {{!module-Tezos_dac_alpha}Tezos_dac_alpha}: Protocol specific library for the Data availability Committee
-- {{!module-Tezos_dal_alpha}Tezos_dal_alpha}: Protocol specific library for the Data availability Layer
-- {{!module-Tezos_layer2_utils_alpha}Tezos_layer2_utils_alpha}: Protocol specific library for Layer 2 utils
-- {{!module-Tezos_protocol_plugin_alpha}Tezos_protocol_plugin_alpha}: Protocol plugin
-- {{!module-Tezos_protocol_plugin_alpha_registerer}Tezos_protocol_plugin_alpha_registerer}: Protocol plugin registerer
-- {{!module-Tezos_smart_rollup_alpha}Tezos_smart_rollup_alpha}: Protocol specific library of helpers for `tezos-smart-rollup`
-- {{!module-Tezos_smart_rollup_layer2_alpha}Tezos_smart_rollup_layer2_alpha}: Protocol specific library for `tezos-smart-rollup`
+- {{!module-Tezos_baking_beta}Tezos_baking_beta}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_beta_commands}Tezos_baking_beta_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_beta_test_helpers}Tezos_beta_test_helpers}: Protocol testing framework
+- {{!module-Tezos_client_beta}Tezos_client_beta}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dac_beta}Tezos_dac_beta}: Protocol specific library for the Data availability Committee
+- {{!module-Tezos_dal_beta}Tezos_dal_beta}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_beta}Tezos_layer2_utils_beta}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_beta}Tezos_protocol_plugin_beta}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_beta_registerer}Tezos_protocol_plugin_beta_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_beta}Tezos_smart_rollup_beta}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_beta}Tezos_smart_rollup_layer2_beta}: Protocol specific library for `tezos-smart-rollup`
