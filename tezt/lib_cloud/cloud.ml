@@ -436,7 +436,7 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
     | Some vms, None -> Some vms
   in
   match vms with
-  | None ->
+  | None | Some [] ->
       (* If there is no configuration, it is a similar scenario as if there were not agent. *)
       f
         {
