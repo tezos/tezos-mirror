@@ -25,9 +25,9 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = ParisC | Alpha
+type t = Beta | ParisC | Alpha
 
-let all = [ParisC; Alpha]
+let all = [Beta; ParisC; Alpha]
 
 let encoding = Data_encoding.string_enum [("parisc", ParisC); ("alpha", Alpha)]
 
@@ -43,11 +43,12 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | ParisC -> "Parisc"
+let name = function Alpha -> "Alpha" | Beta -> "Beta" | ParisC -> "Parisc"
 
-let number = function ParisC -> 020 | Alpha -> 021
+let number = function ParisC -> 020 | Beta -> 021 | Alpha -> 022
 
 let directory = function
+  | Beta -> "proto_beta"
   | Alpha -> "proto_alpha"
   | ParisC -> "proto_020_PsParisC"
 
@@ -57,6 +58,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | ParisC -> "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
+  | Beta -> "PtRU6wuXeNfhzbbbNbZNbaahu2eKBDztN5cqG8LbvLspdUnPGVX"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
@@ -73,7 +75,10 @@ let parameter_file ?(constants = default_constants) protocol =
   let name = constants_to_string constants in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Beta -> "beta"
+  | p -> String.sub (hash p) 0 8
 
 let protocol_dependent_uses ~tag ~path =
   let make protocol =
@@ -93,6 +98,7 @@ let baker = protocol_dependent_uses ~tag:"baker_" ~path:"./octez-baker-"
 
 let encoding_prefix = function
   | Alpha -> "alpha"
+  | Beta -> "beta"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
 type parameter_overrides =
@@ -266,7 +272,10 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let previous_protocol = function Alpha -> Some ParisC | ParisC -> None
+let previous_protocol = function
+  | Alpha -> Some Beta
+  | Beta -> Some ParisC
+  | ParisC -> None
 
 let has_predecessor p = previous_protocol p <> None
 
