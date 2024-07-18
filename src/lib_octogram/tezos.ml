@@ -212,6 +212,12 @@ let octez_endpoint state endpoint =
       Client.Node (Agent_state.find (Octez_node_k node) state)
   | Remote {endpoint} -> Foreign_endpoint (parse_endpoint endpoint)
 
+let octez_foreign_endpoint state endpoint =
+  match endpoint with
+  | Uri.Owned {name = node} ->
+      Node.as_rpc_endpoint (Agent_state.find (Octez_node_k node) state)
+  | Remote {endpoint} -> parse_endpoint endpoint
+
 let dal_foreign_endpoint state endpoint =
   match endpoint with
   | Uri.Owned {name = node} ->
@@ -2860,7 +2866,7 @@ module Start_octez_dal_node = struct
         ~rpc_port
         ~listen_addr:(mk_addr net_port)
         ~metrics_addr:(mk_addr metrics_port)
-        ~l1_node_endpoint:(octez_endpoint state l1_node_uri)
+        ~l1_node_endpoint:(octez_foreign_endpoint state l1_node_uri)
         ()
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
