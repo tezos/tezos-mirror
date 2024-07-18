@@ -2476,6 +2476,7 @@ val init_with_node :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
+  ?node_name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
@@ -2505,6 +2506,7 @@ val init_with_protocol :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
+  ?node_name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
