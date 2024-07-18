@@ -2784,7 +2784,7 @@ let test_kernel_upgrade_no_administrator =
 let test_kernel_upgrade_failing_migration =
   Protocol.register_test
     ~__FILE__
-    ~tags:["migration"; "upgrade"]
+    ~tags:["migration"; "upgrade"; "failed"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
