@@ -207,6 +207,15 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "current_frozen_deposits")
+
+    let staking_balance =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; to get this value, you can call RPCs total_staked and \
+           total_delegated, and add their outputs together."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "staking_balance")
   end
 
   let total_staked =
@@ -254,17 +263,6 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "total_delegated")
-
-  let staking_balance =
-    RPC_service.get_service
-      ~description:
-        "Returns the total amount of tokens (in mutez) delegated to a given \
-         delegate. This includes the balances of all the contracts that \
-         delegate to it, but also the balance of the delegate itself, its \
-         frozen deposits, and its frozen bonds."
-      ~query:RPC_query.empty
-      ~output:Tez.encoding
-      RPC_path.(path / "staking_balance")
 
   let frozen_deposits_limit =
     RPC_service.get_service
@@ -521,7 +519,7 @@ let register () =
           return {cycle; deposit})
         cycles) ;
   register1 ~chunked:false S.total_delegated f_total_delegated ;
-  register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.Deprecated.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.staking_balance ctxt pkh) ;
   register1 ~chunked:false S.frozen_deposits_limit (fun ctxt pkh () () ->
@@ -613,7 +611,7 @@ let unstaked_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
 
 let staking_balance ctxt block pkh =
-  RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
+  RPC_context.make_call1 S.Deprecated.staking_balance ctxt block pkh () ()
 
 let frozen_deposits_limit ctxt block pkh =
   RPC_context.make_call1 S.frozen_deposits_limit ctxt block pkh () ()
