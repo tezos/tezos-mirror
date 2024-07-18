@@ -1109,6 +1109,28 @@ module State = struct
          found in the storage. *)
       return (current_block_number, evm_state)
 
+  (** If we are reconstructing mainnet, the initial kernel is not
+      sufficient.  We need to override the kernel with an additional
+      patch that allows the compatibility with the reconstruct.
+
+      We determine if the replacement is needed based on the smart rollup
+      address. *)
+  let replace_mainnet_kernel_if_needed ctxt evm_state =
+    let open Lwt_result_syntax in
+    if
+      ctxt.smart_rollup_address
+      = Address.of_b58check_exn "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
+    then
+      let*! () = Evm_context_events.reconstruct_replace_mainnet_kernel () in
+      let*! evm_state =
+        Evm_state.modify
+          ~key:"/kernel/boot.wasm"
+          ~value:Evm_node_kernels.mainnet_initial_kernel_reconstruct_compatible
+          evm_state
+      in
+      return evm_state
+    else return evm_state
+
   let reconstruct_history ctxt ~reconstruct_from_boot_sector
       ~rollup_node_data_dir ~genesis_level ~finalized_level ~levels_to_hashes
       ~l2_blocks =
@@ -1186,6 +1208,7 @@ module State = struct
         fresh_evm_state
         []
     in
+    let* evm_state = replace_mainnet_kernel_if_needed ctxt evm_state in
     let*! evm_state =
       Evm_state.modify ~key:"/__at_most_one_block" ~value:"" evm_state
     in
