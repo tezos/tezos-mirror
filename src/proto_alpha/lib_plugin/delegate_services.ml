@@ -257,6 +257,13 @@ module S = struct
         ~query:RPC_query.empty
         ~output:(Data_encoding.option Tez.encoding)
         RPC_path.(path / "frozen_deposits_limit")
+
+    let current_baking_power =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use baking_power instead."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int64
+        RPC_path.(path / "current_baking_power")
   end
 
   let total_staked =
@@ -375,16 +382,16 @@ module S = struct
       ~output:Data_encoding.int64
       RPC_path.(path / "voting_power")
 
-  let current_baking_power =
+  let baking_power =
     RPC_service.get_service
       ~description:
-        "The baking power of a delegate, as computed from its current stake. \
-         This value is not used for computing baking rights but only reflects \
-         the baking power that the delegate would have if the cycle ended at \
-         the current block."
+        "The current baking power of a delegate, using the current staked and \
+         delegated balances of the baker and its delegators. In other words, \
+         the baking rights that the baker would get for a future cycle if the \
+         current cycle ended right at the current block."
       ~query:RPC_query.empty
       ~output:Data_encoding.int64
-      RPC_path.(path / "current_baking_power")
+      RPC_path.(path / "baking_power")
 
   let voting_info =
     RPC_service.get_service
@@ -567,6 +574,11 @@ let f_external_delegated ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   external_delegated ctxt pkh
 
+let f_baking_power ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -672,9 +684,8 @@ let register () =
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Vote.get_voting_power_free ctxt pkh) ;
-  register1 ~chunked:false S.current_baking_power (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh) ;
+  register1 ~chunked:false S.Deprecated.current_baking_power f_baking_power ;
+  register1 ~chunked:false S.baking_power f_baking_power ;
   register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Vote.get_delegate_info ctxt pkh) ;
@@ -759,7 +770,7 @@ let current_voting_power ctxt block pkh =
   RPC_context.make_call1 S.current_voting_power ctxt block pkh () ()
 
 let current_baking_power ctxt block pkh =
-  RPC_context.make_call1 S.current_baking_power ctxt block pkh () ()
+  RPC_context.make_call1 S.baking_power ctxt block pkh () ()
 
 let voting_info ctxt block pkh =
   RPC_context.make_call1 S.voting_info ctxt block pkh () ()
