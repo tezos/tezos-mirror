@@ -13,6 +13,7 @@
 - A DAL feature flag is added to the configuration. If the path has a
   value in `/evm/feature_flags/enable_dal`, the kernel is allowed to
   import data from the DAL. (!13634)
+- Simulation now use timestamp provided by the node.
 
 ## Bug fixes
 

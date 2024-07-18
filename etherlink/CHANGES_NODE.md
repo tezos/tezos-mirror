@@ -22,6 +22,8 @@
   (!14053)
 - Add a private RPC "stateSubkeys", that allows to query the subkeys
   of a path in the storage. (!14129)
+- The current timestamp is used in simulation (instead of previous block
+  timestamp) if the kernel version is compatible. (!14186)
 
 ### Bug fixes
 
