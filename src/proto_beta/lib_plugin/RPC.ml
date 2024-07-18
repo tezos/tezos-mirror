@@ -4092,16 +4092,6 @@ module Delegates = struct
         ~output:info_encoding
         path
 
-    let delegated_balance =
-      RPC_service.get_service
-        ~description:
-          "Returns the sum (in mutez) of all balances of all the contracts \
-           that delegate to a given delegate. This excludes the delegate's own \
-           balance, its frozen deposits and its frozen bonds."
-        ~query:RPC_query.empty
-        ~output:Tez.encoding
-        RPC_path.(path / "delegated_balance")
-
     let min_delegated_in_current_cycle =
       RPC_service.get_service
         ~description:
@@ -4183,19 +4173,10 @@ module Delegates = struct
         info ctxt pkh) ;
     Registration.register1
       ~chunked:false
-      S.delegated_balance
-      (fun ctxt pkh () () ->
-        let* () = check_delegate_registered ctxt pkh in
-        Delegate_services.external_staked_and_delegated ctxt pkh) ;
-    Registration.register1
-      ~chunked:false
       S.min_delegated_in_current_cycle
       (fun ctxt pkh () () ->
         let* () = check_delegate_registered ctxt pkh in
         Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh)
-
-  let delegated_balance ctxt block pkh =
-    RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
 
   let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
 

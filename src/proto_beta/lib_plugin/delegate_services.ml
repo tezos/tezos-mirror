@@ -226,6 +226,15 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "total_delegated_stake")
+
+    let delegated_balance =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; to get this value, you can call RPCs external_staked \
+           and external_delegated, and add their outputs together."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "delegated_balance")
   end
 
   let total_staked =
@@ -636,6 +645,9 @@ let register () =
   register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
   register1 ~chunked:false S.external_staked f_external_staked ;
   register1 ~chunked:false S.external_delegated f_external_delegated ;
+  register1 ~chunked:false S.Deprecated.delegated_balance (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      external_staked_and_delegated ctxt pkh) ;
   register1 ~chunked:false S.staking_denominator (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
