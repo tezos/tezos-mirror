@@ -55,8 +55,8 @@ local query = grafonnet.query;
         + stat.options.withGraphMode('none')
         + stat.options.withColorMode('none'),
 
-      withName():
-        stat.options.withTextMode('name'),
+      withName(name='name'):
+        stat.options.withTextMode(name),
 
       // [withThreshold(thresholds)] Returns the threshold object for stat panels.
       // [threshold] is a [value,color] list.
