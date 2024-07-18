@@ -300,6 +300,24 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "external_staked")
 
+  let external_delegated =
+    RPC_service.get_service
+      ~description:
+        "The sum (in mutez) of non-staked tokens that currently count as \
+         delegated to the baker, excluding those owned by the baker iself. \
+         Does not take limits such as overstaking or overdelegation into \
+         account. This includes the spendable balances and frozen bonds of all \
+         the baker's external delegators. It also includes unstake requests of \
+         contracts other than the baker, on the condition that the contract \
+         was delegating to the baker at the time of the unstake operation. So \
+         this includes most but not all unstake requests from current \
+         delegators, and might include some unstake requests from old \
+         delegators. Limits such as overstaking and overdelegation have not \
+         been applied yet."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "external_delegated")
+
   let staking_denominator =
     RPC_service.get_service
       ~description:
@@ -470,11 +488,15 @@ let f_external_staked ctxt pkh () () =
 
 let unstake_requests ctxt pkh =
   let open Lwt_result_syntax in
-  let* result = Unstake_requests.prepare_finalize_unstake ctxt pkh in
+  let* result =
+    (* This function applies slashing to finalizable requests. *)
+    Unstake_requests.prepare_finalize_unstake ctxt pkh
+  in
   match result with
   | None -> return_none
   | Some {finalizable; unfinalizable} ->
       let* unfinalizable =
+        (* Apply slashing to unfinalizable requests too. *)
         Unstake_requests.For_RPC
         .apply_slash_to_unstaked_unfinalizable_stored_requests
           ctxt
@@ -484,10 +506,10 @@ let unstake_requests ctxt pkh =
 
 let external_staked_and_delegated ctxt pkh =
   let open Lwt_result_syntax in
-  let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
-  let* unstake_requests = unstake_requests ctxt (Implicit pkh) in
-  let* unstake_requests_to_other_delegates =
-    match unstake_requests with
+  let* own_full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+  let* own_unstake_requests = unstake_requests ctxt (Implicit pkh) in
+  let* own_unstaked_from_other_delegates =
+    match own_unstake_requests with
     | None -> return Tez.zero
     | Some {finalizable; unfinalizable} ->
         let* finalizable_sum =
@@ -509,12 +531,28 @@ let external_staked_and_delegated ctxt pkh =
         in
         Lwt.return Tez.(finalizable_sum +? unfinalizable_sum)
   in
-  let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
-  let*? self_staking_balance =
-    Tez.(full_balance -? unstake_requests_to_other_delegates)
+  let* total_staked_and_delegated = total_staked_and_delegated ctxt pkh in
+  let*? own_staked_and_delegated =
+    Tez.(own_full_balance -? own_unstaked_from_other_delegates)
   in
-  let*? sum = Tez.(staking_balance -? self_staking_balance) in
-  return sum
+  let*? external_staked_and_delegated =
+    Tez.(total_staked_and_delegated -? own_staked_and_delegated)
+  in
+  return external_staked_and_delegated
+
+let external_delegated ctxt pkh : Tez.t Environment.Error_monad.tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* external_staked_and_delegated = external_staked_and_delegated ctxt pkh in
+  let* external_staked = external_staked ctxt pkh in
+  let*? external_delegated =
+    Tez.(external_staked_and_delegated -? external_staked)
+  in
+  return external_delegated
+
+let f_external_delegated ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  external_delegated ctxt pkh
 
 let register () =
   let open Lwt_result_syntax in
@@ -597,6 +635,7 @@ let register () =
       return contracts) ;
   register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
   register1 ~chunked:false S.external_staked f_external_staked ;
+  register1 ~chunked:false S.external_delegated f_external_delegated ;
   register1 ~chunked:false S.staking_denominator (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
