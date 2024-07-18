@@ -78,6 +78,13 @@ module Network = struct
   type t = Ghostnet | Sandbox
 
   let to_string = function Ghostnet -> "ghostnet" | Sandbox -> "sandbox"
+
+  let get_level network endpoint =
+    match network with
+    | Sandbox -> Lwt.return 1
+    | Ghostnet ->
+        let* json = RPC_core.call endpoint (RPC.get_chain_block_header ()) in
+        JSON.(json |-> "level" |> as_int) |> Lwt.return
 end
 
 module Cli = struct
@@ -368,6 +375,7 @@ type t = {
   infos : (int, per_level_info) Hashtbl.t;
   metrics : (int, metrics) Hashtbl.t;
   disconnection_state : Disconnect.t option;
+  first_level : int;
 }
 
 let pp_metrics t
@@ -814,29 +822,33 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     ~job_name
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
-let init_ghostnet cloud (configuration : configuration) agent =
-  if configuration.bootstrap then assert false
-  else
-    let node = None in
-    let dal_node = None in
-    (* Taken from ghostnet configuration. *)
-    let node_p2p_endpoint = "ghostnet.tzinit.org" in
-    let dal_node_p2p_endpoint = "dalboot.ghostnet.tzinit.org" in
-    let node_rpc_endpoint =
-      Endpoint.{scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 80}
-    in
-    let client =
-      Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
-    in
-    Lwt.return
-      {
-        node;
-        dal_node;
-        node_p2p_endpoint;
-        node_rpc_endpoint;
-        dal_node_p2p_endpoint;
-        client;
-      }
+let init_ghostnet _cloud (_configuration : configuration) agent =
+  match agent with
+  | None ->
+      let node = None in
+      let dal_node = None in
+      (* Taken from ghostnet configuration. *)
+      let node_p2p_endpoint = "ghostnet.tzinit.org" in
+      let dal_node_p2p_endpoint = "dalboot.ghostnet.tzinit.org" in
+      let node_rpc_endpoint =
+        Endpoint.
+          {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
+      in
+      let client =
+        Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
+      in
+      let bootstrap =
+        {
+          node;
+          dal_node;
+          node_p2p_endpoint;
+          node_rpc_endpoint;
+          dal_node_p2p_endpoint;
+          client;
+        }
+      in
+      Lwt.return (bootstrap, [], [], None)
+  | Some _agent -> assert false
 
 let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     agent =
@@ -1322,7 +1334,12 @@ let init_etherlink cloud ~bootstrap etherlink_rollup_operator_key ~dal_slots
   return {operator; accounts; producers}
 
 let init ~(configuration : configuration) cloud next_agent =
-  let* bootstrap_agent = next_agent ~name:"bootstrap" in
+  let* bootstrap_agent =
+    if Cli.bootstrap then
+      let* agent = next_agent ~name:"bootstrap" in
+      Lwt.return_some agent
+    else Lwt.return_none
+  in
   let* attesters_agents =
     List.init (List.length configuration.stake) (fun i ->
         let name = Format.asprintf "attester-%d" i in
@@ -1349,8 +1366,9 @@ let init ~(configuration : configuration) cloud next_agent =
          etherlink_rollup_operator_key ) =
     match configuration.network with
     | Network.Sandbox ->
+        let bootstrap_agent = Option.get bootstrap_agent in
         init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
-    | Ghostnet -> assert false
+    | Ghostnet -> init_ghostnet cloud configuration bootstrap_agent
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -1402,7 +1420,10 @@ let init ~(configuration : configuration) cloud next_agent =
   in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
-  Hashtbl.replace metrics 1 default_metrics ;
+  let* first_level =
+    Network.get_level configuration.network bootstrap.node_rpc_endpoint
+  in
+  Hashtbl.replace metrics first_level default_metrics ;
   let disconnection_state =
     Option.map Disconnect.init configuration.disconnect
   in
@@ -1419,20 +1440,31 @@ let init ~(configuration : configuration) cloud next_agent =
       infos;
       metrics;
       disconnection_state;
+      first_level;
     }
 
-let wait_for_level (bootstrap : bootstrap) level =
-  match bootstrap.node with
+let wait_for_level t level =
+  match t.bootstrap.node with
   | None ->
-      (* Implemented in a future commit. *)
-      assert false
+      let rec loop () =
+        let* head_level =
+          Network.get_level
+            t.configuration.network
+            t.bootstrap.node_rpc_endpoint
+        in
+        if head_level >= level then Lwt.return_unit
+        else
+          let* () = Lwt_unix.sleep 4. in
+          loop ()
+      in
+      loop ()
   | Some node ->
       let* _ = Node.wait_for_level node level in
       Lwt.return_unit
 
 let on_new_level t level =
   let client = t.bootstrap.client in
-  let* () = wait_for_level t.bootstrap level in
+  let* () = wait_for_level t level in
   Log.info "Start process level %d" level ;
   let* infos_per_level = get_infos_per_level client ~level in
   Hashtbl.replace t.infos level infos_per_level ;
@@ -1620,34 +1652,31 @@ let benchmark () =
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]
     (fun cloud ->
-      match Cloud.agents cloud with
-      | [] -> Test.fail "The test should run with a positive number of agents."
-      | agents ->
-          (* We give to the [init] function a sequence of agents (and cycle if
-             they were all consumed). We set their name only if the number of
-             agents is the computed one. Otherwise, the user has mentioned
-             explicitely a reduced number of agents and it is not clear how to give
-             them proper names. *)
-          let set_name agent name =
-            if List.length agents = List.length vms then
-              Cloud.set_agent_name cloud agent name
-            else Lwt.return_unit
-          in
-          let next_agent =
-            let f = List.to_seq agents |> Seq.cycle |> Seq.to_dispenser in
-            fun ~name ->
-              let agent = f () |> Option.get in
-              let* () = set_name agent name in
-              Lwt.return agent
-          in
-          let* t = init ~configuration cloud next_agent in
-          let first_protocol_level = 2 in
-          let main_loop = loop t first_protocol_level in
-          let etherlink_loop =
-            match t.etherlink with
-            | None -> unit
-            | Some etherlink -> etherlink_loop etherlink
-          in
-          Lwt.join [main_loop; etherlink_loop])
+      let agents = Cloud.agents cloud in
+      (* We give to the [init] function a sequence of agents (and cycle if
+         they were all consumed). We set their name only if the number of
+         agents is the computed one. Otherwise, the user has mentioned
+         explicitely a reduced number of agents and it is not clear how to give
+         them proper names. *)
+      let set_name agent name =
+        if List.length agents = List.length vms then
+          Cloud.set_agent_name cloud agent name
+        else Lwt.return_unit
+      in
+      let next_agent =
+        let f = List.to_seq agents |> Seq.cycle |> Seq.to_dispenser in
+        fun ~name ->
+          let agent = f () |> Option.get in
+          let* () = set_name agent name in
+          Lwt.return agent
+      in
+      let* t = init ~configuration cloud next_agent in
+      let main_loop = loop t (t.first_level + 1) in
+      let etherlink_loop =
+        match t.etherlink with
+        | None -> unit
+        | Some etherlink -> etherlink_loop etherlink
+      in
+      Lwt.join [main_loop; etherlink_loop])
 
 let register () = benchmark ()
