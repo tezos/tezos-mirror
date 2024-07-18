@@ -76,7 +76,7 @@ let wait_for_layer1_final_block dal_node level =
    round used when injecting DAL attestation operations. Note that it is
    normally not necessary to bake with a particular delegate, therefore there is
    no downside to set the case [`All] as the default. *)
-let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
+let bake_for ?(delegates = `All) ?count client =
   let keys =
     match delegates with
     | `All ->
@@ -84,12 +84,12 @@ let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
         []
     | `For keys -> keys
   in
-  Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
+  Client.bake_for_and_wait client ~keys ?count
 
 (* Bake until a block at some given [level] has been finalized and
    processed by the given [dal_nodes]. The head level after this is
    [level + 2]. *)
-let bake_until_processed ?dal_node_endpoint ~level client dal_nodes =
+let bake_until_processed ~level client dal_nodes =
   let* current_level = Client.level client in
   let final_level = level + 2 in
   assert (current_level < final_level) ;
@@ -98,9 +98,7 @@ let bake_until_processed ?dal_node_endpoint ~level client dal_nodes =
       (fun dal_node -> wait_for_layer1_final_block dal_node level)
       dal_nodes
   in
-  let* () =
-    bake_for ?dal_node_endpoint ~count:(final_level - current_level) client
-  in
+  let* () = bake_for ~count:(final_level - current_level) client in
   Lwt.join p
 
 module Client = struct
@@ -2497,7 +2495,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
     =
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
-  let dal_node_endpoint = Helpers.endpoint dal_node in
+  let client = Client.with_dal_node client ~dal_node in
   let number_of_slots = parameters.Dal.Parameters.number_of_slots in
   let slot_size = parameters.cryptobox.slot_size in
   let slot_idx level = level mod number_of_slots in
@@ -2534,7 +2532,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
       else
         let* () = publish_and_store level in
         (* bake (and attest) with all available delegates to go faster *)
-        let* () = bake_for ~dal_node_endpoint client in
+        let* () = bake_for client in
         let* _ = Node.wait_for_level node level in
         iter (level + 1)
     in
@@ -2664,7 +2662,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     dal_node =
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
-  let dal_node_endpoint = Helpers.endpoint dal_node in
+  let client = Client.with_dal_node client ~dal_node in
   let number_of_slots = parameters.Dal.Parameters.number_of_slots in
   let slot_size = parameters.cryptobox.slot_size in
   let lag = parameters.attestation_lag in
@@ -2717,9 +2715,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       if level > to_level then return ()
       else
         let* () = publish_and_store level in
-        let* () =
-          bake_for ~delegates:(`For delegates) ~dal_node_endpoint client
-        in
+        let* () = bake_for ~delegates:(`For delegates) client in
         let* _ = Node.wait_for_level node level in
         iter (level + 1)
     in
@@ -4375,6 +4371,8 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let* () = Dal_node.run ~wait_ready:true attester in
   let* attester_peer_id = peer_id attester in
 
+  let client = Client.with_dal_node client ~dal_node:attester in
+
   (* The connections between attesters and the slot producer have no
      reason to be grafted on other slot indices than the one the slot
      producer is subscribed to, so we instruct
@@ -4467,7 +4465,6 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
              ~slot_index)
          all_shard_indices
   in
-  let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
   let* publication_level, _commitment, () =
     publish_store_and_wait_slot
       node
@@ -4484,7 +4481,6 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
 
   let* () =
     bake_until_processed
-      ~dal_node_endpoint:attester_dal_node_endpoint
       ~level:(publication_level + attestation_lag)
       client
       [attester]
@@ -4506,7 +4502,7 @@ module History_rpcs = struct
       ~last_confirmed_published_level ~initial_blocks_to_bake protocol
       dal_parameters client node dal_node =
     Log.info "slot_index = %d" slot_index ;
-    let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
+    let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
 
     (* [bake_for ~count] doesn't work across the migration block, so we bake in
@@ -4548,7 +4544,7 @@ module History_rpcs = struct
             ~force:true
           @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
         in
-        let* () = bake_for client ~dal_node_endpoint in
+        let* () = bake_for client in
         let* _level = Node.wait_for_level node (level + 1) in
         publish (level + 1) (commitment :: commitments)
     in
@@ -5587,6 +5583,8 @@ module Garbage_collection = struct
 
     (* Create & configure attester *)
     let attester = Dal_node.create ~name:"attester" ~node () in
+    let client = Client.with_dal_node client ~dal_node:attester in
+
     let bootstrap_pkhs =
       Array.to_seq Account.Bootstrap.keys
       |> Seq.map (fun account -> account.Account.public_key_hash)
@@ -5711,7 +5709,6 @@ module Garbage_collection = struct
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
-    let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
     let rec bake_loop n =
       if n <= 0 then unit
       else
@@ -5721,9 +5718,7 @@ module Garbage_collection = struct
             (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
             [attester; dal_bootstrap; slot_producer]
         in
-        let* () =
-          bake_for ~dal_node_endpoint:attester_dal_node_endpoint client
-        in
+        let* () = bake_for client in
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
@@ -5812,6 +5807,8 @@ module Garbage_collection = struct
       Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
     in
     let* () = Dal_node.run ~wait_ready:true attester in
+    let client = Client.with_dal_node client ~dal_node:attester in
+
     Log.info "attester DAL node ready" ;
 
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
@@ -5961,7 +5958,6 @@ module Garbage_collection = struct
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
-    let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
     let rec bake_loop n =
       if n <= 0 then unit
       else
@@ -5971,9 +5967,7 @@ module Garbage_collection = struct
             (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
             [attester; observer; dal_bootstrap; slot_producer]
         in
-        let* () =
-          bake_for ~dal_node_endpoint:attester_dal_node_endpoint client
-        in
+        let* () = bake_for client in
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
@@ -7220,8 +7214,8 @@ end
     the shards of the slot are declared available by the DAL node.  *)
 let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
     sc_rollup_address node client _pvm_name =
+  let client = Client.with_dal_node client ~dal_node in
   let* () = Sc_rollup_node.run sc_node sc_rollup_address [] in
-  let dal_node_endpoint = Helpers.endpoint dal_node in
   let* () =
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_local_dal_injection
@@ -7232,7 +7226,7 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
      included in a block. *)
   let* () =
     repeat 2 (fun () ->
-        let* () = bake_for ~dal_node_endpoint client in
+        let* () = bake_for client in
         let* level = Client.level client in
         let* _level =
           Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
@@ -7241,7 +7235,7 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
   in
   let* () =
     repeat parameters.Dal.Parameters.attestation_lag (fun () ->
-        let* () = bake_for ~dal_node_endpoint client in
+        let* () = bake_for client in
         let* level = Client.level client in
         let* _level =
           Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
@@ -7357,6 +7351,7 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
       attester_node
   in
   let* () = Dal_node.run ~wait_ready:true attester_node in
+  let client = Client.with_dal_node client ~dal_node:attester_node in
 
   let num_cycles = 1 + consensus_rights_delay in
   let* level = Client.level client in
@@ -7428,7 +7423,6 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
       |> List.map (fun a -> a.Account.public_key_hash)
     in
     bake_for
-      ~dal_node_endpoint:(Helpers.endpoint attester_node)
       ~delegates:(`For (new_account.public_key_hash :: bootstrap_accounts))
       client
   in
