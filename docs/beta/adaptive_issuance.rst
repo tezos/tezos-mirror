@@ -33,7 +33,7 @@ This document describes Adaptive Issuance and Staking, two new features (referre
 
   For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
 
-.. _adaptive_issuance_alpha:
+.. _adaptive_issuance_beta:
 
 Adaptive Issuance
 =================
@@ -63,7 +63,7 @@ ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
-At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
+At the end of each blockchain :ref:`cycle <def_cycle_beta>`, the
 regular issuance is adjusted, to nudge the staked ratio towards a
 protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
 are recomputed to match that budget. When the staked
@@ -72,19 +72,19 @@ increase, incentivizing participants to stake funds to re-approach the
 target. Conversely, incentives decrease as the ratio increases beyond
 the target.
 
-.. _adaptive_issuance_rate_alpha:
+.. _adaptive_issuance_rate_beta:
 
 Adaptive issuance rate
 ----------------------
 
 The adaptive issuance rate determines, at the end
 of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
-adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
-and a :ref:`dynamic rate <dynamic_rate_alpha>`. This value is kept within
+adaptive issuance rate is the sum of a :ref:`static rate <static_rate_beta>`
+and a :ref:`dynamic rate <dynamic_rate_beta>`. This value is kept within
 a minimal and a maximal value, to ensure nominal emissions remain within
 reasonable bounds.
 
-.. _staked_ratio_alpha:
+.. _staked_ratio_beta:
 
 Staked ratio
 ............
@@ -102,7 +102,7 @@ Where:
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
-.. _static_rate_alpha:
+.. _static_rate_beta:
 
 Static rate
 ...........
@@ -120,7 +120,7 @@ The static rate is defined as follows:
 
 The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
 
-.. _dynamic_rate_alpha:
+.. _dynamic_rate_beta:
 
 Dynamic rate
 ............
@@ -151,9 +151,9 @@ Where:
 - ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
 - ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 
-In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_alpha>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_alpha>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
+In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_beta>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_beta>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
 
-.. _minimum_and_maximum_rates_alpha:
+.. _minimum_and_maximum_rates_beta:
 
 Minimum and maximum rates
 ..........................
@@ -203,7 +203,7 @@ Where:
 
 - ``ai_activation_cycle`` is the first cycle with Adaptive Issuance
   active, that is, :ref:`5 cycles after the activation of the Paris
-  protocol<feature_activation_alpha>`.
+  protocol<feature_activation_beta>`.
 - ``initial_period`` is a predefined period of time, set to 1 month in Paris.
 - ``transition_period`` is a predefined period of time, set to 5 months in Paris.
 
@@ -218,7 +218,7 @@ Where:
 
 - ``issuance_initial_min`` (4.5%) is the initial minimum
   value. At the time of :ref:`Adaptive Issuance
-  activation<feature_activation_alpha>`, the issuance rate is kept
+  activation<feature_activation_beta>`, the issuance rate is kept
   above this bound for the initial period.
 - ``issuance_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
 
@@ -234,11 +234,11 @@ Where:
 
 - ``issuance_initial_max`` (5.5%) controls the initial maximum
   value. At the time of :ref:`Adaptive Issuance
-  activation<feature_activation_alpha>`, the issuance rate is kept
+  activation<feature_activation_beta>`, the issuance rate is kept
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
-.. _dynmax_rate_alpha:
+.. _dynmax_rate_beta:
 
 Dynamic Maximum
 ......................
@@ -276,12 +276,12 @@ this maximum value to theoretically be smaller than  the minimum bound. In this 
 takes priority, and the max is set to the min. In other words, the bounds in the previous section are always
 applied, regardless of the value of dynmax.
 
-.. _issuance_rate_alpha:
+.. _issuance_rate_beta:
 
 Issuance rate
 ......................
 
-Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_alpha>`, along with the :ref:`dynamic maximum <dynmax_rate_alpha>`, computed for the cycle ``c + 1``.
+Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_beta>`, along with the :ref:`dynamic maximum <dynmax_rate_beta>`, computed for the cycle ``c + 1``.
 
 .. code-block:: python
 
@@ -295,20 +295,20 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycl
     return max( min(total_rate, maximum_rate), minimum_rate )
 
 
-.. _adaptive_rewards_alpha:
+.. _adaptive_rewards_beta:
 
 Adaptive rewards
 ----------------
 
-Before :ref:`Adaptive Issuance activation<feature_activation_alpha>`,
+Before :ref:`Adaptive Issuance activation<feature_activation_beta>`,
 participation rewards are fixed values defined by protocol
 constants. With the new mechanism, the adaptive issuance rate provides
 instead a budget for the whole cycle, which gets allocated equally to
 each block of the cycle and distributed between the various rewards,
 in proportion to their relative :ref:`weights
-<rewards_weights_alpha>`.
+<rewards_weights_beta>`.
 
-.. _rewards_weights_alpha:
+.. _rewards_weights_beta:
 
 Reward weights
 ..............
@@ -401,7 +401,7 @@ Where:
 
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
-for contributing to :ref:`random seed generation <randomness_generation_alpha>`
+for contributing to :ref:`random seed generation <randomness_generation_beta>`
 (that is, for revealing nonce seeds and posting VDF proofs) are not paid
 each block, but rather every 192 blocks.
 
@@ -424,7 +424,7 @@ endpoint <https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-e
 all participation rewards, for the provided block and the next
 ``consensus_rights_delay`` cycles.
 
-.. _new_staking_alpha:
+.. _new_staking_beta:
 
 New Staking mechanism
 =====================
@@ -432,7 +432,7 @@ New Staking mechanism
 Staking is an evolution of the existing Tezos :doc:`Liquid Proof-of-Stake
 mechanism <proof_of_stake>`. It
 introduces a new role for network participants, called **staker**,
-complementary to the existing :ref:`delegate <def_delegate_alpha>`
+complementary to the existing :ref:`delegate <def_delegate_beta>`
 (also known as *baker*) and *delegator* roles. A staker must also be a
 *delegator* – that is, they must first choose a delegate.
 
@@ -448,8 +448,8 @@ delegated funds.
 
 Unlike delegated funds, staked funds are considered to contribute to the
 security deposit associated with their chosen delegate. Thus, they are
-subject to :ref:`slashing <slashing_alpha>` if
-the delegate misbehaves by :ref:`double-signing <def_double_signing_alpha>`
+subject to :ref:`slashing <slashing_beta>` if
+the delegate misbehaves by :ref:`double-signing <def_double_signing_beta>`
 block proposals or consensus operations, and are subject to the same
 withdrawal delays – colloquially, they are "frozen".
 
@@ -464,41 +464,41 @@ abusing the slashing mechanism for profit at the expense of their
 stakers.
 
 *Delegates* :ref:`configure their staking
-policy <staking_policy_configuration_alpha>` by setting staking parameters
+policy <staking_policy_configuration_beta>` by setting staking parameters
 which regulate whether they accept stakers (the default being to reject
 them), and if so, up to which fraction of their total staking balance.
 They can also configure which proportion of the staking rewards from other stakers is set
 to accrue to their own staked balance instead.
-As :ref:`participation rewards <adaptive_rewards_alpha>` are
+As :ref:`participation rewards <adaptive_rewards_beta>` are
 automatically shared between delegates and their
 stakers, delegates can use this parameter to collect an *edge* from the
 rewards attributable to their stakers.
 
 After :ref:`the activation of Adaptive Issuance and
-Staking<feature_activation_alpha>`, freezing and unfreezing of staked
+Staking<feature_activation_beta>`, freezing and unfreezing of staked
 funds
 will be controlled directly by delegates and stakers, and will no longer
 be automatic. This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
-4 cycles (cf. :ref:`Staked funds management <staked_funds_management_alpha>`).
+4 cycles (cf. :ref:`Staked funds management <staked_funds_management_beta>`).
 
 A new user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for :ref:`user accounts <def_user_account_alpha>`.
+the same name introduced for :ref:`user accounts <def_user_account_beta>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
 **NB** Until :ref:`the activation of Adaptive Issuance and Staking
-<feature_activation_alpha>`, only
+<feature_activation_beta>`, only
 *delegates* can stake funds and the relative weight of staked and
 delegated funds remains unchanged. In the current implementation, only
 *user accounts* can become stakers. In other words, smart contracts
 cannot stake funds (they can of course still delegate them).
 
-.. _staking_policy_configuration_alpha:
+.. _staking_policy_configuration_beta:
 
 Staking policy configuration
 ----------------------------
@@ -541,7 +541,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
-.. _staked_funds_management_alpha:
+.. _staked_funds_management_beta:
 
 Staked funds management
 -----------------------
@@ -614,7 +614,7 @@ balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
 unfinalizable unstake request for token staked with the old delegate.
 
-.. _feature_activation_alpha:
+.. _feature_activation_beta:
 
 Activation of Adaptive Issuance and Staking
 ===========================================
@@ -647,7 +647,7 @@ active 5 cycles into the Paris protocol:
 -  Changes to protocol constants. Note that this entails calculating
    participation rewards using the weight-based
    formulas, but these are defined so that they match the previous
-   values when :ref:`Adaptive Issuance <adaptive_issuance_alpha>` is not active.
+   values when :ref:`Adaptive Issuance <adaptive_issuance_beta>` is not active.
 
 .. [1]
    Note that if the nominal annual issuance rate is :math:`r`, the

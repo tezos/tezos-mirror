@@ -143,7 +143,7 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
-.. _reveal_data_channel_smart_rollups_alpha:
+.. _reveal_data_channel_smart_rollups_beta:
 
 Reveal data channel
 """""""""""""""""""
@@ -179,7 +179,7 @@ A smart rollup is characterized by:
 - the Michelson type of the entrypoint used by Layer 1 smart contracts
 to send internal messages to it, and
 - an optional list of addresses used as a white-list of allowed
-committers (see :ref:`private_rollups_alpha`).
+committers (see :ref:`private_rollups_beta`).
 
 All these characteristics are provided when originating a new smart
 rollup.
@@ -238,7 +238,7 @@ An operator publishing a commitment is called a **committer**.
 Notice that, in order to publish a commitment, the operator must freeze a
 deposit of 10,000 tez. For this reason, the committer is sometimes called a
 (smart rollup) *staker*. However, in order to avoid confusion with the
-:ref:`staker <new_staking_alpha>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
+:ref:`staker <new_staking_beta>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
 
 Several committers can publish (and thus stake on) the same commitment. When a
 committer *C* publishes a new commitment based on a commitment that *C*
@@ -273,7 +273,7 @@ to avoid type confusion: namely, a kernel transferring a tuple that
 the Layer 1 interprets as a ticket. Lastly, the outbox message can
 contain a white-list update. This message can only be executed for a
 rollup that is private since its origination (see
-:ref:`private_rollups_alpha`).
+:ref:`private_rollups_beta`).
 
 Refutation
 ^^^^^^^^^^
@@ -323,7 +323,7 @@ published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent committers to avoid the rollup getting stuck.
 
-.. _private_rollups_alpha:
+.. _private_rollups_beta:
 
 Private rollups
 ^^^^^^^^^^^^^^^

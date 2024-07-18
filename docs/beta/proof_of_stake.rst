@@ -12,12 +12,12 @@ Tezos :doc:`governance <voting>`.
 
 If one does not have enough stake to participate on its own or does not want to
 set up the needed infrastructure, (s)he can use :ref:`delegation
-<delegating_coins>`. Therefore, in Tezos, it is the :ref:`delegates<def_delegate_alpha>`
+<delegating_coins>`. Therefore, in Tezos, it is the :ref:`delegates<def_delegate_beta>`
 that may participate in consensus.
 However, at each level, not all delegates necessarily participate, and their participation weight may differ.
 The selection of the delegates' participation rights at a level is done by running a
 PRNG (pseudo-random number generator).
-The PRNG's :ref:`seeds <random_seed_alpha>` are obtained from random
+The PRNG's :ref:`seeds <random_seed_beta>` are obtained from random
 data that are regularly produced and stored on the blockchain. Thus,
 the procedure is deterministic in that delegates' rights are uniquely
 determined from the seed; and it is random, in that its seed (and hence its results) cannot
@@ -27,18 +27,18 @@ be predicted too much in advance.
 Delegation and Staking
 ----------------------
 
-A *delegate* is any :ref:`user account <def_user_account_alpha>` registered as
+A *delegate* is any :ref:`user account <def_user_account_beta>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
 operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
 as delegates.
 
-Any :ref:`account <def_account_alpha>` (user account or smart contract) can specify a delegate
+Any :ref:`account <def_account_beta>` (user account or smart contract) can specify a delegate
 through a delegation operation.  Any account can change or revoke its delegate
 at any time, again through a delegation operation. However, the change only
-becomes effective after ``CONSENSUS_RIGHTS_DELAY + 2`` :ref:`cycles <def_cycle_alpha>`.  The
+becomes effective after ``CONSENSUS_RIGHTS_DELAY + 2`` :ref:`cycles <def_cycle_beta>`.  The
 value ``CONSENSUS_RIGHTS_DELAY`` is a :ref:`protocol constant
-<protocol_constants_alpha>`.
+<protocol_constants_beta>`.
 
 A delegate participates in consensus and in governance with a weight
 proportional to their *delegated stake* -- that is, the balance
@@ -46,9 +46,9 @@ of all the accounts that delegate to it, including the balance of the delegate i
 participate in consensus or in governance, a
 delegate needs to have at least a minimal stake, which is given by the
 ``MINIMAL_STAKE`` :ref:`protocol constant
-<protocol_constants_alpha>` and a minimal frozen stake given by the
+<protocol_constants_beta>` and a minimal frozen stake given by the
 ``MINIMAL_FROZEN_STAKE`` :ref:`protocol constant
-<protocol_constants_alpha>`.
+<protocol_constants_beta>`.
 
 Delegates place security deposits that may be forfeited in case they do not
 follow (some particular rules of) the protocol. Security deposits are deduced
@@ -64,7 +64,7 @@ transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant
 like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
 manager and consensus keys are listed.
 
-If the :ref:`adaptive issuance <adaptive_issuance_alpha>`
+If the :ref:`adaptive issuance <adaptive_issuance_beta>`
 feature is activated, it grants delegators the ability to become
 'stakers' by placing security deposits. These deposits would contribute to their
 delegate's stake and could be subject to slashing penalties if their delegate
@@ -74,7 +74,7 @@ that of delegated funds.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _active_delegate_alpha:
+.. _active_delegate_beta:
 
 A delegate can be marked as either active or passive. A passive
 delegate cannot participate in the consensus algorithm.
@@ -92,7 +92,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
-.. _random_seed_alpha:
+.. _random_seed_beta:
 
 Random seed
 ^^^^^^^^^^^
@@ -103,7 +103,7 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
-.. _rights_alpha:
+.. _rights_beta:
 
 Slot selection
 ^^^^^^^^^^^^^^
@@ -115,7 +115,7 @@ using `Vose's algorithm
 (see also `this more pedagogic description
 <https://www.keithschwarz.com/darts-dice-coins/>`_; the algorithm is the last one listed there).
 This algorithm samples from a discrete probability distribution, which is given by
-the :ref:`stakes<active_stake_alpha>` of a specific cycle: the probability to sample a
+the :ref:`stakes<active_stake_beta>` of a specific cycle: the probability to sample a
 particular delegate is its stake in the cycle over the total stake
 in that cycle.
 
@@ -130,11 +130,11 @@ the mentioned algorithm is invoked to assign a delegate to the given slot.
 Its input is the probability distribution given by the stakes retained for the cycle to which the level belongs.
 And whenever the algorithm needs to draw a random value, this is obtained using a
 simple procedure which has as its initial state: the level, the
-:ref:`random seed<random_seed_alpha>` for the cycle to which the
+:ref:`random seed<random_seed_beta>` for the cycle to which the
 level belongs, and the slot.
 
 
-.. _ps_constants_alpha:
+.. _ps_constants_beta:
 
 Proof-of-stake parameters
 -------------------------
@@ -162,7 +162,7 @@ found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
 
-The adaptive issuance feature :ref:`documentation <adaptive_issuance_alpha>`.
+The adaptive issuance feature :ref:`documentation <adaptive_issuance_beta>`.
 
 Other presentations of the Tezos' proof-of-stake mechanism can be
 found in the

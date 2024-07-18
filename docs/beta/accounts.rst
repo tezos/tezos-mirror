@@ -85,4 +85,4 @@ Smart contracts
 ~~~~~~~~~~~~~~~
 
 A transaction to a smart contract
-address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_alpha>`.
+address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_beta>`.

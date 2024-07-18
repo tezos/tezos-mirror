@@ -105,7 +105,7 @@ Voting Power
 ------------
 
 When supporting a proposal or casting a Yea, Nay, or Pass ballot, each delegate
-has a voting power equal to its *stake*. More precisely, the voting power of a delegate during a voting period is its :ref:`staking balance <active_stake_alpha>`, measured in *mutez*, sampled at the beginning of the period. (Note that this is opposed to validator selection for consensus, which is based on the active stake, and sampled at the end of a previous cycle.)
+has a voting power equal to its *stake*. More precisely, the voting power of a delegate during a voting period is its :ref:`staking balance <active_stake_beta>`, measured in *mutez*, sampled at the beginning of the period. (Note that this is opposed to validator selection for consensus, which is based on the active stake, and sampled at the end of a previous cycle.)
 
 
 Super-majority and Quorum
@@ -145,7 +145,7 @@ Note that Pass ballots do not count towards or against the super-majority;
 they still counts towards participation and quorum.
 
 More details can be found in the file
-:src:`src/proto_alpha/lib_protocol/amendment.ml`.
+:src:`src/proto_beta/lib_protocol/amendment.ml`.
 
 
 The Hash and the Protocol
@@ -243,7 +243,7 @@ above, the quorum is adaptive and that low participation would lower the
 quorum of the next vote.
 
 More details on the operations can be found in
-:src:`src/proto_alpha/lib_protocol/operation_repr.ml`.
+:src:`src/proto_beta/lib_protocol/operation_repr.ml`.
 The binary format is described by
 ``octez-client describe unsigned operation``.
 
@@ -333,7 +333,7 @@ Further details and explanations on the voting procedure can be found at:
 - `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_alpha`.
+:ref:`client_manual_beta`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.

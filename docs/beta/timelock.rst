@@ -58,4 +58,4 @@ For more information on the client commands, see :doc:`cli-commands<cli-commands
 Example
 -------
 
-The built-in :src:`coin flip contract <src/proto_alpha/lib_protocol/contracts/timelock_flip.tz>` gives an example of using time-lock. Beware this contract is for educational purpose only and is not secure.
+The built-in :src:`coin flip contract <src/proto_beta/lib_protocol/contracts/timelock_flip.tz>` gives an example of using time-lock. Beware this contract is for educational purpose only and is not secure.

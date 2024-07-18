@@ -50,12 +50,12 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
-.. _tb_validator_alpha:
+.. _tb_validator_beta:
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
 stake, in the same way as endorsers were selected in Emmy*. We let
-``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_alpha>` per level.
+``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_beta>` per level.
 Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
 For each level, Tenderbake proceeds in rounds. Each *round* represents an
@@ -79,13 +79,13 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
-.. _candidate_block_alpha:
+.. _candidate_block_beta:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
-.. _quorum_alpha:
+.. _quorum_beta:
 
 Unlike Emmy*, Tenderbake has `two types of
 votes <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
@@ -105,7 +105,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
-.. _finality_alpha:
+.. _finality_beta:
 
 Transaction and block finality
 ------------------------------
@@ -138,7 +138,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
-.. _active_stake_alpha:
+.. _active_stake_beta:
 
 Validator selection: staked balance and active stake
 ----------------------------------------------------
@@ -154,10 +154,10 @@ Let us first (re)define these and related concepts.
   staked balance. We explain below how it is computed.
 - The *staked balance* represents the delegate's skin in the game: in
   the case that the delegate behaves badly, its staked balance is
-  partly :ref:`slashed<slashing_alpha>`. This staked balance must be
+  partly :ref:`slashed<slashing_beta>`. This staked balance must be
   at least ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot
   be selected as a validator. Note that until the :ref:`activation of
-  Adaptive Issuance and Staking<feature_activation_alpha>`, the
+  Adaptive Issuance and Staking<feature_activation_beta>`, the
   staked balance is automatically updated at the end of each cycle to
   maximize the active stake.
 - The *spendable balance* of a delegate is its full balance
@@ -191,7 +191,7 @@ will be available at cycle  ``c + 1 + CONSENSUS_RIGHTS_DELAY + MAX_SLASHING_PERI
 
 The active stake is computed ``CONSENSUS_RIGHTS_DELAY`` in advance: at
 the end of cycle ``c`` for cycle ``c + 1 + CONSENSUS_RIGHTS_DELAY`` (as in Emmy*),
-before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
+before updating the delegates' :ref:`activity status<active_delegate_beta>`.
 
 ..
    This entails that a delegate which was participating until cycle ``c -
@@ -210,7 +210,7 @@ More precisely, the active stake is:
 
 - the delegate's staked balance,
 - its stakers' staked balance (up to a limit, see
-  :ref:`limit_of_staking_over_baking<staking_policy_configuration_alpha>`),
+  :ref:`limit_of_staking_over_baking<staking_policy_configuration_beta>`),
 - and the liquid delegated balance + the spendable balance, up to 9 times the delegate's staked balance.
 
 Before Adaptive Issuance, each part weighs equally when computing the baking and voting rights. After Adaptive Issuance, the frozen balances (non-liquid, non-spendable) are weighed for twice as much per tez as the liquid part.
@@ -478,7 +478,7 @@ However, two conditions must be met:
 - the validator has revealed its nonce, and
 - the validator has been present during the cycle.
 
-Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_alpha>`
+Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_beta>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
 if the attesting power (that is, the number of validator slots at the
@@ -529,7 +529,7 @@ included during that cycle has been ``1,987,456`` slots. Given that this number 
 bigger than the minimum required (``2,150,400 * 2 / 3``), it receives an attesting
 reward of ``2,150,400 * 0.000761 = 1636.4544`` tez for that cycle.
 
-.. _slashing_alpha:
+.. _slashing_beta:
 
 Slashing
 ^^^^^^^^
@@ -553,11 +553,11 @@ If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.
 
 The evidence for double signing at a given level can be collected by any
-:ref:`accuser<def_accuser_alpha>` and included as an *accusation* operation in a block
+:ref:`accuser<def_accuser_beta>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
 As soon as a delegate is denounced for any double signing, it is
-immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking
+immediately :ref:`forbidden<new_forbidden_period_beta>` from both baking
 and attesting for at least 2 cycles.
 
 The actual slashing and denunciation rewarding happen at the end of
@@ -571,21 +571,21 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _fitness_alpha:
+.. _fitness_beta:
 
 Fitness
 -------
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
 The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
-The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_alpha>`.
+The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_beta>`.
 In Emmy*, only the level mattered.
 But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
 Therefore the fitness also includes the block's round (as the fifth component).
-Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_alpha>`.
+Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_beta>`.
 Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
 Finally, to (partially) enforce :ref:`the rule on
-re-proposals<quorum_alpha>`, the fitness also includes, as the third
+re-proposals<quorum_beta>`, the fitness also includes, as the third
 component, the round at which a preattestation quorum was observed by
 the baker, if any (this component can therefore be empty). By the way,
 preattestations are present in a block if and only if the locked round
@@ -612,7 +612,7 @@ inner sequences). So the first fitness is smaller than the second one,
 because of the third component, the empty bitstring being smaller than
 any other bitstring.
 
-.. _cs_constants_alpha:
+.. _cs_constants_beta:
 
 Consensus related protocol parameters
 -------------------------------------
@@ -648,7 +648,7 @@ Consensus related protocol parameters
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
      - 5
 
-The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
+The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_beta>`.
 
 Further External Resources
 --------------------------

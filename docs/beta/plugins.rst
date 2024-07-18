@@ -12,7 +12,7 @@ code base, so this is not subject to on-chain governance (see
 :doc:`voting procedure <voting>`), but it is still protocol-dependent,
 which means that it may vary with different protocols. For instance,
 the plugin code for protocol Alpha is located in file
-:src:`src/proto_alpha/lib_plugin/plugin.ml`. Thus, a specific version
+:src:`src/proto_beta/lib_plugin/plugin.ml`. Thus, a specific version
 is included in the Octez node for each protocol version (recall that a
 new release of Octez is usually delivered for each new protocol
 proposal, see :doc:`../releases/releases`)
@@ -27,15 +27,15 @@ In turn protocol plugins may, for example:
 
 - perform protocol-dependent computations that require data not available
   in the amendable part of the protocol like accessing the current time
-  to reason on timestamps (see :ref:`consensus_filter_alpha`);
+  to reason on timestamps (see :ref:`consensus_filter_beta`);
 - preserve the opacity/abstraction barrier of the protocol's internal data
   by performing computations on internal data without revealing it:
   e.g., there are some RPCs that can introspect the protocol-dependent
   content for certain operations;
 - implement some common operations that are customized for each
-  protocol (e.g., :ref:`prevalidator_filters_alpha`).
+  protocol (e.g., :ref:`prevalidator_filters_beta`).
 
-.. _prevalidator_filters_alpha:
+.. _prevalidator_filters_beta:
 
 Prevalidator filters
 --------------------
@@ -54,7 +54,7 @@ The interface of the prevalidator plugin is described at the :package-api:`mempo
 
 The different kinds of prevalidator filters are described below.
 
-.. _fees_filter_alpha:
+.. _fees_filter_beta:
 
 Fees filter
 ...........
@@ -65,13 +65,13 @@ prevalidator filter currently restricts operations based on their
 associated fees, to reject "too cheap" or "zero-fees" operations. This
 can be configured via the ``minimal_fees``,
 ``minimal_nanotez_per_gas_unit`` and ``minimal_nanotez_per_byte`` (see
-:ref:`filter RPCs<active_filter_rpc_alpha>`) parameters of the filter
+:ref:`filter RPCs<active_filter_rpc_beta>`) parameters of the filter
 configuration of your node.
 
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
-.. _consensus_filter_alpha:
+.. _consensus_filter_beta:
 
 Consensus filter
 ................
@@ -97,7 +97,7 @@ block proposal as follows:
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
-.. _precheck_filter_alpha:
+.. _precheck_filter_beta:
 
 Prechecking of manager operations
 .................................
@@ -154,7 +154,7 @@ In addition to quick detection of operations that have no chance to be
 prechecked or applied in the current context, the mempool's ``prefilter`` provides
 a priority for each successfully filtered operation. Concretely, the priority is
 either ``High``, ``Medium`` or ``Low`` in the current implementation, depending
-on the :ref:`validation pass<validation_passes_alpha>`.Some extra information (like the fees, or the gas/fees
+on the :ref:`validation pass<validation_passes_beta>`.Some extra information (like the fees, or the gas/fees
 ratio of manager operations) are also provided along the priorities to enable
 fine-grained operations ordering.
 This extra information is similar to the one used by the baker's
@@ -200,7 +200,7 @@ to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
 
-.. _active_filter_rpc_alpha:
+.. _active_filter_rpc_beta:
 
 Filters RPCs
 ~~~~~~~~~~~~
