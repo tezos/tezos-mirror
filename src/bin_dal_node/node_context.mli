@@ -76,20 +76,17 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt rpc_ctxt cryptobox
-    shards_proofs_precomputation proto_parameters ~level] updates in place the
-    status value to [Ready], and initializes the inner [ready_ctxt] value with
-    the given parameters, except [level] which should represent the current
-    level of the L1 node and is used to determine the initial protocol plugins.
+(** [set_ready ctxt cryptobox shards_proofs_precomputation proto_parameters
+    proto_plugins] updates in place the status value to [Ready], and initializes
+    the inner [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  Rpc_context.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
-  level:Int32.t ->
+  Proto_plugins.t ->
   unit tzresult Lwt.t
 
 (** Returns all the registered plugins *)

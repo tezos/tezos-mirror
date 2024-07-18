@@ -315,14 +315,37 @@ module Handler = struct
       let level =
         match last_notified_level with None -> level | Some level -> level
       in
+      let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+      let*? () =
+        Profile_manager.validate_slot_indexes
+          profile_ctxt
+          ~number_of_slots:proto_parameters.number_of_slots
+      in
+      let* proto_plugins =
+        (* We resolve the plugins for all levels starting with [first_level]. It
+           is currently not necessary to go as far in the past, because only the
+           protocol parameters for these past levels are needed, and these do
+           not change for now (and are not retrieved for these past
+           levels). However, if/when they do change, it will be necessary to
+           retrieve them, using the right plugins. *)
+        let relevant_period =
+          Profile_manager.get_attested_data_default_store_period
+            profile_ctxt
+            proto_parameters
+        in
+        let first_level =
+          Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
+        in
+        Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
+      in
+
       let* () =
         Node_context.set_ready
           ctxt
-          cctxt
           cryptobox
           shards_proofs_precomputation
           proto_parameters
-          ~level
+          proto_plugins
       in
       let*! () = Event.(emit node_is_ready ()) in
       stopper () ;
