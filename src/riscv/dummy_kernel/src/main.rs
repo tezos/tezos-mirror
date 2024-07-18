@@ -15,7 +15,7 @@ pub fn entry(host: &mut impl Runtime) {
     debug_msg!(host, "I am {}\n", SmartRollupAddress::new(meta.address()));
     debug_msg!(host, "{:#?}\n", meta);
 
-    let hash = digest_256(msg.as_bytes());
+    let hash = digest_256(msg.as_bytes()).unwrap();
     debug_msg!(host, "{:02X?}\n", hash);
 
     unsafe {
