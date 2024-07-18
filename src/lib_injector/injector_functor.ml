@@ -158,7 +158,7 @@ module Make (Parameters : PARAMETERS) = struct
     cctxt : Client_context.full;
         (** The client context which is used to perform the injections. *)
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
-    signers : signer list;  (** The signers for this worker. *)
+    mutable signers : signer list;  (** The signers for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -505,6 +505,14 @@ module Make (Parameters : PARAMETERS) = struct
     List.filter
       (fun s -> not @@ Signature.Public_key_hash.Set.mem s.pkh used_signers)
       state.signers
+
+  let rotate_signers state ~used_signers =
+    let used_signers, unused_signers =
+      List.partition
+        (fun s -> Signature.Public_key_hash.Set.mem s.pkh used_signers)
+        state.signers
+    in
+    state.signers <- unused_signers @ used_signers
 
   (** [simulate_operations state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
@@ -856,6 +864,13 @@ module Make (Parameters : PARAMETERS) = struct
           inject_pending_operations_round state signer operations_to_inject)
         signers_and_ops
     in
+    let used_signers =
+      List.fold_left
+        (fun acc (s, _) -> Signature.Public_key_hash.Set.add s.pkh acc)
+        Signature.Public_key_hash.Set.empty
+        signers_and_ops
+    in
+    rotate_signers state ~used_signers ;
     let*? total_np_op =
       List.fold_left
         (fun res injected_res ->
