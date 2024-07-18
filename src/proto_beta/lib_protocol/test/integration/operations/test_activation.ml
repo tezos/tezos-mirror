@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (activation)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_activation.ml
     Subject:    The activation operation creates an implicit contract from a
                 registered commitment present in the context. It is

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Plugin.Mempool
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_plugin/test/main.exe \
                   -- --file test_conflict_handler.ml
     Subject:      Unit tests the Mempool.conflict_handler function of the plugin
 *)

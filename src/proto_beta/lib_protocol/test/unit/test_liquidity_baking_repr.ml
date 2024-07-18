@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol Liquidity_baking_repr module
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
                   -- --file test_liquidity_baking_repr.ml
     Subject:    Tests for the Liquidity_baking_repr module
 *)

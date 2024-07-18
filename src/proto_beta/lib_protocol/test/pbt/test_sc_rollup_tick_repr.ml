@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_protocol/test/pbt/main.exe \
                   -- --file test_sc_rollup_tick_repr.ml
     Subject:      Operations in Tick_repr
 *)

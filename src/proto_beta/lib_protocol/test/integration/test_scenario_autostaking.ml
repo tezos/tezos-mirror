@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Adaptive Issuance, Autostaking
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_protocol/test/integration/main.exe \
                    -- --file test_scenario_autostaking.ml
     Subject:      Test autostaking in the protocol.
 *)

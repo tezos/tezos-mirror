@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_sc_rollup.ml
     Subject:      Test smart contract rollup
 *)

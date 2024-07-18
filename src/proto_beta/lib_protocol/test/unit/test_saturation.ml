@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (saturated arithmetic)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
                   -- --file test_saturation.ml
     Subject:    The gas is represented using saturated arithmetic.
                 These unit tests check that saturated arithmetic operations

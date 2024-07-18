@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (double preattestation) in Full_construction & Application modes
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_double_preattestation.ml
     Subject:    These tests target different cases for double preattestation *)
 

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Plugin.Mempool
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_plugin/test/main.exe \
                   -- --file test_fee_needed_to_overtake.ml
     Subject:      Unit tests the Mempool.fee_needed_to_overtake
                   function of the plugin

@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_client/test/main.exe \
                   -- --file test_michelson_v1_macros.ml
     Dependencies: src/proto_alpha/lib_client/test/assert.ml
     Subject:      Expansion and unexpansion of Micheline terms.
