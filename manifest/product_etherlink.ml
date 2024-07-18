@@ -145,6 +145,37 @@ let evm_node_migrations =
           ];
         ]
 
+let evm_node_kernels =
+  octez_evm_node_lib
+    "evm_node_kernels"
+    ~path:"etherlink/bin_node/kernels"
+    ~synopsis:"Collections of embedded kernels binaries"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "kernels.ml"];
+            [S "deps"; [S "glob_files"; S "*.wasm"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "wasm";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
     "evm_node_lib_dev_encoding"
@@ -193,6 +224,7 @@ let evm_node_lib_dev =
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
         evm_node_migrations;
+        evm_node_kernels;
         prometheus_app;
         octez_dal_node_services;
       ]

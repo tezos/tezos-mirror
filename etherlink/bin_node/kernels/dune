@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_node_kernels)
+ (public_name octez-evm-node-libs.evm_node_kernels)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  caqti-lwt
+  re)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
+
+(rule
+ (target kernels.ml)
+ (deps (glob_files *.wasm))
+ (action (run ocaml-crunch -e wasm -m plain -o %{target} -s .)))
