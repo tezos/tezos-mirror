@@ -8,6 +8,7 @@
 open Manifest
 open Externals
 open Product_data_encoding
+open Product_cohttp
 
 let product_source = ["resto/"]
 

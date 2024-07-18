@@ -13,6 +13,7 @@ open Internals
 open Product_data_encoding
 open Product_prometheus
 open Product_resto
+open Product_cohttp
 
 include Product (struct
   let name = "octez"
