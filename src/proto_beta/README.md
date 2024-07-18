@@ -20,7 +20,7 @@ First of all, one must distinguish the Tezos economic protocol from the other pr
   subject to the on-chain governance, and hence is not involved in the protocol
   hash computation.
 
-There are other protocol-related files outside of this directory. Integration tests are located in `tezt/`. Protocol documentation is located in `docs/alpha/` and the protocol changelog is in `docs/protocols/alpha.rst`.
+There are other protocol-related files outside of this directory. Integration tests are located in `tezt/`. Protocol documentation is located in `docs/beta/` and the protocol changelog is in `docs/protocols/beta.rst`.
 
 ## Implementation Details
 <!--
@@ -37,7 +37,7 @@ components described in the subsequent subsection.
 
 For a high-level overview of the Tezos economic protocol implementation (in the
 `lib_protocol/` subdirectory), see
-<https://tezos.gitlab.io/developer/entering_alpha.html>
+<https://tezos.gitlab.io/developer/entering_beta.html>
 
 ### Other components
 
@@ -65,4 +65,4 @@ The rest of the implementation is structured in the following subdirectories:
 -->
 
 The main API of the protocol is:
-https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha
+https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-beta
