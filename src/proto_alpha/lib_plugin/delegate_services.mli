@@ -172,3 +172,10 @@ val estimated_shared_pending_slashed_amount :
   'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
 
 val register : unit -> unit
+
+(** For RPC.ml *)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
+
+val external_staked_and_delegated :
+  t -> public_key_hash -> Tez.t Environment.Error_monad.tzresult Lwt.t
