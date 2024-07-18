@@ -4770,9 +4770,10 @@ let test_l2_timestamp_opcode =
            previous block (%L)") ;
     unit
   in
-  register_both (* TODO: https://gitlab.com/tezos/tezos/-/issues/7338 *)
-    ~tags:["evm"; "timestamp"; "opcode"; Tag.ci_disabled]
+  register_both
+    ~tags:["evm"; "timestamp"; "opcode"]
     ~title:"Check L2 opcode timestamp"
+    ~kernels:[Kernel.Latest]
     test
 
 let test_migrate_proxy_to_sequencer_future =
