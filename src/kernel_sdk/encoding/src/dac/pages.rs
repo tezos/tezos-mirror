@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -52,17 +52,6 @@ pub(crate) const MAX_USABLE_PAGE_SIZE: usize = MAX_PAGE_SIZE - PAGE_PREFIX_SIZE;
 #[cfg(feature = "alloc")]
 pub use encoding::{prepare_preimages, Page, V0ContentPage, V0HashPage};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-#[cfg(feature = "alloc")]
-use thiserror::Error;
-
-/// Errors encountered while constructing a preimage hash.
-#[cfg(feature = "alloc")]
-#[derive(Debug, Error)]
-pub enum PreimageHashError {
-    /// Preimages are limited to [`MAX_PAGE_SIZE`] bytes.
-    #[error("Content too large to be a preimage page")]
-    InputLengthTooLarge,
-}
 
 /// Hashes `content` into a preimage hash.
 ///
@@ -70,12 +59,12 @@ pub enum PreimageHashError {
 #[cfg(feature = "alloc")]
 pub fn make_preimage_hash(
     content: &[u8],
-) -> Result<[u8; PREIMAGE_HASH_SIZE], PreimageHashError> {
+) -> Result<[u8; PREIMAGE_HASH_SIZE], crypto::blake2b::Blake2bError> {
     if content.len() > MAX_PAGE_SIZE {
-        return Err(PreimageHashError::InputLengthTooLarge);
+        return Err(crypto::blake2b::Blake2bError::Other);
     }
 
-    let hash = crypto::blake2b::digest_256(content);
+    let hash = crypto::blake2b::digest_256(content)?;
     let mut root_hash: [u8; PREIMAGE_HASH_SIZE] = [0; PREIMAGE_HASH_SIZE];
     root_hash[1..].copy_from_slice(&hash);
     Ok(root_hash)
@@ -165,7 +154,7 @@ mod encoding {
     pub fn prepare_preimages(
         content: &[u8],
         mut handle: impl FnMut(PreimageHash, Vec<u8>),
-    ) -> Result<PreimageHash, PreimageHashError> {
+    ) -> Result<PreimageHash, crypto::blake2b::Blake2bError> {
         let mut hashes = Vec::new();
 
         for chunk in content.chunks(V0ContentPage::MAX_CONTENT_SIZE) {

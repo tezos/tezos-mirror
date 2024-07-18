@@ -64,11 +64,12 @@ version = "0.2.2"
 optional = true
 
 [dependencies.tezos_crypto_rs]
-workspace = true
+version = "=0.5.2"
+default-features = false
 optional = true
 
 [dependencies.tezos_data_encoding]
-workspace = true
+version = "=0.5.2"
 optional = true
 
 [dependencies.serde_json]
@@ -94,29 +95,29 @@ default = [
     "bls",
     "testing",
 ]
-crypto = ["dep:tezos_crypto_rs"]
+crypto = ["tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]
 debug_alloc = ["tezos-smart-rollup-debug/alloc"]
 alloc = ["tezos-smart-rollup-entrypoint/alloc"]
 dlmalloc = ["tezos-smart-rollup-entrypoint/dlmalloc"]
 panic-hook = ["tezos-smart-rollup-entrypoint/default"]
 data-encoding = [
-  "tezos_data_encoding",
-  "tezos-smart-rollup-encoding/alloc",
-  "tezos-smart-rollup-encoding/tezos-encoding",
-  "tezos-smart-rollup-encoding/crypto",
+    "tezos_data_encoding",
+    "tezos-smart-rollup-encoding/alloc",
+    "tezos-smart-rollup-encoding/tezos-encoding",
+    "tezos-smart-rollup-encoding/crypto",
 ]
 storage = ["tezos-smart-rollup-storage"]
 std = ["alloc", "debug_alloc", "tezos-smart-rollup-entrypoint/std"]
 testing = ["crypto", "tezos-smart-rollup-mock"]
 proto-alpha = [
-  "tezos-smart-rollup-core/proto-alpha",
-  "tezos-smart-rollup-host/proto-alpha",
-  "tezos-smart-rollup-mock/proto-alpha",
+    "tezos-smart-rollup-core/proto-alpha",
+    "tezos-smart-rollup-host/proto-alpha",
+    "tezos-smart-rollup-mock/proto-alpha",
 ]
 experimental-host-in-memory-store = [
-  "tezos-smart-rollup-entrypoint/proto-alpha",
-  "tezos-smart-rollup-entrypoint/experimental-host-in-memory-store",
+    "tezos-smart-rollup-entrypoint/proto-alpha",
+    "tezos-smart-rollup-entrypoint/experimental-host-in-memory-store",
 ]
 extra = ["alloc", "std", "utils", "dep:serde_json"]
 utils = ["dep:tezos-smart-rollup-utils"]

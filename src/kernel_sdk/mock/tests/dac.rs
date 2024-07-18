@@ -1,7 +1,3 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
-//
-// SPDX-License-Identifier: MIT
-
 //! Test of reveal preimage mechanism from [encoding::dac].
 
 use tezos_crypto_rs::hash::BlsSignature;
@@ -12,10 +8,6 @@ use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 const MAX_DAC_ONE_SHOT_SIZE: usize = 10063860;
-
-fn dummy_bls_sig() -> BlsSignature {
-    BlsSignature::from_base58_check("BLsig9WknWnGmPcJw1q9oCBr53UyjAWxxYNS5wz5HBKmCcuxCfK1Hwhs92YDFocvxUhXfUosgcTuzAEuAAjKzjy7isNhU3o2e8snmZyo9E85oRudCpM1MNtkeAAYEkSXUPLKtRYa9yFwni").unwrap()
-}
 
 #[test]
 fn certificate_reveal_to_store_small() {
@@ -31,7 +23,7 @@ fn certificate_reveal_to_store_small() {
 
     let cert = Certificate::V0(V0Certificate {
         root_hash,
-        aggregated_signature: dummy_bls_sig(),
+        aggregated_signature: BlsSignature(Vec::new()),
         witnesses: tezos_data_encoding::types::Zarith(0.into()),
     });
 
@@ -61,7 +53,7 @@ fn certificate_reveal_to_store_med() {
 
     let cert = Certificate::V0(V0Certificate {
         root_hash,
-        aggregated_signature: dummy_bls_sig(),
+        aggregated_signature: BlsSignature(Vec::new()),
         witnesses: tezos_data_encoding::types::Zarith(0.into()),
     });
 
@@ -90,7 +82,7 @@ fn certificate_reveal_to_store_max() {
 
     let cert = Certificate::V0(V0Certificate {
         root_hash,
-        aggregated_signature: dummy_bls_sig(),
+        aggregated_signature: BlsSignature(Vec::new()),
         witnesses: tezos_data_encoding::types::Zarith(0.into()),
     });
 
@@ -114,7 +106,7 @@ fn certificate_reveal_to_store_too_large() {
 
     let cert = Certificate::V0(V0Certificate {
         root_hash,
-        aggregated_signature: dummy_bls_sig(),
+        aggregated_signature: BlsSignature(Vec::new()),
         witnesses: tezos_data_encoding::types::Zarith(0.into()),
     });
 

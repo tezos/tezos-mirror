@@ -26,17 +26,14 @@ pub mod inbox;
 pub mod michelson;
 #[cfg(feature = "alloc")]
 pub mod outbox;
+#[cfg(feature = "crypto")]
+pub mod public_key;
+#[cfg(feature = "crypto")]
+pub mod public_key_hash;
 
 #[cfg(feature = "crypto")]
 pub mod smart_rollup;
 pub mod timestamp;
-
-#[cfg(feature = "crypto")]
-#[doc(inline)]
-pub use tezos_crypto_rs::public_key;
-#[cfg(feature = "crypto")]
-#[doc(inline)]
-pub use tezos_crypto_rs::public_key_hash;
 
 #[cfg(feature = "testing")]
 pub mod testing;

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2020-2022 SimpleStaking, Viable Systems and Tezedge Contributors
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -46,7 +46,7 @@ mod encoding {
         }
     }
 
-    impl NomReader<'_> for Timestamp {
+    impl NomReader for Timestamp {
         fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
             nom::combinator::map(
                 nom::number::complete::i64(nom::number::Endianness::Big),
