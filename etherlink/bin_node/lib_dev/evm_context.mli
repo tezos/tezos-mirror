@@ -12,6 +12,7 @@ type head = {
   finalized_number : Ethereum_types.quantity;
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
+  pending_upgrade : Ethereum_types.Upgrade.t option;
 }
 
 (** [start ~data_dir ~preimages ~preimages_endpoint

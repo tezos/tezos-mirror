@@ -12,6 +12,7 @@ type head = {
   finalized_number : Ethereum_types.quantity;
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
+  pending_upgrade : Ethereum_types.Upgrade.t option;
 }
 
 type parameters = {
@@ -53,6 +54,7 @@ let session_to_head_info session =
     finalized_number = session.finalized_number;
     next_blueprint_number = session.next_blueprint_number;
     current_block_hash = session.current_block_hash;
+    pending_upgrade = session.pending_upgrade;
   }
 
 let pvm_config ctxt =
