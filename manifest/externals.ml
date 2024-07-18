@@ -70,6 +70,10 @@ let checkseum_ocaml = external_sublib checkseum "checkseum.ocaml"
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
+let cohttp = external_lib "cohttp" V.(at_least "5.3.1")
+
+let conduit_lwt = external_lib "conduit-lwt" V.(exactly "6.2.2")
+
 let conduit_lwt_unix = external_lib "conduit-lwt-unix" V.(exactly "6.2.2")
 
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
@@ -148,6 +152,8 @@ let lwt_exit = external_lib "lwt-exit" V.True
 let lwt_unix = external_sublib lwt "lwt.unix"
 
 let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
+
+let magic_mime = external_lib "magic-mime" V.(at_least "1.3.1")
 
 let mtime = external_lib "mtime" V.(at_least "2.0.0")
 

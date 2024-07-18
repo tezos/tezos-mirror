@@ -40,8 +40,8 @@
   lwt.unix
   octez-libs.json-data-encoding
   ezjsonm
-  cohttp-lwt
-  cohttp-lwt-unix
+  octez-libs.cohttp-lwt
+  octez-libs.cohttp-lwt-unix
   octez-libs.resto-json
   octez-libs.resto
   octez-libs.resto-acl
@@ -61,8 +61,8 @@
   lwt.unix
   octez-libs.json-data-encoding
   ezjsonm
-  cohttp-lwt
-  cohttp-lwt-unix
+  octez-libs.cohttp-lwt
+  octez-libs.cohttp-lwt-unix
   octez-libs.resto-json
   octez-libs.resto-acl
   octez-libs.resto-cohttp-server

@@ -12,7 +12,7 @@
   octez-libs.crypto
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  cohttp-lwt-unix
+  octez-libs.cohttp-lwt-unix
   tezos-openapi
   octez-node-config
   octez-libs.prometheus-app

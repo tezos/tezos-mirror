@@ -9,7 +9,7 @@
  (libraries
   octez-libs.stdlib-unix
   octez-libs.base
-  cohttp-lwt-unix)
+  octez-libs.cohttp-lwt-unix)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

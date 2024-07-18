@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val product_source : string list
+
 val cohttp_lwt : Manifest.target
 
 val cohttp_lwt_unix : Manifest.target
