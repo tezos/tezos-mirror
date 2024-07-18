@@ -199,15 +199,35 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "full_balance")
 
-  let current_frozen_deposits =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7383 *)
+  module Deprecated = struct
+    let current_frozen_deposits =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use total_staked instead."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "current_frozen_deposits")
+
+    let staking_balance =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; to get this value, you can call RPCs total_staked and \
+           total_delegated, and add their outputs together."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "staking_balance")
+  end
+
+  let total_staked =
     RPC_service.get_service
       ~description:
-        "Returns the current amount of the frozen deposits (in mutez). That is \
-         the frozen deposits at beginning of cycle plus rewards minus unstaked \
-         and slashing. It doesn't count unstaked frozen deposits."
+        "The total amount (in mutez) currently staked for the baker, both by \
+         the baker itself and by external stakers. This is the staked amount \
+         before applying the baker's 'limit_of_staking_over_baking'; in other \
+         words, it includes overstaked tez if there are any."
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "current_frozen_deposits")
+      RPC_path.(path / "total_staked")
 
   let frozen_deposits =
     RPC_service.get_service
@@ -228,16 +248,21 @@ module S = struct
       ~output:(Data_encoding.list deposit_per_cycle_encoding)
       RPC_path.(path / "unstaked_frozen_deposits")
 
-  let staking_balance =
+  let total_delegated =
     RPC_service.get_service
       ~description:
-        "Returns the total amount of tokens (in mutez) delegated to a given \
-         delegate. This includes the balances of all the contracts that \
-         delegate to it, but also the balance of the delegate itself, its \
-         frozen deposits, and its frozen bonds."
+        "All tokens (in mutez) that currently count as delegated for the \
+         purpose of computing the baker's rights; they weigh half as much as \
+         staked tez in the rights. Limits such as overstaking and \
+         overdelegation have not been applied yet. This corresponds to all \
+         non-staked tez owned by the baker's delegators (including the baker \
+         itself): spendable balances, frozen bonds, and unstaked requests, \
+         except for any unstake requests that have been created before the \
+         delegator changed its delegate to the current baker (because they \
+         still count as delegated for the old delegate instead)."
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "staking_balance")
+      RPC_path.(path / "total_delegated")
 
   let frozen_deposits_limit =
     RPC_service.get_service
@@ -403,6 +428,28 @@ let check_delegate_registered ctxt pkh =
   | true -> return_unit
   | false -> tzfail (Not_registered pkh)
 
+let total_staked ctxt pkh = Delegate.current_frozen_deposits ctxt pkh
+
+let f_total_staked ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  total_staked ctxt pkh
+
+let total_staked_and_delegated ctxt pkh =
+  Delegate.For_RPC.staking_balance ctxt pkh
+
+let total_delegated ctxt pkh =
+  let open Lwt_result_syntax in
+  let* total_staked = total_staked ctxt pkh in
+  let* total_staked_and_delegated = total_staked_and_delegated ctxt pkh in
+  let*? total_delegated = Tez.(total_staked_and_delegated -? total_staked) in
+  return total_delegated
+
+let f_total_delegated ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  total_delegated ctxt pkh
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -450,9 +497,8 @@ let register () =
           (check_delegate_registered ctxt pkh)
       in
       Delegate.For_RPC.full_balance ctxt pkh) ;
-  register1 ~chunked:false S.current_frozen_deposits (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      Delegate.current_frozen_deposits ctxt pkh) ;
+  register1 ~chunked:false S.Deprecated.current_frozen_deposits f_total_staked ;
+  register1 ~chunked:false S.total_staked f_total_staked ;
   register1 ~chunked:false S.frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.initial_frozen_deposits ctxt pkh) ;
@@ -472,7 +518,8 @@ let register () =
           let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
           return {cycle; deposit})
         cycles) ;
-  register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.total_delegated f_total_delegated ;
+  register1 ~chunked:false S.Deprecated.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.staking_balance ctxt pkh) ;
   register1 ~chunked:false S.frozen_deposits_limit (fun ctxt pkh () () ->
@@ -555,7 +602,7 @@ let full_balance ctxt block pkh =
   RPC_context.make_call1 S.full_balance ctxt block pkh () ()
 
 let current_frozen_deposits ctxt block pkh =
-  RPC_context.make_call1 S.current_frozen_deposits ctxt block pkh () ()
+  RPC_context.make_call1 S.total_staked ctxt block pkh () ()
 
 let frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()
@@ -564,7 +611,7 @@ let unstaked_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
 
 let staking_balance ctxt block pkh =
-  RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
+  RPC_context.make_call1 S.Deprecated.staking_balance ctxt block pkh () ()
 
 let frozen_deposits_limit ctxt block pkh =
   RPC_context.make_call1 S.frozen_deposits_limit ctxt block pkh () ()
