@@ -89,6 +89,11 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
   in
   let job_build_rpm_amd64 = job_build_rpm_amd64 () in
+  let ( jobs_debian_repository,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current ) =
+    Debian_repository.jobs Release
+  in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
@@ -96,6 +101,8 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
           Artifacts job_static_x86_64_release;
           Artifacts job_static_arm64_release;
           Artifacts job_build_rpm_amd64;
+          Artifacts job_build_ubuntu_package_current;
+          Artifacts job_build_debian_package_current;
         ]
     in
     match release_tag_pipeline_type with
@@ -126,6 +133,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_docker_merge;
     job_gitlab_release_or_publish;
   ]
+  @ jobs_debian_repository
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
