@@ -32,6 +32,8 @@ let base_fee_per_gas = World_state.make "/fees/base_fee_per_gas"
 
 let kernel_version = EVM.make "/kernel_version"
 
+let storage_version = EVM.make "/storage_version"
+
 let kernel_root_hash = EVM.make "/kernel_root_hash"
 
 let kernel_upgrade = EVM.make "/kernel_upgrade"

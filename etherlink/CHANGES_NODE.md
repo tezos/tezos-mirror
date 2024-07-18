@@ -25,6 +25,9 @@
 
 - `eth_sendTransaction` now returns "unsupported method" error
   instead of "the pattern matching is not exhaustive" one. (!13960)
+- Simulation uses the `/evm/storage_version` to determine if the feature
+  `with_da_fees` is activated. Enabling incorrectly the feature of past
+  kernels results in errors in simulation.
 
 ### Experimental
 

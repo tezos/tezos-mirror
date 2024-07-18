@@ -20,6 +20,8 @@ val base_fee_per_gas : path
 
 val kernel_version : path
 
+val storage_version : path
+
 val kernel_root_hash : path
 
 val kernel_upgrade : path
