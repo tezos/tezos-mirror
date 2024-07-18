@@ -763,6 +763,12 @@ module State = struct
     in
     Evm_store.use store @@ fun conn ->
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let* latest_relationship = Evm_store.L1_l2_levels_relationships.find conn in
+    let finalized_number =
+      match latest_relationship with
+      | None -> Ethereum_types.Qty Z.zero
+      | Some {finalized; _} -> finalized
+    in
     let smart_rollup_address =
       Option.map
         Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
@@ -826,7 +832,7 @@ module State = struct
         session =
           {
             context;
-            finalized_number = Ethereum_types.quantity_of_z Z.zero;
+            finalized_number;
             next_blueprint_number;
             current_block_hash;
             pending_upgrade;
