@@ -34,8 +34,10 @@ let respond_file ?headers ~fname () =
                 | buf -> Some buf)
               (fun exn ->
                 Log.warn (fun m ->
-                    m "Error resolving file %s (%s)" fname
-                      (Printexc.to_string exn));
+                    m
+                      "Error resolving file %s (%s)"
+                      fname
+                      (Printexc.to_string exn)) ;
                 Lwt.return_none))
       in
       Lwt.on_success (Lwt_stream.closed stream) (fun () ->
@@ -44,8 +46,8 @@ let respond_file ?headers ~fname () =
                (fun () -> Lwt_io.close ic)
                (fun e ->
                  Log.warn (fun f ->
-                     f "Closing channel failed: %s" (Printexc.to_string e));
-                 Lwt.return_unit));
+                     f "Closing channel failed: %s" (Printexc.to_string e)) ;
+                 Lwt.return_unit)) ;
       let body = Cohttp_lwt.Body.of_stream stream in
       let mime_type = Magic_mime.lookup fname in
       let headers =
@@ -61,11 +63,20 @@ let respond_file ?headers ~fname () =
 let log_on_exn = function
   | Unix.Unix_error (error, func, arg) ->
       Log.warn (fun m ->
-          m "Client connection error %s: %s(%S)" (Unix.error_message error) func
+          m
+            "Client connection error %s: %s(%S)"
+            (Unix.error_message error)
+            func
             arg)
   | exn -> Log.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
 
 let create ?timeout ?backlog ?stop ?(on_exn = log_on_exn)
     ?(ctx = Net.default_ctx) ?(mode = `TCP (`Port 8080)) spec =
-  Conduit_lwt_unix.serve ?backlog ?timeout ?stop ~on_exn ~ctx:ctx.Net.ctx ~mode
+  Conduit_lwt_unix.serve
+    ?backlog
+    ?timeout
+    ?stop
+    ~on_exn
+    ~ctx:ctx.Net.ctx
+    ~mode
     (callback spec)

@@ -16,7 +16,6 @@
 
 (** Debugging output for Cohttp Unix *)
 
-val default_reporter : Logs.reporter
 (** [default_reporter] provides a simple reporter that sends the logging output
     to stderr. For example, the code below enables logging at level [level] to
     stderr, using coloured output if possible.
@@ -26,14 +25,15 @@ val default_reporter : Logs.reporter
       Logs.set_level ~all:true (Some level);
       Logs.set_reporter Debug.default_reporter
     ]} *)
+val default_reporter : Logs.reporter
 
-val activate_debug : unit -> unit
 (** [activate_debug] enables debugging output that will be sent to standard
     error. *)
+val activate_debug : unit -> unit
 
-val debug_active : unit -> bool
 (** [debug_active] returns true if [activate_debug] has been called and false
     otherwise *)
+val debug_active : unit -> bool
 
 (** {2 Selectively disable cohttp logging} *)
 

@@ -18,28 +18,21 @@
 
 module IO = Io
 
-type ctx = { ctx : Conduit_lwt_unix.ctx; resolver : Resolver_lwt.t }
+type ctx = {ctx : Conduit_lwt_unix.ctx; resolver : Resolver_lwt.t}
 [@@deriving sexp_of]
 
-val default_ctx : ctx
 (** [default_ctx] is the default network context. It uses
     [Conduit_lwt_unix.default_ctx] and [Resolver_lwt_unix.system]. *)
+val default_ctx : ctx
 
-val init : ?ctx:Conduit_lwt_unix.ctx -> ?resolver:Resolver_lwt.t -> unit -> ctx
 (** [init ?ctx ?resolver ()] is a network context that is the same as the
     {!default_ctx}, but with either the connection handling or resolution module
     overridden with [ctx] or [resolver] respectively. This is useful to supply a
     {!Conduit_lwt_unix.resolver} with a custom source network interface, or a
     {!Resolver_lwt.t} with a different name resolution strategy (for instance to
     override a hostname to point it to a Unix domain socket). *)
+val init : ?ctx:Conduit_lwt_unix.ctx -> ?resolver:Resolver_lwt.t -> unit -> ctx
 
-val connect_uri :
-  ctx:ctx ->
-  Uri.t ->
-  (Conduit_lwt_unix.flow
-  * Lwt_io.input Lwt_io.channel
-  * Lwt_io.output Lwt_io.channel)
-  Lwt.t
 (** [connect_uri ~ctx uri] starts a {i flow} on the given [uri]. The choice of
     the protocol (with or without encryption) is done by the {i scheme} of the
     given [uri]:
@@ -54,7 +47,16 @@ val connect_uri :
     communication with them first). By {i extension}, we mean that the user is
     able to fill its own [ctx] and we don't overlap resolution functions from
     the given [ctx]. *)
+val connect_uri :
+  ctx:ctx ->
+  Uri.t ->
+  (Conduit_lwt_unix.flow
+  * Lwt_io.input Lwt_io.channel
+  * Lwt_io.output Lwt_io.channel)
+  Lwt.t
 
 val close_in : 'a Lwt_io.channel -> unit
+
 val close_out : 'a Lwt_io.channel -> unit
+
 val close : 'a Lwt_io.channel -> 'b Lwt_io.channel -> unit

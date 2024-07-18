@@ -22,8 +22,8 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
         (* Lwt.on_success registers a callback in the stream.
          * The GC will still be able to collect stream. *)
         Lwt.on_success (Lwt_stream.closed stream) (fun () ->
-            closed := true;
-            closefn ());
+            closed := true ;
+            closefn ()) ;
         (* finalise could run in a thread different from the lwt main thread.
          * You may therefore not call into Lwt from a finaliser. *)
         Gc.finalise_last
@@ -34,10 +34,10 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
                     "Body not consumed, leaking stream! Refer to \
                      https://github.com/mirage/ocaml-cohttp/issues/730 for \
                      additional details"))
-          stream;
+          stream ;
         body
     | `No ->
-        closefn ();
+        closefn () ;
         `Empty
 
   let is_meth_chunked = function
@@ -60,7 +60,8 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
           let req = Request.make_for_client ~headers ~chunked meth uri in
           Request.write
             (fun writer -> Body.write_body (Request.write_body writer) body)
-            req oc
+            req
+            oc
       | false ->
           (* If chunked is not allowed, then obtain the body length and
              insert header *)
@@ -70,7 +71,8 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
           in
           Request.write
             (fun writer -> Body.write_body (Request.write_body writer) buf)
-            req oc
+            req
+            oc
     in
     sent >>= fun () ->
     (Response.read ic >>= function
@@ -80,18 +82,19 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
      | `Ok res -> (
          match meth with
          | `HEAD ->
-             closefn ();
+             closefn () ;
              Lwt.return (res, `Empty)
          | _ ->
              let body = read_body ~closefn ic res in
              Lwt.return (res, body)))
     |> fun t ->
-    Lwt.on_cancel t closefn;
-    Lwt.on_failure t (fun _exn -> closefn ());
+    Lwt.on_cancel t closefn ;
+    Lwt.on_failure t (fun _exn -> closefn ()) ;
     t
 
   (* The HEAD should not have a response body *)
   let head ?ctx ?headers uri = call ?ctx ?headers `HEAD uri >|= fst
+
   let get ?ctx ?headers uri = call ?ctx ?headers `GET uri
 
   let delete ?ctx ?body ?chunked ?headers uri =
@@ -108,7 +111,9 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
 
   let post_form ?ctx ?headers ~params uri =
     let headers =
-      Header.add_opt_unless_exists headers "content-type"
+      Header.add_opt_unless_exists
+        headers
+        "content-type"
         "application/x-www-form-urlencoded"
     in
     let body = Body.of_string (Uri.encoded_of_query params) in
@@ -122,7 +127,8 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
         (fun (req, body) ->
           Request.write
             (fun writer -> Body.write_body (Request.write_body writer) body)
-            req oc
+            req
+            oc
           >>= fun () -> Lwt.return (Request.meth req))
         reqs
     in
@@ -143,17 +149,17 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
                | `Ok res -> (
                    match meth with
                    | `HEAD ->
-                       closefn ();
+                       closefn () ;
                        Lwt.return (res, `Empty)
                    | _ ->
                        let body = read_body ~closefn ic res in
                        Lwt.return (res, body)))
               |> fun t ->
-              Lwt.on_cancel t closefn;
-              Lwt.on_failure t (fun _exn -> closefn ());
+              Lwt.on_cancel t closefn ;
+              Lwt.on_failure t (fun _exn -> closefn ()) ;
               t))
         meth_stream
     in
-    Lwt.on_success (Lwt_stream.closed resps) (fun () -> Net.close ic oc);
+    Lwt.on_success (Lwt_stream.closed resps) (fun () -> Net.close ic oc) ;
     Lwt.return resps
 end

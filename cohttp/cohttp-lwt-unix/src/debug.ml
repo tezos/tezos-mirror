@@ -15,6 +15,7 @@
   }}}*)
 
 let _debug_active = ref false
+
 let debug_active () = !_debug_active
 
 open Lwt.Infix
@@ -25,7 +26,7 @@ let reporter file_descr ppf =
     ( Fmt.with_buffer ~like:ppf buf,
       fun () ->
         let str = Buffer.contents buf in
-        Buffer.reset buf;
+        Buffer.reset buf ;
         str )
   in
   let report src level ~over k msgf =
@@ -39,7 +40,7 @@ let reporter file_descr ppf =
         go 0 (Bytes.length buf)
       in
       let clean () =
-        over ();
+        over () ;
         Lwt.return_unit
       in
       Lwt.async (fun () ->
@@ -47,36 +48,39 @@ let reporter file_descr ppf =
             (fun () -> Lwt.finalize write clean)
             (fun exn ->
               Logs.warn (fun m ->
-                  m "Flushing error: %s." (Printexc.to_string exn));
-              Lwt.return_unit));
+                  m "Flushing error: %s." (Printexc.to_string exn)) ;
+              Lwt.return_unit)) ;
       k ()
     in
     let with_metadata header _tags k ppf fmt =
-      Format.kfprintf k ppf
+      Format.kfprintf
+        k
+        ppf
         ("%a[%a]: " ^^ fmt ^^ "\n%!")
-        Logs_fmt.pp_header (level, header)
+        Logs_fmt.pp_header
+        (level, header)
         Fmt.(styled `Magenta string)
         (Logs.Src.name src)
     in
     msgf @@ fun ?header ?tags fmt -> with_metadata header tags k ppf fmt
   in
-  { Logs.report }
+  {Logs.report}
 
 let default_reporter = reporter Lwt_unix.stderr Fmt.stderr
 
 let set_logger =
   lazy
     (if
-     (* If no reporter has been set by the application, set default one
-        that prints to stderr *)
-     Logs.reporter () == Logs.nop_reporter
-    then Logs.set_reporter default_reporter)
+       (* If no reporter has been set by the application, set default one
+          that prints to stderr *)
+       Logs.reporter () == Logs.nop_reporter
+     then Logs.set_reporter default_reporter)
 
 let activate_debug () =
   if not !_debug_active then (
-    _debug_active := true;
-    Lazy.force set_logger;
-    Logs.set_level ~all:true (Some Logs.Debug);
+    _debug_active := true ;
+    Lazy.force set_logger ;
+    Logs.set_level ~all:true (Some Logs.Debug) ;
     Logs.debug (fun f -> f "Cohttp debugging output is active"))
 
 let () =

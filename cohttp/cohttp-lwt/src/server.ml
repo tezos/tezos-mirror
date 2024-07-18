@@ -22,7 +22,7 @@ module Make (IO : S.IO) = struct
   }
 
   let make_response_action ?(conn_closed = ignore) ~callback () =
-    { conn_closed; callback }
+    {conn_closed; callback}
 
   let make ?conn_closed ~callback () =
     let callback conn req body =
@@ -56,9 +56,12 @@ module Make (IO : S.IO) = struct
 
   let respond_string ?(flush = true) ?headers ~status ~body () =
     let res =
-      Response.make ~status ~flush
+      Response.make
+        ~status
+        ~flush
         ~encoding:(Cohttp.Transfer.Fixed (Int64.of_int (String.length body)))
-        ?headers ()
+        ?headers
+        ()
     in
     let body = Body.of_string body in
     Lwt.return (res, body)
@@ -96,7 +99,7 @@ module Make (IO : S.IO) = struct
     | `No | `Unknown -> `Empty
 
   let handle_request callback conn req body =
-    Log.debug (fun m -> m "Handle request: %a." Request.pp_hum req);
+    Log.debug (fun m -> m "Handle request: %a." Request.pp_hum req) ;
     Lwt.finalize
       (fun () ->
         Lwt.catch
@@ -105,8 +108,11 @@ module Make (IO : S.IO) = struct
             | Out_of_memory -> Lwt.fail Out_of_memory
             | exn ->
                 Log.err (fun f ->
-                    f "Error handling %a: %s" Request.pp_hum req
-                      (Printexc.to_string exn));
+                    f
+                      "Error handling %a: %s"
+                      Request.pp_hum
+                      req
+                      (Printexc.to_string exn)) ;
                 respond_error ~body:"Internal Server Error" () >|= fun rsp ->
                 `Response rsp))
       (fun () -> Body.drain_body body)
@@ -114,9 +120,11 @@ module Make (IO : S.IO) = struct
   let handle_response ~keep_alive oc res body conn_closed handle_client =
     IO.catch (fun () ->
         let flush = Response.flush res in
-        Response.write ~flush
+        Response.write
+          ~flush
           (fun writer -> Body.write_body (Response.write_body writer) body)
-          res oc)
+          res
+          oc)
     >>= function
     | Ok () ->
         if keep_alive then handle_client oc
@@ -124,25 +132,29 @@ module Make (IO : S.IO) = struct
           let () = conn_closed () in
           Lwt.return_unit
     | Error e ->
-        Log.info (fun m -> m "IO error while writing body: %a" IO.pp_error e);
-        conn_closed ();
+        Log.info (fun m -> m "IO error while writing body: %a" IO.pp_error e) ;
+        conn_closed () ;
         Body.drain_body body
 
   let rec handle_client ic oc conn spec =
     Request.read ic >>= function
     | `Eof ->
-        spec.conn_closed conn;
+        spec.conn_closed conn ;
         Lwt.return_unit
     | `Invalid data ->
-        Log.err (fun m -> m "invalid input %s while handling client" data);
-        spec.conn_closed conn;
+        Log.err (fun m -> m "invalid input %s while handling client" data) ;
+        spec.conn_closed conn ;
         Lwt.return_unit
     | `Ok req -> (
         let body = read_body ic req in
         handle_request spec.callback conn req body >>= function
         | `Response (res, body) ->
             let keep_alive = Request.is_keep_alive req in
-            handle_response ~keep_alive oc res body
+            handle_response
+              ~keep_alive
+              oc
+              res
+              body
               (fun () -> spec.conn_closed conn)
               (fun oc -> handle_client ic oc conn spec)
         | `Expert (res, io_handler) ->
@@ -159,10 +171,10 @@ module Make (IO : S.IO) = struct
         | Ok () -> Lwt.return_unit
         | Error e ->
             Log.info (fun m ->
-                m "IO error while handling client: %a" IO.pp_error e);
-            conn_closed ();
+                m "IO error while handling client: %a" IO.pp_error e) ;
+            conn_closed () ;
             Lwt.return_unit)
       (fun e ->
-        conn_closed ();
+        conn_closed () ;
         Lwt.fail e)
 end

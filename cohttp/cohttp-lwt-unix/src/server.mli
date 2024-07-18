@@ -6,8 +6,8 @@
 
 include Cohttp_lwt.S.Server with module IO = Io
 
-val resolve_file : docroot:string -> uri:Uri.t -> string
 (** Deprecated. Please use Cohttp.Path.resolve_local_file. *)
+val resolve_file : docroot:string -> uri:Uri.t -> string
 
 val respond_file :
   ?headers:Cohttp.Header.t ->
@@ -15,15 +15,6 @@ val respond_file :
   unit ->
   (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
 
-val create :
-  ?timeout:int ->
-  ?backlog:int ->
-  ?stop:unit Lwt.t ->
-  ?on_exn:(exn -> unit) ->
-  ?ctx:Net.ctx ->
-  ?mode:Conduit_lwt_unix.server ->
-  t ->
-  unit Lwt.t
 (** [create ?timeout ?backlog ?stop ?on_exn ?mode t] is a new HTTP server.
 
     The user can decide to start a simple HTTP server (without encryption) or
@@ -43,3 +34,12 @@ val create :
     via the callback defined in [t]. If the callback raises an exception, it is
     passed to [on_exn] (by default, to a function that logs the exception using
     the {!Logs} library). *)
+val create :
+  ?timeout:int ->
+  ?backlog:int ->
+  ?stop:unit Lwt.t ->
+  ?on_exn:(exn -> unit) ->
+  ?ctx:Net.ctx ->
+  ?mode:Conduit_lwt_unix.server ->
+  t ->
+  unit Lwt.t
