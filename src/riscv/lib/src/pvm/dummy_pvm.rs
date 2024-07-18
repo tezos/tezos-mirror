@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -154,6 +153,7 @@ impl DummyPvm {
 
     pub fn hash(&self) -> Hash {
         tezos_crypto_rs::blake2b::digest_256(self.to_bytes())
+            .unwrap()
             .try_into()
             .unwrap()
     }

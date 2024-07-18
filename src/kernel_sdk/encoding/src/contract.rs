@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -77,7 +77,7 @@ impl Into<String> for Contract {
 
 has_encoding!(Contract, CONTRACT_ENCODING, { Encoding::Custom });
 
-impl NomReader<'_> for Contract {
+impl NomReader for Contract {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         alt((
             map(
@@ -169,7 +169,7 @@ mod test {
 
         let pkh = Contract::from_b58check(kt1);
 
-        assert!(matches!(pkh, Ok(Contract::Originated(_))));
+        assert!(matches!(pkh, Ok(Contract::Originated(ContractKt1Hash(_)))));
 
         let kt1_from_pkh = pkh.unwrap().to_b58check();
 

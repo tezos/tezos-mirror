@@ -21,11 +21,13 @@ path = "../core"
 version = "0.2.2"
 
 [dependencies.tezos_crypto_rs]
-workspace = true
+version = "=0.5.2"
+default-features = false
 optional = true
 
 [dependencies.tezos_data_encoding]
-workspace = true
+version = "=0.5.2"
+default-features = false
 optional = true
 
 [dependencies.thiserror]

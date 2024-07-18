@@ -307,10 +307,12 @@ impl SequencerInput {
             return InputResult::Unparsable;
         }
         let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
+        // The sequencer signs the hash of the blueprint.
+        let msg = tezos_crypto_rs::blake2b::digest_256(&bytes).unwrap();
 
         let correctly_signed = context
             .sequencer
-            .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
+            .verify_signature(&seq_blueprint.signature, &msg)
             .unwrap_or(false);
 
         if correctly_signed {
@@ -502,7 +504,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         inbox_msg_id: u32,
         enable_fa_deposits: bool,
     ) -> Self {
-        if transfer.destination.hash().as_ref() != smart_rollup_address {
+        if transfer.destination.hash().0 != smart_rollup_address {
             log!(
                 host,
                 Info,

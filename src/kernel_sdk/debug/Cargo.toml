@@ -26,7 +26,4 @@ default-features = false
 default = ["alloc"]
 alloc = []
 testing = ["tezos-smart-rollup-core/testing"]
-proto-alpha = [
-  "tezos-smart-rollup-core/proto-alpha",
-  "tezos-smart-rollup-host/proto-alpha",
-]
+proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]

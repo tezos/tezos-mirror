@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,7 +10,6 @@
 //! and the updates to accounts that happen within said transactions.
 
 use crypto::hash::ContractTz1Hash;
-use crypto::hash::HashTrait;
 use crypto::hash::HashType;
 use crypto::hash::PublicKeyEd25519;
 use num_bigint::{BigInt, TryFromBigIntError};
@@ -380,7 +379,7 @@ impl Account {
     ) -> Result<(), AccountStorageError> {
         let path = concat(&self.path, &PUBLIC_KEY_PATH)?;
 
-        host.store_write(&path, pk.as_ref(), 0)
+        host.store_write(&path, &pk.0, 0)
             .map_err(AccountStorageError::from)
     }
 
@@ -414,7 +413,7 @@ impl Account {
         let mut buffer = [0_u8; PK_SIZE];
 
         match host.store_read_slice(&path, 0, &mut buffer) {
-            Ok(PK_SIZE) => Ok(Some(PublicKeyEd25519::try_from_bytes(&buffer).unwrap())),
+            Ok(PK_SIZE) => Ok(Some(PublicKeyEd25519(buffer.to_vec()))),
             Ok(_) => Err(AccountStorageError::MalformedSignature),
             Err(PathNotFound | HostErr(StoreNotAValue)) => Ok(None),
             Err(error) => Err(AccountStorageError::from(error)),

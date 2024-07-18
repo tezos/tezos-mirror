@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -231,7 +231,7 @@ fn filter_inbox_message<'a, Host: Runtime>(
             destination,
             ..
         })) => {
-            if rollup_address != destination.hash() {
+            if rollup_address.0 != destination.hash().0 {
                 #[cfg(feature = "debug")]
                 debug_msg!(
                     host,
@@ -336,7 +336,7 @@ mod test {
         let mut mock_runtime = MockHost::default();
 
         let destination =
-            ContractTz1Hash::from_b58check("tz1XdRrrqrMfsFKA8iuw53xHzug9ipr6MuHq").unwrap();
+            ContractTz1Hash::from_b58check("tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K").unwrap();
 
         let ticket_creator =
             Contract::from_b58check("KT1JW6PwhfaEJu6U3ENsxUeja48AdtqSoekd").unwrap();
@@ -374,7 +374,7 @@ mod test {
         let mut mock_runtime = MockHost::default();
 
         // setup message
-        let receiver = gen_ed25519_keys().0.pk_hash();
+        let receiver = gen_ed25519_keys().0.pk_hash().unwrap();
         let originator = Contract::Originated(
             ContractKt1Hash::from_b58check("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq").unwrap(),
         );

@@ -15,8 +15,8 @@ categories = ["development-tools", "development-tools::testing"]
 
 [dependencies]
 hex = "0.4"
-tezos_crypto_rs.workspace = true
-tezos_data_encoding.workspace = true
+tezos_crypto_rs = { version = "=0.5.2", default-features = false }
+tezos_data_encoding = "=0.5.2"
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
@@ -38,7 +38,4 @@ version = "0.2.2"
 features = ["default"]
 
 [features]
-proto-alpha = [
-  "tezos-smart-rollup-core/proto-alpha",
-  "tezos-smart-rollup-host/proto-alpha",
-]
+proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]

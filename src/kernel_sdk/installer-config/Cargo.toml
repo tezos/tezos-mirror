@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -12,10 +12,10 @@ repository = "https://gitlab.com/tezos/tezos.git"
 description = "Installer configuration for installer kernel of Tezos Smart Rollups."
 keywords = ["tezos", "smart", "rollup", "installer", "config"]
 categories = [
-  "development-tools",
-  "parser-implementations",
-  "config",
-  "no-std::no-alloc",
+    "development-tools",
+    "parser-implementations",
+    "config",
+    "no-std::no-alloc",
 ]
 
 [dependencies.tezos-smart-rollup-host]
@@ -38,7 +38,7 @@ version = "7.1"
 default-features = false
 
 [dependencies.tezos_data_encoding]
-workspace = true
+version = "=0.5.2"
 optional = true
 
 [dependencies.serde]
@@ -55,7 +55,8 @@ version = "0.4.3"
 optional = true
 
 [dependencies.tezos_crypto_rs]
-workspace = true
+version = "=0.5.2"
+default-features = false
 optional = true
 
 [dependencies.thiserror]
@@ -70,14 +71,14 @@ version = "0.2.2"
 default = ["std"]
 std = ["alloc"]
 alloc = [
-  "dep:tezos_data_encoding",
-  "tezos-smart-rollup-host/alloc",
-  "tezos-smart-rollup-encoding/alloc",
-  "tezos-smart-rollup-encoding/tezos-encoding",
-  "serde",
-  "serde_yaml",
-  "hex",
-  "dep:tezos_crypto_rs",
-  "thiserror",
+    "tezos_data_encoding",
+    "tezos-smart-rollup-host/alloc",
+    "tezos-smart-rollup-encoding/alloc",
+    "tezos-smart-rollup-encoding/tezos-encoding",
+    "serde",
+    "serde_yaml",
+    "hex",
+    "tezos_crypto_rs",
+    "thiserror",
 ]
 testing = []

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,7 +6,6 @@
 
 use super::Contract;
 use crypto::hash::ContractKt1Hash;
-use crypto::hash::HashTrait;
 use crypto::hash::HashType;
 use proptest::prelude::*;
 
@@ -14,7 +13,8 @@ impl Contract {
     /// Randomly selected originated contract.
     pub fn arb_originated() -> BoxedStrategy<Contract> {
         any::<[u8; HashType::ContractKt1Hash.size()]>()
-            .prop_map(|c| ContractKt1Hash::try_from_bytes(&c).unwrap())
+            .prop_map(Vec::from)
+            .prop_map(ContractKt1Hash)
             .prop_map(Contract::Originated)
             .boxed()
     }

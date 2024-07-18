@@ -65,7 +65,7 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
         initrd,
         inbox.build(),
         hooks,
-        rollup_address.into_hash().as_ref().try_into().unwrap(),
+        rollup_address.into_hash().0.try_into().unwrap(),
         opts.common.inbox.origination_level,
     )?;
 

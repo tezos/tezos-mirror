@@ -4,7 +4,6 @@
 
 //! Generation of arbitrary operations for testing.
 use crate::{fake_hash::arb_kt1, inbox::Signer};
-use crypto::hash::HashTrait;
 use tezos_smart_rollup_encoding::{entrypoint::Entrypoint, michelson::ticket::StringTicket};
 
 use super::{Operation, OperationContent};
@@ -34,12 +33,8 @@ impl OperationContent {
             .prop_map(|(hash, ticket)| {
                 let amount = ticket.amount_as().unwrap();
                 let ticket_hash = ticket.hash().unwrap();
-                OperationContent::transfer(
-                    ContractTz1Hash::try_from_bytes(&hash).unwrap(),
-                    ticket_hash,
-                    amount,
-                )
-                .unwrap()
+                OperationContent::transfer(ContractTz1Hash(hash.to_vec()), ticket_hash, amount)
+                    .unwrap()
             })
             .boxed()
     }
@@ -49,8 +44,7 @@ impl Operation {
     /// Generation strategy for operations.
     pub fn arb_with_signer() -> BoxedStrategy<(Operation, SecretKeyEd25519)> {
         (
-            any::<[u8; HashType::SeedEd25519.size()]>()
-                .prop_map(|s| SeedEd25519::try_from_bytes(&s).unwrap()),
+            any::<[u8; HashType::SeedEd25519.size()]>().prop_map(|s| SeedEd25519(s.to_vec())),
             i64::arbitrary().prop_map(|i| if i < 0 { -(i + 1) } else { i }),
             // Mix of withdrawals & transfers
             bool::arbitrary().prop_flat_map(|transfer| {
@@ -65,7 +59,7 @@ impl Operation {
             .prop_map(|(seed, counter, contents, signer_as_address)| {
                 let (pk, sk) = seed.keypair().unwrap();
                 let signer = if signer_as_address {
-                    Signer::Tz1(pk.pk_hash())
+                    Signer::Tz1(pk.pk_hash().unwrap())
                 } else {
                     Signer::PublicKey(pk)
                 };

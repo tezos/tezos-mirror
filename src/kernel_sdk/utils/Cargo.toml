@@ -16,10 +16,6 @@ categories = ["development-tools"]
 [features]
 default = []
 
-[dependencies]
-tezos_crypto_rs.workspace = true
-tezos_data_encoding.workspace = true
-
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
 version = "0.2.2"
@@ -29,6 +25,14 @@ features = ["alloc", "tezos-encoding"]
 [dependencies.tezos-smart-rollup-mock]
 path = "../mock"
 version = "0.2.2"
+
+[dependencies.tezos_crypto_rs]
+version = "=0.5.2"
+default-features = false
+
+[dependencies.tezos_data_encoding]
+version = "=0.5.2"
+default-features = false
 
 [dependencies.hex]
 version = "0.4"

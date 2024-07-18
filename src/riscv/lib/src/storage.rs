@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -83,7 +82,7 @@ impl Store {
     pub fn store(&self, data: &[u8]) -> Result<Hash, StorageError> {
         // This is safe to unwrap because `digest_256` always returns
         // a `DIGEST_SIZE`-long `Vec<u8>`.
-        let hash: Hash = tezos_crypto_rs::blake2b::digest_256(data)
+        let hash: Hash = tezos_crypto_rs::blake2b::digest_256(data)?
             .try_into()
             .unwrap();
         let file_name = self.path_of_hash(&hash);
