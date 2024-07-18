@@ -63,6 +63,7 @@ type t = {
   mutable additional_bootstraps : Account.key list;
   mutable mode : mode;
   runner : Runner.t option;
+  dal_node : Dal_node.t option;
 }
 
 type stresstest_gas_estimation = {
@@ -141,16 +142,26 @@ let address ?(hostname = false) ?from peer =
 
 let create_with_mode ?runner ?(path = Uses.path Constant.octez_client)
     ?(admin_path = Uses.path Constant.octez_admin_client) ?name
-    ?(color = Log.Color.FG.blue) ?base_dir mode =
+    ?(color = Log.Color.FG.blue) ?base_dir ?dal_node mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
   let additional_bootstraps = [] in
-  {path; admin_path; name; color; base_dir; additional_bootstraps; mode; runner}
+  {
+    path;
+    admin_path;
+    name;
+    color;
+    base_dir;
+    additional_bootstraps;
+    mode;
+    runner;
+    dal_node;
+  }
 
 let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
-    ?media_type () =
+    ?media_type ?dal_node () =
   create_with_mode
     ?runner
     ?path
@@ -158,6 +169,7 @@ let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
     ?name
     ?color
     ?base_dir
+    ?dal_node
     (Client (endpoint, media_type))
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
@@ -763,6 +775,12 @@ let empty_mempool_file ?(filename = "mempool.json") () =
   write_file mempool ~contents:mempool_str ;
   mempool
 
+let dal_node_arg dal_node_endpoint client =
+  match (dal_node_endpoint, client.dal_node) with
+  | Some endpoint, _ -> ["--dal-node"; endpoint]
+  | None, Some dal_node -> ["--dal-node"; Dal_node.rpc_endpoint dal_node]
+  | None, None -> []
+
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
@@ -788,7 +806,7 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ optional_arg "count" string_of_int count
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
-    @ optional_arg "dal-node" Fun.id dal_node_endpoint
+    @ dal_node_arg dal_node_endpoint client
     @ optional_arg "adaptive-issuance-vote" ai_vote_to_string ai_vote
     @ optional_switch "record_state" state_recorder)
 
@@ -2843,7 +2861,7 @@ let write_sources_file ~min_agreement ~uris client =
       Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
 
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
-    ?event_level ?event_sections_levels ?(nodes_args = []) () =
+    ?event_level ?event_sections_levels ?(nodes_args = []) ?dal_node () =
   let filter_node_arg = function
     | Node.Connections _ | Synchronisation_threshold _ -> None
     | x -> Some x
@@ -2865,6 +2883,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ?name
       ?color
       ?base_dir
+      ?dal_node
       (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
   let* () =
@@ -2957,7 +2976,7 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
 let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
     ?event_level ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?(keys = Constant.all_secret_keys) ?rpc_external tag () =
+    ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node tag () =
   match tag with
   | (`Client | `Proxy) as mode ->
       let* node =
@@ -2975,13 +2994,21 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
         | `Proxy -> Proxy endpoint
       in
       let client =
-        create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
+        create_with_mode ?path ?admin_path ?name ?color ?base_dir ?dal_node mode
       in
       Account.write keys ~base_dir:client.base_dir ;
       return (node, client)
   | `Light ->
       let* client, node1, _ =
-        init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
+        init_light
+          ?path
+          ?admin_path
+          ?name
+          ?color
+          ?base_dir
+          ?dal_node
+          ~nodes_args
+          ()
       in
       return (node1, client)
 
@@ -2989,7 +3016,7 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
     ?event_level ?event_sections_levels ?nodes_args
     ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?timestamp ?keys ?rpc_external tag ~protocol () =
+    ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node tag ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -3003,6 +3030,7 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
       ?nodes_args
       ?keys
       ?rpc_external
+      ?dal_node
       tag
       ()
   in
