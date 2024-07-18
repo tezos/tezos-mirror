@@ -235,6 +235,42 @@ module S = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "delegated_balance")
+
+    let frozen_deposits =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; call RPC total_staked on the last block of \
+           (current_cycle - 3) instead. Returns the total amount (in mutez) \
+           that was staked for the baker by all stakers (including the baker \
+           itself) at the time the staking rights for the current cycle were \
+           computed."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "frozen_deposits")
+
+    let frozen_deposits_limit =
+      RPC_service.get_service
+        ~description:
+          "DEPRECATED; the frozen deposits limit has no effects since the \
+           activation of Adaptive Issuance and Staking during the Paris \
+           protocol."
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.option Tez.encoding)
+        RPC_path.(path / "frozen_deposits_limit")
+
+    let current_baking_power =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use baking_power instead."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int64
+        RPC_path.(path / "current_baking_power")
+
+    let delegated_contracts =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use delegators instead."
+        ~query:RPC_query.empty
+        ~output:(list Contract.encoding)
+        RPC_path.(path / "delegated_contracts")
   end
 
   let total_staked =
@@ -247,15 +283,6 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "total_staked")
-
-  let frozen_deposits =
-    RPC_service.get_service
-      ~description:
-        "Returns the amount (in mutez) frozen as a deposit at the time the \
-         staking rights for the current cycle were computed."
-      ~query:RPC_query.empty
-      ~output:Tez.encoding
-      RPC_path.(path / "frozen_deposits")
 
   let unstaked_frozen_deposits =
     RPC_service.get_service
@@ -283,22 +310,15 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "total_delegated")
 
-  let frozen_deposits_limit =
+  let delegators =
     RPC_service.get_service
       ~description:
-        "Returns the frozen deposits limit for the given delegate or none if \
-         no limit is set."
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Tez.encoding)
-      RPC_path.(path / "frozen_deposits_limit")
-
-  let delegated_contracts =
-    RPC_service.get_service
-      ~description:
-        "Returns the list of contracts that delegate to a given delegate."
+        "The list of all contracts that are currently delegating to the \
+         delegate. Includes both user accounts and smart contracts. Includes \
+         the delegate itself."
       ~query:RPC_query.empty
       ~output:(list Contract.encoding)
-      RPC_path.(path / "delegated_contracts")
+      RPC_path.(path / "delegators")
 
   let external_staked =
     RPC_service.get_service
@@ -371,16 +391,16 @@ module S = struct
       ~output:Data_encoding.int64
       RPC_path.(path / "voting_power")
 
-  let current_baking_power =
+  let baking_power =
     RPC_service.get_service
       ~description:
-        "The baking power of a delegate, as computed from its current stake. \
-         This value is not used for computing baking rights but only reflects \
-         the baking power that the delegate would have if the cycle ended at \
-         the current block."
+        "The current baking power of a delegate, using the current staked and \
+         delegated balances of the baker and its delegators. In other words, \
+         the baking rights that the baker would get for a future cycle if the \
+         current cycle ended right at the current block."
       ~query:RPC_query.empty
       ~output:Data_encoding.int64
-      RPC_path.(path / "current_baking_power")
+      RPC_path.(path / "baking_power")
 
   let voting_info =
     RPC_service.get_service
@@ -563,6 +583,17 @@ let f_external_delegated ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   external_delegated ctxt pkh
 
+let f_baking_power ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh
+
+let f_delegators ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  let*! contracts = Delegate.delegated_contracts ctxt pkh in
+  return contracts
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -612,7 +643,7 @@ let register () =
       Delegate.For_RPC.full_balance ctxt pkh) ;
   register1 ~chunked:false S.Deprecated.current_frozen_deposits f_total_staked ;
   register1 ~chunked:false S.total_staked f_total_staked ;
-  register1 ~chunked:false S.frozen_deposits (fun ctxt pkh () () ->
+  register1 ~chunked:false S.Deprecated.frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.initial_frozen_deposits ctxt pkh) ;
   register1 ~chunked:false S.unstaked_frozen_deposits (fun ctxt pkh () () ->
@@ -635,13 +666,14 @@ let register () =
   register1 ~chunked:false S.Deprecated.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.staking_balance ctxt pkh) ;
-  register1 ~chunked:false S.frozen_deposits_limit (fun ctxt pkh () () ->
+  register1
+    ~chunked:false
+    S.Deprecated.frozen_deposits_limit
+    (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.frozen_deposits_limit ctxt pkh) ;
-  register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      let*! contracts = Delegate.delegated_contracts ctxt pkh in
-      return contracts) ;
+  register1 ~chunked:true S.Deprecated.delegated_contracts f_delegators ;
+  register1 ~chunked:true S.delegators f_delegators ;
   register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
   register1 ~chunked:false S.external_staked f_external_staked ;
   register1 ~chunked:false S.external_delegated f_external_delegated ;
@@ -665,9 +697,8 @@ let register () =
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Vote.get_voting_power_free ctxt pkh) ;
-  register1 ~chunked:false S.current_baking_power (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh) ;
+  register1 ~chunked:false S.Deprecated.current_baking_power f_baking_power ;
+  register1 ~chunked:false S.baking_power f_baking_power ;
   register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Vote.get_delegate_info ctxt pkh) ;
@@ -719,7 +750,7 @@ let current_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.total_staked ctxt block pkh () ()
 
 let frozen_deposits ctxt block pkh =
-  RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()
+  RPC_context.make_call1 S.Deprecated.frozen_deposits ctxt block pkh () ()
 
 let unstaked_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
@@ -728,10 +759,10 @@ let staking_balance ctxt block pkh =
   RPC_context.make_call1 S.Deprecated.staking_balance ctxt block pkh () ()
 
 let frozen_deposits_limit ctxt block pkh =
-  RPC_context.make_call1 S.frozen_deposits_limit ctxt block pkh () ()
+  RPC_context.make_call1 S.Deprecated.frozen_deposits_limit ctxt block pkh () ()
 
 let delegated_contracts ctxt block pkh =
-  RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
+  RPC_context.make_call1 S.delegators ctxt block pkh () ()
 
 let total_delegated_stake ctxt block pkh =
   RPC_context.make_call1 S.external_staked ctxt block pkh () ()
@@ -752,7 +783,7 @@ let current_voting_power ctxt block pkh =
   RPC_context.make_call1 S.current_voting_power ctxt block pkh () ()
 
 let current_baking_power ctxt block pkh =
-  RPC_context.make_call1 S.current_baking_power ctxt block pkh () ()
+  RPC_context.make_call1 S.baking_power ctxt block pkh () ()
 
 let voting_info ctxt block pkh =
   RPC_context.make_call1 S.voting_info ctxt block pkh () ()
