@@ -554,6 +554,10 @@ let () =
   return status
 
 let () =
+  Local_directory.register1 Rollup_node_services.Local.injector_operation_status
+  @@ fun node_ctxt l1_hash () () -> injector_operation_status node_ctxt l1_hash
+
+let () =
   Admin_directory.register0 Rollup_node_services.Admin.injector_queues_total
   @@ fun _node_ctxt () () ->
   let open Lwt_result_syntax in
