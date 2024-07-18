@@ -4122,55 +4122,6 @@ module Delegates = struct
         RPC_path.(path / "min_delegated_in_current_cycle")
   end
 
-  let unstake_requests ctxt pkh =
-    let open Lwt_result_syntax in
-    let* result = Unstake_requests.prepare_finalize_unstake ctxt pkh in
-    match result with
-    | None -> return_none
-    | Some {finalizable; unfinalizable} ->
-        let* unfinalizable =
-          Unstake_requests.For_RPC
-          .apply_slash_to_unstaked_unfinalizable_stored_requests
-            ctxt
-            unfinalizable
-        in
-        return_some Unstake_requests.{finalizable; unfinalizable}
-
-  let delegated_balance ctxt pkh =
-    let open Lwt_result_syntax in
-    let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
-    let* unstake_requests = unstake_requests ctxt (Implicit pkh) in
-    let* unstake_requests_to_other_delegates =
-      match unstake_requests with
-      | None -> return Tez.zero
-      | Some {finalizable; unfinalizable} ->
-          let* finalizable_sum =
-            List.fold_left_es
-              (fun acc (delegate, _, (amount : Tez.t)) ->
-                if Signature.Public_key_hash.(delegate <> pkh) then
-                  Lwt.return Tez.(acc +? amount)
-                else return acc)
-              Tez.zero
-              finalizable
-          in
-          let* unfinalizable_sum =
-            if Signature.Public_key_hash.(unfinalizable.delegate <> pkh) then
-              List.fold_left_es
-                (fun acc (_, (amount : Tez.t)) ->
-                  Lwt.return Tez.(acc +? amount))
-                Tez.zero
-                unfinalizable.requests
-            else return Tez.zero
-          in
-          Lwt.return Tez.(finalizable_sum +? unfinalizable_sum)
-    in
-    let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
-    let*? self_staking_balance =
-      Tez.(full_balance -? unstake_requests_to_other_delegates)
-    in
-    let*? sum = Tez.(staking_balance -? self_staking_balance) in
-    return sum
-
   let info ctxt pkh =
     let open Lwt_result_syntax in
     let* () = check_delegate_registered ctxt pkh in
@@ -4180,7 +4131,9 @@ module Delegates = struct
     let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
     let* frozen_deposits_limit = Delegate.frozen_deposits_limit ctxt pkh in
     let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
-    let* delegated_balance = delegated_balance ctxt pkh in
+    let* delegated_balance =
+      Delegate_services.external_staked_and_delegated ctxt pkh
+    in
     let* min_delegated_in_current_cycle =
       Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh
     in
@@ -4233,7 +4186,7 @@ module Delegates = struct
       S.delegated_balance
       (fun ctxt pkh () () ->
         let* () = check_delegate_registered ctxt pkh in
-        delegated_balance ctxt pkh) ;
+        Delegate_services.external_staked_and_delegated ctxt pkh) ;
     Registration.register1
       ~chunked:false
       S.min_delegated_in_current_cycle
