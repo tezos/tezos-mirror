@@ -31,15 +31,6 @@
    Subject:      Test a simple contract origination and call
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "file:tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 let test_origination_call =
   Protocol.register_test
     ~__FILE__
