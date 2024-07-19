@@ -70,10 +70,10 @@ module Events = struct
          {operation_hash}"
       ~level:Info
       ~pp1:Tezos_crypto_dal.Cryptobox.Commitment.pp
-      ~pp3:Injector.Inj_operation.Id.pp
+      ~pp3:Injector_sigs.Id.pp
       ("slot_commitment", Tezos_crypto_dal.Cryptobox.Commitment.encoding)
       ("slot_index", Data_encoding.uint8)
-      ("operation_hash", Injector.Inj_operation.Id.encoding)
+      ("operation_hash", Injector_sigs.Id.encoding)
 
   let request_failed =
     declare_3
