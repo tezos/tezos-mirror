@@ -29,6 +29,8 @@
   `with_da_fees` is activated. Enabling incorrectly the feature of past
   kernels results in errors in simulation. (!14127)
 - Improves the error message in case of unknown block in RPCs. (!14150)
+- Produces an empty block in case the produced one will trigger a
+  kernel upgrade. (!14207)
 
 ### Experimental
 
