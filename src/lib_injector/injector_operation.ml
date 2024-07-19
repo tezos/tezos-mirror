@@ -27,22 +27,6 @@ open Injector_sigs
 
 module Make (O : PARAM_OPERATION) :
   INJECTOR_OPERATION with type operation = O.t = struct
-  module Id =
-    Tezos_crypto.Blake2B.Make
-      (Tezos_crypto.Base58)
-      (struct
-        let name = "injector_operation_hash"
-
-        let title = "An identifier (hash) for an operation in the injector"
-
-        let b58check_prefix = "\064\007\206" (* iop(53) *)
-
-        let size = None
-      end)
-
-  let () =
-    Tezos_crypto.Base58.check_encoded_prefix Id.b58check_encoding "iop" 53
-
   type operation = O.t
 
   type id = Id.t

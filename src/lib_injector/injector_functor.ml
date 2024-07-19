@@ -99,14 +99,11 @@ module Make (Parameters : PARAMETERS) = struct
 
   type injected_l1_op_content = {
     level : int32;
-    inj_ops : Inj_operation.Id.t list;
+    inj_ops : Id.t list;
     signer_pkh : Signature.public_key_hash;
   }
 
-  type included_l1_op_content = {
-    level : int32;
-    inj_ops : Inj_operation.Id.t list;
-  }
+  type included_l1_op_content = {level : int32; inj_ops : Id.t list}
 
   type status =
     | Pending of POperation.t
@@ -118,14 +115,14 @@ module Make (Parameters : PARAMETERS) = struct
       (struct
         let name = "operations_queue"
       end)
-      (Inj_operation.Id)
+      (Id)
       (struct
         include Inj_operation
 
         let persist o = Parameters.persist_operation o.operation
       end)
 
-  module Injected_operations = Inj_operation.Id.Table
+  module Injected_operations = Id.Table
   module Injected_ophs = Operation_hash.Table
 
   (** The part of the state which gathers information about injected
@@ -139,7 +136,7 @@ module Make (Parameters : PARAMETERS) = struct
             (i.e. an L1 operation). *)
   }
 
-  module Included_operations = Inj_operation.Id.Table
+  module Included_operations = Id.Table
   module Included_in_blocks = Block_hash.Table
 
   (** The part of the state which gathers information about

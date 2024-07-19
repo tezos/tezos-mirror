@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Id = Tezos_crypto.Hashed.Injector_operations_hash
+
 (** Defines the strategy for a worker. *)
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
@@ -97,9 +99,6 @@ end
 (** Internal representation of injector operations. *)
 module type INJECTOR_OPERATION = sig
   type operation
-
-  (** Hash with b58check encoding iop(53), for ids of injector operations *)
-  module Id : Tezos_crypto.Intfs.HASH
 
   (** Alias for L1 operations ids *)
   type id = Id.t
@@ -321,7 +320,7 @@ module type S = sig
 
   (** Add an operation as pending injection in the injector. It returns the id
       of the operation in the injector queue. *)
-  val add_pending_operation : operation -> Inj_operation.Id.t tzresult Lwt.t
+  val add_pending_operation : operation -> Id.t tzresult Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending
@@ -340,7 +339,7 @@ module type S = sig
   val running_worker_tags : unit -> tag list list
 
   (** The status of an operation in the injector. *)
-  val operation_status : Inj_operation.Id.t -> status option
+  val operation_status : Id.t -> status option
 
   (** Returns the total operations per worker queue and in total. This function
       is constant time excepted for the injectors iteration.  *)
