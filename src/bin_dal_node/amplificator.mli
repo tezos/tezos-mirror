@@ -17,7 +17,7 @@
 (** An amplificator process.  *)
 type t
 
-(** [try_amplification node_store commitment slot_id node_ctxt amplificator]
+(** [try_amplification node_ctxt commitment slot_id amplificator]
     triggers an amplification, ie the reconstruction and publication of a
     partial set of shards. It is called each time a new shard is received by an
     observer node, after being added to the shard store
@@ -37,10 +37,9 @@ type t
     main process of the DAL node but by the process provided in the
     [amplificator] argument. *)
 val try_amplification :
-  Store.t ->
+  Node_context.t ->
   Cryptobox.Commitment.t ->
   Types.slot_id ->
-  Node_context.t ->
   t option ->
   unit tzresult Lwt.t
 
@@ -48,6 +47,5 @@ val try_amplification :
 val make : unit -> t tzresult Lwt.t
 
 (** [init amplificator node_ctxt params] Initializes the amplificator [t] with
-    the current context and proto parameters *)
-val init :
-  t -> Node_context.t -> Dal_plugin.proto_parameters -> unit tzresult Lwt.t
+    the current context. *)
+val init : t -> Node_context.t -> unit tzresult Lwt.t

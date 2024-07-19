@@ -24,46 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A [ready_ctx] value contains globally needed informations for a running dal
-    node. It is available when both cryptobox is initialized and the plugin
-    for dal has been loaded.
-
-   A [ready_ctx] also has a field [shards_proofs_precomputation] that contains
-   the (costly) precomputation needed to get shard proofs.
-*)
-type ready_ctxt = {
-  cryptobox : Cryptobox.t;
-  proto_parameters : Dal_plugin.proto_parameters;
-  proto_plugins : Proto_plugins.t;
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  mutable ongoing_amplifications : Types.Slot_id.Set.t;
-      (** The slot identifiers of the commitments currently being
-     amplified. This set is used to prevent concurrent amplifications
-     of the same slot. *)
-  mutable slots_under_reconstruction :
-    (bytes, Errors.other) result Lwt.t Types.Slot_id.Map.t;
-      (** Promises kept in a map to avoid parallel reconstructions in
-     the [Slot_manager] module. *)
-}
-
-(** A promise that is fullfilled only when the status of the node evolves from
-    [Starting] to [Ready] state. *)
-type starting_status
-
-(** The status of the dal node *)
-type status = Ready of ready_ctxt | Starting of starting_status
-
-(** A [t] value contains both the status and the dal node configuration. It's
-    field are available through accessors *)
+(** A [t] value contains the needed informations for a running a DAL node. Its
+    fields are available through accessors. *)
 type t
 
-(** [init config store gs_worker transport_layer cctx crawler
-    last_processed_level_store] creates a [t] with a status set to [Starting]
-    using the given dal node configuration [config], node store [store],
-    gossipsub worker instance [gs_worker], transport layer instance
-    [transport_layer], and tezos node client context [cctx]. *)
+(** [init] creates a [t] value based on the given arguments. *)
 val init :
   Configuration_file.t ->
+  Cryptobox.t ->
+  Cryptobox.shards_proofs_precomputation option ->
+  Dal_plugin.proto_parameters ->
+  Proto_plugins.t ->
   Store.t ->
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
@@ -72,22 +43,6 @@ val init :
   Crawler.t ->
   Last_processed_level.t ->
   t
-
-(** Raised by [set_ready] when the status is already [Ready _] *)
-exception Status_already_ready
-
-(** [set_ready ctxt cryptobox shards_proofs_precomputation proto_parameters
-    proto_plugins] updates in place the status value to [Ready], and initializes
-    the inner [ready_ctxt] value with the given parameters.
-
-    @raise Status_already_ready when the status is already [Ready _] *)
-val set_ready :
-  t ->
-  Cryptobox.t ->
-  Cryptobox.shards_proofs_precomputation option ->
-  Dal_plugin.proto_parameters ->
-  Proto_plugins.t ->
-  unit tzresult Lwt.t
 
 (** Returns all the registered plugins *)
 val get_all_plugins : t -> (module Dal_plugin.T) list
@@ -122,20 +77,8 @@ val may_add_plugin :
 val may_reconstruct :
   reconstruct:(Types.slot_id -> (bytes, Errors.other) result Lwt.t) ->
   Types.slot_id ->
-  ready_ctxt ->
+  t ->
   (bytes, Errors.other) result Lwt.t
-
-type error += Node_not_ready
-
-(** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
-    propagates [Node_not_ready] if status is not ready yet. If called multiple
-    times, it replaces current values for [ready_ctxt] with new ones *)
-val get_ready : t -> ready_ctxt tzresult
-
-(** returns a promise that resolves when the ready state evolves from [Starting]
-    to [Ready]. The returned promise is already resolved if the node is already
-    in [Ready] state. *)
-val wait_for_ready_state : t -> unit Lwt.t
 
 (** [get_profile_ctxt ctxt] returns the profile context.  *)
 val get_profile_ctxt : t -> Profile_manager.t
@@ -151,8 +94,15 @@ val set_profile_ctxt : t -> ?save:bool -> Profile_manager.t -> unit Lwt.t
 (** [get_config ctxt] returns the dal node configuration *)
 val get_config : t -> Configuration_file.t
 
-(** [get_status ctxt] returns the dal node status *)
-val get_status : t -> status
+(** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
+val get_cryptobox : t -> Cryptobox.t
+
+(** [get_proto_parameters ctxt] returns the DAL node's current protocol parameters. *)
+val get_proto_parameters : t -> Dal_plugin.proto_parameters
+
+(** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
+val get_shards_proofs_precomputation :
+  t -> Cryptobox.shards_proofs_precomputation option
 
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.t
@@ -169,6 +119,10 @@ val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
+
+val get_ongoing_amplifications : t -> Types.Slot_id.Set.t
+
+val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
 
 (** [storage_period ctxt proto_parameters] returns for how many levels should
     the node store data about attested slots. This depends on the node's profile

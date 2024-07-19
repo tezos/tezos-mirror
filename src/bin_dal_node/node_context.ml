@@ -24,28 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-exception Status_already_ready
-
-type ready_ctxt = {
+type t = {
+  config : Configuration_file.t;
   cryptobox : Cryptobox.t;
-  proto_parameters : Dal_plugin.proto_parameters;
-  proto_plugins : Proto_plugins.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
+  proto_parameters : Dal_plugin.proto_parameters;
+  mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
     (bytes, Errors.other) result Lwt.t Types.Slot_id.Map.t;
-}
-
-type starting_status = {
-  started_promise : unit Lwt.t;
-  started_resolver : unit Lwt.u;
-}
-
-type status = Ready of ready_ctxt | Starting of starting_status
-
-type t = {
-  mutable status : status;
-  config : Configuration_file.t;
   store : Store.t;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
   neighbors_cctxts : Dal_node_client.cctxt list;
@@ -58,7 +45,8 @@ type t = {
   last_processed_level_store : Last_processed_level.t;
 }
 
-let init config store gs_worker transport_layer cctxt metrics_server crawler
+let init config cryptobox shards_proofs_precomputation proto_parameters
+    proto_plugins store gs_worker transport_layer cctxt metrics_server crawler
     last_processed_level_store =
   let neighbors_cctxts =
     List.map
@@ -69,10 +57,14 @@ let init config store gs_worker transport_layer cctxt metrics_server crawler
         Dal_node_client.make_unix_cctxt endpoint)
       config.Configuration_file.neighbors
   in
-  let started_promise, started_resolver = Lwt.task () in
   {
-    status = Starting {started_promise; started_resolver};
     config;
+    cryptobox;
+    shards_proofs_precomputation;
+    proto_parameters;
+    proto_plugins;
+    ongoing_amplifications = Types.Slot_id.Set.empty;
+    slots_under_reconstruction = Types.Slot_id.Map.empty;
     store;
     tezos_node_cctxt = cctxt;
     neighbors_cctxts;
@@ -85,53 +77,6 @@ let init config store gs_worker transport_layer cctxt metrics_server crawler
     crawler;
     last_processed_level_store;
   }
-
-type error += Node_not_ready
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.not.ready"
-    ~title:"DAL Node not ready"
-    ~description:"DAL node is starting. It's not ready to respond to RPCs."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "DAL node is starting. It's not ready to respond to RPCs.")
-    Data_encoding.(unit)
-    (function Node_not_ready -> Some () | _ -> None)
-    (fun () -> Node_not_ready)
-
-let get_ready ctxt =
-  let open Result_syntax in
-  match ctxt.status with
-  | Ready ctxt -> Ok ctxt
-  | Starting _ -> fail [Node_not_ready]
-
-let wait_for_ready_state ctxt =
-  let open Lwt_syntax in
-  match ctxt.status with
-  | Ready _ -> return_unit
-  | Starting s -> s.started_promise
-
-let set_ready ctxt cryptobox shards_proofs_precomputation proto_parameters
-    proto_plugins =
-  let open Lwt_result_syntax in
-  match ctxt.status with
-  | Starting starting_status ->
-      ctxt.status <-
-        Ready
-          {
-            proto_plugins;
-            cryptobox;
-            proto_parameters;
-            shards_proofs_precomputation;
-            ongoing_amplifications = Types.Slot_id.Set.empty;
-            slots_under_reconstruction = Types.Slot_id.Map.empty;
-          } ;
-      Lwt.wakeup starting_status.started_resolver () ;
-      return_unit
-  | Ready _ -> raise Status_already_ready
 
 let may_reconstruct ~reconstruct slot_id t =
   let open Lwt_result_syntax in
@@ -153,28 +98,20 @@ let may_reconstruct ~reconstruct slot_id t =
 
 let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
-  match ctxt.status with
-  | Starting _ -> return_unit
-  | Ready ready_ctxt ->
-      let* proto_plugins =
-        Proto_plugins.may_add
-          cctxt
-          ready_ctxt.proto_plugins
-          ~first_level:block_level
-          ~proto_level
-      in
-      ctxt.status <- Ready {ready_ctxt with proto_plugins} ;
-      return_unit
+  let* proto_plugins =
+    Proto_plugins.may_add
+      cctxt
+      ctxt.proto_plugins
+      ~first_level:block_level
+      ~proto_level
+  in
+  ctxt.proto_plugins <- proto_plugins ;
+  return_unit
 
 let get_plugin_for_level ctxt ~level =
-  let open Result_syntax in
-  let* ready_ctxt = get_ready ctxt in
-  Proto_plugins.get_plugin_for_level ready_ctxt.proto_plugins ~level
+  Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
 
-let get_all_plugins ctxt =
-  match ctxt.status with
-  | Starting _ -> []
-  | Ready {proto_plugins; _} -> Proto_plugins.to_list proto_plugins
+let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
@@ -220,7 +157,11 @@ let set_profile_ctxt ctxt ?(save = true) pctxt =
 
 let get_config ctxt = ctxt.config
 
-let get_status ctxt = ctxt.status
+let get_cryptobox ctxt = ctxt.cryptobox
+
+let get_proto_parameters ctxt = ctxt.proto_parameters
+
+let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 
 let get_last_processed_level_store ctxt = ctxt.last_processed_level_store
 
@@ -232,15 +173,19 @@ let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
+let get_ongoing_amplifications ctxt = ctxt.ongoing_amplifications
+
+let set_ongoing_amplifications ctxt ongoing_amplifications =
+  ctxt.ongoing_amplifications <- ongoing_amplifications
+
 let fetch_committee ctxt ~level =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
-      let*? ready_ctxt = get_ready ctxt in
       let*? (module Plugin) =
-        Proto_plugins.get_plugin_for_level ready_ctxt.proto_plugins ~level
+        Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
       in
       let+ committee = Plugin.get_committee cctxt ~level in
       Committee_cache.add cache ~level ~committee ;

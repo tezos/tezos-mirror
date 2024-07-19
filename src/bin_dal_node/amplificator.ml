@@ -86,19 +86,24 @@ let () =
     If the promise raises an exception, it is turned into an error
     using [Error_monad.fail_with_exn] and passed to the [on_error]
     handler after the release of the lock. *)
-let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id
-    ~on_error (f : unit -> unit tzresult Lwt.t) =
+let with_amplification_lock (ctxt : Node_context.t) slot_id ~on_error
+    (f : unit -> unit tzresult Lwt.t) =
   let open Lwt_result_syntax in
   let open Types.Slot_id.Set in
   let acquire_lock () =
-    ready_ctxt.ongoing_amplifications <-
-      add slot_id ready_ctxt.ongoing_amplifications
+    let ongoing_amplifications = Node_context.get_ongoing_amplifications ctxt in
+    Node_context.set_ongoing_amplifications
+      ctxt
+      (add slot_id ongoing_amplifications)
   in
   let release_lock () =
-    ready_ctxt.ongoing_amplifications <-
-      remove slot_id ready_ctxt.ongoing_amplifications
+    let ongoing_amplifications = Node_context.get_ongoing_amplifications ctxt in
+    Node_context.set_ongoing_amplifications
+      ctxt
+      (remove slot_id ongoing_amplifications)
   in
-  if mem slot_id ready_ctxt.ongoing_amplifications then return_unit
+  let ongoing_amplifications = Node_context.get_ongoing_amplifications ctxt in
+  if mem slot_id ongoing_amplifications then return_unit
   else
     let () = acquire_lock () in
     let () =
@@ -370,8 +375,10 @@ let make () =
   in
   return amplificator
 
-let init amplificator node_context proto_parameters =
+let init amplificator node_context =
   let open Lwt_result_syntax in
+  let proto_parameters = Node_context.get_proto_parameters node_context in
+
   (* Run a job enqueueing all shards calculation tasks *)
   let amplificator_query_sender_job =
     let*! r = query_sender_job amplificator in
@@ -489,16 +496,11 @@ let amplify node_store commitment (slot_id : Types.slot_id)
       in
       return_unit
 
-let try_amplification (node_store : Store.t) commitment
-    (slot_id : Types.slot_id) node_ctxt amplificator =
+let try_amplification node_ctxt commitment (slot_id : Types.slot_id)
+    amplificator =
   let open Lwt_result_syntax in
-  let*! () = Node_context.wait_for_ready_state node_ctxt in
-  match Node_context.get_status node_ctxt with
-  | Starting _ ->
-      (* The node is supposed to be ready thanks to [wait_for_ready_state]
-         above. *)
-      assert false
-  | Ready {shards_proofs_precomputation = None; _} ->
+  match Node_context.get_shards_proofs_precomputation node_ctxt with
+  | None ->
       (* The prover SRS is not loaded so we cannot reconstruct slots
          yet. *)
       let*! () =
@@ -508,10 +510,15 @@ let try_amplification (node_store : Store.t) commitment
             (slot_id.slot_level, slot_id.slot_index))
       in
       return_unit
-  | Ready ({cryptobox; proto_parameters; _} as ready_ctxt) ->
-      let dal_parameters = Cryptobox.parameters cryptobox in
-      let number_of_shards = dal_parameters.number_of_shards in
-      let redundancy_factor = dal_parameters.redundancy_factor in
+  | Some _ ->
+      let node_store = Node_context.get_store node_ctxt in
+      let proto_parameters = Node_context.get_proto_parameters node_ctxt in
+      let number_of_shards =
+        proto_parameters.cryptobox_parameters.number_of_shards
+      in
+      let redundancy_factor =
+        proto_parameters.cryptobox_parameters.redundancy_factor
+      in
       let number_of_needed_shards = number_of_shards / redundancy_factor in
       let* number_of_already_stored_shards =
         Store.Shards.count_values node_store.shards slot_id
@@ -526,7 +533,7 @@ let try_amplification (node_store : Store.t) commitment
       else
         (* We have enough shards to reconstruct the whole slot. *)
         with_amplification_lock
-          ready_ctxt
+          node_ctxt
           slot_id
           ~on_error:
             Event.(

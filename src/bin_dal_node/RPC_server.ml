@@ -27,14 +27,7 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-let call_handler1 ctxt handler =
-  handler (Node_context.get_store ctxt) |> Errors.to_option_tzresult
-
-let call_handler2 ctxt handler =
-  let open Lwt_result_syntax in
-  let*? ready_ctxt = Node_context.get_ready ctxt in
-  let store = Node_context.get_store ctxt in
-  handler store ready_ctxt |> Errors.to_option_tzresult
+let call_handler1 handler = handler () |> Errors.to_option_tzresult
 
 type error +=
   | Cryptobox_error of string * string
@@ -84,14 +77,9 @@ let () =
 
 module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
-    call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
+    call_handler1 (fun () ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_content
-          ~reconstruct_if_missing:true
-          ctxt
-          store
-          cryptobox
-          slot_id)
+        Slot_manager.get_slot_content ~reconstruct_if_missing:true ctxt slot_id)
 
   let commitment_proof_from_polynomial cryptobox polynomial =
     let open Result_syntax in
@@ -113,18 +101,17 @@ module Slots_handlers = struct
     | Ok proof -> return proof
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
-    call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
+    call_handler1 (fun () ->
         let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         let* content =
           Slot_manager.get_slot_content
             ~reconstruct_if_missing:true
             ctxt
-            store
-            cryptobox
             slot_id
         in
         let*! proof =
+          let cryptobox = Node_context.get_cryptobox ctxt in
           let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
           let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in
           return proof
@@ -144,11 +131,11 @@ module Slots_handlers = struct
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 
   let post_slot ctxt query slot =
-    call_handler2
-      ctxt
-      (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
-      ->
+    call_handler1 (fun () ->
         let open Lwt_result_syntax in
+        let store = Node_context.get_store ctxt in
+        let cryptobox = Node_context.get_cryptobox ctxt in
+        let proto_parameters = Node_context.get_proto_parameters ctxt in
         if
           not
             (Profile_manager.is_prover_profile
@@ -177,6 +164,9 @@ module Slots_handlers = struct
           let*? commitment_proof =
             commitment_proof_from_polynomial cryptobox polynomial
           in
+          let shards_proofs_precomputation =
+            Node_context.get_shards_proofs_precomputation ctxt
+          in
           let* () =
             Slot_manager.add_commitment_shards
               ~shards_proofs_precomputation
@@ -189,17 +179,16 @@ module Slots_handlers = struct
           return (commitment, commitment_proof))
 
   let get_slot_commitment ctxt slot_level slot_index () () =
-    call_handler2 ctxt (fun store ({cryptobox; _} as ctxt) ->
+    call_handler1 (fun () ->
         let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         let* content =
           Slot_manager.get_slot_content
             ~reconstruct_if_missing:true
             ctxt
-            store
-            cryptobox
             slot_id
         in
+        let cryptobox = Node_context.get_cryptobox ctxt in
         let*? polynomial =
           Slot_manager.polynomial_from_slot cryptobox content
         in
@@ -207,31 +196,29 @@ module Slots_handlers = struct
         return commitment)
 
   let get_slot_status ctxt slot_level slot_index () () =
-    call_handler1 ctxt (fun store ->
+    call_handler1 (fun () ->
+        let store = Node_context.get_store ctxt in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_status ~slot_id store)
 
   let get_slot_shard ctxt slot_level slot_index shard_index () () =
-    call_handler1 ctxt (fun node_store ->
+    call_handler1 (fun () ->
+        let store = Node_context.get_store ctxt in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_shard node_store slot_id shard_index)
+        Slot_manager.get_slot_shard store slot_id shard_index)
 
   let get_slot_pages ctxt slot_level slot_index () () =
-    call_handler2 ctxt (fun node_store ({cryptobox; _} as ctxt) ->
+    call_handler1 (fun () ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_pages
-          ~reconstruct_if_missing:true
-          cryptobox
-          ctxt
-          node_store
-          slot_id)
+        Slot_manager.get_slot_pages ~reconstruct_if_missing:true ctxt slot_id)
 end
 
 module Profile_handlers = struct
   let patch_profiles ctxt () operator_profiles =
     let open Lwt_result_syntax in
     let gs_worker = Node_context.get_gs_worker ctxt in
-    call_handler2 ctxt (fun _store {proto_parameters; _} ->
+    call_handler1 (fun () ->
+        let proto_parameters = Node_context.get_proto_parameters ctxt in
         match
           Profile_manager.add_operator_profiles
             (Node_context.get_profile_ctxt ctxt)
@@ -283,7 +270,8 @@ module Profile_handlers = struct
         let* flags = List.map_es are_shards_stored all_slot_indexes in
         return (Types.Attestable_slots {slots = flags; published_level})
     in
-    call_handler2 ctxt (fun store {proto_parameters; _} ->
+    call_handler1 (fun () ->
+        let store = Node_context.get_store ctxt in
         (* For retrieving the assigned shard indexes, we consider the committee
            at [attested_level - 1], because the (DAL) attestations in the blocks
            at level [attested_level] refer to the predecessor level. *)
@@ -296,6 +284,7 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
+        let proto_parameters = Node_context.get_proto_parameters ctxt in
         get_attestable_slots
           ~shard_indices
           store
