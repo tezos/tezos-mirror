@@ -5,7 +5,8 @@ Description: Your choice for the liquidity vote:
  continuing or restarting the subsidy, and "pass" to abstain.
  .
  This option is mandatory to start the baker.
-Type: string
+Type: select
+Choices: off, on, pass
 
 Template: octez-baker/baker-key
 Description: The baker key to associate to this baker:
@@ -19,8 +20,8 @@ Description: The protocol associated to the baker:
  For production bakers this is the protocol of mainnet. Upon activation
  both the baker for the active protocol and the next protocol must be running
  at the same time.
-Type: string
-Default: Proxford
+Type: select
+Choices: ${choices}
 
 Template: octez-baker/baker-next-protocol
 Description: The protocol associated to the baker:
@@ -30,4 +31,15 @@ Description: The protocol associated to the baker:
  .
  After activation you can re-configure the package to stop the baker for the
  old protocol and mark the freshly activated protocol as active.
-Type: string
+Type: select
+Choices: ${choices}
+
+Template: octez-baker/upgrade_note_current
+Type: note
+Description: Important upgrade information
+ This package has been upgraded to a new version. Please note that some changes
+ have been made that may affect your usage of the package. The configuration
+ of the package has been updated. If you did any customizations, please check
+ the configuration of the octez-baker
+ .
+ Please review the release notes for more information.

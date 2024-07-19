@@ -5,7 +5,6 @@ set -eu
 DEVEL=0
 
 packages() {
-  set -x
   # Build tezos as usual
   # shellcheck disable=SC1091
   . "$HOME/.cargo/env"

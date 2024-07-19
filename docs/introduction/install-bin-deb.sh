@@ -43,9 +43,12 @@ else
     if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
       distribution="${PREFIX}master/$distribution"
     else
-      echo "Cannot test for a protected branch that \
-        is not associated with a release tag or it's master"
-      exit 1
+      if [ -n "${CI_COMMIT_TAG}" ]; then
+        distribution="${CI_COMMIT_TAG}/$distribution"
+      else
+        echo "Cannot test a repository for a protected branch that is not associated to a tag or master"
+        exit 1
+      fi
     fi
   else
     # Not a release, not a protected branch
@@ -57,6 +60,9 @@ else
     fi
   fi
 fi
+
+# For the upgrade script in the CI, we do not want debconf to ask questions
+export DEBIAN_FRONTEND=noninteractive
 
 set -e
 set -x
