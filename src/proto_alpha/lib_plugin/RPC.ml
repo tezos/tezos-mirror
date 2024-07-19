@@ -3948,86 +3948,6 @@ module Validators = struct
       ()
 end
 
-module Delegates = struct
-  let check_delegate_registered ctxt pkh =
-    let open Lwt_result_syntax in
-    let*! result = Delegate.registered ctxt pkh in
-    if result then return_unit
-    else Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
-end
-
-module Staking = struct
-  let path =
-    RPC_path.(
-      open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
-
-  let stakers_encoding =
-    let open Data_encoding in
-    let staker_enconding =
-      obj2
-        (req "staker" Alpha_context.Contract.implicit_encoding)
-        (req "frozen_deposits" Tez.encoding)
-    in
-    list staker_enconding
-
-  module S = struct
-    let stakers =
-      RPC_service.get_service
-        ~description:
-          "Returns the list of accounts that stake to a given delegate \
-           together with their share of the frozen deposits."
-        ~query:RPC_query.empty
-        ~output:stakers_encoding
-        RPC_path.(path / "stakers")
-
-    let is_forbidden =
-      RPC_service.get_service
-        ~description:
-          "Returns true if the delegate is forbidden to participate in \
-           consensus."
-        ~query:RPC_query.empty
-        ~output:Data_encoding.bool
-        RPC_path.(path / "is_forbidden")
-  end
-
-  let contract_stake ctxt ~delegator_contract ~delegate =
-    let open Alpha_context in
-    let open Lwt_result_syntax in
-    let* staked_balance =
-      Staking_pseudotokens.For_RPC.staked_balance
-        ctxt
-        ~contract:delegator_contract
-        ~delegate
-    in
-    if not Tez.(staked_balance = zero) then
-      let delegator_pkh =
-        match delegator_contract with
-        | Contract.Implicit pkh -> pkh
-        | Contract.Originated _ -> assert false
-        (* Originated contracts cannot stake *)
-      in
-      return @@ Some (delegator_pkh, staked_balance)
-    else return_none
-
-  let register () =
-    let open Lwt_result_syntax in
-    Registration.register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
-        return @@ Delegate.is_forbidden_delegate ctxt pkh) ;
-    Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
-        let* () = Delegates.check_delegate_registered ctxt pkh in
-        let*! delegators = Delegate.delegated_contracts ctxt pkh in
-        List.filter_map_es
-          (fun delegator_contract ->
-            contract_stake ctxt ~delegator_contract ~delegate:pkh)
-          delegators)
-
-  let stakers ctxt block pkh =
-    RPC_context.make_call1 S.stakers ctxt block pkh () ()
-
-  let is_forbidden ctxt block pkh =
-    RPC_context.make_call1 S.is_forbidden ctxt block pkh () ()
-end
-
 let get_blocks_preservation_cycles ~get_context =
   let open Lwt_option_syntax in
   let constants_key = [Constants_repr.version; "constants"] in
@@ -4107,7 +4027,6 @@ let register () =
   Validators.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
-  Staking.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
       if q.offset < 0l then Environment.Error_monad.tzfail Negative_level_offset
       else
