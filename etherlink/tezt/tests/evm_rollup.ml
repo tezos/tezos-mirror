@@ -305,11 +305,20 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
-    ?restricted_rpcs ?enable_dal ?dal_slots protocol =
+    ?restricted_rpcs ?(enable_dal = false) ?dal_slots protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
+  let* dal_node =
+    if enable_dal then
+      let dal_node = Dal_node.create ~node () in
+      let* () = Dal_node.init_config ?producer_profiles:dal_slots dal_node in
+      let* () = Dal_node.run ~wait_ready:true dal_node in
+      some dal_node
+    else none
+  in
+  let client = Client.with_dal_node client ?dal_node in
   let* l1_contracts =
     match admin with
     | Some admin ->
@@ -367,7 +376,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
                sequencer_governance))
         ?maximum_allowed_ticks
         ~output:output_config
-        ?enable_dal
+        ~enable_dal
         ?dal_slots
         ()
     in
@@ -481,6 +490,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
           Constant.octez_evm_node;
           Constant.smart_rollup_installer;
         ]
+        @ (if enable_dal then [Constant.octez_dal_node] else [])
         @ additional_uses
       in
       Protocol.register_test

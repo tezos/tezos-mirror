@@ -186,6 +186,15 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
       ?timestamp:genesis_timestamp
       protocol
   in
+  let* dal_node =
+    if enable_dal then
+      let dal_node = Dal_node.create ~node () in
+      let* () = Dal_node.init_config ?producer_profiles:dal_slots dal_node in
+      let* () = Dal_node.run ~wait_ready:true dal_node in
+      some dal_node
+    else none
+  in
+  let client = Client.with_dal_node client ?dal_node in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -441,9 +450,10 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
     protocols =
   let additional_uses =
-    if threshold_encryption then
-      Constant.octez_dsn_node :: kernel :: additional_uses
-    else kernel :: additional_uses
+    (if threshold_encryption then [Constant.octez_dsn_node] else [])
+    @ [kernel]
+    @ (if enable_dal then [Constant.octez_dal_node] else [])
+    @ additional_uses
   in
   let body protocol =
     let* sequencer_setup =
