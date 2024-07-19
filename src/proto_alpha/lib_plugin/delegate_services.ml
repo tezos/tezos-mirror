@@ -216,10 +216,7 @@ module S = struct
 
     let total_delegated_stake =
       RPC_service.get_service
-        ~description:
-          "Returns the sum (in mutez) of all tokens staked by the delegators \
-           of a given delegate. This excludes the delegate's own staked \
-           tokens."
+        ~description:"DEPRECATED; use external_staked instead."
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "total_delegated_stake")
