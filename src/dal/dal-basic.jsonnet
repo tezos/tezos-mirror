@@ -53,9 +53,29 @@ dashboard.new(
   template.new(
     name='node_instance',
     datasource='Prometheus',
-    query='label_values(octez_version,' + std.extVar('node_instance_label') + ')',
+    query='label_values(dal_node_new_layer1_head,' + std.extVar('node_instance_label') + ')',
     refresh='load',
     label='Node instance'
+  )
+)
+
+.addTemplate(
+  template.new(
+    name='slot_index',
+    datasource='Prometheus',
+    query='label_values(dal_gs_count_peers_per_topic, slot_index)',
+    refresh='load',
+    label='Slot index'
+  )
+)
+
+.addTemplate(
+  template.new(
+    name='pkh',
+    datasource='Prometheus',
+    query='label_values(dal_gs_count_peers_per_topic, pkh)',
+    refresh='load',
+    label='Pkh'
   )
 )
 
