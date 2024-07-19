@@ -215,6 +215,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       ()
   in
   let* dal_node2 = start_dal_node node2 ~producer_profiles:[slot_index] () in
+  let client1 = Client.with_dal_node client1 ~dal_node:dal_node2 in
   let*! () = Client.reveal ~src:Constant.bootstrap2.alias client2 in
   let* () = Client.bake_for_and_wait client1 in
   Log.info
@@ -253,12 +254,8 @@ let test_produce_and_propagate_shards ~executors ~protocol =
             "Expected validated operations in mempool to be %L, got %R.") ;
       unit
     in
-    let dal_node_endpoint = Dal.Helpers.endpoint dal_node2 in
     Log.info "Bake one block to include the op, and two blocks to finalize it." ;
-    let* () =
-      Base.repeat 3 (fun () ->
-          Client.bake_for_and_wait client1 ~dal_node_endpoint)
-    in
+    let* () = Base.repeat 3 (fun () -> Client.bake_for_and_wait client1) in
     Log.info
       "Wait until node1 downloads [dal_parameters.cryptobox.number_of_shards] \
        shards. (i.e. the published slot is attestable by node1.)" ;
@@ -277,7 +274,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     Log.info "Bake several blocks to surpass the attestation lag." ;
     let* () =
       Base.repeat (dal_parameters.attestation_lag - 2) (fun () ->
-          Client.bake_for_and_wait client1 ~dal_node_endpoint)
+          Client.bake_for_and_wait client1)
     in
     Log.info "Assert that the attestation was indeed posted." ;
     let* {dal_attestation; _} =
