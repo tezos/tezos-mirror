@@ -753,18 +753,11 @@ let update_and_register_profiles ctxt =
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
   let proto_parameters = Node_context.get_proto_parameters ctxt in
-  let profile_ctxt_opt =
-    Profile_manager.add_profiles
-      Profile_manager.empty
-      proto_parameters
-      gs_worker
-      profile_ctxt
+  let profile_ctxt =
+    Profile_manager.register_profile profile_ctxt proto_parameters gs_worker
   in
-  match profile_ctxt_opt with
-  | None -> fail Errors.[Profile_incompatibility]
-  | Some profile_ctxt ->
-      let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
-      return_unit
+  let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
+  return_unit
 
 let get_proto_plugins cctxt profile_ctxt last_processed_level
     (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =

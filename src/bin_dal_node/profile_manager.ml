@@ -37,11 +37,6 @@ let random_observer = Types.Random_observer
 
 let operator operator_profile = Types.Operator operator_profile
 
-let is_empty = function
-  | Types.Bootstrap -> false
-  | Random_observer -> false
-  | Operator profile -> Operator_profile.is_empty profile
-
 let is_bootstrap_profile = function
   | Types.Bootstrap -> true
   | Random_observer | Operator _ -> false
@@ -66,8 +61,8 @@ let merge_profiles ~lower_prio ~higher_prio =
   | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
   | (Operator _ | Bootstrap), Random_observer -> Random_observer
 
-let add_operator_profiles t proto_parameters gs_worker
-    (operator_profiles : Operator_profile.t) =
+let add_and_register_operator_profile t proto_parameters gs_worker
+    (operator_profile : Operator_profile.t) =
   match t with
   | Types.Bootstrap -> None
   | Operator operator_sets ->
@@ -83,23 +78,46 @@ let add_operator_profiles t proto_parameters gs_worker
             (Operator_profile.merge
                ~on_new_attester
                operator_sets
-               operator_profiles))
+               operator_profile))
   | Random_observer ->
       Stdlib.failwith
-        "Profile_manager.add_operator_profiles: random observer should have a \
-         slot index assigned at this point"
+        "Profile_manager.add_and_register_operator_profile: random observer \
+         should have a slot index assigned at this point"
 
-let add_profiles t proto_parameters gs_worker = function
-  | Types.Bootstrap -> if is_empty t then Some Types.Bootstrap else None
-  | Random_observer ->
+let register_profile t proto_parameters gs_worker =
+  match t with
+  | Types.Bootstrap -> t
+  | Random_observer -> (
       let slot_index = Random.int proto_parameters.Dal_plugin.number_of_slots in
-      add_operator_profiles
-        t
-        proto_parameters
-        gs_worker
-        (Operator_profile.make ~observers:[slot_index] ())
-  | Operator operator_profiles ->
-      add_operator_profiles t proto_parameters gs_worker operator_profiles
+      let t_opt =
+        add_and_register_operator_profile
+          empty
+          proto_parameters
+          gs_worker
+          (Operator_profile.make ~observers:[slot_index] ())
+      in
+      match t_opt with
+      | Some t -> t
+      | None ->
+          (* unreachable*)
+          Stdlib.failwith
+            "Profile_manager.register_profile: unexpected profile \
+             incompatibility")
+  | Operator operator_profile -> (
+      let t_opt =
+        add_and_register_operator_profile
+          empty
+          proto_parameters
+          gs_worker
+          operator_profile
+      in
+      match t_opt with
+      | Some t -> t
+      | None ->
+          (* unreachable*)
+          Stdlib.failwith
+            "Profile_manager.register_profile: unexpected profile \
+             incompatibility")
 
 let validate_slot_indexes t ~number_of_slots =
   let open Result_syntax in
@@ -107,7 +125,7 @@ let validate_slot_indexes t ~number_of_slots =
   | Types.Bootstrap -> return_unit
   | Random_observer ->
       Stdlib.failwith
-        "Profile_manager.add_operator_profiles: random observer should have a \
+        "Profile_manager.validate_slot_indexes: random observer should have a \
          slot index assigned at this point"
   | Operator o -> (
       match Operator_profile.producer_slot_out_of_bounds number_of_slots o with
@@ -162,8 +180,8 @@ let get_profiles t =
   | Operator profiles -> Operator profiles
   | Random_observer ->
       Stdlib.failwith
-        "Profile_manager.add_operator_profiles: random observer should have a \
-         slot index assigned at this point"
+        "Profile_manager.get_profiles: random observer should have a slot \
+         index assigned at this point"
 
 let supports_refutations t =
   match get_profiles t with
