@@ -2458,8 +2458,8 @@ tezt:static-binaries:
       junit: $JUNIT
     when: always
 
-oc.install_python_focal:
-  image: public.ecr.aws/lts/ubuntu:20.04_stable
+oc.install_python_noble:
+  image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: doc
   tags:
   - gcp

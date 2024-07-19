@@ -41,7 +41,7 @@ let debian_package_release_matrix = function
 let ubuntu_package_release_matrix = function
   | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
   | Full | Release ->
-      [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [[("RELEASE", ["noble"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
 let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
@@ -219,8 +219,8 @@ let jobs pipeline_type =
              Artifacts job_build_ubuntu_package_current_a;
              Artifacts job_build_ubuntu_package_current_b;
            ])
-      ~image:Images.ubuntu_focal
-      ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
+      ~image:Images.ubuntu_noble
+      ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
   (* These jobs create the apt repository for the next packages *)
   let job_apt_repo_debian =
@@ -238,8 +238,8 @@ let jobs pipeline_type =
       ~name:"apt_repo_ubuntu"
       ~prefix:true
       ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
-      ~image:Images.ubuntu_focal
-      ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
+      ~image:Images.ubuntu_noble
+      ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
   (* These test the installability of the current packages *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
@@ -279,14 +279,14 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.lintian_ubuntu"
         ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
-        ~image:Images.ubuntu_focal
-        ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy focal"];
+        ~image:Images.ubuntu_noble
+        ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_ubuntu_focal"
+        ~name:"oc.install_bin_ubuntu_noble"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
-        ~image:Images.ubuntu_focal
-        ["./docs/introduction/install-bin-deb.sh ubuntu focal"];
+        ~image:Images.ubuntu_noble
+        ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_jammy"
