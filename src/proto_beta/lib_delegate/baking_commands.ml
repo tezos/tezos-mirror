@@ -25,6 +25,7 @@
 
 open Client_proto_args
 open Baking_errors
+module Events = Baking_events.Commands
 
 let pidfile_arg =
   let open Lwt_result_syntax in
@@ -44,6 +45,49 @@ let may_lock_pidfile pidfile_opt f =
           failwith "Failed to create the pidfile: %s" pidfile)
         ~filename:pidfile
         f
+
+let check_node_version cctxt check_node_version_bypass =
+  let open Lwt_result_syntax in
+  if check_node_version_bypass then
+    let*! () = Events.(emit node_version_check_bypass ()) in
+    return_unit
+  else
+    let baker_version = Tezos_version_value.Current_git_info.octez_version in
+    let (baker_commit_info
+          : Tezos_version.Octez_node_version.commit_info option) =
+      Some
+        {
+          commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+          commit_date = Tezos_version_value.Current_git_info.committer_date;
+        }
+    in
+    let* node_version = Version_services.version cctxt in
+    let*! () =
+      Events.(
+        emit
+          node_version_check
+          ( node_version.version,
+            node_version.commit_info,
+            baker_version,
+            baker_commit_info ))
+    in
+    match
+      Tezos_version.Octez_node_version.partially_compare
+        baker_version
+        baker_commit_info
+        node_version.version
+        node_version.commit_info
+    with
+    | Some r when r <= 0 -> return_unit
+    | _ ->
+        tzfail
+          (Node_version_incompatible
+             {
+               node_version = node_version.version;
+               node_commit_info = node_version.commit_info;
+               baker_version;
+               baker_commit_info;
+             })
 
 let http_headers_env_variable =
   "TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS"
@@ -197,6 +241,14 @@ let state_recorder_switch_arg =
          "If record-state flag is set, the baker saves all its internal \
           consensus state in the filesystem, otherwise just in memory."
        ())
+
+let node_version_check_bypass_arg =
+  Tezos_clic.switch
+    ~long:"node-version-check-bypass"
+    ~doc:
+      "If node-version-check-bypass flag is set, the baker will not check its \
+       compatibility with the version of the node to which it is connected."
+    ()
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -564,8 +616,9 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args13
+  Tezos_clic.args14
     pidfile_arg
+    node_version_check_bypass_arg
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
     minimal_nanotez_per_byte_arg
@@ -581,6 +634,7 @@ let baker_args =
 
 let run_baker
     ( pidfile,
+      check_node_version_bypass,
       minimal_fees,
       minimal_nanotez_per_gas_unit,
       minimal_nanotez_per_byte,
@@ -595,6 +649,7 @@ let run_baker
       pre_emptive_forge_time ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
+  let* () = check_node_version cctxt check_node_version_bypass in
   let*! per_block_vote_file =
     if per_block_vote_file = None then
       (* If the votes file was not explicitly given, we

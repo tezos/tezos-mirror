@@ -114,6 +114,11 @@ Baker
 - Remove ``preendorse for`` and ``endorse for`` deprecated commands from baker.
   (MR :gl:`!14096`)
 
+- By default, the Baker only accepts to communicate with nodes of the same or
+  more recent version. To allow the Baker to communicate with nodes of older
+  version or dev version, use the --node-version-check-bypass option. (MR
+  :gl:`!14044`)
+
 Accuser
 -------
 

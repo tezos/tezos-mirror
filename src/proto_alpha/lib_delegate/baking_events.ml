@@ -34,6 +34,45 @@ let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
 
 let waiting_color = Internal_event.Magenta
 
+module Commands = struct
+  include Internal_event.Simple
+
+  let section = section @ ["commands"]
+
+  let node_version_check_bypass =
+    declare_0
+      ~section
+      ~name:"node_version_check_bypass"
+      ~level:Warning
+      ~msg:"Compatibility between node version and baker version by passed"
+      ()
+
+  let node_version_check =
+    declare_4
+      ~section
+      ~name:"node_version_check"
+      ~level:Debug
+      ~msg:
+        "Checking compatibility between node version {node_version} \
+         ({node_commit}) and baker version {baker_version} ({baker_commit})"
+      ~pp1:Tezos_version.Version.pp_simple
+      ("node_version", Tezos_version.Octez_node_version.version_encoding)
+      ~pp2:
+        (Format.pp_print_option
+           Tezos_version.Octez_node_version.commit_info_pp_short)
+      ( "node_commit",
+        Data_encoding.option
+          Tezos_version.Octez_node_version.commit_info_encoding )
+      ~pp3:Tezos_version.Version.pp_simple
+      ("baker_version", Tezos_version.Octez_node_version.version_encoding)
+      ~pp4:
+        (Format.pp_print_option
+           Tezos_version.Octez_node_version.commit_info_pp_short)
+      ( "baker_commit",
+        Data_encoding.option
+          Tezos_version.Octez_node_version.commit_info_encoding )
+end
+
 module State_transitions = struct
   include Internal_event.Simple
 

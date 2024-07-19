@@ -2191,10 +2191,10 @@ let _etherlink_print_version_exe =
 
 let _octez_version_tests =
   tezt
-    ["test_parser"]
+    ["test_parser"; "test_octez_node_version"]
     ~path:"src/lib_version/test"
     ~opam:"octez-libs"
-    ~deps:[octez_version |> open_; octez_version_parser]
+    ~deps:[octez_version |> open_; octez_version_parser; qcheck_tezt]
 
 let octez_p2p_services =
   octez_lib
