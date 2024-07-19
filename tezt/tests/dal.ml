@@ -7216,7 +7216,7 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
     sc_rollup_address node client _pvm_name =
   let client = Client.with_dal_node client ~dal_node in
   let* () = Sc_rollup_node.run sc_node sc_rollup_address [] in
-  let* () =
+  let* _id =
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_local_dal_injection
          ~slot_content:"Hello DAL from a Smart Rollup"

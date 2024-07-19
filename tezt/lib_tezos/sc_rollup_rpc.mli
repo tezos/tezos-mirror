@@ -169,9 +169,10 @@ val post_local_batcher_injection :
   ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
 
 (** RPC: [POST local/dal/injection] injects the given DAL [slot_content] at
-    [slot_index] in the rollup node's DAL queue. *)
+    [slot_index] in the rollup node's DAL queue. Returns an id of the
+    injected DAL slot. *)
 val post_local_dal_injection :
-  slot_content:string -> slot_index:int -> unit RPC_core.t
+  slot_content:string -> slot_index:int -> string RPC_core.t
 
 type outbox_proof = {commitment_hash : string; proof : string}
 

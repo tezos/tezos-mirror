@@ -25,7 +25,7 @@ module Dal_worker_types = struct
           slot_content : string;
           slot_index : int;
         }
-          -> (unit, error trace) t
+          -> (Injector_sigs.Id.t, error trace) t
 
     type view = View : _ t -> view
 
@@ -133,9 +133,10 @@ let inject_slot state ~slot_content ~slot_index =
         return op.id
   in
   let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
-  return_unit
+  return l1_hash
 
-let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
+let on_register state ~slot_content ~slot_index :
+    Injector_sigs.Id.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let number_of_slots =
     (Reference.get state.node_ctxt.current_protocol).constants.dal

@@ -251,10 +251,7 @@ let post_local_dal_injection ~slot_content ~slot_index =
         ("slot_index", `Float (float_of_int slot_index));
       ]
   in
-  make POST ["local"; "dal"; "injection"] ~data:(Data data) (fun json ->
-      match JSON.as_object json with
-      | [] -> ()
-      | _ -> JSON.error json "Not an empty object")
+  make POST ["local"; "dal"; "injection"] ~data:(Data data) JSON.as_string
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
