@@ -48,10 +48,24 @@ module S = struct
   let balance =
     RPC_service.get_service
       ~description:
-        "Access the spendable balance of a contract, excluding frozen bonds."
+        "The spendable balance of a contract (in mutez), also known as liquid \
+         balance. Corresponds to tez owned by the contract that are neither \
+         staked, nor in unstaked requests, nor in frozen bonds. Identical to \
+         the 'spendable' RPC."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "balance")
+
+  let spendable =
+    RPC_service.get_service
+      ~description:
+        "The spendable balance of a contract (in mutez), also known as liquid \
+         balance. Corresponds to tez owned by the contract that are neither \
+         staked, nor in unstaked requests, nor in frozen bonds. Identical to \
+         the 'balance' RPC."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "spendable")
 
   let frozen_bonds =
     RPC_service.get_service
@@ -63,12 +77,24 @@ module S = struct
   let balance_and_frozen_bonds =
     RPC_service.get_service
       ~description:
-        "Access the sum of the spendable balance and frozen bonds of a \
-         contract. This sum is part of the contract's stake, and it is exactly \
-         the contract's stake if the contract is not a delegate."
+        "The sum (in mutez) of the spendable balance and frozen bonds of a \
+         contract. Corresponds to the contract's full balance from which \
+         staked funds and unstake requests have been excluded. Identical to \
+         the 'spendable_and_frozen_bonds' RPC."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "balance_and_frozen_bonds")
+
+  let spendable_and_frozen_bonds =
+    RPC_service.get_service
+      ~description:
+        "The sum (in mutez) of the spendable balance and frozen bonds of a \
+         contract. Corresponds to the contract's full balance from which \
+         staked funds and unstake requests have been excluded. Identical to \
+         the 'balance_and_frozen_bonds' RPC."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "spendable_and_frozen_bonds")
 
   let staked_balance =
     RPC_service.get_service
@@ -126,8 +152,10 @@ module S = struct
   let full_balance =
     RPC_service.get_service
       ~description:
-        "Access the full balance of a contract, including frozen bonds and \
-         stake."
+        "The full balance (in mutez) of the contract. Includes its spendable \
+         balance, staked tez, unstake requests, and frozen bonds. Even if the \
+         contract is a delegate, it does not include any staked or delegated \
+         tez owned by external delegators."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "full_balance")
@@ -466,10 +494,15 @@ let register () =
         List.rev rev_values
   in
   register_field ~chunked:false S.balance Contract.get_balance ;
+  register_field ~chunked:false S.spendable Contract.get_balance ;
   register_field ~chunked:false S.frozen_bonds Contract.get_frozen_bonds ;
   register_field
     ~chunked:false
     S.balance_and_frozen_bonds
+    Contract.get_balance_and_frozen_bonds ;
+  register_field
+    ~chunked:false
+    S.spendable_and_frozen_bonds
     Contract.get_balance_and_frozen_bonds ;
   register_field
     ~chunked:false

@@ -230,7 +230,13 @@ module Contract : sig
   val unstaked_finalizable_balance :
     t -> Contract.t -> Tez.t option tzresult Lwt.t
 
-  val full_balance : t -> Contract.t -> Tez.t tzresult Lwt.t
+  (** Calls
+      [/chains/<chain_id>/blocks/<block_id>/contracts/<contract_id>/full_balance].
+
+      If the contract is a delegate, also calls
+      [/chains/<chain_id>/blocks/<block_id>/delegates/<contract_pkh>/own_full_balance]
+      and checks that both RPCs return the same value. *)
+  val full_balance : ?__LOC__:string -> t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val staking_numerator : t -> Contract.t -> Z.t tzresult Lwt.t
 
@@ -275,7 +281,14 @@ module Delegate : sig
 
   val info : t -> public_key_hash -> Plugin.RPC.Delegates.info tzresult Lwt.t
 
-  val full_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
+  (** Calls RPCs
+      [/chains/<chain_id>/blocks/<blocsk_id>/contracts/<Implicit
+      pkh>/full_balance] and
+      [/chains/<chain_id>/blocks/<block_id>/delegates/<pkh>/own_full_balance],
+      checks that both RPCs output the same value, then returns this
+      value. *)
+  val full_balance :
+    ?__LOC__:string -> t -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val current_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
 

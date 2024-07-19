@@ -402,6 +402,40 @@ module Vote = struct
   }
 end
 
+(** Retrieves the contract's full balance.
+
+    Calls both RPCs
+    [../<block_id>/contracts/<contract_id>/full_balance] and
+    [../<block_id>/delegates/<pkh>/own_full_balance], and checks that
+    they return the same value.
+
+    Expected to be called only when [pkh] is a delegate, although it
+    would actually work for a non-delegate [pkh] too. *)
+let get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh =
+  let open Lwt_result_syntax in
+  let* contract_full_balance =
+    Contract_services.full_balance rpc_ctxt ctxt (Implicit pkh)
+  in
+  let* delegate_own_full_balance =
+    Delegate_services.full_balance rpc_ctxt ctxt pkh
+  in
+  (* We use {!Tezt.Check.( = )} rather than {!Assert.equal_tez} to
+     raise an exception rather than return an error if the equality is
+     not satisfied, because it's a universal invariant. With
+     {!Assert.equal_tez}, tests that expect a failure for another
+     reason might succeed if they don't check the error
+     properly. Moreover, this lets us use a more specific error
+     message. *)
+  Tezt.Check.(
+    (contract_full_balance = delegate_own_full_balance)
+      ~__LOC__
+      (equalable Tez.pp Tez.equal)
+      ~error_msg:
+        "Broken RPC invariant:\n\
+         ../contracts/<contract_id>/full_balance returned %L\n\
+         ../delegates/<pkh>/own_full_balance") ;
+  return delegate_own_full_balance
+
 module Contract = struct
   let pp = Alpha_context.Contract.pp
 
@@ -428,9 +462,6 @@ module Contract = struct
 
   let unstaked_finalizable_balance ctxt contract =
     Alpha_services.Contract.unstaked_finalizable_balance rpc_ctxt ctxt contract
-
-  let full_balance ctxt contract =
-    Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
 
   let staking_numerator ctxt contract =
     let open Lwt_result_syntax in
@@ -462,6 +493,16 @@ module Contract = struct
 
   let delegate_opt ctxt contract =
     Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
+
+  let full_balance ?(__LOC__ = __LOC__) ctxt contract =
+    let open Lwt_result_syntax in
+    let* delegate_opt = delegate_opt ctxt contract in
+    match (contract, delegate_opt) with
+    | Contract.Implicit pkh, Some pkh'
+      when Signature.Public_key_hash.equal pkh pkh' ->
+        (* Contract is a delegate. *)
+        get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh
+    | _ -> Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
 
   let storage ctxt contract =
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
@@ -508,7 +549,8 @@ module Delegate = struct
 
   let info ctxt pkh = Plugin.RPC.Delegates.info rpc_ctxt ctxt pkh
 
-  let full_balance ctxt pkh = Delegate_services.full_balance rpc_ctxt ctxt pkh
+  let full_balance ?(__LOC__ = __LOC__) ctxt pkh =
+    get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh
 
   let current_frozen_deposits ctxt pkh =
     Delegate_services.current_frozen_deposits rpc_ctxt ctxt pkh

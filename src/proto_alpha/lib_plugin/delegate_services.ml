@@ -189,18 +189,15 @@ module S = struct
 
   let path = RPC_path.(raw_path /: Signature.Public_key_hash.rpc_arg)
 
-  let full_balance =
-    RPC_service.get_service
-      ~description:
-        "Returns the full balance (in mutez) of a given delegate, including \
-         the frozen deposits and the frozen bonds. It does not include its \
-         delegated balance."
-      ~query:RPC_query.empty
-      ~output:Tez.encoding
-      RPC_path.(path / "full_balance")
-
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7383 *)
   module Deprecated = struct
+    let full_balance =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use own_full_balance instead."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "full_balance")
+
     let current_frozen_deposits =
       RPC_service.get_service
         ~description:"DEPRECATED; use total_staked instead."
@@ -272,6 +269,19 @@ module S = struct
         ~output:(list Contract.encoding)
         RPC_path.(path / "delegated_contracts")
   end
+
+  let own_full_balance =
+    RPC_service.get_service
+      ~description:
+        "The full balance (in mutez) of tokens owned by the delegate itself. \
+         Includes its spendable balance, staked tez, unstake requests, and \
+         frozen bonds. Does not include any tokens owned by external \
+         delegators. This RPC fails when the pkh is not a delegate. When it is \
+         a delegate, this RPC outputs the same amount as \
+         ../<block_id>/context/contracts/<delegate_contract_id>/full_balance."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "own_full_balance")
 
   let total_staked =
     RPC_service.get_service
@@ -485,6 +495,13 @@ let check_delegate_registered ctxt pkh =
   | true -> return_unit
   | false -> tzfail (Not_registered pkh)
 
+let f_own_full_balance ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () =
+    trace (Balance_rpc_non_delegate pkh) (check_delegate_registered ctxt pkh)
+  in
+  Delegate.For_RPC.full_balance ctxt pkh
+
 let total_staked ctxt pkh = Delegate.current_frozen_deposits ctxt pkh
 
 let f_total_staked ctxt pkh () () =
@@ -634,13 +651,8 @@ let register () =
       | {with_minimal_stake = true; without_minimal_stake = true; _}
       | {with_minimal_stake = false; without_minimal_stake = false; _} ->
           return delegates) ;
-  register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
-      let* () =
-        trace
-          (Balance_rpc_non_delegate pkh)
-          (check_delegate_registered ctxt pkh)
-      in
-      Delegate.For_RPC.full_balance ctxt pkh) ;
+  register1 ~chunked:false S.Deprecated.full_balance f_own_full_balance ;
+  register1 ~chunked:false S.own_full_balance f_own_full_balance ;
   register1 ~chunked:false S.Deprecated.current_frozen_deposits f_total_staked ;
   register1 ~chunked:false S.total_staked f_total_staked ;
   register1 ~chunked:false S.Deprecated.frozen_deposits (fun ctxt pkh () () ->
@@ -744,7 +756,7 @@ let list ctxt block ?(active = true) ?(inactive = false)
     ()
 
 let full_balance ctxt block pkh =
-  RPC_context.make_call1 S.full_balance ctxt block pkh () ()
+  RPC_context.make_call1 S.own_full_balance ctxt block pkh () ()
 
 let current_frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.total_staked ctxt block pkh () ()
