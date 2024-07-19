@@ -27,7 +27,8 @@
   instead of "the pattern matching is not exhaustive" one. (!13960)
 - Simulation uses the `/evm/storage_version` to determine if the feature
   `with_da_fees` is activated. Enabling incorrectly the feature of past
-  kernels results in errors in simulation.
+  kernels results in errors in simulation. (!14127)
+- Improves the error message in case of unknown block in RPCs. (!14150)
 
 ### Experimental
 
@@ -39,6 +40,7 @@
 - The simulation can be called by not taking into account DA fees in the gas
   computation. (!13729)
 - Simulation supports mainnet after the security upgrade. (!14006)
+
 
 ## Version for ec7c3b349624896b269e179384d0a45cf39e1145
 

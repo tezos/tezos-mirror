@@ -58,8 +58,6 @@ module Make (Reader : READER) = struct
 
   exception Invalid_block_structure of string
 
-  exception Invalid_block_index of Z.t
-
   let block_number n =
     let open Lwt_result_syntax in
     match n with
@@ -169,7 +167,7 @@ module Make (Reader : READER) = struct
         decode_block_hash
     in
     match block_hash_opt with
-    | None -> raise @@ Invalid_block_index level
+    | None -> failwith "Unknown block %a" Z.pp_print level
     | Some block_hash -> (
         let* block_opt =
           inspect_durable_and_decode_opt

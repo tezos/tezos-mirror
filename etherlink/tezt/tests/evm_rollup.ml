@@ -6295,10 +6295,7 @@ let test_rpc_feeHistory_future =
   in
   let*@? error = Rpc.fee_history "0x02" "0xFFFFFFFF" evm_setup.evm_node in
   Check.(
-    ((error.message
-    = "Evm_node_lib_dev.Durable_storage.Make(Reader).Invalid_block_index(4294967295)"
-     )
-       string)
+    (error.message =~ rex "Unknown block 4294967295")
       ~error_msg:"The transaction should fail with message %R, got &L") ;
   unit
 
