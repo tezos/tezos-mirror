@@ -133,6 +133,7 @@ val create :
   ?base_dir:string ->
   ?endpoint:endpoint ->
   ?media_type:media_type ->
+  ?dal_node:Dal_node.t ->
   unit ->
   t
 
@@ -144,6 +145,7 @@ val create_with_mode :
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
+  ?dal_node:Dal_node.t ->
   mode ->
   t
 
@@ -155,6 +157,13 @@ val get_mode : t -> mode
     we wanna keep a client's wallet. This is impossible if we created
     a new client from scratch. *)
 val set_mode : mode -> t -> unit
+
+(** Get a client's Dal node. *)
+val get_dal_node : t -> Dal_node.t option
+
+(** [with_dal_node t dal_node] returns the client [t] with its
+    Dal node updated to [dal_node]. *)
+val with_dal_node : ?dal_node:Dal_node.t -> t -> t
 
 (** Write the [--sources] file used by the light mode. *)
 val write_sources_file :
@@ -2484,6 +2493,7 @@ val init_with_node :
   ?nodes_args:Node.argument list ->
   ?keys:Account.key list ->
   ?rpc_external:bool ->
+  ?dal_node:Dal_node.t ->
   [`Client | `Light | `Proxy] ->
   unit ->
   (Node.t * t) Lwt.t
@@ -2519,6 +2529,7 @@ val init_with_protocol :
   ?timestamp:timestamp ->
   ?keys:Account.key list ->
   ?rpc_external:bool ->
+  ?dal_node:Dal_node.t ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
@@ -2559,6 +2570,7 @@ val init_light :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
+  ?dal_node:Dal_node.t ->
   unit ->
   (t * Node.t * Node.t) Lwt.t
 
