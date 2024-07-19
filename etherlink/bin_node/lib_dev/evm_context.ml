@@ -1148,9 +1148,10 @@ module State = struct
     in
 
     let config = pvm_config ctxt in
-    let rec go ~current_block_number evm_state tezos_level =
+    let rec go ~count_progress ~current_block_number evm_state tezos_level =
       if tezos_level > finalized_level then return_unit
       else
+        let*! () = count_progress 1 in
         let* messages = messages_of_level tezos_level in
         (* For now we use the mocked sol, ipl and eol of the debugger. *)
         let messages =
@@ -1193,7 +1194,11 @@ module State = struct
             (* Otherwise just move to the next tezos level. *)
             return (current_block_number, evm_state)
         in
-        go ~current_block_number evm_state (Int32.succ tezos_level)
+        go
+          ~count_progress
+          ~current_block_number
+          evm_state
+          (Int32.succ tezos_level)
     in
     (* Create a fresh evm state where the blocks will be applied one by one. *)
     let* fresh_evm_state =
@@ -1212,7 +1217,14 @@ module State = struct
     let*! evm_state =
       Evm_state.modify ~key:"/__at_most_one_block" ~value:"" evm_state
     in
-    go ~current_block_number:Z.(pred zero) evm_state first_level
+    let total =
+      Int32.sub finalized_level first_level |> Int32.to_int |> Int.succ
+    in
+    let progress_bar =
+      Progress_bar.progress_bar ~counter:`Int ~message:"Reconstructing" total
+    in
+    Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
+    go ~count_progress ~current_block_number:Z.(pred zero) evm_state first_level
 
   let wasm_pvm_version (ctxt : t) =
     let open Lwt_result_syntax in
