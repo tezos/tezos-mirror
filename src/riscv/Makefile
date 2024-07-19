@@ -32,7 +32,6 @@ riscv-dummy.elf::
 	@make -C dummy_kernel build
 	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
 
-
 # Update checked-in binaries
 .PHONY: update-assets
 update-assets: assets/riscv-dummy.elf
