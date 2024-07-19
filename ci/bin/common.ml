@@ -19,6 +19,13 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+(* types for the debian repository pipelines.
+   - Release: we run all the release jobs, but no tests
+   - Partial: we run only a subset of the tests jobs
+   - Full: we run the complete test matrix
+*)
+type debian_repository_pipeline = Full | Partial | Release
+
 (* Encodes the conditional [before_merging] pipeline and its
    unconditional variant [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test
@@ -853,20 +860,18 @@ let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
     ~ci_docker_hub
     ["./scripts/ci/docker_promote_to_latest.sh"]
 
-type bin_package_target = Dpkg | Rpm
+type bin_package_target = Rpm
 
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
 let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ?(stage = Stages.build) ~arch ~target () : tezos_job =
   let arch_string = arch_to_string_alt arch in
-  let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
+  let target_string = match target with Rpm -> "rpm" in
   let image = bin_package_image in
   let parallel =
     let distributions =
-      match target with
-      | Dpkg -> ["debian:bookworm"; "ubuntu:focal"; "ubuntu:jammy"]
-      | Rpm -> ["fedora:39"; "rockylinux:9.3"]
+      match target with Rpm -> ["fedora:39"; "rockylinux:9.3"]
     in
     Matrix [[("DISTRIBUTION", distributions)]]
   in
@@ -881,7 +886,6 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     before_script
       ~source_version:true
       (match target with
-      | Dpkg -> ["./scripts/ci/bin_packages_deb_dependencies.sh"]
       | Rpm -> ["./scripts/ci/bin_packages_rpm_dependencies.sh"])
   in
   job
@@ -920,14 +924,6 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "mv octez-*.* packages/$DISTRO/$RELEASE/";
     ]
   |> enable_networked_cargo
-
-let job_build_dpkg_amd64 : unit -> tezos_job =
-  job_build_bin_package
-    ~__POS__
-    ~name:"oc.build:dpkg:amd64"
-    ~target:Dpkg
-    ~arch:Amd64
-    ~dependencies:(Dependent [])
 
 let job_build_rpm_amd64 : unit -> tezos_job =
   job_build_bin_package

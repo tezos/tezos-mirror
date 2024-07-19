@@ -26,7 +26,7 @@ oc.docker-build-debian-dependencies:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.6
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   parallel:
     matrix:
@@ -42,12 +42,14 @@ oc.build-debian:
   stage: build
   tags:
   - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh
   variables:
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:
@@ -66,12 +68,14 @@ oc.build-debian-current:
   stage: build
   tags:
   - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh
   variables:
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:
@@ -103,17 +107,6 @@ apt_repo_debian_current:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
-oc.install_bin_debian_bookworm:
-  image: debian:bookworm
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian_current
-  dependencies: []
-  script:
-  - ./docs/introduction/install-bin-deb.sh debian bookworm
-
 oc.docker-build-ubuntu-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
@@ -128,7 +121,7 @@ oc.docker-build-ubuntu-dependencies:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.6
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   parallel:
     matrix:
@@ -144,12 +137,14 @@ oc.build-ubuntu:
   stage: build
   tags:
   - $TAGS
+  needs:
+  - oc.docker-build-ubuntu-dependencies
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh
   variables:
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   artifacts:
     paths:
@@ -168,12 +163,14 @@ oc.build-ubuntu-current:
   stage: build
   tags:
   - $TAGS
+  needs:
+  - oc.docker-build-ubuntu-dependencies
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh
   variables:
-    DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   artifacts:
     paths:
@@ -204,6 +201,17 @@ apt_repo_ubuntu_current:
   variables:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+oc.install_bin_debian_bookworm:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian_current
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
 
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable

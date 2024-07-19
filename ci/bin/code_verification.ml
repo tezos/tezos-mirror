@@ -315,16 +315,6 @@ let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
 
-let debian_repository_child_pipeline pipeline_type =
-  let pipeline_name =
-    match pipeline_type with
-    | Before_merging -> "debian_repository"
-    | Schedule_extended_test -> "debian_repository_scheduled"
-  in
-  Pipeline.register_child
-    pipeline_name
-    ~jobs:(Debian_repository.jobs pipeline_type)
-
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -669,9 +659,8 @@ let jobs pipeline_type =
     let bin_packages_jobs =
       match pipeline_type with
       | Schedule_extended_test ->
-          let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
           let job_build_rpm_amd64 = job_build_rpm_amd64 () in
-          [job_build_dpkg_amd64; job_build_rpm_amd64]
+          [job_build_rpm_amd64]
       | Before_merging -> []
     in
     let job_ocaml_check : tezos_job =
@@ -1845,15 +1834,22 @@ let jobs pipeline_type =
 
   (*Manual jobs *)
   let manual =
-    (* Debian packages are always built on scheduled pipelines, and
-       can be built manually on the [Before_merging] pipelines. *)
+    (* On scheduled pipelines we build and test the full test matrix.
+       On [Before_merging] pipelines only a subset of the packages are built
+       and tested *)
     let job_debian_repository_trigger : tezos_job =
+      let debian_pipeline_type =
+        match pipeline_type with
+        | Before_merging -> Partial
+        | Schedule_extended_test -> Full
+      in
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
-        (debian_repository_child_pipeline pipeline_type)
+        (Debian_repository.debian_repository_child_pipeline
+           debian_pipeline_type)
     in
     match pipeline_type with
     | Before_merging ->
@@ -1881,17 +1877,6 @@ let jobs pipeline_type =
             ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
-        let job_build_dpkg_amd64_manual =
-          job_build_bin_package
-            ~__POS__
-            ~name:"oc.build:dpkg:amd64"
-            ~target:Dpkg
-            ~arch:Tezos_ci.Amd64
-            ~rules:(make_rules ~manual:Yes ())
-            ~dependencies:(Dependent [])
-            ~stage:Stages.manual
-            ()
-        in
         let job_build_rpm_amd64_manual =
           job_build_bin_package
             ~__POS__
@@ -1915,7 +1900,6 @@ let jobs pipeline_type =
         [
           job_docker_amd64_test_manual;
           job_docker_arm64_test_manual;
-          job_build_dpkg_amd64_manual;
           job_build_rpm_amd64_manual;
           job_build_homebrew_manual;
           job_debian_repository_trigger;

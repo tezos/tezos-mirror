@@ -4,6 +4,7 @@
 stages:
 - images
 - build
+- publishing
 - prepare_release
 - publish_release_gitlab
 
@@ -153,51 +154,6 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
 
-oc.build:dpkg:amd64:
-  image: $DISTRIBUTION
-  stage: build
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  before_script:
-  - . ./scripts/version.sh
-  - ./scripts/ci/bin_packages_deb_dependencies.sh
-  script:
-  - wget https://sh.rustup.rs/rustup-init.sh
-  - chmod +x rustup-init.sh
-  - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version
-    -y
-  - . $HOME/.cargo/env
-  - export OPAMYES="true"
-  - opam init --bare --disable-sandboxing
-  - make build-deps
-  - eval $(opam env)
-  - make $TARGET
-  - DISTRO=$(echo "$DISTRIBUTION" | cut -d':' -f1)
-  - RELEASE=$(echo "$DISTRIBUTION" | cut -d':' -f2)
-  - mkdir -p packages/$DISTRO/$RELEASE
-  - mv octez-*.* packages/$DISTRO/$RELEASE/
-  variables:
-    TARGET: dpkg
-    OCTEZ_PKGMAINTAINER: nomadic-labs
-    BLST_PORTABLE: "yes"
-    ARCH: amd64
-    CARGO_HOME: /root/.cargo
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - packages/
-    when: on_success
-  parallel:
-    matrix:
-    - DISTRIBUTION:
-      - debian:bookworm
-      - ubuntu:focal
-      - ubuntu:jammy
-
 oc.build:rpm:amd64:
   image: $DISTRIBUTION
   stage: build
@@ -269,14 +225,206 @@ gitlab:release:
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.build:dpkg:amd64
   - oc.build:rpm:amd64
+  - oc.build-ubuntu-current
+  - oc.build-debian-current
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.build:dpkg:amd64
   - oc.build:rpm:amd64
+  - oc.build-ubuntu-current
+  - oc.build-debian-current
   interruptible: false
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
+
+oc.docker-build-debian-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-debian-packages-dependencies.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-debian:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh
+  variables:
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-debian-current:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages_current.sh
+  variables:
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+apt_repo_debian_current:
+  image: debian:bookworm
+  stage: publishing
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian-current
+  dependencies:
+  - oc.build-debian-current
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh debian bookworm
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+
+oc.docker-build-ubuntu-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-debian-packages-dependencies.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-ubuntu:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.docker-build-ubuntu-dependencies
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh
+  variables:
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-ubuntu-current:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.docker-build-ubuntu-dependencies
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages_current.sh
+  variables:
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+apt_repo_ubuntu_current:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  stage: publishing
+  tags:
+  - gcp
+  needs:
+  - oc.build-ubuntu-current
+  dependencies:
+  - oc.build-ubuntu-current
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/prepare-apt-repo.sh
+  script:
+  - ./scripts/ci/create_debian_repo.sh ubuntu focal jammy
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg

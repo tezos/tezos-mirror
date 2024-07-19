@@ -27,8 +27,8 @@ let build_debian_packages_image =
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let debian_package_release_matrix = function
-  | Before_merging -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
-  | Schedule_extended_test ->
+  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
+  | Full | Release ->
       [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (** These are the set of Ubuntu release-architecture combinations for
@@ -39,8 +39,8 @@ let debian_package_release_matrix = function
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let ubuntu_package_release_matrix = function
-  | Before_merging -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
-  | Schedule_extended_test ->
+  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
+  | Full | Release ->
       [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
@@ -66,10 +66,14 @@ let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     script
 
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
-   we test only on Debian stable. *)
+   we test only on Debian stable. Returns a triplet, the first element is
+   the list of all jobs, the second is the job building ubuntu packages artifats
+   and the third debian packages artifacts *)
 let jobs pipeline_type =
   let variables add =
-    ("DEP_IMAGE", "registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE")
+    ( "DEP_IMAGE",
+      "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE"
+    )
     :: add
   in
   let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
@@ -98,7 +102,7 @@ let jobs pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
   let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution
-      ~script =
+      ~script ~dependencies =
     job
       ~__POS__
       ~name
@@ -106,6 +110,7 @@ let jobs pipeline_type =
       ~stage:Stages.build
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
+      ~dependencies
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
@@ -134,6 +139,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-debian-current"
       ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh"
       ~matrix:(debian_package_release_matrix pipeline_type)
   in
@@ -142,6 +148,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-ubuntu-current"
       ~distribution:"ubuntu"
+      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
@@ -153,6 +160,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh"
       ~matrix:(debian_package_release_matrix pipeline_type)
   in
@@ -161,6 +169,7 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
+      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
@@ -230,7 +239,6 @@ let jobs pipeline_type =
       job_build_debian_package_current;
       job_apt_repo_debian_current;
     ]
-    @ test_current_debian_packages_jobs
   in
   let ubuntu_jobs =
     [
@@ -239,8 +247,28 @@ let jobs pipeline_type =
       job_build_ubuntu_package_current;
       job_apt_repo_ubuntu_current;
     ]
-    @ test_current_ubuntu_packages_jobs
   in
   match pipeline_type with
-  | Before_merging -> debian_jobs
-  | Schedule_extended_test -> debian_jobs @ ubuntu_jobs
+  | Partial ->
+      ( debian_jobs @ test_current_debian_packages_jobs,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current )
+  | Full ->
+      ( debian_jobs @ ubuntu_jobs @ test_current_debian_packages_jobs
+        @ test_current_ubuntu_packages_jobs,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current )
+  | Release ->
+      ( debian_jobs @ ubuntu_jobs,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current )
+
+let debian_repository_child_pipeline pipeline_type =
+  let pipeline_name =
+    match pipeline_type with
+    | Partial -> "debian_repository_partial"
+    | Full -> "debian_repository_full"
+    | Release -> "debian_repository_release"
+  in
+  let jobs, _, _ = jobs pipeline_type in
+  Pipeline.register_child pipeline_name ~jobs

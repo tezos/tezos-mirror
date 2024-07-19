@@ -88,23 +88,11 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~name:"gitlab:publish"
       ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
   in
-  let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
   let job_build_rpm_amd64 = job_build_rpm_amd64 () in
-  let job_apt_repo_ubuntu =
-    Debian_repository.job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_ubuntu"
-      ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])
-      ~image:Images.ubuntu_focal
-      ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
-  in
-  let job_apt_repo_debian =
-    Debian_repository.job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_debian"
-      ~dependencies:(Dependent [Artifacts job_build_dpkg_amd64])
-      ~image:Images.debian_bookworm
-      ["./scripts/ci/create_debian_repo.sh debian bookworm"]
+  let ( jobs_debian_repository,
+        job_build_ubuntu_package_current,
+        job_build_debian_package_current ) =
+    Debian_repository.jobs Release
   in
   let job_gitlab_release_or_publish =
     let dependencies =
@@ -112,8 +100,9 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         [
           Artifacts job_static_x86_64_release;
           Artifacts job_static_arm64_release;
-          Artifacts job_build_dpkg_amd64;
           Artifacts job_build_rpm_amd64;
+          Artifacts job_build_ubuntu_package_current;
+          Artifacts job_build_debian_package_current;
         ]
     in
     match release_tag_pipeline_type with
@@ -140,11 +129,11 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_static_arm64_release;
     job_docker_amd64;
     job_docker_arm64;
-    job_build_dpkg_amd64;
     job_build_rpm_amd64;
     job_docker_merge;
     job_gitlab_release_or_publish;
   ]
+  @ jobs_debian_repository
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
@@ -152,8 +141,6 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   | false, Release_tag -> [job_opam_release]
   | true, Release_tag ->
       [
-        job_apt_repo_debian;
-        job_apt_repo_ubuntu;
         (* This job normally runs in the {!Octez_latest_release} pipeline
            that is triggered manually after a release is made. However, to
            make release testing easier, we include it here directly. Thus,
