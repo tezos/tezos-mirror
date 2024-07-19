@@ -571,6 +571,7 @@ let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
       ?preimages_dir
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
+      ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
       ?additional_uses
       ~threshold_encryption
