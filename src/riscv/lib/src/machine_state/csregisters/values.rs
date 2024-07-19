@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::CSRegister;
+use super::root::RootCSRegister;
 use crate::struct_layout;
 use crate::{
     bits::Bits64,
@@ -92,23 +92,23 @@ macro_rules! csregisters_boilerplate {
             // hence they need to go through a match statement.
             // e.g. the CSRRW / CSRRC etc instructions
             #[inline(always)]
-            pub(super) fn general_raw_read(&self, csr: CSRegister) -> CSRRepr {
+            pub(super) fn general_raw_read(&self, csr: RootCSRegister) -> CSRRepr {
                 match csr {
-                    $( CSRegister::$name => self.[<read_ $name>](), )*
+                    $( RootCSRegister::$name => self.[<read_ $name>]() ),*
                 }
             }
 
             #[inline(always)]
-            pub(super) fn general_raw_write(&mut self, csr: CSRegister, value: CSRRepr) {
+            pub(super) fn general_raw_write(&mut self, csr: RootCSRegister, value: CSRRepr) {
                 match csr {
-                    $( CSRegister::$name => self.[<write_ $name>](value), )*
+                    $( RootCSRegister::$name => self.[<write_ $name>](value) ),*
                 }
             }
 
             #[inline(always)]
-            pub(super) fn general_raw_replace(&mut self, csr: CSRegister, value: CSRRepr) -> CSRRepr {
+            pub(super) fn general_raw_replace(&mut self, csr: RootCSRegister, value: CSRRepr) -> CSRRepr {
                 match csr {
-                    $( CSRegister::$name => self.[<replace_ $name>](value), )*
+                    $( RootCSRegister::$name => self.[<replace_ $name>](value) ),*
                 }
             }
         }
@@ -216,8 +216,6 @@ csregisters_boilerplate!(
         mcountinhibit: CSRRepr,
         scounteren: CSRRepr,
         mcounteren: CSRRepr,
-        fflags: CSRRepr,
-        frm: CSRRepr,
         fcsr: CSRRepr,
         pmpcfg0: CSRRepr,
         pmpcfg2: CSRRepr,
@@ -297,12 +295,10 @@ csregisters_boilerplate!(
         mimpid: CSRRepr,
         misa: CSRRepr,
         mscratch: CSRRepr,
-        sstatus: CSRRepr,
         mstatus: CSRRepr,
         sscratch: CSRRepr,
         stvec: CSRRepr,
         mtvec: CSRRepr,
-        sie: CSRRepr,
         mie: CSRRepr,
         satp: CSRRepr,
         scause: CSRRepr,
@@ -312,7 +308,6 @@ csregisters_boilerplate!(
         stval: CSRRepr,
         mtval: CSRRepr,
         mtval2: CSRRepr,
-        sip: CSRRepr,
         mip: CSRRepr,
         mtinst: CSRRepr,
         senvcfg: CSRRepr,
@@ -460,8 +455,6 @@ struct_layout!(
         mcountinhibit: Atom<CSRRepr>,
         scounteren: Atom<CSRRepr>,
         mcounteren: Atom<CSRRepr>,
-        fflags: Atom<CSRRepr>,
-        frm: Atom<CSRRepr>,
         fcsr: Atom<CSRRepr>,
         pmpcfg0: Atom<CSRRepr>,
         pmpcfg2: Atom<CSRRepr>,
@@ -541,12 +534,10 @@ struct_layout!(
         mimpid: Atom<CSRRepr>,
         misa: Atom<CSRRepr>,
         mscratch: Atom<CSRRepr>,
-        sstatus: Atom<CSRRepr>,
         mstatus: Atom<CSRRepr>,
         sscratch: Atom<CSRRepr>,
         stvec: Atom<CSRRepr>,
         mtvec: Atom<CSRRepr>,
-        sie: Atom<CSRRepr>,
         mie: Atom<CSRRepr>,
         satp: Atom<CSRRepr>,
         scause: Atom<CSRRepr>,
@@ -556,7 +547,6 @@ struct_layout!(
         stval: Atom<CSRRepr>,
         mtval: Atom<CSRRepr>,
         mtval2: Atom<CSRRepr>,
-        sip: Atom<CSRRepr>,
         mip: Atom<CSRRepr>,
         mtinst: Atom<CSRRepr>,
         senvcfg: Atom<CSRRepr>,
