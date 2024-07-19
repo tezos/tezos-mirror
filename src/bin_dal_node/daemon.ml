@@ -249,21 +249,27 @@ module Handler = struct
             (* 4. In the case the message id is not Valid. *)
             other
 
+  let build_profile_context config =
+    let open Lwt_result_syntax in
+    let base_dir = Configuration_file.store_path config in
+    let*! res = Profile_manager.load_profile_ctxt ~base_dir in
+    match res with
+    | Ok loaded_profile ->
+        (* The profiles from the loaded context are prioritized over the
+             profiles provided in the config file. *)
+        Profile_manager.merge_profiles
+          ~lower_prio:config.Configuration_file.profile
+          ~higher_prio:loaded_profile
+        |> return
+    | Error err ->
+        let*! () = Event.(emit loading_profiles_failed err) in
+        return config.Configuration_file.profile
+
   (* Set the profile context once we have the protocol plugin. This is supposed
      to be called only once. *)
   let set_profile_context ctxt config proto_parameters =
     let open Lwt_result_syntax in
-    let*! pctxt_opt = Node_context.load_profile_ctxt ctxt in
-    let profile =
-      match pctxt_opt with
-      | None -> config.Configuration_file.profile
-      | Some loaded_profile ->
-          (* The profiles from the loaded context are prioritized over the
-             profiles provided in the config file. *)
-          Profile_manager.merge_profiles
-            ~lower_prio:config.Configuration_file.profile
-            ~higher_prio:loaded_profile
-    in
+    let* profile = build_profile_context config in
     let pctxt_opt =
       Profile_manager.add_profiles
         Profile_manager.empty
@@ -332,9 +338,9 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  let should_store_skip_list_cells ctxt dal_constants =
+  let supports_refutations ctxt =
     let profile = Node_context.get_profile_ctxt ctxt in
-    Profile_manager.should_store_skip_list_cells profile dal_constants
+    Profile_manager.supports_refutations profile
 
   (* This function removes from the store the given slot and its
      shards. In case of error, this function emits a warning instead
@@ -373,43 +379,49 @@ module Handler = struct
      cells attested at that level. *)
   let remove_old_level_stored_data proto_parameters ctxt current_level =
     let open Lwt_syntax in
-    let oldest_level = Node_context.level_to_gc ctxt ~current_level in
-    let store = Node_context.get_store ctxt in
-    let* () =
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
-         We may want to remove this check. *)
-      if should_store_skip_list_cells ctxt proto_parameters then
-        let* res =
-          Store.Skip_list_cells.remove
-            store.skip_list_cells
-            ~attested_level:oldest_level
-        in
-        match res with
-        | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
-        | Error err ->
-            Event.(emit removing_skip_list_cells_failed (oldest_level, err))
-      else return_unit
-    in
-    let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
-    let store = Node_context.get_store ctxt in
-    let* () =
-      let* res =
-        Store.Statuses.remove_level_status
-          ~level:oldest_level
-          store.slot_header_statuses
-      in
-      match res with
-      | Ok () -> Event.(emit removed_status oldest_level)
-      | Error err -> Event.(emit removing_status_failed (oldest_level, err))
-    in
-    List.iter_s
-      (fun slot_index ->
-        let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
-        remove_slots_and_shards
-          ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-          store
-          slot_id)
-      (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
+    Node_context.level_to_gc ctxt proto_parameters ~current_level
+    |> Option.iter_s (fun oldest_level ->
+           let store = Node_context.get_store ctxt in
+           let* () =
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
+                We may want to remove this check. *)
+             if supports_refutations ctxt then
+               let* res =
+                 Skip_list_cells_store.remove
+                   store.skip_list_cells
+                   ~attested_level:oldest_level
+               in
+               match res with
+               | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
+               | Error err ->
+                   Event.(
+                     emit removing_skip_list_cells_failed (oldest_level, err))
+             else return_unit
+           in
+           let number_of_slots =
+             Dal_plugin.(proto_parameters.number_of_slots)
+           in
+           let* () =
+             let* res =
+               Store.Statuses.remove_level_status
+                 ~level:oldest_level
+                 store.slot_header_statuses
+             in
+             match res with
+             | Ok () -> Event.(emit removed_status oldest_level)
+             | Error err ->
+                 Event.(emit removing_status_failed (oldest_level, err))
+           in
+           List.iter_s
+             (fun slot_index ->
+               let slot_id : Types.slot_id =
+                 {slot_level = oldest_level; slot_index}
+               in
+               remove_slots_and_shards
+                 ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+                 store
+                 slot_id)
+             (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id))
 
   (* [attestation_lag] levels after the publication of a commitment,
      if it has not been attested it will never be so we can safely
@@ -464,6 +476,47 @@ module Handler = struct
       (Node_context.get_gs_worker ctxt)
       committee
 
+  let get_constants ctxt cctxt ~level =
+    let open Lwt_result_syntax in
+    let*? (module Plugin) = Node_context.get_plugin_for_level ctxt ~level in
+    Plugin.get_constants `Main (`Level level) cctxt
+
+  let store_skip_list_cells (type block_info) ctxt cctxt dal_constants
+      (block_info : block_info) block_level
+      (module Plugin : Dal_plugin.T with type block_info = block_info) =
+    let open Lwt_result_syntax in
+    if supports_refutations ctxt then
+      let* cells_of_level =
+        let pred_published_level =
+          Int32.sub
+            block_level
+            (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
+        in
+        Plugin.Skip_list.cells_of_level
+          block_info
+          cctxt
+          ~dal_constants
+          ~pred_publication_level_dal_constants:
+            (lazy (get_constants ctxt cctxt ~level:pred_published_level))
+      in
+      let cells_of_level =
+        List.map
+          (fun (hash, cell) ->
+            ( Dal_proto_types.Skip_list_hash.of_proto
+                Plugin.Skip_list.hash_encoding
+                hash,
+              Dal_proto_types.Skip_list_cell.of_proto
+                Plugin.Skip_list.cell_encoding
+                cell ))
+          cells_of_level
+      in
+      let store = Node_context.get_store ctxt in
+      Store.Skip_list_cells.insert
+        store.skip_list_cells
+        ~attested_level:block_level
+        cells_of_level
+    else return_unit
+
   let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
     let block_level = finalized_shell_header.Block_header.level in
@@ -473,48 +526,19 @@ module Handler = struct
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let get_constants ~level =
-      let*? (module PluginCurr) =
-        Node_context.get_plugin_for_level ctxt ~level
-      in
-      PluginCurr.get_constants `Main (`Level level) cctxt
-    in
-    let* dal_constants = get_constants ~level:block_level in
+    let* dal_constants = get_constants ctxt cctxt ~level:block_level in
     let* () =
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
-          if should_store_skip_list_cells ctxt dal_constants then
-            let* cells_of_level =
-              let pred_published_level =
-                Int32.sub
-                  block_level
-                  (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
-              in
-              Plugin.Skip_list.cells_of_level
-                block_info
-                cctxt
-                ~dal_constants
-                ~pred_publication_level_dal_constants:
-                  (lazy (get_constants ~level:pred_published_level))
-            in
-            let cells_of_level =
-              List.map
-                (fun (hash, cell) ->
-                  ( Dal_proto_types.Skip_list_hash.of_proto
-                      Plugin.Skip_list.hash_encoding
-                      hash,
-                    Dal_proto_types.Skip_list_cell.of_proto
-                      Plugin.Skip_list.cell_encoding
-                      cell ))
-                cells_of_level
-            in
-            let store = Node_context.get_store ctxt in
-            Store.Skip_list_cells.insert
-              store.skip_list_cells
-              ~attested_level:block_level
-              cells_of_level
-          else return_unit
+          store_skip_list_cells
+            ctxt
+            cctxt
+            dal_constants
+            block_info
+            block_level
+            (module Plugin : Dal_plugin.T
+              with type block_info = Plugin.block_info)
         in
         let* () =
           if not (is_bootstrap_node ctxt) then
@@ -881,6 +905,8 @@ let run ~data_dir ~configuration_override =
   let* last_notified_level =
     Last_processed_level.load_last_processed_level last_processed_level_store
   in
+  (* First wait for the L1 node to be bootstrapped. *)
+  let* () = wait_for_l1_bootstrapped cctxt in
   let*! crawler =
     let open Constants in
     Crawler.start
@@ -902,20 +928,18 @@ let run ~data_dir ~configuration_override =
       crawler
       last_processed_level_store
   in
+  (* Start RPC server. *)
   let* rpc_server = RPC_server.(start config ctxt) in
+  let _ = RPC_server.install_finalizer rpc_server in
+  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+  (* Activate the p2p instance. *)
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;
-  (* activate the p2p instance. *)
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
-  let _ = RPC_server.install_finalizer rpc_server in
-  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
-
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
-  (* First wait for the L1 node to be bootstrapped. *)
-  let* () = wait_for_l1_bootstrapped cctxt in
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize

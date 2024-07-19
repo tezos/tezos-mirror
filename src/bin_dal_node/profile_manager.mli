@@ -99,9 +99,8 @@ val get_profiles : t -> Types.profile
 val get_attested_data_default_store_period :
   t -> Dal_plugin.proto_parameters -> int
 
-(** Returns [true] iff the the node should store skip list cells for the given
-    profile. *)
-val should_store_skip_list_cells : t -> Dal_plugin.proto_parameters -> bool
+(** Returns [true] iff the node should support refutation games. *)
+val supports_refutations : t -> bool
 
 (** Load the profile context from disk. The file where the context is loaded
     from is relative to the given [base_dir]. An error is returned in case of an

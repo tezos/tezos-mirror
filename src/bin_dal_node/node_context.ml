@@ -198,21 +198,24 @@ let get_all_plugins ctxt =
   | Starting _ -> []
   | Ready {proto_plugins; _} -> Proto_plugins.to_list proto_plugins
 
-let level_to_gc ctxt ~current_level =
+let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
-  | Full -> Int32.zero
-  | Rolling {blocks = `Some n} ->
-      Int32.(max zero (sub current_level (of_int n)))
-  | Rolling {blocks = `Auto} -> (
-      match ctxt.status with
-      | Starting _ -> Int32.zero
-      | Ready {proto_parameters; _} ->
-          let n =
-            Profile_manager.get_attested_data_default_store_period
-              ctxt.profile_ctxt
-              proto_parameters
-          in
-          Int32.(max zero (sub current_level (of_int n))))
+  | Full -> `Always
+  | Rolling {blocks = `Some n} -> `Finite n
+  | Rolling {blocks = `Auto} ->
+      let n =
+        Profile_manager.get_attested_data_default_store_period
+          ctxt.profile_ctxt
+          proto_parameters
+      in
+      `Finite n
+
+let level_to_gc ctxt proto_parameters ~current_level =
+  match storage_period ctxt proto_parameters with
+  | `Always -> None
+  | `Finite n ->
+      let level = Int32.(sub current_level (of_int n)) in
+      if level < 1l then None else Some level
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
