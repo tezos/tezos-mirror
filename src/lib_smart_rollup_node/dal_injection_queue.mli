@@ -14,4 +14,4 @@ val init : _ Node_context.t -> unit tzresult Lwt.t
     [slot_content] in the queue for future injection on L1 and DAL with index
     [slot_index]. *)
 val register_dal_slot :
-  slot_content:string -> slot_index:int -> unit tzresult Lwt.t
+  slot_content:string -> slot_index:int -> Injector_sigs.Id.t tzresult Lwt.t

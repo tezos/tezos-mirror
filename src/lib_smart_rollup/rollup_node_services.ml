@@ -790,7 +790,7 @@ module Local = struct
       ~input:
         Data_encoding.(
           def "dal_slot" ~description:"Slot to inject" input_encoding)
-      ~output:Data_encoding.unit
+      ~output:Hashed.Injector_operations_hash.encoding
       (path / "dal" / "injection")
 
   let synchronized =
