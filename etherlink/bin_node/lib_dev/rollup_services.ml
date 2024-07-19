@@ -169,6 +169,23 @@ let dal_injection =
     ~output:Tezos_crypto.Hashed.Injector_operations_hash.encoding
     (open_root / "local" / "dal" / "injection")
 
+let injector_operation_status :
+    ( [`GET],
+      unit,
+      unit * Tezos_crypto.Hashed.Injector_operations_hash.t,
+      unit,
+      unit,
+      Octez_smart_rollup__Rollup_node_services.message_status )
+    Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Retrieve the status of the (injected) operation whose injector ID is \
+       given"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Rollup_node_services.Encodings.message_status
+    (open_root / "local" / "injector" / "operation"
+   /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "status")
+
 let simulation :
     ( [`POST],
       unit,
@@ -298,6 +315,19 @@ let publish_on_dal :
     ()
     ()
     (inputs, slot_index)
+
+let get_injector_operation_status :
+    rollup_node_endpoint:Uri.t ->
+    injection_id:Tezos_crypto.Hashed.Injector_operations_hash.t ->
+    Rollup_node_services.message_status tzresult Lwt.t =
+ fun ~rollup_node_endpoint ~injection_id ->
+  call_service
+    ~keep_alive:false
+    ~base:rollup_node_endpoint
+    injector_operation_status
+    ((), injection_id)
+    ()
+    ()
 
 let durable_state_subkeys :
     ( [`GET],
