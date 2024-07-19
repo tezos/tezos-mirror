@@ -718,6 +718,9 @@ type bisect_ppx = No | Yes | With_sigterm
       target where [...] is the value of the parameter. Use this parameter if
       the library includes an [index.mld] file.
 
+    - [link_flags]: specifies a [(link_flags ...)] stanza. This argument is merged with the other
+      ones affecting [(link_flags ...)] stanza.
+
     - [linkall]: if [true], add [-linkall] to the list of flags to be passed
       to the OCaml compiler. In executables and tests, it is added to the [(link_flags ...)]
       stanza, causing all modules of all dependencies to be linked unconditionally,
@@ -848,6 +851,7 @@ type 'a maker =
   ?inline_tests_deps:Dune.s_expr list ->
   ?wrapped:bool ->
   ?documentation:Dune.s_expr ->
+  ?link_flags:Dune.s_expr list ->
   ?linkall:bool ->
   ?modes:Dune.mode list ->
   ?modules:string list ->
