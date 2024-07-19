@@ -29,6 +29,11 @@ val build_raw_rpc_directory_with_validator :
   (module Registered_protocol.T) ->
   (Store.chain_store * Store.Block.t) Tezos_rpc.Directory.directory
 
+val build_raw_rpc_directory_without_validator :
+  (module Block_services.PROTO) ->
+  (module Registered_protocol.T) ->
+  (Store.chain_store * Store.Block.t) Tezos_rpc.Directory.directory
+
 (** [build_rpc_directory_with_validator chain_store block_services]
     builds an [RPC_directory.t] that contains all RPCs in
     [block_services], especially the one that depends on the

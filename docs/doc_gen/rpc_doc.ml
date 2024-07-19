@@ -385,12 +385,17 @@ let make_index ?introduction_path ~required_version ~hash () =
         | Some proto -> proto
       in
       Tezos_rpc.Directory.map (fun () -> assert false)
-      @@ Block_directory.build_raw_rpc_directory_with_validator
-           (module Proto)
-           (module Proto)
+      @@ Tezos_rpc.Directory.merge
+           (Block_directory.build_raw_rpc_directory_without_validator
+              (module Proto)
+              (module Proto))
+           (Block_directory.build_raw_rpc_directory_with_validator
+              (module Proto)
+              (module Proto))
     in
     Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() dir
   in
+
   let ppf = Format.std_formatter in
   pp_document ppf name introduction_path path dir required_version ;
   return_ok ()
