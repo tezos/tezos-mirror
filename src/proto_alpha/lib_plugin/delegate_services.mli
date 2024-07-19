@@ -60,6 +60,25 @@ type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
 val deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t
 
+type info = {
+  full_balance : Tez.t;
+  current_frozen_deposits : Tez.t;
+  frozen_deposits : Tez.t;
+  staking_balance : Tez.t;
+  frozen_deposits_limit : Tez.t option;
+  delegated_contracts : Alpha_context.Contract.t list;
+  delegated_balance : Tez.t;
+  min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
+  total_delegated_stake : Tez.t;
+  staking_denominator : Staking_pseudotoken.t;
+  deactivated : bool;
+  grace_period : Cycle.t;
+  pending_denunciations : bool;
+  voting_info : Vote.delegate_info;
+  active_consensus_key : Signature.Public_key_hash.t;
+  pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+}
+
 val full_balance :
   'a #RPC_context.simple ->
   'a ->
@@ -170,6 +189,9 @@ val pending_denunciations :
 
 val estimated_shared_pending_slashed_amount :
   'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+
+val info :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> info shell_tzresult Lwt.t
 
 val register : unit -> unit
 

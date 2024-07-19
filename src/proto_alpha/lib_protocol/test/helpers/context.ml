@@ -524,7 +524,7 @@ module Contract = struct
 end
 
 module Delegate = struct
-  type info = Plugin.RPC.Delegates.info = {
+  type info = Delegate_services.info = {
     full_balance : Tez.t;
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
@@ -547,7 +547,7 @@ module Delegate = struct
 
   let grace_period ctxt pkh = Delegate_services.grace_period rpc_ctxt ctxt pkh
 
-  let info ctxt pkh = Plugin.RPC.Delegates.info rpc_ctxt ctxt pkh
+  let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
 
   let full_balance ?(__LOC__ = __LOC__) ctxt pkh =
     get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh
