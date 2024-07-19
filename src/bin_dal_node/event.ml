@@ -131,14 +131,6 @@ let layer1_node_tracking_started =
     ~level:Notice
     ()
 
-let layer1_node_tracking_started_for_plugin =
-  declare_0
-    ~section
-    ~name:"dal_node_layer_1_start_tracking_for_plugin"
-    ~msg:"started tracking layer 1's node to determine plugin"
-    ~level:Notice
-    ()
-
 let protocol_plugin_resolved =
   declare_1
     ~section

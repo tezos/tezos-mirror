@@ -41,13 +41,12 @@ type t = {
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
   metrics_server : Metrics.t;
-  crawler : Crawler.t;
   last_processed_level_store : Last_processed_level.t;
 }
 
-let init config cryptobox shards_proofs_precomputation proto_parameters
-    proto_plugins store gs_worker transport_layer cctxt metrics_server crawler
-    last_processed_level_store =
+let init config profile_ctxt cryptobox shards_proofs_precomputation
+    proto_parameters proto_plugins store gs_worker transport_layer cctxt
+    metrics_server last_processed_level_store =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -72,9 +71,8 @@ let init config cryptobox shards_proofs_precomputation proto_parameters
       Committee_cache.create ~max_size:Constants.committee_cache_size;
     gs_worker;
     transport_layer;
-    profile_ctxt = Profile_manager.empty;
+    profile_ctxt;
     metrics_server;
-    crawler;
     last_processed_level_store;
   }
 

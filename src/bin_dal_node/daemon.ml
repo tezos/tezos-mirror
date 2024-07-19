@@ -223,79 +223,6 @@ module Handler = struct
             (* 4. In the case the message id is not Valid. *)
             other
 
-  let build_profile_context config =
-    let open Lwt_result_syntax in
-    let base_dir = Configuration_file.store_path config in
-    let*! res = Profile_manager.load_profile_ctxt ~base_dir in
-    match res with
-    | Ok loaded_profile ->
-        (* The profiles from the loaded context are prioritized over the
-             profiles provided in the config file. *)
-        Profile_manager.merge_profiles
-          ~lower_prio:config.Configuration_file.profile
-          ~higher_prio:loaded_profile
-        |> return
-    | Error err ->
-        let*! () = Event.(emit loading_profiles_failed err) in
-        return config.Configuration_file.profile
-
-  (* Registers the attester profile context once we have the protocol plugin. This is supposed
-     to be called only once. *)
-  let update_and_register_profiles ctxt =
-    let open Lwt_result_syntax in
-    let profile_ctxt = Node_context.get_profile_ctxt ctxt in
-    let gs_worker = Node_context.get_gs_worker ctxt in
-    let proto_parameters = Node_context.get_proto_parameters ctxt in
-    let profile_ctxt_opt =
-      Profile_manager.add_profiles
-        Profile_manager.empty
-        proto_parameters
-        gs_worker
-        profile_ctxt
-    in
-    match profile_ctxt_opt with
-    | None -> fail Errors.[Profile_incompatibility]
-    | Some profile_ctxt ->
-        let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
-        return_unit
-
-  let set_ready cctxt config profile_ctxt last_processed_level
-      (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
-    let open Lwt_result_syntax in
-    (* Initialize the crypto process *)
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-       Instead of recomputing these parameters, they could be stored
-       (for a given cryptobox). *)
-    let* cryptobox, shards_proofs_precomputation =
-      init_cryptobox config proto_parameters
-    in
-    Value_size_hooks.set_share_size
-      (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-    Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
-    let* proto_plugins =
-      (* We resolve the plugins for all levels starting with [first_level]. It
-         is currently not necessary to go as far in the past, because only the
-         protocol parameters for these past levels are needed, and these do
-         not change for now (and are not retrieved for these past
-         levels). However, if/when they do change, it will be necessary to
-         retrieve them, using the right plugins. *)
-      let level =
-        match last_processed_level with
-        | None -> head_level
-        | Some level -> level
-      in
-      let relevant_period =
-        Profile_manager.get_attested_data_default_store_period
-          profile_ctxt
-          proto_parameters
-      in
-      let first_level =
-        Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
-      in
-      Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
-    in
-    return (cryptobox, shards_proofs_precomputation, proto_plugins)
-
   let supports_refutations ctxt =
     let profile = Node_context.get_profile_ctxt ctxt in
     Profile_manager.supports_refutations profile
@@ -803,6 +730,63 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters =
       in
       handle ~dal_blocks:b ~l1_cycles:c
 
+let build_profile_context config =
+  let open Lwt_result_syntax in
+  let base_dir = Configuration_file.store_path config in
+  let*! res = Profile_manager.load_profile_ctxt ~base_dir in
+  match res with
+  | Ok loaded_profile ->
+      (* The profiles from the loaded context are prioritized over the
+           profiles provided in the config file. *)
+      Profile_manager.merge_profiles
+        ~lower_prio:config.Configuration_file.profile
+        ~higher_prio:loaded_profile
+      |> return
+  | Error err ->
+      let*! () = Event.(emit loading_profiles_failed err) in
+      return config.Configuration_file.profile
+
+(* Registers the attester profile context once we have the protocol plugin. This is supposed
+   to be called only once. *)
+let update_and_register_profiles ctxt =
+  let open Lwt_result_syntax in
+  let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+  let gs_worker = Node_context.get_gs_worker ctxt in
+  let proto_parameters = Node_context.get_proto_parameters ctxt in
+  let profile_ctxt_opt =
+    Profile_manager.add_profiles
+      Profile_manager.empty
+      proto_parameters
+      gs_worker
+      profile_ctxt
+  in
+  match profile_ctxt_opt with
+  | None -> fail Errors.[Profile_incompatibility]
+  | Some profile_ctxt ->
+      let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
+      return_unit
+
+let get_proto_plugins cctxt profile_ctxt last_processed_level
+    (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
+  (* We resolve the plugins for all levels starting with [first_level]. It
+     is currently not necessary to go as far in the past, because only the
+     protocol parameters for these past levels are needed, and these do
+     not change for now (and are not retrieved for these past
+     levels). However, if/when they do change, it will be necessary to
+     retrieve them, using the right plugins. *)
+  let level =
+    match last_processed_level with None -> head_level | Some level -> level
+  in
+  let relevant_period =
+    Profile_manager.get_attested_data_default_store_period
+      profile_ctxt
+      proto_parameters
+  in
+  let first_level =
+    Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
+  in
+  Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -924,7 +908,7 @@ let run ~data_dir ~configuration_override =
   let* () = wait_for_l1_bootstrapped cctxt in
   (* Check the DAL node's and L1 node's history mode. *)
   let* ((_, _, proto_parameters) as plugin_info) = get_head_plugin cctxt in
-  let* profile_ctxt = Handler.build_profile_context config in
+  let* profile_ctxt = build_profile_context config in
   let*? () =
     Profile_manager.validate_slot_indexes
       profile_ctxt
@@ -932,8 +916,34 @@ let run ~data_dir ~configuration_override =
   in
   let* () = check_history_mode config profile_ctxt proto_parameters in
   let* () = check_l1_history_mode profile_ctxt cctxt proto_parameters in
-  let* cryptobox, shards_proofs_precomputation, proto_plugins =
-    Handler.set_ready cctxt config profile_ctxt last_processed_level plugin_info
+  (* Initialize the crypto process *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
+     Instead of recomputing these parameters, they could be stored
+     (for a given cryptobox). *)
+  let* cryptobox, shards_proofs_precomputation =
+    init_cryptobox config proto_parameters
+  in
+  (* Set value size hooks. *)
+  Value_size_hooks.set_share_size
+    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
+  let* proto_plugins =
+    get_proto_plugins cctxt profile_ctxt last_processed_level plugin_info
+  in
+  let ctxt =
+    Node_context.init
+      config
+      profile_ctxt
+      cryptobox
+      shards_proofs_precomputation
+      proto_parameters
+      proto_plugins
+      store
+      gs_worker
+      transport_layer
+      cctxt
+      metrics_server
+      last_processed_level_store
   in
   let*! crawler =
     let open Constants in
@@ -945,23 +955,8 @@ let run ~data_dir ~configuration_override =
       ?last_notified_level:last_processed_level
       cctxt
   in
-  let ctxt =
-    Node_context.init
-      config
-      cryptobox
-      shards_proofs_precomputation
-      proto_parameters
-      proto_plugins
-      store
-      gs_worker
-      transport_layer
-      cctxt
-      metrics_server
-      crawler
-      last_processed_level_store
-  in
   let* amplificator =
-    if Profile_manager.is_prover_profile config.Configuration_file.profile then
+    if Profile_manager.is_prover_profile profile_ctxt then
       let* amplificator = Amplificator.make () in
       return_some amplificator
     else return_none
@@ -971,7 +966,6 @@ let run ~data_dir ~configuration_override =
     | None -> return_unit
     | Some amplificator -> Amplificator.init amplificator ctxt
   in
-  let*! () = Event.(emit node_is_ready ()) in
   (* Start RPC server. *)
   let* rpc_server = RPC_server.(start config ctxt) in
   let _ = RPC_server.install_finalizer rpc_server in
@@ -982,9 +976,11 @@ let run ~data_dir ~configuration_override =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
-  let* () = Handler.update_and_register_profiles ctxt in
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
+  (* Register topics with gossipsub worker. *)
+  let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
+  let*! () = Event.(emit node_is_ready ()) in
   let* () = daemonize [Handler.new_finalized_head ctxt cctxt crawler] in
   return_unit

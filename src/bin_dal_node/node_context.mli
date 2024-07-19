@@ -31,6 +31,7 @@ type t
 (** [init] creates a [t] value based on the given arguments. *)
 val init :
   Configuration_file.t ->
+  Profile_manager.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
@@ -40,7 +41,6 @@ val init :
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
   Metrics.t ->
-  Crawler.t ->
   Last_processed_level.t ->
   t
 
@@ -114,14 +114,19 @@ val get_last_processed_level_store : t -> Last_processed_level.t
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t
 
-(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
+(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 
-(** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
+(** [get_neighbors_cctxts ctxt] returns the client contexts of the DAL node's
+    neighbors. *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
 
+(** [get_ongoing_amplification ctxt] returns the slot ids for which there are
+    ongoing amplifications. *)
 val get_ongoing_amplifications : t -> Types.Slot_id.Set.t
 
+(** [set_ongoing_amplification ctxt ongoing_amplifications] set the slot ids for
+    which there are ongoing amplifications. *)
 val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
 
 (** [storage_period ctxt proto_parameters] returns for how many levels should
