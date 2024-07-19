@@ -25,6 +25,14 @@
 
 type error += Node_connection_lost
 
+type error +=
+  | Node_version_incompatible of {
+      node_version : Tezos_version_parser.t;
+      node_commit_info : Tezos_version.Octez_node_version.commit_info option;
+      baker_version : Tezos_version_parser.t;
+      baker_commit_info : Tezos_version.Octez_node_version.commit_info option;
+    }
+
 type error += Cannot_load_local_file of string
 
 type error += Broken_locked_values_invariant
@@ -51,6 +59,52 @@ let () =
     Data_encoding.empty
     (function Node_connection_lost -> Some () | _ -> None)
     (fun () -> Node_connection_lost) ;
+  register_error_kind
+    `Temporary
+    ~id:"Baking_commands.node_version_incompatible"
+    ~title:"Node version is incompatible"
+    ~description:"The node version is incompatible with this baker"
+    ~pp:(fun fmt
+             ((node_version, node_commit_info, baker_version, baker_commit_info) :
+               Tezos_version_parser.t
+               * Tezos_version.Octez_node_version.commit_info option
+               * Tezos_version_parser.t
+               * Tezos_version.Octez_node_version.commit_info option) ->
+      Format.fprintf
+        fmt
+        "@[Node version is %a (%a) but it is expected to be more recent than \
+         %a (%a).@ This check can be bypassed at your own risk with the flag \
+         --node-version-check-bypass.@]"
+        Tezos_version.Version.pp_simple
+        node_version
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.pp_print_string ppf "none")
+           Tezos_version.Octez_node_version.commit_info_pp_short)
+        node_commit_info
+        Tezos_version.Version.pp_simple
+        baker_version
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.pp_print_string ppf "none")
+           Tezos_version.Octez_node_version.commit_info_pp_short)
+        baker_commit_info)
+    Data_encoding.(
+      obj4
+        (req "node_version" Tezos_version.Octez_node_version.version_encoding)
+        (opt
+           "node_commit_info"
+           Tezos_version.Octez_node_version.commit_info_encoding)
+        (req "baker_version" Tezos_version.Octez_node_version.version_encoding)
+        (opt
+           "baker_commit_info"
+           Tezos_version.Octez_node_version.commit_info_encoding))
+    (function
+      | Node_version_incompatible
+          {node_version; node_commit_info; baker_version; baker_commit_info} ->
+          Some (node_version, node_commit_info, baker_version, baker_commit_info)
+      | _ -> None)
+    (fun (node_version, node_commit_info, baker_version, baker_commit_info) ->
+      Node_version_incompatible
+        {node_version; node_commit_info; baker_version; baker_commit_info}) ;
   register_error_kind
     `Temporary
     ~id:"Baking_scheduling.cannot_load_local_file"
