@@ -7,8 +7,8 @@ open! Bigarray
 type repo
 type state
 type id
-type status
 type hooks
+type status = Evaluating | WaitingForInput | WaitingForMetadata
 external octez_riscv_default_pvm_hooks: unit -> hooks = "octez_riscv_default_pvm_hooks"
 external octez_riscv_id_unsafe_of_raw_bytes: bytes -> id = "octez_riscv_id_unsafe_of_raw_bytes"
 external octez_riscv_storage_id_to_raw_bytes: id -> bytes = "octez_riscv_storage_id_to_raw_bytes"
