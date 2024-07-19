@@ -32,11 +32,13 @@ gitlab_release_no_v=$(echo "${CI_COMMIT_TAG}" | sed -e 's/^octez-v//g')
 gitlab_release_no_dot=$(echo "${gitlab_release_no_v}" | sed -e 's/\./-/g')
 
 # X
-gitlab_release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-v([0-9]+)\.([0-9]+)(-rc[0-9]+)?$/\1/p')
+gitlab_release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\1/p')
 # Y
-gitlab_release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-v([0-9]+)\.([0-9]+)(-rc[0-9]+)?$/\2/p')
+gitlab_release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\2/p')
 # Z
 gitlab_release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\4/p')
+# Beta
+gitlab_release_beta_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-v([0-9]+)\.([0-9]+)(-beta)?([0-9]+)?$/\4/p')
 
 # Is this a release candidate?
 if [ -n "${gitlab_release_rc_version}" ]; then
@@ -44,6 +46,10 @@ if [ -n "${gitlab_release_rc_version}" ]; then
   # shellcheck disable=SC2034
   gitlab_release_name="Octez Release Candidate ${gitlab_release_major_version}.${gitlab_release_minor_version}~rc${gitlab_release_rc_version}"
   opam_release_tag="${gitlab_release_major_version}.${gitlab_release_minor_version}~rc${gitlab_release_rc_version}"
+# Is this a beta ?
+elif [ -n "${gitlab_release_beta_version}" ]; then
+  gitlab_release_name="Octez Beta ${gitlab_release_major_version}.${gitlab_release_minor_version}~beta${gitlab_release_beta_version}"
+  opam_release_tag="${gitlab_release_major_version}.${gitlab_release_minor_version}~beta${gitlab_release_beta_version}"
 else
   # No, release name: Octez Release X.Y
   # shellcheck disable=SC2034
