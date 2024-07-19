@@ -1055,3 +1055,234 @@ let job_build_arm64_release ?rules () : tezos_job =
 
 let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
   job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:false ()
+
+let job_build_kernels ?rules () : tezos_job =
+  job
+    ~__POS__
+    ~name:"oc.build_kernels"
+    ~image:Images.rust_toolchain
+    ~stage:Stages.build
+    ?rules
+    [
+      "make -f kernels.mk build";
+      "make -f etherlink.mk evm_kernel.wasm";
+      "make -C src/riscv riscv-sandbox riscv-dummy.elf";
+      "make -C src/riscv/tests/ build";
+    ]
+    ~artifacts:
+      (artifacts
+         ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
+         ~expire_in:(Duration (Days 1))
+         ~when_:On_success
+         [
+           "evm_kernel.wasm";
+           "smart-rollup-installer";
+           "sequenced_kernel.wasm";
+           "tx_kernel.wasm";
+           "tx_kernel_dal.wasm";
+           "dal_echo_kernel.wasm";
+           "src/riscv/riscv-sandbox";
+           "src/riscv/riscv-dummy.elf";
+           "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
+         ])
+  |> enable_kernels
+  |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
+  |> enable_cargo_cache
+
+module Tezt = struct
+  let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
+      ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
+      ?(tezt_parallel = 1) ?(tezt_variant = "")
+      ?(before_script = before_script ~source_version:true ~eval_opam:true [])
+      ?timeout ~dependencies () : tezos_job =
+    let variables =
+      [
+        ("JUNIT", "tezt-junit.xml");
+        ("TEZT_VARIANT", tezt_variant);
+        ("TESTS", Tezt_core.TSL.show tezt_tests);
+        ("TEZT_RETRY", string_of_int tezt_retry);
+        ("TEZT_PARALLEL", string_of_int tezt_parallel);
+      ]
+    in
+    let artifacts =
+      artifacts
+        ~reports:(reports ~junit:"$JUNIT" ())
+        [
+          "selected_tezts.tsv";
+          "tezt.log";
+          "tezt-*.log";
+          "tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json";
+          "$JUNIT";
+        ]
+        (* The record artifacts [tezt-results-$CI_NODE_INDEX.json]
+           should be stored for as long as a given commit on master is
+           expected to be HEAD in order to support auto-balancing. At
+           the time of writing, we have approximately 6 merges per day,
+           so 1 day should more than enough. However, we set it to 3
+           days to keep records over the weekend. The tezt artifacts
+           (including records and coverage) take up roughly 2MB /
+           job. Total artifact storage becomes [N*P*T*W] where [N] is
+           the days of retention (7 atm), [P] the number of pipelines
+           per day (~200 atm), [T] the number of Tezt jobs per pipeline
+           (100) and [W] the artifact size per tezt job (2MB). This
+           makes 280GB which is ~4% of our
+           {{:https://gitlab.com/tezos/tezos/-/artifacts}total artifact
+           usage}. *)
+        ~expire_in:(Duration (Days 7))
+        ~when_:Always
+    in
+    let print_variables =
+      [
+        "TESTS";
+        "JUNIT";
+        "CI_NODE_INDEX";
+        "CI_NODE_TOTAL";
+        "TEZT_PARALLEL";
+        "TEZT_VARIANT";
+      ]
+    in
+    let retry = if retry = 0 then None else Some retry in
+    job
+      ?timeout
+      ~__POS__
+      ~image:Images.CI.e2etest
+      ~name
+      ?parallel
+      ~tag
+      ~stage:Stages.test
+      ?rules
+      ~artifacts
+      ~variables
+      ~dependencies
+      ?retry
+      ~before_script
+      [
+        (* Print [print_variables] in a shell-friendly manner for easier debugging *)
+        "echo \""
+        ^ String.concat
+            " "
+            (List.map (fun var -> sf {|%s=\"${%s}\"|} var var) print_variables)
+        ^ "\"";
+        (* Store the list of tests that have been scheduled for execution for later debugging.
+           It is imperative this this first call to tezt receives any flags passed to the
+           second call that affect test selection.Note that TESTS must be quoted (here and below)
+           since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
+           syntax. *)
+        "./scripts/ci/tezt.sh \"${TESTS}\" --from-record tezt/records --job \
+         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
+         selected_tezts.tsv";
+        (* For Tezt tests, there are multiple timeouts:
+           - --global-timeout is the internal timeout of Tezt, which only works if tests
+             are cooperative;
+           - the "timeout" command, which we set to send SIGTERM to Tezt 60s after --global-timeout
+             in case tests are not cooperative;
+           - the "timeout" command also sends SIGKILL 60s after having sent SIGTERM in case
+             Tezt is still stuck;
+           - the CI timeout.
+           The use of the "timeout" command is to make sure that Tezt eventually exits,
+           because if the CI timeout is reached, there are no artefacts,
+           and thus no logs to investigate.
+           See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
+        "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
+         \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
+         --global-timeout 1800 --on-unknown-regression-files fail --junit \
+         ${JUNIT} --from-record tezt/records --job \
+         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+         tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
+         ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
+      ]
+
+  (** Tezt tag selector string.
+
+    It returns a TSL expression that:
+    - always deselects tags with [ci_disabled];
+    - selects, respectively deselects, the tests with the tags
+      [memory_3k], [memory_4k], [time_sensitive], [slow] or [cloud],
+      depending on the value of the corresponding function
+      argument. These arguments all default to false.
+
+    See [src/lib_test/tag.mli] for a description of the above tags.
+
+    The list of TSL expressions [and_] are appended to the final
+    selector, allowing to modify the selection further. *)
+  let tests_tag_selector ?(memory_3k = false) ?(memory_4k = false)
+      ?(time_sensitive = false) ?(slow = false) ?(cloud = false)
+      (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
+    let tags =
+      [
+        (false, "ci_disabled");
+        (memory_3k, "memory_3k");
+        (memory_4k, "memory_4k");
+        (time_sensitive, "time_sensitive");
+        (slow, "slow");
+        (cloud, "cloud");
+      ]
+    in
+    let positive, negative = List.partition fst tags in
+    let positive = List.map snd positive in
+    let negative = List.map snd negative in
+    Tezt_core.(
+      TSL.conjunction
+      @@ List.map (fun tag -> TSL_AST.Has_tag tag) positive
+      @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
+      @ and_)
+
+  (* Used in [before_merging] and [schedule_extended_tests].
+
+     Fetch records for Tezt generated on the last merge request pipeline
+     on the most recently merged MR and makes them available in artifacts
+     for future merge request pipelines. *)
+  let job_select_tezts : tezos_job =
+    Tezos_ci.job
+      ~__POS__
+      ~name:"select_tezts"
+        (* We need:
+           - Git (to run git diff)
+           - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+      ~image:Images.CI.prebuild
+      ~stage:Stages.build
+      ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
+      (script_propagate_exit_code "scripts/ci/select_tezts.sh")
+      ~allow_failure:(With_exit_codes [17])
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Days 3))
+           ~when_:Always
+           ["selected_tezts.tsl"])
+
+  (* Fetch records for Tezt generated on the last merge request
+     pipeline on the most recently merged MR and makes them available
+     in artifacts for future merge request pipelines. *)
+  let job_tezt_fetch_records ?rules () : tezos_job =
+    Tezos_ci.job
+      ~__POS__
+      ~name:"oc.tezt:fetch-records"
+      ~image:Images.CI.build
+      ~stage:Stages.build
+      ~before_script:
+        (before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           [])
+      ?rules
+      [
+        "dune exec scripts/ci/update_records/update.exe -- --log-file \
+         tezt-fetch-records.log --from last-successful-schedule-extended-test \
+         --info";
+      ]
+      ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
+        (* Allow failure of this job, since Tezt can use the records
+           stored in the repo as backup for balancing. *)
+      ~allow_failure:Yes
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Hours 4))
+           ~when_:Always
+           [
+             "tezt-fetch-records.log";
+             "tezt/records/*.json";
+             (* Keep broken records for debugging *)
+             "tezt/records/*.json.broken";
+           ])
+end
