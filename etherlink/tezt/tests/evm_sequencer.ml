@@ -2469,6 +2469,75 @@ let test_self_upgrade_kernel =
 
   unit
 
+let test_empty_block_on_upgrade =
+  register_both
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "upgrade"; "empty"]
+    ~title:"Sequencer produces an empty block in case of upgrade."
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_node;
+           sc_rollup_address;
+           sequencer;
+           kernel;
+           _;
+         }
+             _protocol ->
+  (* Send a deposit so the sequencer will in theory add it to its next block. *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount:(Tez.of_int 1)
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:"0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Send an upgrade. *)
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:kernel
+      ~activation_timestamp:"2026-01-01T00:00:00Z"
+  in
+
+  (* Bake a few blocks to make sure the sequencer sees the deposit and the
+     upgrade. *)
+  let* () =
+    repeat 3 (fun _ ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  let check_transactions_in_block expected_number_of_transactions =
+    let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+    let length_block =
+      match block.transactions with
+      | Empty -> 0
+      | Hash l -> List.length l
+      | Full l -> List.length l
+    in
+    Check.((expected_number_of_transactions = length_block) int)
+      ~error_msg:"Expected %L transactions got %R transactions" ;
+    unit
+  in
+
+  (* Producing the block will create an empty block. As the kernel
+     is going to upgrade, the sequencer will not pick the transaction. *)
+  let*@ _ = produce_block ~timestamp:"2026-02-02T00:00:00Z" sequencer in
+  let* () = check_transactions_in_block 0 in
+  (* Next block will have the deposit. *)
+  let*@ _ = produce_block ~timestamp:"2026-02-02T00:00:00Z" sequencer in
+  let* () = check_transactions_in_block 1 in
+
+  unit
+
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_upgrade_kernel_auto_sync =
@@ -4878,6 +4947,7 @@ let () =
   test_observer_forwards_transaction protocols ;
   test_observer_timeout_when_necessary protocols ;
   test_sequencer_is_reimbursed protocols ;
+  test_empty_block_on_upgrade protocols ;
   test_upgrade_kernel_auto_sync protocols ;
   test_self_upgrade_kernel protocols ;
   test_force_kernel_upgrade protocols ;
