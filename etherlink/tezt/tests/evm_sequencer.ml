@@ -164,10 +164,11 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
       ticket_router_tester;
     }
 
-let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?commitment_period ?challenge_window
+let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?commitment_period ?challenge_window
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -237,7 +238,11 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  let private_rpc_port = Some (Port.fresh ()) in
+  let private_rpc_port =
+    match sequencer_private_rpc_port with
+    | Some p -> Some p
+    | None -> Some (Port.fresh ())
+  in
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
@@ -291,6 +296,7 @@ let setup_sequencer ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   in
   let* sequencer =
     Evm_node.init
+      ?rpc_port:sequencer_rpc_port
       ~patch_config
       ~mode:sequencer_mode
       (Sc_rollup_node.endpoint sc_rollup_node)
@@ -422,15 +428,16 @@ let send_fa_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
-    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?history_mode ~enable_dal
+let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?bootstrap_accounts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?commitment_period ?challenge_window
+    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
+    ?history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
     protocols =
   let additional_uses =
@@ -441,6 +448,8 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
+        ?sequencer_rpc_port
+        ?sequencer_private_rpc_port
         ~mainnet_compat
         ?commitment_period
         ?challenge_window
@@ -482,7 +491,8 @@ let register_test ~mainnet_compat ?genesis_timestamp ?time_between_blocks
     ~tags:((if enable_dal then ["dal"; Tag.ci_disabled] else []) @ tags)
     protocols
 
-let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+let register_both ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?bootstrap_accounts ?sequencer ?sequencer_pool_address
@@ -495,6 +505,8 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     let _, kernel_use = Kernel.to_uses_and_tags kernel in
     register_test
       ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
+      ?sequencer_rpc_port
+      ?sequencer_private_rpc_port
       ?commitment_period
       ?challenge_window
       ?genesis_timestamp
@@ -526,6 +538,8 @@ let register_both ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
       body
       protocols ;
     register_test
+      ?sequencer_rpc_port
+      ?sequencer_private_rpc_port
       ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
       ?commitment_period
       ?challenge_window
