@@ -11,11 +11,11 @@ license: "MIT"
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 depends: [
-  "aches" {= "1.0.0"}
-  "aches-lwt" {= "1.0.0"}
+  "aches" {= "1.1.0"}
+  "aches-lwt" {= "1.1.0"}
   "afl-persistent" {= "1.4"}
-  "alcotest" {= "1.7.0"}
-  "alcotest-lwt" {= "1.7.0"}
+  "alcotest" {= "1.8.0"}
+  "alcotest-lwt" {= "1.8.0"}
   "angstrom" {= "0.16.0"}
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.2.6"}
@@ -29,7 +29,7 @@ depends: [
   "bheap" {= "2.0.0"}
   "bigarray-compat" {= "1.1.0"}
   "bigstring" {= "0.3"}
-  "bigstringaf" {= "0.9.1"}
+  "bigstringaf" {= "0.10.0"}
   "bisect_ppx" {= "2.8.3"}
   "bos" {= "0.2.1"}
   "ca-certs" {= "0.2.3"}
@@ -42,12 +42,12 @@ depends: [
   "checkseum" {= "0.5.2"}
   "clap" {= "0.3.0"}
   "class_group_vdf" {= "0.0.4"}
-  "cmdliner" {= "1.2.0"}
+  "cmdliner" {= "1.3.0"}
   "cohttp" {= "5.3.1"}
   "conduit" {= "6.2.2"}
   "conduit-lwt" {= "6.2.2"}
   "conduit-lwt-unix" {= "6.2.2"}
-  "conf-autoconf" {= "0.1"}
+  "conf-autoconf" {= "0.2"}
   "conf-bash" {= "1"}
   "conf-cmake" {= "1"}
   "conf-g++" {= "1.0"}
@@ -73,13 +73,13 @@ depends: [
   "digestif" {= "1.2.0"}
   "dmap" {= "0.5"}
   "domain-name" {= "0.4.0"}
-  "dune" {= "3.15.2"}
-  "dune-build-info" {= "3.15.2"}
-  "dune-configurator" {= "3.15.2"}
-  "dune-private-libs" {= "3.15.2"}
-  "dune-site" {= "3.15.2"}
+  "dune" {= "3.16.0"}
+  "dune-build-info" {= "3.16.0"}
+  "dune-configurator" {= "3.16.0"}
+  "dune-private-libs" {= "3.16.0"}
+  "dune-site" {= "3.16.0"}
   "duration" {= "0.2.1"}
-  "dyn" {= "3.15.2"}
+  "dyn" {= "3.16.0"}
   "either" {= "1.0.0"}
   "eqaf" {= "0.9"}
   "ezjsonm" {= "1.3.0"}
@@ -94,10 +94,12 @@ depends: [
   "hidapi" {= "1.2.1"}
   "hidapi-lwt" {= "1.2.1"}
   "hkdf" {= "1.0.4"}
+
+
   "index" {= "1.6.2"}
   "integers" {= "0.7.0"}
-  "ipaddr" {= "5.5.0"}
-  "ipaddr-sexp" {= "5.5.0"}
+  "ipaddr" {= "5.6.0"}
+  "ipaddr-sexp" {= "5.6.0"}
   "jane-street-headers" {= "v0.16.0"}
   "jingoo" {= "1.5.0"}
   "jsonm" {= "1.0.2"}
@@ -113,12 +115,12 @@ depends: [
   "lwt-exit" {= "1.0"}
   "lwt-watcher" {= "0.2"}
   "lwt_react" {= "1.2.0"}
-  "macaddr" {= "5.5.0"}
+  "macaddr" {= "5.6.0"}
   "magic-mime" {= "1.3.1"}
-  "menhir" {= "20231231"}
-  "menhirCST" {= "20231231"}
-  "menhirLib" {= "20231231"}
-  "menhirSdk" {= "20231231"}
+  "menhir" {= "20240715"}
+  "menhirCST" {= "20240715"}
+  "menhirLib" {= "20240715"}
+  "menhirSdk" {= "20240715"}
   "mew" {= "0.1.0"}
   "mew_vi" {= "0.5.0"}
   "mirage-crypto" {= "0.11.3"}
@@ -127,7 +129,7 @@ depends: [
   "mirage-crypto-rng" {= "0.11.3"}
   "mirage-crypto-rng-lwt" {= "0.11.3"}
   "mtime" {= "2.0.0"}
-  "num" {= "1.5"}
+  "num" {= "1.5-1"}
   "ocaml" {= "4.14.1"}
   "ocaml-base-compiler" {= "4.14.1"}
   "ocaml-compiler-libs" {= "v0.12.4"}
@@ -136,7 +138,7 @@ depends: [
   "ocaml-options-vanilla" {= "1"}
   "ocaml-syntax-shims" {= "1.0.0"}
   "ocaml-version" {= "3.6.7"}
-  "ocamlbuild" {= "0.14.3"}
+  "ocamlbuild" {= "0.15.0"}
   "ocamlfind" {= "1.9.6"}
   "ocamlformat" {= "0.26.2"}
   "ocamlformat-lib" {= "0.26.2"}
@@ -145,7 +147,7 @@ depends: [
   "ocp-ocamlres" {= "0.4"}
   "ocplib-endian" {= "1.2"}
   "optint" {= "0.3.0"}
-  "ordering" {= "3.15.2"}
+  "ordering" {= "3.16.0"}
   "parsexp" {= "v0.16.0"}
   "pbkdf" {= "1.2.0"}
   "pp" {= "1.2.0"}
@@ -155,7 +157,7 @@ depends: [
   "ppx_cold" {= "v0.16.0"}
   "ppx_compare" {= "v0.16.0"}
   "ppx_derivers" {= "1.2.1"}
-  "ppx_deriving" {= "5.2.1"}
+  "ppx_deriving" {= "6.0.2"}
   "ppx_enumerate" {= "v0.16.0"}
   "ppx_expect" {= "v0.16.0"}
   "ppx_globalize" {= "v0.16.0"}
@@ -166,23 +168,23 @@ depends: [
   "ppx_optcomp" {= "v0.16.0"}
   "ppx_repr" {= "0.7.0"}
   "ppx_sexp_conv" {= "v0.16.0"}
-  "ppxlib" {= "0.32.1"}
+  "ppxlib" {= "0.33.0"}
   "prbnmcn-basic-structures" {= "0.0.1"}
   "prbnmcn-linalg" {= "0.0.1"}
   "prbnmcn-stats" {= "0.0.6"}
   "pringo" {= "1.3"}
-  "progress" {= "0.3.0"}
+  "progress" {= "0.4.0"}
   "psq" {= "0.2.1"}
   "ptime" {= "1.1.0"}
   "pure-splitmix" {= "0.3"}
   "pyml" {= "20231101"}
-  "qcheck-alcotest" {= "0.21.3"}
-  "qcheck-core" {= "0.21.3"}
+  "qcheck-alcotest" {= "0.22"}
+  "qcheck-core" {= "0.22"}
   "re" {= "1.11.0"}
   "react" {= "1.2.2"}
   "repr" {= "0.7.0"}
   "result" {= "1.5"}
-  "ringo" {= "1.0.0"}
+  "ringo" {= "1.1.0"}
   "rresult" {= "0.7.0"}
   "rusage" {= "1.0.0"}
   "secp256k1-internal" {= "0.4.0"}
@@ -191,16 +193,16 @@ depends: [
   "seqes" {= "0.2"}
   "sexplib" {= "v0.16.0"}
   "sexplib0" {= "v0.16.0"}
-  "sqlite3" {= "5.1.0"}
+  "sqlite3" {= "5.2.0"}
   "stdcompat" {= "19"}
   "stdint" {= "0.7.2"}
   "stdio" {= "v0.16.0"}
   "stdlib-shims" {= "0.3.0"}
-  "stdune" {= "3.15.2"}
+  "stdune" {= "3.16.0"}
   "stringext" {= "1.6.0"}
   "tar" {= "2.6.0"}
   "tar-unix" {= "2.6.0"}
-  "terminal" {= "0.3.0"}
+  "terminal" {= "0.4.0"}
   "tezos-sapling-parameters" {= "1.1.0"}
   "tezt" {= "4.1.0"}
   "time_now" {= "v0.16.0"}

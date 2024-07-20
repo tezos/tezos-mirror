@@ -68,9 +68,23 @@ echo "Remove all packages which are not needed by the packages we actually want.
 #   we want to have when building released binaries
 # - caqti-driver-postgresq is needed by tps measurement software to
 #   read tezos-indexer databases
+
+case "$(uname -m)" in
+  "x86_64")
+    arch="x86_64"
+    ;;
+  "aarch64")
+    arch="arm64"
+    ;;
+  *)
+    arch="unknown"
+    ;;
+esac
+
 cd opam-repository
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  "octez-deps,ocaml,ocaml-base-compiler,odoc<2.3.0,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg"
+  "octez-deps,ocaml,ocaml-base-compiler,odoc<2.3.0,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg" \
+  --environment "os=linux,arch=$arch,os-family=alpine"
 
 # Clean up: remove packages that we do not actually want to install.
 rm -rf packages/"$dummy_pkg" packages/octez-deps
