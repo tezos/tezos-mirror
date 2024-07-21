@@ -313,6 +313,6 @@ let () =
          remove constraint on odoc version when odoc bug is solved *)
       external_lib "odoc" V.(at_least "2.4.2");
       external_lib "ocp-indent" V.True;
-      external_lib "ocaml-lsp-server" V.(at_least "1.17.0");
+      external_lib "ocaml-lsp-server" V.(at_least "1.18.0");
       external_lib "merge-fmt" V.True;
     ]
