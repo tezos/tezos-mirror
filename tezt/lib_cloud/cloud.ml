@@ -86,6 +86,31 @@ let shutdown ?exn t =
   Log.info "Shutting down processes..." ;
   let* () =
     Lwt.catch
+      (fun () ->
+        match t.deployement with
+        | None -> Lwt.return_unit
+        | Some deployement ->
+            let agents = Deployement.agents deployement in
+            agents
+            |> List.map (fun agent ->
+                   let point = Agent.point agent in
+                   Process.run
+                     "ssh"
+                     [
+                       "-S";
+                       Format.asprintf
+                         "~/.ssh/sockets/root@%s-%d"
+                         (fst point)
+                         (snd point);
+                       "-O";
+                       "exit";
+                       Format.asprintf "root@%s" (fst point);
+                     ])
+            |> Lwt.join)
+      (fun _exn -> Lwt.return_unit)
+  in
+  let* () =
+    Lwt.catch
       (fun () -> Process.clean_up ())
       (fun exn ->
         Log.warn
