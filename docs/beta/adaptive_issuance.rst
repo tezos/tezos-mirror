@@ -315,7 +315,7 @@ Reward weights
 
 The Adaptive-Issuance/Staking proposal defines the weights for participation rewards as:
 
-- Attestation (formerly, endorsing) rewards: 10,240.
+- Attestation rewards: 10,240.
 - Fixed baking reward: 5,120.
 - Bonus baking reward: 5,120.
 - Nonce revelation tip: 1.
