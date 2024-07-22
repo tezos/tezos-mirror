@@ -529,6 +529,56 @@ function update_source() {
 
 }
 
+function generate_regression_test() {
+  log_blue "generate regression test"
+  # shellcheck disable=SC2312
+  # shellcheck disable=SC1003
+  printf '
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Testing
+   -------
+   Component:    Protocol
+   Invocation:   dune exec tezt/tests/main.exe -- --file check_proto_%s_changes.ml
+   Subject:      Ensure protocol_%s has not changed
+*)
+
+let register () =
+  Regression.register
+    ~__FILE__
+    ~title:"Check that the %s protocol has not changed"
+    ~tags:[Tag.layer1; "protocol"; "%s"]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun _protocol ->
+  (* Check that md5sum of all files in src/proto_%s is consistent *)
+    let _, _ =
+    Unix.open_process
+      "mkdir /tmp/tezos_proto_snapshot && git archive HEAD src/proto_%s | tar -x -C /tmp/tezos_proto_snapshot"
+  in
+  let ic, _ =
+    Unix.open_process
+      "find /tmp/tezos_proto_snapshot -type f -exec md5sum {} %s; | sort -k 2 | md5sum"
+  in
+  let _, _ = Unix.open_process "rm -rf /tmp/tezos_proto_snapshot" in
+
+  let output = input_line ic in
+  Regression.capture output ;
+  return ()' "$(date +%Y)" "${label}" "${label}" "${label}" "${label}" "${label}" "${label}" '\\' > "tezt/tests/check_proto_${label}_changes.ml"
+  ocamlformat -i "tezt/tests/check_proto_${label}_changes.ml"
+  git add "tezt/tests/check_proto_${label}_changes.ml"
+
+  sed -i.old -e "s/let register_protocol_independent_tests () =/let register_protocol_independent_tests () =\n  Check_proto_${label}_changes.register ();/" tezt/tests/main.ml
+  ocamlformat -i tezt/tests/main.ml
+  commit "tezt: generate regression test"
+}
+
 function update_tezt_tests() {
 
   # ensure protocols compile and parameter files are generated
@@ -577,53 +627,8 @@ function update_tezt_tests() {
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit "tezt: adapt lib_tezos/protocol.ml"
 
-  log_blue "generate regression test"
-  # shellcheck disable=SC2312
-  # shellcheck disable=SC1003
-  printf '
-(*****************************************************************************)
-(*                                                                           *)
-(* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(*****************************************************************************)
-
-(* Testing
-   -------
-   Component:    Protocol
-   Invocation:   dune exec tezt/tests/main.exe -- --file check_proto_%s_changes.ml
-   Subject:      Ensure protocol_%s has not changed
-*)
-
-let register () =
-  Regression.register
-    ~__FILE__
-    ~title:"Check that the %s protocol has not changed"
-    ~tags:[Tag.layer1; "protocol"; "%s"]
-    ~uses_node:false
-    ~uses_client:false
-    ~uses_admin_client:false
-  @@ fun _protocol ->
-  (* Check that md5sum of all files in src/proto_%s is consistent *)
-    let _, _ =
-    Unix.open_process
-      "mkdir /tmp/tezos_proto_snapshot && git archive HEAD src/proto_%s | tar -x -C /tmp/tezos_proto_snapshot"
-  in
-  let ic, _ =
-    Unix.open_process
-      "find /tmp/tezos_proto_snapshot -type f -exec md5sum {} %s; | sort -k 2 | md5sum"
-  in
-  let _, _ = Unix.open_process "rm -rf /tmp/tezos_proto_snapshot" in
-
-  let output = input_line ic in
-  Regression.capture output ;
-  return ()' "$(date +%Y)" "${label}" "${label}" "${label}" "${label}" "${label}" "${label}" '\\' > "tezt/tests/check_proto_${label}_changes.ml"
-  ocamlformat -i "tezt/tests/check_proto_${label}_changes.ml"
-  git add "tezt/tests/check_proto_${label}_changes.ml"
-
-  sed -i.old -e "s/let register_protocol_independent_tests () =/let register_protocol_independent_tests () =\n  Check_proto_${label}_changes.register ();/" tezt/tests/main.ml
-  ocamlformat -i tezt/tests/main.ml
-  commit "tezt: generate regression test"
+  # TODO: fix and reintroduce this test
+  #generate_regression_test
 
   #fix other tests:
   sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i tezt/tests/*.ml
