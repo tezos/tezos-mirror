@@ -66,9 +66,9 @@ let slot_id_cache_size = 100
 
 let shards_verification_sampling_frequency = 100
 
-let amplification_random_delay_min = 1.
+let amplification_random_delay_min = 10.0
 
-let amplification_random_delay_max = 2.
+let amplification_random_delay_max = 20.0
 
 let amplification_timeout = 120.
 
