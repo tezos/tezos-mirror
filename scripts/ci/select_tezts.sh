@@ -20,8 +20,14 @@ if [ -z "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
   abort
 fi
 
-echo "---- Fetching HEAD and $CI_MERGE_REQUEST_DIFF_BASE_SHA from $ORIGIN..."
-if ! git fetch "$ORIGIN" HEAD "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
+# If set, diff base against CI_MERGE_REQUEST_SOURCE_BRANCH_SHA instead of HEAD.
+# This variable contains the HEAD SHA of the merge request's source branch.
+# On merged result pipelines, this is not equivalent on the local git's HEAD,
+# as the merged result pipeline runs on an ephemeral, rebased branch.
+head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-HEAD}
+
+echo "---- Fetching HEAD ($head) and base ($CI_MERGE_REQUEST_DIFF_BASE_SHA) from $ORIGIN..."
+if ! git fetch "$ORIGIN" "$head" "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
   # Example error that was seen in a job:
   # error: RPC failed; curl 92 HTTP/2 stream 5 was not closed cleanly: INTERNAL_ERROR (err 2)
   # error: 50483 bytes of body are still expected
@@ -32,7 +38,7 @@ if ! git fetch "$ORIGIN" HEAD "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
 fi
 
 echo "---- Diffing..."
-CHANGES="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA")"
+CHANGES="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA" "$head")"
 echo "$CHANGES"
 
 echo "---- Compiling manifest/manifest..."
