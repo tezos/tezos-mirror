@@ -285,6 +285,10 @@ let wait_for_blueprint_invalid ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"blueprint_invalid.v0"
   @@ Fun.const (Some ())
 
+let wait_for_invalid_kernel ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"invalid_kernel.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_pending_upgrade ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"pending_upgrade.v0"
   @@ JSON.(

@@ -41,12 +41,14 @@ let compute_until_snapshot ~wasm_entrypoint ~max_steps ?write_debug pvm_state =
       | _ -> Wasm_vm.should_compute pvm_state)
     pvm_state
 
-let compute_fast ~wasm_entrypoint ~reveal_builtins ~write_debug pvm_state =
+let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
+    =
   let open Lwt.Syntax in
   let* version = Wasm_vm.get_wasm_version pvm_state in
   (* Execute! *)
   let* durable =
     Exec.compute
+      ~hooks
       ~wasm_entrypoint
       ~version
       ~reveal_builtins
@@ -148,7 +150,12 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
       in
       let go_like_the_wind () =
         let* pvm_state =
-          compute_fast ~wasm_entrypoint ~write_debug ~reveal_builtins pvm_state
+          compute_fast
+            ~wasm_entrypoint
+            ~hooks
+            ~write_debug
+            ~reveal_builtins
+            pvm_state
         in
         let accum_ticks =
           Int64.add accum_ticks (Z.to_int64 pvm_state.max_nb_ticks)

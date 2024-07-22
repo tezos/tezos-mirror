@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 type t = {
+  fast_exec_invalid_kernel : (unit -> unit Lwt.t) option;
   fast_exec_panicked : (unit -> unit Lwt.t) option;
   fast_exec_completed : (unit -> unit Lwt.t) option;
   fast_exec_fallback : bool;
@@ -13,10 +14,14 @@ type t = {
 
 let no_hooks =
   {
+    fast_exec_invalid_kernel = None;
     fast_exec_panicked = None;
     fast_exec_completed = None;
     fast_exec_fallback = true;
   }
+
+let on_fast_exec_invalid_kernel hook hooks =
+  {hooks with fast_exec_invalid_kernel = Some hook}
 
 let on_fast_exec_panicked hook hooks =
   {hooks with fast_exec_panicked = Some hook}

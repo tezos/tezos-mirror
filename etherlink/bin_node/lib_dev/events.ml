@@ -161,6 +161,14 @@ let patched_kernel =
     ~msg:"Kernel successfully patched, starting from level {level}"
     ("level", Ethereum_types.quantity_encoding)
 
+let invalid_kernel =
+  Internal_event.Simple.declare_0
+    ~level:Error
+    ~section
+    ~name:"invalid_kernel"
+    ~msg:"The kernel stored in the EVM state is not valid"
+    ()
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Ethereum_types.Upgrade.t) =
@@ -203,3 +211,5 @@ let retrying_connect ~endpoint ~delay =
   emit event_retrying_connect (Uri.to_string endpoint, delay)
 
 let patched_kernel level = emit patched_kernel level
+
+let invalid_kernel () = emit invalid_kernel ()

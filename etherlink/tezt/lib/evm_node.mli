@@ -177,6 +177,8 @@ val wait_for_block_producer_locked : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
 
+val wait_for_invalid_kernel : ?timeout:float -> t -> unit Lwt.t
+
 val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_rollup_node_follower_connection_acquired :

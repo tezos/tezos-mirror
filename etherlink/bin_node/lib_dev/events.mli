@@ -70,3 +70,5 @@ val event_kernel_log :
 val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t
 
 val patched_kernel : Ethereum_types.quantity -> unit Lwt.t
+
+val invalid_kernel : unit -> unit Lwt.t
