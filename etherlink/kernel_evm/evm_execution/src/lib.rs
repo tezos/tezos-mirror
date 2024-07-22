@@ -979,7 +979,7 @@ mod test {
 
     #[test]
     fn test_signature_to_address() {
-        let test_list = vec![
+        let test_list = [
             (
                 "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d",
                 "90F8bf6A479f320ead074411a4B0e7944Ea8c9C1",
@@ -2018,7 +2018,7 @@ mod test {
         );
         let expected_gas = 21000 // base cost
         + 5124; // execution gas cost (taken at face value from tests)
-        let expected_result = Ok(Some(ExecutionOutcome {
+        let expected_result = ExecutionOutcome {
             gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
@@ -2026,9 +2026,9 @@ mod test {
             result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 50578554,
-        }));
+        };
 
-        assert_eq!(result, expected_result);
+        assert_eq!(result.unwrap().unwrap(), expected_result);
 
         assert_eq!(
             evm_account_storage
@@ -2040,8 +2040,7 @@ mod test {
             None
         );
 
-        let funds_total =
-            1_000_000 + all_the_gas - expected_result.unwrap().unwrap().gas_used;
+        let funds_total = 1_000_000 + all_the_gas - expected_result.gas_used;
 
         assert_eq!(
             get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),

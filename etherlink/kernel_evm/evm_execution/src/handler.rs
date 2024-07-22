@@ -2432,27 +2432,23 @@ mod test {
 
     const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000_000;
 
-    fn set_code<'a>(
-        handler: &mut EvmHandler<'a, MockHost>,
-        address: &H160,
-        code: Vec<u8>,
-    ) {
+    fn set_code(handler: &mut EvmHandler<'_, MockHost>, address: &H160, code: Vec<u8>) {
         let mut account = handler.get_or_create_account(*address).unwrap();
         account.set_code(handler.borrow_host(), &code).unwrap();
     }
 
-    fn set_nonce<'a>(handler: &mut EvmHandler<'a, MockHost>, address: &H160, nonce: u64) {
+    fn set_nonce(handler: &mut EvmHandler<'_, MockHost>, address: &H160, nonce: u64) {
         let mut account = handler.get_or_create_account(*address).unwrap();
         account.set_nonce(handler.borrow_host(), nonce).unwrap()
     }
 
-    fn get_balance<'a>(handler: &mut EvmHandler<'a, MockHost>, address: &H160) -> U256 {
+    fn get_balance(handler: &mut EvmHandler<'_, MockHost>, address: &H160) -> U256 {
         let account = handler.get_or_create_account(*address).unwrap();
         account.balance(handler.borrow_host()).unwrap()
     }
 
-    fn set_balance<'a>(
-        handler: &mut EvmHandler<'a, MockHost>,
+    fn set_balance(
+        handler: &mut EvmHandler<'_, MockHost>,
         address: &H160,
         new_balance: U256,
     ) {
@@ -2475,8 +2471,8 @@ mod test {
         }
     }
 
-    fn get_durable_slot<'a>(
-        handler: &mut EvmHandler<'a, MockHost>,
+    fn get_durable_slot(
+        handler: &mut EvmHandler<'_, MockHost>,
         address: &H160,
         index: &H256,
     ) -> H256 {
