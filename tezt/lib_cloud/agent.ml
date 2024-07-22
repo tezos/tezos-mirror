@@ -209,6 +209,13 @@ let copy agent ~source ~destination =
     in
     Lwt.return_unit
 
+let is_binary file =
+  let* output = Process.run_and_read_stdout "file" [file] in
+  String.split_on_char ' ' output
+  |> List.tl |> List.hd |> String.trim
+  |> String.starts_with ~prefix:"ELF"
+  |> Lwt.return
+
 let copy =
   (* We memoize the copy so that it is done at most once per destination per
      scenario. This optimisation ease the writing of scenario so that copy can
@@ -221,19 +228,26 @@ let copy =
     match Hashtbl.find_opt already_copied (agent, destination) with
     | Some promise -> promise
     | None ->
-        let p =
-          let* () =
-            docker_run_command
-              agent
-              "mkdir"
-              ["-p"; Filename.dirname destination]
-            |> Process.check
+        (* Octez_latest_release image uses alpine, we can't copy binaries from our local setup. *)
+        let* is_binary_file = is_binary source in
+        if
+          is_binary_file
+          && agent.configuration.docker_image = Octez_latest_release
+        then Lwt.return (path_of agent source)
+        else
+          let p =
+            let* () =
+              docker_run_command
+                agent
+                "mkdir"
+                ["-p"; Filename.dirname destination]
+              |> Process.check
+            in
+            let* () = copy agent ~source ~destination in
+            Lwt.return destination
           in
-          let* () = copy agent ~source ~destination in
-          Lwt.return destination
-        in
-        Hashtbl.replace already_copied (agent, destination) p ;
-        p
+          Hashtbl.replace already_copied (agent, destination) p ;
+          p
 
 let next_available_port t = t.next_available_port ()
 

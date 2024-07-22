@@ -38,10 +38,20 @@ val vm_name : t -> string
 (** [set_name agent name] sets the name of the agent to [name]. *)
 val set_name : t -> string -> unit
 
-(** [copy ?destination agent ~source] copy the file into the [agent] directory and
+(** [copy ?destination agent ~source] copies the file into the [agent] directory and
     returned the directory where the file can be found. It is assumed
     the [source] file does not exist on the agent machine. If the
-    parent directory does not exist, it will be created. *)
+    parent directory does not exist, it will be created.
+
+    It returns the destination the files was copied at. If
+    [destination] is not set, the destination is given by
+    [configuration.default_binaries_path] concatenated to the
+    [source]. Otherwise, [destination] is returned.
+
+    If [configuration.docker_image] is [Octezt_latest_release], binary
+    files won't be copied and the destination will be the same as if
+    [destination] was not provided.
+ *)
 val copy : ?destination:string -> t -> source:string -> string Lwt.t
 
 (** [next_available_port agent] returns the next available port for
