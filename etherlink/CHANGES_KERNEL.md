@@ -24,13 +24,15 @@
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
 This kernel has been activated on Etherlink Testnet on block
-[3,825,580][4f44-activation].
+[3,825,580][4f44-activation-testnet], and on Etherlink Mainnet Beta on block
+[1,273,380][4f44-activation-mainnet].
 
 **Note:** This commit is not part of the `master` branch of the Octez
 repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 
 [mainnet-branch]: https://gitlab.com/tezos/tezos/-/tree/etherlink-mainnet-launch
-[4f44-activation]: https://testnet-explorer.etherlink.com/block/0x54e37d7743b4a79e23640ab36fcd95cf9e54d9b95959cc6c7ed3abfaff93dc52
+[4f44-activation-testnet]: https://testnet-explorer.etherlink.com/block/0x54e37d7743b4a79e23640ab36fcd95cf9e54d9b95959cc6c7ed3abfaff93dc52
+[4f44-activation-mainnet]: https://explorer.etherlink.com/block/0x18027e1703da079fed2d8bea3395a7f365957194b7ed35eaba36e901217e6c6f
 
 ## Features
 

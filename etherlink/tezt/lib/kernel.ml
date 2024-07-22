@@ -15,21 +15,14 @@ let to_uses_and_tags = function
   | Latest -> ("latest", Constant.WASM.evm_kernel)
 
 let commit_of = function
-  | Mainnet -> Some Constant.WASM.mainnet_evm_commit
-  | Ghostnet -> Some Constant.WASM.ghostnet_evm_commit
   | Latest -> None
+  | Ghostnet -> Some Constant.WASM.ghostnet_evm_commit
+  | Mainnet -> Some Constant.WASM.mainnet_evm_commit
 
 let upgrade_to = function
-  | Mainnet -> Ghostnet
-  | Ghostnet -> Latest
   | Latest -> Latest
-
-(** [mainnet_compat_kernel_config kernel] returns [true] when the [kernel]
-    requires the data model of the initial kernel originated on Mainnet. *)
-let mainnet_compat_kernel_config = function
-  | Mainnet -> true
-  | Ghostnet -> false
-  | Latest -> false
+  | Ghostnet -> Latest
+  | Mainnet -> Ghostnet
 
 let of_use u =
   if Uses.(tag u = tag Constant.WASM.mainnet_evm_kernel) then Mainnet
