@@ -42,6 +42,7 @@ type argument =
   | RPC_additional_addr_external of string
   | Max_active_rpc_connections of int
   | Enable_http_cache_headers
+  | Context_pruning of string
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -76,6 +77,7 @@ let make_argument = function
   | Max_active_rpc_connections n ->
       ["--max-active-rpc-connections"; string_of_int n]
   | Enable_http_cache_headers -> ["--enable-http-cache-headers"]
+  | Context_pruning x -> ["--context-pruning"; x]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -99,7 +101,8 @@ let is_redundant = function
   | Metadata_size_limit _, Metadata_size_limit _
   | Version, Version
   | Max_active_rpc_connections _, Max_active_rpc_connections _
-  | Enable_http_cache_headers, Enable_http_cache_headers ->
+  | Enable_http_cache_headers, Enable_http_cache_headers
+  | Context_pruning _, Context_pruning _ ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -125,7 +128,8 @@ let is_redundant = function
   | RPC_additional_addr_external _, _
   | Version, _
   | Max_active_rpc_connections _, _
-  | Enable_http_cache_headers, _ ->
+  | Enable_http_cache_headers, _
+  | Context_pruning _, _ ->
       false
 
 (* Some arguments should not be written in the config file by [Node.init]

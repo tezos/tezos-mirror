@@ -90,6 +90,7 @@ type t = {
   enable_http_cache_headers : bool option;
       (** Adds Cache-control header directives to RPC responses for queries
           that are relative to the head block. *)
+  context_pruning : Storage_maintenance.context_pruning option;
 }
 
 val process_command : unit tzresult Lwt.t -> unit Cmdliner.Term.ret

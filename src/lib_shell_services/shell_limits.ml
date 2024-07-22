@@ -245,12 +245,15 @@ let chain_validator_limits_encoding =
              });
        ])
 
+let default_storage_maintenance_context_pruning = Storage_maintenance.Enabled
+
 type limits = {
   block_validator_limits : block_validator_limits;
   prevalidator_limits : prevalidator_limits;
   peer_validator_limits : peer_validator_limits;
   chain_validator_limits : chain_validator_limits;
   history_mode : History_mode.t option;
+  context_pruning : Storage_maintenance.context_pruning option;
 }
 
 let default_limits =
@@ -260,6 +263,7 @@ let default_limits =
     peer_validator_limits = default_peer_validator_limits;
     chain_validator_limits = default_chain_validator_limits;
     history_mode = None;
+    context_pruning = Some Enabled;
   }
 
 let limits_encoding =
@@ -271,25 +275,29 @@ let limits_encoding =
            prevalidator_limits;
            chain_validator_limits;
            history_mode;
+           context_pruning;
          } ->
       ( peer_validator_limits,
         block_validator_limits,
         prevalidator_limits,
         chain_validator_limits,
-        history_mode ))
+        history_mode,
+        context_pruning ))
     (fun ( peer_validator_limits,
            block_validator_limits,
            prevalidator_limits,
            chain_validator_limits,
-           history_mode ) ->
+           history_mode,
+           context_pruning ) ->
       {
         peer_validator_limits;
         block_validator_limits;
         prevalidator_limits;
         chain_validator_limits;
         history_mode;
+        context_pruning;
       })
-    (obj5
+    (obj6
        (dft
           "peer_validator"
           peer_validator_limits_encoding
@@ -306,4 +314,5 @@ let limits_encoding =
           "chain_validator"
           chain_validator_limits_encoding
           default_chain_validator_limits)
-       (opt "history_mode" History_mode.encoding))
+       (opt "history_mode" History_mode.encoding)
+       (opt "context_pruning" Storage_maintenance.context_pruning_encoding))
