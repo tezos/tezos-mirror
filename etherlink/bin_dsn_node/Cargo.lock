@@ -901,6 +901,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsn-key-holder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "primitive-types",
+]
+
+[[package]]
 name = "dsn-node"
 version = "0.1.0"
 dependencies = [
