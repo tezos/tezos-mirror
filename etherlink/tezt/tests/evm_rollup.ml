@@ -6292,6 +6292,31 @@ let test_simulation_out_of_funds =
   let*@ _res = Rpc.estimate_gas eth_call evm_setup.evm_node in
   unit
 
+let test_rpc_state_value_and_subkeys =
+  register_sequencer
+    ~tags:["evm"; "rpc"; "state_value"; "state_subkeys"]
+    ~title:"RPC methods stateValue and stateSubkeys"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let {evm_node; sc_rollup_node; client; _} = evm_setup in
+  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+  let* () =
+    repeat 3 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let*@! kernel_version = Rpc.state_value evm_node "/evm/kernel_root_hash" in
+  Check.(
+    (kernel_version = evm_setup.kernel_root_hash)
+      string
+      ~error_msg:"Kernel version is %L, but should be %R") ;
+  let*@! world_state_subkeys = Rpc.state_subkeys evm_node "/evm/world_state" in
+  Check.(
+    (List.sort String.compare world_state_subkeys
+    = List.sort String.compare ["indexes"; "blocks"; "fees"; "eth_accounts"])
+      (list string)
+      ~error_msg:"Kernel version is %L, but should be %R") ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -6409,7 +6434,8 @@ let register_evm_node ~protocols =
   test_rpc_feeHistory_future protocols ;
   test_rpc_feeHistory_long protocols ;
   test_rpcs_can_be_disabled protocols ;
-  test_simulation_out_of_funds protocols
+  test_simulation_out_of_funds protocols ;
+  test_rpc_state_value_and_subkeys protocols
 
 let protocols = Protocol.all
 

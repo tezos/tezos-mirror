@@ -78,6 +78,8 @@ module Request = struct
 
   let stateValue path = {method_ = "stateValue"; parameters = `String path}
 
+  let stateSubkeys path = {method_ = "stateSubkeys"; parameters = `String path}
+
   let produceProposal ?timestamp () =
     let parameters =
       match timestamp with None -> `Null | Some timestamp -> `String timestamp
@@ -313,6 +315,18 @@ let state_value evm_node path =
   return
   @@ decode_or_error
        (fun json -> Evm_node.extract_result json |> JSON.as_string_opt)
+       json
+
+let state_subkeys evm_node path =
+  let* json =
+    Evm_node.call_evm_rpc ~private_:true evm_node (Request.stateSubkeys path)
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> JSON.as_list_opt |> function
+         | Some l -> Some (List.map JSON.as_string l)
+         | None -> None)
        json
 
 let send_raw_transaction ~raw_tx evm_node =
