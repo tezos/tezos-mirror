@@ -197,6 +197,7 @@ let upgrade_kernel ~configuration_path ~testnet () =
         ~tag:"new_kernel"
         ~path:
           (upgrade_config.kernel_dir // (upgrade_config.new_kernel ^ ".wasm"))
+        ()
     in
     replace_preimages ~smart_rollup_node ~new_kernel
   in

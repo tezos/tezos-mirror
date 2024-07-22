@@ -6127,8 +6127,11 @@ let register_riscv ~protocols =
   let kind = "riscv" in
   let boot_sector =
     read_riscv_kernel
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf")
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf.checksum")
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf" ())
+      (Uses.make
+         ~tag:"riscv"
+         ~path:"src/riscv/assets/riscv-dummy.elf.checksum"
+         ())
   in
   test_origination ~kind protocols ;
   test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ;
@@ -6144,8 +6147,8 @@ let register_riscv_jstz ~protocols =
   let kind = "riscv" in
   let boot_sector =
     read_riscv_kernel
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz")
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum")
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz" ())
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum" ())
   in
   test_advances_state_with_inbox
     protocols
@@ -6153,7 +6156,7 @@ let register_riscv_jstz ~protocols =
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
     ~inbox_file:
-      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json")
+      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ())
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;

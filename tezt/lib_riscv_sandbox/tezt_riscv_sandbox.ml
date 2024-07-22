@@ -25,13 +25,13 @@
 (*****************************************************************************)
 
 let riscv_sandbox =
-  Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/riscv-sandbox"
+  Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/riscv-sandbox" ()
 
 (* Tell Manifezt that [riscv_sandbox] itself depends on the full contents
    of the [src/riscv] directory. Manifezt doesn't know how to automatically
    infer non-OCaml dependency relationships. Also declare a dependency on
    the RISC-V test suite using the same tag to avoid warnings. *)
-let _ = Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/"
+let _ = Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/" ()
 
 type vm_kind = Pvm | Test
 

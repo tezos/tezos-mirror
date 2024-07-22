@@ -32,15 +32,18 @@
 *)
 
 let hermit_loader =
-  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/hermit-loader"
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/hermit-loader" ()
 
-let dummy_kernel = Uses.make ~tag:"riscv" ~path:"src/riscv/riscv-dummy.elf"
+let dummy_kernel = Uses.make ~tag:"riscv" ~path:"src/riscv/riscv-dummy.elf" ()
 
 let dummy_kernel_inbox =
-  Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/dummy-kernel-inbox.json"
+  Uses.make
+    ~tag:"riscv"
+    ~path:"tezt/tests/riscv-tests/dummy-kernel-inbox.json"
+    ()
 
 let dummy_kernel_frozen =
-  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf"
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf" ()
 
 let test_dummy_kernel () =
   Tezt_riscv_sandbox.run_pvm
@@ -61,6 +64,7 @@ let inline_asm_tests =
   Uses.make
     ~tag:"riscv"
     ~path:"src/riscv/tests/inline_asm/rv64-inline-asm-tests"
+    ()
 
 let test_inline_asm () = Tezt_riscv_sandbox.run_test ~input:inline_asm_tests ()
 

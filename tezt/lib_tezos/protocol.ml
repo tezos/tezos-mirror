@@ -88,6 +88,7 @@ let protocol_dependent_uses ~tag ~path =
     Uses.make
       ~tag:(tag ^ String.lowercase_ascii protocol)
       ~path:(path ^ protocol)
+      ()
   in
   (* Make sure [Uses.lookup] knows about all executables even before tests
      actually registers themselves. *)
