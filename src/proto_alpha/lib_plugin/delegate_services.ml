@@ -327,6 +327,34 @@ module S = struct
       ~output:(list Contract.encoding)
       RPC_path.(path / "delegators")
 
+  let own_staked =
+    RPC_service.get_service
+      ~description:
+        "The amount (in mutez) currently owned and staked by the baker itself. \
+         Returns the same value as \
+         ../<block_id>/context/contracts/<delegate_contract_id>/staked_balance \
+         (except for the fact that the present RPC fails if the \
+         public_key_hash in the path is not a delegate)."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "own_staked")
+
+  let own_delegated =
+    RPC_service.get_service
+      ~description:
+        "The amount (in mutez) currently owned by the baker itself and \
+         counting as delegated for the purpose of baking rights. This \
+         corresponds to all non-staked tokens owned by the baker: spendable \
+         balance, frozen bonds, and unstake requests. (Note: There is one \
+         exception: if the baker still has unstake requests created at a time \
+         when it was delegating to a different delegate, then these unstake \
+         requests still count as delegated to the former delegate. Any such \
+         unstake requests are excluded from the amount returned by the present \
+         RPC, despite being non-staked tokens owned by the baker.)"
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "own_delegated")
+
   let external_staked =
     RPC_service.get_service
       ~description:
@@ -521,13 +549,12 @@ let f_total_delegated ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   total_delegated ctxt pkh
 
-let external_staked ctxt pkh =
-  Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez ctxt ~delegate:pkh
-
-let f_external_staked ctxt pkh () () =
+let own_staked ctxt pkh =
   let open Lwt_result_syntax in
-  let* () = check_delegate_registered ctxt pkh in
-  external_staked ctxt pkh
+  let* own_staked_opt =
+    Contract.For_RPC.get_staked_balance ctxt (Implicit pkh)
+  in
+  return (Option.value own_staked_opt ~default:Tez.zero)
 
 let unstake_requests ctxt pkh =
   let open Lwt_result_syntax in
@@ -547,7 +574,7 @@ let unstake_requests ctxt pkh =
       in
       return_some Unstake_requests.{finalizable; unfinalizable}
 
-let external_staked_and_delegated ctxt pkh =
+let own_staked_and_delegated ctxt pkh =
   let open Lwt_result_syntax in
   let* own_full_balance = Delegate.For_RPC.full_balance ctxt pkh in
   let* own_unstake_requests = unstake_requests ctxt (Implicit pkh) in
@@ -574,10 +601,30 @@ let external_staked_and_delegated ctxt pkh =
         in
         Lwt.return Tez.(finalizable_sum +? unfinalizable_sum)
   in
-  let* total_staked_and_delegated = total_staked_and_delegated ctxt pkh in
   let*? own_staked_and_delegated =
     Tez.(own_full_balance -? own_unstaked_from_other_delegates)
   in
+  return own_staked_and_delegated
+
+let own_delegated ctxt pkh =
+  let open Lwt_result_syntax in
+  let* own_staked_and_delegated = own_staked_and_delegated ctxt pkh in
+  let* own_staked = own_staked ctxt pkh in
+  let*? own_delegated = Tez.(own_staked_and_delegated -? own_staked) in
+  return own_delegated
+
+let external_staked ctxt pkh =
+  Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez ctxt ~delegate:pkh
+
+let f_external_staked ctxt pkh () () =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  external_staked ctxt pkh
+
+let external_staked_and_delegated ctxt pkh =
+  let open Lwt_result_syntax in
+  let* total_staked_and_delegated = total_staked_and_delegated ctxt pkh in
+  let* own_staked_and_delegated = own_staked_and_delegated ctxt pkh in
   let*? external_staked_and_delegated =
     Tez.(total_staked_and_delegated -? own_staked_and_delegated)
   in
@@ -607,6 +654,12 @@ let f_delegators ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   let*! contracts = Delegate.delegated_contracts ctxt pkh in
   return contracts
+
+let wrap_check_registered ~chunked s f =
+  register1 ~chunked s (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let* () = check_delegate_registered ctxt pkh in
+      f ctxt pkh)
 
 let register () =
   let open Lwt_result_syntax in
@@ -684,6 +737,8 @@ let register () =
   register1 ~chunked:true S.Deprecated.delegated_contracts f_delegators ;
   register1 ~chunked:true S.delegators f_delegators ;
   register1 ~chunked:false S.Deprecated.total_delegated_stake f_external_staked ;
+  wrap_check_registered ~chunked:false S.own_staked own_staked ;
+  wrap_check_registered ~chunked:false S.own_delegated own_delegated ;
   register1 ~chunked:false S.external_staked f_external_staked ;
   register1 ~chunked:false S.external_delegated f_external_delegated ;
   register1 ~chunked:false S.Deprecated.delegated_balance (fun ctxt pkh () () ->
