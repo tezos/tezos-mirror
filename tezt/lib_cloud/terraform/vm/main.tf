@@ -281,6 +281,8 @@ resource "google_compute_instance_template" "default" {
   disk {
     source_image = data.google_compute_image.cos.self_link
     type         = "PERSISTENT"
+    disk_type    = "pd-ssd"
+    disk_size_gb = 200
     boot         = true
     auto_delete  = true
   }
