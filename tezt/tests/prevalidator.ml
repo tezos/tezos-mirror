@@ -1890,7 +1890,6 @@ module Revamped = struct
     let inject_attestation (delegate : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~use_legacy_name:false
            ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
            ~level
            ~round:0
@@ -2142,7 +2141,6 @@ module Revamped = struct
       let* op =
         Operation.Consensus.operation
           (Operation.Consensus.attestation
-             ~use_legacy_name:false
              ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
              ~level
              ~round:0
@@ -2404,7 +2402,6 @@ module Revamped = struct
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~use_legacy_name:false
            ~slot:(Operation.Consensus.first_slot ~slots_json account)
            ~level
            ~round:0
@@ -2538,7 +2535,6 @@ module Revamped = struct
     let inject_attestation ~(account : Account.key) ~(signer : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~use_legacy_name:false
            ~slot:(Operation.Consensus.first_slot ~slots_json account)
            ~level
            ~round:0
@@ -2747,7 +2743,6 @@ module Revamped = struct
       in
       let op =
         Operation.Consensus.attestation
-          ~use_legacy_name:false
           ~slot
           ~level
           ~round

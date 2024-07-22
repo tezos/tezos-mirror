@@ -244,13 +244,10 @@ module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
 
-  (** [consensus ~kind ~use_legacy_name ~level ~round ~slot ~block_payload_hash]
+  (** [consensus ~kind ~level ~round ~slot ~block_payload_hash]
       crafts a consensus operation with the [kind] at [level] on the [round]
-      with the [slot] and [block_payload_hash]. If [use_legacy_name] is set, the
-      [kind] field in the crafted JSON will be "(pre)endorsement" instead of
-      "(pre)attestation". *)
+      with the [slot] and [block_payload_hash]. *)
   val consensus :
-    use_legacy_name:bool ->
     kind:consensus_kind ->
     slot:int ->
     level:int ->
@@ -258,27 +255,17 @@ module Consensus : sig
     block_payload_hash:string ->
     t
 
-  (** [preattestation ?use_legacy_name ~level ~round ~slot ~block_payload_hash]
+  (** [preattestation ~level ~round ~slot ~block_payload_hash]
       crafts a preattestation operation at [level] on the [round] with the
-      [slot] and [block_payload_hash]. If [use_legacy_name] is set, the [kind]
-      field in the crafted JSON will be "preendorsement" instead of
-      "preattestation". *)
+      [slot] and [block_payload_hash]. *)
   val preattestation :
-    use_legacy_name:bool ->
-    slot:int ->
-    level:int ->
-    round:int ->
-    block_payload_hash:string ->
-    t
+    slot:int -> level:int -> round:int -> block_payload_hash:string -> t
 
-  (** [attestation ?use_legacy_name ~level ~round ~slot ~block_payload_hash
+  (** [attestation ~level ~round ~slot ~block_payload_hash
       ?dal_attestation ()] crafts an attestation operation at the given [level]
       on the given [round] with the given [slot] and [block_payload_hash] and
-      optionally the given [dal_attestation]. If [use_legacy_name] is set, the
-      [kind] field in the crafted JSON will be "endorsement" instead of
-      "attestation". *)
+      optionally the given [dal_attestation]. *)
   val attestation :
-    use_legacy_name:bool ->
     slot:int ->
     level:int ->
     round:int ->
@@ -287,10 +274,9 @@ module Consensus : sig
     unit ->
     t
 
-  (** [kind_to_string kind ~use_legacy_name] returns the name of the
-      [kind]. If [use_legacy_name] is set, the name corresponding to the [kind]
-      will be "(pre)endorsement" instead of "(pre)attestation". *)
-  val kind_to_string : consensus_kind -> use_legacy_name:bool -> string
+  (** [kind_to_string kind ] returns the name of the
+      [kind]. *)
+  val kind_to_string : consensus_kind -> string
 
   (** [operation] constructs an operation from a consensus
      operation. the [client] is used to fetch the branch and the
@@ -342,44 +328,34 @@ module Anonymous : sig
     | Double_attestation_evidence
     | Double_preattestation_evidence
 
-  (** [double_consensus_evidence ~kind ~use_legacy_name op1 op2] crafts a double
+  (** [double_consensus_evidence ~kind op1 op2] crafts a double
       consensus evidence operation with the [kind], [op1] and [op2]. Both
       operations should be of the same kind and the same as the one expected by
-      [kind]. If [use_legacy_name] is set, the [kind] field in the crafted JSON
-      will be "(pre)endorsement" instead of "(pre)attestation". *)
+      [kind]. *)
   val double_consensus_evidence :
     kind:double_consensus_evidence_kind ->
-    use_legacy_name:bool ->
     operation * Tezos_crypto.Signature.t ->
     operation * Tezos_crypto.Signature.t ->
     t
 
-  (** [double_attestation_evidence ~use_legacy_name op1 op2] crafts a double
+  (** [double_attestation_evidence op1 op2] crafts a double
       attestation evidence operation with op1 and op2. Both operations should be
-      attestations. If [use_legacy_name] is set, the [kind] field in the crafted
-      JSON will be "endorsement" instead of "attestation". *)
+      attestations. *)
   val double_attestation_evidence :
-    use_legacy_name:bool ->
     operation * Tezos_crypto.Signature.t ->
     operation * Tezos_crypto.Signature.t ->
     t
 
-  (** [double_preattestation_evidence ~use_legacy_name op1 op2] crafts a double
-      attestation evidence operation with op1 and op2. Both operations should be
-      preattestations. If [use_legacy_name] is set, the [kind] field in the
-      crafted JSON will be "preendorsement" instead of "preattestation". *)
+  (** [double_preattestation_evidence op1 op2] crafts a double
+      preattestation evidence operation with op1 and op2. Both operations should be
+      preattestations. *)
   val double_preattestation_evidence :
-    use_legacy_name:bool ->
     operation * Tezos_crypto.Signature.t ->
     operation * Tezos_crypto.Signature.t ->
     t
 
-  (** [kind_to_string kind ~use_legacy_name] return the name of the [kind]. If
-      [use_legacy_name] is set, the name corresponding to the [kind] will be
-      "double_(pre)endorsement_evidence" instead of
-      "double_(pre)attestation_evidence". *)
-  val kind_to_string :
-    double_consensus_evidence_kind -> use_legacy_name:bool -> string
+  (** [kind_to_string kind] return the name of the [kind]. *)
+  val kind_to_string : double_consensus_evidence_kind -> string
 
   (** [operation] constructs an operation from an anonymous operation. the
       [client] is used to fetch the branch and the [chain_id]. *)
