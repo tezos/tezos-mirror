@@ -8,22 +8,24 @@
 module Docker_registry : sig
   val init : unit -> unit Lwt.t
 
-  val deploy : unit -> unit Lwt.t
+  val deploy : tezt_cloud:string -> project_id:string -> unit Lwt.t
 
-  val get_docker_registry : unit -> string Lwt.t
+  val get_docker_registry : tezt_cloud:string -> string Lwt.t
 
-  val get_hostname : unit -> string Lwt.t
+  val get_hostname : tezt_cloud:string -> string Lwt.t
+
+  val get_zone : tezt_cloud:string -> string Lwt.t
 end
 
 module VM : sig
   module Workspace : sig
-    val init : string list -> unit Lwt.t
+    val init : tezt_cloud:string -> string list -> unit Lwt.t
 
-    val get : unit -> string list Lwt.t
+    val list : tezt_cloud:string -> string list Lwt.t
 
     val select : string -> unit Lwt.t
 
-    val destroy : unit -> unit Lwt.t
+    val destroy : tezt_cloud:string -> unit Lwt.t
   end
 
   val init : unit -> unit Lwt.t
@@ -41,11 +43,5 @@ module VM : sig
 
   val zone : unit -> string Lwt.t
 
-  val destroy : string list -> unit Lwt.t
-end
-
-module State_bucket : sig
-  val init : unit -> unit Lwt.t
-
-  val deploy : unit -> unit Lwt.t
+  val destroy : string list -> project_id:string -> unit Lwt.t
 end

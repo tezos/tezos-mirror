@@ -5,6 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* [generate_key ()] generates an ssh key based on the
-   [Env.tezt_cloud] variable environment. *)
+(** [generate_key ()] generates an ssh key based on the [Env.tezt_cloud]
+     variable environment. *)
 val generate_key : unit -> unit Lwt.t

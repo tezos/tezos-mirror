@@ -1,0 +1,6287 @@
+{
+   "__inputs": [ ],
+   "__requires": [ ],
+   "annotations": {
+      "list": [ ]
+   },
+   "editable": true,
+   "gnetId": null,
+   "graphTooltip": 0,
+   "hideControls": false,
+   "id": null,
+   "links": [ ],
+   "panels": [
+      {
+         "collapse": false,
+         "collapsed": false,
+         "id": 2,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Node stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [
+                  {
+                     "id": 0,
+                     "options": {
+                        "0": {
+                           "color": "red",
+                           "index": 1,
+                           "text": "Bootstrapping"
+                        },
+                        "1": {
+                           "color": "green",
+                           "index": 0,
+                           "text": "Bootstrapped"
+                        },
+                        "null": {
+                           "color": "yellow",
+                           "index": 2,
+                           "text": "Unknown"
+                        }
+                     },
+                     "type": "value"
+                  }
+               ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [ ]
+               },
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 1
+         },
+         "id": 3,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "mean"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "octez_validator_chain_is_bootstrapped{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "",
+               "refId": "A"
+            }
+         ],
+         "title": "Bootstrap status",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [
+                  {
+                     "id": 0,
+                     "options": {
+                        "0": {
+                           "color": "red",
+                           "index": 0,
+                           "text": "Unsync"
+                        },
+                        "1": {
+                           "color": "green",
+                           "index": 1,
+                           "text": "Sync"
+                        },
+                        "2": {
+                           "color": "red",
+                           "index": 2,
+                           "text": "Stuck"
+                        },
+                        "null": {
+                           "color": "yellow",
+                           "index": 3,
+                           "text": "Unknow"
+                        }
+                     },
+                     "type": "value"
+                  }
+               ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [ ]
+               },
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 1
+         },
+         "id": 4,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "mean"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "octez_validator_chain_synchronisation_status{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "",
+               "refId": "A"
+            }
+         ],
+         "title": "Sync status",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 4,
+            "x": 4,
+            "y": 1
+         },
+         "id": 5,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_version{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "{{ chain_name }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Chain name",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "name"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 8,
+            "y": 1
+         },
+         "id": 6,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_version{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "{{ version }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Node release version",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "name"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 11,
+            "y": 1
+         },
+         "id": 7,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "(label_replace(octez_version{app=\"$node_instance\"},\"commit_hash_short\" ,\"$1\",\"commit_hash\",\"^(.{8}).*$\"))",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "{{ commit_hash_short }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Node release commit",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "name"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "description": "Reflects the uptime of the monitoring of the job, not the uptime of the process.",
+         "format": "dtdhms",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 4,
+            "x": 0,
+            "y": 4
+         },
+         "id": 8,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "time()-(process_start_time_seconds{app=\"$node_instance\"})",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "node uptime",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Node uptime",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "max"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 4,
+            "x": 0,
+            "y": 7
+         },
+         "id": 9,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_validator_chain_head_level{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "current head level",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Current head level",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "avg"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 10
+         },
+         "id": 10,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_version{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "{{ p2p_version }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "P2p version",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "name"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 10
+         },
+         "id": 11,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_version{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "{{ distributed_db_version }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Distributed db version",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "value"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 13
+         },
+         "id": 12,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_store_savepoint_level{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "current savepoint",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Current savepoint level",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "avg"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 13
+         },
+         "id": 13,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_store_checkpoint_level{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "current checkpoint",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Current checkpoint level",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "avg"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 16
+         },
+         "id": 14,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_store_caboose_level{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "current caboose",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Current caboose level",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "avg"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 16
+         },
+         "id": 15,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_validator_chain_head_cycle{app=\"$node_instance\"}",
+               "format": "time_series",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "Current cycle",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Current cycle",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "avg"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 19
+         },
+         "id": 16,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_p2p_points_trusted{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "trusted points",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Trusted points",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "max"
+      },
+      {
+         "cacheTimeout": null,
+         "colorBackground": false,
+         "colorValue": false,
+         "colors": [
+            "#299c46",
+            "rgba(237, 129, 40, 0.89)",
+            "#d44a3a"
+         ],
+         "datasource": "Prometheus",
+         "format": "none",
+         "gauge": {
+            "maxValue": 100,
+            "minValue": 0,
+            "show": false,
+            "thresholdLabels": false,
+            "thresholdMarkers": true
+         },
+         "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 19
+         },
+         "id": 17,
+         "interval": null,
+         "links": [ ],
+         "mappingType": 1,
+         "mappingTypes": [
+            {
+               "name": "value to text",
+               "value": 1
+            },
+            {
+               "name": "range to text",
+               "value": 2
+            }
+         ],
+         "maxDataPoints": 100,
+         "nullPointMode": "connected",
+         "nullText": null,
+         "postfix": "",
+         "postfixFontSize": "50%",
+         "prefix": "",
+         "prefixFontSize": "50%",
+         "rangeMaps": [
+            {
+               "from": "null",
+               "text": "N/A",
+               "to": "null"
+            }
+         ],
+         "sparkline": {
+            "fillColor": "rgba(31, 118, 189, 0.18)",
+            "full": false,
+            "lineColor": "rgb(31, 120, 193)",
+            "show": false
+         },
+         "tableColumn": "",
+         "targets": [
+            {
+               "expr": "octez_p2p_connections_private{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Private Connections",
+               "refId": "A"
+            }
+         ],
+         "thresholds": "",
+         "title": "Private Connections",
+         "type": "singlestat",
+         "valueFontSize": "80%",
+         "valueMaps": [
+            {
+               "op": "=",
+               "text": "N/A",
+               "value": "null"
+            }
+         ],
+         "valueName": "max"
+      },
+      {
+         "aliasColors": {
+            "Head level": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 10,
+            "w": 10,
+            "x": 4,
+            "y": 4
+         },
+         "id": 18,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_chain_head_level{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Head level",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Head level history",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Validation time": "light-blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 10,
+            "x": 4,
+            "y": 14
+         },
+         "id": 19,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_block_last_finished_request_completion_timestamp{app=\"$node_instance\"} - octez_validator_block_last_finished_request_treatment_timestamp{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Validation time",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Block validation time",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "datasource": "Loki",
+         "gridPos": {
+            "h": 21,
+            "w": 10,
+            "x": 14,
+            "y": 0
+         },
+         "id": 20,
+         "options": {
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+         },
+         "span": 12,
+         "targets": [
+            {
+               "expr": "{job=\"octez-node\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Node logs",
+               "refId": "A"
+            }
+         ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Node logs",
+         "type": "logs"
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "decimals": 0,
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 14,
+            "x": 0,
+            "y": 22
+         },
+         "id": 21,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": true,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_block_operations_per_pass{pass_id=\"0\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Consensus",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_validator_block_operations_per_pass{pass_id=\"1\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Vote",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_validator_block_operations_per_pass{pass_id=\"2\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Anonymous",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_validator_block_operations_per_pass{pass_id=\"3\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Manager",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Head operations",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "decimals": 0,
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "decimals": 0,
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Invalid blocks": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 10,
+            "x": 14,
+            "y": 22
+         },
+         "id": 22,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_store_invalid_blocks{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Invalid blocks",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Invalid blocks history",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Gas consumed": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 14,
+            "x": 0,
+            "y": 30
+         },
+         "id": 23,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": true,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_chain_head_consumed_gas{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Gas consumed",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Gas consumed history",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "sci",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "sci",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Round": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 10,
+            "x": 14,
+            "y": 30
+         },
+         "id": 24,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": false,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_chain_head_round{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Round",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Round history",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Merge time": "light-blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 14,
+            "x": 0,
+            "y": 38
+         },
+         "id": 25,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_store_last_merge_time{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Merge time",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Store merge time",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Written block size": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 10,
+            "x": 14,
+            "y": 38
+         },
+         "id": 26,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": true,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_store_last_written_block_size{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Written block size",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Last written block size",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 8,
+            "x": 0,
+            "y": 47
+         },
+         "id": 27,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Node Hardware stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Cpu load": "light-yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 47
+         },
+         "id": 28,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "sum(netdata_app_cpu_utilization_percentage_average{app_group=\"octez\",app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Cpu load",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Cpu actitvity",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "percent",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "percent",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Memory usage": "light-green",
+            "Swap usage": "light-orange"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 47
+         },
+         "id": 29,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "netdata_app_mem_usage_MiB_average{app_group=\"octez\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Memory usage",
+               "refId": "A"
+            },
+            {
+               "expr": "netdata_app_swap_usage_MiB_average{app_group=\"octez\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Swap usage",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Memory usage",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "mbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "mbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "datasource": null,
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [ ]
+               },
+               "unit": "decbytes"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 2,
+            "x": 0,
+            "y": 55
+         },
+         "id": 30,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "lastNotNull"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "node_filesystem_free_bytes{mountpoint=\"/\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Available bytes on disk.",
+               "refId": "A"
+            }
+         ],
+         "title": "Disk free space",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 11,
+            "x": 2,
+            "y": 55
+         },
+         "id": 31,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "netdata_disk_space_GiB_average{chart=\"disk_space._\",dimension=\"used\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "{{dimension}}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Storage",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "reads": "light-green",
+            "writes": "light-yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 11,
+            "x": 13,
+            "y": 55
+         },
+         "id": 32,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "netdata_app_disk_logical_io_KiB_persec_average{app_group=\"octez\",dimension=\"reads\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "reads",
+               "refId": "A"
+            },
+            {
+               "expr": "netdata_app_disk_logical_io_KiB_persec_average{app_group=\"octez\",dimension=\"writes\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "writes",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "IOs",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "kbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "kbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": null,
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 63
+         },
+         "id": 33,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [
+            {
+               "alias": "/.*received/",
+               "transform": "negative-Y"
+            }
+         ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "irate(node_network_receive_bytes_total[5m]) > 0",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Bytes received",
+               "refId": "A"
+            },
+            {
+               "expr": "irate(node_network_transmit_bytes_total[5m]) > 0",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Bytes transmitted",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Network traffic",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "Bps",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "Bps",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "All fds": "light-green",
+            "Files": "light-blue",
+            "Pipes": "light-orange",
+            "Sockets": "light-yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "decimals": 0,
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 63
+         },
+         "id": 34,
+         "legend": {
+            "alignAsTable": "true",
+            "avg": "true",
+            "current": "true",
+            "max": "true",
+            "min": "true",
+            "rightSide": "true",
+            "show": "true",
+            "sideWidth": null,
+            "total": false,
+            "values": "true"
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "sum(netdata_app_fds_open_fds_average{dimension=\"sockets\",app_group=\"octez\",app=\"$node_instance\"}) + sum(netdata_app_fds_open_fds_average{dimension=\"files\",app_group=\"octez\",app=\"$node_instance\"}) + sum(netdata_app_fds_open_fds_average{dimension=\"pipes\",app_group=\"octez\",app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "All fds",
+               "refId": "A"
+            },
+            {
+               "expr": "netdata_app_fds_open_fds_average{dimension=\"sockets\",app_group=\"octez\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Sockets",
+               "refId": "B"
+            },
+            {
+               "expr": "netdata_app_fds_open_fds_average{dimension=\"files\",app_group=\"octez\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Files",
+               "refId": "C"
+            },
+            {
+               "expr": "netdata_app_fds_open_fds_average{dimension=\"pipes\",app_group=\"octez\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Pipes",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "File descriptors",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "decimals": 0,
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "decimals": 0,
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 8,
+            "x": 0,
+            "y": 72
+         },
+         "id": 35,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "P2P stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Branch delayed": "light-red",
+            "Branch refused": "light-orange",
+            "Outdated": "blue",
+            "Refused": "red",
+            "Unprocessed": "light-yellow",
+            "Validated": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "decimals": 0,
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 72
+         },
+         "id": 36,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": true,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": true,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_mempool_pending_validated{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Validated",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_mempool_pending_refused{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Refused",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_mempool_pending_outdated{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Outdated",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_mempool_pending_branch_refused{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Branch refused",
+               "refId": "D"
+            },
+            {
+               "expr": "octez_mempool_pending_branch_delayed{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Branch delayed",
+               "refId": "E"
+            },
+            {
+               "expr": "octez_mempool_pending_unprocessed{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Unprocessed",
+               "refId": "F"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Mempool status",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "decimals": 0,
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "decimals": 0,
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Incoming connections": "light-green",
+            "Outgoing connections": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 72
+         },
+         "id": 37,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_p2p_connections_outgoing{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Outgoing connections",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_p2p_connections_incoming{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Incoming connections",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "P2P total connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Disconnected peers": "light-yellow",
+            "Running peers": "light-green",
+            "Waiting to reconnect": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 80
+         },
+         "id": 38,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_p2p_peers_disconnected{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Disconnected peers",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_p2p_peers_running{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Running peers",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_p2p_points_greylisted{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Waiting to reconnect",
+               "refId": "C"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "P2P peers connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Disconnected points": "light-red",
+            "Running points": "light-green",
+            "Trusted points": "light-yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 80
+         },
+         "id": 39,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_p2p_points_disconnected{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Disconnected points",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_p2p_points_running{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Running points",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_p2p_points_trusted{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Trusted points",
+               "refId": "C"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "P2P points connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "current head broadcasted": "light-green",
+            "current head received": "light-blue",
+            "current head sent": "light-green",
+            "get current head broadcasted": "green",
+            "get current head received": "blue",
+            "get current head sent": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 0,
+            "y": 88
+         },
+         "id": 40,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_current_head_messages{action=\"broadcasted\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get current head broadcasted",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_current_head_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get current head sent",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_current_head_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "current head received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_current_head_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get current head received",
+               "refId": "D"
+            },
+            {
+               "expr": "octez_distributed_db_message_current_head_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "current head sent",
+               "refId": "E"
+            },
+            {
+               "expr": "octez_distributed_db_message_current_head_messages{action=\"broadcasted\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "current head broadcasted",
+               "refId": "F"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB current head messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "current branch received": "light-blue",
+            "current branch sent": "light-green",
+            "get current branch received": "blue",
+            "get current branch sent": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 88
+         },
+         "id": 41,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_current_branch_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get current branch sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_current_branch_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "current branch received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_current_branch_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get current branch received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_current_branch_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "current branch sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB current branch messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "block header received": "light-blue",
+            "block header sent": "light-green",
+            "get block headers received": "blue",
+            "get block headers sent": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 88
+         },
+         "id": 42,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_block_headers_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get block headers sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_block_header_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "block header received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_block_headers_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get block headers received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_block_header_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "block header sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB block headers messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "get predecessor header received": "blue",
+            "get predecessor header sent": "green",
+            "predecessor header received": "light-blue",
+            "predecessor header sent": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 88
+         },
+         "id": 43,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_predecessor_header_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get predecessor header sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_predecessor_header_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "predecessor header received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_predecessor_header_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get predecessor header received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_predecessor_header_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "predecessor header sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB predecessor header messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "get operations received": "blue",
+            "get operations sent": "green",
+            "operation received": "light-blue",
+            "operation sent": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 0,
+            "y": 96
+         },
+         "id": 44,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_operations_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get operations sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_operation_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "operation received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_operations_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get operations received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_operation_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "operation sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB operations messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "get ops for blocks received": "blue",
+            "get ops for blocks sent": "green",
+            "ops for block received": "light-blue",
+            "ops for block sent": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 96
+         },
+         "id": 45,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_operations_for_blocks_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get ops for blocks sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_operations_for_block_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "ops for block received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_operations_for_blocks_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get ops for blocks received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_operations_for_block_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "ops for block sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB operations for blocks messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "get protocols received": "blue",
+            "get protocols sent": "green",
+            "protocol received": "light-blue",
+            "protocol sent": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 12,
+            "y": 96
+         },
+         "id": 46,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_protocols_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get protocols sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_protocol_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "protocol received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_protocols_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get protocols received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_protocol_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "protocol sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB protocols messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "get protocol branch received": "blue",
+            "get protocol branch sent": "green",
+            "protocol branch received": "light-blue",
+            "protocol branch sent": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 15,
+            "y": 96
+         },
+         "id": 47,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_protocol_branch_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get protocol branch sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_protocol_branch_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "protocol branch received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_protocol_branch_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get protocol branch received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_protocol_branch_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "protocol branch sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB protocol branch messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "checkpoint received": "light-blue",
+            "checkpoint sent": "light-green",
+            "get checkpoint received": "blue",
+            "get checkpoint sent": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 18,
+            "y": 96
+         },
+         "id": 48,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_checkpoint_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get checkpoint sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_checkpoint_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "checkpoint received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_checkpoint_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get checkpoint received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_checkpoint_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "checkpoint sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB checkpoint messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "deactivate received": "light-blue",
+            "deactivate sent": "light-green",
+            "get deactivate received": "blue",
+            "get deactivate sent": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 21,
+            "y": 96
+         },
+         "id": 49,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_message_get_deactivate_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get deactivate sent",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_message_deactivate_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "deactivate received",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_message_get_deactivate_messages{action=\"received\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "get deactivate received",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_message_deactivate_messages{action=\"sent\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "deactivate sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB deactivate messages",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 8,
+            "x": 0,
+            "y": 105
+         },
+         "id": 50,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Workers stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 105
+         },
+         "id": 51,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_block_worker_request_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Block validator request count",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_validator_block_worker_completion_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Block validator completion count",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_validator_block_worker_request_error_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Block validator error count",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_validator_chain_worker_request_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Chain validator request count",
+               "refId": "D"
+            },
+            {
+               "expr": "octez_validator_chain_worker_completion_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Chain validator completion count",
+               "refId": "E"
+            },
+            {
+               "expr": "octez_validator_chain_worker_error_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Chain validator error count",
+               "refId": "F"
+            },
+            {
+               "expr": "octez_mempool_worker_request_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Prevalidator validator request count",
+               "refId": "G"
+            },
+            {
+               "expr": "octez_mempool_worker_completion_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Prevalidator validator completion count",
+               "refId": "H"
+            },
+            {
+               "expr": "octez_mempool_worker_error_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Prevalidator validator error count",
+               "refId": "I"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Validation workers requests",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 105
+         },
+         "id": 52,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_distributed_db_requester_table_length{requester_kind=\"block_header\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "headers table",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_distributed_db_requester_scheduler_length{requester_kind=\"block_header\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "headers scheduler",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_distributed_db_requester_table_length{requester_kind=\"operations\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "operations table",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_distributed_db_requester_scheduler_length{requester_kind=\"operations\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "operations scheduler",
+               "refId": "D"
+            },
+            {
+               "expr": "octez_distributed_db_requester_table_length{requester_kind=\"operation\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "operation table",
+               "refId": "E"
+            },
+            {
+               "expr": "octez_distributed_db_requester_scheduler_length{requester_kind=\"operation\",app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "operation scheduler",
+               "refId": "F"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "DDB Workers",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "block validator": "light-red",
+            "chain validator": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 121
+         },
+         "id": 53,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_chain_last_finished_request_treatment_timestamp{app=\"$node_instance\"} - octez_validator_chain_last_finished_request_push_timestamp{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "chain validator",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_validator_block_last_finished_request_treatment_timestamp{app=\"$node_instance\"} - octez_validator_block_last_finished_request_push_timestamp{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "block validator",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Validators Requests Treatments",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "block validator": "light-red",
+            "chain validator": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 121
+         },
+         "id": 54,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_chain_last_finished_request_completion_timestamp{app=\"$node_instance\"} - octez_validator_chain_last_finished_request_treatment_timestamp{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "chain validator",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_validator_block_last_finished_request_completion_timestamp{app=\"$node_instance\"} - octez_validator_block_last_finished_request_treatment_timestamp{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "block validator",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Validators Requests Completion",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "connections": "light-green",
+            "fetching canceled knew unknown head": "light-orange",
+            "fetching canceled new branch": "green",
+            "fetching canceled new known valid head": "light-yellow",
+            "invalid blocks": "light-red",
+            "invalid locator": "light-orange",
+            "new branch completed": "light-blue",
+            "new head completed": "blue",
+            "on no request count": "white",
+            "system error": "orange",
+            "too short locator": "brown",
+            "unavailable protocol": "light-red",
+            "unknown ancestor": "yellow",
+            "unknown error": "red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 129
+         },
+         "id": 55,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_validator_peer_connections{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "connections",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_validator_peer_invalid_block{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "invalid blocks",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_validator_peer_invalid_locator{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "invalid locator",
+               "refId": "C"
+            },
+            {
+               "expr": "octez_validator_peer_new_branch_completed{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "new branch completed",
+               "refId": "D"
+            },
+            {
+               "expr": "octez_validator_peer_new_head_completed{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "new head completed",
+               "refId": "E"
+            },
+            {
+               "expr": "octez_validator_peer_on_no_request_count{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "on no request count",
+               "refId": "F"
+            },
+            {
+               "expr": "octez_validator_peer_operations_fetching_canceled_new_branch{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "fetching canceled new branch",
+               "refId": "G"
+            },
+            {
+               "expr": "octez_validator_peer_operations_fetching_canceled_new_known_valid_head{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "fetching canceled new known valid head",
+               "refId": "H"
+            },
+            {
+               "expr": "octez_validator_peer_operations_fetching_canceled_new_unknown_head{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "fetching canceled knew unknown head",
+               "refId": "I"
+            },
+            {
+               "expr": "octez_validator_peer_system_error{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "system error",
+               "refId": "J"
+            },
+            {
+               "expr": "octez_validator_peer_too_short_locator{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "too short locator",
+               "refId": "K"
+            },
+            {
+               "expr": "octez_validator_peer_unavailable_protocol{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "unavailable protocol",
+               "refId": "L"
+            },
+            {
+               "expr": "octez_validator_peer_unknown_ancestor{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "unknown ancestor",
+               "refId": "M"
+            },
+            {
+               "expr": "octez_validator_peer_unknown_error{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "unknown error",
+               "refId": "N"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Peer validators",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 16,
+            "w": 8,
+            "x": 0,
+            "y": 130
+         },
+         "id": 56,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "RPC",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Blocks": "light-blue",
+            "Chains": "light-red",
+            "Config": "light-yellow",
+            "Injection": "green",
+            "Misc": "grey",
+            "Network": "blue",
+            "Private": "purple",
+            "Protocols": "blue",
+            "Versions": "light-green",
+            "Workers": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 130
+         },
+         "id": 57,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/chains/<chain_id>/.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Chains",
+               "refId": "A"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/chains/<chain_id>/blocks/.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Blocks",
+               "refId": "B"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/version.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Versions",
+               "refId": "C"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/config.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Config",
+               "refId": "D"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/network.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Network",
+               "refId": "E"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/workers.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Workers",
+               "refId": "F"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/injection.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Injection",
+               "refId": "G"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/protocols.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Protocols",
+               "refId": "H"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/private.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Private",
+               "refId": "I"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'/(fetch_protocol|stats|monitor)*.',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Misc",
+               "refId": "J"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "RPC calls",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Blocks": "light-blue",
+            "Chains": "light-red",
+            "Config": "light-yellow",
+            "Injection": "green",
+            "Misc": "grey",
+            "Network": "blue",
+            "Private": "purple",
+            "Protocols": "blue",
+            "Versions": "light-green",
+            "Workers": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 138
+         },
+         "id": 58,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/chains/<chain_id>/.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/chains/<chain_id>/.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Chains",
+               "refId": "A"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/chains/<chain_id>/blocks/.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/chains/<chain_id>/blocks/.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Blocks",
+               "refId": "B"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/version.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/version.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Versions",
+               "refId": "C"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/config.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/config.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Config",
+               "refId": "D"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/network.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/network.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Network",
+               "refId": "E"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/workers.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/workers.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Workers",
+               "refId": "F"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/injection.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/injection.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Injection",
+               "refId": "G"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/protocols.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/protocols.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Protocols",
+               "refId": "H"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/private.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/private.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Private",
+               "refId": "I"
+            },
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'/(fetch_protocol|stats|monitor)*.',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'/(fetch_protocol|stats|monitor)*.',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Misc",
+               "refId": "J"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "RPC durations",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "s",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "light-yellow",
+                        "value": "Base"
+                     }
+                  ]
+               },
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 130
+         },
+         "id": 59,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "last"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "sum(octez_rpc_calls_count{endpoint=~'.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "total calls",
+               "refId": "A"
+            }
+         ],
+         "title": "Total of RPC calls",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "light-yellow",
+                        "value": "Base"
+                     }
+                  ]
+               },
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 130
+         },
+         "id": 60,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "mean"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "sum(rate(octez_rpc_calls_count{endpoint=~\".*\",app=\"$node_instance\"}[1h]))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "calls rate",
+               "refId": "A"
+            }
+         ],
+         "title": "RPC calls rate per hour",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "blue",
+                        "value": "Base"
+                     }
+                  ]
+               },
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 12,
+            "y": 138
+         },
+         "id": 61,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "mean"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'.*',app=\"$node_instance\"})/sum(octez_rpc_calls_count{endpoint=~'.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "average duration",
+               "refId": "A"
+            }
+         ],
+         "title": "Average of calls durations",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "blue",
+                        "value": "Base"
+                     }
+                  ]
+               },
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 15,
+            "y": 138
+         },
+         "id": 62,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "max"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "max(octez_rpc_calls_sum{app=\"$node_instance\"} / octez_rpc_calls_count{app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "max average duration",
+               "refId": "A"
+            }
+         ],
+         "title": "Max of average calls durations",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "blue",
+                        "value": "Base"
+                     }
+                  ]
+               },
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 18,
+            "y": 138
+         },
+         "id": 63,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "max"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "max(octez_rpc_calls_sum{app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "max total duration",
+               "refId": "A"
+            }
+         ],
+         "title": "Max of total calls durations",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "datasource": "Prometheus",
+         "fieldConfig": {
+            "defaults": {
+               "links": [ ],
+               "mappings": [ ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "blue",
+                        "value": "Base"
+                     }
+                  ]
+               },
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 21,
+            "y": 138
+         },
+         "id": 64,
+         "links": [ ],
+         "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+               "calcs": [
+                  "last"
+               ],
+               "fields": "",
+               "values": false
+            },
+            "textMode": "auto"
+         },
+         "pluginVersion": "7",
+         "targets": [
+            {
+               "expr": "sum(octez_rpc_calls_sum{endpoint=~'.*',app=\"$node_instance\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "total duration",
+               "refId": "A"
+            }
+         ],
+         "title": "Total of RPC calls duration",
+         "transparent": false,
+         "type": "stat"
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 147
+         },
+         "id": 65,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Miscellaneous",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Forced major collections": "light-blue",
+            "Heap compactions": "light-red",
+            "Major collections": "light-yellow",
+            "Minor collections": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 147
+         },
+         "id": 66,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "ocaml_gc_minor_collections{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Minor collections",
+               "refId": "A"
+            },
+            {
+               "expr": "ocaml_gc_major_collections{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Major collections",
+               "refId": "B"
+            },
+            {
+               "expr": "ocaml_gc_forced_major_collections{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Forced major collections",
+               "refId": "C"
+            },
+            {
+               "expr": "ocaml_gc_compactions{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Heap compactions",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "GC maintenance operations",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 10,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Major heap": "light-green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 147
+         },
+         "id": 67,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": false,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "ocaml_gc_heap_words{app=\"$node_instance\"}* 8",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Major heap",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "GC major word sizes",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 8,
+            "x": 0,
+            "y": 156
+         },
+         "id": 68,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Delegates Hardware stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Cpu load accuser": "light-yellow",
+            "Cpu load baker": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 156
+         },
+         "id": 69,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "netdata_apps_cpu_percentage_average{dimension=\"octez-accuser\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Cpu load accuser",
+               "refId": "A"
+            },
+            {
+               "expr": "netdata_apps_cpu_percentage_average{dimension=\"octez-baker\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Cpu load baker",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Cpu actitvity",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "percent",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "percent",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Memory usage accuser": "dark-yellow",
+            "Memory usage baker": "dark-red",
+            "Swap usage accuser": "light-yellow",
+            "Swap usage baker": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 156
+         },
+         "id": 70,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "netdata_apps_mem_MiB_average{dimension=\"octez-accuser\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Memory usage accuser",
+               "refId": "A"
+            },
+            {
+               "expr": "netdata_apps_swap_MiB_average{dimension=\"octez-accuser\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Swap usage accuser",
+               "refId": "B"
+            },
+            {
+               "expr": "netdata_apps_mem_MiB_average{dimension=\"octez-baker\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Memory usage baker",
+               "refId": "C"
+            },
+            {
+               "expr": "netdata_apps_swap_MiB_average{dimension=\"octez-baker\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Swap usage baker",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Memory usage",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "mbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "mbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "reads accuser": "dark-yellow",
+            "reads baker": "dark-red",
+            "writes accuser": "light-yellow",
+            "writes baker": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 156
+         },
+         "id": 71,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "netdata_apps_lreads_KiB_persec_average{dimension=\"octez-accuser\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "reads accuser",
+               "refId": "A"
+            },
+            {
+               "expr": "netdata_apps_lwrites_KiB_persec_average{dimension=\"octez-accuser\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "writes accuser",
+               "refId": "B"
+            },
+            {
+               "expr": "netdata_apps_lreads_KiB_persec_average{dimension=\"octez-baker\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "reads baker",
+               "refId": "C"
+            },
+            {
+               "expr": "netdata_apps_lweads_KiB_persec_average{dimension=\"octez-baker\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "writes baker",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "IOs",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "kbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "kbytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 8,
+            "x": 0,
+            "y": 165
+         },
+         "id": 72,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Logs",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "datasource": "Loki",
+         "gridPos": {
+            "h": 10,
+            "w": 8,
+            "x": 0,
+            "y": 165
+         },
+         "id": 73,
+         "options": {
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+         },
+         "span": 12,
+         "targets": [
+            {
+               "expr": "{job=\"octez-node\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Node logs",
+               "refId": "A"
+            }
+         ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Node logs",
+         "type": "logs"
+      },
+      {
+         "datasource": "Loki",
+         "gridPos": {
+            "h": 10,
+            "w": 8,
+            "x": 8,
+            "y": 165
+         },
+         "id": 74,
+         "options": {
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+         },
+         "span": 12,
+         "targets": [
+            {
+               "expr": "{job=\"octez-baker\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Baker logs",
+               "refId": "A"
+            }
+         ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Baker logs",
+         "type": "logs"
+      },
+      {
+         "datasource": "Loki",
+         "gridPos": {
+            "h": 10,
+            "w": 8,
+            "x": 16,
+            "y": 165
+         },
+         "id": 75,
+         "options": {
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+         },
+         "span": 12,
+         "targets": [
+            {
+               "expr": "{job=\"octez-accuser\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Accuser logs",
+               "refId": "A"
+            }
+         ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Accuser logs",
+         "type": "logs"
+      },
+      {
+         "datasource": "Loki",
+         "gridPos": {
+            "h": 14,
+            "w": 12,
+            "x": 0,
+            "y": 175
+         },
+         "id": 76,
+         "options": {
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+         },
+         "span": 12,
+         "targets": [
+            {
+               "expr": "{job=\"varlogs\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "System logs",
+               "refId": "A"
+            }
+         ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "System logs",
+         "type": "logs"
+      }
+   ],
+   "refresh": "",
+   "rows": [ ],
+   "schemaVersion": 18,
+   "style": "dark",
+   "tags": [
+      "tezos",
+      "octez",
+      "hardware",
+      "logs"
+   ],
+   "templating": {
+      "list": [
+         {
+            "allValue": null,
+            "current": { },
+            "datasource": "Prometheus",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Node instance",
+            "multi": false,
+            "name": "node_instance",
+            "options": [ ],
+            "query": "label_values(octez_version,app)",
+            "refresh": 1,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         }
+      ]
+   },
+   "time": {
+      "from": "now-3h",
+      "to": "now"
+   },
+   "timepicker": {
+      "refresh_intervals": [
+         "5s",
+         "10s",
+         "30s",
+         "1m",
+         "5m",
+         "15m",
+         "30m",
+         "1h",
+         "2h",
+         "1d"
+      ],
+      "time_options": [
+         "5m",
+         "15m",
+         "1h",
+         "6h",
+         "12h",
+         "24h",
+         "2d",
+         "7d",
+         "30d"
+      ]
+   },
+   "timezone": "browser",
+   "title": "Octez full dashboard",
+   "version": 0
+}

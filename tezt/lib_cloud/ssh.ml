@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 let generate_key () =
-  let path = Format.asprintf "%s" (Lazy.force Env.ssh_private_key) in
+  let path = Format.asprintf "%s" (Env.ssh_private_key_filename ()) in
   (* -C is for comment;
      -N is for the passphrase (no passphrase here)
   *)

@@ -416,7 +416,7 @@ module Agent : sig
     ?data_dir:string ->
     ?mode:mode ->
     string ->
-    Tezt_tezos.Agent.t ->
+    Agent.t ->
     t Lwt.t
 
   val init :
@@ -425,7 +425,7 @@ module Agent : sig
     ?mode:mode ->
     ?data_dir:string ->
     string ->
-    Tezt_tezos.Agent.t ->
+    Agent.t ->
     t Lwt.t
 
   val rpc_port : t -> int

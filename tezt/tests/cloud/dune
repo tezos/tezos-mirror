@@ -7,7 +7,7 @@
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
-  tezt_cloud
+  tezt-tezos.tezt-cloud
   tezt_etherlink)
  (link_flags
   (:standard)
@@ -19,4 +19,4 @@
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_cloud))
+  -open Tezt_tezos_tezt_cloud))

@@ -246,12 +246,12 @@ let handle_http_error resp_status resp_body request =
        body
        req
 
-let update_dashboard config dashboard =
-  if dashboard.uid =~! uid_rex then
+let update_dashboard_from_json config ~json ~uid =
+  if uid =~! uid_rex then
     invalid_arg
       (sf
          "Grafana.update_dashboard: invalid UID: %s (must match: %s)"
-         dashboard.uid
+         uid
          (show_rex uid_rex)) ;
   let authorization =
     Option.map (fun t -> ("Authorization", "Bearer " ^ t)) config.api_token
@@ -261,7 +261,7 @@ let update_dashboard config dashboard =
   let* () =
     let delete_request =
       {
-        uri = make_url config ("dashboards/uid/" ^ dashboard.uid);
+        uri = make_url config ("api/dashboards/uid/" ^ uid);
         meth = `DELETE;
         headers = Cohttp.Header.of_list authorization;
         body = None;
@@ -274,12 +274,10 @@ let update_dashboard config dashboard =
     | status -> handle_http_error status body delete_request
   in
   (* (Re-)create dashboard. *)
-  let body =
-    `O [("dashboard", encode_dashboard config dashboard)] |> JSON.encode_u
-  in
+  let body = json in
   let create_request =
     {
-      uri = make_url config "dashboards/db";
+      uri = make_url config "api/dashboards/db";
       meth = `POST;
       headers =
         Cohttp.Header.of_list
@@ -291,6 +289,12 @@ let update_dashboard config dashboard =
   match response.status with
   | #Cohttp.Code.success_status -> Cohttp_lwt.Body.drain_body body
   | status -> handle_http_error status body create_request
+
+let update_dashboard config dashboard =
+  let json =
+    `O [("dashboard", encode_dashboard config dashboard)] |> JSON.encode_u
+  in
+  update_dashboard_from_json config ~json ~uid:dashboard.uid
 
 let where_clause_of_tag (tag_name, tag_label) =
   InfluxDB.Tag (tag_name, EQ, tag_label)

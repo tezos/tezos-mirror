@@ -12,3 +12,5 @@ type t
 val run : unit -> t Lwt.t
 
 val shutdown : t -> unit Lwt.t
+
+val dashboards_filepaths : unit -> string list Lwt.t

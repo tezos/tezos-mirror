@@ -2,16 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezt_cloud)
- (package tezt-cloud)
+ (name tezt_tezos_tezt_cloud)
+ (public_name tezt-tezos.tezt-cloud)
  (libraries
   tezt
-  tezt-tezos
-  tezt-tezos.tezt-performance-regression)
+  tezt-tezos.tezt-performance-regression
+  octez-libs.data-encoding)
  (flags
   (:standard)
   -open Tezt
   -open Tezt.Base
-  -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax
   -open Tezt_tezos_tezt_performance_regression))

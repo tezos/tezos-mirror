@@ -9,9 +9,8 @@ type t
 
 type target = {address : string; port : int; app_name : string}
 
-(** [start ?scrape_interval agents] starts the prometheus server.
-  [scrape_interval] is set to [5] seconds by default. *)
-val start : ?scrape_interval:int -> Agent.t List.t -> t Lwt.t
+(** [start agents] starts the prometheus server. *)
+val start : Agent.t List.t -> t Lwt.t
 
 (** [shutdown prometheus] shutdowns the prometheus server. *)
 val shutdown : t -> unit Lwt.t
@@ -19,9 +18,10 @@ val shutdown : t -> unit Lwt.t
 (** [export_snapshot prometheus] exports a prometheus snapshot. *)
 val export_snapshot : t -> unit Lwt.t
 
-(** [run_wtih_snapshot ~snapshot ~port] allows to run the prometheus with the
-  given snapshot on port [port]. *)
-val run_with_snapshot : snapshot:string -> port:int -> t Lwt.t
+(** [run_wtih_snapshot ()] allows to run the prometheus with the given
+    snapshot. The snapshot must have been exported by running a tezt-cloud
+    scenario beforehand. *)
+val run_with_snapshot : unit -> t Lwt.t
 
 (** [reload prometheus] reloads the prometheus configuration. This can be used
   to take into account a change such a different agent name or a new source. *)
