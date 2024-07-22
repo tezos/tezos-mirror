@@ -220,15 +220,13 @@ unsafe impl SmartRollupCore for MockHost {
         self.state.borrow().store.store_value_size(path, path_len)
     }
 
-    // TODO adapt reveal_metadata
-    // https://gitlab.com/tezos/tezos/-/issues/7378
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
-        assert!(METADATA_SIZE <= max_bytes);
         let metadata: [u8; METADATA_SIZE] =
             self.state.borrow().get_metadata().clone().into();
-        let slice = from_raw_parts_mut(destination_addr, metadata.len());
-        slice.copy_from_slice(metadata.as_slice());
-        metadata.len().try_into().unwrap()
+        let len = min(max_bytes, metadata.len());
+        let slice = from_raw_parts_mut(destination_addr, len);
+        slice.copy_from_slice(&metadata[..len]);
+        len as i32
     }
 
     // TODO turn payload.split_at into a read or error code helper function.
