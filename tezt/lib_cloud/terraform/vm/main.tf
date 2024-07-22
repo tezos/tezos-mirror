@@ -101,6 +101,12 @@ module "gce-container" {
 
   container = { image = "${var.docker_image}"
 
+    # This can be useful to execute some processes from the docker containers
+    # that requires some capabalities on the VM
+    securityContext = {
+      privileged = true
+    }
+
     # Volume settings is only necessary for the proxy VM
     volumeMounts = [
       {
