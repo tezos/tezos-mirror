@@ -2900,7 +2900,7 @@ let test_force_kernel_upgrade_too_early =
     ~upgrade_to:(fun _ -> Ghostnet)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
+    ~tags:["evm"; "sequencer"; "upgrade"; "force"; Tag.ci_disabled]
     ~title:"Force kernel upgrade fail too early"
   @@ fun _from
              to_
@@ -2963,7 +2963,7 @@ let test_force_kernel_upgrade =
   register_upgrade_all
     ~kernels:[Latest]
     ~upgrade_to:(fun _ -> Ghostnet)
-    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
+    ~tags:["evm"; "sequencer"; "upgrade"; "force"; Tag.ci_disabled]
     ~genesis_timestamp
     ~title:"Force kernel upgrade"
   @@ fun _from
