@@ -150,6 +150,26 @@ let could_not_find_context =
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
 
+let context_error_at_block_application =
+  declare_2
+    ~section
+    ~name:"context_error_at_block_application"
+    ~msg:"Application of block {hash} failed on context error: {error}"
+    ~level:Warning
+    ~pp1:Block_hash.pp
+    ~pp2:Error_monad.pp_print_trace
+    ("hash", Block_hash.encoding)
+    ("error", Error_monad.trace_encoding)
+
+let retry_block_application =
+  declare_1
+    ~section
+    ~name:"retry_block_application"
+    ~msg:"retry block {hash} application"
+    ~level:Notice
+    ~pp1:Block_hash.pp
+    ("hash", Block_hash.encoding)
+
 let stopping_node_missing_context_key =
   declare_0
     ~section
