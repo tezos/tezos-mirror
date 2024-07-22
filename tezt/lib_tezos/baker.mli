@@ -126,10 +126,11 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
     passed. The default value is [Some Pass].
 
-    [operations_pool], [force_apply], [state_recorder] and
-    [node_version_check_bypass] are passed to the baker daemon through the flag
-    [--operations-pool], [--force_apply], [--record-state] and
-    [--node-version-check-bypass].
+    [operations_pool], [force_apply], [state_recorder],
+    [node_version_check_bypass] and [node_version_allowed] are passed to the
+    baker daemon through the flag [--operations-pool], [--force_apply],
+    [--record-state], [--node-version-check-bypass] and
+    [--node-version-allowed].
 
     If [remote_mode] is specified, the baker will run in RPC-only mode.
 
@@ -157,6 +158,7 @@ val create :
   ?minimal_nanotez_per_gas_unit:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   Node.t ->
   Client.t ->
   t
@@ -196,6 +198,7 @@ val create_from_uris :
   ?minimal_nanotez_per_gas_unit:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
@@ -233,11 +236,11 @@ val create_from_uris :
     account".
 
     [votefile], [liquidity_baking_toggle_vote], [force_apply],
-    [state_recorder], [node_version_check_bypass] respectively
-    [operations_pool] are passed to the baker daemon through the flags
-    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply],
-    [--record-state], [--node-version-check-bypass] respectively
-    [--operations-pool].
+    [state_recorder], [node_version_check_bypass], [node_version_allowed]
+    respectively [operations_pool] are passed to the baker daemon through the
+    flags [--votefile], [--liquidity-baking-toggle-vote], [--should-apply],
+    [--record-state], [--node-version-check-bypass], [--node-version-allowed]
+    respectively [--operations-pool].
 
     If [remote_mode] is specified, the baker will run in RPC-only mode.
 
@@ -263,6 +266,7 @@ val init :
   ?minimal_nanotez_per_gas_unit:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   Node.t ->
   Client.t ->
   t Lwt.t

@@ -54,6 +54,7 @@ module Parameters = struct
     minimal_nanotez_per_gas_unit : int option;
     state_recorder : bool;
     node_version_check_bypass : bool;
+    node_version_allowed : string option;
   }
 
   type session_state = {mutable ready : bool}
@@ -100,8 +101,8 @@ let create_from_uris ?runner ~protocol
     ?(delegates = []) ?votefile ?(liquidity_baking_toggle_vote = Some Pass)
     ?(force_apply = false) ?(remote_mode = false) ?operations_pool
     ?dal_node_rpc_endpoint ?minimal_nanotez_per_gas_unit
-    ?(state_recorder = false) ?(node_version_check_bypass = false) ~base_dir
-    ~node_data_dir ~node_rpc_endpoint () =
+    ?(state_recorder = false) ?(node_version_check_bypass = false)
+    ?node_version_allowed ~base_dir ~node_data_dir ~node_rpc_endpoint () =
   let baker =
     create
       ~path
@@ -126,6 +127,7 @@ let create_from_uris ?runner ~protocol
         minimal_nanotez_per_gas_unit;
         state_recorder;
         node_version_check_bypass;
+        node_version_allowed;
       }
   in
   on_stdout baker (handle_raw_stdout baker) ;
@@ -135,7 +137,7 @@ let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
     ?(remote_mode = false) ?operations_pool ?dal_node
     ?minimal_nanotez_per_gas_unit ?(state_recorder = false)
-    ?(node_version_check_bypass = false) node client =
+    ?(node_version_check_bypass = false) ?node_version_allowed node client =
   let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   create_from_uris
     ?runner
@@ -154,6 +156,7 @@ let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ?dal_node_rpc_endpoint
     ~state_recorder
     ~node_version_check_bypass
+    ?node_version_allowed
     ~base_dir:(Client.base_dir client)
     ~node_data_dir:(Node.data_dir node)
     ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
@@ -206,6 +209,12 @@ let run ?event_level ?event_sections_levels (baker : t) =
       "node-version-check-bypass"
       baker.persistent_state.node_version_check_bypass
   in
+  let node_version_allowed =
+    Cli_arg.optional_arg
+      "node-version-allowed"
+      Fun.id
+      baker.persistent_state.node_version_allowed
+  in
   let run_args =
     if baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
@@ -215,6 +224,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
     @ run_args @ liquidity_baking_toggle_vote @ votefile @ force_apply
     @ operations_pool @ dal_node_endpoint @ delegates
     @ minimal_nanotez_per_gas_unit @ state_recorder @ node_version_check_bypass
+    @ node_version_allowed
   in
 
   let on_terminate _ =
@@ -251,7 +261,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply ?remote_mode
     ?operations_pool ?dal_node ?minimal_nanotez_per_gas_unit ?state_recorder
-    ?node_version_check_bypass node client =
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -270,6 +280,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
       ?minimal_nanotez_per_gas_unit
       ?state_recorder
       ?node_version_check_bypass
+      ?node_version_allowed
       ~delegates
       node
       client
