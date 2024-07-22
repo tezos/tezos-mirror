@@ -229,8 +229,6 @@ unsafe impl SmartRollupCore for MockHost {
         len as i32
     }
 
-    // TODO turn payload.split_at into a read or error code helper function.
-    // https://gitlab.com/tezos/tezos/-/issues/7377
     unsafe fn reveal(
         &self,
         payload_addr: *const u8,
@@ -239,6 +237,9 @@ unsafe impl SmartRollupCore for MockHost {
         max_bytes: usize,
     ) -> i32 {
         let payload: &[u8] = from_raw_parts(payload_addr, payload_len);
+        if payload.is_empty() {
+            return 0;
+        }
         let (tag, payload) = payload.split_at(size_of::<u8>());
         match tag[0] {
             0 => {
@@ -256,6 +257,13 @@ unsafe impl SmartRollupCore for MockHost {
             }
             2 => {
                 // Reveal_dal_page
+
+                const PAYLOAD_SIZE: usize =
+                    size_of::<i32>() + size_of::<u8>() + size_of::<i16>();
+                if payload.len() < PAYLOAD_SIZE {
+                    return 0;
+                }
+
                 let (published_level, remaining) = payload.split_at(size_of::<i32>());
                 let (slot_index, remaining) = remaining.split_at(size_of::<u8>());
                 let (page_index, _) = remaining.split_at(size_of::<i16>());
