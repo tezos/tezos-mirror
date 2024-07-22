@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
 //
@@ -85,7 +85,7 @@ pub mod v1_primitives {
 // combine MichelsonTicketContent and Michelson traits
 /// marker trait for michelson encoding
 pub trait Michelson:
-    HasEncoding + BinWriter + NomReader + Debug + PartialEq + Eq
+    HasEncoding + BinWriter + for<'a> NomReader<'a> + Debug + PartialEq + Eq
 {
 }
 
@@ -278,7 +278,7 @@ impl HasEncoding for MichelsonNat {
 // --------
 // DECODING
 // --------
-impl NomReader for MichelsonContract {
+impl NomReader<'_> for MichelsonContract {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(
             nom_read_micheline_bytes(Contract::nom_read),
@@ -287,7 +287,7 @@ impl NomReader for MichelsonContract {
     }
 }
 
-impl NomReader for MichelsonUnit {
+impl NomReader<'_> for MichelsonUnit {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(
             MichelinePrimNoArgsNoAnnots::<{ prim::UNIT_TAG }>::nom_read,
@@ -296,12 +296,12 @@ impl NomReader for MichelsonUnit {
     }
 }
 
-impl<Arg0, Arg1> NomReader for MichelsonPair<Arg0, Arg1>
+impl<'a, Arg0, Arg1> NomReader<'a> for MichelsonPair<Arg0, Arg1>
 where
-    Arg0: NomReader + Debug + PartialEq + Eq,
-    Arg1: NomReader + Debug + PartialEq + Eq,
+    Arg0: NomReader<'a> + Debug + PartialEq + Eq,
+    Arg1: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         map(
             MichelinePrim2ArgsNoAnnots::<_, _, { prim::PAIR_TAG }>::nom_read,
             Into::into,
@@ -609,12 +609,12 @@ where
     }
 }
 
-impl<Arg0, Arg1> NomReader for MichelsonOr<Arg0, Arg1>
+impl<'a, Arg0, Arg1> NomReader<'a> for MichelsonOr<Arg0, Arg1>
 where
-    Arg0: NomReader + Debug + PartialEq + Eq,
-    Arg1: NomReader + Debug + PartialEq + Eq,
+    Arg0: NomReader<'a> + Debug + PartialEq + Eq,
+    Arg1: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         alt((
             map(
                 MichelinePrim1ArgNoAnnots::<_, { prim::LEFT_TAG }>::nom_read,
@@ -628,11 +628,11 @@ where
     }
 }
 
-impl<Arg> NomReader for MichelsonOption<Arg>
+impl<'a, Arg> NomReader<'a> for MichelsonOption<Arg>
 where
-    Arg: NomReader + Debug + PartialEq + Eq,
+    Arg: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         alt((
             map(
                 MichelinePrimNoArgsNoAnnots::<{ prim::NONE_TAG }>::nom_read,
@@ -646,25 +646,25 @@ where
     }
 }
 
-impl NomReader for MichelsonString {
+impl NomReader<'_> for MichelsonString {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_string, MichelsonString)(input)
     }
 }
 
-impl NomReader for MichelsonBytes {
+impl NomReader<'_> for MichelsonBytes {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_bytes(nom_read::bytes), MichelsonBytes)(input)
     }
 }
 
-impl NomReader for MichelsonInt {
+impl NomReader<'_> for MichelsonInt {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_int, MichelsonInt)(input)
     }
 }
 
-impl NomReader for MichelsonNat {
+impl NomReader<'_> for MichelsonNat {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         use nom::error::{ErrorKind, ParseError};
         use tezos_data_encoding::nom::error::*;

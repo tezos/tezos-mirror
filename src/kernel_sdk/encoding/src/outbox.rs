@@ -53,7 +53,7 @@ pub struct OutboxMessageTransactionBatch<Expr: Michelson> {
 /// This trait is already derived for homogeneous [OutboxMessageTransactionBatch] type
 /// and for code-generated structs supporting transactions with different Michelson types
 /// [AtomicBatch2] and further up to [AtomicBatch5].
-pub trait AtomicBatch: HasEncoding + BinWriter + NomReader {}
+pub trait AtomicBatch: HasEncoding + BinWriter + for<'a> NomReader<'a> {}
 
 impl<Expr: Michelson> OutboxMessageTransactionBatch<Expr> {
     /// Returns the number of transactions in the batch.
@@ -136,7 +136,7 @@ macro_rules! impl_outbox_message_encodable {
                 }
             }
 
-            impl<$( [<Expr $idx>]: Michelson ),+> NomReader for $s<$( [<Expr $idx>] ),+> {
+            impl<$( [<Expr $idx>]: Michelson ),+> NomReader<'_> for $s<$( [<Expr $idx>] ),+> {
                 fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
                     use tezos_data_encoding::nom::dynamic;
                     use nom::sequence::tuple;

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
@@ -702,6 +702,7 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
+    use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -721,7 +722,9 @@ mod tests {
     const ZERO_TX_HASH: TransactionHash = [0; TRANSACTION_HASH_SIZE];
 
     fn smart_rollup_address() -> SmartRollupAddress {
-        SmartRollupAddress::new(SmartRollupHash(SMART_ROLLUP_ADDRESS.into()))
+        SmartRollupAddress::new(
+            SmartRollupHash::try_from_bytes(&SMART_ROLLUP_ADDRESS).unwrap(),
+        )
     }
 
     fn input_to_bytes(

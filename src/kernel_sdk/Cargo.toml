@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 #
 # SPDX-License-Identifier: MIT
@@ -24,3 +24,11 @@ members = [
   "installer-client",
   "installer-config",
 ]
+
+[workspace.dependencies.tezos_crypto_rs]
+version = "0.6.0"
+default-features = false
+
+[workspace.dependencies.tezos_data_encoding]
+version = "0.6.0"
+default-features = false
