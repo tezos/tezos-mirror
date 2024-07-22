@@ -37,8 +37,6 @@ type parameters = {
   internal_events : Tezos_base.Internal_event_config.t;
 }
 
-type never = |
-
 type _ request =
   | Apply : {
       chain_id : Chain_id.t;
@@ -93,7 +91,7 @@ type _ request =
     }
       -> unit request
   | Context_split : unit request
-  | Terminate : never request
+  | Terminate : unit request
   | Reconfigure_event_logging :
       Tezos_base_unix.Internal_event_unix.Configuration.t
       -> unit request
