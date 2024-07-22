@@ -184,58 +184,38 @@ let validate_new_head w hash (header : Block_header.t) =
             (hash, i))
         (0 -- (header.shell.validation_passes - 1)) ;
       return_unit
-  | `Ok ->
-      let rec validate_and_apply ~retry_on_context_error () =
-        let*! () =
-          Events.(emit requesting_new_head_validation) block_received
-        in
-        let*! v =
-          Block_validator.validate_and_apply
-            ~notify_new_block:pv.parameters.notify_new_block
-            ~advertise_after_validation:true
-            pv.parameters.block_validator
-            pv.parameters.chain_db
-            hash
-            header
-            operations
-        in
-        match v with
-        | Invalid errs ->
-            (* This will convert into a kickban when treated by [on_error] --
-               or, at least, by a worker termination which will close the
-               connection. *)
-            Lwt.return_error errs
-        | Inapplicable_after_validation errs ->
-            if
-              retry_on_context_error
-              && Block_validator.errors_contains_context_error errs
-            then
-              (* This is a special case where the block is valid but
-                 inapplicable because of a context error. We retry the
-                 validation without the context error. *)
-              let*! () =
-                Events.(emit retry_application_after_context_error)
-                  block_received
-              in
-              validate_and_apply ~retry_on_context_error:false ()
-            else
-              let*! () =
-                Events.(emit ignoring_inapplicable_block) block_received
-              in
-              (* We do not kickban the peer if the block received was
-                 successfully validated but inapplicable -- this means that he
-                 could have propagated a validated block before terminating
-                 its application *)
-              return_unit
-        | Valid ->
-            let*! () = Events.(emit new_head_validation_end) block_received in
-            let meta =
-              Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
-            in
-            Peer_metadata.incr meta Valid_blocks ;
-            return_unit
+  | `Ok -> (
+      let*! () = Events.(emit requesting_new_head_validation) block_received in
+      let*! v =
+        Block_validator.validate_and_apply
+          ~notify_new_block:pv.parameters.notify_new_block
+          ~advertise_after_validation:true
+          pv.parameters.block_validator
+          pv.parameters.chain_db
+          hash
+          header
+          operations
       in
-      validate_and_apply ~retry_on_context_error:true ()
+      match v with
+      | Invalid errs ->
+          (* This will convert into a kickban when treated by [on_error] --
+             or, at least, by a worker termination which will close the
+             connection. *)
+          Lwt.return_error errs
+      | Inapplicable_after_validation _errs ->
+          let*! () = Events.(emit ignoring_inapplicable_block) block_received in
+          (* We do not kickban the peer if the block received was
+             successfully validated but inapplicable -- this means that he
+             could have propagated a validated block before terminating
+             its application *)
+          return_unit
+      | Valid ->
+          let*! () = Events.(emit new_head_validation_end) block_received in
+          let meta =
+            Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+          in
+          Peer_metadata.incr meta Valid_blocks ;
+          return_unit)
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
