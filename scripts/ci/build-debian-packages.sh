@@ -28,7 +28,7 @@ debchange --changelog scripts/packaging/octez/debian/changelog \
   --newversion "$DEBVERSION" "$DEBCHANGELOG"
 
 # Build octez debian packages
-scripts/packaging/build-deb-local.sh
+scripts/packaging/build-deb-local.sh "$1"
 
 # Move the debian package to be packed as artifacts
 mkdir -p "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
