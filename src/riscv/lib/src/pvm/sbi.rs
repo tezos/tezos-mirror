@@ -17,7 +17,8 @@ use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use tezos_smart_rollup_constants::{
     core::MAX_INPUT_MESSAGE_SIZE,
     riscv::{
-        SbiError, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
+        SbiError, SBI_CONSOLE_PUTCHAR, SBI_DBCN, SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS,
+        SBI_SHUTDOWN, SBI_SRST, SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256,
         SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
         SBI_TEZOS_METADATA_REVEAL,
     },
@@ -42,6 +43,20 @@ fn sbi_return1<ML: MainMemoryLayout, M: Manager>(machine: &mut MachineState<ML, 
     }
 
     machine.hart.xregisters.write(a0, value);
+}
+
+/// Write an `sbiret` return struct.
+#[inline(always)]
+fn sbi_return_sbiret<ML: MainMemoryLayout, M: Manager>(
+    machine: &mut MachineState<ML, M>,
+    error: Option<SbiError>,
+    value: XValue,
+) {
+    machine
+        .hart
+        .xregisters
+        .write(a0, error.map(|err| err as i64 as XValue).unwrap_or(0));
+    machine.hart.xregisters.write(a1, value);
 }
 
 /// Run the given closure `inner` and write the corresponding SBI results to `machine`.
@@ -288,7 +303,7 @@ where
 
 /// Handle a [SBI_SHUTDOWN] call.
 #[inline(always)]
-fn handle_shutdown<ML, M>(machine: &mut MachineState<ML, M>)
+fn handle_legacy_shutdown<ML, M>(machine: &mut MachineState<ML, M>)
 where
     ML: MainMemoryLayout,
     M: Manager,
@@ -299,7 +314,7 @@ where
 
 /// Handle a [SBI_CONSOLE_PUTCHAR] call.
 #[inline(always)]
-fn handle_console_putchar<ML, M>(machine: &mut MachineState<ML, M>, hooks: &mut PvmHooks)
+fn handle_legacy_console_putchar<ML, M>(machine: &mut MachineState<ML, M>, hooks: &mut PvmHooks)
 where
     ML: MainMemoryLayout,
     M: Manager,
@@ -309,6 +324,30 @@ where
 
     // This call always succeeds.
     sbi_return1(machine, 0);
+}
+
+/// Handle a [SBI_DBCN_CONSOLE_WRITE_BYTE] call.
+#[inline(always)]
+fn handle_debug_console_write_byte<ML, M>(machine: &mut MachineState<ML, M>, hooks: &mut PvmHooks)
+where
+    ML: MainMemoryLayout,
+    M: Manager,
+{
+    let char = machine.hart.xregisters.read(a0) as u8;
+    (hooks.putchar_hook)(char);
+
+    // This call always succeeds.
+    sbi_return_sbiret(machine, None, 0);
+}
+
+/// Handle a [SBI_SRST_SYSTEM_RESET] call.
+#[inline(always)]
+fn handle_system_reset<ML, M>(machine: &mut MachineState<ML, M>)
+where
+    ML: MainMemoryLayout,
+    M: Manager,
+{
+    sbi_return_sbiret(machine, Some(SbiError::NotSupported), 0);
 }
 
 /// Handle unsupported SBI calls.
@@ -350,8 +389,22 @@ where
     // SBI extension is contained in a7.
     let sbi_extension = machine.hart.xregisters.read(a7);
     match sbi_extension {
-        SBI_CONSOLE_PUTCHAR => handle_console_putchar(machine, hooks),
-        SBI_SHUTDOWN => handle_shutdown(machine),
+        SBI_CONSOLE_PUTCHAR => handle_legacy_console_putchar(machine, hooks),
+        SBI_SHUTDOWN => handle_legacy_shutdown(machine),
+        SBI_DBCN => {
+            let sbi_function = machine.hart.xregisters.read(a6);
+            match sbi_function {
+                SBI_DBCN_CONSOLE_WRITE_BYTE => handle_debug_console_write_byte(machine, hooks),
+                _ => handle_not_supported(machine),
+            }
+        }
+        SBI_SRST => {
+            let sbi_function = machine.hart.xregisters.read(a6);
+            match sbi_function {
+                SBI_SRST_SYSTEM_RESET => handle_system_reset(machine),
+                _ => handle_not_supported(machine),
+            }
+        }
         SBI_FIRMWARE_TEZOS => {
             let sbi_function = machine.hart.xregisters.read(a6);
             match sbi_function {

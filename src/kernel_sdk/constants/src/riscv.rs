@@ -8,6 +8,18 @@ pub const SBI_CONSOLE_PUTCHAR: u64 = 0x01;
 /// Extension ID for `sbi_shutdown`
 pub const SBI_SHUTDOWN: u64 = 0x08;
 
+/// Extension ID for Debug Console
+pub const SBI_DBCN: u64 = 0x4442434E;
+
+/// Function ID for `sbi_debug_console_write_byte`
+pub const SBI_DBCN_CONSOLE_WRITE_BYTE: u64 = 0x02;
+
+/// Extension ID for System Reset
+pub const SBI_SRST: u64 = 0x53525354;
+
+/// Function ID for `sbi_system_reset`
+pub const SBI_SRST_SYSTEM_RESET: u64 = 0x00;
+
 /// Extension ID for Tezos-specific functions
 // IDs from 0x0A000000 to 0x0AFFFFFF are "firmware-specific" extension IDs
 pub const SBI_FIRMWARE_TEZOS: u64 = 0x0A000000;
