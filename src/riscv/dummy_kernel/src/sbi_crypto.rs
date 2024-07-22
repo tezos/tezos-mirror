@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-// TODO: https://gitlab.com/tezos/tezos/-/issues/6809
-// Move host crypto functionality into Kernel SDK!
+// TODO: RV-121: We want to access the crypto functions through the Tezos crypto crate instead of
+// needing to define them here.
 
 use tezos_smart_rollup_constants::riscv::{
     SBI_FIRMWARE_TEZOS, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY,
