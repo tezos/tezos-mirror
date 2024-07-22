@@ -26,51 +26,63 @@
 
 open Ethereum_types
 
-(** New versions of estimate gas may specify whether we want to
-    include the DA fees or not.  As currently some kernels running on
-    Ghostnet and/or Mainnet don't support yet this feature, we put
-    this as optional. *)
-type estimate_gas_input = {
+type estimate_gas_input_v1 = {
   call : Ethereum_types.call;
-  with_da_fees : bool option;
+  with_da_fees : bool;
       (** If true, the gas returned by the simulation include the DA
           gas units. *)
 }
 
+type estimate_gas_input = V0 of call | V1 of estimate_gas_input_v1
+
 (** [hex_string_to_bytes s] transforms a hex string [s] into a byte string. *)
 let hex_string_to_bytes (Hex s) = `Hex s |> Hex.to_bytes_exn
 
-(** Encoding used to forward the call to the kernel, to be used in simulation
-     mode only. *)
-let rlp_encode ({call; with_da_fees} : estimate_gas_input) =
-  let of_opt of_val = function
-    | None -> Rlp.Value Bytes.empty
-    | Some v -> of_val v
-  in
-  let of_addr (Address s) = Rlp.Value (hex_string_to_bytes s) in
-  let of_qty (Qty z) = Rlp.Value (Z.to_bits z |> Bytes.of_string) in
-  let of_hash (Hash h) = Rlp.Value (hex_string_to_bytes h) in
-  let rlp_form =
-    Rlp.List
-      ([
-         of_opt of_addr call.from;
-         of_opt of_addr call.to_;
-         of_opt of_qty call.gas;
-         of_opt of_qty call.gasPrice;
-         of_opt of_qty call.value;
-         of_opt of_hash call.data;
-       ]
-      @
-      match with_da_fees with
-      | Some with_da_fees -> [Ethereum_types.bool_to_rlp_bytes with_da_fees]
-      | None -> [])
-  in
+let of_opt of_val = function
+  | None -> Rlp.Value Bytes.empty
+  | Some v -> of_val v
 
-  (* we aim to use [String.chunk_bytes] *)
-  if Option.is_some with_da_fees then
-    (* If with_da_fees is present, that's the new version of simulation. *)
-    Bytes.cat (Bytes.make 1 '\001') (Rlp.encode rlp_form)
-  else Rlp.encode rlp_form
+let of_addr (Address s) = Rlp.Value (hex_string_to_bytes s)
+
+let of_qty (Qty z) = Rlp.Value (Z.to_bits z |> Bytes.of_string)
+
+let of_hash (Hash h) = Rlp.Value (hex_string_to_bytes h)
+
+let rlp_v0 call =
+  Rlp.List
+    [
+      of_opt of_addr call.from;
+      of_opt of_addr call.to_;
+      of_opt of_qty call.gas;
+      of_opt of_qty call.gasPrice;
+      of_opt of_qty call.value;
+      of_opt of_hash call.data;
+    ]
+
+let rlp_v1 {call; with_da_fees} =
+  Rlp.List
+    [
+      of_opt of_addr call.from;
+      of_opt of_addr call.to_;
+      of_opt of_qty call.gas;
+      of_opt of_qty call.gasPrice;
+      of_opt of_qty call.value;
+      of_opt of_hash call.data;
+      Ethereum_types.bool_to_rlp_bytes with_da_fees;
+    ]
+
+(** Encoding used to forward the call to the kernel, to be used in simulation
+    mode only. *)
+let rlp_encode input =
+  let prefix, rlp =
+    match input with
+    | V0 call -> (None, rlp_v0 call)
+    | V1 input -> (Some '\001', rlp_v1 input)
+  in
+  let payload = Rlp.encode rlp in
+  match prefix with
+  | None -> payload
+  | Some prefix -> Bytes.cat (Bytes.make 1 prefix) payload
 
 type simulation_message =
   | Start
