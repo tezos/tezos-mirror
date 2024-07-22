@@ -232,22 +232,48 @@ let errors_contains_context_error errors =
 let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
     block_hash bv_operations =
   let open Lwt_result_syntax in
-  let*! () = Events.(emit applying_block) block_hash in
-  let*! r =
-    protect ~canceler:(Worker.canceler worker) (fun () ->
-        protect ?canceler (fun () ->
-            with_retry_to_load_protocol bv ~peer (fun () ->
-                Block_validator_process.apply_block
-                  ~should_validate:false
-                  bv.validation_process
-                  chain_store
-                  ~predecessor
-                  block_header
-                  bv_operations)))
+  let rec apply_block ~retry =
+    let*! () = Events.(emit applying_block) block_hash in
+    let*! r =
+      protect ~canceler:(Worker.canceler worker) (fun () ->
+          protect ?canceler (fun () ->
+              with_retry_to_load_protocol bv ~peer (fun () ->
+                  Block_validator_process.apply_block
+                    ~should_validate:false
+                    bv.validation_process
+                    chain_store
+                    ~predecessor
+                    block_header
+                    bv_operations)))
+    in
+    match r with
+    | Error errs ->
+        (* This is a mitigation for context errors. If the application of the
+           block fails, we retry once. The external validator is shut down and
+           will restart on the new application request sent. This is done to
+           force a full reload of the context.
+
+           If the re-application fails, the errors will be raised and the node
+           will shutdown gracefully. *)
+        if retry && errors_contains_context_error errs then
+          match Block_validator_process.kind bv.validation_process with
+          | Block_validator_process.External_process ->
+              let*! () =
+                Events.(emit context_error_at_block_application)
+                  (block_hash, errs)
+              in
+              let*! () = Block_validator_process.close bv.validation_process in
+              let*! () = Events.(emit retry_block_application) block_hash in
+              apply_block ~retry:false
+          | Single_process ->
+              (* If the node is configured in single process mode we cannot
+                 mitigate. The application error is directly raised and the node
+                 will be shut down gracefully. *)
+              Lwt.return (Application_error errs)
+        else Lwt.return (Application_error errs)
+    | Ok application_result -> Lwt.return (Applied application_result)
   in
-  match r with
-  | Error errs -> Lwt.return (Application_error errs)
-  | Ok application_result -> Lwt.return (Applied application_result)
+  apply_block ~retry:true
 
 let commit_and_notify_block notify_new_block chain_db hash header operations
     application_result =
