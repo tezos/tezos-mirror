@@ -126,6 +126,77 @@ let take_delayed_transactions maximum_number_of_chunks =
   in
   return (delayed_transactions, remaining_cumulative_size)
 
+let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
+    ~smart_rollup_address ~transactions_and_hashes ~delayed_transactions
+    head_info =
+  let open Lwt_result_syntax in
+  let transactions, tx_hashes = List.split transactions_and_hashes in
+  Misc.with_timing
+    (Blueprint_events.blueprint_production
+       head_info.Evm_context.next_blueprint_number)
+  @@ fun () ->
+  let* blueprint =
+    Misc.with_timing
+      (Blueprint_events.blueprint_proposal
+         head_info.Evm_context.next_blueprint_number)
+    @@ fun () ->
+    Sequencer_blueprint.create
+      ~sequencer_key
+      ~cctxt
+      ~timestamp
+      ~smart_rollup_address
+      ~transactions
+      ~delayed_transactions
+      ~parent_hash:head_info.current_block_hash
+      ~number:head_info.next_blueprint_number
+  in
+  let* () =
+    Evm_context.apply_blueprint timestamp blueprint delayed_transactions
+  in
+  let (Qty number) = head_info.next_blueprint_number in
+  let* () = Blueprints_publisher.publish number blueprint in
+  let*! () =
+    List.iter_p
+      (fun hash -> Block_producer_events.transaction_selected ~hash)
+      (tx_hashes @ delayed_transactions)
+  in
+  return_unit
+
+(** Produces a block if we find at least one valid transaction in the transaction
+    pool or if [force] is true. *)
+let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
+    ~timestamp ~maximum_number_of_chunks head_info =
+  let open Lwt_result_syntax in
+  let* delayed_transactions, remaining_cumulative_size =
+    take_delayed_transactions maximum_number_of_chunks
+  in
+  let* transactions_and_hashes =
+    (* Low key optimization to avoid even checking the txpool if there is not
+       enough space for the smallest transaction. *)
+    if remaining_cumulative_size <= minimum_ethereum_transaction_size then
+      return []
+    else
+      Tx_pool.pop_transactions
+        ~maximum_cumulative_size:remaining_cumulative_size
+  in
+  let n =
+    List.length transactions_and_hashes + List.length delayed_transactions
+  in
+  if force || n > 0 then
+    let* () =
+      produce_block_with_transactions
+        ~sequencer_key
+        ~cctxt
+        ~timestamp
+        ~smart_rollup_address
+        ~transactions_and_hashes
+        ~delayed_transactions
+        head_info
+    in
+    let* () = Tx_pool.clear_popped_transactions () in
+    return n
+  else return 0
+
 let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     ~maximum_number_of_chunks =
   let open Lwt_result_syntax in
@@ -134,52 +205,34 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     let*! () = Block_producer_events.production_locked () in
     return 0
   else
-    let* delayed_transactions, remaining_cumulative_size =
-      take_delayed_transactions maximum_number_of_chunks
+    let*! head_info = Evm_context.head_info () in
+    let is_going_to_upgrade =
+      match head_info.pending_upgrade with
+      | Some Ethereum_types.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+          timestamp >= upgrade_timestamp
+      | None -> false
     in
-    let* transactions_and_hashes =
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if remaining_cumulative_size <= minimum_ethereum_transaction_size then
-        return []
-      else
-        Tx_pool.pop_transactions
-          ~maximum_cumulative_size:remaining_cumulative_size
-    in
-    let transactions, tx_hashes = List.split transactions_and_hashes in
-    let n = List.length transactions + List.length delayed_transactions in
-    if force || n > 0 then
-      let*! head_info = Evm_context.head_info () in
-      Misc.with_timing
-        (Blueprint_events.blueprint_production head_info.next_blueprint_number)
-      @@ fun () ->
-      let* blueprint =
-        Misc.with_timing
-          (Blueprint_events.blueprint_proposal head_info.next_blueprint_number)
-        @@ fun () ->
-        Sequencer_blueprint.create
+    if is_going_to_upgrade then
+      let* () =
+        produce_block_with_transactions
           ~sequencer_key
           ~cctxt
           ~timestamp
           ~smart_rollup_address
-          ~transactions
-          ~delayed_transactions
-          ~parent_hash:head_info.current_block_hash
-          ~number:head_info.next_blueprint_number
+          ~transactions_and_hashes:[]
+          ~delayed_transactions:[]
+          head_info
       in
-      let* () =
-        Evm_context.apply_blueprint timestamp blueprint delayed_transactions
-      in
-      let (Qty number) = head_info.next_blueprint_number in
-      let* () = Blueprints_publisher.publish number blueprint in
-      let*! () =
-        List.iter_p
-          (fun hash -> Block_producer_events.transaction_selected ~hash)
-          (tx_hashes @ delayed_transactions)
-      in
-      let* () = Tx_pool.clear_popped_transactions () in
-      return n
-    else return 0
+      return 0
+    else
+      produce_block_if_needed
+        ~cctxt
+        ~sequencer_key
+        ~timestamp
+        ~smart_rollup_address
+        ~force
+        ~maximum_number_of_chunks
+        head_info
 
 module Handlers = struct
   type self = worker
