@@ -170,7 +170,7 @@ let copy agent ~source ~destination =
           (fun () ->
             let* destination_hash =
               let* output =
-                docker_run_command agent "md5sum" [destination]
+                Process.spawn ~runner:agent.runner "md5sum" [destination]
                 |> Process.check_and_read_stdout
               in
               (* md5sum output is: '<hash> <file>'. We only take the hash. *)
@@ -237,8 +237,8 @@ let copy =
         else
           let p =
             let* () =
-              docker_run_command
-                agent
+              Process.spawn
+                ~runner:agent.runner
                 "mkdir"
                 ["-p"; Filename.dirname destination]
               |> Process.check

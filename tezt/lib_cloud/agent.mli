@@ -73,5 +73,14 @@ val cmd_wrapper : t -> Gcloud.cmd_wrapper option
 (** Run a command on the host machine of the VM. *)
 val host_run_command : t -> string -> string list -> Process.t
 
-(** Run a command on the docker image run by the agent. *)
+(** Run a command on the docker image run by the agent.
+
+    This command should not be used outside of the [tezt-cloud]
+    library. It does not behave well when the scenario is interrupted
+    and the process is still running. Instead, [Process.spawn
+    ~runner:(Agent.runner agent)] should be used.
+
+    The library uses it to ensure there won't be any check of the host
+    when issuing for the first time an ssh connection.
+ *)
 val docker_run_command : t -> string -> string list -> Process.t
