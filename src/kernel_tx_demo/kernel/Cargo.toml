@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 nom = "7.1"
 thiserror = "1.0"
 hex = "0.4"
-num-bigint = "0.4"
+num-bigint = { version = "0.4", default-features = false }
 num-traits = "0.2.8"
 
 tezos_data_encoding = "0.6"
