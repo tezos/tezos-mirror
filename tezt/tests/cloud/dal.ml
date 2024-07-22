@@ -87,12 +87,98 @@ module Network = struct
         JSON.(json |-> "level" |> as_int) |> Lwt.return
 end
 
+module Node = struct
+  let runner_of_agent = Agent.runner
+
+  include Node
+
+  let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
+    match network with
+    | Network.Ghostnet -> (
+        match data_dir with
+        | Some data_dir ->
+            let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* () = Node.run node [Network "ghostnet"] in
+            let* () = Node.wait_for_ready node in
+            Lwt.return node
+        | None ->
+            let* node =
+              Node.Agent.create
+                ~arguments:
+                  [Network "ghostnet"; Expected_pow 26; Cors_origin "*"]
+                ?data_dir
+                ~name
+                agent
+            in
+            let* () =
+              Process.spawn
+                ~runner:(runner_of_agent agent)
+                "wget"
+                [
+                  "-O";
+                  "snapshot_file";
+                  "https://snapshots.eu.tzinit.org/ghostnet/rolling";
+                ]
+              |> Process.check
+            in
+            let* () = Node.config_init node [] in
+            let* () =
+              Node.snapshot_import ~no_check:true node "snapshot_file"
+            in
+            let* () = Node.run node arguments in
+            let* () = wait_for_ready node in
+            Lwt.return node)
+    | Sandbox -> (
+        match data_dir with
+        | None ->
+            let* node = Node.Agent.create ~name agent in
+            let* () = Node.config_init node [] in
+            let* () =
+              match dal_config with
+              | None -> Lwt.return_unit
+              | Some config ->
+                  Node.Config_file.update
+                    node
+                    (Node.Config_file.set_sandbox_network_with_dal_config
+                       config)
+            in
+            let* () =
+              Node.run
+                node
+                ([
+                   No_bootstrap_peers;
+                   Synchronisation_threshold 0;
+                   Cors_origin "*";
+                 ]
+                @ arguments)
+            in
+            let* () = wait_for_ready node in
+            Lwt.return node
+        | Some data_dir ->
+            let arguments =
+              [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
+              @ arguments
+            in
+            let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* () = Node.run node [] in
+            let* () = Node.wait_for_ready node in
+            Lwt.return node)
+end
+
 module Cli = struct
   let section =
     Clap.section
       ~description:
         "All the options related to running DAL scenarions onto the cloud"
       "Cloud DAL"
+
+  let fundraiser =
+    Clap.default_string
+      ~section
+      ~long:"fundraiser"
+      ~description:
+        "Fundraiser secret key that have enough money of test network"
+      "edsk3AWajGUgzzGi3UrQiNWeRZR1YMRYVxfe642AFSKBTFXaoJp5hu"
 
   let network_typ =
     Clap.typ
@@ -217,7 +303,10 @@ module Cli = struct
       ~placeholder:"<protocol_name> (such as alpha, oxford,...)"
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
-      Protocol.Alpha
+      (match network with Sandbox -> Alpha | Ghostnet -> ParisC)
+
+  let data_dir =
+    Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
 
   let etherlink = Clap.flag ~section ~set_long:"etherlink" false
 
@@ -822,56 +911,138 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     ~job_name
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
-let init_ghostnet _cloud (_configuration : configuration) agent =
-  match agent with
-  | None ->
-      let node = None in
-      let dal_node = None in
-      (* Taken from ghostnet configuration. *)
-      let node_p2p_endpoint = "ghostnet.tzinit.org" in
-      let dal_node_p2p_endpoint = "dalboot.ghostnet.tzinit.org" in
-      let node_rpc_endpoint =
-        Endpoint.
-          {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
+let init_ghostnet cloud (configuration : configuration) agent =
+  let* bootstrap =
+    match agent with
+    | None ->
+        let node = None in
+        let dal_node = None in
+        (* Taken from ghostnet configuration. *)
+        let node_p2p_endpoint = "ghostnet.tzinit.org" in
+        let dal_node_p2p_endpoint = "dalboot.ghostnet.tzinit.org" in
+        let node_rpc_endpoint =
+          Endpoint.
+            {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
+        in
+        let client =
+          Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
+        in
+        let bootstrap =
+          {
+            node;
+            dal_node;
+            node_p2p_endpoint;
+            node_rpc_endpoint;
+            dal_node_p2p_endpoint;
+            client;
+          }
+        in
+        Lwt.return bootstrap
+    | Some agent ->
+        let* node =
+          Node.init ~name:"bootstrap-node" configuration.network agent
+        in
+        let* dal_node =
+          Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node
+        in
+        let* () =
+          Dal_node.init_config
+            ~expected_pow:26.
+            ~bootstrap_profile:true
+            dal_node
+        in
+        let* () = Node.wait_for_ready node in
+        let* () = add_source cloud agent ~job_name:"bootstrap" node dal_node in
+        let* () = Dal_node.run ~event_level:`Notice dal_node in
+        let client = Client.create ~endpoint:(Node node) () in
+        let node_rpc_endpoint =
+          Endpoint.
+            {
+              scheme = "http";
+              host = Agent.point agent |> fst;
+              port = Node.rpc_port node;
+            }
+        in
+        let bootstrap =
+          {
+            node = Some node;
+            dal_node = Some dal_node;
+            node_p2p_endpoint = Node.point_str node;
+            node_rpc_endpoint;
+            dal_node_p2p_endpoint = Dal_node.point_str dal_node;
+            client;
+          }
+        in
+        Lwt.return bootstrap
+  in
+  let* baker_accounts =
+    Client.stresstest_gen_keys
+      ~alias_prefix:"baker"
+      (List.length configuration.stake)
+      bootstrap.client
+  in
+  let* producer_accounts =
+    Client.stresstest_gen_keys
+      ~alias_prefix:"dal_producer"
+      configuration.dal_node_producer
+      bootstrap.client
+  in
+  let* () =
+    Client.import_secret_key
+      bootstrap.client
+      (Unencrypted Cli.fundraiser)
+      ~alias:"fundraiser"
+  in
+  let* () =
+    let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
+    let* _ = Process.wait process in
+    Lwt.return_unit
+  in
+  let* fundraiser = Client.show_address ~alias:"fundraiser" bootstrap.client in
+  let* counter =
+    Operation.get_next_counter ~source:fundraiser bootstrap.client
+  in
+  let* () =
+    if List.length producer_accounts > 0 then
+      let* _op_hash =
+        producer_accounts
+        |> List.map (fun producer ->
+               Operation.Manager.transfer
+                 ~amount:(10 * 1_000_000)
+                 ~dest:producer
+                 ())
+        |> Operation.Manager.make_batch ~source:fundraiser ~counter
+        |> Fun.flip (Operation.Manager.inject ~dont_wait:true) bootstrap.client
       in
-      let client =
-        Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
-      in
-      let bootstrap =
-        {
-          node;
-          dal_node;
-          node_p2p_endpoint;
-          node_rpc_endpoint;
-          dal_node_p2p_endpoint;
-          client;
-        }
-      in
-      Lwt.return (bootstrap, [], [], None)
-  | Some _agent -> assert false
+      (* Wait a bit. *)
+      Lwt_unix.sleep 10.
+    else unit
+  in
+  Lwt.return (bootstrap, baker_accounts, producer_accounts, None)
 
 let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     agent =
-  let* bootstrap_node = Node.Agent.create ~name:"bootstrap-node" agent in
-  let* dal_bootstrap_node =
-    Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node:bootstrap_node
-  in
-  let* () = Node.config_init bootstrap_node [] in
-  let config : Cryptobox.Config.t =
+  let dal_bootstrap_node_net_port = Agent.next_available_port agent in
+  let dal_config : Cryptobox.Config.t =
     {
       activated = true;
-      bootstrap_peers = [Dal_node.point_str dal_bootstrap_node];
+      bootstrap_peers =
+        [Format.asprintf "127.0.0.1:%d" dal_bootstrap_node_net_port];
     }
   in
-  let* () =
-    Node.Config_file.update
-      bootstrap_node
-      (Node.Config_file.set_sandbox_network_with_dal_config config)
+  let name = "bootstrap-node" in
+  let data_dir =
+    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
-  let* () =
-    Node.run
-      bootstrap_node
-      [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
+  let* bootstrap_node =
+    Node.init ?data_dir ~dal_config ~name configuration.network agent
+  in
+  let* dal_bootstrap_node =
+    Dal_node.Agent.create
+      ~net_port:dal_bootstrap_node_net_port
+      ~name:"bootstrap-dal-node"
+      agent
+      ~node:bootstrap_node
   in
   let* () = Node.wait_for_ready bootstrap_node in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
@@ -962,10 +1133,16 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
 let init_baker cloud (configuration : configuration) ~bootstrap account i agent
     =
   let stake = List.nth configuration.stake i in
+  let name = Format.asprintf "baker-node-%d" i in
+  let data_dir =
+    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+  in
   let* node =
-    Node.Agent.init
+    Node.init
+      ?data_dir
+      ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       ~name:(Format.asprintf "baker-node-%d" i)
-      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
+      configuration.network
       agent
   in
   let* dal_node =
@@ -1012,11 +1189,18 @@ let init_baker cloud (configuration : configuration) ~bootstrap account i agent
   in
   Lwt.return {node; dal_node; baker; account; stake}
 
-let init_producer cloud ~bootstrap ~number_of_slots account i agent =
+let init_producer cloud configuration ~bootstrap ~number_of_slots account i
+    agent =
+  let name = Format.asprintf "producer-node-%i" i in
+  let data_dir =
+    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+  in
   let* node =
-    Node.Agent.init
+    Node.init
+      ?data_dir
       ~name:(Format.asprintf "producer-node-%i" i)
-      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
+      ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
+      configuration.network
       agent
   in
   let* client = Client.Agent.create ~node agent in
@@ -1027,6 +1211,7 @@ let init_producer cloud ~bootstrap ~number_of_slots account i agent =
       account.Account.secret_key
       ~alias:account.Account.alias
   in
+  let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
   let*! () =
     Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
   in
@@ -1385,6 +1570,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (fun i (agent, account) ->
         init_producer
           cloud
+          configuration
           ~bootstrap
           ~number_of_slots:parameters.number_of_slots
           account
@@ -1616,7 +1802,12 @@ let benchmark () =
     ]
     |> List.concat
   in
-  let default_vm_configuration = Configuration.make () in
+  let docker_image =
+    match configuration.network with
+    | Ghostnet -> Some Env.Octez_latest_release
+    | Sandbox -> None
+  in
+  let default_vm_configuration = Configuration.make ?docker_image () in
   let vms =
     vms
     |> List.map (function
@@ -1633,7 +1824,7 @@ let benchmark () =
                    with _ -> default_vm_configuration))
            | `Producer | `Observer -> (
                match configuration.producer_machine_type with
-               | None -> default_vm_configuration
+               | None -> Configuration.make ()
                | Some machine_type -> Configuration.make ~machine_type ())
            | `Etherlink_operator -> default_vm_configuration
            | `Etherlink_producer _ -> default_vm_configuration)

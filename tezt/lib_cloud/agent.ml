@@ -223,6 +223,7 @@ let copy =
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
   fun ?destination agent ~source ->
+    Log.info "COPY %s" source ;
     let destination =
       Option.value ~default:(path_of agent source) destination
     in

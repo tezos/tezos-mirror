@@ -9,31 +9,41 @@ module Node = struct
   include Tezt_tezos.Node
 
   module Agent = struct
-    let create ?(path = Uses.path Constant.octez_node) ?name agent =
-      let* path = Agent.copy agent ~source:path in
-      let runner = Agent.runner agent in
-      let rpc_port = Agent.next_available_port agent in
-      let net_port = Agent.next_available_port agent in
-      let metrics_port = Agent.next_available_port agent in
-      create ?name ~path ~runner ~rpc_port ~net_port ~metrics_port []
-      |> Lwt.return
+    let create ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
+      ?name agent =
+    let* path = Agent.copy agent ~source:path in
+    let runner = Agent.runner agent in
+    let rpc_port = Agent.next_available_port agent in
+    let net_port = Agent.next_available_port agent in
+    let metrics_port = Agent.next_available_port agent in
+    create
+      ?data_dir
+      ?name
+      ~path
+      ~runner
+      ~rpc_port
+      ~net_port
+      ~metrics_port
+      arguments
+    |> Lwt.return
 
-    let init ?(arguments = []) ?(path = Uses.path Constant.octez_node) ?name
-        agent =
-      let runner = Agent.runner agent in
-      let* path = Agent.copy agent ~source:path in
-      let rpc_port = Agent.next_available_port agent in
-      let net_port = Agent.next_available_port agent in
-      let metrics_port = Agent.next_available_port agent in
-      init
-        ?name
-        ~path
-        ~runner
-        ~rpc_port
-        ~net_port
-        ~metrics_port
-        ~event_level:`Notice
-        arguments
+  let init ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
+      ?name agent =
+    let runner = Agent.runner agent in
+    let* path = Agent.copy agent ~source:path in
+    let rpc_port = Agent.next_available_port agent in
+    let net_port = Agent.next_available_port agent in
+    let metrics_port = Agent.next_available_port agent in
+    init
+      ?name
+      ?data_dir
+      ~path
+      ~runner
+      ~rpc_port
+      ~net_port
+      ~metrics_port
+      ~event_level:`Notice
+      arguments
   end
 end
 
@@ -41,18 +51,22 @@ module Dal_node = struct
   include Tezt_tezos.Dal_node
 
   module Agent = struct
-    let create ?(path = Uses.path Constant.octez_dal_node |> Filename.basename)
-        ?name ~node agent =
-      let* path = Agent.copy agent ~source:path in
-      let runner = Agent.runner agent in
-      let rpc_port = Agent.next_available_port agent in
-      let net_port = Agent.next_available_port agent in
-      let metrics_port = Agent.next_available_port agent in
-      let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
-      let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
-      create ?name ~path ~runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
-      |> Lwt.return
-  end
+   let create ?net_port
+      ?(path = Uses.path Constant.octez_dal_node |> Filename.basename) ?name
+      ~node agent =
+    let* path = Agent.copy agent ~source:path in
+    let runner = Agent.runner agent in
+    let rpc_port = Agent.next_available_port agent in
+    let net_port =
+      match net_port with
+      | None -> Agent.next_available_port agent
+      | Some port -> port
+    in
+    let metrics_port = Agent.next_available_port agent in
+    let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
+    let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
+    create ?name ~path ~runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
+    |> Lwt.return
 end
 
 module Sc_rollup_node = struct
