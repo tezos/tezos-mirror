@@ -793,6 +793,15 @@ module Local = struct
       ~output:Hashed.Injector_operations_hash.encoding
       (path / "dal" / "injection")
 
+  let injector_operation_status =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Retrieve the status of the injected operation using its injector ID."
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.message_status
+      (path / "injector" / "operation"
+     /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "status")
+
   let synchronized =
     Tezos_rpc.Service.get_service
       ~description:

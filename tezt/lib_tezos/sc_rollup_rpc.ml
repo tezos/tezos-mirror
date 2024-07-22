@@ -253,6 +253,9 @@ let post_local_dal_injection ~slot_content ~slot_index =
   in
   make POST ["local"; "dal"; "injection"] ~data:(Data data) JSON.as_string
 
+let get_injector_operation_status ~id =
+  make GET ["local"; "injector"; "operation"; id; "status"] Fun.id
+
 type outbox_proof = {commitment_hash : string; proof : string}
 
 let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =

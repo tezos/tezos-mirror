@@ -174,6 +174,8 @@ val post_local_batcher_injection :
 val post_local_dal_injection :
   slot_content:string -> slot_index:int -> string RPC_core.t
 
+val get_injector_operation_status : id:string -> JSON.t RPC_core.t
+
 type outbox_proof = {commitment_hash : string; proof : string}
 
 (** RPC: [GET global/block/<block>/helpers/proofs/outbox/<outbox_level>/messages] *)

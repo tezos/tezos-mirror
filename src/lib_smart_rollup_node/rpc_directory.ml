@@ -441,6 +441,100 @@ let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let cemented = Compare.Int32.(inbox_level <= lcc.level) in
   (finalized, cemented)
 
+let injector_operation_status node_ctxt l1_hash =
+  let open Lwt_result_syntax in
+  match Injector.operation_status l1_hash with
+  | None -> return Rollup_node_services.Unknown
+  | Some (Pending op) -> return (Rollup_node_services.Pending_injection op)
+  | Some (Injected {op; oph; op_index}) ->
+      return (Rollup_node_services.Injected {op = op.operation; oph; op_index})
+  | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
+      let* finalized, cemented = inbox_info_of_level node_ctxt l1_level in
+      let* commitment_level =
+        commitment_level_of_inbox_level node_ctxt l1_level
+      in
+      match commitment_level with
+      | None ->
+          return
+            (Rollup_node_services.Included
+               {
+                 op = op.operation;
+                 oph;
+                 op_index;
+                 l1_block;
+                 l1_level;
+                 finalized;
+                 cemented;
+               })
+      | Some commitment_level -> (
+          let* block =
+            Node_context.find_l2_block_by_level node_ctxt commitment_level
+          in
+          match block with
+          | None ->
+              (* Commitment not computed yet for inbox *)
+              return
+                (Rollup_node_services.Included
+                   {
+                     op = op.operation;
+                     oph;
+                     op_index;
+                     l1_block;
+                     l1_level;
+                     finalized;
+                     cemented;
+                   })
+          | Some block -> (
+              let commitment_hash =
+                WithExceptions.Option.get
+                  ~loc:__LOC__
+                  block.header.commitment_hash
+              in
+              (* Commitment computed *)
+              let* published_at =
+                Node_context.commitment_published_at_level
+                  node_ctxt
+                  commitment_hash
+              in
+              match published_at with
+              | None | Some {published_at_level = None; _} ->
+                  (* Commitment not published yet *)
+                  return
+                    (Rollup_node_services.Included
+                       {
+                         op = op.operation;
+                         oph;
+                         op_index;
+                         l1_block;
+                         l1_level;
+                         finalized;
+                         cemented;
+                       })
+              | Some
+                  {
+                    first_published_at_level;
+                    published_at_level = Some published_at_level;
+                  } ->
+                  (* Commitment published *)
+                  let* commitment =
+                    Node_context.get_commitment node_ctxt commitment_hash
+                  in
+                  return
+                    (Rollup_node_services.Committed
+                       {
+                         op = op.operation;
+                         oph;
+                         op_index;
+                         l1_block;
+                         l1_level;
+                         finalized;
+                         cemented;
+                         commitment;
+                         commitment_hash;
+                         first_published_at_level;
+                         published_at_level;
+                       }))))
+
 let () =
   Local_directory.register1 Rollup_node_services.Local.batcher_message
   @@ fun node_ctxt hash () () ->
@@ -453,110 +547,15 @@ let () =
         let return status = return (Some msg, status) in
         match batch_status with
         | Pending_batch -> return Rollup_node_services.Pending_batch
-        | Batched l1_hash -> (
-            match Injector.operation_status l1_hash with
-            | None -> return Rollup_node_services.Unknown
-            | Some (Pending op) ->
-                return (Rollup_node_services.Pending_injection op)
-            | Some (Injected {op; oph; op_index}) ->
-                return
-                  (Rollup_node_services.Injected
-                     {op = op.operation; oph; op_index})
-            | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
-                let* finalized, cemented =
-                  inbox_info_of_level node_ctxt l1_level
-                in
-                let* commitment_level =
-                  commitment_level_of_inbox_level node_ctxt l1_level
-                in
-                match commitment_level with
-                | None ->
-                    return
-                      (Rollup_node_services.Included
-                         {
-                           op = op.operation;
-                           oph;
-                           op_index;
-                           l1_block;
-                           l1_level;
-                           finalized;
-                           cemented;
-                         })
-                | Some commitment_level -> (
-                    let* block =
-                      Node_context.find_l2_block_by_level
-                        node_ctxt
-                        commitment_level
-                    in
-                    match block with
-                    | None ->
-                        (* Commitment not computed yet for inbox *)
-                        return
-                          (Rollup_node_services.Included
-                             {
-                               op = op.operation;
-                               oph;
-                               op_index;
-                               l1_block;
-                               l1_level;
-                               finalized;
-                               cemented;
-                             })
-                    | Some block -> (
-                        let commitment_hash =
-                          WithExceptions.Option.get
-                            ~loc:__LOC__
-                            block.header.commitment_hash
-                        in
-                        (* Commitment computed *)
-                        let* published_at =
-                          Node_context.commitment_published_at_level
-                            node_ctxt
-                            commitment_hash
-                        in
-                        match published_at with
-                        | None | Some {published_at_level = None; _} ->
-                            (* Commitment not published yet *)
-                            return
-                              (Rollup_node_services.Included
-                                 {
-                                   op = op.operation;
-                                   oph;
-                                   op_index;
-                                   l1_block;
-                                   l1_level;
-                                   finalized;
-                                   cemented;
-                                 })
-                        | Some
-                            {
-                              first_published_at_level;
-                              published_at_level = Some published_at_level;
-                            } ->
-                            (* Commitment published *)
-                            let* commitment =
-                              Node_context.get_commitment
-                                node_ctxt
-                                commitment_hash
-                            in
-                            return
-                              (Rollup_node_services.Committed
-                                 {
-                                   op = op.operation;
-                                   oph;
-                                   op_index;
-                                   l1_block;
-                                   l1_level;
-                                   finalized;
-                                   cemented;
-                                   commitment;
-                                   commitment_hash;
-                                   first_published_at_level;
-                                   published_at_level;
-                                 }))))))
+        | Batched l1_hash ->
+            let* res = injector_operation_status node_ctxt l1_hash in
+            return res)
   in
-
   return status
+
+let () =
+  Local_directory.register1 Rollup_node_services.Local.injector_operation_status
+  @@ fun node_ctxt l1_hash () () -> injector_operation_status node_ctxt l1_hash
 
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.injector_queues_total
