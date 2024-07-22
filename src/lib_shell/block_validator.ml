@@ -216,6 +216,19 @@ let validate_block worker ?canceler bv peer chain_db chain_store ~predecessor
   | Error errs -> Lwt.return (Validation_error errs)
   | Ok () -> Lwt.return Validated
 
+let errors_contains_context_error errors =
+  let rex =
+    (* Matching all the candidate to a context error:
+       - "[Ir]min|[Bb]rassaia": for any error from irmin or brassaia components
+       - "unknown inode key": to catch the so called inode error *)
+    Re.compile (Re.Perl.re "[Ii]rmin|[Bb]rassaia|unknown inode key")
+  in
+  let is_context_error error =
+    let error_s = Format.asprintf "%a" Error_monad.pp error in
+    match Re.exec rex error_s with exception Not_found -> false | _ -> true
+  in
+  List.exists is_context_error errors
+
 let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
     block_hash bv_operations =
   let open Lwt_result_syntax in
@@ -469,19 +482,6 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
       let* () = Events.(emit preapplication_failure) (view.level, st, errs) in
       (* Keep the worker alive. *)
       return_ok_unit
-
-let errors_contains_context_error errors =
-  let rex =
-    (* Matching all the candidate to a context error:
-       - "[Ir]min|[Bb]rassaia": for any error from irmin or brassaia components
-       - "unknown inode key": to catch the so called inode error *)
-    Re.compile (Re.Perl.re "[Ii]rmin|[Bb]rassaia|unknown inode key")
-  in
-  let is_context_error error =
-    let error_s = Format.asprintf "%a" Error_monad.pp error in
-    match Re.exec rex error_s with exception Not_found -> false | _ -> true
-  in
-  List.exists is_context_error errors
 
 (* This failsafe aims to look for a context error that is known to be
    critical and, if found, stop the node gracefully. *)
