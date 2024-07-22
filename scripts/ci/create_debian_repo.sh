@@ -23,7 +23,7 @@ Usage: $0 <DISTRIBUTION> <RELEASE..>
 
 <DISTRIBUTION>: The linux distribution, eg. debian or ubuntu
 
-<RELEASE>: The release of the Linux distribution, e.g. 'jammy', 'focal', 'bookworm'.
+<RELEASE>: The release of the Linux distribution, e.g. 'jammy', 'noble', 'bookworm'.
 This argument can be repeated to build for multiple releases.
 
 Set the ARCHITECTURES env variable of packages built for
@@ -43,7 +43,7 @@ DISTRIBUTION=${1}
 shift
 # The release of the linux distribution for which
 # we are creating the apt repository
-# E.g. 'jammy focal', 'bookworm'
+# E.g. 'jammy noble', 'bookworm'
 RELEASES=$*
 
 # If it's a protected branch the value of $bucket will
@@ -104,7 +104,7 @@ echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
 mkdir -p "$TARGETDIR/dists"
 
 for architecture in $ARCHITECTURES; do # amd64, arm64 ...
-  for release in $RELEASES; do         # unstable, jammy, focal ...
+  for release in $RELEASES; do         # unstable, jammy, noble ...
     echo "Setting up APT repository for $DISTRIBUTION / $release / $architecture"
     echo "targetdir: $TARGETDIR"
 

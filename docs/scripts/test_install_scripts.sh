@@ -12,10 +12,10 @@
 # Therefore, mind keeping in sync the list of scenarios with both the Makefile
 # and the CI (file .gitlab/ci/jobs/test/install_octez.yml).
 
-# Ubuntu Focal Fossa 20.04 LTS:
-UBUNTU_FOCAL=public.ecr.aws/lts/ubuntu:20.04_stable
+# Ubuntu Noble 24.04 LTS:
+UBUNTU_NOBLE=public.ecr.aws/lts/ubuntu:24.04_stable
 
-# Ubuntu Jammy Jellyfish 22.04 LTS:
+# Ubuntu Jammy 22.04 LTS:
 UBUNTU_JAMMY=public.ecr.aws/lts/ubuntu:22.04_stable
 
 # Debian stable
@@ -29,9 +29,9 @@ usage() {
 usage:
   $0 <test-name>
 where <test-name> can be:
-* install-bin-focal
+* install-bin-noble
 * install-bin-jammy
-* install-bin-rc-focal
+* install-bin-rc-noble
 * install-bin-rc-jammy
 * install-bin-bookworm
 * install-bin-rc-bookworm
@@ -40,7 +40,7 @@ where <test-name> can be:
 * compile-release-sources-bullseye
 * compile-sources-bullseye
 * compile-sources-mantic
-* install-python-focal
+* install-python-noble
 * install-python-jammy
 * install-python-bullseye
 !EOF
@@ -55,14 +55,14 @@ fi
 
 for test_case in "$@"; do
   case "$test_case" in
-  "install-bin-focal")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-deb.sh ubuntu focal
+  "install-bin-noble")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_NOBLE" /Scripts/install-bin-deb.sh ubuntu noble
     ;;
   "install-bin-jammy")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-deb.sh ubuntu jammy
     ;;
-  "install-bin-rc-focal")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-deb.sh ubuntu focal rc
+  "install-bin-rc-noble")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_NOBLE" /Scripts/install-bin-deb.sh ubuntu noble rc
     ;;
   "install-bin-rc-jammy")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-deb.sh ubuntu jammy rc
@@ -74,7 +74,7 @@ for test_case in "$@"; do
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$DEBIAN_BOOKWORM" /Scripts/install-bin-deb.sh debian bookworm rc
     ;;
   "install-opam-scratch")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_FOCAL" /Scripts/install-opam-scratch.sh
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_NOBLE" /Scripts/install-opam-scratch.sh
     ;;
   "install-opam-jammy")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-22.04 /Scripts/install-opam.sh
@@ -88,8 +88,8 @@ for test_case in "$@"; do
   "compile-sources-mantic")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-23.10 /Scripts/compile-sources.sh tezos/tezos master
     ;;
-  "install-python-focal")
-    docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_FOCAL" /Scripts/install-python-debian-ubuntu.sh
+  "install-python-noble")
+    docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_NOBLE" /Scripts/install-python-debian-ubuntu.sh
     ;;
   "install-python-jammy")
     docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_JAMMY" /Scripts/install-python-debian-ubuntu.sh

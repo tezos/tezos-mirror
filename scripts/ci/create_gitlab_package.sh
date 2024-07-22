@@ -12,7 +12,7 @@ set -eu
 . ./scripts/ci/octez-release.sh
 
 debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-ubuntu_focal_packages="$(find packages/ubuntu/focal/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
+ubuntu_noble_packages="$(find packages/ubuntu/noble/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
 ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
 fedora_packages="$(find packages/fedora/39/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
 rockylinux_packages="$(find packages/rockylinux/9.3/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
@@ -23,7 +23,7 @@ gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/ge
 
 gitlab_octez_debian_bookworm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_debian_bookworm_package_name}/${gitlab_package_version}"
 
-gitlab_octez_ubuntu_focal_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_focal_package_name}/${gitlab_package_version}"
+gitlab_octez_ubuntu_noble_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_noble_package_name}/${gitlab_package_version}"
 gitlab_octez_ubuntu_jammy_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_jammy_package_name}/${gitlab_package_version}"
 
 gitlab_octez_fedora_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_fedora_package_name}/${gitlab_package_version}"
@@ -88,10 +88,10 @@ for package in ${debian_bookworm_packages}; do
   gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_debian_bookworm_package_url}"
 done
 
-echo "Upload Ubuntu focal packages"
-for package in ${ubuntu_focal_packages}; do
+echo "Upload Ubuntu noble packages"
+for package in ${ubuntu_noble_packages}; do
   package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_focal_package_url}"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_noble_package_url}"
 done
 
 echo "Upload Ubuntu jammy packages"

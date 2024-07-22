@@ -32,7 +32,7 @@ package_web_path() {
 gitlab_binaries_url=$(package_web_path "${gitlab_octez_binaries_package_name}")
 gitlab_octez_source_url=$(package_web_path "${gitlab_octez_source_package_name}")
 gitlab_debian_bookworm_packages_url=$(package_web_path "${gitlab_octez_debian_bookworm_package_name}")
-gitlab_ubuntu_focal_packages_url=$(package_web_path "${gitlab_octez_ubuntu_focal_package_name}")
+gitlab_ubuntu_noble_packages_url=$(package_web_path "${gitlab_octez_ubuntu_noble_package_name}")
 gitlab_ubuntu_jammy_packages_url=$(package_web_path "${gitlab_octez_ubuntu_jammy_package_name}")
 gitlab_fedora_packages_url=$(package_web_path "${gitlab_octez_fedora_package_name}")
 gitlab_rockylinux_packages_url=$(package_web_path "${gitlab_octez_rockylinux_package_name}")
@@ -76,7 +76,7 @@ release-cli create \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Octez source\",\"url\":\"${gitlab_octez_source_url}\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Debian Bookworm packages\",\"url\":\"${gitlab_debian_bookworm_packages_url}\",\"link_type\":\"package\"}" \
-  --assets-link="{\"name\":\"Ubuntu Focal packages\",\"url\":\"${gitlab_ubuntu_focal_packages_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Ubuntu Noble packages\",\"url\":\"${gitlab_ubuntu_noble_packages_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Ubuntu Jammy packages\",\"url\":\"${gitlab_ubuntu_jammy_packages_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Fedora packages\",\"url\":\"${gitlab_fedora_packages_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Rocky Linux packages\",\"url\":\"${gitlab_rockylinux_packages_url}\",\"link_type\":\"package\"}"
