@@ -45,24 +45,6 @@ else
   docker_image_name="registry.gitlab.com/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
 
-# Allow to pull from private AWS ECR if used as CI_REGISTRY
-# CI_REGISTRY is defined by the Gitlab Runner
-# shellcheck disable=SC2153
-if echo "${CI_REGISTRY}" | grep -q '\.dkr\.ecr\.'; then
-  echo "### Logging into Amazon ECR for pulling images"
-  if [ ! -f "/secrets/.aws_ecr/CI_AWS_ECR_TOKEN" ]; then
-    echo "Use Amazon ECR Docker Credential Helper"
-    # Make sure Amazon ECR Docker Credential Helper is installed
-    docker-credential-ecr-login version > /dev/null
-    # Merge with existing Docker client configuration
-    jq ". + {\"credHelpers\": { \"${CI_REGISTRY}\": \"ecr-login\"}}" ~/.docker/config.json | sponge ~/.docker/config.json
-  else
-    echo "Use the stored ECR token"
-    docker login --username AWS --password-stdin "${CI_REGISTRY}" < /secrets/.aws_ecr/CI_AWS_ECR_TOKEN
-  fi
-  echo "### Amazon ECR Docker Credential Helper enabled for ${CI_REGISTRY}"
-fi
-
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
 if [ -n "${GCP_REGISTRY:-}" ]; then
   # There are two registries for storing Docker images. The first allows pushes from
