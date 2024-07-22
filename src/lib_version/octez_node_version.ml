@@ -116,6 +116,11 @@ let encoding =
        (req "network_version" Network_version.encoding)
        (req "commit_info" (option commit_info_encoding)))
 
+let commit_info_equivalent c1 c2 =
+  let c1 = String.lowercase_ascii c1.commit_hash in
+  let c2 = String.lowercase_ascii c2.commit_hash in
+  String.starts_with ~prefix:c1 c2 || String.starts_with ~prefix:c2 c1
+
 let partially_compare (v1 : Version.t) (c1 : commit_info option)
     (v2 : Version.t) (c2 : commit_info option) =
   let is_dev (v : Tezos_version_parser.t) =
@@ -127,7 +132,7 @@ let partially_compare (v1 : Version.t) (c1 : commit_info option)
   let is_commit_equal =
     match (c1, c2) with
     | None, _ | _, None -> None
-    | Some x, Some y -> Some (x = y)
+    | Some x, Some y -> Some (commit_info_equivalent x y)
   in
   let version_comparison =
     if v1 = v2 then Some 0

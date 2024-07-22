@@ -69,6 +69,12 @@ let commit_info_opt_pp =
     ~none:(fun ppf () -> Format.pp_print_string ppf "none")
     Octez_node_version.commit_info_pp
 
+let commit_info_opt_different c1 c2 =
+  match (c1, c2) with
+  | Some c1, Some c2 -> not (Octez_node_version.commit_info_equivalent c1 c2)
+  | None, None -> true
+  | _ -> false
+
 let print_opt ?v1 ?c1 ?v2 ?c2 () =
   let pp_opt msg pp fmt = function
     | None -> Format.fprintf fmt "@,"
@@ -127,7 +133,7 @@ let () =
     ~print
     generator
   @@ fun (v, c1, c2) ->
-  QCheck2.assume (c1 <> c2) ;
+  QCheck2.assume (commit_info_opt_different c1 c2) ;
   match Octez_node_version.partially_compare v c1 v c2 with
   | None -> true
   | _ -> QCheck2.Test.fail_reportf "These versions should be uncomparable"
@@ -148,7 +154,7 @@ let () =
     ~print
     generator
   @@ fun (v, c1, c2) ->
-  QCheck2.assume (c1 <> c2) ;
+  QCheck2.assume (commit_info_opt_different c1 c2) ;
   match Octez_node_version.partially_compare v c1 v c2 with
   | None -> true
   | _ -> QCheck2.Test.fail_reportf "These versions should be uncomparable"
@@ -201,7 +207,7 @@ let () =
     generator
   @@ fun (v1, c1, v2, c2) ->
   QCheck2.assume (v1 <> v2) ;
-  QCheck2.assume (c1 <> c2) ;
+  QCheck2.assume (commit_info_opt_different c1 c2) ;
   match Octez_node_version.partially_compare v1 c1 v2 c2 with
   | None -> true
   | _ -> QCheck2.Test.fail_reportf "These versions should be uncomparable"
