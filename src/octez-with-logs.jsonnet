@@ -66,7 +66,7 @@ dashboard.new(
   )
 )
 
-#Node a grid is 24 slots wide
+//Node a grid is 24 slots wide
 .addPanels(
   [
     //#######
