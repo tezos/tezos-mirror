@@ -48,8 +48,8 @@ Adaptive Issuance
 - Added the Dynamic Maximum system, that changes the maximum issuance as a
   function of the stake ratio. (MR :gl:`!13519`)
 
-- Changed the semantics of ``min-delegated-in-cycle`` used to compute 
-  baking rights to only consider the minimum in between blocks instead of 
+- Changed the semantics of ``min-delegated-in-cycle`` used to compute
+  baking rights to only consider the minimum in between blocks instead of
   formerly used intra-transactions minimum. (MR :gl:`!13945`)
 
 Gas improvements
@@ -62,12 +62,13 @@ RPC Changes
 -----------
 
 - In the following paths, ``../`` is short for
-  ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``
+  ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
+  The documentation for the RPCs can be found on
+  https://tezos.gitlab.io/beta/rpc.html.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET
-    ../total_staked``. This RPC still returns the total amount staked
-    for the baker by all stakers (including the baker itself). The old
-    path is now **deprecated**. (MR :gl:`!14176`)
+    ../total_staked``.  The old path is now **deprecated**. (MR
+    :gl:`!14176`)
 
   * Added RPC ``GET ../total_delegated``, which returns the amount
     that counts as delegated to the baker for the purpose of computing
@@ -79,6 +80,48 @@ RPC Changes
     you can call RPCs ``GET ../total_staked`` and ``GET
     ../total_delegated``, and add their outputs together. (MR
     :gl:`!14176`)
+
+  * Renamed RPC ``GET ../total_delegated_stake`` to ``GET
+    ../external_staked``.  The old path is now **deprecated**. (MR
+    :gl:`!14187`)
+
+  * Added RPC ``GET ../external_delegated``, which returns the amount
+    of non-staked tez owned by all delegators except for the
+    baker itself. (MR :gl:`!14187`)
+
+  * **Deprecated** RPC ``GET ../delegated_balance``. To get its value,
+    you can call RPCs ``GET ../external_staked`` and ``GET
+    ../external_delegated``, and add their outputs together. (MR
+    :gl:`!14187`)
+
+  * **Deprecated** RPC ``GET ../frozen_deposits``. To get its value,
+    you can call RPCs ``GET ../total_staked`` on the last block of 3
+    cycles ago. (MR :gl:`!14192`)
+
+  * **Deprecated** RPC ``GET ../frozen_deposits_limit``. The RPC has
+    no effects since the activation of Adaptive Issuance and Staking
+    during the Paris protocol. (MR :gl:`!14192`)
+
+  * Renamed RPC ``GET ../current_baking_power`` to ``GET
+    ../baking_power``.  The old path is now **deprecated**. (MR
+    :gl:`!14192`)
+
+  * Renamed RPC ``GET ../delegated_contracts`` to ``GET
+    ../delegators``.  The old path is now **deprecated**. (MR
+    :gl:`!14192`)
+
+  * Renamed RPC ``GET ../full_balance`` to ``GET
+    ../own_full_balance``.  The old path is now **deprecated**. (MR
+    :gl:`!14154`)
+
+- In the following paths, ``../`` is short for
+  ``/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/``.
+
+  * Added RPC ``GET ../spendable`` which is identical to ``GET
+    ../balance``. (MR :gl:`!14154`)
+
+  * Added RPC ``GET ../spendable_and_frozen_bonds`` which is identical
+    to ``GET ../balance_and_frozen_bonds``. (MR :gl:`!14154`)
 
 Operation receipts
 ------------------
