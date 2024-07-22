@@ -843,7 +843,8 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
 let endpoint = rpc_endpoint ?local:None
 
 let patch_config_with_experimental_feature
-    ?(drop_duplicate_when_injection = false) =
+    ?(drop_duplicate_when_injection = false)
+    ?(node_transaction_validation = false) () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -853,10 +854,16 @@ let patch_config_with_experimental_feature
         json
     else json
   in
-  JSON.update "experimental_features"
-  @@ conditional_json_put
-       drop_duplicate_when_injection
-       ~name:"drop_duplicate_on_injection"
+
+  JSON.update "experimental_features" @@ fun json ->
+  conditional_json_put
+    drop_duplicate_when_injection
+    ~name:"drop_duplicate_on_injection"
+    (`Bool true)
+    json
+  |> conditional_json_put
+       node_transaction_validation
+       ~name:"node_transaction_validation"
        (`Bool true)
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
