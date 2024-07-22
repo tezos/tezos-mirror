@@ -47,18 +47,19 @@ val start : parameters -> unit tzresult Lwt.t
 (** [shutdown ()] stops the events follower. *)
 val shutdown : unit -> unit Lwt.t
 
-(** [submit_next_proposal timestamp)] request to submit a new proposal
-    at [timestamp].
-
-    If a proposal was already produced and no preblock is yet received
-    it does not submit a new proposal. Else if the sequencer is set
-    with no {!Configuration.time_between_blocks} then the proposal is
-    produced. Else it depends if the last preblock had a timestamp
-    older than time between blocks or if there is transaction to
-    inject from the tx_pool. *)
-val submit_next_proposal : Time.Protocol.t -> unit tzresult Lwt.t
+(** [submit_next_proposal ~force time] attempts to
+    submits a new proposal with timestamp [time] to the DSN node.
+    A proposal is submitted only if the [Threshold_encryption_proposal_handler]
+    and the [Tx_pool] are not locked. Furthermore, when [force = false], a
+    proposal is submitted only if either it contains at least one transaction.
+    This function returns a value of type
+    [Threshold_encryption_types.proposal_submittions_outcome].
+*)
+val submit_next_proposal :
+  Time.Protocol.t ->
+  Threshold_encryption_types.proposal_submission_outcome tzresult Lwt.t
 
 (** [unlock_next_proposal ()] Notifies the blueprint_producer that a
-    preblock has been applied on top of the EVM state. The proposal
-    handler is allowed to submit a new proposal. *)
+    preblock has been applied on top of the EVM state. The proposal handler
+    is allowed to submit a new proposal. *)
 val unlock_next_proposal : unit -> unit tzresult Lwt.t

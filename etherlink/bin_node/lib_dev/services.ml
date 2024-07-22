@@ -643,7 +643,7 @@ let dispatch_private_request (_config : Configuration.t)
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Misc.now ()) in
-          let* () =
+          let* _submitted =
             Threshold_encryption_proposals_handler.submit_next_proposal
               timestamp
           in

@@ -58,7 +58,7 @@ let next_rollup_node_level ~sc_rollup_node ~client =
 let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
   match Evm_node.mode evm_node with
   | Sequencer _ -> Rpc.produce_block ?timestamp evm_node
-  | Threshold_encryption_sequencer _ -> (
+  | Threshold_encryption_sequencer {time_between_blocks; _} -> (
       let open Rpc.Syntax in
       let*@ current_number = Rpc.block_number evm_node in
       let wait_blueprint =
@@ -68,7 +68,13 @@ let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
             (Int32.to_int current_number + 1)
         else unit
       in
-      let* res = Rpc.produce_proposal ?timestamp evm_node
+      let* res =
+        (* if time_between_blocks is not Nothing, then it is unsafe
+           so make a produce_proposal request as the proposal handler might
+           be locked, in which case the threshold encryption sequencer will fail. *)
+        if time_between_blocks = Some Nothing then
+          Rpc.produce_proposal ?timestamp evm_node
+        else return @@ Ok ()
       and* () = wait_blueprint in
       match res with Ok () -> return (Ok 0) | Error res -> return (Error res))
   | _ -> assert false

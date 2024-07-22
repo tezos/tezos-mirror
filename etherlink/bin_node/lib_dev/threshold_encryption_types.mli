@@ -54,3 +54,13 @@ type preblock = proposal
 
 (** Encoding for preblocks. *)
 val preblock_encoding : preblock Data_encoding.t
+
+(** Possible outcomes when submitting a proposal to the dsn node. *)
+type proposal_submission_outcome =
+  | Tx_pool_is_locked
+      (** The proposal was not submitted because the [Tx_pool] is locked. *)
+  | Proposal_is_early
+      (** The proposal was not submitted because it did not contain any
+      transaction, and not enough time has passed since when a proposal was
+      submitted last. *)
+  | Proposal_submitted  (** The proposal was submitted to the DSN node. *)
