@@ -143,6 +143,8 @@ let deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t =
     (fun (cycle, deposit) -> {cycle; deposit})
     (obj2 (req "cycle" Cycle.encoding) (req "deposit" Tez.encoding))
 
+let unstaked_per_cycle_encoding = Data_encoding.list deposit_per_cycle_encoding
+
 type pending_staking_parameters = Cycle.t * Staking_parameters_repr.t
 
 let pending_staking_parameters_encoding :
@@ -265,6 +267,13 @@ module S = struct
         ~query:RPC_query.empty
         ~output:(list Contract.encoding)
         RPC_path.(path / "delegated_contracts")
+
+    let unstaked_frozen_deposits =
+      RPC_service.get_service
+        ~description:"DEPRECATED; use total_unstaked_per_cycle instead."
+        ~query:RPC_query.empty
+        ~output:unstaked_per_cycle_encoding
+        RPC_path.(path / "unstaked_frozen_deposits")
   end
 
   let own_full_balance =
@@ -291,15 +300,17 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "total_staked")
 
-  let unstaked_frozen_deposits =
+  let total_unstaked_per_cycle =
     RPC_service.get_service
       ~description:
-        "Returns, for each cycle, the sum of unstaked-but-frozen deposits for \
-         this cycle. Cycles go from the last unslashable cycle to the current \
-         cycle."
+        "For each cycle, returns the total amount (in mutez) contained in all \
+         unstake requests created during this cycle by all delegators, \
+         including the baker itself. Note that these tokens count as delegated \
+         to the baker for the purpose of computing baking rights, and are \
+         included in the amount returned by the total_delegated RPC."
       ~query:RPC_query.empty
-      ~output:(Data_encoding.list deposit_per_cycle_encoding)
-      RPC_path.(path / "unstaked_frozen_deposits")
+      ~output:unstaked_per_cycle_encoding
+      RPC_path.(path / "total_unstaked_per_cycle")
 
   let total_delegated =
     RPC_service.get_service
@@ -644,6 +655,23 @@ let f_external_delegated ctxt pkh () () =
   let* () = check_delegate_registered ctxt pkh in
   external_delegated ctxt pkh
 
+let total_unstaked_per_cycle ctxt pkh =
+  let open Lwt_result_syntax in
+  let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
+  let last_unslashable_cycle =
+    Option.value ~default:Cycle.root
+    @@ Cycle.sub
+         ctxt_cycle
+         (Constants.slashable_deposits_period ctxt
+         + Constants_repr.max_slashing_period)
+  in
+  let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
+  List.map_es
+    (fun cycle ->
+      let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
+      return {cycle; deposit})
+    cycles
+
 let f_baking_power ctxt pkh () () =
   let open Lwt_result_syntax in
   let* () = check_delegate_registered ctxt pkh in
@@ -708,22 +736,14 @@ let register () =
   register1 ~chunked:false S.Deprecated.frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.initial_frozen_deposits ctxt pkh) ;
-  register1 ~chunked:false S.unstaked_frozen_deposits (fun ctxt pkh () () ->
-      let* () = check_delegate_registered ctxt pkh in
-      let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
-      let last_unslashable_cycle =
-        Option.value ~default:Cycle.root
-        @@ Cycle.sub
-             ctxt_cycle
-             (Constants.slashable_deposits_period ctxt
-             + Constants_repr.max_slashing_period)
-      in
-      let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
-      List.map_es
-        (fun cycle ->
-          let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
-          return {cycle; deposit})
-        cycles) ;
+  wrap_check_registered
+    ~chunked:false
+    S.Deprecated.unstaked_frozen_deposits
+    total_unstaked_per_cycle ;
+  wrap_check_registered
+    ~chunked:false
+    S.total_unstaked_per_cycle
+    total_unstaked_per_cycle ;
   register1 ~chunked:false S.total_delegated f_total_delegated ;
   register1 ~chunked:false S.Deprecated.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
@@ -817,7 +837,13 @@ let frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.Deprecated.frozen_deposits ctxt block pkh () ()
 
 let unstaked_frozen_deposits ctxt block pkh =
-  RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
+  RPC_context.make_call1
+    S.Deprecated.unstaked_frozen_deposits
+    ctxt
+    block
+    pkh
+    ()
+    ()
 
 let staking_balance ctxt block pkh =
   RPC_context.make_call1 S.Deprecated.staking_balance ctxt block pkh () ()
