@@ -14,13 +14,6 @@ Build-Depends: rsync,
   libprotobuf-dev, protobuf-compiler,
   libsqlite3-dev
 
-Package: octez-zcash-params
-Architecture: all
-Multi-Arch: foreign
-Description: Octez zcash parameters
- This package provides Zcash parameters necessary for the Octez node,
- covering cryptographic keys, zk-SNARKs, and protocol configurations.
-
 Package: octez-node
 Architecture: amd64 arm64
 Depends: adduser,

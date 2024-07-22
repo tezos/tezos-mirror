@@ -1,0 +1,5 @@
+octez (0.0.1-1) unstable; urgency=medium
+
+  * Initial packaging work with dpkg-buildpackage.
+
+ -- Nomadic Labs <pkg@nomadic-labs.com>  Thu, 06 Jul 2017 09:19:24 +0000

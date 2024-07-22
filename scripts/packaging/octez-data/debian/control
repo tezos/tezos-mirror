@@ -1,0 +1,12 @@
+Source: octez
+Section: devel
+Priority: optional
+Maintainer: Nomadic Labs <pkg@nomadic-labs.com>
+Homepage: https://gitlab.com/tezos/tezos
+
+Package: octez-zcash-params
+Architecture: all
+Multi-Arch: foreign
+Description: Octez zcash parameters
+ This package provides Zcash parameters necessary for the Octez node,
+ covering cryptographic keys, zk-SNARKs, and protocol configurations.
