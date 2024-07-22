@@ -1397,7 +1397,11 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
   let* () = bake_for client in
   let* published_level = Client.level client in
   (* Finalize the publication. *)
+  let wait_for_dal_node =
+    wait_for_layer1_final_block dal_node published_level
+  in
   let* () = bake_for ~count:2 client in
+  let* () = wait_for_dal_node in
   let* received_slot =
     Dal_RPC.(
       call dal_node
@@ -5635,6 +5639,10 @@ module Garbage_collection = struct
     in
     Log.info "Producer DAL node is running" ;
 
+    let* current_level = Client.level client in
+    let wait_for_producer =
+      wait_for_layer1_final_block slot_producer (current_level + 1)
+    in
     let* published_level, _commitment, () =
       publish_store_and_wait_slot
         node
@@ -5646,6 +5654,7 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
+    let* () = wait_for_producer in
 
     Log.info "RPC to producer for first shard" ;
     (* Check the producer stored the first shard *)
@@ -5803,6 +5812,13 @@ module Garbage_collection = struct
       wait_for_first_shard ~published_level ~slot_index attester
     in
 
+    let* current_level = Client.level client in
+    let wait_for_producer =
+      wait_for_layer1_final_block slot_producer (current_level + 1)
+    in
+    let wait_for_attester =
+      wait_for_layer1_final_block attester (current_level + 1)
+    in
     let* published_level, _commitment, shard_index_attester =
       publish_store_and_wait_slot
         node
@@ -5814,6 +5830,8 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
+    let* () = wait_for_producer in
+    let* () = wait_for_attester in
 
     Log.info "RPC first shard producer" ;
     let* _shard_producer =
@@ -6042,6 +6060,16 @@ module Garbage_collection = struct
       return (shard_index_observer, shard_index_attester)
     in
 
+    let* current_level = Client.level client in
+    let wait_for_producer =
+      wait_for_layer1_final_block slot_producer (current_level + 1)
+    in
+    let wait_for_observer =
+      wait_for_layer1_final_block observer (current_level + 1)
+    in
+    let wait_for_attester =
+      wait_for_layer1_final_block attester (current_level + 1)
+    in
     let* ( published_level,
            _commitment,
            (shard_index_observer, shard_index_attester) ) =
@@ -6055,6 +6083,9 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
+    let* () = wait_for_producer in
+    let* () = wait_for_observer in
+    let* () = wait_for_attester in
 
     Log.info "RPC first shard observer" ;
     let* _shard_observer =
