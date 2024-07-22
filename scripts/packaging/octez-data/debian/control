@@ -10,3 +10,9 @@ Multi-Arch: foreign
 Description: Octez zcash parameters
  This package provides Zcash parameters necessary for the Octez node,
  covering cryptographic keys, zk-SNARKs, and protocol configurations.
+
+Package: octez-zcash-dal-params
+Architecture: all
+Multi-Arch: foreign
+Description: Octez zcash dal parameters
+ This package provides Zcash parameters necessary for the Octez DAL node.

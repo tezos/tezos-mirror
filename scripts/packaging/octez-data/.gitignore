@@ -31,5 +31,7 @@ debian/*.substvars
 debian/files
 debian/substvars
 zcash-params
+dal-trusted-setup
 
 debian/octez-zcash-params/
+debian/scripts/packaging/octez-zcash-dal-params/
