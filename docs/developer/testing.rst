@@ -75,15 +75,12 @@ appropriate for the corresponding component and testing type. The frameworks
 are linked to a sub-section of this page where the framework is presented
 in more detail.
 
-..
-   MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
-
-.. csv-table:: Testing frameworks and their applications in Octez. EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotezt_section`, QC: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
+.. csv-table:: Testing frameworks and their applications in Octez. EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotezt_section`, QC: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`, TZT: :ref:`Michelson unit tests <michelson_unit_tests>`
    :header: "Component","Unit","Property","Integration","System","Regression","Performance"
 
    "Node",":ref:`AT <alcotezt_section>`",":ref:`QC <property_based_test>`",":ref:`AT <alcotezt_section>`",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "-- Protocol",":ref:`AT <alcotezt_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`",""
-   "-- -- Michelson interpreter",":ref:`AT <alcotezt_section>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
+   "-- -- Michelson interpreter",":ref:`AT <alcotezt_section>`, :ref:`TZT <michelson_unit_tests>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
    "Client",":ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`","",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "Networked nodes","--","",":ref:`TZ <tezt_section>`","", ""
    "Attester","","","",""
@@ -232,25 +229,25 @@ Typical use cases:
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
-..
-   .. _michelson_unit_tests:
+.. _michelson_unit_tests:
 
-   Michelson unit tests
-   --------------------
+Michelson unit tests
+--------------------
 
-   The `Michelson unit test proposal
-   <https://gitlab.com/tezos/tezos/-/merge_requests/1487>`__ defines a
-   format for unit tests for Michelson snippets. If the proposal is eventually accepted, then these
-   tests will be executable through ``octez-client``.
+The :ref:`TZT syntax extension <michelson_tzt>` defines a
+format for unit tests for Michelson snippets. The
+tests written in it are executable:
 
-   Example use cases:
-    - Verifying the functional (input--output) behavior of snippets of
-      Michelson instructions.
-    - Conformance testing for Michelson interpreters.
+- through ``octez-client run unit test`` for the Michelson interpreter written in OCaml;
+- through ``cargo run --bin tzt_runner`` for the Michelson interpreter written in Rust.
 
-   References:
-    - `Merge request defining the Michelson unit test format <https://gitlab.com/tezos/tezos/-/merge_requests/1487>`_
-    - `A conformance test suite for Michelson interpreter using the Michelson unit test format <https://github.com/runtimeverification/michelson-semantics/tree/master/tests/unit>`_
+Example use cases:
+
+- Verifying the functional (input--output) behavior of snippets of
+  Michelson instructions.
+- Conformance testing for Michelson interpreters.
+
+A `conformance test suite for Michelson interpreters <https://github.com/runtimeverification/michelson-semantics/tree/master/tests/unit>`__ written using the TZT extension is maintained and is used for non-regression testing.
 
 .. _gitlab_test_ci:
 

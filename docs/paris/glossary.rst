@@ -379,9 +379,9 @@ _`Staker`
     The security deposit accrues to the stake of the implicit account's delegate and is
     subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_paris>`.
 
- _`Transaction`
-    An operation_ to transfer tez between two accounts, or to run the code of a
-    `smart contract`_.
+_`Transaction`
+  An operation_ to transfer tez between two accounts, or to run the code of a
+  `smart contract`_.
 
 _`Validation pass`
     An index (a natural number) associated with a particular kind of
