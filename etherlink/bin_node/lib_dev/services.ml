@@ -462,7 +462,11 @@ let dispatch_request (config : Configuration.t)
             else
               let f tx_raw =
                 let txn = Ethereum_types.hex_to_bytes tx_raw in
-                let* is_valid = Backend_rpc.is_tx_valid txn in
+                let* is_valid =
+                  if config.experimental_features.node_transaction_validation
+                  then Validate.is_tx_valid (module Backend_rpc) txn
+                  else Backend_rpc.is_tx_valid txn
+                in
                 match is_valid with
                 | Error err ->
                     let*! () =
