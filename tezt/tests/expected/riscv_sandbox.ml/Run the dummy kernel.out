@@ -1,5 +1,5 @@
 
-./src/riscv/riscv-sandbox run --input tezt/tests/riscv-tests/hermit-loader --initrd src/riscv/riscv-dummy.elf --max-steps 9223372036854775807 --inbox-file tezt/tests/riscv-tests/dummy-kernel-inbox.json --pvm
+./src/riscv/riscv-sandbox run --input src/riscv/assets/hermit-loader --initrd src/riscv/riscv-dummy.elf --max-steps 9223372036854775807 --inbox-file tezt/tests/riscv-tests/dummy-kernel-inbox.json --pvm
 [src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
 [0][WARN] Unable to read entropy! Fallback to a naive implementation!
 Hello World

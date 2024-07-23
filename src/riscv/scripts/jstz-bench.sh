@@ -84,7 +84,7 @@ build_jstz_riscv() {
 run_jstz_riscv() {
   $PROFILING_WRAPPER "./$SANDBOX_BIN" run \
     --pvm \
-    --input ../../tezt/tests/riscv-tests/hermit-loader \
+    --input assets/hermit-loader \
     --initrd jstz/target/riscv64gc-unknown-hermit/release/jstz \
     --inbox-file "$RUN_INBOX" \
     --address "$DEFAULT_ROLLUP_ADDRESS" \

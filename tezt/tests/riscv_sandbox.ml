@@ -32,7 +32,7 @@
 *)
 
 let hermit_loader =
-  Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/hermit-loader"
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/hermit-loader"
 
 let dummy_kernel = Uses.make ~tag:"riscv" ~path:"src/riscv/riscv-dummy.elf"
 
