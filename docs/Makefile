@@ -20,11 +20,11 @@ PROTOCOLS     = $(NAMED_PROTOS) alpha beta
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-paris_long    = PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ
+paris_long    = PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi
 beta_long     = PtRU6wuXeNfhzbbbNbZNbaahu2eKBDztN5cqG8LbvLspdUnPGVX
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-paris_short   = PtParisB
+paris_short   = PtParisC
 beta_short    = beta
 alpha_short   = alpha
 
