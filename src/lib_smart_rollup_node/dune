@@ -16,9 +16,6 @@
   tezos-openapi
   octez-node-config
   octez-libs.prometheus-app
-  camlzip
-  tar
-  tar-unix
   tezos-dal-node-lib
   tezos-dac-lib
   tezos-dac-client-lib
