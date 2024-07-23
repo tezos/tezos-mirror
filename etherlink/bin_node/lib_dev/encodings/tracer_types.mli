@@ -16,13 +16,15 @@ type tracer_config = {
   enable_memory : bool;
   disable_stack : bool;
   disable_storage : bool;
+  with_logs : bool;
+  only_top_call : bool;
 }
 
 val default_tracer_config : tracer_config
 
 val tracer_config_encoding : tracer_config Data_encoding.t
 
-type tracer_kind = StructLogger
+type tracer_kind = StructLogger | CallTracer
 
 val tracer_kind_encoding : tracer_kind Data_encoding.t
 
@@ -62,33 +64,47 @@ type uint53 = Z.t
 
 val uint53_encoding : uint53 Data_encoding.t
 
-type opcode_log = {
-  pc : uint53;
-  op : Opcode.t;
-  gas : uint53;
-  gas_cost : uint53;
-  memory : Hex.t list option;
-  mem_size : int32 option;
-  stack : Hex.t list option;
-  return_data : Hex.t option;
-  storage : (Hex.t * Hex.t) list option;
-  depth : uint53;
-  refund : uint53;
-  error : string option;
-}
+module StructLogger : sig
+  type opcode_log = {
+    pc : uint53;
+    op : Opcode.t;
+    gas : uint53;
+    gas_cost : uint53;
+    memory : Hex.t list option;
+    mem_size : int32 option;
+    stack : Hex.t list option;
+    return_data : Hex.t option;
+    storage : (Hex.t * Hex.t) list option;
+    depth : uint53;
+    refund : uint53;
+    error : string option;
+  }
 
-type output = {
-  gas : int64;
-  failed : bool;
-  return_value : Ethereum_types.hash;
-  struct_logs : opcode_log list;
-}
+  type output = {
+    gas : int64;
+    failed : bool;
+    return_value : Ethereum_types.hash;
+    struct_logs : opcode_log list;
+  }
+
+  val output_encoding : output Data_encoding.t
+
+  val output_binary_decoder :
+    gas:bytes ->
+    failed:bytes ->
+    return_value:bytes ->
+    struct_logs:bytes list ->
+    output tzresult
+end
+
+module CallTracer : sig
+  type output = {calls : output list; type_ : string; from : string}
+
+  val output_encoding : output Data_encoding.t
+end
+
+type output =
+  | StructLoggerOutput of StructLogger.output
+  | CallTracerOutput of CallTracer.output
 
 val output_encoding : output Data_encoding.t
-
-val output_binary_decoder :
-  gas:bytes ->
-  failed:bytes ->
-  return_value:bytes ->
-  struct_logs:bytes list ->
-  output tzresult

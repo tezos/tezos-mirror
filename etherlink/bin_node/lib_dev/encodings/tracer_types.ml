@@ -5,6 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Byte used as prefix in the input stored for the kernel
+   to identify the tracer.
+
+   The StructLogger is the default tracer, and doesn't use a prefix.
+*)
+let tracer_input_prefix_calltracer = '\001'
+
 type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
@@ -12,10 +19,14 @@ type error +=
   | Trace_not_found
 
 type tracer_config = {
+  (* StructLogger flags *)
   enable_return_data : bool;
   enable_memory : bool;
   disable_stack : bool;
   disable_storage : bool;
+  (* CallTracer flags *)
+  with_logs : bool;
+  only_top_call : bool;
 }
 
 let default_tracer_config =
@@ -24,45 +35,62 @@ let default_tracer_config =
     enable_memory = false;
     disable_stack = false;
     disable_storage = false;
+    with_logs = true;
+    only_top_call = true;
   }
 
 let tracer_config_encoding =
   let open Data_encoding in
   conv
-    (fun {enable_return_data; enable_memory; disable_stack; disable_storage} ->
+    (fun {
+           enable_return_data;
+           enable_memory;
+           disable_stack;
+           disable_storage;
+           with_logs;
+           only_top_call;
+         } ->
       ( enable_return_data,
         enable_memory,
         disable_stack,
         disable_storage,
+        with_logs,
+        only_top_call,
         false,
         5 ))
     (fun ( enable_return_data,
            enable_memory,
            disable_stack,
            disable_storage,
+           with_logs,
+           only_top_call,
            _,
            _ ) ->
-      {enable_return_data; enable_memory; disable_stack; disable_storage})
-    (obj6
+      {
+        enable_return_data;
+        enable_memory;
+        disable_stack;
+        disable_storage;
+        with_logs;
+        only_top_call;
+      })
+    (obj8
        (dft "enableReturnData" bool default_tracer_config.enable_return_data)
        (dft "enableMemory" bool default_tracer_config.enable_memory)
        (dft "disableStack" bool default_tracer_config.disable_stack)
        (dft "disableStorage" bool default_tracer_config.disable_storage)
+       (dft "withLog" bool default_tracer_config.with_logs)
+       (dft "onlyTopCall" bool default_tracer_config.only_top_call)
        (dft "debug" bool false)
        (dft "limit" int31 5))
 
-type tracer_kind = StructLogger
+type tracer_kind = StructLogger | CallTracer
 
 (* TODO: (#7212) make it return an error so that we can return an understadable
    error to the user. *)
-(* Cannot be made a string_enum due to `"data_encoding.string_enum: cannot have a
-   single case, use constant instead"`. *)
 let tracer_kind_encoding =
-  Data_encoding.(
-    conv
-      (fun StructLogger -> ())
-      (fun () -> StructLogger)
-      (constant "structLogger"))
+  Data_encoding.string_enum
+    [("structLogger", StructLogger); ("callTracer", CallTracer)]
 
 type config = {
   tracer : tracer_kind;
@@ -166,7 +194,7 @@ let call_input_encoding =
     config_encoding
     default_config
 
-let input_rlp_encoder ?hash config =
+let struct_logger_input_rlp_encoder ?hash config =
   let open Rlp in
   let hash =
     match hash with
@@ -186,6 +214,29 @@ let input_rlp_encoder ?hash config =
     Ethereum_types.bool_to_rlp_bytes config.tracer_config.disable_storage
   in
   List [hash; memory; return_data; stack; storage] |> encode |> Bytes.to_string
+
+let call_tracer_input_rlp_encoder ?hash config =
+  let open Rlp in
+  let hash =
+    match hash with
+    | Some hash -> Value (Ethereum_types.hash_to_bytes hash |> Bytes.of_string)
+    | None -> Value Bytes.empty
+  in
+  let with_logs =
+    Ethereum_types.bool_to_rlp_bytes config.tracer_config.with_logs
+  in
+  let only_top_call =
+    Ethereum_types.bool_to_rlp_bytes config.tracer_config.only_top_call
+  in
+  List [hash; with_logs; only_top_call]
+  |> encode
+  |> Bytes.cat (Bytes.make 1 tracer_input_prefix_calltracer)
+  |> Bytes.to_string
+
+let input_rlp_encoder ?hash config =
+  match config.tracer with
+  | StructLogger -> struct_logger_input_rlp_encoder ?hash config
+  | CallTracer -> call_tracer_input_rlp_encoder ?hash config
 
 let hex_encoding =
   let open Data_encoding in
@@ -532,104 +583,161 @@ let uint53_encoding =
   let json_encoding = conv uint53_to_json json_to_uint53 json in
   splitted ~json:json_encoding ~binary:z
 
-type opcode_log = {
-  pc : uint53;
-  op : Opcode.t;
-  gas : uint53;
-  gas_cost : uint53;
-  memory : Hex.t list option;
-  mem_size : int32 option;
-  stack : Hex.t list option;
-  return_data : Hex.t option;
-  storage : (Hex.t * Hex.t) list option;
-  depth : uint53;
-  refund : uint53;
-  error : string option;
-}
+module StructLogger = struct
+  type opcode_log = {
+    pc : uint53;
+    op : Opcode.t;
+    gas : uint53;
+    gas_cost : uint53;
+    memory : Hex.t list option;
+    mem_size : int32 option;
+    stack : Hex.t list option;
+    return_data : Hex.t option;
+    storage : (Hex.t * Hex.t) list option;
+    depth : uint53;
+    refund : uint53;
+    error : string option;
+  }
 
-let decode_value decode =
-  let open Result_syntax in
-  function
-  | Rlp.Value b -> decode b
-  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected value")
+  let decode_value decode =
+    let open Result_syntax in
+    function
+    | Rlp.Value b -> decode b
+    | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected value")
 
-let decode_list decode =
-  let open Result_syntax in
-  function
-  | Rlp.List l -> return (decode l)
-  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected list")
+  let decode_list decode =
+    let open Result_syntax in
+    function
+    | Rlp.List l -> return (decode l)
+    | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected list")
 
-let opcode_rlp_decoder bytes =
-  let open Result_syntax in
-  let* rlp = Rlp.decode bytes in
-  match rlp with
-  | Rlp.List
-      [
-        Value pc;
-        Value op;
-        Value gas;
-        Value gas_cost;
-        Value depth;
-        error;
-        stack;
-        return_data;
-        raw_memory;
-        storage;
-      ] ->
-      let pc = Bytes.to_string pc |> Z.of_bits in
-      let* op =
-        if Bytes.length op > 1 then
-          tzfail
-            (error_of_fmt
-               "Invalid opcode encoding: %a"
-               Hex.pp
-               (Hex.of_bytes op))
-        else if Bytes.length op = 0 then return '\x00'
-        else return (Bytes.get op 0)
-      in
-      let gas = Bytes.to_string gas |> Z.of_bits in
-      let gas_cost = Bytes.to_string gas_cost |> Z.of_bits in
-      let depth = Bytes.to_string depth |> Z.of_bits in
-      let* error =
-        Rlp.decode_option
-          (decode_value (fun e -> return @@ Bytes.to_string e))
-          error
-      in
-      let* return_data =
-        Rlp.decode_option
-          (decode_value (fun d -> return @@ Hex.of_bytes d))
-          return_data
-      in
-      let* stack =
-        Rlp.decode_option
-          (decode_list
-          @@ List.filter_map (function
-                 | Rlp.List _ -> None
-                 | Rlp.Value v -> Some (Hex.of_bytes v)))
-          stack
-      in
-      let* raw_memory = Rlp.decode_option (decode_value return) raw_memory in
-      let mem_size =
-        Option.map (fun m -> Bytes.length m |> Int32.of_int) raw_memory
-      in
-      let* memory =
-        Option.map_e
-          (fun memory ->
-            let* chunks = TzString.chunk_bytes 32 memory in
-            return @@ List.map Hex.of_string chunks)
-          raw_memory
-      in
-      let* storage =
-        let parse_storage_index = function
-          | Rlp.List [Value _; Value index; Value value] ->
-              Some (Hex.of_bytes index, Hex.of_bytes value)
-          | _ -> None
+  let opcode_rlp_decoder bytes =
+    let open Result_syntax in
+    let* rlp = Rlp.decode bytes in
+    match rlp with
+    | Rlp.List
+        [
+          Value pc;
+          Value op;
+          Value gas;
+          Value gas_cost;
+          Value depth;
+          error;
+          stack;
+          return_data;
+          raw_memory;
+          storage;
+        ] ->
+        let pc = Bytes.to_string pc |> Z.of_bits in
+        let* op =
+          if Bytes.length op > 1 then
+            tzfail
+              (error_of_fmt
+                 "Invalid opcode encoding: %a"
+                 Hex.pp
+                 (Hex.of_bytes op))
+          else if Bytes.length op = 0 then return '\x00'
+          else return (Bytes.get op 0)
         in
-        Rlp.decode_option
-          (decode_list (List.filter_map parse_storage_index))
-          storage
-      in
-      return
+        let gas = Bytes.to_string gas |> Z.of_bits in
+        let gas_cost = Bytes.to_string gas_cost |> Z.of_bits in
+        let depth = Bytes.to_string depth |> Z.of_bits in
+        let* error =
+          Rlp.decode_option
+            (decode_value (fun e -> return @@ Bytes.to_string e))
+            error
+        in
+        let* return_data =
+          Rlp.decode_option
+            (decode_value (fun d -> return @@ Hex.of_bytes d))
+            return_data
+        in
+        let* stack =
+          Rlp.decode_option
+            (decode_list
+            @@ List.filter_map (function
+                   | Rlp.List _ -> None
+                   | Rlp.Value v -> Some (Hex.of_bytes v)))
+            stack
+        in
+        let* raw_memory = Rlp.decode_option (decode_value return) raw_memory in
+        let mem_size =
+          Option.map (fun m -> Bytes.length m |> Int32.of_int) raw_memory
+        in
+        let* memory =
+          Option.map_e
+            (fun memory ->
+              let* chunks = TzString.chunk_bytes 32 memory in
+              return @@ List.map Hex.of_string chunks)
+            raw_memory
+        in
+        let* storage =
+          let parse_storage_index = function
+            | Rlp.List [Value _; Value index; Value value] ->
+                Some (Hex.of_bytes index, Hex.of_bytes value)
+            | _ -> None
+          in
+          Rlp.decode_option
+            (decode_list (List.filter_map parse_storage_index))
+            storage
+        in
+        return
+          {
+            pc;
+            op;
+            gas;
+            gas_cost;
+            memory;
+            mem_size;
+            stack;
+            return_data;
+            storage;
+            depth;
+            refund = Z.zero;
+            error;
+          }
+    | _ ->
+        tzfail (error_of_fmt "Invalid rlp encoding for opcode: %a" Rlp.pp rlp)
+
+  let opcode_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             pc;
+             op;
+             gas;
+             gas_cost;
+             memory;
+             mem_size;
+             stack;
+             return_data;
+             storage;
+             depth;
+             refund;
+             error;
+           } ->
+        ( ( pc,
+            op,
+            gas,
+            gas_cost,
+            memory,
+            mem_size,
+            stack,
+            return_data,
+            storage,
+            depth ),
+          (refund, error) ))
+      (fun ( ( pc,
+               op,
+               gas,
+               gas_cost,
+               memory,
+               mem_size,
+               stack,
+               return_data,
+               storage,
+               depth ),
+             (refund, error) ) ->
         {
           pc;
           op;
@@ -641,110 +749,93 @@ let opcode_rlp_decoder bytes =
           return_data;
           storage;
           depth;
-          refund = Z.zero;
+          refund;
           error;
-        }
-  | _ -> tzfail (error_of_fmt "Invalid rlp encoding for opcode: %a" Rlp.pp rlp)
+        })
+      (merge_objs
+         (obj10
+            (req "pc" uint53_encoding)
+            (req "op" Opcode.encoding)
+            (req "gas" uint53_encoding)
+            (req "gasCost" uint53_encoding)
+            (req "memory" (option (list hex_encoding)))
+            (req "memSize" (option int32))
+            (req "stack" (option (list hex_encoding)))
+            (req "returnData" (option hex_encoding))
+            (req "storage" (option (list (tup2 hex_encoding hex_encoding))))
+            (req "depth" uint53_encoding))
+         (obj2 (req "refund" uint53_encoding) (req "error" (option string))))
 
-let opcode_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           pc;
-           op;
-           gas;
-           gas_cost;
-           memory;
-           mem_size;
-           stack;
-           return_data;
-           storage;
-           depth;
-           refund;
-           error;
-         } ->
-      ( ( pc,
-          op,
-          gas,
-          gas_cost,
-          memory,
-          mem_size,
-          stack,
-          return_data,
-          storage,
-          depth ),
-        (refund, error) ))
-    (fun ( ( pc,
-             op,
-             gas,
-             gas_cost,
-             memory,
-             mem_size,
-             stack,
-             return_data,
-             storage,
-             depth ),
-           (refund, error) ) ->
-      {
-        pc;
-        op;
-        gas;
-        gas_cost;
-        memory;
-        mem_size;
-        stack;
-        return_data;
-        storage;
-        depth;
-        refund;
-        error;
-      })
-    (merge_objs
-       (obj10
-          (req "pc" uint53_encoding)
-          (req "op" Opcode.encoding)
-          (req "gas" uint53_encoding)
-          (req "gasCost" uint53_encoding)
-          (req "memory" (option (list hex_encoding)))
-          (req "memSize" (option int32))
-          (req "stack" (option (list hex_encoding)))
-          (req "returnData" (option hex_encoding))
-          (req "storage" (option (list (tup2 hex_encoding hex_encoding))))
-          (req "depth" uint53_encoding))
-       (obj2 (req "refund" uint53_encoding) (req "error" (option string))))
+  type output = {
+    gas : int64;
+    failed : bool;
+    return_value : Ethereum_types.hash;
+    struct_logs : opcode_log list;
+  }
 
-type output = {
-  gas : int64;
-  failed : bool;
-  return_value : Ethereum_types.hash;
-  struct_logs : opcode_log list;
-}
+  let output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {gas; failed; return_value; struct_logs} ->
+        (gas, failed, return_value, struct_logs))
+      (fun (gas, failed, return_value, struct_logs) ->
+        {gas; failed; return_value; struct_logs})
+      (obj4
+         (req "gas" int64)
+         (req "failed" bool)
+         (req "returnValue" Ethereum_types.hash_encoding)
+         (req "structLogs" (list opcode_encoding)))
+
+  let output_binary_decoder ~gas ~failed ~return_value ~struct_logs =
+    let open Result_syntax in
+    let gas =
+      Ethereum_types.decode_number_le gas |> fun (Ethereum_types.Qty z) ->
+      Z.to_int64 z
+    in
+    let failed =
+      if Bytes.length failed = 0 then false else Bytes.get failed 0 = '\x01'
+    in
+    let return_value =
+      let (`Hex hex_value) = Hex.of_bytes return_value in
+      Ethereum_types.hash_of_string hex_value
+    in
+    let* struct_logs = List.map_e opcode_rlp_decoder struct_logs in
+    return {gas; failed; return_value; struct_logs}
+end
+
+module CallTracer = struct
+  type output = {calls : output list; type_ : string; from : string}
+
+  let output_encoding =
+    let open Data_encoding in
+    mu "callTracerOutput" (fun enc ->
+        conv
+          (fun {calls; type_; from} -> (calls, type_, from))
+          (fun (calls, type_, from) -> {calls; type_; from})
+          (obj3
+             (req "calls" (list enc))
+             (req "type" string)
+             (req "from" string)))
+end
+
+type output =
+  | StructLoggerOutput of StructLogger.output
+  | CallTracerOutput of CallTracer.output
 
 let output_encoding =
   let open Data_encoding in
-  conv
-    (fun {gas; failed; return_value; struct_logs} ->
-      (gas, failed, return_value, struct_logs))
-    (fun (gas, failed, return_value, struct_logs) ->
-      {gas; failed; return_value; struct_logs})
-    (obj4
-       (req "gas" int64)
-       (req "failed" bool)
-       (req "returnValue" Ethereum_types.hash_encoding)
-       (req "structLogs" (list opcode_encoding)))
-
-let output_binary_decoder ~gas ~failed ~return_value ~struct_logs =
-  let open Result_syntax in
-  let gas =
-    Ethereum_types.decode_number_le gas |> fun (Ethereum_types.Qty z) ->
-    Z.to_int64 z
-  in
-  let failed =
-    if Bytes.length failed = 0 then false else Bytes.get failed 0 = '\x01'
-  in
-  let return_value =
-    let (`Hex hex_value) = Hex.of_bytes return_value in
-    Ethereum_types.hash_of_string hex_value
-  in
-  let* struct_logs = List.map_e opcode_rlp_decoder struct_logs in
-  return {gas; failed; return_value; struct_logs}
+  union
+    [
+      case
+        ~title:"structLogger"
+        (Tag 0)
+        StructLogger.output_encoding
+        (function StructLoggerOutput output -> Some output | _ -> None)
+        (fun output -> StructLoggerOutput output);
+      case
+        ~title:"callTracer"
+        (Tag 1)
+        CallTracer.output_encoding
+        (function CallTracerOutput output -> Some output | _ -> None)
+        (fun output -> CallTracerOutput output);
+    ]

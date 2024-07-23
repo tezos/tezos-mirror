@@ -26,52 +26,73 @@ let read_value ?default state path =
       | Some d -> return d
       | None -> tzfail Tracer_types.Trace_not_found)
 
-let read_logs_length state transaction_hash =
-  let open Lwt_result_syntax in
-  let* value =
-    read_value
-      ~default:(Bytes.of_string "\000")
-      state
-      (Durable_storage_path.Trace.logs_length ~transaction_hash)
-  in
-  return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
+module StructLoggerRead = struct
+  let read_logs_length state transaction_hash =
+    let open Lwt_result_syntax in
+    let* value =
+      read_value
+        ~default:(Bytes.of_string "\000")
+        state
+        (Durable_storage_path.Trace.logs_length ~transaction_hash)
+    in
+    return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
 
-let read_opcode state transaction_hash opcode_index =
-  read_value
-    state
-    (Durable_storage_path.Trace.opcode ~transaction_hash opcode_index)
-
-let read_logs state transaction_hash =
-  let open Lwt_result_syntax in
-  let* length = read_logs_length state transaction_hash in
-  let*? opcodes =
-    List.init
-      ~when_negative_length:(TzTrace.make (error_of_fmt "Invalid length"))
-      length
-      Fun.id
-  in
-  List.map_es (read_opcode state transaction_hash) opcodes
-
-let read_output state transaction_hash =
-  let open Lwt_result_syntax in
-  let* gas =
-    read_value state (Durable_storage_path.Trace.output_gas ~transaction_hash)
-  in
-  let* failed =
+  let read_opcode state transaction_hash opcode_index =
     read_value
       state
-      (Durable_storage_path.Trace.output_failed ~transaction_hash)
-  in
-  let* return_value =
-    read_value
-    (* The key doesn't exist if there is no value returned by the transaction *)
-      ~default:Bytes.empty
-      state
-      (Durable_storage_path.Trace.output_return_value ~transaction_hash)
-  in
-  let* struct_logs = read_logs state transaction_hash in
-  Lwt.return
-  @@ Tracer_types.output_binary_decoder ~gas ~failed ~return_value ~struct_logs
+      (Durable_storage_path.Trace.opcode ~transaction_hash opcode_index)
+
+  let read_logs state transaction_hash =
+    let open Lwt_result_syntax in
+    let* length = read_logs_length state transaction_hash in
+    let*? opcodes =
+      List.init
+        ~when_negative_length:(TzTrace.make (error_of_fmt "Invalid length"))
+        length
+        Fun.id
+    in
+    List.map_es (read_opcode state transaction_hash) opcodes
+
+  let read_output state transaction_hash =
+    let open Lwt_result_syntax in
+    let* gas =
+      read_value state (Durable_storage_path.Trace.output_gas ~transaction_hash)
+    in
+    let* failed =
+      read_value
+        state
+        (Durable_storage_path.Trace.output_failed ~transaction_hash)
+    in
+    let* return_value =
+      read_value
+      (* The key doesn't exist if there is no value returned by the transaction *)
+        ~default:Bytes.empty
+        state
+        (Durable_storage_path.Trace.output_return_value ~transaction_hash)
+    in
+    let* struct_logs = read_logs state transaction_hash in
+    Lwt.return
+    @@ Tracer_types.StructLogger.output_binary_decoder
+         ~gas
+         ~failed
+         ~return_value
+         ~struct_logs
+end
+
+module CallTracerRead = struct
+  (* TODO: implement output reading *)
+  let read_output _state _hash =
+    Lwt_result_syntax.tzfail Tracer_types.Trace_not_found
+end
+
+let read_output config state root_indexed_hash =
+  let open Tracer_types in
+  let open Lwt_result_syntax in
+  match config.tracer with
+  | StructLogger ->
+      let* output = StructLoggerRead.read_output state root_indexed_hash in
+      return (StructLoggerOutput output)
+  | CallTracer -> CallTracerRead.read_output state root_indexed_hash
 
 let trace_transaction (module Exe : Evm_execution.S) ~block_number
     ~transaction_hash ~config =
@@ -96,7 +117,7 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
       let* root_indexed_by_hash =
         is_tracing_root_indexed_by_hash hash evm_state
       in
-      read_output evm_state root_indexed_by_hash
+      read_output config evm_state root_indexed_by_hash
 
 let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let open Lwt_result_syntax in
@@ -123,4 +144,4 @@ let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let* evm_state =
     Exe.execute ~alter_evm_state:set_config simulation_input block
   in
-  read_output evm_state None
+  read_output config evm_state None
