@@ -250,7 +250,7 @@ type size_info = {number_of_addresses : int; number_of_transactions : int}
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        Simulation.validation_result * string
+        Ethereum_types.transaction_object * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions : int -> ((string * Ethereum_types.hash) list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
@@ -276,7 +276,9 @@ module Request = struct
           ~title:"Add_transaction"
           (obj3
              (req "request" (constant "add_transaction"))
-             (req "simpulation_result" Simulation.validation_result_encoding)
+             (req
+                "transaction_object"
+                Ethereum_types.transaction_object_encoding)
              (req "transaction" string))
           (function
             | View (Add_transaction (transaction, txn)) ->
@@ -462,15 +464,12 @@ let insert_valid_transaction state tx_raw address
       state.pool <- pool ;
       return (Ok hash)
 
-let on_normal_transaction state validation_result tx_raw =
-  match validation_result with
-  | Either.Left transaction_object ->
-      insert_valid_transaction
-        state
-        tx_raw
-        (transaction_object : Ethereum_types.transaction_object).from
-        (Some transaction_object)
-  | Right address -> insert_valid_transaction state tx_raw address None
+let on_normal_transaction state transaction_object tx_raw =
+  insert_valid_transaction
+    state
+    tx_raw
+    (transaction_object : Ethereum_types.transaction_object).from
+    (Some transaction_object)
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
@@ -700,9 +699,9 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state w in
     match request with
-    | Request.Add_transaction (is_valid, txn) ->
+    | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
-        let* res = on_normal_transaction state is_valid txn in
+        let* res = on_normal_transaction state transaction_object txn in
         let* () = observer_self_inject_request w in
         return res
     | Request.Pop_transactions maximum_cumulative_size ->
@@ -807,12 +806,12 @@ let shutdown () =
   let*! () = Worker.shutdown w in
   return_unit
 
-let add is_valid raw_tx =
+let add transaction_object raw_tx =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     w
-    (Request.Add_transaction (is_valid, raw_tx))
+    (Request.Add_transaction (transaction_object, raw_tx))
   |> handle_request_error
 
 let nonce pkey =

@@ -465,12 +465,16 @@ let dispatch_request (config : Configuration.t)
                       Tx_pool_events.invalid_transaction ~transaction:tx_raw
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok is_valid -> (
-                    let* tx_hash = Tx_pool.add is_valid txn in
+                | Ok (Either.Left transaction_object) -> (
+                    let* tx_hash = Tx_pool.add transaction_object txn in
                     match tx_hash with
                     | Ok tx_hash -> rpc_ok tx_hash
                     | Error reason ->
                         rpc_error (Rpc_errors.transaction_rejected reason None))
+                | Ok (Either.Right _) ->
+                    rpc_error
+                      (Rpc_errors.internal_error
+                         "Transaction validation in the kernel is deprecated")
               in
               build_with_input ~f module_ parameters
         | Eth_call.Method ->

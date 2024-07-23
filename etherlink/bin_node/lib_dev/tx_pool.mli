@@ -28,13 +28,13 @@ val start : parameters -> unit tzresult Lwt.t
     to be processed. *)
 val shutdown : unit -> unit tzresult Lwt.t
 
-(** [add validation_result raw_tx] adds a eth transaction identified by its
-    [validation_result] and its raw contents to the tx-pool.
+(** [add transaction_object raw_tx] adds a eth transaction and its raw contents
+    to the tx-pool.
 
-    The consistency between [validation_result] and [raw_tx] is assumed by
+    The consistency between [transaction_object] and [raw_tx] is assumed by
     [add]. It is the responsibility of the caller to enforce it. *)
 val add :
-  Simulation.validation_result ->
+  Ethereum_types.transaction_object ->
   string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
