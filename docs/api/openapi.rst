@@ -52,8 +52,8 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
-- `rpc-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi-dev.json>`_
+- :src:`docs/api/rpc-openapi.json` (version 20.2)
+- :src:`docs/api/rpc-openapi-dev.json` (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -63,12 +63,12 @@ Paris RPCs
 The OpenAPI specifications for RPCs which are specific to the ParisC (``PtParisC``)
 protocol can be found at:
 
-- `paris-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-openapi.json>`_
+- :src:`docs/api/paris-openapi.json` (version 20.2)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Paris protocol can be found at:
 
-- `paris-mempool-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi.json>`_
+- :src:`docs/api/paris-mempool-openapi.json` (version 20.2)
 
 Alpha RPCs
 ----------
@@ -76,12 +76,12 @@ Alpha RPCs
 The OpenAPI specifications for RPCs which are specific to the Alpha
 protocol can be found at:
 
-- `alpha-openapi.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/alpha-openapi.json>`_
+- :src:`docs/api/alpha-openapi.json` (version master)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Alpha protocol can be found at:
 
-- `alpha-mempool-openapi.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/alpha-mempool-openapi.json>`_
+- :src:`docs/api/alpha-mempool-openapi.json` (version master)
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -99,8 +99,7 @@ Paris RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 (``PtParisB``) protocol can be found at:
 
-- `paris-smart-rollup-node-openapi.json (version 20.2)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi.json>`_
+- :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 20.2)
 
 Alpha RPCs
 ----------
@@ -108,8 +107,7 @@ Alpha RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Alpha
 protocol can be found at:
 
-- `alpha-smart-rollup-node-openapi.json (version master)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/alpha-smart-rollup-node-openapi.json>`_
+- :src:`docs/api/alpha-smart-rollup-node-openapi.json` (version master)
 
 DAL Node
 ~~~~~~~~
@@ -117,8 +115,8 @@ DAL Node
 The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
-- `dal-node-openapi.json (version 20.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi.json>`_
-- `dal-node-openapi-dev.json (version master) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/dal-node-openapi-dev.json>`_
+- :src:`docs/api/dal-node-openapi.json` (version 20.2)
+- :src:`docs/api/dal-node-openapi-dev.json` (version master)
 
 .. _openapi_generate:
 
