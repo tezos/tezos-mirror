@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>         *)
 (*                                                                           *)
 (*****************************************************************************)
 
