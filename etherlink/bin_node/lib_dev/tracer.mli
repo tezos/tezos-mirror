@@ -4,6 +4,18 @@
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
+module CallTracerRead : sig
+  (** [build_calltrace end_call get_next] rebuilds a call trace. 
+      [end_call node list] adds a list of calls to a node, and 
+      [get_next i] gets the data [(node,depth)] at line [i] in storage. 
+
+      This is left relatively generic to facilitate testing the algorithm.
+  *)
+  val build_calltrace :
+    ('a -> 'a list -> 'a) ->
+    (int -> ('a * int) option tzresult Lwt.t) ->
+    'a tzresult Lwt.t
+end
 
 (** [trace_transaction ~block_number ~transaction ~config] replays the block
     [block_number] and traces [transaction_hash] in it, with the given
