@@ -25,6 +25,16 @@ val blueprint_applied : Z.t * Ethereum_types.block_hash -> unit Lwt.t
     [level] has been forwarded to a rollup node  *)
 val blueprint_injected : Z.t -> unit Lwt.t
 
+(** [blueprint_injected_on_inbox level] advertizes that a blueprint
+    for level [level] has been forwarded to a rollup node for
+    injection on the shared inbox *)
+val blueprint_injected_on_inbox : Z.t -> unit Lwt.t
+
+(** [blueprint_injected_on_DAL level] advertizes that a blueprint
+    for level [level] has been forwarded to a rollup node for
+    injection on the DAL *)
+val blueprint_injected_on_DAL : Z.t -> unit Lwt.t
+
 (** [blueprint_injection_failed level trace] advertizes that a blueprint could
     not be injected for level [level]. *)
 val blueprint_injection_failed : Z.t -> tztrace -> unit Lwt.t

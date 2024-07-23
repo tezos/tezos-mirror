@@ -118,11 +118,13 @@ module Worker = struct
           [`External payload] )
         when use_dal_if_enabled && dal_last_used < level ->
           (state self).dal_last_used <- level ;
+          let*! () = Blueprint_events.blueprint_injected_on_DAL level in
           Rollup_services.publish_on_dal
             ~rollup_node_endpoint
             ~slot_index
             payload
       | _ ->
+          let*! () = Blueprint_events.blueprint_injected_on_inbox level in
           Rollup_services.publish
             ~keep_alive:false
             ~rollup_node_endpoint
