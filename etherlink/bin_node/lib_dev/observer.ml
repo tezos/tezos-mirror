@@ -28,7 +28,7 @@ end) : Services_backend_sig.Backend = struct
 
     let encode_transactions ~smart_rollup_address:_ ~transactions =
       let open Result_syntax in
-      let hashes = List.map Transaction.hash_raw_tx transactions in
+      let hashes = List.map hash_raw_tx transactions in
       return (hashes, transactions)
   end
 
