@@ -470,20 +470,24 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
       (* Keep the worker alive. *)
       return_ok_unit
 
-let errors_contains_inode_error errors =
-  let rex = Re.compile (Re.Perl.re "unknown inode key") in
-  let is_inode_error = function
-    | Exn (Failure s) -> (
-        match Re.exec rex s with _ -> true | exception Not_found -> false)
-    | _ -> false
+let errors_contains_context_error errors =
+  let rex =
+    (* Matching all the candidate to a context error:
+       - "[Ir]min|[Bb]rassaia": for any error from irmin or brassaia components
+       - "unknown inode key": to catch the so called inode error *)
+    Re.compile (Re.Perl.re "[Ii]rmin|[Bb]rassaia|unknown inode key")
   in
-  List.exists is_inode_error errors
+  let is_context_error error =
+    let error_s = Format.asprintf "%a" Error_monad.pp error in
+    match Re.exec rex error_s with exception Not_found -> false | _ -> true
+  in
+  List.exists is_context_error errors
 
-(* This failsafe aims to look for an irmin error that is known to be
+(* This failsafe aims to look for a context error that is known to be
    critical and, if found, stop the node gracefully. *)
-let check_and_quit_on_irmin_errors errors =
+let check_and_quit_on_context_errors errors =
   let open Lwt_syntax in
-  if errors_contains_inode_error errors then
+  if errors_contains_context_error errors then
     let* () = Events.(emit stopping_node_missing_context_key ()) in
     let* _ = Lwt_exit.exit_and_wait 1 in
     return_unit
@@ -521,7 +525,7 @@ let on_completion :
       match Request.view request with
       | Preapplication v ->
           let* () = Events.(emit preapplication_failure) (v.level, st, errs) in
-          let* () = check_and_quit_on_irmin_errors errs in
+          let* () = check_and_quit_on_context_errors errs in
           return_unit
       | Validation _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Application_error_after_validation errs -> (
@@ -539,7 +543,7 @@ let on_completion :
                 Events.(emit application_failure_after_validation)
                   (v.block, st, errs)
               in
-              let* () = check_and_quit_on_irmin_errors errs in
+              let* () = check_and_quit_on_context_errors errs in
               return_unit)
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Validation_failed errs -> (
@@ -553,7 +557,7 @@ let on_completion :
               Events.(emit validation_canceled) (v.block, st)
           | errs ->
               let* () = Events.(emit validation_failure) (v.block, st, errs) in
-              let* () = check_and_quit_on_irmin_errors errs in
+              let* () = check_and_quit_on_context_errors errs in
               return_unit)
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Commit_block_failed errs -> (
@@ -569,7 +573,7 @@ let on_completion :
               let* () =
                 Events.(emit commit_block_failure) (v.block, st, errs)
               in
-              let* () = check_and_quit_on_irmin_errors errs in
+              let* () = check_and_quit_on_context_errors errs in
               return_unit)
       | Preapplication _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, (Preapplied _ | Preapplication_error _)

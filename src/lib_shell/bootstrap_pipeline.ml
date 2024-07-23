@@ -507,7 +507,7 @@ let rec validation_worker_loop pipeline =
           | Inapplicable_after_validation errs ->
               if
                 retry_on_context_error
-                && Block_validator.errors_contains_inode_error errs
+                && Block_validator.errors_contains_context_error errs
               then
                 (* This is a special case where the block is valid but
                    inapplicable because of a context error. We retry the

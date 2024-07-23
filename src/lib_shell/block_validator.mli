@@ -180,6 +180,5 @@ val current_request :
   (Time.System.t * Time.System.t * Block_validator_worker_state.Request.view)
   option
 
-(** Checks if the errors contains the infamous 'unknown inode key' context
-    error to mitigate it. *)
-val errors_contains_inode_error : error list -> bool
+(** Checks if the errors contains context error to mitigate it. *)
+val errors_contains_context_error : error list -> bool
