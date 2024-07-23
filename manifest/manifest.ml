@@ -1195,6 +1195,7 @@ module Target = struct
     wrapped : bool option;
     documentation : Dune.s_expr option;
     kind : kind;
+    link_flags : Dune.s_expr list;
     linkall : bool;
     modes : Dune.mode list option;
     modules : modules;
@@ -1398,6 +1399,7 @@ module Target = struct
     ?inline_tests_deps:Dune.s_expr list ->
     ?wrapped:bool ->
     ?documentation:Dune.s_expr ->
+    ?link_flags:Dune.s_expr list ->
     ?linkall:bool ->
     ?modes:Dune.mode list ->
     ?modules:string list ->
@@ -1453,8 +1455,8 @@ module Target = struct
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?inline_tests_deps ?wrapped ?documentation ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = [])
+      ?inline_tests_deps ?wrapped ?documentation ?(link_flags = [])
+      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
       ?opam_homepage ?(opam_with_test = Always) ?opam_version
       ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
@@ -1796,6 +1798,7 @@ module Target = struct
         wrapped;
         documentation;
         kind;
+        link_flags;
         linkall;
         modes;
         modules;
@@ -2335,6 +2338,7 @@ module Sub_lib = struct
        ?inline_tests_deps
        ?wrapped
        ?documentation
+       ?link_flags
        ?linkall
        ?modes
        ?modules
@@ -2422,6 +2426,7 @@ module Sub_lib = struct
       ?inline_tests_deps
       ?wrapped
       ?documentation
+      ?link_flags
       ?linkall
       ?modes
       ?modules
@@ -2623,7 +2628,9 @@ let generate_dune (internal : Target.internal) =
       else []
     in
     let linkall_flags = if linkall then [Dune.[S "-linkall"]] else [] in
-    List.concat [static_flags; macos_link_flags; linkall_flags] |> function
+    List.concat
+      [static_flags; macos_link_flags; linkall_flags; internal.link_flags]
+    |> function
     | [] -> None
     | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
   in
