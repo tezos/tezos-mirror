@@ -205,6 +205,12 @@ if [[ ${command} == "stabilise" ]]; then
 
 fi
 
+## check if git tree is clean
+if [[ $(git status --porcelain | wc -l) -gt 0 ]]; then
+  error "Git tree is not clean, please commit or stash your changes" 1>&2
+  print_and_exit 1 "${LINENO}"
+fi
+
 log_blue "${msg}."
 
 # Check if the protocol source exists
