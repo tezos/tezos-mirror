@@ -31,6 +31,7 @@ type snapshot_version = V0
 (** Snapshot metadata for version 0. This information is written as a header of
     the archive snapshot file. *)
 type snapshot_metadata = {
+  version : snapshot_version;
   history_mode : Configuration.history_mode;
   address : Address.t;
   head_level : int32;

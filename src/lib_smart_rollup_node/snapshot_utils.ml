@@ -73,32 +73,30 @@ let gzip_writer : writer = (module Gzip_writer)
 type snapshot_version = V0
 
 type snapshot_metadata = {
+  version : snapshot_version;
   history_mode : Configuration.history_mode;
   address : Address.t;
   head_level : int32;
   last_commitment : Commitment.Hash.t;
 }
 
-let snapshot_version_encoding =
-  let open Data_encoding in
-  conv_with_guard
-    (function V0 -> 0)
-    (function
-      | 0 -> Ok V0 | x -> Error ("Invalid snapshot version " ^ string_of_int x))
-    int8
-
 let snaphsot_metadata_encoding =
   let open Data_encoding in
-  conv
-    (fun {history_mode; address; head_level; last_commitment} ->
-      (history_mode, address, head_level, last_commitment))
-    (fun (history_mode, address, head_level, last_commitment) ->
-      {history_mode; address; head_level; last_commitment})
-  @@ obj4
-       (req "history_mode" Configuration.history_mode_encoding)
-       (req "address" Address.encoding)
-       (req "head_level" int32)
-       (req "last_commitment" Commitment.Hash.encoding)
+  union
+    [
+      case
+        ~title:"snapshot_metadata_v0"
+        (Tag 0)
+        (obj4
+           (req "history_mode" Configuration.history_mode_encoding)
+           (req "address" Address.encoding)
+           (req "head_level" int32)
+           (req "last_commitment" Commitment.Hash.encoding))
+        (fun {version = V0; history_mode; address; head_level; last_commitment} ->
+          Some (history_mode, address, head_level, last_commitment))
+        (fun (history_mode, address, head_level, last_commitment) ->
+          {version = V0; history_mode; address; head_level; last_commitment});
+    ]
 
 let snapshot_metadata_size =
   Data_encoding.Binary.fixed_length snaphsot_metadata_encoding
@@ -107,25 +105,19 @@ let snapshot_metadata_size =
 let version = V0
 
 let write_snapshot_metadata (module Writer : WRITER_OUTPUT) metadata =
-  let version_bytes =
-    Data_encoding.Binary.to_bytes_exn snapshot_version_encoding version
-  in
   let metadata_bytes =
     Data_encoding.Binary.to_bytes_exn snaphsot_metadata_encoding metadata
   in
-  Writer.output Writer.out_chan version_bytes 0 (Bytes.length version_bytes) ;
   Writer.output Writer.out_chan metadata_bytes 0 (Bytes.length metadata_bytes)
 
 let read_snapshot_metadata (module Reader : READER_INPUT) =
-  let version_bytes = Bytes.create 1 in
   let metadata_bytes = Bytes.create snapshot_metadata_size in
-  Reader.really_input Reader.in_chan version_bytes 0 1 ;
   Reader.really_input Reader.in_chan metadata_bytes 0 snapshot_metadata_size ;
-  let snapshot_version =
-    Data_encoding.Binary.of_bytes_exn snapshot_version_encoding version_bytes
+  let metadata =
+    Data_encoding.Binary.of_bytes_exn snaphsot_metadata_encoding metadata_bytes
   in
-  assert (snapshot_version = version) ;
-  Data_encoding.Binary.of_bytes_exn snaphsot_metadata_encoding metadata_bytes
+  assert (metadata.version = version) ;
+  metadata
 
 let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
     ~include_file ~dest =

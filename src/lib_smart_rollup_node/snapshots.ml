@@ -121,6 +121,7 @@ let pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir =
   let* () = Store.close store in
   return
     {
+      version = V0;
       history_mode;
       address = metadata.rollup_address;
       head_level = head.header.level;
