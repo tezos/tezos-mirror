@@ -121,7 +121,7 @@ let on_new_head
       | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
       | Some nb_of_events_bytes ->
           let (Qty nb_of_events) =
-            Ethereum_types.decode_number nb_of_events_bytes
+            Ethereum_types.decode_number_le nb_of_events_bytes
           in
           let nb_of_events = Z.to_int nb_of_events in
           let* events =

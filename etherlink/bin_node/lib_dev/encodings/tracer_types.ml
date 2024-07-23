@@ -736,7 +736,7 @@ let output_encoding =
 let output_binary_decoder ~gas ~failed ~return_value ~struct_logs =
   let open Result_syntax in
   let gas =
-    Ethereum_types.decode_number gas |> fun (Ethereum_types.Qty z) ->
+    Ethereum_types.decode_number_le gas |> fun (Ethereum_types.Qty z) ->
     Z.to_int64 z
   in
   let failed =

@@ -233,12 +233,12 @@ module Make (Reader : READER) = struct
     Lwt.return_ok receipts
 
   let chain_id () =
-    inspect_durable_and_decode Durable_storage_path.chain_id decode_number
+    inspect_durable_and_decode Durable_storage_path.chain_id decode_number_le
 
   let base_fee_per_gas () =
     inspect_durable_and_decode
       Durable_storage_path.base_fee_per_gas
-      decode_number
+      decode_number_le
 
   let kernel_version () =
     inspect_durable_and_decode
