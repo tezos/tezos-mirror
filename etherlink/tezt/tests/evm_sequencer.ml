@@ -202,6 +202,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ?dal_node
       ?history_mode
   in
   let preimages_dir =
