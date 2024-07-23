@@ -70,10 +70,6 @@ let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
 let conduit_lwt_unix = external_lib "conduit-lwt-unix" V.(exactly "6.2.2")
 
-let cohttp_lwt = external_lib "cohttp-lwt" V.(at_least "5.2.0")
-
-let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "5.2.0")
-
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
 let compiler_libs_optcomp = external_lib "compiler-libs.optcomp" V.True ~opam:""

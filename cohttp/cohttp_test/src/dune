@@ -1,3 +1,0 @@
-(library
- (name cohttp_test)
- (libraries cohttp oUnit))

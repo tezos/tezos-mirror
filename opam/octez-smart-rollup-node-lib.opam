@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
-  "cohttp-lwt-unix" { >= "5.2.0" }
+  "cohttp-lwt-unix" { = "5.3.0" }
   "tezos-openapi" { = version }
   "octez-node-config" { = version }
   "camlzip" { >= "1.11" & < "1.12" }

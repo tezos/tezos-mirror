@@ -29,8 +29,8 @@ depends: [
   "checkseum" { != "0.5.0" }
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
-  "cohttp-lwt" { >= "5.2.0" }
-  "cohttp-lwt-unix" { >= "5.2.0" }
+  "cohttp-lwt" { = "5.3.0" }
+  "cohttp-lwt-unix" { = "5.3.0" }
   "conduit-lwt-unix" { = "6.2.2" }
   "conf-libev"
   "conf-rust"
