@@ -439,7 +439,7 @@ let send_fa_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
 
 (* Register a single variant of a test but for all protocols. *)
 let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
-    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?bootstrap_accounts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
@@ -463,7 +463,7 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
       setup_sequencer
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
-        ~mainnet_compat
+        ~mainnet_compat:false
         ?commitment_period
         ?challenge_window
         ?genesis_timestamp
@@ -573,7 +573,6 @@ let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
               register_test
                 ?sequencer_rpc_port
                 ?sequencer_private_rpc_port
-                ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
                 ?commitment_period
                 ?challenge_window
                 ?genesis_timestamp
@@ -4127,123 +4126,6 @@ let test_replay_rpc =
       ~error_msg:"Replayed block hash is %R, but the original block has %L") ;
   unit
 
-let test_txpool_content_empty_with_legacy_encoding =
-  let genesis_timestamp =
-    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
-  in
-  let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_all
-    ~title:
-      "`txpool_content` RPC is empty with the legacy encodings of the \
-       validation"
-    ~tags:["evm"; "txpool_content"; "legacy"]
-    ~time_between_blocks:Nothing
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~additional_uses:[Constant.WASM.evm_kernel]
-    ~kernels:[Mainnet]
-    ~genesis_timestamp
-  @@ fun {
-           sc_rollup_node;
-           l1_contracts;
-           sc_rollup_address;
-           client;
-           sequencer;
-           proxy;
-           observer;
-           _;
-         }
-             _protocol ->
-  let tx1 =
-    (* {
-         "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
-         "nonce": "0",
-         "gasPrice": "100000",
-         "gasLimit": "23300",
-         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-         "to": "0x11D3C9168db9d12a3C591061D555870969b43dC9",
-         "v": "0a96",
-         "r": "4217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079",
-         "s": "23ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592",
-         "value": "100",
-         "data": ""
-       } *)
-    "f86480830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a96a04217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079a023ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592"
-  in
-  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx1 sequencer in
-  let*@ txpool_result = Rpc.txpool_content sequencer in
-  (match txpool_result with
-  | [], [] -> ()
-  | _ ->
-      Test.fail
-        "The RPC is supposed to return an empty list of pending transactions \
-         in the previous kernel.") ;
-
-  let* () =
-    upgrade
-      ~sc_rollup_node
-      ~sc_rollup_address
-      ~admin:Constant.bootstrap2.public_key_hash
-      ~admin_contract:l1_contracts.admin
-      ~client
-      ~upgrade_to:Constant.WASM.evm_kernel
-      ~activation_timestamp
-  in
-  (* Per the activation timestamp, the state will remain synchronised until
-     the kernel is upgraded. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let* _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
-        unit)
-  in
-
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
-  and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer in
-
-  (* Produce a block after activation timestamp, both the rollup
-     node and the sequencer will upgrade to itself. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let* _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
-        unit)
-  and* _ = Evm_node.wait_for_successful_upgrade sequencer
-  and* _ = Evm_node.wait_for_successful_upgrade observer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
-
-  let tx2 =
-    (* {
-         "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
-         "nonce": "1",
-         "gasPrice": "100000",
-         "gasLimit": "23300",
-         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-         "to": "0x11D3C9168db9d12a3C591061D555870969b43dC9",
-         "v": "0a95",
-         "r": "30d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970",
-         "s": "45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c",
-         "value": "100",
-         "data": ""
-       } *)
-    "f86401830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a95a030d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970a045ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
-  in
-
-  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx2 sequencer in
-  let*@ txpool_pending, _txpool_queued = Rpc.txpool_content sequencer in
-  match txpool_pending with
-  | [_] -> unit
-  | [] ->
-      Test.fail
-        "The transaction pool RPC is expected to contain a transaction after \
-         the upgrade"
-  | _ ->
-      Test.fail
-        "The transaction pool RPC returns more than a single transaction"
-
 let test_trace_transaction =
   register_all
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
@@ -4977,7 +4859,6 @@ let () =
   test_preimages_endpoint protocols ;
   test_store_smart_rollup_address protocols ;
   test_replay_rpc protocols ;
-  test_txpool_content_empty_with_legacy_encoding protocols ;
   test_trace_transaction protocols ;
   test_trace_transaction_on_invalid_transaction protocols ;
   test_trace_transaction_call protocols ;

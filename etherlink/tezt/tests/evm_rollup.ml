@@ -360,7 +360,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let output_config = Temp.file "config.yaml" in
     let*! () =
       Evm_node.make_kernel_installer_config
-        ~mainnet_compat:Kernel.(mainnet_compat_kernel_config kernel)
+        ~mainnet_compat:false
         ~remove_whitelist:Option.(is_some whitelist)
         ?kernel_root_hash
         ~bootstrap_accounts
@@ -3139,11 +3139,6 @@ let test_mainnet_ghostnet_kernel_migration =
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
-  let expected_ticketer evm_setup =
-    match evm_setup.l1_contracts with
-    | Some {exchanger; _} -> exchanger
-    | None -> Test.fail "The test needs a ticketer"
-  in
 
   let scenario_prior ~evm_setup =
     let* transfer_result =
@@ -3155,54 +3150,9 @@ let test_mainnet_ghostnet_kernel_migration =
     in
     let*@ block_result = latest_block evm_setup.evm_node in
     let* config_result = config_setup evm_setup in
-    let expected_ticketer = expected_ticketer evm_setup in
-    let* ticketer =
-      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/ticketer"
-           ()
-    in
-    let ticketer =
-      Option.map (fun ticketer -> Hex.to_string (`Hex ticketer)) ticketer
-    in
-    Check.((Some expected_ticketer = ticketer) (option string))
-      ~error_msg:"Ticketer not found at /evm/ticketer" ;
     return {transfer_result; block_result; config_result}
   in
   let scenario_after ~evm_setup ~sanity_check =
-    let expected_ticketer = expected_ticketer evm_setup in
-    let* evm_ticketer =
-      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/ticketer"
-           ()
-    in
-    let evm_ticketer =
-      Option.map (fun ticketer -> Hex.to_string (`Hex ticketer)) evm_ticketer
-    in
-    Check.((None = evm_ticketer) (option string))
-      ~error_msg:"/evm/ticketer should be none after migration" ;
-
-    let* evm_world_state_ticketer =
-      Sc_rollup_node.RPC.call evm_setup.sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/world_state/ticketer"
-           ()
-    in
-    let evm_world_state_ticketer =
-      Option.map
-        (fun ticketer -> Hex.to_string (`Hex ticketer))
-        evm_world_state_ticketer
-    in
-    Check.((Some expected_ticketer = evm_world_state_ticketer) (option string))
-      ~error_msg:"Ticketer not found at /evm/world_state/ticketer" ;
-
     let* () =
       ensure_transfer_result_integrity
         ~sender
