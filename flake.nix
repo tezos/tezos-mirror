@@ -102,13 +102,4 @@
         inherit (self) packages devShells;
       };
     };
-
-  nixConfig = {
-    extra-substituters = ["https://nix.cache.hwlium.com"];
-    extra-trusted-public-keys = [
-      "nix.cache.ole.run-1:4r2pTlyRkYixibZKLNlSbHL1tbxHZGAnsKMFbz1Oz3s="
-      "nix.cache.hwlium.com:M57rk9haJRNFiNUA+6sF6ogbIVg4k8XrKpf5QSohBEA="
-      "nix.cache.hwlium.com-2:mFFtk/Pvh/mrCJ7DHOY9mf769A/Nth97WFXMPMy6BGw="
-    ];
-  };
 }
