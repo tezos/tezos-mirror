@@ -251,7 +251,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     | Some src_sk ->
         let watermark =
           match contents with
-          (* TODO-TB sign endorsement? *)
+          (* TODO-TB sign attestation? *)
           | _ -> Signature.Generic_operation
         in
         let*! () =

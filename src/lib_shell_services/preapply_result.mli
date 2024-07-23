@@ -29,7 +29,7 @@ type 'error t = {
   refused : (Operation.t * 'error list) Operation_hash.Map.t;
       (** Refused operations, for example because of an invalid signature *)
   outdated : (Operation.t * 'error list) Operation_hash.Map.t;
-      (** Outdated operations, for example a late endorsement *)
+      (** Outdated operations, for example a late attestation *)
   branch_refused : (Operation.t * 'error list) Operation_hash.Map.t;
       (** Branch refused operations, for example because of insufficient balance *)
   branch_delayed : (Operation.t * 'error list) Operation_hash.Map.t;

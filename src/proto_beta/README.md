@@ -42,14 +42,14 @@ For a high-level overview of the Tezos economic protocol implementation (in the
 ### Other components
 
 The rest of the implementation is structured in the following subdirectories:
-- `bin_accuser/`, `bin_baker/`, and `bin_endorser/`: these directories implement protocol-specific binaries for bakers and other nodes actively participating in the economic protocol.
+- `bin_accuser/` and `bin_baker/`: these directories implement protocol-specific binaries for bakers and other nodes actively participating in the economic protocol.
 - `lib_client/`, `lib_client_commands/`, `lib_client_sapling/`
 
   These directories contain the protocol-specific parts of the client.
   + `lib_client` contains many wrappers around RPC calls from the protocol and the RPC plugin, and also the client part of the Michelson runtime (mostly macro expansion, location translation, and pretty-printing of errors).
   + `lib_client_commands` contains the command definitions using CLIC.
   + `lib_client_sapling` is the Sapling part of the client.
-- `lib_delegate/`: this directory contains code that is used by node "clients" (the client, the baker, the endorser, the accuser) to interact with the economic protocol and to implement consensus related tasks (like baking).
+- `lib_delegate/`: this directory contains code that is used by node "clients" (the client, the baker, the accuser) to interact with the economic protocol and to implement consensus related tasks (like baking).
 - `lib_parameters/`: this directory defines the global constants that the protocol is instantiated with.
 - `lib_plugin/`
 
