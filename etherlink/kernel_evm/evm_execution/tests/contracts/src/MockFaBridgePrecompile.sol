@@ -24,6 +24,7 @@ contract MockFaBridgePrecompile {
         address sender,
         address ticketOwner,
         bytes22 receiver,
+        bytes22 proxy,
         uint256 amount,
         uint256 withdrawalId
     );

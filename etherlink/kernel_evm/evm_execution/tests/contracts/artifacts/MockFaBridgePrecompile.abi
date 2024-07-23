@@ -104,6 +104,12 @@
         "internalType": "bytes22"
       },
       {
+        "name": "proxy",
+        "type": "bytes22",
+        "indexed": false,
+        "internalType": "bytes22"
+      },
+      {
         "name": "amount",
         "type": "uint256",
         "indexed": false,

@@ -22,6 +22,8 @@
 
 ## Internal
 
+- L1 proxy address is added as a field to the FA withdrawal event. (!14260)
+
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
 This kernel has been activated on Etherlink Testnet on block
