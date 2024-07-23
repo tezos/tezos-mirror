@@ -32,6 +32,17 @@ riscv-dummy.elf::
 	@make -C dummy_kernel build
 	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
 
+
+# Update checked-in binaries
+.PHONY: update-assets
+update-assets: assets/riscv-dummy.elf
+
+# Update the compiled dummy kernel used in CI tests
+assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
+	@make -C dummy_kernel build
+	@cp dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
+	@sha256sum $@ > $@.checksum
+
 .PHONY: build-deps
 build-deps:
 	@exec ./scripts/install-rust-std-hermit.sh
