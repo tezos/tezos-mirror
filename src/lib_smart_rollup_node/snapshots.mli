@@ -17,6 +17,24 @@ type compression =
           temporarily than {!On_the_fly} but does not lock the rollup node for
           very long. *)
 
+module Snapshot_metadata : sig
+  (** Versioning of snapshot format. Only one version for now. *)
+  type version = V0
+
+  (** Snapshot metadata for version 0. This information is written as a header of
+    the archive snapshot file. *)
+  type t = {
+    version : version;
+    history_mode : Configuration.history_mode;
+    address : Address.t;
+    head_level : int32;
+    last_commitment : Commitment.Hash.t;
+  }
+
+  (** Fixed size metadata encoding. *)
+  val encoding : t Data_encoding.t
+end
+
 (** [export cctxt ~no_checks ~compression ~data_dir ~dest ~filename] creates a
     tar gzipped archive with name [filename] (or a generated name) in [dest] (or
     the current directory) containing a snapshot of the data of the rollup node
@@ -68,8 +86,7 @@ val import :
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)
 val info :
-  snapshot_file:string ->
-  Snapshot_utils.snapshot_metadata * [`Compressed | `Uncompressed]
+  snapshot_file:string -> Snapshot_metadata.t * [`Compressed | `Uncompressed]
 
 (** [with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches ?skip_condition
     f] applies [f] in a read-write context that is created from [data-dir] (and

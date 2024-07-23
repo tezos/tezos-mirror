@@ -9,6 +9,47 @@ open Snapshot_utils
 
 type compression = No | On_the_fly | After
 
+module Snapshot_metadata = struct
+  type version = V0
+
+  type t = {
+    version : version;
+    history_mode : Configuration.history_mode;
+    address : Address.t;
+    head_level : int32;
+    last_commitment : Commitment.Hash.t;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"snapshot_metadata_v0"
+          (Tag 0)
+          (obj4
+             (req "history_mode" Configuration.history_mode_encoding)
+             (req "address" Address.encoding)
+             (req "head_level" int32)
+             (req "last_commitment" Commitment.Hash.encoding))
+          (fun {
+                 version = V0;
+                 history_mode;
+                 address;
+                 head_level;
+                 last_commitment;
+               } -> Some (history_mode, address, head_level, last_commitment))
+          (fun (history_mode, address, head_level, last_commitment) ->
+            {version = V0; history_mode; address; head_level; last_commitment});
+      ]
+
+  let size =
+    Data_encoding.Binary.fixed_length encoding
+    |> WithExceptions.Option.get ~loc:__LOC__
+end
+
+open Snapshot_utils.Make (Snapshot_metadata)
+
 let check_store_version store_dir =
   let open Lwt_result_syntax in
   let* store_version = Store_version.read_version_file ~dir:store_dir in
@@ -121,7 +162,7 @@ let pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir =
   let* () = Store.close store in
   return
     {
-      version = V0;
+      Snapshot_metadata.version = V0;
       history_mode;
       address = metadata.rollup_address;
       head_level = head.header.level;
@@ -378,7 +419,7 @@ let check_l2_chain ~message ~data_dir (store : _ Store.t) context
   in
   check_chain head.header.block_hash None
 
-let check_last_commitment head snapshot_metadata =
+let check_last_commitment head (snapshot_metadata : Snapshot_metadata.t) =
   let last_snapshot_commitment =
     Sc_rollup_block.most_recent_commitment head.Sc_rollup_block.header
   in
@@ -672,7 +713,8 @@ let with_locks ~data_dir f =
     ~filename:(Node_context.processing_lockfile_path ~data_dir)
     f
 
-let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
+let export_dir (metadata : Snapshot_metadata.t) ~take_locks ~compression
+    ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
   let* snapshot_file =
     let with_locks =
@@ -835,7 +877,8 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     ~dest
     ~filename
 
-let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
+let pre_import_checks cctxt ~no_checks ~data_dir
+    (snapshot_metadata : Snapshot_metadata.t) =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   (* Load stores in read-only to make simple checks. *)
@@ -917,7 +960,8 @@ let check_data_dir_unpopulated data_dir () =
       data_dir
   else return_unit
 
-let maybe_gc_after_import cctxt ~data_dir snapshot_metadata
+let maybe_gc_after_import cctxt ~data_dir
+    (snapshot_metadata : Snapshot_metadata.t)
     (original_history_mode : Configuration.history_mode option) =
   let open Lwt_result_syntax in
   match (original_history_mode, snapshot_metadata.history_mode) with
