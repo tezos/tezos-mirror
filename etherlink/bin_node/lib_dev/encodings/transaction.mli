@@ -35,3 +35,10 @@ type transaction = {
 
 (** [decode_legacy bytes] tries to decode [bytes] into a {!transaction}. *)
 val decode_legacy : bytes -> (transaction, string) result
+
+(** [to_transaction_object ~hash transaction] transforms a [transaction] and
+    its [hash] to a {!Ethereum_types.transaction_object}. *)
+val to_transaction_object :
+  hash:Ethereum_types.hash ->
+  transaction ->
+  (Ethereum_types.transaction_object, string) result
