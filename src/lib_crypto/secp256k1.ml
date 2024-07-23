@@ -350,3 +350,25 @@ let deterministic_nonce sk msg =
 let deterministic_nonce_hash sk msg =
   let nonce = deterministic_nonce sk msg in
   Blake2B.to_bytes (Blake2B.hash_bytes [nonce])
+
+let recover signature msg =
+  let open Error_monad.Result_syntax in
+  (* Decode the signature. *)
+  let* signature =
+    Sign.read_recoverable context (Bigstring.of_bytes signature)
+  in
+  (* Recover the public key that signed the message. *)
+  let* public_key = Sign.recover context ~signature (Bigstring.of_bytes msg) in
+  let public_key_bytes =
+    Key.to_bytes ~compress:false context public_key |> Bigstring.to_bytes
+  in
+  (* The public key hash is the hash of pk[1..]. *)
+  let public_key_hash =
+    Hacl.Hash.Keccak_256.digest
+      (Bytes.sub public_key_bytes 1 (Bytes.length public_key_bytes - 1))
+  in
+  (* The ethereum address is pkhash[12..]. *)
+  let address =
+    Bytes.sub public_key_hash 12 (Bytes.length public_key_hash - 12)
+  in
+  return address

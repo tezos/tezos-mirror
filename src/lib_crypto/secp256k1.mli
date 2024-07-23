@@ -35,3 +35,9 @@ val sign_keccak256 : Secret_key.t -> bytes -> t
 
 (** Check the Keccak256 hash of bytes, instead of BLAKE2b. *)
 val check_keccak256 : Public_key.t -> t -> bytes -> bool
+
+(** [recover_caller signature msg] recovers the caller of signature
+    [signature] on message [msg]. The "caller" in this context is
+    the rightmost 160-bits of the Keccak-256 hash of the corresponding
+    ECDSA public key. *)
+val recover : bytes -> bytes -> (bytes, string) result
