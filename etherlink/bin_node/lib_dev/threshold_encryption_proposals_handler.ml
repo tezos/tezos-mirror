@@ -77,6 +77,19 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type error += Threshold_encryption_proposals_handler_terminated
 
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_threshold_encryption_proposals_handler_terminated"
+    ~title:"Threshold encryption proposals handler terminated"
+    ~description:
+      "The threshold encryption proposals handler worker is no longer running"
+    ~pp:(fun ppf () -> Format.fprintf ppf "")
+    Data_encoding.empty
+    (function
+      | Threshold_encryption_proposals_handler_terminated -> Some () | _ -> None)
+    (fun () -> Threshold_encryption_proposals_handler_terminated)
+
 let handle_request_error rq =
   let open Lwt_syntax in
   let* rq in
@@ -267,6 +280,19 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 type error += No_threshold_encryption_proposals_handler
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_threshold_encryption_proposals_handler_not_started"
+    ~title:"No threshold encryption proposals handler"
+    ~description:
+      "The threshold encryption proposals handler worker is not started"
+    ~pp:(fun ppf () -> Format.fprintf ppf "")
+    Data_encoding.empty
+    (function
+      | No_threshold_encryption_proposals_handler -> Some () | _ -> None)
+    (fun () -> No_threshold_encryption_proposals_handler)
 
 let worker =
   lazy
