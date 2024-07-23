@@ -7,6 +7,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::machine_state::backend::{self, Region};
+use arbitrary_int::u5;
 use std::fmt;
 
 /// Integer register index
@@ -90,9 +91,9 @@ pub const t4: XRegister = x29;
 pub const t5: XRegister = x30;
 pub const t6: XRegister = x31;
 
-pub fn parse_xregister(r: u32) -> XRegister {
+pub fn parse_xregister(r: u5) -> XRegister {
     use XRegister::*;
-    match r {
+    match r.value() {
         0b0_0000 => x0,
         0b0_0001 => x1,
         0b0_0010 => x2,
@@ -125,7 +126,7 @@ pub fn parse_xregister(r: u32) -> XRegister {
         0b1_1101 => x29,
         0b1_1110 => x30,
         0b1_1111 => x31,
-        _ => panic!("Invalid register"),
+        _ => unreachable!("Invalid register"),
     }
 }
 
@@ -262,9 +263,9 @@ pub enum FRegister {
     f31,
 }
 
-pub fn parse_fregister(r: u32) -> FRegister {
+pub fn parse_fregister(r: u5) -> FRegister {
     use FRegister::*;
-    match r {
+    match r.value() {
         0b0_0000 => f0,
         0b0_0001 => f1,
         0b0_0010 => f2,
@@ -297,7 +298,7 @@ pub fn parse_fregister(r: u32) -> FRegister {
         0b1_1101 => f29,
         0b1_1110 => f30,
         0b1_1111 => f31,
-        _ => panic!("Invalid register"),
+        _ => unreachable!("Invalid register"),
     }
 }
 

@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+arbitrary-int.workspace = true
 bincode.workspace = true
 derive_more.workspace = true
 ed25519-dalek.workspace = true
