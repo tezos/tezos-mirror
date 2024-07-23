@@ -330,6 +330,8 @@ module State = struct
     Evm_store.use ctxt.store @@ fun conn ->
     Evm_store.with_transaction conn @@ fun conn -> k conn
 
+  let store_path ~data_dir = Filename.Infix.(data_dir // "store")
+
   let lockfile_path ~store_path = Filename.Infix.(store_path // "evm_lock")
 
   let load ~data_dir ~store_perm:perm index =
