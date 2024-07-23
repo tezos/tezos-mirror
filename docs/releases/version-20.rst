@@ -32,6 +32,9 @@ Octez v20.2 fixes an implementation bug in the baker binary. We found that, unde
 
 **Even though this scenario is highly unlikely, we still recommend Tezos bakers to upgrade to v20.2.**
 
+Changes
+-------
+
 Version 20 introduced the following changes or new features:
 
 Node
@@ -45,13 +48,6 @@ Some deprecated RPCs have been removed. Please check `the changelog <../CHANGES.
 The RPC ``/health/ready`` has been introduced to get the status of the RPC server.
 
 Starting from Octez v20, we strongly advise nodes and bakers operators to synchronise their clocks using NTP as issued in `the node section of getting started <https://tezos.gitlab.io/introduction/howtouse.html#node>`__.
-
-Regarding the minimal hardware, we advise nodes and bakers operators to run on at least the following hardware requierements:
-
-- 3 cores, 2 needed by the node and 1 needed by the baker (arm64 or amd64/x86-64)
-- 8GB of RAM + 8GB of swap or 16GB of RAM
-- 100GB SSD storage (or similar I/O performance)
-- A low-latency reliable internet connection
 
 Smart rollup
 ~~~~~~~~~~~~
@@ -69,6 +65,23 @@ DAL
 The DAL node is released with Octez v20.0, as the Paris protocol would activate the :doc:`DAL <../shell/dal_overview>` on Tezos Mainnet upon protocol activation.
 
 Check :doc:`the documentation <../shell/dal_node>` for more details on the DAL node and how to operate it.
+
+Minimal hardware specifications
+-------------------------------
+
+Our benchmarks suggest the following *minimal* specs for Octez node and baker operators:
+
+- 3 CPU cores: 2 needed by the node and 1 needed by the baker (arm64 or amd64/x86-64)
+- 8GB of RAM + 8GB of swap (or 16GB of RAM)
+- 100GB SSD storage (or similar I/O performance)
+- A low-latency reliable internet connection
+
+This configuration has been tested for running an Octez node in :doc:`rolling history mode <../user/history_modes>`.
+Other more specific uses may need adequate configurations.
+For instance:
+
+- running a node in full or archive mode requires extra storage space;
+- bakers participating to the DAL should consult `this article <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`__.
 
 Update Instructions
 -------------------
