@@ -1033,8 +1033,11 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
-(** Potentially upgrade to v_3 and then upgrade the block_store_status in v_3_1. *)
+(** Upgrade the block_store_status in v_3_1. *)
 val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+
+(** Upgrade the offset format for cemented files in v_3_2. *)
+val v_3_2_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
 (**/**)
 
