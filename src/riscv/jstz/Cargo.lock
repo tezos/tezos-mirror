@@ -1124,7 +1124,7 @@ dependencies = [
 [[package]]
 name = "jstz_api"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git?branch=emturner-rv-57#522c248f5034969c376ff4d5cf75953d014579f9"
+source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
 dependencies = [
  "base64 0.21.7",
  "boa_engine",
@@ -1148,7 +1148,7 @@ dependencies = [
 [[package]]
 name = "jstz_core"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git?branch=emturner-rv-57#522c248f5034969c376ff4d5cf75953d014579f9"
+source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1166,7 +1166,7 @@ dependencies = [
 [[package]]
 name = "jstz_crypto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git?branch=emturner-rv-57#522c248f5034969c376ff4d5cf75953d014579f9"
+source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
 dependencies = [
  "anyhow",
  "boa_gc",
@@ -1180,7 +1180,7 @@ dependencies = [
 [[package]]
 name = "jstz_kernel"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git?branch=emturner-rv-57#522c248f5034969c376ff4d5cf75953d014579f9"
+source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1199,7 +1199,7 @@ dependencies = [
 [[package]]
 name = "jstz_proto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git?branch=emturner-rv-57#522c248f5034969c376ff4d5cf75953d014579f9"
+source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
 dependencies = [
  "boa_engine",
  "boa_gc",

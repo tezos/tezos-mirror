@@ -44,15 +44,12 @@ features = [
 
 [workspace.dependencies.jstz_kernel]
 git = "https://github.com/jstz-dev/jstz.git"
-branch = "emturner-rv-57"
 
 [workspace.dependencies.jstz_crypto]
 git = "https://github.com/jstz-dev/jstz.git"
-branch = "emturner-rv-57"
 
 [workspace.dependencies.jstz_proto]
 git = "https://github.com/jstz-dev/jstz.git"
-branch = "emturner-rv-57"
 
 [workspace.dependencies.serde]
 version = "1.0.197"
