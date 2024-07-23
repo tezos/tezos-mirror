@@ -298,3 +298,5 @@ val check_indexes_consistency :
   ?genesis_hash:Block_hash.t ->
   t ->
   unit tzresult Lwt.t
+
+val v_3_2_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t

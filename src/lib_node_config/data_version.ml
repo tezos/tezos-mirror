@@ -102,7 +102,8 @@ end
  *  - 2.0     : introduce context GC (upgrade to irmin.3.4) -- v15.0
  *  - 3.0     : change blocks' context hash semantics and introduce
                 context split (upgrade to irmin.3.5) -- v16.0
- *  - 3.1     : change encoding for block store status -- v20.3 *)
+ *  - 3.1     : change encoding for block store status -- v20.3 
+ *  - 3.2     : update offset format for cemented files to 64-bit -- v20.3 *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
@@ -111,7 +112,9 @@ let v_3_0 = Version.make ~major:3 ~minor:0
 
 let v_3_1 = Version.make ~major:3 ~minor:1
 
-let current_version = v_3_1
+let v_3_2 = Version.make ~major:3 ~minor:2
+
+let current_version = v_3_2
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -125,14 +128,23 @@ let current_version = v_3_1
    - we want to deprecate a specific upgrade
 *)
 let upgradable_data_version =
+  let open Lwt_result_syntax in
   let v_3_1_upgrade ~data_dir genesis =
     let store_dir = store_dir data_dir in
     Store.v_3_1_upgrade ~store_dir genesis
   in
+  let v_3_2_upgrade ~data_dir genesis =
+    let store_dir = store_dir data_dir in
+    Store.v_3_2_upgrade ~store_dir genesis
+  in
   [
     ( v_3_0,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        v_3_1_upgrade ~data_dir genesis );
+        let* () = v_3_1_upgrade ~data_dir genesis in
+        v_3_2_upgrade ~data_dir genesis );
+    ( v_3_1,
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        v_3_2_upgrade ~data_dir genesis );
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -420,10 +432,10 @@ let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =
   let open Lwt_result_syntax in
   let* o = ensure_data_dir ~mode data_dir in
   match o with
-  | None ->
-      return_unit
-      (* Enable automatic upgrade to avoid users to manually upgrade. *)
-  | Some (version, _) when Version.(equal version v_3_0) ->
+  | None -> return_unit
+  | Some (version, _) when false ->
+      (* Enable automatic upgrade to avoid users to manually upgrade.
+         This is disabled for the current version. *)
       let* () =
         upgrade_data_dir ~data_dir genesis ~chain_name:() ~sandbox_parameters:()
       in

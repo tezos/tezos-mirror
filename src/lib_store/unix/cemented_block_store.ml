@@ -1080,3 +1080,5 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
           table_list
       in
       return_unit
+
+let v_3_2_upgrade _chain_dir = Lwt_result_syntax.return_unit
