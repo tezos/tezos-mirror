@@ -58,8 +58,3 @@ val shutdown : unit -> unit Lwt.t
 val submit_next_proposal :
   Time.Protocol.t ->
   Threshold_encryption_types.proposal_submission_outcome tzresult Lwt.t
-
-(** [unlock_next_proposal ()] Notifies the blueprint_producer that a
-    preblock has been applied on top of the EVM state. The proposal handler
-    is allowed to submit a new proposal. *)
-val unlock_next_proposal : unit -> unit tzresult Lwt.t

@@ -20,7 +20,6 @@ module Types = struct
     maximum_number_of_chunks : int;
     keep_alive : bool;
     time_between_blocks : Configuration.time_between_blocks;
-    mutable locked : bool;
     mutable last_proposed_timestamp : Time.Protocol.t option;
   }
 end
@@ -51,7 +50,6 @@ module Request = struct
     | Submit_next_proposal :
         Time.Protocol.t
         -> (Threshold_encryption_types.proposal_submission_outcome, tztrace) t
-    | Unlock_next_proposal : (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -68,15 +66,8 @@ module Request = struct
              (req "request" (constant "submit_next_proposal"))
              (req "timestamp" Time.Protocol.encoding))
           (function
-            | View (Submit_next_proposal timestamp) -> Some ((), timestamp)
-            | View _ -> None)
+            | View (Submit_next_proposal timestamp) -> Some ((), timestamp))
           (fun ((), timestamp) -> View (Submit_next_proposal timestamp));
-        case
-          (Tag 1)
-          ~title:"unlock_next_proposal"
-          (obj1 (req "request" (constant "Unlock_next_proposal")))
-          (function View Unlock_next_proposal -> Some () | View _ -> None)
-          (fun () -> View Unlock_next_proposal);
       ]
 
   let pp _ppf (View _) = ()
@@ -84,9 +75,7 @@ end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
-type error +=
-  | Threshold_encryption_proposals_handler_terminated
-  | Threshold_encryption_proposals_handler_locked
+type error += Threshold_encryption_proposals_handler_terminated
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -182,12 +171,6 @@ let submit_proposal (state : Types.state) timestamp =
     (* In this case the proposal will not make it into a preblock. *)
     let*! () = Block_producer_events.production_locked () in
     return Threshold_encryption_types.Tx_pool_is_locked
-  else if state.locked then
-    (* In this case the proposal will not make it into a preblock. *)
-    let*! () =
-      Threshold_encryption_proposals_handler_events.proposal_is_locked ()
-    in
-    tzfail Threshold_encryption_proposals_handler_locked
   else
     let* delayed_transactions, remaining_cumulative_size =
       take_delayed_transactions state.maximum_number_of_chunks
@@ -228,12 +211,9 @@ let submit_proposal (state : Types.state) timestamp =
           ~sidecar_endpoint:state.sidecar_endpoint
           proposal
       in
-      state.Types.locked <- true ;
       state.Types.last_proposed_timestamp <- Some timestamp ;
       return Threshold_encryption_types.Proposal_submitted)
     else return Threshold_encryption_types.Proposal_is_early
-
-let unlock_next_proposal state = state.Types.locked <- false
 
 module Handlers = struct
   type self = worker
@@ -243,13 +223,8 @@ module Handlers = struct
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun w request ->
-    let open Lwt_result_syntax in
     let state = Worker.state w in
     match request with
-    | Request.Unlock_next_proposal ->
-        protect @@ fun () ->
-        let () = unlock_next_proposal state in
-        return_unit
     | Request.Submit_next_proposal proposal ->
         protect @@ fun () -> submit_proposal state proposal
 
@@ -270,7 +245,6 @@ module Handlers = struct
           sidecar_endpoint;
           maximum_number_of_chunks;
           keep_alive;
-          locked = false;
           time_between_blocks;
           last_proposed_timestamp = None;
         }
@@ -323,10 +297,4 @@ let submit_next_proposal timestamp =
   Worker.Queue.push_request_and_wait
     worker
     (Request.Submit_next_proposal timestamp)
-  |> handle_request_error
-
-let unlock_next_proposal () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Unlock_next_proposal
   |> handle_request_error

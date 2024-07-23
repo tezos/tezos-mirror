@@ -9,8 +9,6 @@ val started : unit -> unit Lwt.t
 
 val shutdown : unit -> unit Lwt.t
 
-val proposal_is_locked : unit -> unit Lwt.t
-
 val proposal_processed : unit -> unit Lwt.t
 
 (** Emits a `Debug` log that notifies that the
