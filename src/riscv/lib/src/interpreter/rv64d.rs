@@ -569,7 +569,7 @@ mod tests {
         proptest!(|(
             d in any::<f64>().prop_map(f64::to_bits),
             rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
-            rs1_f in (1_u8..31).prop_map(u5::new).prop_map(parse_fregister),
+            rs1_f in (0_u8..31).prop_map(u5::new).prop_map(parse_fregister),
             rs2 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
         )| {
             let mut backend = create_backend!(HartStateLayout, F);

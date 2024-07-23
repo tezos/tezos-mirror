@@ -12,14 +12,14 @@ use std::fmt;
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
-#[repr(usize)]
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum XRegister {
     // The `usize` representation of these constructors shall be used as an
     // index into the 31-element array holding the registers.
     // x0 represents no entry in this array because it is handled separately.
     // Therefore we assign a dummy index to x0.
-    x0 = 0xFFFF,
+    x0 = u8::MAX,
     x1 = 0,
     x2,
     x3,
@@ -91,43 +91,14 @@ pub const t4: XRegister = x29;
 pub const t5: XRegister = x30;
 pub const t6: XRegister = x31;
 
+#[inline(always)]
 pub fn parse_xregister(r: u5) -> XRegister {
-    use XRegister::*;
-    match r.value() {
-        0b0_0000 => x0,
-        0b0_0001 => x1,
-        0b0_0010 => x2,
-        0b0_0011 => x3,
-        0b0_0100 => x4,
-        0b0_0101 => x5,
-        0b0_0110 => x6,
-        0b0_0111 => x7,
-        0b0_1000 => x8,
-        0b0_1001 => x9,
-        0b0_1010 => x10,
-        0b0_1011 => x11,
-        0b0_1100 => x12,
-        0b0_1101 => x13,
-        0b0_1110 => x14,
-        0b0_1111 => x15,
-        0b1_0000 => x16,
-        0b1_0001 => x17,
-        0b1_0010 => x18,
-        0b1_0011 => x19,
-        0b1_0100 => x20,
-        0b1_0101 => x21,
-        0b1_0110 => x22,
-        0b1_0111 => x23,
-        0b1_1000 => x24,
-        0b1_1001 => x25,
-        0b1_1010 => x26,
-        0b1_1011 => x27,
-        0b1_1100 => x28,
-        0b1_1101 => x29,
-        0b1_1110 => x30,
-        0b1_1111 => x31,
-        _ => unreachable!("Invalid register"),
-    }
+    let r = r.value().wrapping_sub(1);
+
+    // SAFETY: the bounds of u5, under a wrapping decrement
+    // are known to correspond to valid values of
+    // XRegister's underlying representation.
+    unsafe { std::mem::transmute(r) }
 }
 
 impl fmt::Display for XRegister {
@@ -227,7 +198,7 @@ impl<M: backend::Manager> XRegisters<M> {
 /// Floating-point number register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(usize)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
 pub enum FRegister {
     f0 = 0,
     f1,
@@ -263,43 +234,13 @@ pub enum FRegister {
     f31,
 }
 
+#[inline(always)]
 pub fn parse_fregister(r: u5) -> FRegister {
-    use FRegister::*;
-    match r.value() {
-        0b0_0000 => f0,
-        0b0_0001 => f1,
-        0b0_0010 => f2,
-        0b0_0011 => f3,
-        0b0_0100 => f4,
-        0b0_0101 => f5,
-        0b0_0110 => f6,
-        0b0_0111 => f7,
-        0b0_1000 => f8,
-        0b0_1001 => f9,
-        0b0_1010 => f10,
-        0b0_1011 => f11,
-        0b0_1100 => f12,
-        0b0_1101 => f13,
-        0b0_1110 => f14,
-        0b0_1111 => f15,
-        0b1_0000 => f16,
-        0b1_0001 => f17,
-        0b1_0010 => f18,
-        0b1_0011 => f19,
-        0b1_0100 => f20,
-        0b1_0101 => f21,
-        0b1_0110 => f22,
-        0b1_0111 => f23,
-        0b1_1000 => f24,
-        0b1_1001 => f25,
-        0b1_1010 => f26,
-        0b1_1011 => f27,
-        0b1_1100 => f28,
-        0b1_1101 => f29,
-        0b1_1110 => f30,
-        0b1_1111 => f31,
-        _ => unreachable!("Invalid register"),
-    }
+    let r = r.value() as usize;
+
+    // SAFETY: the possible values of u5 are known to correspond to
+    // the possible values of the underlying representation of FRegister.
+    unsafe { std::mem::transmute(r) }
 }
 
 // We want those constructors at the module top-level.
@@ -450,6 +391,8 @@ mod tests {
             Backend, Layout,
         },
     };
+    use arbitrary_int::Number;
+    use strum::IntoEnumIterator;
 
     backend_test!(test_zero, F, {
         let mut backend = F::new::<XRegistersLayout>();
@@ -512,4 +455,35 @@ mod tests {
             registers.reset();
         });
     });
+
+    #[test]
+    fn parse_xregister_zero_to_x0() {
+        assert_eq!(0_u8, (XRegister::x0 as u8).wrapping_add(1));
+
+        assert_eq!(parse_xregister(u5::new(0)), XRegister::x0);
+    }
+
+    #[test]
+    fn parse_xregister_nonzero() {
+        for (idx, xreg) in NONZERO_REGISTERS.iter().enumerate() {
+            assert_eq!(*xreg as usize, idx);
+
+            assert_eq!(parse_xregister(u5::new((idx + 1) as u8)), *xreg);
+        }
+    }
+
+    #[test]
+    fn parse_fregister_all() {
+        for (idx, freg) in FRegister::iter().enumerate() {
+            assert_eq!(freg as usize, idx);
+
+            assert_eq!(parse_fregister(u5::new(idx as u8)), freg);
+        }
+    }
+
+    #[test]
+    fn fregister_bounds() {
+        assert_eq!(FRegister::f0 as usize, u5::new(0).value() as usize);
+        assert_eq!(FRegister::f31 as usize, u5::MAX.value() as usize);
+    }
 }
