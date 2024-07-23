@@ -220,19 +220,15 @@ unsafe impl SmartRollupCore for MockHost {
         self.state.borrow().store.store_value_size(path, path_len)
     }
 
-    // TODO adapt reveal_metadata
-    // https://gitlab.com/tezos/tezos/-/issues/7378
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
-        assert!(METADATA_SIZE <= max_bytes);
         let metadata: [u8; METADATA_SIZE] =
             self.state.borrow().get_metadata().clone().into();
-        let slice = from_raw_parts_mut(destination_addr, metadata.len());
-        slice.copy_from_slice(metadata.as_slice());
-        metadata.len().try_into().unwrap()
+        let len = min(max_bytes, metadata.len());
+        let slice = from_raw_parts_mut(destination_addr, len);
+        slice.copy_from_slice(&metadata[..len]);
+        len as i32
     }
 
-    // TODO turn payload.split_at into a read or error code helper function.
-    // https://gitlab.com/tezos/tezos/-/issues/7377
     unsafe fn reveal(
         &self,
         payload_addr: *const u8,
@@ -241,6 +237,9 @@ unsafe impl SmartRollupCore for MockHost {
         max_bytes: usize,
     ) -> i32 {
         let payload: &[u8] = from_raw_parts(payload_addr, payload_len);
+        if payload.is_empty() {
+            return 0;
+        }
         let (tag, payload) = payload.split_at(size_of::<u8>());
         match tag[0] {
             0 => {
@@ -258,6 +257,13 @@ unsafe impl SmartRollupCore for MockHost {
             }
             2 => {
                 // Reveal_dal_page
+
+                const PAYLOAD_SIZE: usize =
+                    size_of::<i32>() + size_of::<u8>() + size_of::<i16>();
+                if payload.len() < PAYLOAD_SIZE {
+                    return 0;
+                }
+
                 let (published_level, remaining) = payload.split_at(size_of::<i32>());
                 let (slot_index, remaining) = remaining.split_at(size_of::<u8>());
                 let (page_index, _) = remaining.split_at(size_of::<i16>());
