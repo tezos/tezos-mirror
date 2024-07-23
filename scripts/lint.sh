@@ -71,7 +71,7 @@ update_all_dot_ocamlformats() {
     cp .ocamlformat "$ofmt"
     git add "$ofmt"
   done
-  # we don't want to reformat protocols (but alpha and beta) because it would alter its hash
+  # we don't want to reformat protocols (but alpha and stabilised protocols) because it would alter its hash
   protocols=$(find src/ -maxdepth 1 -name "proto_*" -not -name "proto_beta" -not -name "proto_alpha")
   for d in $protocols; do
     (cd "$d/lib_protocol" && (find ./ -maxdepth 1 -name "*.ml*" | sed 's:^./::' | LC_COLLATE=C sort > ".ocamlformat-ignore"))
