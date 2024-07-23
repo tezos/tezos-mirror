@@ -390,6 +390,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       node
       ~base_dir:(Client.base_dir client)
       ~default_operator:rollup_operator_key
+      ?dal_node
   in
   (* Start a rollup node *)
   let preimages_dir =
