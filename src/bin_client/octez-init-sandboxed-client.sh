@@ -207,7 +207,7 @@ main() {
   cat << EOF
 if type octez-client-reset >/dev/null 2>&1 ; then octez-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias octez-activate-beta="$client -block genesis activate protocol PtRU6wuXeNfhzbbbNbZNbaahu2eKBDztN5cqG8LbvLspdUnPGVX with fitness 1 and key activator and parameters $beta_parameters_file";
+alias octez-activate-beta="$client -block genesis activate protocol PtA4NFGxa5mLmPaEAAxAofESvLzZPSJ6GQz66SobecGbnCy3FXE with fitness 1 and key activator and parameters $beta_parameters_file";
 alias octez-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file" ;
 alias octez-client-reset="rm -rf \"$client_dir\"; unalias octez-activate-alpha octez-client-reset" ;
 alias octez-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;

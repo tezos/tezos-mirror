@@ -21,7 +21,7 @@ PROTOCOLS     = $(NAMED_PROTOS) alpha beta
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 paris_long    = PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi
-beta_long     = PtRU6wuXeNfhzbbbNbZNbaahu2eKBDztN5cqG8LbvLspdUnPGVX
+beta_long     = PtA4NFGxa5mLmPaEAAxAofESvLzZPSJ6GQz66SobecGbnCy3FXE
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 paris_short   = PtParisC
@@ -89,7 +89,7 @@ odoc-lite:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms --exclude=target \
-		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../vendors ../dune ../dune-project ../dune-workspace ../data-encoding ../rust-toolchain ../resto ../prometheus $(TMPDOCDIR)/ 
+		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../vendors ../dune ../dune-project ../dune-workspace ../data-encoding ../rust-toolchain ../resto ../prometheus $(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh on
 	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in odoc.log"
 	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \

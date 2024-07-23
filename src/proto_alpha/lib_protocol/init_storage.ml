@@ -206,7 +206,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         in
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
-        (* Start of Beta stitching. Comment used for automatic snapshot *)
+        (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
     | Beta ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
@@ -216,7 +216,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
         return (ctxt, [])
-    (* End of Beta stitching. Comment used for automatic snapshot *)
+    (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
   let* ctxt =
     List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
