@@ -100,8 +100,8 @@ Description: Smart Rollup node for the Tezos blockchain.
 
 Package: octez-dal-node
 Architecture: amd64 arm64
-Depends: ${misc:Depends}, ${shlibs:Depends},
- octez-baker (= ${source:Version}),
+Depends: ${misc:Depends}, ${shlibs:Depends}, octez-zcash-dal-params
+Suggests: octez-baker (= ${source:Version})
 Description: Octez distribution Availability Layer (DAL) node
  The DAL node is responsible for temporarily storing data and providing it to
  bakers and Smart Rollups. Similar to the Octez node, it offers an
