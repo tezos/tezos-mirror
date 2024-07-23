@@ -62,16 +62,16 @@ val retry :
     - create the streams for valid blocks, new heads, and operations from the
     node's mempool's
 
-    - create an initial state, see [create_initial_state]
+    - create an initial state, see {!create_initial_state}
 
     - register dal profiles by calling the [register_dal_profiles] node RPC
 
     - start a revelation worker for nonces by calling
-    [Baking_nonces.start_revelation_worker]
+    {!Baking_nonces.start_revelation_worker}
 
-    - create the automaton state, see [create_loop_state]
+    - create the automaton state, see {!create_loop_state}
 
-    - run the automaton loop, see [automaton_loop] *)
+    - run the automaton loop, see {!automaton_loop} *)
 val run :
   Protocol_client_context.full ->
   ?canceler:Lwt_canceler.t ->
@@ -122,8 +122,9 @@ val create_loop_state :
 
 (** [create_initial_state context ?synchronize chain baking_configuration
     operation_worker current_proposal ?constants consensus_keys] creates an
-    initial [Baking_state.t] by initializing a [Baking_state.global_state], a
-    [Baking_state.level_state] and a [Baking_state.round_state].
+    initial {!Baking_state.t} by initializing a
+    {!type-Baking_state.global_state}, a {!type-Baking_state.level_state}
+    and a {!type-Baking_state.round_state}.
 
     - For the [global_state] initialization, a validation mode is set based on
     the [baking_configuration] and a forge worker is started. If [constants] is
@@ -134,7 +135,7 @@ val create_loop_state :
     and delegates slots are computed for the given [consensus_keys].
 
     - For the [round_state] initialization, current round is compute by calling
-    [Baking_actions.compute_round] with [current_proposal] information if
+    {!Baking_actions.compute_round} with [current_proposal] information if
     [synchronize] is set to [true] (which is the default). *)
 val create_initial_state :
   Protocol_client_context.full ->
@@ -150,13 +151,13 @@ val create_initial_state :
 (** [automaton_loop ?stop_on_event baking_configuration on_error loop_state
     state event]:
 
-    - calls [State_transition.step] with the [state] and [event] and recover a
+    - calls {!State_transition.step} with the [state] and [event] and recover a
     new state and an action to perform
 
-    - calls [Baking_actions.perform_action] on this new state and action
+    - calls {!Baking_actions.perform_action} on this new state and action
 
     - records the new state on the disk if the [baking_configuration] is not
-    [Baking_configuration.Memory]
+    {!Baking_configuration.Memory}
 
     - computes the next timeouts from the current [state] using a function that
     returns an Lwt promise that fulfills once the nearest timeout (between those
