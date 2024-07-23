@@ -226,8 +226,13 @@ let encode_address (Address address) = encode_hex address
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
 let decode_number_be bytes =
-  Bytes.fold_left (fun acc c -> (acc lsl 8) + Char.code c) 0 bytes
-  |> Z.of_int |> quantity_of_z
+  Bytes.fold_left
+    (fun acc c ->
+      let open Z in
+      add (of_int (Char.code c)) (shift_left acc 8))
+    Z.zero
+    bytes
+  |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
