@@ -881,7 +881,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Alpha | Beta
+type previous_protocol =
+  | Genesis of Parameters_repr.t
+  | Alpha
+  | (* Alpha predecessor *) Beta (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -898,7 +901,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if Compare.String.(s = "beta") then return (Beta, ctxt)
+        else if (* Alpha predecessor *) Compare.String.(s = "beta") then
+          return (Beta, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1247,7 +1251,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let*! c = get_previous_protocol_constants ctxt in
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
-        (* Start of Beta stitching. Comment used for automatic snapshot *)
+        (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
     | Beta ->
         let module Previous = Constants_parametric_previous_repr in
         let*! c = get_previous_protocol_constants ctxt in
@@ -1529,7 +1533,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let*! ctxt = add_constants ctxt constants in
 
         return (ctxt, Some c)
-    (* End of Beta stitching. Comment used for automatic snapshot *)
+    (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
   let+ ctxt =
     prepare
