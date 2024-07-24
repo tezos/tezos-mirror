@@ -487,7 +487,7 @@ let rec validation_worker_loop pipeline =
         (hash, pipeline.peer_id)
     in
     let* operations in
-    let rec validate_and_apply ~retry_on_context_error () =
+    let* () =
       protect ~canceler:pipeline.canceler (fun () ->
           let*! r =
             Block_validator.validate_and_apply
@@ -504,24 +504,9 @@ let rec validation_worker_loop pipeline =
           | Block_validator.Invalid errs ->
               (* Cancel the pipeline if a block is invalid *)
               Lwt.return_error errs
-          | Inapplicable_after_validation errs ->
-              if
-                retry_on_context_error
-                && Block_validator.errors_contains_context_error errs
-              then
-                (* This is a special case where the block is valid but
-                   inapplicable because of a context error. We retry the
-                   validation without the context error. *)
-                let*! () =
-                  Bootstrap_pipeline_event.(
-                    emit retry_application_after_context_error)
-                    (pipeline.peer_id, hash)
-                in
-                validate_and_apply ~retry_on_context_error:false ()
-              else Lwt.return_error errs
+          | Inapplicable_after_validation errs -> Lwt.return_error errs
           | Valid -> return_unit)
     in
-    let* () = validate_and_apply ~retry_on_context_error:true () in
     let*! () =
       Bootstrap_pipeline_event.(emit validated_block) (hash, pipeline.peer_id)
     in
