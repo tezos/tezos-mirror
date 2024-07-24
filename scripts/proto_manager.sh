@@ -379,7 +379,7 @@ function copy_source() {
   rm -rf /tmp/tezos_proto_snapshot
   #delete all dune files in src/proto_${version} containing the line "; This file was automatically generated, do not edit."
   find "src/proto_${version}" -name dune -exec grep -q "; This file was automatically generated, do not edit." {} \; -exec rm {} \;
-  commit "src: copy from ${protocol_source}"
+  commit_no_hooks "src: copy from ${protocol_source}"
 
   # set current version
   # Starting from 018 the version value moved to `constants_repr`. To be
@@ -398,7 +398,7 @@ function copy_source() {
       "src/proto_${version}/lib_protocol/raw_context.ml" \
       "src/proto_${version}/lib_client/proxy.ml"
   fi
-  commit "src: set current version"
+  commit_no_hooks "src: set current version"
 
   cd "src/proto_${version}"/lib_protocol
 
@@ -413,7 +413,7 @@ function copy_source() {
 
   sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old init_storage.ml
   ocamlformat -i init_storage.ml
-  commit "src: adapt ${capitalized_label} predecessors"
+  commit_no_hooks "src: adapt ${capitalized_label} predecessors"
 
   cd ../../..
 
@@ -435,7 +435,7 @@ function copy_source() {
     fi
 
     git mv "src/proto_${version}" "src/proto_${new_protocol_name}"
-    commit "src: rename proto_${version} to proto_${new_protocol_name}"
+    commit_no_hooks "src: rename proto_${version} to proto_${new_protocol_name}"
   else
     new_protocol_name="${version}"
     new_tezos_protocol="${version}"
@@ -448,7 +448,7 @@ function copy_source() {
     new_file=${file//_"${protocol_source}"/_"${new_protocol_name}"}
     git mv "${file}" "${new_file}"
   done
-  commit "src: rename binaries main_*.ml{,i} files"
+  commit_no_hooks "src: rename binaries main_*.ml{,i} files"
 
   cd lib_protocol
 
@@ -467,7 +467,7 @@ function copy_source() {
     -e "s/protocol-functor-${tezos-protocol-source}/protocol-functor-${new_tezos_protocol}/"
   find . -type f -name "*.ml" -exec ocamlformat -i {} \;
   find . -type f -name "*.mli" -exec ocamlformat -i {} \;
-  commit "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+  commit_no_hooks "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
 
   # add this protocol to the immutable list
   if [[ ${is_snapshot} == true ]]; then
@@ -475,17 +475,16 @@ function copy_source() {
   else
     printf "%s\n" "${long_hash}" >> ../../lib_protocol_compiler/final_protocol_versions
   fi
-  commit "src: add protocol to final_protocol_versions"
-
+  commit_no_hooks "src: add protocol to final_protocol_versions"
   cd ../../..
 
   if [[ ${is_snapshot} == true ]]; then
     rm "src/proto_${new_protocol_name}/README.md"
-    commit "src: remove README"
+    commit_no_hooks "src: remove README"
   else
     sed -i "s/${protocol_source}/${label}/g" "src/proto_${label}/README.md"
 
-    commit "src: rename protocol in the README"
+    commit_no_hooks "src: rename protocol in the README"
   fi
 
   echo -e "\e[33mLinking protocol in the node, client and codec\e[0m"
@@ -495,7 +494,7 @@ function copy_source() {
     sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
   fi
   ocamlformat -i manifest/product_octez.ml
-  commit "manifest: link protocol in the node, client and codec"
+  commit_no_hooks "manifest: link protocol in the node, client and codec"
 
   if [[ ${is_snapshot} == true ]]; then
     # find all dune files in src/proto_${protocol_source} and remove them
@@ -516,7 +515,7 @@ function copy_source() {
   if [[ ${is_snapshot} == true ]]; then
     warning "${protocol_source} has been unlinked in the manifest,  removing it from the source code"
     rm -rf "src/proto_${protocol_source}"
-    commit "src: remove proto_${protocol_source}"
+    commit_no_hooks "src: remove proto_${protocol_source}"
   fi
 
   # modify the first_argument variable directly
@@ -530,11 +529,11 @@ function update_protocol_tests() {
   # Replace test invocation headers that mention protocol_source
   find "src/proto_${new_protocol_name}" -type f -path \*/test/\*.ml \
     -exec sed -i "s@Invocation:\(.*\)/proto_${protocol_source}/\(.*\)@Invocation:\1/proto_${new_protocol_name}/\2@" \{\} \;
-  commit "tests: fix test invocation headers"
+  commit_no_hooks "tests: fix test invocation headers"
 
   #Replace all occurences of \[capitalized_protocol_source\] with \[capitalized_label\] in src_proto_${new_protocol_name}
   find "src/proto_${new_protocol_name}" -type f -exec sed -i "s/\\[${capitalized_source}\\]/\\[${capitalized_label}\\]/g" {} \;
-  commit "tests: fix tests registrations"
+  commit_no_hooks "tests: fix tests registrations"
 
   #update scoru_wasm protocol_migratiton tests
   # add proto_${label} to proto_name before Proto_alpha -> "Proto_alpha"
@@ -577,14 +576,14 @@ function update_protocol_tests() {
     ocamlformat -i src/lib_scoru_wasm/wasm_vm.ml
   fi
 
-  commit "scoru: update scoru_wasm protocol_migration"
+  commit_no_hooks "scoru: update scoru_wasm protocol_migration"
 
   sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
     -e "s/${capitalized_source}/${capitalized_label}/g" \
     -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
     -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
   ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
-  commit "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
+  commit_no_hooks "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
 
 }
 
