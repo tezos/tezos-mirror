@@ -85,7 +85,7 @@ let is_compressed_snapshot snapshot_file =
       close_in ic ;
       raise e
 
-module Make (Snapshot_metadata : sig
+module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
@@ -93,18 +93,18 @@ module Make (Snapshot_metadata : sig
   val size : int
 end) =
 struct
-  let write_snapshot_metadata (module Writer : WRITER_OUTPUT) metadata =
-    let metadata_bytes =
-      Data_encoding.Binary.to_bytes_exn Snapshot_metadata.encoding metadata
+  let write_snapshot_header (module Writer : WRITER_OUTPUT) header =
+    let header_bytes =
+      Data_encoding.Binary.to_bytes_exn Header.encoding header
     in
-    Writer.output Writer.out_chan metadata_bytes 0 (Bytes.length metadata_bytes)
+    Writer.output Writer.out_chan header_bytes 0 (Bytes.length header_bytes)
 
-  let read_snapshot_metadata (module Reader : READER_INPUT) =
-    let metadata_bytes = Bytes.create Snapshot_metadata.size in
-    Reader.really_input Reader.in_chan metadata_bytes 0 Snapshot_metadata.size ;
-    Data_encoding.Binary.of_bytes_exn Snapshot_metadata.encoding metadata_bytes
+  let read_snapshot_header (module Reader : READER_INPUT) =
+    let header_bytes = Bytes.create Header.size in
+    Reader.really_input Reader.in_chan header_bytes 0 Header.size ;
+    Data_encoding.Binary.of_bytes_exn Header.encoding header_bytes
 
-  let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
+  let create (module Reader : READER) (module Writer : WRITER) header ~dir
       ~include_file ~dest =
     let module Archive_writer = Tar.Make (struct
       include Reader
@@ -169,20 +169,20 @@ struct
     in
     let out_chan = Writer.open_out dest in
     try
-      write_snapshot_metadata
+      write_snapshot_header
         (module struct
           include Writer
 
           let out_chan = out_chan
         end)
-        metadata ;
+        header ;
       Archive_writer.Archive.create_gen file_stream out_chan ;
       Writer.close_out out_chan
     with e ->
       Writer.close_out out_chan ;
       raise e
 
-  let extract (module Reader : READER) (module Writer : WRITER) metadata_check
+  let extract (module Reader : READER) (module Writer : WRITER) header_check
       ~snapshot_file ~dest =
     let open Lwt_result_syntax in
     let module Writer = struct
@@ -213,13 +213,13 @@ struct
     in
     Lwt.finalize
       (fun () ->
-        let metadata = read_snapshot_metadata reader_input in
-        let* check_result = metadata_check metadata in
+        let header = read_snapshot_header reader_input in
+        let* check_result = header_check header in
         let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
         Progress_bar.with_reporter spinner @@ fun count_progress ->
         Writer.count_progress := count_progress ;
         Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
-        return (metadata, check_result))
+        return (header, check_result))
       (fun () ->
         Reader.close_in in_chan ;
         Lwt.return_unit)
@@ -256,7 +256,7 @@ struct
       close_in in_chan ;
       raise e
 
-  let read_metadata (module Reader : READER) ~snapshot_file =
+  let read_header (module Reader : READER) ~snapshot_file =
     let in_chan = Reader.open_in snapshot_file in
     let reader_input : (module READER_INPUT) =
       (module struct
@@ -266,9 +266,9 @@ struct
       end)
     in
     try
-      let metadata = read_snapshot_metadata reader_input in
+      let header = read_snapshot_header reader_input in
       Reader.close_in in_chan ;
-      metadata
+      header
     with e ->
       Reader.close_in in_chan ;
       raise e

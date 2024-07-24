@@ -29,38 +29,38 @@ val gzip_writer : writer
     snapshot file, i.e. a gzip file. *)
 val is_compressed_snapshot : string -> bool
 
-module Make (Snapshot_metadata : sig
+module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
 
   val size : int
 end) : sig
-  (** [create reader writer metadata ~dir ~include_file ~dest] creates a
-      snapshot archive with the header [metadata] and the hierarchy of files in
+  (** [create reader writer header ~dir ~include_file ~dest] creates a
+      snapshot archive with the header [header] and the hierarchy of files in
       directory [dir] for which [include_file] returns true. The archive is
       produced in file [dest]. *)
   val create :
     reader ->
     writer ->
-    Snapshot_metadata.t ->
+    Header.t ->
     dir:string ->
     include_file:(relative_path:string -> bool) ->
     dest:string ->
     unit
 
-  (** [extract reader writer check_metadata ~snapshot_file ~dest] extracts the
+  (** [extract reader writer check_header ~snapshot_file ~dest] extracts the
       snapshot archive [snapshot_file] in the directory [dest]. Existing files
-      in [dest] with the same names are overwritten. The metadata header read
-      from the snapshot is checked with [check_metadata] before beginning
+      in [dest] with the same names are overwritten. The header header read
+      from the snapshot is checked with [check_header] before beginning
       extraction, and returned. *)
   val extract :
     reader ->
     writer ->
-    (Snapshot_metadata.t -> 'a tzresult Lwt.t) ->
+    (Header.t -> 'a tzresult Lwt.t) ->
     snapshot_file:string ->
     dest:string ->
-    (Snapshot_metadata.t * 'a) tzresult Lwt.t
+    (Header.t * 'a) tzresult Lwt.t
 
   (** [compress ~snapshot_file] compresses the snapshot archive [snapshot_file]
       of the form ["path/to/snapshot.uncompressed"] to a new file
@@ -68,7 +68,7 @@ end) : sig
       upon successful compression. *)
   val compress : snapshot_file:string -> string
 
-  (** [read_metadata reader ~snapshot_file] reads the metadata from the snapshot
+  (** [read_header reader ~snapshot_file] reads the header from the snapshot
       file without extracting it. *)
-  val read_metadata : reader -> snapshot_file:string -> Snapshot_metadata.t
+  val read_header : reader -> snapshot_file:string -> Header.t
 end

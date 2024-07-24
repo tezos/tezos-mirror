@@ -17,7 +17,7 @@ type compression =
           temporarily than {!On_the_fly} but does not lock the rollup node for
           very long. *)
 
-module Snapshot_metadata : sig
+module Header : sig
   (** Versioning of snapshot format. Only one version for now. *)
   type version = V0
 
@@ -85,8 +85,7 @@ val import :
 
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)
-val info :
-  snapshot_file:string -> Snapshot_metadata.t * [`Compressed | `Uncompressed]
+val info : snapshot_file:string -> Header.t * [`Compressed | `Uncompressed]
 
 (** [with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches ?skip_condition
     f] applies [f] in a read-write context that is created from [data-dir] (and
