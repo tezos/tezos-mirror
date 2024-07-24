@@ -1673,7 +1673,7 @@ module Raw_exporter : EXPORTER = struct
         cemented_blocks_file t.snapshot_cemented_dir ~start_level ~end_level
         |> file_path)
     in
-    Lwt_utils_unix.copy_file ~src:file ~dst:filename
+    Lwt_utils_unix.copy_file ~src:file ~dst:filename ()
 
   let create_cemented_block_indexes t =
     let open Cemented_block_store in
@@ -1777,7 +1777,7 @@ module Raw_exporter : EXPORTER = struct
         protocol_file (protocol_store_dir t.snapshot_tmp_dir) dst_ph
         |> file_path)
     in
-    Lwt_utils_unix.copy_file ~src ~dst
+    Lwt_utils_unix.copy_file ~src ~dst ()
 
   let write_metadata t (metadata : Snapshot_metadata.t) =
     let metadata_file =
@@ -3376,7 +3376,7 @@ module Raw_importer : IMPORTER = struct
         (Naming.dir_path t.dst_protocol_dir)
         (Protocol_hash.to_b58check protocol_hash)
     in
-    let*! () = Lwt_utils_unix.copy_file ~src ~dst in
+    let*! () = Lwt_utils_unix.copy_file ~src ~dst () in
     let*! protocol_sources = Lwt_utils_unix.read_file dst in
     match Protocol.of_string protocol_sources with
     | None -> tzfail (Cannot_decode_protocol protocol_hash)
@@ -3446,7 +3446,7 @@ module Raw_importer : IMPORTER = struct
     let open Lwt_syntax in
     let src = Filename.concat (Naming.dir_path t.snapshot_cemented_dir) file in
     let dst = Filename.concat (Naming.dir_path t.dst_cemented_dir) file in
-    let* () = Lwt_utils_unix.copy_file ~src ~dst in
+    let* () = Lwt_utils_unix.copy_file ~src ~dst () in
     return_ok_unit
 
   let restore_floating_blocks t genesis_hash =
