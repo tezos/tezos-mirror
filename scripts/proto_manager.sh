@@ -22,6 +22,7 @@ if [[ -t 1 ]]; then
   green="\e[32m"
   cyan="\e[36m"
   magenta="\e[35m"
+  blinking="\e[5m"
   reset="\e[0m"
 else
   yellow=""
@@ -30,6 +31,7 @@ else
   green=""
   cyan=""
   reset=""
+  blinking=""
   magenta=""
 fi
 
@@ -424,6 +426,49 @@ function copy_source() {
   log_magenta "Short hash: ${short_hash}"
 
   if [[ ${is_snapshot} == true ]]; then
+    echo "Current hash is: ${long_hash}"
+    echo "If you want to change it use a third party hasher and update nonce"
+    sed -i 's/Vanity nonce: TBD/Vanity nonce: 0000000000000000/' "src/proto_${version}/lib_protocol/main.ml"
+    # wait for the user to press enter
+    echo -e "Dumping protocol source into ${blue}proto_to_hash.txt"
+    ./octez-protocol-compiler -dump-only "src/proto_${version}/lib_protocol/" > proto_to_hash.txt
+    sed -i 's/Vanity nonce: 0000000000000000/Vanity nonce: TBD/' "src/proto_${version}/lib_protocol/main.ml"
+    echo "For instance using the following command:"
+    printf "${yellow}seq 1 8 | parallel --line-buffer ${red}<path_to_hasher> ${blue}proto_to_hash.txt ${magenta}%s${reset}\n" "$(echo "${label}" | cut -c 1-6)"
+    echo "Please insert vanity nonce or press enter to continue with the current hash"
+    echo -e "${yellow}${blinking}Vanity nonce: ${reset}\c"
+    read -r nonce
+    # if nonce is not empty, sed     '(* Vanity nonce: TBD *)'  in proto_${version}/lib_protocol/main.ml
+    if [[ -n ${nonce} ]]; then
+      sed -i.old -e "s/Vanity nonce: TBD/Vanity nonce: ${nonce}/" "src/proto_${version}/lib_protocol/main.ml"
+
+      long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${version}/lib_protocol")
+      short_hash=$(echo "${long_hash}" | head -c 8)
+      log_magenta "Hash computed: ${long_hash}"
+      log_magenta "Short hash: ${short_hash}"
+      echo "New hash is: ${long_hash}"
+      echo "Press y to continue or n to stop"
+      read -r continue
+      if [[ ${continue} != "y" ]]; then
+        print_and_exit 1 "${LINENO}"
+      else
+        echo "Continuing with the current hash"
+      fi
+      rm -f proto_to_hash.txt
+      commit_no_hooks "src: add vanity nonce"
+    fi
+  fi
+  cd "src/proto_${version}/lib_protocol"
+  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
+  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "TEZOS_PROTOCOL")
+  # replace fake hash with real hash, this file doesn't influence the hash
+  sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
+    TEZOS_PROTOCOL
+  commit_no_hooks "src: replace fake hash with real hash"
+
+  cd ../../..
+
+  if [[ ${is_snapshot} == true ]]; then
     echo "Renaming src/proto_${version} to src/proto_${version}_${short_hash}"
     new_protocol_name="${version}_${short_hash}"
     new_tezos_protocol="${version}-${short_hash}"
@@ -451,14 +496,6 @@ function copy_source() {
   commit_no_hooks "src: rename binaries main_*.ml{,i} files"
 
   cd lib_protocol
-
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "TEZOS_PROTOCOL")
-  # replace fake hash with real hash, this file doesn't influence the hash
-  sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
-    TEZOS_PROTOCOL
-  commit "src: replace fake hash with real hash"
-
   # We use `--print0` and `xargs -0` instead of just passing the result
   # of find to sed in order to support spaces in filenames.
   find . -type f -print0 | xargs -0 \
