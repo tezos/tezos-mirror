@@ -29,3 +29,8 @@ let of_use u =
   else if Uses.(tag u = tag Constant.WASM.ghostnet_evm_kernel) then Ghostnet
   else if Uses.(tag u = tag Constant.WASM.evm_kernel) then Latest
   else raise (Invalid_argument "Kernel.of_use")
+
+let supports_dal = function
+  | Mainnet -> false
+  | Ghostnet -> false
+  | Latest -> true
