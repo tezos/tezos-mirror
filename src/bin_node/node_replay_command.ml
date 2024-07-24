@@ -207,6 +207,36 @@ let receipts_iteri_2 ~when_different_lengths l r f =
   in
   aux l r 0 0
 
+let _stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
+    ~valid_context_hash ~valid_receipt ~timing =
+  Option.iter_s
+    (fun stats_output ->
+      let block = `String (Block_services.to_string block) in
+      let hash = `String (Block_hash.to_b58check block_hash) in
+      let level = `Float (Int32.to_float block_level) in
+      let cycle_change = `Bool cycle_change in
+      let valid_context_hash = `Bool valid_context_hash in
+      let valid_receipt = `Bool valid_receipt in
+      let timing = `Float (Ptime.Span.to_float_s timing) in
+      let data =
+        `O
+          [
+            ("block", block);
+            ("hash", hash);
+            ("level", level);
+            ("timing", timing);
+            ("cycle_change", cycle_change);
+            ("valid_context_hash", valid_context_hash);
+            ("valid_receipt", valid_receipt);
+          ]
+      in
+      let open Lwt_syntax in
+      let* () =
+        Lwt_io.write_line stats_output (Ezjsonm.to_string ~minify:true data)
+      in
+      Lwt_io.flush stats_output)
+    stats_output
+
 let replay_one_block strict main_chain_store validator_process block
     previous_lpbl =
   let open Lwt_result_syntax in
