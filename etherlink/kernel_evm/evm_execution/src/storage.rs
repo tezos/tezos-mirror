@@ -13,6 +13,7 @@ pub mod tracer {
     use tezos_smart_rollup_storage::StorageError;
     use thiserror::Error;
 
+    use crate::trace::CallTrace;
     use crate::trace::StructLog;
 
     const TRACE_GAS: RefPath = RefPath::assert_from(b"/evm/trace/gas");
@@ -63,6 +64,21 @@ pub mod tracer {
         let struct_logs_storage = IndexableStorage::new(&TRACE_STRUCT_LOGS)?;
 
         struct_logs_storage.push_value(host, &logs)?;
+
+        Ok(())
+    }
+
+    const CALL_TRACE: RefPath = RefPath::assert_from(b"/evm/trace/call_trace");
+
+    pub fn store_call_trace<Host: Runtime>(
+        host: &mut Host,
+        call_trace: CallTrace,
+    ) -> Result<(), Error> {
+        let call_trace = rlp::encode(&call_trace);
+
+        let call_trace_storage = IndexableStorage::new(&CALL_TRACE)?;
+
+        call_trace_storage.push_value(host, &call_trace)?;
 
         Ok(())
     }
