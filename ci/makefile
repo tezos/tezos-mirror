@@ -1,18 +1,22 @@
 .PHONY: all
-all:  # Regenerate GitLab CI configuration.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe
+all: manifest # Regenerate GitLab CI configuration.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe
 
 .PHONY: verbose
-verbose: # Regenerate GitLab CI configuration with verbose output.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose
+verbose: manifest # Regenerate GitLab CI configuration with verbose output.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose
 
 .PHONY: inline-source-info
-inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info
+inline-source-info: manifest # Regenerate GitLab CI configuration, inlining source information in generated files.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info
 
 .PHONY: remove-extra-files
-remove-extra-files: # Regenerate GitLab CI configuration and remove any non-generated files.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
+remove-extra-files: manifest # Regenerate GitLab CI configuration and remove any non-generated files.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
+
+.PHONY: manifest
+manifest:
+	cd .. && ${MAKE} -C manifest
 
 .PHONY: docker-do-%
 docker-do-%:
