@@ -643,6 +643,11 @@ let snapshot_ro_file_perm = 0o444
 
 let snapshot_dir_perm = 0o755
 
+(* The [cemented_buffer_size] is used to enhance performance while
+   copying cemented cycles. This hardcoded value is designed to
+   provide good performance across a wide range of architectures. *)
+let cemented_buffer_size = 4096 * 1024
+
 module Snapshot_metadata = struct
   type metadata = {
     chain_name : Distributed_db_version.Name.t;
@@ -1289,7 +1294,7 @@ end = struct
 
   let copy_n ifd ofd n =
     let open Lwt_syntax in
-    let block_size = 32768 in
+    let block_size = cemented_buffer_size in
     let buffer = Cstruct.create block_size in
     let rec loop remaining =
       if remaining = 0L then Lwt.return_unit
@@ -1673,7 +1678,11 @@ module Raw_exporter : EXPORTER = struct
         cemented_blocks_file t.snapshot_cemented_dir ~start_level ~end_level
         |> file_path)
     in
-    Lwt_utils_unix.copy_file ~src:file ~dst:filename ()
+    Lwt_utils_unix.copy_file
+      ~buffer_size:cemented_buffer_size
+      ~src:file
+      ~dst:filename
+      ()
 
   let create_cemented_block_indexes t =
     let open Cemented_block_store in
@@ -3446,7 +3455,9 @@ module Raw_importer : IMPORTER = struct
     let open Lwt_syntax in
     let src = Filename.concat (Naming.dir_path t.snapshot_cemented_dir) file in
     let dst = Filename.concat (Naming.dir_path t.dst_cemented_dir) file in
-    let* () = Lwt_utils_unix.copy_file ~src ~dst () in
+    let* () =
+      Lwt_utils_unix.copy_file ~buffer_size:cemented_buffer_size ~src ~dst ()
+    in
     return_ok_unit
 
   let restore_floating_blocks t genesis_hash =
