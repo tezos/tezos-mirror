@@ -67,6 +67,9 @@ sudo apt-get update
 sudo apt-get install -y octez-client
 sudo apt-get install -y octez-node
 sudo apt-get install -y octez-baker
+sudo apt-get install -y octez-smartrollup
+sudo apt-get install -y octez-evmnode
+sudo apt-get install -y octez-dal-node
 
 # [test executables]
 octez-client --version

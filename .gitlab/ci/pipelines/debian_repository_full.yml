@@ -63,7 +63,7 @@ oc.build-debian:
       - gcp
       - gcp_arm64
 
-oc.build-debian-current:
+oc.build-debian-current_a:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
   stage: build
   tags:
@@ -73,7 +73,33 @@ oc.build-debian-current:
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages_current.sh
+  - ./scripts/ci/build-debian-packages_current.sh A
+  variables:
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: debian
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-debian-current_b:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.docker-build-debian-dependencies
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages_current.sh B
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
@@ -95,9 +121,11 @@ apt_repo_debian_current:
   tags:
   - gcp
   needs:
-  - oc.build-debian-current
+  - oc.build-debian-current_a
+  - oc.build-debian-current_b
   dependencies:
-  - oc.build-debian-current
+  - oc.build-debian-current_a
+  - oc.build-debian-current_b
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
@@ -158,7 +186,7 @@ oc.build-ubuntu:
       - gcp
       - gcp_arm64
 
-oc.build-ubuntu-current:
+oc.build-ubuntu-current_a:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
   stage: build
   tags:
@@ -168,7 +196,33 @@ oc.build-ubuntu-current:
   dependencies: []
   script:
   - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages_current.sh
+  - ./scripts/ci/build-debian-packages_current.sh A
+  variables:
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - focal
+      - jammy
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.build-ubuntu-current_b:
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.docker-build-ubuntu-dependencies
+  dependencies: []
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages_current.sh B
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
@@ -190,9 +244,11 @@ apt_repo_ubuntu_current:
   tags:
   - gcp
   needs:
-  - oc.build-ubuntu-current
+  - oc.build-ubuntu-current_a
+  - oc.build-ubuntu-current_b
   dependencies:
-  - oc.build-ubuntu-current
+  - oc.build-ubuntu-current_a
+  - oc.build-ubuntu-current_b
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh

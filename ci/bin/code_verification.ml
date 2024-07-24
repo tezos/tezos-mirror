@@ -1882,6 +1882,7 @@ let jobs pipeline_type =
             ~__POS__
             ~name:"oc.build:rpm:amd64"
             ~target:Rpm
+            ~group:A
             ~arch:Tezos_ci.Amd64
             ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])

@@ -15,7 +15,7 @@ cd /root/tezos/
 eval "$(opam env)"
 
 # Build octez debian packages
-make dpkg
+make "dpkg-$1"
 
 # Move the debian package to be packed as artifacts
 mkdir -p "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"

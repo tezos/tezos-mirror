@@ -44,9 +44,6 @@ protocols=$(tr '\n' ' ' < $proto_file | sed -e 's/ $//g')
 
 # Variables
 #
-# Where the zcash files are
-zcashdir="_opam/share/zcash-params"
-#
 # Package maintainer
 OCTEZ_PKGMAINTAINER=${OCTEZ_PKGMAINTAINER:-package@nomadic-labs.com}
 #
@@ -175,13 +172,15 @@ fixBinaryList() {
 zcashParams() {
   _pkgzcash=$1
   _zcashtgt=$2
+  # Where the zcash files are
+  _zcashdir=${3:-"_opam/share/zcash-params"}
 
   if [ -f "${_pkgzcash}" ]; then
     zcashstuff=$(cat "${_pkgzcash}" 2> /dev/null)
     echo "=> Zcash"
     mkdir -p "${_zcashtgt}"
     for shr in ${zcashstuff}; do
-      cp "${zcashdir}/${shr}" \
+      cp "${_zcashdir}/${shr}" \
         "${_zcashtgt}"
     done
   fi

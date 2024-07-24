@@ -862,10 +862,12 @@ let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
 
 type bin_package_target = Rpm
 
+type bin_package_group = A | B
+
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
 let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
-    ?(stage = Stages.build) ~arch ~target () : tezos_job =
+    ?(stage = Stages.build) ~arch ~target ~group () : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let target_string = match target with Rpm -> "rpm" in
   let image = bin_package_image in
@@ -875,6 +877,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     in
     Matrix [[("DISTRIBUTION", distributions)]]
   in
+  let group_string = match group with A -> "A" | B -> "B" in
   let artifacts =
     artifacts
       ~expire_in:(Duration (Days 1))
@@ -899,6 +902,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ~variables:
       [
         ("TARGET", target_string);
+        ("GROUP", group_string);
         ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
         ("BLST_PORTABLE", "yes");
         ("ARCH", arch_string);
@@ -917,7 +921,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "opam init --bare --disable-sandboxing";
       "make build-deps";
       "eval $(opam env)";
-      "make $TARGET";
+      "make $TARGET-$GROUP";
       "DISTRO=$(echo \"$DISTRIBUTION\" | cut -d':' -f1)";
       "RELEASE=$(echo \"$DISTRIBUTION\" | cut -d':' -f2)";
       "mkdir -p packages/$DISTRO/$RELEASE";
@@ -930,6 +934,7 @@ let job_build_rpm_amd64 : unit -> tezos_job =
     ~__POS__
     ~name:"oc.build:rpm:amd64"
     ~target:Rpm
+    ~group:A
     ~arch:Amd64
     ~dependencies:(Dependent [])
 

@@ -515,13 +515,14 @@ oc.build:rpm:amd64:
   - opam init --bare --disable-sandboxing
   - make build-deps
   - eval $(opam env)
-  - make $TARGET
+  - make $TARGET-$GROUP
   - DISTRO=$(echo "$DISTRIBUTION" | cut -d':' -f1)
   - RELEASE=$(echo "$DISTRIBUTION" | cut -d':' -f2)
   - mkdir -p packages/$DISTRO/$RELEASE
   - mv octez-*.* packages/$DISTRO/$RELEASE/
   variables:
     TARGET: rpm
+    GROUP: A
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
     ARCH: amd64

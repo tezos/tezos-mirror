@@ -431,14 +431,23 @@ fmt-ocaml:
 fmt-python:
 	@$(MAKE) -C docs fmt
 
-.PHONY: dpkg
-dpkg:	all
-	@./scripts/dpkg/make_dpkg.sh
+.PHONY: dpkg-A
+dpkg-A:	all
+	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
 
-.PHONY: rpm
-rpm:	all
+.PHONY: dpkg-B
+dpkg-B:	all
+	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/B
+
+.PHONY: dpkg
+dpkg:	all dpkg-A dpkg-B
+
+.PHONY: rpm-A
+rpm-A: all
 	@./scripts/rpm/make_rpm.sh
 
+.PHONY: rpm
+rpm: all rpm-A
 
 .PHONY: build-deps
 build-deps:
