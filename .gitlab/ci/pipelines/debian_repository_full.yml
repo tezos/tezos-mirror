@@ -258,6 +258,23 @@ apt_repo_ubuntu_current:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
+oc.lintian_debian:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
+  before_script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian -y
+  script:
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
+
 oc.install_bin_debian_bookworm:
   image: debian:bookworm
   stage: publishing_tests
@@ -268,6 +285,23 @@ oc.install_bin_debian_bookworm:
   dependencies: []
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
+
+oc.lintian_ubuntu:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.build-ubuntu
+  dependencies:
+  - oc.build-ubuntu
+  before_script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian -y
+  script:
+  - ./scripts/ci/lintian_debian_packages.sh ubuntu jammy focal
 
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable

@@ -127,6 +127,23 @@ apt_repo_debian_current:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
+oc.lintian_debian:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
+  before_script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian -y
+  script:
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
+
 oc.install_bin_debian_bookworm:
   image: debian:bookworm
   stage: publishing_tests

@@ -233,10 +233,34 @@ let jobs pipeline_type =
       ~stage:Stages.publishing_tests
       script
   in
+  let job_lintian ~__POS__ ~name ~dependencies ~image ?allow_failure script =
+    job
+      ?allow_failure
+      ~__POS__
+      ~name
+      ~image
+      ~dependencies
+      ~stage:Stages.publishing_tests
+      ~before_script:
+        (before_script
+           ~source_version:true
+           [
+             "export DEBIAN_FRONTEND=noninteractive";
+             "apt-get update";
+             "apt-get install lintian -y";
+           ])
+      script
+  in
   let test_current_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. release pipelines
        test the entire matrix *)
     [
+      job_lintian
+        ~__POS__
+        ~name:"oc.lintian_ubuntu"
+        ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
+        ~image:Images.ubuntu_focal
+        ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy focal"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_focal"
@@ -253,6 +277,12 @@ let jobs pipeline_type =
   in
   let test_current_debian_packages_jobs =
     [
+      job_lintian
+        ~__POS__
+        ~name:"oc.lintian_debian"
+        ~dependencies:(Dependent [Artifacts job_build_debian_package])
+        ~image:Images.debian_bookworm
+        ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"

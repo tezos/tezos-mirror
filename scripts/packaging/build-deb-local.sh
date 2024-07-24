@@ -29,4 +29,8 @@ cd -
 
 echo "All packages are available in ./scripts/packaging"
 
-lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose
+# Run lintian only if building packages locally.
+# On the CI we have a specific job for it
+if [ -z "${CI:-}" ]; then
+  lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose
+fi
