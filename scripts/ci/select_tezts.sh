@@ -2,6 +2,9 @@
 
 set -e
 
+script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+src_dir="$(dirname "$(dirname "$script_dir")")"
+
 ORIGIN=${ORIGIN:-origin}
 
 if [[ "$CI_MERGE_REQUEST_LABELS" =~ (^|,)ci--run-all-tezts($|,) ]]; then
@@ -15,19 +18,25 @@ abort() {
   exit 17
 }
 
-if [ -z "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
-  echo "CI_MERGE_REQUEST_DIFF_BASE_SHA is unspecified or empty, test selection is disabled."
-  abort
-fi
-
 # If set, diff base against CI_MERGE_REQUEST_SOURCE_BRANCH_SHA instead of HEAD.
 # This variable contains the HEAD SHA of the merge request's source branch.
 # On merged result pipelines, this is not equivalent on the local git's HEAD,
 # as the merged result pipeline runs on an ephemeral, rebased branch.
 head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-HEAD}
+target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-${ORIGIN}/master}
 
-echo "---- Fetching HEAD ($head) and base ($CI_MERGE_REQUEST_DIFF_BASE_SHA) from $ORIGIN..."
-if ! git fetch "$ORIGIN" "$head" "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
+merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$head" "$target" || {
+  # Print on stderr to make visible outside command substitution
+  echo "Failed to get merge base, test selection is disabled." >&2
+  abort
+})
+if [ -z "$merge_base" ]; then
+  echo "Merge base is empty, test selection is disabled."
+  abort
+fi
+
+echo "---- Fetching source branch HEAD ($head) and base ($merge_base) from $ORIGIN..."
+if ! git fetch "$ORIGIN" "$head" "$merge_base"; then
   # Example error that was seen in a job:
   # error: RPC failed; curl 92 HTTP/2 stream 5 was not closed cleanly: INTERNAL_ERROR (err 2)
   # error: 50483 bytes of body are still expected
@@ -38,7 +47,7 @@ if ! git fetch "$ORIGIN" "$head" "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
 fi
 
 echo "---- Diffing..."
-CHANGES="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA" "$head")"
+CHANGES="$(git diff --name-only "$merge_base" "$head")"
 echo "$CHANGES"
 
 echo "---- Compiling manifest/manifest..."
