@@ -1,3 +1,4 @@
 /*.json
 /perf.data*
 /*.svg
+/parse-benchmark

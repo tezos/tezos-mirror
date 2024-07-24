@@ -41,9 +41,10 @@ fn show_results(stats: &BenchStats, opts: &BenchRunOptions) {
 }
 
 pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
-    use commands::{compare, run};
+    use commands::{compare, parser, run};
     match opts.bench_command {
         cli::BenchSubcommand::Run(bench_run_opts) => run::run(bench_run_opts),
         cli::BenchSubcommand::Compare(bench_run_opts) => compare::compare(bench_run_opts),
+        cli::BenchSubcommand::Parser(parser_run_opts) => parser::bench(parser_run_opts),
     }
 }

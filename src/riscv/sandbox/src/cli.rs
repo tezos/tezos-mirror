@@ -75,6 +75,8 @@ pub enum BenchSubcommand {
     Run(BenchRunOptions),
     /// Loads and compares runs from given json files
     Compare(BenchCompareOptions),
+    /// Runs a parser benchmark over the given RISC-V binaries
+    Parser(BenchParserRunOptions),
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -108,6 +110,17 @@ pub struct BenchRunOptions {
 
     #[command(flatten)]
     pub sort_args: TableSortArgs,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct BenchParserRunOptions {
+    /// How often to repeat the benchmark run
+    #[arg(long = "iter", default_value_t = 1)]
+    pub repeat: usize,
+
+    /// Paths to the input ELF executable
+    #[arg(num_args=1..)]
+    pub inputs: Vec<Box<Path>>,
 }
 
 /// Validator for `--output <filename>` option
