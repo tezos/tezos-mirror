@@ -28,7 +28,7 @@ type error = Overwrite_forbiden of string | File_not_found of string
 
 (* We need to exit Lwt + tzResult context from Yes_wallet. *)
 let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
-    ~active_bakers_only alias_pkh_pk_list =
+    ~active_bakers_only alias_pkh_pk_list other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -39,9 +39,11 @@ let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
          ?level
          base_dir
          ~active_bakers_only
-         alias_pkh_pk_list)
+         alias_pkh_pk_list
+         other_accounts_pkh)
   with
-  | Ok alias_pkh_pk_list -> alias_pkh_pk_list
+  | Ok alias_pkh_pk_list_and_other_accounts ->
+      alias_pkh_pk_list_and_other_accounts
   | Error trace ->
       Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
       exit 1
@@ -58,7 +60,7 @@ let run_load_contracts ?dump_contracts ?network_opt ?level base_dir =
       exit 1
 
 let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases =
+    ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -68,7 +70,8 @@ let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
          ?network_opt
          base_dir
          ~active_bakers_only
-         ~aliases)
+         ~aliases
+         ~other_accounts_pkh)
   with
   | Ok alias_pkh_pk_list -> alias_pkh_pk_list
   | Error trace ->
@@ -357,6 +360,7 @@ let () =
             base_dir
             ~active_bakers_only
             ~aliases
+            ~other_accounts_pkh:[]
         in
         Format.printf
           "@[<h>Number of keys to export:@;<3 0>%d@]@."
@@ -422,7 +426,7 @@ let () =
                 contracts_list)
       | None -> exit 0)
   | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
-      let alias_pkh_pk_list =
+      let alias_pkh_pk_list, _other_accounts =
         run_load_bakers_public_keys
           ?staking_share_opt
           ?network_opt
@@ -430,6 +434,7 @@ let () =
           base_dir
           ~active_bakers_only
           aliases
+          []
       in
 
       let flags =
