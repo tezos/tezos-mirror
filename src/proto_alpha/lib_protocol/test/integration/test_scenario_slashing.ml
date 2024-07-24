@@ -136,7 +136,7 @@ let check_has_no_slots ~loc baker_name =
   exec (fun ((block, state) as input) ->
       let baker = State.find_account baker_name state in
       let* rights =
-        Tezos_protocol_plugin_alpha.Plugin.RPC.Attestation_rights.get
+        Plugin.RPC.Attestation_rights.get
           Block.rpc_ctxt
           ~delegates:[baker.pkh]
           block
@@ -168,7 +168,7 @@ let check_has_slots ~loc baker_name =
   exec (fun ((block, state) as input) ->
       let baker = State.find_account baker_name state in
       let* rights =
-        Tezos_protocol_plugin_alpha.Plugin.RPC.Attestation_rights.get
+        Plugin.RPC.Attestation_rights.get
           Block.rpc_ctxt
           ~delegates:[baker.pkh]
           block
