@@ -114,6 +114,15 @@ RPC Changes
     ../own_full_balance``.  The old path is now **deprecated**. (MR
     :gl:`!14154`)
 
+  * Added RPCs ``GET ../own_staked`` and ``GET ../own_delegated``.
+    They are similar to ``total_staked`` and ``total_delegated``,
+    except that they only consider tez owned by the baker itself. (MR
+    :gl:`!14244`)
+
+  * Renamed RPC ``GET ../unstaked_frozen_deposits`` to ``GET
+    ../total_unstaked_per_cycle``. The old path is now
+    **deprecated**. (MR :gl:`!14244`)
+
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/``.
 
