@@ -50,6 +50,8 @@ val empty : t
 
 val bootstrap : t
 
+val random_observer : t
+
 (** [operator op] returns an operator with the profile described by [op] *)
 val operator : Operator_profile.t -> t
 
