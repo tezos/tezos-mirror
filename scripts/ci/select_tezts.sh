@@ -36,7 +36,7 @@ CHANGES="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA")"
 echo "$CHANGES"
 
 echo "---- Compiling manifest/manifest..."
-make -C manifest manifest
+make --silent -C manifest manifest
 
 echo "---- Selecting tests..."
 # "--" ensures that if a filename starts with a dash, it is not interpreted as an option.
