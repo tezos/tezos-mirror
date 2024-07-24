@@ -197,7 +197,7 @@ module Term = struct
     let doc = "The Octez DAL node observer profiles for given slot indexes." in
     Arg.(
       value
-      & opt (list observer_profile_arg) []
+      & opt (some' (list observer_profile_arg)) None
       & info
           ~docs
           ~doc
@@ -370,13 +370,18 @@ let make ~run =
           history_mode;
         }
     in
-    let profile = Operator_profile.make ~attesters ~producers ~observers () in
-    match (bootstrap_flag, profile) with
-    | false, profiles when Operator_profile.is_empty profiles -> run None
-    | true, profiles when Operator_profile.is_empty profiles ->
+    let profile = Operator_profile.make ~attesters ~producers ?observers () in
+    match (bootstrap_flag, observers, profile) with
+    | false, None, profiles when Operator_profile.is_empty profiles -> run None
+    | false, Some _, profiles when Operator_profile.is_empty profiles ->
+        (* The user only mentioned '--observer' without any slot and
+           without any other profile. It will be assigned to random
+           slots. *)
+        run (Some Profile_manager.random_observer)
+    | false, _, _ -> run @@ Some (Profile_manager.operator profile)
+    | true, None, profiles when Operator_profile.is_empty profiles ->
         run @@ Some Profile_manager.bootstrap
-    | false, profiles -> run @@ Some (Profile_manager.operator profiles)
-    | true, _ ->
+    | true, _, _ ->
         `Error
           ( false,
             "a bootstrap node (option '--bootstrap') cannot be an attester \
