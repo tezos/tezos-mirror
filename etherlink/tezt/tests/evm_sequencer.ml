@@ -534,6 +534,12 @@ type feature_test_registration =
        which should not run in CI. *)
 [@@warning "-unused-constructor"]
 
+let default_threshold_encryption_registration =
+  Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
+
+let default_dal_registration =
+  Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
+
 (* Register all variants of a test. *)
 let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
@@ -544,13 +550,8 @@ let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
     ?commitment_period ?challenge_window ?additional_uses
-    ?(use_threshold_encryption =
-      Register_both
-        {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []})
-    ?(use_dal =
-      Register_both
-        {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}) ~title
-    ~tags body protocols =
+    ?(use_threshold_encryption = default_threshold_encryption_registration)
+    ?(use_dal = default_dal_registration) ~title ~tags body protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
