@@ -36,16 +36,16 @@ module Make (Header : sig
 
   val size : int
 end) : sig
-  (** [create reader writer header ~dir ~include_file ~dest] creates a
-      snapshot archive with the header [header] and the hierarchy of files in
-      directory [dir] for which [include_file] returns true. The archive is
-      produced in file [dest]. *)
+  (** [create reader writer header ~files ~dest] creates a snapshot archive with
+      the header [header] with the contents of [files]. Each element of [files]
+      is a pair whose first component is the path of the file to include and the
+      second component is the "relative" path it should be registered to in the
+      snapshot archive The archive is produced in file [dest]. *)
   val create :
     reader ->
     writer ->
     Header.t ->
-    dir:string ->
-    include_file:(relative_path:string -> bool) ->
+    files:(string * string) list ->
     dest:string ->
     unit
 

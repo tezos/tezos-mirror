@@ -104,22 +104,16 @@ struct
     Reader.really_input Reader.in_chan header_bytes 0 Header.size ;
     Data_encoding.Binary.of_bytes_exn Header.encoding header_bytes
 
-  let create (module Reader : READER) (module Writer : WRITER) header ~dir
-      ~include_file ~dest =
+  let create (module Reader : READER) (module Writer : WRITER) header ~files
+      ~dest =
     let module Archive_writer = Tar.Make (struct
       include Reader
       include Writer
     end) in
-    let files =
-      Tezos_stdlib_unix.Utils.list_files dir
-      |> List.filter (fun relative_path -> include_file ~relative_path)
-    in
     let total =
       List.fold_left
-        (fun total relative_path ->
-          let {Unix.st_size; _} =
-            Unix.lstat (Filename.concat dir relative_path)
-          in
+        (fun total (file, _) ->
+          let {Unix.st_size; _} = Unix.lstat file in
           total + st_size)
         0
         files
@@ -152,14 +146,13 @@ struct
     in
     let file_stream =
       List.rev_map
-        (fun relative_path ->
-          let full_path = Filename.concat dir relative_path in
+        (fun (full_path, path_in_snapshot) ->
           let {Unix.st_perm; st_size; st_mtime; _} = Unix.lstat full_path in
           let header =
             Tar.Header.make
               ~file_mode:st_perm
               ~mod_time:(Int64.of_float st_mtime)
-              relative_path
+              path_in_snapshot
               (Int64.of_int st_size)
           in
           let writer = write_file full_path in

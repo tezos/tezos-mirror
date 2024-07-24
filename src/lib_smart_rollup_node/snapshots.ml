@@ -736,22 +736,26 @@ let export_dir (header : Header.t) ~take_locks ~compression ~data_dir ~dest
     let*! () =
       let open Lwt_syntax in
       let* () = Option.iter_s Lwt_utils_unix.create_dir dest in
-      let include_file ~relative_path =
+      let include_file relative_path =
         Re.Str.string_match snapshotable_files_regexp relative_path 0
         && not (Re.Str.string_match operator_local_file_regexp relative_path 0)
+      in
+      let files =
+        Tezos_stdlib_unix.Utils.fold_files
+          data_dir
+          (fun relative_path acc ->
+            if not (include_file relative_path) then acc
+            else
+              let full_path = Filename.concat data_dir relative_path in
+              (full_path, relative_path) :: acc)
+          []
       in
       let writer =
         match compression with
         | On_the_fly -> gzip_writer
         | No | After -> stdlib_writer
       in
-      create
-        stdlib_reader
-        writer
-        header
-        ~dir:data_dir
-        ~include_file
-        ~dest:dest_file ;
+      create stdlib_reader writer header ~files ~dest:dest_file ;
       return_unit
     in
     return dest_file
