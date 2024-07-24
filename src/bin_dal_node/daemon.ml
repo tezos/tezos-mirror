@@ -370,37 +370,35 @@ module Handler = struct
       (block_info : block_info) block_level
       (module Plugin : Dal_plugin.T with type block_info = block_info) =
     let open Lwt_result_syntax in
-    if supports_refutations ctxt then
-      let* cells_of_level =
-        let pred_published_level =
-          Int32.sub
-            block_level
-            (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
-        in
-        Plugin.Skip_list.cells_of_level
-          block_info
-          cctxt
-          ~dal_constants
-          ~pred_publication_level_dal_constants:
-            (lazy (get_constants ctxt cctxt ~level:pred_published_level))
+    let* cells_of_level =
+      let pred_published_level =
+        Int32.sub
+          block_level
+          (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
       in
-      let cells_of_level =
-        List.map
-          (fun (hash, cell) ->
-            ( Dal_proto_types.Skip_list_hash.of_proto
-                Plugin.Skip_list.hash_encoding
-                hash,
-              Dal_proto_types.Skip_list_cell.of_proto
-                Plugin.Skip_list.cell_encoding
-                cell ))
-          cells_of_level
-      in
-      let store = Node_context.get_store ctxt in
-      Store.Skip_list_cells.insert
-        store.skip_list_cells
-        ~attested_level:block_level
+      Plugin.Skip_list.cells_of_level
+        block_info
+        cctxt
+        ~dal_constants
+        ~pred_publication_level_dal_constants:
+          (lazy (get_constants ctxt cctxt ~level:pred_published_level))
+    in
+    let cells_of_level =
+      List.map
+        (fun (hash, cell) ->
+          ( Dal_proto_types.Skip_list_hash.of_proto
+              Plugin.Skip_list.hash_encoding
+              hash,
+            Dal_proto_types.Skip_list_cell.of_proto
+              Plugin.Skip_list.cell_encoding
+              cell ))
         cells_of_level
-    else return_unit
+    in
+    let store = Node_context.get_store ctxt in
+    Store.Skip_list_cells.insert
+      store.skip_list_cells
+      ~attested_level:block_level
+      cells_of_level
 
   let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
@@ -416,14 +414,16 @@ module Handler = struct
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
-          store_skip_list_cells
-            ctxt
-            cctxt
-            dal_constants
-            block_info
-            block_level
-            (module Plugin : Dal_plugin.T
-              with type block_info = Plugin.block_info)
+          if supports_refutations ctxt then
+            store_skip_list_cells
+              ctxt
+              cctxt
+              dal_constants
+              block_info
+              block_level
+              (module Plugin : Dal_plugin.T
+                with type block_info = Plugin.block_info)
+          else return_unit
         in
         let* () =
           if not (is_bootstrap_node ctxt) then
