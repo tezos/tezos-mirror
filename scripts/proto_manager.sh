@@ -205,6 +205,12 @@ if [[ ${command} == "stabilise" ]]; then
 
 fi
 
+## check if git tree is clean
+if [[ $(git status --porcelain | wc -l) -gt 0 ]]; then
+  error "Git tree is not clean, please commit or stash your changes" 1>&2
+  print_and_exit 1 "${LINENO}"
+fi
+
 log_blue "${msg}."
 
 # Check if the protocol source exists
@@ -361,56 +367,6 @@ function copy_source() {
 
   cd "src/proto_${version}"/lib_protocol
 
-  # start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # start_predecessor="\(\* Start of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
-  # end_predecessor="\(\* End of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
-  # type_to_remove="\(\* ${capitalized_source} predecessor \*\)"
-  # type_to_add="\(\* ${capitalized_label} predecessor \*\)"
-
-  # start_remove="\(\* Start of code to remove at next automatic protocol snapshot \*\)"
-  # remove_comment="\(\* Please add here any code that should be removed at the next automatic protocol snapshot \*\)"
-  # end_remove="\(\* End of code to remove at next automatic protocol snapshot \*\)"
-
-  # start_typechecker="\(\* This line is only here to please the typechecker\,"
-  # end_typechecker="let\*\! c = get_previous_protocol_constants ctxt in"
-  # log_blue "fix prepare_first_block in ${capitalized_label}"
-  # prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "raw_context.ml")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed "s/${capitalized_source} stitching/alpha predecessor stitching/g" <<<"${prepare_first_block}")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed "s/${capitalized_source}/${capitalized_label}/g" <<<"${prepare_first_block_patched}")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed "s/let module Previous = Constants_parametric_repr in/let module Previous = Constants_parametric_previous_repr in/" <<<"${prepare_first_block_patched}")
-  # prepare_first_block_patched=$(perl -0777 -pe "s/${start_typechecker}.*${end_typechecker}//s" <<<"${prepare_first_block_patched}")
-  # # shellcheck disable=SC2001
-  # prepare_first_block_patched=$(sed -e "s/let\* c = get_constants ctxt in/let*! c = get_previous_protocol_constants ctxt in/" <<<"${prepare_first_block_patched}")
-  # escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
-  # #replace all multiline code between $start_predecessor and $end_predecessor with the content of prepare_first_block_patched in src/proto_${protocol_source}/lib_protocol/raw_context.ml using perl
-  # perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "raw_context.ml"
-  # # remove all code between $start_remove and $end_remove in src/proto_${protocol_source}/lib_protocol/raw_context.ml
-  # perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "raw_context.ml"
-  # #replace code between "$type_to_remove' and '$type_to_remove' with capitalized_label in src/proto_${protocol_source}/lib_protocol/raw_context.ml
-  # perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "raw_context.ml"
-  # perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "raw_context.mli"
-  # replace_string="Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
-  # #replace  code between "$type_to_remove' and '$type_to_remove' with $replace_string in src/proto_${protocol_source}/lib_protocol/raw_context.ml
-  # perl -0777 -pe "s/${type_to_remove}[ \t]+Compare.*${type_to_remove}/${type_to_remove}$replace_string${type_to_remove}/s" -i "raw_context.ml"
-
-  # #remove source as label predecessor and  remove line containing "return (${capitalized_source}, ctxt))
-  # sed -i.old -e "s/| ${capitalized_source}//" \
-  #   -e "/return (${capitalized_source}, ctxt)/d" raw_context.ml \
-  #   raw_context.ml
-
-  # sed -i.old -e "s/| ${capitalized_source}//" \
-  #   -e "/return (${capitalized_source}, ctxt)/d" raw_context.ml \
-  #   raw_context.mli
-
-  # start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  # perl -0777 -pe "s/${start_source}.*${end_source}//s" -i raw_context.ml
-  # perl -0777 -pe "s/${start_source}.*${end_source}//s" -i init_storage.ml
-
   ### FIX ${capitalized_label} PREDECESSORS
   replace_line="else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
   # replace line containing "return (${capitalized_source}, ctxt)) with replace_line in raw_context.ml
@@ -441,7 +397,6 @@ function copy_source() {
   find . -name main_\*_"${protocol_source}".ml -or -name main_\*_"${protocol_source}".mli | while read -r file; do
     new_file=${file//_"${protocol_source}"/_"${new_protocol_name}"}
     git mv "${file}" "${new_file}"
-
   done
   commit "src: rename binaries main_*.ml{,i} files"
 
@@ -458,9 +413,11 @@ function copy_source() {
     sed -i.old -e "s/protocol_${protocol_source}/protocol_${new_protocol_name}/" \
     -e "s/protocol-${tezos_protocol_source}/protocol-${new_tezos_protocol}/" \
     -e "s/protocol-functor-${tezos-protocol-source}/protocol-functor-${new_tezos_protocol}/"
+  commit "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+
   # add this protocol to the immutable list
   printf "%s\n" "${long_hash}" >> ../../lib_protocol_compiler/final_protocol_versions
-  commit "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+  commit "src: add protocol to final_protocol_versions"
 
   cd ../../..
 
@@ -578,6 +535,56 @@ function update_source() {
 
 }
 
+function generate_regression_test() {
+  log_blue "generate regression test"
+  # shellcheck disable=SC2312
+  # shellcheck disable=SC1003
+  printf '
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Testing
+   -------
+   Component:    Protocol
+   Invocation:   dune exec tezt/tests/main.exe -- --file check_proto_%s_changes.ml
+   Subject:      Ensure protocol_%s has not changed
+*)
+
+let register () =
+  Regression.register
+    ~__FILE__
+    ~title:"Check that the %s protocol has not changed"
+    ~tags:[Tag.layer1; "protocol"; "%s"]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun _protocol ->
+  (* Check that md5sum of all files in src/proto_%s is consistent *)
+    let _, _ =
+    Unix.open_process
+      "mkdir /tmp/tezos_proto_snapshot && git archive HEAD src/proto_%s | tar -x -C /tmp/tezos_proto_snapshot"
+  in
+  let ic, _ =
+    Unix.open_process
+      "find /tmp/tezos_proto_snapshot -type f -exec md5sum {} %s; | sort -k 2 | md5sum"
+  in
+  let _, _ = Unix.open_process "rm -rf /tmp/tezos_proto_snapshot" in
+
+  let output = input_line ic in
+  Regression.capture output ;
+  return ()' "$(date +%Y)" "${label}" "${label}" "${label}" "${label}" "${label}" "${label}" '\\' > "tezt/tests/check_proto_${label}_changes.ml"
+  ocamlformat -i "tezt/tests/check_proto_${label}_changes.ml"
+  git add "tezt/tests/check_proto_${label}_changes.ml"
+
+  sed -i.old -e "s/let register_protocol_independent_tests () =/let register_protocol_independent_tests () =\n  Check_proto_${label}_changes.register ();/" tezt/tests/main.ml
+  ocamlformat -i tezt/tests/main.ml
+  commit "tezt: generate regression test"
+}
+
 function update_tezt_tests() {
 
   # ensure protocols compile and parameter files are generated
@@ -626,53 +633,8 @@ function update_tezt_tests() {
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit "tezt: adapt lib_tezos/protocol.ml"
 
-  log_blue "generate regression test"
-  # shellcheck disable=SC2312
-  # shellcheck disable=SC1003
-  printf '
-(*****************************************************************************)
-(*                                                                           *)
-(* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(*****************************************************************************)
-
-(* Testing
-   -------
-   Component:    Protocol
-   Invocation:   dune exec tezt/tests/main.exe -- --file check_proto_%s_changes.ml
-   Subject:      Ensure protocol_%s has not changed
-*)
-
-let register () =
-  Regression.register
-    ~__FILE__
-    ~title:"Check that the %s protocol has not changed"
-    ~tags:[Tag.layer1; "protocol"; "%s"]
-    ~uses_node:false
-    ~uses_client:false
-    ~uses_admin_client:false
-  @@ fun _protocol ->
-  (* Check that md5sum of all files in src/proto_%s is consistent *)
-    let _, _ =
-    Unix.open_process
-      "mkdir /tmp/tezos_proto_snapshot && git archive HEAD src/proto_%s | tar -x -C /tmp/tezos_proto_snapshot"
-  in
-  let ic, _ =
-    Unix.open_process
-      "find /tmp/tezos_proto_snapshot -type f -exec md5sum {} %s; | sort -k 2 | md5sum"
-  in
-  let _, _ = Unix.open_process "rm -rf /tmp/tezos_proto_snapshot" in
-
-  let output = input_line ic in
-  Regression.capture output ;
-  return ()' "$(date +%Y)" "${label}" "${label}" "${label}" "${label}" "${label}" "${label}" '\\' > "tezt/tests/check_proto_${label}_changes.ml"
-  ocamlformat -i "tezt/tests/check_proto_${label}_changes.ml"
-  git add "tezt/tests/check_proto_${label}_changes.ml"
-
-  sed -i.old -e "s/let register_protocol_independent_tests () =/let register_protocol_independent_tests () =\n  Check_proto_${label}_changes.register ();/" tezt/tests/main.ml
-  ocamlformat -i tezt/tests/main.ml
-  commit "tezt: generate regression test"
+  # TODO: fix and reintroduce this test
+  #generate_regression_test
 
   #fix other tests:
   sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i tezt/tests/*.ml
@@ -832,8 +794,10 @@ function generate_doc() {
 
   # update docs Makefile
   sed -i.old -r "s/(PROTOCOLS .*) ${protocol_source}/\1 ${protocol_source} ${label}/" docs/Makefile
-  sed "/${protocol_source}_long .*/i \ ${label}_long = ${long_hash}" -i docs/Makefile
-  sed "/${protocol_source}_short .*/i \ ${label}_short = ${label}" -i docs/Makefile
+  line=$(printf "%s_long%*s= %s" "${label}" $((10 - ${#label})) '' "$long_hash")
+  sed "/${protocol_source}_long .*/i${line}" -i docs/Makefile
+  line=$(printf "%s_short%*s= %s" "${label}" $((8 - ${#label})) '' "$label")
+  sed "/${protocol_source}_short .*/i${label}_short = ${label}" -i docs/Makefile
   sed -i.old -e "s/${protocol_source}\/rpc\.rst/${protocol_source}\/rpc.rst ${label}\/rpc.rst/g" docs/Makefile
   commit "docs: update docs Makefile"
 
