@@ -755,14 +755,16 @@ let test_publish_blueprints =
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
     ~use_dal:ci_enabled_dal_registration
-  @@ fun {sequencer; proxy; client; sc_rollup_node; _} _protocol ->
+  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
   let* _ =
     repeat 5 (fun () ->
         let*@ _ = produce_block sequencer in
         unit)
   in
 
-  let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 5 in
+  (* Wait more to avoid flakiness, in particular with DAL *)
+  let timeout = if enable_dal then 50. else 5. in
+  let* () = Evm_node.wait_for_blueprint_injected ~timeout sequencer 5 in
 
   (* At this point, the evm node should called the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
