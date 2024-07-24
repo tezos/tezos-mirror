@@ -22,6 +22,7 @@ use crate::transaction_layer_data::TransactionLayerData;
 use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
+use crate::TracerConfig::StructLogger;
 use crate::{tick_model_opcodes, TracerConfig};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
@@ -315,7 +316,7 @@ fn trace<Host: Runtime>(
     memory: Vec<u8>,
     storage: Vec<StorageMapItem>,
 ) -> Result<(), EthereumError> {
-    if let (Some(tracer), Some(opcode), Ok(pc)) = (tracer, opcode, pc) {
+    if let (Some(StructLogger(tracer)), Some(opcode), Ok(pc)) = (tracer, opcode, pc) {
         let opcode = opcode.as_u8();
         let pc: u64 = pc.try_into().unwrap_or_default();
         let depth: u16 = depth.try_into().unwrap_or_default();

@@ -17,30 +17,45 @@ use tezos_ethereum::{
     transaction::TransactionHash,
 };
 
+// For the following constant, we add +1 for the transaction hash in the input.
+const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
+const CALL_TRACER_CONFIG_SIZE: usize = 3;
+
+pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
+
 #[derive(Debug, Clone, Copy)]
-pub struct TracerConfig {
+pub struct StructLoggerConfig {
     pub enable_memory: bool,
     pub enable_return_data: bool,
     pub disable_stack: bool,
     pub disable_storage: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CallTracerConfig {
+    pub only_top_call: bool,
+    pub with_logs: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TracerConfig {
+    StructLogger(StructLoggerConfig),
+    CallTracer(CallTracerConfig),
+}
+
 pub fn get_tracer_config(
     current_transaction_hash: Option<TransactionHash>,
     trace_input: &Option<TracerInput>,
 ) -> Option<TracerConfig> {
-    if let Some(TracerInput {
-        transaction_hash,
-        config,
-    }) = trace_input
-    {
+    if let Some(trace_input) = trace_input {
+        let (transaction_hash, config) = (*trace_input).into();
         match (current_transaction_hash, transaction_hash) {
             (Some(current_transaction_hash), Some(transaction_hash))
                 if transaction_hash.0 == current_transaction_hash =>
             {
-                Some(*config)
+                Some(config)
             }
-            (None, None) | (Some(_), None) => Some(*config),
+            (None, None) | (Some(_), None) => Some(config),
             _ => None,
         }
     } else {
@@ -49,16 +64,27 @@ pub fn get_tracer_config(
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct TracerInput {
+pub struct StructLoggerInput {
     pub transaction_hash: Option<H256>,
-    pub config: TracerConfig,
+    pub config: StructLoggerConfig,
 }
 
-impl Decodable for TracerInput {
-    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
-        check_list(decoder, 5)?;
+#[derive(Debug, Clone, Copy)]
+pub struct CallTracerInput {
+    pub transaction_hash: Option<H256>,
+    pub config: CallTracerConfig,
+}
 
+#[derive(Debug, Clone, Copy)]
+pub enum TracerInput {
+    StructLogger(StructLoggerInput),
+    CallTracer(CallTracerInput),
+}
+
+impl Decodable for StructLoggerInput {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         let mut it = decoder.iter();
+        check_list(decoder, STRUCT_LOGGER_CONFIG_SIZE)?;
 
         let transaction_hash = decode_option(&next(&mut it)?, "transaction_hash")?;
         let enable_memory = decode_field(&next(&mut it)?, "enable_memory")?;
@@ -66,13 +92,32 @@ impl Decodable for TracerInput {
         let disable_stack = decode_field(&next(&mut it)?, "disable_stack")?;
         let disable_storage = decode_field(&next(&mut it)?, "disable_storage")?;
 
-        Ok(TracerInput {
+        Ok(StructLoggerInput {
             transaction_hash,
-            config: TracerConfig {
+            config: StructLoggerConfig {
                 enable_return_data,
                 enable_memory,
                 disable_stack,
                 disable_storage,
+            },
+        })
+    }
+}
+
+impl Decodable for CallTracerInput {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        let mut it = decoder.iter();
+        check_list(decoder, CALL_TRACER_CONFIG_SIZE)?;
+
+        let transaction_hash = decode_option(&next(&mut it)?, "transaction_hash")?;
+        let only_top_call = decode_field(&next(&mut it)?, "only_top_call")?;
+        let with_logs = decode_field(&next(&mut it)?, "with_logs")?;
+
+        Ok(CallTracerInput {
+            transaction_hash,
+            config: CallTracerConfig {
+                only_top_call,
+                with_logs,
             },
         })
     }

@@ -11,7 +11,9 @@ use crate::simulation::SimulationResult;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use evm_execution::storage::blocks::add_new_block_hash;
-use evm_execution::trace::TracerInput;
+use evm_execution::trace::{
+    CallTracerInput, StructLoggerInput, TracerInput, CALL_TRACER_CONFIG_PREFIX,
+};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -1127,7 +1129,17 @@ pub fn read_tracer_input<Host: Runtime>(
             .store_read_all(&TRACER_INPUT)
             .context("Cannot read tracer input")?;
 
-        Ok(Some(FromRlpBytes::from_rlp_bytes(&bytes)?))
+        let tracer = if bytes[0] == CALL_TRACER_CONFIG_PREFIX {
+            let call_tracer_input: CallTracerInput =
+                FromRlpBytes::from_rlp_bytes(&bytes[1..])?;
+            TracerInput::CallTracer(call_tracer_input)
+        } else {
+            let struct_logger_input: StructLoggerInput =
+                FromRlpBytes::from_rlp_bytes(&bytes)?;
+            TracerInput::StructLogger(struct_logger_input)
+        };
+
+        Ok(Some(tracer))
     } else {
         Ok(None)
     }
