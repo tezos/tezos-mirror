@@ -83,6 +83,7 @@ type sequencer_setup = {
   l1_contracts : l1_contracts;
   boot_sector : string;
   kernel : Uses.t;
+  enable_dal : bool;
 }
 
 let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
@@ -362,6 +363,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
       sc_rollup_node;
       boot_sector = output;
       kernel;
+      enable_dal;
     }
 
 let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
@@ -2686,9 +2688,7 @@ let test_delayed_transfer_timeout =
            sc_rollup_node;
            sequencer;
            proxy;
-           observer = _;
-           boot_sector = _;
-           kernel = _;
+           _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2846,9 +2846,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
            sc_rollup_node;
            sequencer;
            proxy;
-           observer = _;
-           boot_sector = _;
-           kernel = _;
+           _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -3106,9 +3104,7 @@ let test_delayed_inbox_flushing =
            sc_rollup_node;
            sequencer;
            proxy;
-           observer = _;
-           boot_sector = _;
-           kernel = _;
+           _;
          }
              _protocol ->
   (* Kill the sequencer *)
