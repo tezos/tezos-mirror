@@ -73,12 +73,41 @@ module Disconnect = struct
     Lwt.return {t with disconnected_bakers = bakers_to_keep_disconnected}
 end
 
+module Network = struct
+  type t = Ghostnet | Sandbox
+
+  let to_string = function Ghostnet -> "ghostnet" | Sandbox -> "sandbox"
+end
+
 module Cli = struct
   let section =
     Clap.section
       ~description:
         "All the options related to running DAL scenarions onto the cloud"
       "Cloud DAL"
+
+  let network_typ =
+    Clap.typ
+      ~name:"network"
+      ~dummy:Network.Ghostnet
+      ~parse:(function
+        | "ghostnet" -> Some Ghostnet | "sandbox" -> Some Sandbox | _ -> None)
+      ~show:Network.to_string
+
+  let network =
+    Clap.default
+      ~section
+      ~long:"network"
+      ~placeholder:"<network> (sandbox,ghostnet,...)"
+      ~description:"Allow to specify a network to use for the scenario"
+      network_typ
+      Sandbox
+
+  let bootstrap =
+    Clap.flag
+      ~section
+      ~set_long:"bootstrap"
+      (match network with Sandbox -> true | Ghostnet -> false)
 
   let stake =
     let stake_typ =
@@ -100,7 +129,7 @@ module Cli = struct
          shares old by one baker. The total stake is given by the sum of all \
          shares."
       stake_typ
-      [100]
+      (match network with Sandbox -> [100] | Ghostnet -> [])
 
   let stake_machine_type =
     let stake_machine_type_typ =
@@ -229,9 +258,18 @@ type configuration = {
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
   disconnect : (int * int) option;
+  network : Network.t;
+  bootstrap : bool;
 }
 
-type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
+type bootstrap = {
+  node : Node.t option;
+  dal_node : Dal_node.t option;
+  node_p2p_endpoint : string;
+  node_rpc_endpoint : Endpoint.t;
+  dal_node_p2p_endpoint : string;
+  client : Client.t;
+}
 
 type baker = {
   node : Node.t;
@@ -773,7 +811,8 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     ~job_name
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
-let init_bootstrap cloud (configuration : configuration) agent =
+let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
+    agent =
   let* bootstrap_node = Node.Agent.create ~name:"bootstrap-node" agent in
   let* dal_bootstrap_node =
     Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node:bootstrap_node
@@ -810,13 +849,9 @@ let init_bootstrap cloud (configuration : configuration) agent =
       client
   in
   let* etherlink_rollup_operator_key =
-    Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
-  in
-  let* etherlink_rollup_producers_key =
-    Client.stresstest_gen_keys
-      ~alias_prefix:"etherlink_producer"
-      Cli.etherlink_producers
-      client
+    if configuration.etherlink then
+      Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
+    else Lwt.return []
   in
   let* parameter_file =
     let base =
@@ -831,14 +866,16 @@ let init_bootstrap cloud (configuration : configuration) agent =
     let additional_bootstrap_accounts =
       List.map
         (fun key -> (key, Some 1_000_000_000_000, false))
-        (producer_accounts @ etherlink_rollup_operator_key
-       @ etherlink_rollup_producers_key)
+        (producer_accounts @ etherlink_rollup_operator_key)
     in
     Protocol.write_parameter_file
       ~bootstrap_accounts
       ~additional_bootstrap_accounts
       ~base
       []
+  in
+  let etherlink_rollup_operator_key =
+    match etherlink_rollup_operator_key with [key] -> Some key | _ -> None
   in
   let* () =
     Client.activate_protocol_and_wait
@@ -862,23 +899,34 @@ let init_bootstrap cloud (configuration : configuration) agent =
       bootstrap_node
       dal_bootstrap_node
   in
+  let node_rpc_endpoint =
+    Endpoint.
+      {
+        scheme = "http";
+        host = Agent.point agent |> fst;
+        port = Node.rpc_port bootstrap_node;
+      }
+  in
   let (bootstrap : bootstrap) =
-    {node = bootstrap_node; dal_node = dal_bootstrap_node; client}
+    {
+      node = Some bootstrap_node;
+      dal_node = Some dal_bootstrap_node;
+      node_p2p_endpoint = Node.point_str bootstrap_node;
+      node_rpc_endpoint;
+      dal_node_p2p_endpoint = Dal_node.point_str dal_bootstrap_node;
+      client;
+    }
   in
   Lwt.return
-    ( bootstrap,
-      baker_accounts,
-      producer_accounts,
-      List.hd etherlink_rollup_operator_key )
+    (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
-let init_baker cloud (configuration : configuration) ~bootstrap_node
-    ~dal_bootstrap_node account i agent =
+let init_baker cloud (configuration : configuration) ~bootstrap account i agent
+    =
   let stake = List.nth configuration.stake i in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "baker-node-%d" i)
-      ~arguments:
-        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
   in
   let* dal_node =
@@ -892,7 +940,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap_node
       Dal_node.init_config
         ~expected_pow:0.
         ~attester_profiles:[account.Account.public_key_hash]
-        ~peers:[Dal_node.point_str dal_bootstrap_node] (* no need for peer *)
+        ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
         dal_node
     in
     let* () = Dal_node.run ~event_level:`Notice dal_node in
@@ -925,13 +973,11 @@ let init_baker cloud (configuration : configuration) ~bootstrap_node
   in
   Lwt.return {node; dal_node; baker; account; stake}
 
-let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
-    account i agent =
+let init_producer cloud ~bootstrap ~number_of_slots account i agent =
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "producer-node-%i" i)
-      ~arguments:
-        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
   in
   let* client = Client.Agent.create ~node agent in
@@ -955,7 +1001,7 @@ let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
     Dal_node.init_config
       ~expected_pow:0.
       ~producer_profiles:[i mod number_of_slots]
-      ~peers:[Dal_node.point_str dal_bootstrap_node]
+      ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
   in
   let* () =
@@ -971,13 +1017,11 @@ let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {client; node; dal_node; account; is_ready}
 
-let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
-    =
+let init_observer cloud ~bootstrap ~slot_index i agent =
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "observer-node-%i" i)
-      ~arguments:
-        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
   in
   let* dal_node =
@@ -990,7 +1034,7 @@ let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
     Dal_node.init_config
       ~expected_pow:0.
       ~observer_profiles:[slot_index]
-      ~peers:[Dal_node.point_str dal_bootstrap_node]
+      ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
   in
   let* () =
@@ -1004,15 +1048,14 @@ let init_observer cloud ~bootstrap_node ~dal_bootstrap_node ~slot_index i agent
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap_node
-    account agent =
+let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap account
+    agent =
   let open Sc_rollup_helpers in
   let open Tezt_etherlink in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-node" name)
-      ~arguments:
-        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
   in
   let* client = Client.Agent.create ~node agent in
@@ -1135,15 +1178,13 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap_node
   in
   return operator
 
-let init_etherlink_producer_setup cloud operator name account ~bootstrap_node
-    agent =
+let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   let open Sc_rollup_helpers in
   let open Tezt_etherlink in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-node" name)
-      ~arguments:
-        [Peer (Node.point_str bootstrap_node); Synchronisation_threshold 0]
+      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
   in
   let* client = Client.Agent.create ~node agent in
@@ -1225,15 +1266,14 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap_node
   in
   return operator
 
-let init_etherlink cloud ~bootstrap_node etherlink_rollup_operator_key
-    next_agent =
+let init_etherlink cloud ~bootstrap etherlink_rollup_operator_key next_agent =
   let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
   let* operator =
     init_etherlink_operator_setup
       cloud
       Cli.etherlink_sequencer
       "operator"
-      ~bootstrap_node
+      ~bootstrap
       etherlink_rollup_operator_key
       operator_agent
   in
@@ -1253,7 +1293,7 @@ let init_etherlink cloud ~bootstrap_node etherlink_rollup_operator_key
              operator
              (Format.asprintf "producer-%d" i)
              accounts.(i)
-             ~bootstrap_node
+             ~bootstrap
              agent)
     |> Lwt.all
   in
@@ -1285,30 +1325,27 @@ let init ~(configuration : configuration) cloud next_agent =
          baker_accounts,
          producer_accounts,
          etherlink_rollup_operator_key ) =
-    init_bootstrap cloud configuration bootstrap_agent
+    match configuration.network with
+    | Network.Sandbox ->
+        init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
+    | Ghostnet -> assert false
   in
   let* bakers =
     Lwt_list.mapi_p
       (fun i (agent, account) ->
-        init_baker
-          cloud
-          configuration
-          ~bootstrap_node:bootstrap.node
-          ~dal_bootstrap_node:bootstrap.dal_node
-          account
-          i
-          agent)
+        init_baker cloud configuration ~bootstrap account i agent)
       (List.combine attesters_agents baker_accounts)
   in
-  let client = Client.create ~endpoint:(Node bootstrap.node) () in
+  let client =
+    Client.create ~endpoint:(Foreign_endpoint bootstrap.node_rpc_endpoint) ()
+  in
   let* parameters = Dal_common.Parameters.from_client client in
   let* producers =
     Lwt_list.mapi_p
       (fun i (agent, account) ->
         init_producer
           cloud
-          ~bootstrap_node:bootstrap.node
-          ~dal_bootstrap_node:bootstrap.dal_node
+          ~bootstrap
           ~number_of_slots:parameters.number_of_slots
           account
           i
@@ -1317,23 +1354,16 @@ let init ~(configuration : configuration) cloud next_agent =
   and* observers =
     Lwt_list.mapi_p
       (fun i (agent, slot_index) ->
-        init_observer
-          cloud
-          ~bootstrap_node:bootstrap.node
-          ~dal_bootstrap_node:bootstrap.dal_node
-          ~slot_index
-          i
-          agent)
+        init_observer cloud ~bootstrap ~slot_index i agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
   let* etherlink =
     if Cli.etherlink then
+      let etherlink_rollup_operator_key =
+        Option.get etherlink_rollup_operator_key
+      in
       let* etherlink =
-        init_etherlink
-          cloud
-          ~bootstrap_node:bootstrap.node
-          etherlink_rollup_operator_key
-          next_agent
+        init_etherlink cloud ~bootstrap etherlink_rollup_operator_key next_agent
       in
       some etherlink
     else none
@@ -1359,13 +1389,18 @@ let init ~(configuration : configuration) cloud next_agent =
       disconnection_state;
     }
 
+let wait_for_level (bootstrap : bootstrap) level =
+  match bootstrap.node with
+  | None ->
+      (* Implemented in a future commit. *)
+      assert false
+  | Some node ->
+      let* _ = Node.wait_for_level node level in
+      Lwt.return_unit
+
 let on_new_level t level =
-  let node = t.bootstrap.node in
   let client = t.bootstrap.client in
-  let* () =
-    let* _ = Node.wait_for_level node level in
-    Lwt.return_unit
-  in
+  let* () = wait_for_level t.bootstrap level in
   Log.info "Start process level %d" level ;
   let* infos_per_level = get_infos_per_level client ~level in
   Hashtbl.replace t.infos level infos_per_level ;
@@ -1391,9 +1426,7 @@ let on_new_level t level =
             let baker_to_reconnect =
               (List.nth t.bakers (b mod nb_bakers)).dal_node
             in
-            Dal_common.Helpers.connect_nodes_via_p2p
-              t.bootstrap.dal_node
-              baker_to_reconnect)
+            Dal_node.run baker_to_reconnect)
       in
       Lwt.return {t with disconnection_state = Some disconnection_state}
 
@@ -1487,6 +1520,8 @@ let configuration =
   let etherlink_sequencer = Cli.etherlink_sequencer in
   let etherlink_producers = Cli.etherlink_producers in
   let disconnect = Cli.disconnect in
+  let network = Cli.network in
+  let bootstrap = Cli.bootstrap in
   {
     stake;
     stake_machine_type;
@@ -1498,12 +1533,14 @@ let configuration =
     etherlink_sequencer;
     etherlink_producers;
     disconnect;
+    network;
+    bootstrap;
   }
 
 let benchmark () =
   let vms =
     [
-      [`Bootstrap];
+      (if configuration.bootstrap then [`Bootstrap] else []);
       List.map (fun i -> `Baker i) configuration.stake;
       List.init configuration.dal_node_producer (fun _ -> `Producer);
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
