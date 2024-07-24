@@ -379,7 +379,9 @@ let make ~run =
     | true, _ ->
         `Error
           ( false,
-            "A bootstrap node cannot also be an attester or a slot producer." )
+            "a bootstrap node (option '--bootstrap') cannot be an attester \
+             (option '--attester'), an operator (option '--operator') nor an \
+             observer (option '--observer')" )
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
