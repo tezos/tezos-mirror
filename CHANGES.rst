@@ -188,6 +188,9 @@ Smart Rollup node
   enabled with the flag ``--enable-performance-metrics`` (requires
   ``lsof``). (MR :gl:`!12290`)
 
+- Rotate multiple batcher keys in injector so that they are used evenly. (MR
+  :gl:`!14194`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
