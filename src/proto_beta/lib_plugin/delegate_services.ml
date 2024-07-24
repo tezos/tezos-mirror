@@ -58,6 +58,15 @@ let () =
     (function Balance_rpc_non_delegate pkh -> Some pkh | _ -> None)
     (fun pkh -> Balance_rpc_non_delegate pkh)
 
+let stakers_encoding =
+  let open Data_encoding in
+  let staker_enconding =
+    obj2
+      (req "staker" Alpha_context.Contract.implicit_encoding)
+      (req "frozen_deposits" Tez.encoding)
+  in
+  list staker_enconding
+
 type consensus_key = {
   consensus_key_pkh : Signature.Public_key_hash.t;
   consensus_key_pk : Signature.Public_key.t;
@@ -396,6 +405,23 @@ module S = struct
         RPC_path.(path / "unstaked_frozen_deposits")
   end
 
+  let is_forbidden =
+    RPC_service.get_service
+      ~description:
+        "Returns true if the delegate is forbidden to participate in consensus."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.bool
+      RPC_path.(path / "is_forbidden")
+
+  let stakers =
+    RPC_service.get_service
+      ~description:
+        "Returns the list of accounts that stake to a given delegate together \
+         with their share of the frozen deposits."
+      ~query:RPC_query.empty
+      ~output:stakers_encoding
+      RPC_path.(path / "stakers")
+
   let own_full_balance =
     RPC_service.get_service
       ~description:
@@ -677,6 +703,25 @@ let check_delegate_registered ctxt pkh =
   | true -> return_unit
   | false -> tzfail (Not_registered pkh)
 
+let contract_stake ctxt ~delegator_contract ~delegate =
+  let open Alpha_context in
+  let open Lwt_result_syntax in
+  let* staked_balance =
+    Staking_pseudotokens.For_RPC.staked_balance
+      ctxt
+      ~contract:delegator_contract
+      ~delegate
+  in
+  if not Tez.(staked_balance = zero) then
+    let delegator_pkh =
+      match delegator_contract with
+      | Contract.Implicit pkh -> pkh
+      | Contract.Originated _ -> assert false
+      (* Originated contracts cannot stake *)
+    in
+    return @@ Some (delegator_pkh, staked_balance)
+  else return_none
+
 let f_own_full_balance ctxt pkh () () =
   let open Lwt_result_syntax in
   let* () =
@@ -928,6 +973,15 @@ let register () =
       | {with_minimal_stake = true; without_minimal_stake = true; _}
       | {with_minimal_stake = false; without_minimal_stake = false; _} ->
           return delegates) ;
+  register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
+      return @@ Delegate.is_forbidden_delegate ctxt pkh) ;
+  register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      let*! delegators = Delegate.delegated_contracts ctxt pkh in
+      List.filter_map_es
+        (fun delegator_contract ->
+          contract_stake ctxt ~delegator_contract ~delegate:pkh)
+        delegators) ;
   register1 ~chunked:false S.Deprecated.full_balance f_own_full_balance ;
   register1 ~chunked:false S.own_full_balance f_own_full_balance ;
   register1 ~chunked:false S.Deprecated.current_frozen_deposits f_total_staked ;
@@ -1032,6 +1086,9 @@ let list ctxt block ?(active = true) ?(inactive = false)
     block
     {active; inactive; with_minimal_stake; without_minimal_stake}
     ()
+
+let is_forbidden ctxt block pkh =
+  RPC_context.make_call1 S.is_forbidden ctxt block pkh () ()
 
 let full_balance ctxt block pkh =
   RPC_context.make_call1 S.own_full_balance ctxt block pkh () ()

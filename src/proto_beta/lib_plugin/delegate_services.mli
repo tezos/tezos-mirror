@@ -79,6 +79,9 @@ type info = {
   pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
 }
 
+val is_forbidden :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> bool shell_tzresult Lwt.t
+
 val full_balance :
   'a #RPC_context.simple ->
   'a ->
