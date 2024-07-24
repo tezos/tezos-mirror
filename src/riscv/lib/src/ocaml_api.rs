@@ -10,6 +10,8 @@ use crate::pvm::{
 use crate::storage::{self, StorageError};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
+use sha2::{Digest, Sha256};
+use std::{fs, str};
 
 const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 
@@ -176,19 +178,57 @@ pub fn octez_riscv_get_level(state: Pointer<State>) -> Option<u32> {
     state.as_ref().0.get_current_level()
 }
 
+fn verify_checksum(contents: &[u8], checksum: &str) -> bool {
+    let mut hasher = Sha256::new();
+    hasher.update(&contents);
+    let digest = format!("{:x}", hasher.finalize());
+    digest == checksum
+}
+
+fn read_boot_sector_binary(path: &str, checksum: &str) -> Vec<u8> {
+    let binary = fs::read(path).unwrap_or_else(|_| {
+        panic!("Error installing boot sector: could not read binary at {path}")
+    });
+    assert!(
+        verify_checksum(&binary, checksum),
+        "Error installing boot sector: checksum mismatch for {path}"
+    );
+    binary
+}
+
 #[ocaml::func]
 #[ocaml::sig("state -> bytes -> state")]
 pub fn octez_riscv_install_boot_sector(
     state: Pointer<State>,
     boot_sector: &[u8],
 ) -> Pointer<State> {
-    State(
-        state
-            .as_ref()
-            .0
-            .install_boot_sector(HERMIT_LOADER, boot_sector),
-    )
-    .into()
+    // RISC-V kernels are too large to be originated directly. In order to
+    // temporarily bypass this limitation (TODO: RV-109 Port kernel installer to RISC-V)
+    // the boot sector is installed by loading it from a path passed at origination
+    // after checking consistency with the provided checksum. Optionally, the Hermit loader
+    // can also be passed in the origination string:
+    // "kernel:<path to kernel>:<kernel checksum>[:<path to loader>:<loader checksum>]"
+    // Any string not matching this format will be treated as an actual kernel to be installed.
+    let state = &state.as_ref().0;
+    match str::from_utf8(boot_sector) {
+        Ok(s) => {
+            let parts: Vec<&str> = s.split(':').collect();
+            match parts.as_slice() {
+                ["kernel", kernel_path, kernel_checksum] => {
+                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                    return State(state.install_boot_sector(&HERMIT_LOADER, &kernel)).into();
+                }
+                ["kernel", kernel_path, kernel_checksum, loader_path, loader_checksum] => {
+                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                    let loader = read_boot_sector_binary(loader_path, loader_checksum);
+                    return State(state.install_boot_sector(&loader, &kernel)).into();
+                }
+                _ => (),
+            }
+        }
+        Err(_) => (),
+    };
+    State(state.install_boot_sector(&HERMIT_LOADER, boot_sector)).into()
 }
 
 #[ocaml::func]
