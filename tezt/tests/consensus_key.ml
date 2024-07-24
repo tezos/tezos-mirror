@@ -524,17 +524,17 @@ let consensus_key_typ : consensus_key Check.typ =
       (tuple2 string (list (tuple2 int string))))
 
 let get_consensus_key client (delegate : Account.key) : consensus_key Lwt.t =
-  let* delegate_json =
+  let* json =
     Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate delegate.public_key_hash
+    @@ RPC.get_chain_block_context_delegate_consensus_key
+         delegate.public_key_hash
   in
   return
     JSON.
       {
-        active_consensus_key =
-          delegate_json |-> "active_consensus_key" |> as_string;
+        active_consensus_key = json |-> "active" |-> "pkh" |> as_string;
         pending_consensus_keys =
-          delegate_json |-> "pending_consensus_keys" |> as_list
+          json |-> "pendings" |> as_list
           |> List.map (fun pending_key ->
                  ( pending_key |-> "cycle" |> as_int,
                    pending_key |-> "pkh" |> as_string ));

@@ -1522,6 +1522,22 @@ let get_chain_block_context_delegate_voting_power ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_delegate_consensus_key ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "consensus_key";
+    ]
+    Fun.id
+
 let get_chain_block_context_total_supply ?(chain = "main") ?(block = "head") ()
     =
   make GET ["chains"; chain; "blocks"; block; "context"; "total_supply"] Fun.id
