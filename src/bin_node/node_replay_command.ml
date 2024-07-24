@@ -237,8 +237,8 @@ let _stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
       Lwt_io.flush stats_output)
     stats_output
 
-let replay_one_block strict main_chain_store validator_process block
-    previous_lpbl =
+let replay_one_block strict _stats_output_chan main_chain_store
+    validator_process block previous_lpbl =
   let open Lwt_result_syntax in
   let* block_alias =
     match block with
@@ -415,7 +415,7 @@ let replay_one_block strict main_chain_store validator_process block
     in
     return_some lpbl
 
-let replay ~internal_events ~singleprocess ~strict
+let replay ~internal_events ~singleprocess ~strict ~stats_output
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
@@ -485,6 +485,21 @@ let replay ~internal_events ~singleprocess ~strict
       return (validator_process, store)
   in
   let main_chain_store = Store.main_chain_store store in
+  let*! stats_output_chan =
+    let open Lwt_syntax in
+    match stats_output with
+    | Some stats_output ->
+        let* chan =
+          Lwt_io.(
+            open_file
+              stats_output
+              ~flags:[O_WRONLY; O_APPEND; O_CREAT; O_CLOEXEC]
+              ~perm:0o644
+              ~mode:output)
+        in
+        return_some chan
+    | None -> return_none
+  in
   Lwt.finalize
     (fun () ->
       let* _ =
@@ -493,6 +508,7 @@ let replay ~internal_events ~singleprocess ~strict
             | Block_services.Block b ->
                 replay_one_block
                   strict
+                  stats_output_chan
                   main_chain_store
                   validator_process
                   b
@@ -502,6 +518,7 @@ let replay ~internal_events ~singleprocess ~strict
                 else if Int32.compare starts ends = 0 then
                   replay_one_block
                     strict
+                    stats_output_chan
                     main_chain_store
                     validator_process
                     (`Level starts)
@@ -511,6 +528,7 @@ let replay ~internal_events ~singleprocess ~strict
                     (fun lafl block ->
                       replay_one_block
                         strict
+                        stats_output_chan
                         main_chain_store
                         validator_process
                         block
@@ -526,11 +544,15 @@ let replay ~internal_events ~singleprocess ~strict
       in
       return_unit)
     (fun () ->
+      flush_all () ;
+      let*! () =
+        Option.iter_s (fun chan -> Lwt_io.close chan) stats_output_chan
+      in
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
-    (config : Config_file.t) blocks =
+let run ?verbosity ~singleprocess ~strict ~stats_output
+    ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let* () =
     Data_version.ensure_data_dir
@@ -574,6 +596,7 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
                ~internal_events
                ~singleprocess
                ~strict
+               ~stats_output
                ~operation_metadata_size_limit
                config
                blocks)
@@ -592,12 +615,13 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess strict blocks data_dir config_file
-    operation_metadata_size_limit =
+let process verbosity singleprocess strict blocks stats_output data_dir
+    config_file operation_metadata_size_limit =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
+
   let run =
     let open Lwt_result_syntax in
     let* config =
@@ -617,6 +641,7 @@ let process verbosity singleprocess strict blocks data_dir config_file
       ?verbosity
       ~singleprocess
       ~strict
+      ~stats_output
       ~operation_metadata_size_limit
       config
       blocks
@@ -697,11 +722,23 @@ module Term = struct
       value & flag
       & info ~docs:Shared_arg.Manpage.misc_section ~doc ["singleprocess"])
 
+  let stats_output =
+    let open Cmdliner in
+    let doc =
+      "The block information, validation status, and timing statistics will be \
+       written in the provided file. If the file already exists, the data will \
+       be append to it"
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ~docs:Shared_arg.Manpage.misc_section ~doc ["stats-output"])
+
   let term =
     Cmdliner.Term.(
       ret
         (const process $ verbosity $ singleprocess $ strict $ blocks
-       $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
+       $ stats_output $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
        $ Shared_arg.Term.operation_metadata_size_limit))
 end
 
