@@ -7,6 +7,7 @@
 //!
 //! We need to read and write Ethereum specific values such
 //! as addresses and values.
+use crate::trace::TracerConfig::{CallTracer, StructLogger};
 use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
@@ -43,7 +44,7 @@ extern crate tezos_smart_rollup_debug as debug;
 extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
-use trace::TracerConfig;
+use trace::{CallTrace, TracerConfig};
 
 use crate::{handler::ExtendedExitReason, storage::tracer};
 
@@ -131,18 +132,15 @@ pub enum EthereumError {
 
 fn trace_outcome<Host: Runtime>(
     handler: EvmHandler<Host>,
-    tracing: bool,
     is_success: bool,
-    result: &Option<Vec<u8>>,
+    output: &Option<Vec<u8>>,
     gas_used: u64,
 ) -> Result<(), EthereumError> {
-    if tracing {
-        tracer::store_trace_failed(handler.host, is_success)?;
-        tracer::store_trace_gas(handler.host, gas_used)?;
-        if let Some(return_value) = result {
-            tracer::store_return_value(handler.host, return_value)?;
-        }
-    }
+    tracer::store_trace_failed(handler.host, is_success)?;
+    tracer::store_trace_gas(handler.host, gas_used)?;
+    if let Some(return_value) = output {
+        tracer::store_return_value(handler.host, return_value)?;
+    };
     Ok(())
 }
 
@@ -192,8 +190,6 @@ where
 
     log!(host, Debug, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
 
-    let tracing = tracer.is_some();
-
     let mut handler = handler::EvmHandler::<'_, Host>::new(
         host,
         evm_account_storage,
@@ -207,14 +203,27 @@ where
         tracer,
     );
 
+    let call_data_for_tracing = if tracer.is_some() {
+        Some(call_data.clone())
+    } else {
+        None
+    };
+
     if (!pay_for_gas)
         || handler.pre_pay_transactions(caller, gas_limit, effective_gas_price)?
     {
-        let result = if let Some(address) = address {
-            handler.call_contract(caller, address, value, call_data, gas_limit, false)
+        let (result, base_call_type) = if let Some(address) = address {
+            (
+                handler
+                    .call_contract(caller, address, value, call_data, gas_limit, false),
+                "CALL",
+            )
         } else {
             // This is a create-contract transaction
-            handler.create_contract(caller, value, call_data, gas_limit)
+            (
+                handler.create_contract(caller, value, call_data, gas_limit),
+                "CREATE",
+            )
         };
 
         match result {
@@ -245,18 +254,56 @@ where
                     }
                 }
 
-                trace_outcome(
-                    handler,
-                    tracing,
-                    result.is_success(),
-                    &result.result,
-                    result.gas_used,
-                )?;
+                if let Some(call_data) = call_data_for_tracing {
+                    if let Some(StructLogger(_)) = tracer {
+                        trace_outcome(
+                            handler,
+                            result.is_success(),
+                            &result.result,
+                            result.gas_used,
+                        )?
+                    } else if let Some(CallTracer(_)) = tracer {
+                        let mut call_trace = CallTrace::new_minimal_trace(
+                            base_call_type.into(),
+                            caller,
+                            value.unwrap_or_default(),
+                            result.gas_used,
+                            call_data,
+                            0, // Initial call, we start at depth 0.
+                        );
+
+                        call_trace.add_to(address);
+                        call_trace.add_gas(gas_limit);
+                        call_trace
+                            .add_output(result.result.as_ref().map(|res| res.to_vec()));
+
+                        tracer::store_call_trace(handler.host, call_trace)?;
+                    }
+                }
 
                 Ok(Some(result))
             }
             Err(e) => {
-                trace_outcome(handler, tracing, false, &None, 0)?;
+                if let Some(call_data) = call_data_for_tracing {
+                    if let Some(StructLogger(_)) = tracer {
+                        trace_outcome(handler, false, &None, 0)?
+                    } else if let Some(CallTracer(_)) = tracer {
+                        let mut call_trace = CallTrace::new_minimal_trace(
+                            base_call_type.into(),
+                            caller,
+                            value.unwrap_or_default(),
+                            0,
+                            call_data,
+                            0, // Initial call, we start at depth 0.
+                        );
+
+                        call_trace.add_to(address);
+                        call_trace.add_gas(gas_limit);
+                        call_trace.add_error(Some(format!("{:?}", e).into()));
+
+                        tracer::store_call_trace(handler.host, call_trace)?;
+                    }
+                }
                 Err(e)
             }
         }

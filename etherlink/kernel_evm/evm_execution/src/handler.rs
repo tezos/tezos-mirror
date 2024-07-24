@@ -16,13 +16,13 @@ use crate::account_storage::{
 };
 use crate::storage::blocks::get_block_hash;
 use crate::storage::tracer;
-use crate::trace::{StorageMapItem, StructLog};
+use crate::trace::{CallTrace, CallTracerConfig, StorageMapItem, StructLog};
 use crate::transaction::TransactionContext;
 use crate::transaction_layer_data::TransactionLayerData;
 use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
-use crate::TracerConfig::StructLogger;
+use crate::TracerConfig::{CallTracer, StructLogger};
 use crate::{tick_model_opcodes, TracerConfig};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
@@ -30,8 +30,8 @@ use core::convert::Infallible;
 use evm::executor::stack::Log;
 use evm::gasometer::{GasCost, MemoryCost};
 use evm::{
-    Capture, Config, Context, CreateScheme, ExitError, ExitFatal, ExitReason, ExitRevert,
-    ExitSucceed, Handler, Opcode, Stack, Transfer,
+    CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitFatal, ExitReason,
+    ExitRevert, ExitSucceed, Handler, Opcode, Resolve, Stack, Transfer,
 };
 use host::runtime::Runtime;
 use primitive_types::{H160, H256, U256};
@@ -293,14 +293,6 @@ pub struct EvmHandler<'a, Host: Runtime> {
     storage_state: Vec<StorageMapItem>,
 }
 
-fn trace_map_error<E>(result: Result<(), E>) -> Result<(), EthereumError> {
-    result.map_err(|_| {
-        EthereumError::WrappedError(std::borrow::Cow::Borrowed(
-            "Something went wrong while storing tracing informations.",
-        ))
-    })
-}
-
 #[allow(clippy::too_many_arguments)]
 fn trace<Host: Runtime>(
     host: &mut Host,
@@ -311,7 +303,7 @@ fn trace<Host: Runtime>(
     gas: u64,
     gas_cost: u64,
     depth: usize,
-    error: Option<Vec<u8>>,
+    step_result: &Result<(), Capture<ExitReason, Resolve<EvmHandler<'_, Host>>>>,
     stack: Vec<H256>,
     memory: Vec<u8>,
     storage: Vec<StorageMapItem>,
@@ -324,6 +316,23 @@ fn trace<Host: Runtime>(
         let return_data = tracer.enable_return_data.then_some(return_data);
         let memory = tracer.enable_memory.then_some(memory);
         let storage = (!tracer.disable_storage).then_some(storage);
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+        // For error, find the appropriate value to return for tracing.
+        // The following value is kind of a placeholder.
+        let error = if let Err(Capture::Exit(reason)) = &step_result {
+            match &reason {
+                ExitReason::Error(exit) => {
+                    Some(format!("{:?}", exit).as_bytes().to_vec())
+                }
+                ExitReason::Fatal(exit) => {
+                    Some(format!("{:?}", exit).as_bytes().to_vec())
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
 
         let struct_log = StructLog {
             pc,
@@ -338,7 +347,7 @@ fn trace<Host: Runtime>(
             storage,
         };
 
-        trace_map_error(tracer::store_struct_log(host, struct_log))?;
+        tracer::store_struct_log(host, struct_log)?;
     }
     Ok(())
 }
@@ -743,20 +752,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 benchmarks::end_opcode_section(self.host, gas_cost, &step_result);
             };
 
-            let error = if let Err(Capture::Exit(reason)) = &step_result {
-                match &reason {
-                    ExitReason::Error(exit) => {
-                        Some(format!("{:?}", exit).as_bytes().to_vec())
-                    }
-                    ExitReason::Fatal(exit) => {
-                        Some(format!("{:?}", exit).as_bytes().to_vec())
-                    }
-                    _ => None,
-                }
-            } else {
-                None
-            };
-
             trace(
                 self.host,
                 &self.tracer,
@@ -766,7 +761,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 gas_remaining,
                 gas_cost,
                 depth,
-                error,
+                &step_result,
                 stack,
                 memory,
                 storage,
@@ -2306,13 +2301,76 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
                 match self.begin_inter_transaction(false, gas_limit) {
                     Ok(()) => {
+                        let gas_before = self.gas_used();
                         let result = self.execute_create(
                             caller,
                             value,
-                            init_code,
+                            init_code.clone(),
                             contract_address,
                             true,
                         );
+                        let gas_after = self.gas_used();
+
+                        // TRACING
+                        if let Some(CallTracer(CallTracerConfig {
+                            with_logs,
+                            only_top_call: false,
+                        })) = self.tracer
+                        {
+                            let mut call_trace = CallTrace::new_minimal_trace(
+                                if let CreateScheme::Create2 { .. } = scheme {
+                                    "CREATE2"
+                                } else {
+                                    "CREATE"
+                                }
+                                .into(),
+                                caller,
+                                value,
+                                gas_after - gas_before,
+                                init_code,
+                                // We need to make the distinction between the initial call (depth 0)
+                                // and the other subcalls
+                                (self.stack_depth() + 1).try_into().unwrap_or_default(),
+                            );
+
+                            call_trace.add_gas(target_gas);
+
+                            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+                            // For errors and revert reasons, find the appropriate values
+                            // to return for tracing. The following values are kind of placeholders.
+                            match &result {
+                                Ok((ExitReason::Succeed(_), _, output)) => {
+                                    call_trace.add_output(Some(output.to_owned()))
+                                }
+                                Ok((ExitReason::Error(e), _, output)) => {
+                                    call_trace.add_output(Some(output.to_owned()));
+                                    call_trace.add_error(Some(format!("{:?}", e).into()))
+                                }
+                                Ok((ExitReason::Revert(r), _, output)) => {
+                                    call_trace.add_output(Some(output.to_owned()));
+                                    call_trace.add_revert_reason(Some(
+                                        format!("{:?}", r).into(),
+                                    ));
+                                }
+                                Ok((ExitReason::Fatal(f), _, output)) => {
+                                    call_trace.add_output(Some(output.to_owned()));
+                                    call_trace.add_error(Some(format!("{:?}", f).into()))
+                                }
+                                Err(e) => {
+                                    call_trace.add_error(Some(format!("{:?}", e).into()))
+                                }
+                            };
+
+                            if with_logs {
+                                call_trace.add_logs(
+                                    self.transaction_data
+                                        .last()
+                                        .map(|tx_layer| tx_layer.logs.clone()),
+                                )
+                            }
+
+                            let _ = tracer::store_call_trace(self.host, call_trace);
+                        }
 
                         self.end_inter_transaction(result)
                     }
@@ -2343,10 +2401,11 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         transfer: Option<Transfer>,
         input: Vec<u8>,
         target_gas: Option<u64>,
-        is_static: bool,
+        call_scheme: CallScheme,
         context: Context,
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
         let transaction_context = TransactionContext::from_context(context);
+        let caller = transaction_context.context.caller;
 
         // Retrieve value from `Transfer` struct to check if caller has enough balance
         let value = match transfer {
@@ -2354,8 +2413,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             Some(Transfer { value, .. }) => value,
         };
 
-        match self.can_begin_inter_transaction(transaction_context.context.caller, &value)
-        {
+        match self.can_begin_inter_transaction(caller, &value) {
             Precondition::PassPrecondition => {
                 let mut gas_limit = self.nested_call_gas_limit(target_gas);
 
@@ -2381,17 +2439,82 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         gas_limit.map(|v| v.saturating_add(self.config.call_stipend));
                 }
 
-                if let Err(err) = self.begin_inter_transaction(is_static, gas_limit) {
+                if let Err(err) = self.begin_inter_transaction(
+                    call_scheme == CallScheme::StaticCall,
+                    gas_limit,
+                ) {
                     return Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]));
                 }
 
-                let result =
-                    self.execute_call(code_address, transfer, input, transaction_context);
+                let address = transaction_context.context.address;
+
+                let gas_before = self.gas_used();
+                let result = self.execute_call(
+                    code_address,
+                    transfer,
+                    input.clone(),
+                    transaction_context,
+                );
+                let gas_after = self.gas_used();
 
                 match self.end_inter_transaction(result) {
-                    Capture::Exit((reason, _, value)) => {
+                    Capture::Exit((reason, _, output)) => {
                         log!(self.host, Debug, "Call ended with reason: {:?}", reason);
-                        Capture::Exit((reason, value))
+
+                        // TRACING
+                        if let Some(CallTracer(CallTracerConfig {
+                            with_logs,
+                            only_top_call: false,
+                        })) = self.tracer
+                        {
+                            let mut call_trace = CallTrace::new_minimal_trace(
+                                match call_scheme {
+                                    CallScheme::Call => "CALL",
+                                    CallScheme::CallCode => "CALLCODE",
+                                    CallScheme::DelegateCall => "DELEGATECALL",
+                                    CallScheme::StaticCall => "STATICCALL",
+                                }
+                                .into(),
+                                caller,
+                                value,
+                                gas_after - gas_before,
+                                input,
+                                // We need to make the distinction between the initial call (depth 0)
+                                // and the other subcalls
+                                (self.stack_depth() + 1).try_into().unwrap_or_default(),
+                            );
+
+                            call_trace.add_to(Some(address));
+                            call_trace.add_gas(target_gas);
+                            call_trace.add_output(Some(output.to_owned()));
+
+                            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+                            // For errors and revert reasons, find the appropriate values
+                            // to return for tracing. The following values are kind of placeholders.
+                            match &reason {
+                                ExitReason::Succeed(_) => (),
+                                ExitReason::Error(e) => {
+                                    call_trace.add_error(Some(format!("{:?}", e).into()))
+                                }
+                                ExitReason::Revert(r) => call_trace
+                                    .add_revert_reason(Some(format!("{:?}", r).into())),
+                                ExitReason::Fatal(f) => {
+                                    call_trace.add_error(Some(format!("{:?}", f).into()))
+                                }
+                            };
+
+                            if with_logs {
+                                call_trace.add_logs(
+                                    self.transaction_data
+                                        .last()
+                                        .map(|tx_layer| tx_layer.logs.clone()),
+                                )
+                            }
+
+                            let _ = tracer::store_call_trace(self.host, call_trace);
+                        }
+
+                        Capture::Exit((reason, output))
                     }
                     Capture::Trap(x) => Capture::Trap(x),
                 }
