@@ -192,22 +192,23 @@ let () =
 (* Iterator over receipts, that are, list of lists of bytes. The index
    given to [f] corresponds to the dimension [x][y] of the list being
    inspected. *)
-let receipts_iteri_2 ~when_different_lengths l r f =
+let receipts_foldi_2 ~when_different_lengths l r acc
+    (f : 'acc -> 'a -> 'b -> int -> int -> ('acc, 'c) result Lwt.t) =
   let open Lwt_result_syntax in
-  let rec aux l r ri fi =
+  let rec aux acc l r ri fi =
     match (l, r) with
-    | [], [] -> return_unit
+    | [], [] -> return acc
     | [], _ :: _ | _ :: _, [] -> when_different_lengths l r
-    | [] :: exps, [] :: gots -> aux exps gots (succ ri) 0
+    | [] :: exps, [] :: gots -> aux acc exps gots (succ ri) 0
     | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ ->
         when_different_lengths l r
     | (exp :: exps) :: expss, (got :: gots) :: gotss ->
-        let* () = f exp got ri fi in
-        aux (exps :: expss) (gots :: gotss) ri (succ fi)
+        let* acc = f acc exp got ri fi in
+        aux acc (exps :: expss) (gots :: gotss) ri (succ fi)
   in
-  aux l r 0 0
+  aux acc l r 0 0
 
-let _stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
+let stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
     ~valid_context_hash ~valid_receipt ~timing =
   Option.iter_s
     (fun stats_output ->
@@ -237,9 +238,10 @@ let _stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
       Lwt_io.flush stats_output)
     stats_output
 
-let replay_one_block strict _stats_output_chan main_chain_store
-    validator_process block previous_lpbl =
+let replay_one_block strict stats_output main_chain_store validator_process
+    block previous_lpbl =
   let open Lwt_result_syntax in
+  let block_name = block in
   let* block_alias =
     match block with
     | `Head _ | `Alias _ -> return_some (Block_services.to_string block)
@@ -313,7 +315,8 @@ let replay_one_block strict _stats_output_chan main_chain_store
         bv_operations
     in
     let now = Time.System.now () in
-    let*! () = Event.(emit block_validation_end) (Ptime.diff now start_time) in
+    let timing = Ptime.diff now start_time in
+    let*! () = Event.(emit block_validation_end) timing in
     let* () =
       when_
         (not
@@ -329,12 +332,13 @@ let replay_one_block strict _stats_output_chan main_chain_store
           return_unit)
     in
     let block_metadata_bytes = fst result.block_metadata in
+    let valid_context_hash =
+      Bytes.equal expected_block_receipt_bytes block_metadata_bytes
+    in
     let* () =
       (* Check that the block metadata bytes are equal.
          If not, decode and print them as Json to ease debugging. *)
-      when_
-        (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
-        (fun () ->
+      when_ (not valid_context_hash) (fun () ->
           let to_json block =
             Data_encoding.Json.construct Proto.block_header_metadata_encoding
             @@ Data_encoding.Binary.of_bytes_exn
@@ -351,7 +355,7 @@ let replay_one_block strict _stats_output_chan main_chain_store
     (* Check that the operations metadata are equal.
        If not, decode and print them as Json to ease debugging. *)
     let open Block_validation in
-    let check_receipt (exp_m, exp_mh) (got_m, got_mh) i j =
+    let check_receipt valid_acc (exp_m, exp_mh) (got_m, got_mh) i j =
       let equal_hash = Operation_metadata_hash.equal exp_mh got_mh in
       let equal_content =
         match (exp_m, got_m) with
@@ -361,44 +365,48 @@ let replay_one_block strict _stats_output_chan main_chain_store
         | Too_large_metadata, Metadata _ ->
             true
       in
+      let valid = equal_hash && equal_content in
       (* Check that the operations metadata bytes are equal.
          If not, decode and print them as Json to ease debugging. *)
-      when_ ((not equal_hash) || not equal_content) (fun () ->
-          let* protocol = Store.Block.protocol_hash main_chain_store block in
-          let* (module Proto) = Registered_protocol.get_result protocol in
-          let op =
-            operations
-            |> (fun l -> List.nth_opt l i)
-            |> WithExceptions.Option.get ~loc:__LOC__
-            |> (fun l -> List.nth_opt l j)
-            |> WithExceptions.Option.get ~loc:__LOC__
-            |> fun {proto; _} -> proto
-          in
-          let to_json metadata_bytes =
-            Data_encoding.Json.construct
-              Proto.operation_data_and_receipt_encoding
-              Data_encoding.Binary.
-                ( of_bytes_exn Proto.operation_data_encoding op,
-                  of_bytes_exn Proto.operation_receipt_encoding metadata_bytes
-                )
-          in
-          let exp_json_opt, got_json_opt =
-            match (exp_m, got_m) with
-            | Too_large_metadata, Metadata b -> (None, Some (to_json b))
-            | Metadata b, Too_large_metadata -> (Some (to_json b), None)
-            | Too_large_metadata, Too_large_metadata -> (None, None)
-            | Metadata b, Metadata b' -> (Some (to_json b), Some (to_json b'))
-          in
-          let*! () =
-            Event.(strict_emit ~strict inconsistent_operation_receipt)
-              ((i, j), exp_mh, exp_json_opt, got_mh, got_json_opt)
-          in
-          return_unit)
+      let* () =
+        when_ (not valid) (fun () ->
+            let* protocol = Store.Block.protocol_hash main_chain_store block in
+            let* (module Proto) = Registered_protocol.get_result protocol in
+            let op =
+              operations
+              |> (fun l -> List.nth_opt l i)
+              |> WithExceptions.Option.get ~loc:__LOC__
+              |> (fun l -> List.nth_opt l j)
+              |> WithExceptions.Option.get ~loc:__LOC__
+              |> fun {proto; _} -> proto
+            in
+            let to_json metadata_bytes =
+              Data_encoding.Json.construct
+                Proto.operation_data_and_receipt_encoding
+                Data_encoding.Binary.
+                  ( of_bytes_exn Proto.operation_data_encoding op,
+                    of_bytes_exn Proto.operation_receipt_encoding metadata_bytes
+                  )
+            in
+            let exp_json_opt, got_json_opt =
+              match (exp_m, got_m) with
+              | Too_large_metadata, Metadata b -> (None, Some (to_json b))
+              | Metadata b, Too_large_metadata -> (Some (to_json b), None)
+              | Too_large_metadata, Too_large_metadata -> (None, None)
+              | Metadata b, Metadata b' -> (Some (to_json b), Some (to_json b'))
+            in
+            let*! () =
+              Event.(strict_emit ~strict inconsistent_operation_receipt)
+                ((i, j), exp_mh, exp_json_opt, got_mh, got_json_opt)
+            in
+            return_unit)
+      in
+      return (valid && valid_acc)
     in
-    let* () =
+    let* valid_receipt =
       match (expected_operation_receipts, result.ops_metadata) with
       | Metadata_hash expected, Metadata_hash result ->
-          receipts_iteri_2
+          receipts_foldi_2
             ~when_different_lengths:(fun exp got ->
               let*! () =
                 Event.(strict_emit ~strict unexpected_receipts_layout)
@@ -406,12 +414,24 @@ let replay_one_block strict _stats_output_chan main_chain_store
                     List.(map length exp),
                     List.(map length got) )
               in
-              return_unit)
+              return_false)
             expected
             result
+            true
             check_receipt
       | No_metadata_hash _, _ | _, No_metadata_hash _ ->
-          (* Nothing to compare *) return_unit
+          (* Nothing to compare *) return_true
+    in
+    let*! () =
+      stats_print
+        ~stats_output
+        ~block:block_name
+        ~block_hash:(Store.Block.hash block)
+        ~block_level:(Store.Block.level block)
+        ~cycle_change
+        ~timing
+        ~valid_context_hash
+        ~valid_receipt
     in
     return_some lpbl
 
