@@ -178,7 +178,7 @@ module Term = struct
     Arg.(
       value
       & opt (list attester_profile_arg) []
-      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"])
+      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"; "attester"])
 
   let producer_profile =
     let open Cmdliner in
@@ -186,7 +186,11 @@ module Term = struct
     Arg.(
       value
       & opt (list producer_profile_arg) []
-      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["producer-profiles"])
+      & info
+          ~docs
+          ~doc
+          ~docv:"INDEX1,INDEX2,..."
+          ["producer-profiles"; "producer"; "operator"])
 
   let observer_profile =
     let open Cmdliner in
@@ -194,7 +198,11 @@ module Term = struct
     Arg.(
       value
       & opt (list observer_profile_arg) []
-      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["observer-profiles"])
+      & info
+          ~docs
+          ~doc
+          ~docv:"INDEX1,INDEX2,..."
+          ["observer-profiles"; "observer"])
 
   let bootstrap_profile =
     let open Cmdliner in
@@ -202,7 +210,7 @@ module Term = struct
       "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
        cannot also be an attester or a slot producer"
     in
-    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"])
+    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"; "bootstrap"])
 
   let peers =
     let open Cmdliner in
