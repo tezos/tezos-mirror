@@ -180,6 +180,8 @@ let network_opt_name = "--network"
 
 let level_opt_name = "--level"
 
+let other_accounts_opt_name = "--other-accounts"
+
 let supported_network =
   List.map fst Octez_node_config.Config_file.builtin_blockchain_networks
 
@@ -210,7 +212,9 @@ let usage () =
      if %s <NUM> is used, the first largest bakers that have an accumulated \
      stake of at least <NUM> percent of the total stake are kept@,\
      if %s <%a> is used the store is opened using the right genesis parameter \
-     (default is mainnet) @]@]@,\
+     (default is mainnet) @,\
+     if %s <pkh .. pkh> is used, the generated wallet will also contain the \
+     addresses for the given list of space separated pkh. @]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
      computes the total supply form all contracts and commitments. result is \
      printed in stantdard output, optionally informations on all read \
@@ -236,11 +240,38 @@ let usage () =
         ~pp_sep:(fun ppf () -> pp_print_string ppf "|")
         pp_print_string)
     supported_network
+    other_accounts_opt_name
     alias_file_opt_name
     force_opt_name
 
+let parse_accounts str_list =
+  let rec aux acc str_list =
+    match str_list with
+    | [] -> (acc, [])
+    | str :: str_list -> (
+        let pkh_result =
+          Tezos_crypto.Signature.Public_key_hash.of_b58check str
+        in
+        match pkh_result with
+        | Ok pkh -> aux (pkh :: acc) str_list
+        | Error _ -> (acc, str :: str_list))
+  in
+  aux [] str_list
+
+let other_accounts_opt argv =
+  let rec parse acc argv =
+    match argv with
+    | [] -> ([], List.rev acc)
+    | opt :: argv when opt = other_accounts_opt_name ->
+        let accounts, argv_tail = parse_accounts argv in
+        (accounts, List.rev_append acc argv_tail)
+    | opt :: argv -> parse (opt :: acc) argv
+  in
+  parse [] argv
+
 let () =
   let argv = Array.to_list Sys.argv in
+  let other_accounts_pkh, argv = other_accounts_opt argv in
   let staking_share_opt =
     let rec aux argv =
       match argv with
@@ -360,7 +391,7 @@ let () =
             base_dir
             ~active_bakers_only
             ~aliases
-            ~other_accounts_pkh:[]
+            ~other_accounts_pkh
         in
         Format.printf
           "@[<h>Number of keys to export:@;<3 0>%d@]@."
@@ -434,7 +465,7 @@ let () =
           base_dir
           ~active_bakers_only
           aliases
-          []
+          other_accounts_pkh
       in
 
       let flags =
