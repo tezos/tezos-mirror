@@ -4446,6 +4446,12 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
      late. *)
   let* () = bake_for ~count:num_blocks client in
 
+  let* head_level = Client.level client in
+  (* before the crawler is started, the bootstrap phase advances the
+     [last_processed_level] (so [last_notified_level] to the following
+     value: *)
+  let last_notified_level = head_level - 2 in
+
   (* Restart the DAL node, the finalized events watcher promise, and wait until
      the node is ready. We wait for the node to be ready after spawning an
      instance of seen_finalized_per_level_events to prevent the test from being
@@ -4458,7 +4464,7 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
     monitor_finalized_levels_events
       dal_node
       ~__LOC__
-      ~last_notified_level:last_finalized_level
+      ~last_notified_level
       ~target_level:(last_finalized_level + (2 * num_blocks))
   in
   let* () = Dal_node.wait_for_ready dal_node in
