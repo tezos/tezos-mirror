@@ -98,6 +98,13 @@ module Params = struct
         in
         Lwt.return_ok
         @@ Evm_node_lib_dev_encoding.Ethereum_types.(Address (Hex hex_addr)))
+
+  let snapshot_file next =
+    Tezos_clic.param
+      ~name:"snapshot_file"
+      ~desc:"Snapshot archive file"
+      string
+      next
 end
 
 let wallet_dir_arg =
@@ -516,6 +523,32 @@ let common_config_args =
     tx_pool_tx_per_addr_limit_arg
     verbose_arg
     restricted_rpcs_arg
+
+let compress_on_the_fly_arg : (bool, unit) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"compress-on-the-fly"
+    ~doc:
+      "Produce a compressed snapshot on the fly. The rollup node will use less \
+       disk space to produce the snapshot but will lock the rollup node (if \
+       running) for a longer time. Without this option, producing a snaphsot \
+       requires the available disk space to be around the size of the data \
+       dir."
+    ()
+
+let uncompressed : (bool, unit) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"uncompressed"
+    ~doc:"Produce an uncompressed snapshot."
+    ()
+
+let snapshot_dir_arg =
+  Tezos_clic.arg
+    ~long:"dest"
+    ~placeholder:"path"
+    ~doc:
+      "Directory in which to export the snapshot (defaults to current \
+       directory)"
+    Params.string
 
 let assert_rollup_node_endpoint_equal ~arg ~param =
   if arg <> param then
@@ -2142,6 +2175,43 @@ let observer_simple_command =
         ?kernel
         ())
 
+let export_snapshot (data_dir, dest, compress_on_the_fly, uncompressed) filename
+    =
+  let open Lwt_result_syntax in
+  let open Evm_node_lib_dev.Snapshots in
+  let compression =
+    match (compress_on_the_fly, uncompressed) with
+    | true, true ->
+        Format.eprintf
+          "Cannot have both --uncompressed and --compress-on-the-fly" ;
+        exit 1
+    | true, false -> On_the_fly
+    | false, false -> After
+    | false, true -> No
+  in
+  let* snapshot_file = export ?dest ?filename ~compression ~data_dir () in
+  Format.printf "Snapshot exported to %s@." snapshot_file ;
+  return_unit
+
+let export_snapshot_auto_name_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Export a snapshot of the EVM node."
+    (args4 data_dir_arg snapshot_dir_arg compress_on_the_fly_arg uncompressed)
+    (prefixes ["snapshot"; "export"] @@ stop)
+    (fun params () -> export_snapshot params None)
+
+let export_snapshot_named_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Export a snapshot of the EVM node to a given file."
+    (args3 data_dir_arg compress_on_the_fly_arg uncompressed)
+    (prefixes ["snapshot"; "export"] @@ Params.snapshot_file @@ stop)
+    (fun (data_dir, compress_on_the_fly, uncompressed) filename () ->
+      export_snapshot
+        (data_dir, None, compress_on_the_fly, uncompressed)
+        (Some filename))
+
 (* List of program commands *)
 let commands =
   [
@@ -2164,6 +2234,8 @@ let commands =
     patch_kernel_command;
     init_config_command;
     make_kernel_config_command;
+    export_snapshot_auto_name_command;
+    export_snapshot_named_command;
   ]
 
 let global_options = Tezos_clic.no_options
