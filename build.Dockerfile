@@ -25,6 +25,7 @@ COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
+COPY --chown=tezos:nogroup scripts/install_dal_trusted_setup.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup irmin tezos/irmin
 COPY --chown=tezos:nogroup brassaia tezos/brassaia
