@@ -16,7 +16,7 @@ remove-extra-files: manifest # Regenerate GitLab CI configuration and remove any
 
 .PHONY: manifest
 manifest:
-	cd .. && ${MAKE} -C manifest
+	cd .. && ${MAKE} --silent -C manifest
 
 .PHONY: docker-do-%
 docker-do-%:
