@@ -258,7 +258,7 @@ module Contract : sig
 end
 
 module Delegate : sig
-  type info = Plugin.RPC.Delegates.info = {
+  type info = Delegate_services.info = {
     full_balance : Tez.t;
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
@@ -279,7 +279,7 @@ module Delegate : sig
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
 
-  val info : t -> public_key_hash -> Plugin.RPC.Delegates.info tzresult Lwt.t
+  val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
 
   (** Calls RPCs
       [/chains/<chain_id>/blocks/<blocsk_id>/contracts/<Implicit

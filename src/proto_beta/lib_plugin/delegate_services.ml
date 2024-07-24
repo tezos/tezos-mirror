@@ -154,6 +154,126 @@ let pending_staking_parameters_encoding :
     (req "cycle" Cycle.encoding)
     (req "parameters" Staking_parameters_repr.encoding)
 
+let min_delegated_in_current_cycle_encoding =
+  let open Data_encoding in
+  conv
+    (fun (min_delegated, anchor) -> (min_delegated, anchor))
+    (fun (min_delegated, anchor) -> (min_delegated, anchor))
+    (obj2 (req "amount" Tez.encoding) (opt "level" Level_repr.encoding))
+
+type info = {
+  full_balance : Tez.t;
+  current_frozen_deposits : Tez.t;
+  frozen_deposits : Tez.t;
+  staking_balance : Tez.t;
+  frozen_deposits_limit : Tez.t option;
+  delegated_contracts : Alpha_context.Contract.t list;
+  delegated_balance : Tez.t;
+  min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
+  total_delegated_stake : Tez.t;
+  staking_denominator : Staking_pseudotoken.t;
+  deactivated : bool;
+  grace_period : Cycle.t;
+  pending_denunciations : bool;
+  voting_info : Vote.delegate_info;
+  active_consensus_key : Signature.Public_key_hash.t;
+  pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+}
+
+let info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           full_balance;
+           current_frozen_deposits;
+           frozen_deposits;
+           staking_balance;
+           frozen_deposits_limit;
+           delegated_contracts;
+           delegated_balance;
+           min_delegated_in_current_cycle;
+           total_delegated_stake;
+           staking_denominator;
+           deactivated;
+           grace_period;
+           pending_denunciations;
+           voting_info;
+           active_consensus_key;
+           pending_consensus_keys;
+         } ->
+      ( ( full_balance,
+          current_frozen_deposits,
+          frozen_deposits,
+          staking_balance,
+          frozen_deposits_limit,
+          delegated_contracts,
+          delegated_balance,
+          min_delegated_in_current_cycle,
+          deactivated,
+          grace_period ),
+        ( (pending_denunciations, total_delegated_stake, staking_denominator),
+          (voting_info, (active_consensus_key, pending_consensus_keys)) ) ))
+    (fun ( ( full_balance,
+             current_frozen_deposits,
+             frozen_deposits,
+             staking_balance,
+             frozen_deposits_limit,
+             delegated_contracts,
+             delegated_balance,
+             min_delegated_in_current_cycle,
+             deactivated,
+             grace_period ),
+           ( (pending_denunciations, total_delegated_stake, staking_denominator),
+             (voting_info, (active_consensus_key, pending_consensus_keys)) ) ) ->
+      {
+        full_balance;
+        current_frozen_deposits;
+        frozen_deposits;
+        staking_balance;
+        frozen_deposits_limit;
+        delegated_contracts;
+        delegated_balance;
+        min_delegated_in_current_cycle;
+        total_delegated_stake;
+        staking_denominator;
+        deactivated;
+        grace_period;
+        pending_denunciations;
+        voting_info;
+        active_consensus_key;
+        pending_consensus_keys;
+      })
+    (merge_objs
+       (obj10
+          (req "full_balance" Tez.encoding)
+          (req "current_frozen_deposits" Tez.encoding)
+          (req "frozen_deposits" Tez.encoding)
+          (req "staking_balance" Tez.encoding)
+          (opt "frozen_deposits_limit" Tez.encoding)
+          (req "delegated_contracts" (list Alpha_context.Contract.encoding))
+          (req "delegated_balance" Tez.encoding)
+          (req
+             "min_delegated_in_current_cycle"
+             min_delegated_in_current_cycle_encoding)
+          (req "deactivated" bool)
+          (req "grace_period" Cycle.encoding))
+       (merge_objs
+          (obj3
+             (req "pending_denunciations" bool)
+             (req "total_delegated_stake" Tez.encoding)
+             (req "staking_denominator" Staking_pseudotoken.For_RPC.encoding))
+          (merge_objs
+             Vote.delegate_info_encoding
+             (obj2
+                (req "active_consensus_key" Signature.Public_key_hash.encoding)
+                (dft
+                   "pending_consensus_keys"
+                   (list
+                      (obj2
+                         (req "cycle" Cycle.encoding)
+                         (req "pkh" Signature.Public_key_hash.encoding)))
+                   [])))))
+
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
 
@@ -522,6 +642,32 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "estimated_shared_pending_slashed_amount")
+
+  let min_delegated_in_current_cycle =
+    RPC_service.get_service
+      ~description:
+        "Returns the minimum of delegated tez (in mutez) during the current \
+         cycle and the block level at the end of which the minimum was \
+         reached. This only takes into account the value of `total_delegated` \
+         at the end of each block, not in the middle of applying operations. \
+         This is the delegated amount that would be used to compute the \
+         delegate's future baking rights if the cycle ended at the current \
+         block. If the minimum was reached multiple times, the returned level \
+         is the earliest level of the current cycle that reached this minimum. \
+         For instance, if `total_delegated` hasn't changed at all since the \
+         beginning of the current cycle, returns the first level of the \
+         current cycle. (If the contract is not registered as a delegate, \
+         returns 0 mutez and omits the level.)"
+      ~query:RPC_query.empty
+      ~output:min_delegated_in_current_cycle_encoding
+      RPC_path.(path / "min_delegated_in_current_cycle")
+
+  let info =
+    RPC_service.get_service
+      ~description:"Everything about a delegate."
+      ~query:RPC_query.empty
+      ~output:info_encoding
+      path
 end
 
 let check_delegate_registered ctxt pkh =
@@ -683,6 +829,59 @@ let f_delegators ctxt pkh () () =
   let*! contracts = Delegate.delegated_contracts ctxt pkh in
   return contracts
 
+let info ctxt pkh =
+  let open Lwt_result_syntax in
+  let* () = check_delegate_registered ctxt pkh in
+  let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+  let* current_frozen_deposits = Delegate.current_frozen_deposits ctxt pkh in
+  let* frozen_deposits = Delegate.initial_frozen_deposits ctxt pkh in
+  let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
+  let* frozen_deposits_limit = Delegate.frozen_deposits_limit ctxt pkh in
+  let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
+  let* delegated_balance = external_staked_and_delegated ctxt pkh in
+  let* min_delegated_in_current_cycle =
+    Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh
+  in
+  let* total_delegated_stake =
+    Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+      ctxt
+      ~delegate:pkh
+  in
+  let* staking_denominator =
+    Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+      ctxt
+      ~delegate:pkh
+  in
+  let* deactivated = Delegate.deactivated ctxt pkh in
+  let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
+  let*! pending_denunciations =
+    Delegate.For_RPC.has_pending_denunciations ctxt pkh
+  in
+  let* voting_info = Vote.get_delegate_info ctxt pkh in
+  let* consensus_key = Delegate.Consensus_key.active_pubkey ctxt pkh in
+  let+ pendings = Delegate.Consensus_key.pending_updates ctxt pkh in
+  let pending_consensus_keys =
+    List.map (fun (cycle, pkh, _) -> (cycle, pkh)) pendings
+  in
+  {
+    full_balance;
+    current_frozen_deposits;
+    frozen_deposits;
+    staking_balance;
+    frozen_deposits_limit;
+    delegated_contracts;
+    delegated_balance;
+    min_delegated_in_current_cycle;
+    total_delegated_stake;
+    staking_denominator;
+    deactivated;
+    grace_period;
+    pending_denunciations;
+    voting_info;
+    active_consensus_key = consensus_key.consensus_pkh;
+    pending_consensus_keys;
+  }
+
 let wrap_check_registered ~chunked s f =
   register1 ~chunked s (fun ctxt pkh () () ->
       let open Lwt_result_syntax in
@@ -816,7 +1015,14 @@ let register () =
     S.estimated_shared_pending_slashed_amount
     (fun ctxt delegate () () ->
       let* () = check_delegate_registered ctxt delegate in
-      Delegate.For_RPC.get_estimated_shared_pending_slashed_amount ctxt delegate)
+      Delegate.For_RPC.get_estimated_shared_pending_slashed_amount ctxt delegate) ;
+  register1
+    ~chunked:false
+    S.min_delegated_in_current_cycle
+    (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh) ;
+  register1 ~chunked:false S.info (fun ctxt pkh () () -> info ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false)
     ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =
@@ -901,3 +1107,5 @@ let estimated_shared_pending_slashed_amount ctxt block pkh =
     pkh
     ()
     ()
+
+let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
