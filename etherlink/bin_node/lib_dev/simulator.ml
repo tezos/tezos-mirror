@@ -71,6 +71,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     match simulation_version with
     | `V0 -> Simulation.V0 call
     | `V1 -> V1 {call; with_da_fees}
+    | `V2 -> V2 {call; with_da_fees; timestamp = Misc.now ()}
 
   (* Simulation have different versions in the kernel, the inputs change
      between the different versions.
@@ -83,7 +84,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let open Lwt_result_syntax in
     let* storage_version = get_storage_version simulation_state in
     if storage_version < 12 then return `V0
-    else if storage_version > 12 then return `V1
+    else if storage_version > 12 then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)

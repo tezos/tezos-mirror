@@ -55,6 +55,7 @@ fn migrate_to<Host: Runtime>(
 
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V13 => Ok(MigrationStatus::Done),
     }
 }
 

@@ -41,6 +41,7 @@ use primitive_types::{H160, H256, U256};
 pub enum StorageVersion {
     V11 = 11,
     V12,
+    V13,
 }
 
 impl From<StorageVersion> for u64 {
@@ -55,7 +56,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V12;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V13;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 

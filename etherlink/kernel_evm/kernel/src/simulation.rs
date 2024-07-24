@@ -31,11 +31,12 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
-    next, VersionedEncoding,
+    decode_timestamp, next, VersionedEncoding,
 };
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
@@ -188,6 +189,9 @@ pub struct Evaluation {
     /// The gas returned by the simualtion include the DA fees if this parameter
     /// is set to true.
     pub with_da_fees: bool,
+    /// The timestamp used during simulation. It is marked as optional as
+    /// the support has been added in `StorageVersion::V13`.
+    pub timestamp: Option<Timestamp>,
 }
 
 impl<T> From<EthereumError> for SimulationResult<T, String> {
@@ -257,6 +261,7 @@ impl Evaluation {
                     value,
                     data,
                     with_da_fees: true,
+                    timestamp: None,
                 })
             } else {
                 Err(DecoderError::RlpIncorrectListLen)
@@ -291,6 +296,43 @@ impl Evaluation {
                     value,
                     data,
                     with_da_fees,
+                    timestamp: None,
+                })
+            } else {
+                Err(DecoderError::RlpIncorrectListLen)
+            }
+        } else {
+            Err(DecoderError::RlpExpectedToBeList)
+        }
+    }
+
+    fn rlp_decode_v2(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        // the proxynode works preferably with little endian
+        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
+        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
+        if decoder.is_list() {
+            if Ok(8) == decoder.item_count() {
+                let mut it = decoder.iter();
+                let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+                let gas: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
+                let gas_price: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
+                let value: Option<U256> =
+                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
+                let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+                let with_da_fees: bool = decode_field(&next(&mut it)?, "with_da_fees")?;
+                let timestamp: Timestamp = decode_timestamp(&next(&mut it)?)?;
+                Ok(Self {
+                    from,
+                    to,
+                    gas,
+                    gas_price,
+                    value,
+                    data,
+                    with_da_fees,
+                    timestamp: Some(timestamp),
                 })
             } else {
                 Err(DecoderError::RlpIncorrectListLen)
@@ -302,12 +344,19 @@ impl Evaluation {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
         let first = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
-        if first == 0x01 {
-            let decoder = Rlp::new(&bytes[1..]);
-            Self::rlp_decode_v1(&decoder)
-        } else {
-            let decoder = Rlp::new(bytes);
-            Self::rlp_decode_v0(&decoder)
+        match first {
+            0x01 => {
+                let decoder = Rlp::new(&bytes[1..]);
+                Self::rlp_decode_v1(&decoder)
+            }
+            0x02 => {
+                let decoder = Rlp::new(&bytes[1..]);
+                Self::rlp_decode_v2(&decoder)
+            }
+            _ => {
+                let decoder = Rlp::new(bytes);
+                Self::rlp_decode_v0(&decoder)
+            }
         }
     }
 
@@ -341,21 +390,34 @@ impl Evaluation {
         }
 
         let constants = match storage::read_current_block(host) {
-            Ok(block) => BlockConstants {
-                number: block.number + 1,
-                coinbase,
-                // TODO: https://gitlab.com/tezos/tezos/-/issues/7338
-                // The timestamp is incorrect in simulation. The simulation
-                // caller should provide a view of the real timestamp.
-                timestamp: U256::from(block.timestamp.as_u64()),
-                gas_limit: crate::block::GAS_LIMIT,
-                block_fees,
-                chain_id,
-                prevrandao: None,
-            },
+            Ok(block) => {
+                // Timestamp is taken from the simulation caller if provided.
+                // If the timestamp is missing, because of an older evm-node,
+                // default to last block timestamp.
+                let timestamp = self
+                    .timestamp
+                    .map(|timestamp| U256::from(timestamp.as_u64()))
+                    .unwrap_or_else(|| U256::from(block.timestamp.as_u64()));
+
+                BlockConstants {
+                    number: block.number + 1,
+                    coinbase,
+                    timestamp,
+                    gas_limit: crate::block::GAS_LIMIT,
+                    block_fees,
+                    chain_id,
+                    prevrandao: None,
+                }
+            }
             Err(_) => {
-                let timestamp = current_timestamp(host);
-                let timestamp = U256::from(timestamp.as_u64());
+                // Timestamp is taken from the simulation caller if provided.
+                // If the timestamp is missing, because of an older evm-node,
+                // default to current timestamp.
+                let timestamp = self
+                    .timestamp
+                    .map(|timestamp| U256::from(timestamp.as_u64()))
+                    .unwrap_or_else(|| U256::from(current_timestamp(host).as_u64()));
+
                 BlockConstants::first_block(
                     timestamp,
                     chain_id,
@@ -447,7 +509,7 @@ impl TxValidation {
                 BlockConstants {
                     number: block.number + 1,
                     coinbase,
-                    // The timetamp is incorrect in simulation. The simulation
+                    // The timestamp is incorrect in simulation. The simulation
                     // caller should provide a view of the real timestamp.
                     timestamp: U256::from(block.timestamp.as_u64()),
                     gas_limit: crate::block::GAS_LIMIT,
@@ -762,6 +824,7 @@ mod tests {
             value: None,
             data: vec![],
             with_da_fees: true,
+            timestamp: None,
         };
 
         let evaluation = Evaluation::from_bytes(&input_string);
@@ -789,6 +852,7 @@ mod tests {
             value: Some(U256::from(33333)),
             data,
             with_da_fees: true,
+            timestamp: None,
         };
 
         let evaluation = Evaluation::from_bytes(&input_string);
@@ -884,6 +948,7 @@ mod tests {
             gas: Some(100000),
             value: None,
             with_da_fees: false,
+            timestamp: None,
         };
         let outcome = evaluation.run(&mut host, None, false);
 
@@ -909,6 +974,7 @@ mod tests {
             gas: Some(111111),
             value: None,
             with_da_fees: false,
+            timestamp: None,
         };
         let outcome = evaluation.run(&mut host, None, false);
 
@@ -940,6 +1006,7 @@ mod tests {
             gas: None,
             value: None,
             with_da_fees: false,
+            timestamp: None,
         };
         let outcome = evaluation.run(&mut host, None, false);
 
@@ -970,6 +1037,7 @@ mod tests {
             value: Some(U256::from(33333)),
             data,
             with_da_fees: false,
+            timestamp: None,
         };
 
         let mut encoded =
@@ -1008,6 +1076,7 @@ mod tests {
             value: None,
             data,
             with_da_fees: false,
+            timestamp: None,
         };
 
         let encoded = hex::decode(
