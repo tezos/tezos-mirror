@@ -352,7 +352,7 @@ let () =
       else
         let yes_alias_list =
           run_build_yes_wallet
-            ~staking_share_opt
+            ?staking_share_opt
             ?network_opt
             base_dir
             ~active_bakers_only
@@ -424,7 +424,7 @@ let () =
   | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
       let alias_pkh_pk_list =
         run_load_bakers_public_keys
-          ~staking_share_opt
+          ?staking_share_opt
           ?network_opt
           ?level:level_opt
           base_dir

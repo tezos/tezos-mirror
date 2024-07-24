@@ -486,20 +486,19 @@ let get_context ?level ~network_opt base_dir =
   let header = header.shell in
   return (protocol_hash, context, header, store)
 
-(** [load_mainnet_bakers_public_keys base_dir ?level active_backers_only
-    alias_phk_pk_list] checkouts the head context at the given
-    [base_dir] and computes a list of [(alias, pkh, pk, stake,
-    frozen_deposits, unstake_frozen_deposits)] corresponding to all
-    delegates in that context. The [alias] for the delegates are
-    gathered from [alias_pkh_pk_list]).
+(** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
+    ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context at the
+    given [base_dir] and computes a list of [(alias, pkh, pk, stake,
+    frozen_deposits, unstake_frozen_deposits)] corresponding to all delegates in
+    that context. The [alias] for the delegates are gathered from
+    [alias_pkh_pk_list]).
 
     if [active_bakers_only] then the deactivated delegates are
     filtered out of the list. if an optional [level] is given, use the
     context from this level instead of head, if it exists.
 *)
-let load_bakers_public_keys ?(staking_share_opt = None)
-    ?(network_opt = "mainnet") ?level base_dir ~active_bakers_only
-    alias_pkh_pk_list =
+let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
+    ~active_bakers_only base_dir alias_pkh_pk_list =
   let open Lwt_result_syntax in
   let* protocol_hash, context, header, store =
     get_context ?level ~network_opt base_dir
