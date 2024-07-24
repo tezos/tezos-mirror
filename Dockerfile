@@ -13,7 +13,12 @@ FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as intermediate
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin /home/tezos/bin
 # Add parameters for active protocols
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/parameters /home/tezos/scripts/
+# Add DAL SRS files
+COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/scripts/version.sh /home/tezos/scripts/version.sh
+COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/scripts/install_dal_trusted_setup.sh /home/tezos/scripts/install_dal_trusted_setup.sh
+RUN DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup /home/tezos/scripts/install_dal_trusted_setup.sh
 # Add EVM kernel artifacts
+# hadolint ignore=DL3059
 RUN mkdir -p /home/tezos/scripts/evm_kernel
 COPY --chown=tezos:nogroup --from=builder /home/tezos/evm_kernel/evm_installer.wasm* /home/tezos/evm_kernel/_evm_installer_preimages* /home/tezos/scripts/evm_kernel/
 COPY --chown=tezos:nogroup --from=builder /home/tezos/evm_kernel/evm_benchmark_kernel.wasm* /home/tezos/scripts/evm_kernel/
@@ -51,6 +56,7 @@ USER tezos
 ENV EDITOR=/usr/bin/vi
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin /usr/local/bin
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos/
+COPY --chown=tezos:nogroup --from=intermediate /usr/share/dal-trusted-setup /usr/share/dal-trusted-setup
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 
@@ -82,6 +88,7 @@ LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
 
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin /usr/local/bin
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
+COPY --chown=tezos:nogroup --from=intermediate /usr/share/dal-trusted-setup /usr/share/dal-trusted-setup
 
 
 # hadolint ignore=DL3006
@@ -105,4 +112,5 @@ LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin /usr/local/bin
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/entrypoint.* /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
+COPY --chown=tezos:nogroup --from=intermediate /usr/share/dal-trusted-setup /usr/share/dal-trusted-setup
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
