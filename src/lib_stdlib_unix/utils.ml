@@ -22,39 +22,37 @@ let display_progress ?(refresh_rate = (1, 1)) msgf =
 let display_progress_end () =
   if Unix.isatty Unix.stderr then Format.eprintf "@."
 
-let list_files dir ?(include_file = fun ~relative_path:_ -> true) f =
-  let rec list_files_in_dir stream
+let fold_files dir f acc =
+  let rec list_files_in_dir acc
       ((dir, relative_dir, dir_handle) as current_dir_info) =
     match Unix.readdir dir_handle with
-    | "." | ".." -> list_files_in_dir stream current_dir_info
+    | "." | ".." -> list_files_in_dir acc current_dir_info
     | basename ->
         let full_path = Filename.concat dir basename in
         let relative_path = Filename.concat relative_dir basename in
-        let stream =
+        let acc =
           if Sys.is_directory full_path then
             let sub_dir_handle = Unix.opendir full_path in
-            list_files_in_dir stream (full_path, relative_path, sub_dir_handle)
-          else if include_file ~relative_path then
-            Stream.icons (f ~full_path ~relative_path) stream
-          else stream
+            list_files_in_dir acc (full_path, relative_path, sub_dir_handle)
+          else f relative_path acc
         in
-        list_files_in_dir stream current_dir_info
+        list_files_in_dir acc current_dir_info
     | exception End_of_file ->
         Unix.closedir dir_handle ;
-        stream
+        acc
   in
   let dir_handle = Unix.opendir dir in
-  list_files_in_dir Stream.sempty (dir, "", dir_handle)
+  list_files_in_dir acc (dir, "", dir_handle)
 
-let directory_contents_size ?include_file dir =
-  let file_stream =
-    list_files dir ?include_file @@ fun ~full_path ~relative_path:_ ->
-    let {Unix.st_size; _} = Unix.lstat full_path in
-    st_size
-  in
-  let total = ref 0 in
-  Stream.iter (fun size -> total := !total + size) file_stream ;
-  !total
+let list_files dir = fold_files dir List.cons [] |> List.rev
+
+let directory_contents_size dir =
+  fold_files
+    dir
+    (fun relative_path total ->
+      let {Unix.st_size; _} = Unix.lstat (Filename.concat dir relative_path) in
+      total + st_size)
+    0
 
 let rec create_dir ?(perm = 0o755) dir =
   let stat =
@@ -98,27 +96,21 @@ let copy_dir ?(perm = 0o755) ?progress src dst =
     match progress with
     | None -> fun f -> f (fun _ -> ())
     | Some (message, color) ->
-        let total =
-          directory_contents_size src ~include_file:(fun ~relative_path:_ ->
-              true)
-        in
+        let total = directory_contents_size src in
         let progress_bar =
           Progress_bar.progress_bar ~counter:`Bytes ~message ~color total
         in
         fun f -> Progress_bar.with_reporter progress_bar f
   in
   maybe_report_progress @@ fun count_progress ->
-  let files =
-    list_files src ~include_file:(fun ~relative_path:_ -> true)
-    @@ fun ~full_path ~relative_path ->
-    let dst_file = Filename.concat dst relative_path in
-    (full_path, dst_file)
-  in
-  Stream.iter
-    (fun (src, dst) ->
+  fold_files
+    src
+    (fun relative_path () ->
+      let src = Filename.concat src relative_path in
+      let dst = Filename.concat dst relative_path in
       let dst_dir = Filename.dirname dst in
       create_dir ~perm dst_dir ;
       copy_file ~count_progress ~src ~dst)
-    files
+    ()
 
 let copy_file = copy_file ~count_progress:(fun _ -> ())

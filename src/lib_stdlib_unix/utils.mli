@@ -32,19 +32,17 @@ val display_progress_end : unit -> unit
 
 (** {2 Files manipulation} *)
 
-(** [list_files dir ~include_file f] lists the files in directory [dir] which
-    satisfy predicate [include_file] (by default all files) and applies [f] on
-    each element. The result is returned as a stream.  *)
-val list_files :
-  string ->
-  ?include_file:(relative_path:string -> bool) ->
-  (full_path:string -> relative_path:string -> 'a) ->
-  'a Stream.t
+(** [list_files dir] lists the files in directory [dir] and returns a list of
+    file names with relative (to [dir]) paths.  *)
+val list_files : string -> string list
 
-(** [directory_contents_size ~include_file] returns the total size of contents
-    of directory [dir] which satisfy the predicate [include_file].  *)
-val directory_contents_size :
-  ?include_file:(relative_path:string -> bool) -> string -> int
+(** [fold_files dir f acc] applies [f] on all files in [dir] (recursively) and
+    accumulated on [acc].  *)
+val fold_files : string -> (string -> 'a -> 'a) -> 'a -> 'a
+
+(** [directory_contents_size dir] returns the total size of contents of
+    directory [dir].  *)
+val directory_contents_size : string -> int
 
 (** [create_dir ~perm path] creates directory [path] with permissions [perm] if
     it does not exist. All directories in [path] are created if necessary, à la

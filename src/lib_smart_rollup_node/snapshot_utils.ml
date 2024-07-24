@@ -133,8 +133,19 @@ let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
     include Reader
     include Writer
   end) in
+  let files =
+    Tezos_stdlib_unix.Utils.list_files dir
+    |> List.filter (fun relative_path -> include_file ~relative_path)
+  in
   let total =
-    Tezos_stdlib_unix.Utils.directory_contents_size dir ~include_file
+    List.fold_left
+      (fun total relative_path ->
+        let {Unix.st_size; _} =
+          Unix.lstat (Filename.concat dir relative_path)
+        in
+        total + st_size)
+      0
+      files
   in
   let progress_bar =
     Progress_bar.progress_bar
@@ -163,18 +174,21 @@ let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
       raise e
   in
   let file_stream =
-    Tezos_stdlib_unix.Utils.list_files dir ~include_file
-    @@ fun ~full_path ~relative_path ->
-    let {Unix.st_perm; st_size; st_mtime; _} = Unix.lstat full_path in
-    let header =
-      Tar.Header.make
-        ~file_mode:st_perm
-        ~mod_time:(Int64.of_float st_mtime)
-        relative_path
-        (Int64.of_int st_size)
-    in
-    let writer = write_file full_path in
-    (header, writer)
+    List.rev_map
+      (fun relative_path ->
+        let full_path = Filename.concat dir relative_path in
+        let {Unix.st_perm; st_size; st_mtime; _} = Unix.lstat full_path in
+        let header =
+          Tar.Header.make
+            ~file_mode:st_perm
+            ~mod_time:(Int64.of_float st_mtime)
+            relative_path
+            (Int64.of_int st_size)
+        in
+        let writer = write_file full_path in
+        (header, writer))
+      files
+    |> Stream.of_list
   in
   let out_chan = Writer.open_out dest in
   try
