@@ -106,6 +106,10 @@ val produce_proposal :
 (** [state_value evm_node path] calls the private RPC [stateValue]. *)
 val state_value : Evm_node.t -> string -> (string option, error) result Lwt.t
 
+(** [state_subkeys evm_node path] calls the private RPC [stateSubkeys]. *)
+val state_subkeys :
+  Evm_node.t -> string -> (string list option, error) result Lwt.t
+
 (** [send_raw_transaction ~raw_tx evm_node] calls [eth_sendRawTransaction]
     with [raw_tx] as argument. *)
 val send_raw_transaction :

@@ -63,6 +63,28 @@ end) : Services_backend_sig.Backend = struct
         ((), block_id)
         {key = path}
         ()
+
+    let subkeys ?block path =
+      let open Lwt_result_syntax in
+      match block with
+      | Some param
+        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
+          failwith
+            "The EVM node in proxy mode support state requests only on latest \
+             block."
+      | _ -> (
+          let* subkeys =
+            call_service
+              ~keep_alive:Base.keep_alive
+              ~base:Base.base
+              durable_state_subkeys
+              ((), Block_id.Head)
+              {key = path}
+              ()
+          in
+          match subkeys with
+          | Some subkeys -> return subkeys
+          | None -> return [])
   end
 
   module TxEncoder = struct

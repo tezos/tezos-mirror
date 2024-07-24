@@ -662,6 +662,13 @@ let dispatch_private_request (_config : Configuration.t)
           rpc_ok value
         in
         build ~f module_ parameters
+    | Method (Durable_state_subkeys.Method, module_) ->
+        let f path =
+          let open Lwt_result_syntax in
+          let* value = Backend_rpc.Reader.subkeys path in
+          rpc_ok value
+        in
+        build_with_input ~f module_ parameters
     | Method (Replay_block.Method, module_) ->
         let f block_number =
           let open Lwt_result_syntax in

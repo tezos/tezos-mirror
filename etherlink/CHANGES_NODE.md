@@ -20,6 +20,8 @@
   by an EVM node. The main use case for this command can be used to fix bugs in
   RPCs partly implemented in the kernel (*e.g.*, `eth_call` for instance).
   (!14053)
+- Add a private RPC "stateSubkeys", that allows to query the subkeys
+  of a path in the storage. (!14129)
 
 ### Bug fixes
 

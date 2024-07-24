@@ -76,6 +76,14 @@ val inspect :
   string ->
   bytes option tzresult Lwt.t
 
+(** [inspect_subkeys ?block path] returns the subkeys stored in [path]
+    on the EVM state of [block] (if [block] is omitted then the
+    freshest state is used). *)
+val inspect_subkeys :
+  ?block:Ethereum_types.Block_parameter.extended ->
+  string ->
+  string list tzresult Lwt.t
+
 (** [get_evm_state block] returns the evm state associated to [block]. Fails
     if it doesn't exist. *)
 val get_evm_state :
