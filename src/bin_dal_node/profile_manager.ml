@@ -167,8 +167,8 @@ let get_profiles t =
 
 let supports_refutations t =
   match get_profiles t with
-  | Random_observer -> true
-  | Operator op -> Operator_profile.(has_producer op || has_observer op)
+  | Random_observer -> false
+  | Operator op -> Operator_profile.(has_producer op)
   | Bootstrap -> false
 
 (* Returns the period relevant for a refutation game. With a block time of 10
@@ -195,14 +195,11 @@ let get_attested_data_default_store_period t proto_parameters =
        during attestation lag period *)
     | Random_observer -> (true, refutation_game_period)
     | Operator op ->
-        let is_not_attester_only =
-          Operator_profile.(has_producer op || has_observer op)
-        in
+        let has_producer = Operator_profile.(has_producer op) in
         let period =
-          if is_not_attester_only then refutation_game_period
-          else attestation_period
+          if has_producer then refutation_game_period else attestation_period
         in
-        (is_not_attester_only, period)
+        (has_producer, period)
     | Bootstrap -> (false, attestation_period)
   in
   (* This is just to keep this function synced with {!supports_refutations}. *)
