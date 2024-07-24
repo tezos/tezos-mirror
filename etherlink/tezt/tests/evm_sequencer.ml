@@ -540,6 +540,9 @@ let default_threshold_encryption_registration =
 let default_dal_registration =
   Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
 
+let ci_enabled_dal_registration =
+  Register_both {extra_tags_with = []; extra_tags_without = []}
+
 (* Register all variants of a test. *)
 let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
@@ -745,6 +748,7 @@ let test_publish_blueprints =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {sequencer; proxy; client; sc_rollup_node; _} _protocol ->
   let* _ =
     repeat 5 (fun () ->
@@ -772,6 +776,7 @@ let test_sequencer_too_ahead =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "max_blueprint_ahead"]
     ~title:"Sequencer locks production if it's too ahead"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {sequencer; sc_rollup_node; proxy; client; sc_rollup_address; _}
              _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
@@ -1285,6 +1290,7 @@ let test_delayed_deposit_is_included =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
     ~title:"Delayed deposit is included"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2669,6 +2675,7 @@ let test_delayed_transfer_timeout =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
     ~title:"Delayed transaction timeout"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {
            client;
            node = _;
@@ -2828,6 +2835,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "min_levels"]
     ~title:"Delayed transaction timeout considers l1 level"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {
            client;
            node = _;
@@ -3235,6 +3243,7 @@ let test_timestamp_from_the_future =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "block"; "timestamp"]
     ~title:"Timestamp from the future are refused"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
   (* In this test the time between blocks is 1 second. *)
 
@@ -3722,6 +3731,7 @@ let test_blueprint_is_limited_in_size =
     ~title:
       "Checks the sequencer doesn't produce blueprint bigger than the given \
        maximum number of chunks"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   let* requests, hashes =
@@ -3804,6 +3814,7 @@ let test_blueprint_limit_with_delayed_inbox =
       "Checks the sequencer doesn't produce blueprint bigger than the given \
        maximum number of chunks and count delayed transactions size in the \
        blueprint"
+    ~use_dal:ci_enabled_dal_registration
   @@ fun {sc_rollup_node; client; sequencer; sc_rollup_address; l1_contracts; _}
              _protocol ->
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
