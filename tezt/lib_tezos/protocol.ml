@@ -29,7 +29,9 @@ type t = Beta | ParisC | Alpha
 
 let all = [Beta; ParisC; Alpha]
 
-let encoding = Data_encoding.string_enum [("parisc", ParisC); ("alpha", Alpha)]
+let encoding =
+  Data_encoding.string_enum
+    [("parisc", ParisC); ("alpha", Alpha); ("beta", Beta)]
 
 type constants =
   | Constants_sandbox
