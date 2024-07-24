@@ -164,7 +164,7 @@ let current_block_height evm_state =
          [-1]. *)
       return (Qty Z.(pred zero))
   | Some current_block_number ->
-      let (Qty current_block_number) = decode_number current_block_number in
+      let (Qty current_block_number) = decode_number_le current_block_number in
       return (Qty current_block_number)
 
 let current_block_hash evm_state =

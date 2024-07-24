@@ -276,7 +276,7 @@ module Encodings = struct
       let decode_gas_used =
         let open Result_syntax in
         function
-        | Rlp.Value v -> return (decode_number v)
+        | Rlp.Value v -> return (decode_number_le v)
         | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
 
       let decode_execution_result =

@@ -223,11 +223,16 @@ let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
 
-let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
+let decode_number_le bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
 let decode_number_be bytes =
-  Bytes.fold_left (fun acc c -> (acc lsl 8) + Char.code c) 0 bytes
-  |> Z.of_int |> quantity_of_z
+  Bytes.fold_left
+    (fun acc c ->
+      let open Z in
+      add (of_int (Char.code c)) (shift_left acc 8))
+    Z.zero
+    bytes
+  |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
@@ -264,7 +269,7 @@ let transaction_log_body_from_rlp = function
             | _ -> raise (Invalid_argument "Expected hash representing topic"))
           topics,
         decode_hex data,
-        decode_number index )
+        decode_number_le index )
   | _ ->
       raise
         (Invalid_argument
@@ -361,13 +366,13 @@ let transaction_receipt_from_rlp block_hash bytes =
           Value status;
         ]) ->
       let hash = decode_hash hash in
-      let index = decode_number index in
-      let block_number = decode_number block_number in
+      let index = decode_number_le index in
+      let block_number = decode_number_le block_number in
       let from = decode_address from in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
-      let cumulative_gas_used = decode_number cumulative_gas_used in
-      let effective_gas_price = decode_number effective_gas_price in
-      let gas_used = decode_number gas_used in
+      let cumulative_gas_used = decode_number_le cumulative_gas_used in
+      let effective_gas_price = decode_number_le effective_gas_price in
+      let gas_used = decode_number_le gas_used in
       let contract_address =
         if contract_address = Bytes.empty then None
         else Some (decode_address contract_address)
@@ -390,8 +395,8 @@ let transaction_receipt_from_rlp block_hash bytes =
           logs_body
       in
       let bloom = decode_hex bloom in
-      let type_ = decode_number type_ in
-      let status = decode_number status in
+      let type_ = decode_number_le type_ in
+      let status = decode_number_le status in
       {
         transactionHash = hash;
         transactionIndex = index;
@@ -508,7 +513,7 @@ type transaction_object = {
 
 let transaction_object_from_rlp_item block_hash rlp_item =
   let decode_optional_number bytes =
-    if block_hash == None then None else Some (decode_number bytes)
+    if block_hash == None then None else Some (decode_number_le bytes)
   in
 
   match rlp_item with
@@ -530,14 +535,14 @@ let transaction_object_from_rlp_item block_hash rlp_item =
       ] ->
       let block_number = decode_optional_number block_number in
       let from = decode_address from in
-      let gas = decode_number gas_used in
-      let gas_price = decode_number gas_price in
+      let gas = decode_number_le gas_used in
+      let gas_price = decode_number_le gas_price in
       let hash = decode_hash hash in
       let input = decode_hash input in
-      let nonce = decode_number nonce in
+      let nonce = decode_number_le nonce in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
       let index = decode_optional_number index in
-      let value = decode_number value in
+      let value = decode_number_le value in
       (* The signature is taken from the raw transaction, that is encoded in big
          endian. *)
       let v = decode_number_be v in
@@ -720,7 +725,7 @@ let block_from_rlp_v0 bytes =
           Value gasUsed;
           Value timestamp;
         ]) ->
-      let (Qty number) = decode_number number in
+      let (Qty number) = decode_number_le number in
       let hash = decode_block_hash hash in
       let parent = decode_block_hash parent_hash in
       let logsBloom =
@@ -754,11 +759,11 @@ let block_from_rlp_v0 bytes =
       in
       let extraData = decode_option ~default:(Hex "") decode_hex extraData in
       let gasLimit =
-        decode_option ~default:(Qty Z.zero) decode_number gasLimit
+        decode_option ~default:(Qty Z.zero) decode_number_le gasLimit
       in
       let transactions = TxHash (decode_list decode_hash transactions) in
-      let gasUsed = decode_number gasUsed in
-      let timestamp = decode_number timestamp in
+      let gasUsed = decode_number_le gasUsed in
+      let timestamp = decode_number_le timestamp in
       {
         number = Qty number;
         hash;
@@ -815,7 +820,7 @@ let block_from_rlp_v1 bytes =
           Value baseFeePerGas;
           Value prevRandao;
         ]) ->
-      let (Qty number) = decode_number number in
+      let (Qty number) = decode_number_le number in
       let hash = decode_block_hash hash in
       let parent = decode_block_hash parent_hash in
       let logsBloom =
@@ -849,12 +854,12 @@ let block_from_rlp_v1 bytes =
       in
       let extraData = decode_option ~default:(Hex "") decode_hex extraData in
       let gasLimit =
-        decode_option ~default:(Qty Z.zero) decode_number gasLimit
+        decode_option ~default:(Qty Z.zero) decode_number_le gasLimit
       in
       let transactions = TxHash (decode_list decode_hash transactions) in
-      let gasUsed = decode_number gasUsed in
-      let timestamp = decode_number timestamp in
-      let baseFeePerGas = Some (decode_number baseFeePerGas) in
+      let gasUsed = decode_number_le gasUsed in
+      let timestamp = decode_number_le timestamp in
+      let baseFeePerGas = Some (decode_number_le baseFeePerGas) in
       let prevRandao = Some (decode_block_hash prevRandao) in
       {
         number = Qty number;
@@ -1440,7 +1445,7 @@ module Blueprint_applied = struct
 
   let of_rlp = function
     | Rlp.List [Value number; Value hash] ->
-        let number = decode_number number in
+        let number = decode_number_le number in
         let hash = decode_block_hash hash in
         Some {number; hash}
     | _ -> None

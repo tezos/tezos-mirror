@@ -70,7 +70,9 @@ val pp_quantity : Format.formatter -> quantity -> unit
 
 val quantity_of_z : Z.t -> quantity
 
-val decode_number : bytes -> quantity
+val decode_number_le : bytes -> quantity
+
+val decode_number_be : bytes -> quantity
 
 val encode_u256_le : quantity -> bytes
 

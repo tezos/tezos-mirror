@@ -175,7 +175,7 @@ module Worker = struct
     in
     match finalized_current_number with
     | Some bytes ->
-        let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
+        let (Qty evm_block_number) = Ethereum_types.decode_number_le bytes in
         set_latest_level_confirmed self evm_block_number ;
         return_unit
     | None -> return_unit
