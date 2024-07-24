@@ -5,7 +5,7 @@
 //! Implementation of Zifencei extension for RISC-V
 
 use crate::{
-    machine_state::{bus::main_memory, MachineState},
+    machine_state::{bus::main_memory, AccessType, MachineState},
     state_backend,
 };
 
@@ -17,10 +17,6 @@ where
     /// Execute a `fence.i` instruction.
     #[inline(always)]
     pub fn run_fencei(&mut self) {
-        // By default RISC-V does not guarantee that instructions written to
-        // memory are seen by the Hart. The Hart will cache instruction
-        // memory and therefore won't bother re-reading the cache from memory
-        // until `fence.i` is called.
-        // Because we have no instruction cache yet, this operation is a no-op.
+        self.translation_cache.invalidate([AccessType::Instruction]);
     }
 }

@@ -8,11 +8,12 @@ use crate::{
         hart_state::HartState,
         mode::Mode,
         registers::XRegister,
-        MachineState,
+        AccessType, MachineState,
     },
     state_backend as backend,
     traps::Exception,
 };
+use strum::IntoEnumIterator;
 
 impl<M> HartState<M>
 where
@@ -122,9 +123,9 @@ where
     ///
     /// Section 5.2.1: It is always legal to over-fence.
     #[inline(always)]
-    pub fn sfence_vma(&mut self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
-        // fencing all memory loads / stores, this invalidates the TLB cache
-        self.translation_cache.invalidate();
+    pub fn run_sfence_vma(&mut self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
+        // Invalidate all cached address translations.
+        self.translation_cache.invalidate(AccessType::iter());
 
         let mode = self.hart.mode.read();
         let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
@@ -168,7 +169,7 @@ mod tests {
                 CSRegister::mstatus,
                 (bit as CSRRepr) << xstatus::MStatus::TVM_OFFSET,
             );
-            let r = state.sfence_vma(t0, a0);
+            let r = state.run_sfence_vma(t0, a0);
             assert_eq!(r, result);
         };
 

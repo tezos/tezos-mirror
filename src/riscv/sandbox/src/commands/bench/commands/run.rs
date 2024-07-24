@@ -36,7 +36,7 @@ fn get_current_instr<S: Stepper>(stepper: &S) -> Result<Instr, InstrGetError> {
     let machine_state = stepper.machine_state();
     let get_half_instr = |raw_pc: Address| -> Result<u16, InstrGetError> {
         let pc = machine_state
-            .translate(raw_pc, AccessType::Instruction)
+            .translate_without_cache(raw_pc, AccessType::Instruction)
             .or(Err(InstrGetError::Translation))?;
         machine_state.bus.read(pc).or(Err(InstrGetError::Parse))
     };

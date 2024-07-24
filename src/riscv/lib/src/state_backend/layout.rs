@@ -338,3 +338,31 @@ where
         placed.map(|placed| T::allocate(backend, placed))
     }
 }
+
+/// This [`Layout`] is identical to [`[T; LEN]`] but it allows you to choose a very high `LEN`.
+pub struct Many<T: Layout, const LEN: usize> {
+    positions: Vec<T::Placed>,
+}
+
+impl<T, const LEN: usize> Layout for Many<T, LEN>
+where
+    T: Layout,
+{
+    type Placed = Self;
+
+    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+        let mut positions = Vec::<T::Placed>::with_capacity(LEN);
+        positions.resize_with(LEN, || T::place_with(alloc));
+        Self { positions }
+    }
+
+    type Allocated<M: super::Manager> = Vec<T::Allocated<M>>;
+
+    fn allocate<M: super::Manager>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
+        placed
+            .positions
+            .into_iter()
+            .map(|placed| T::allocate(backend, placed))
+            .collect::<Vec<_>>()
+    }
+}
