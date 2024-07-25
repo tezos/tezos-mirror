@@ -14,14 +14,11 @@ in ./forbidden_commit_messages.txt
 
 When running locally, MERGE BASE is the best common ancestor between
 HEAD and the supposed target branch master (can be set through
-CI_MERGE_REQUEST_TARGET_BRANCH_NAME), obtained through 'git
-merge-base'.
+CI_MERGE_REQUEST_TARGET_BRANCH_NAME), obtained through
+'scripts/ci/git_merge_base.sh'.
 
-When running in GitLab CI merge request pipeline, as detected by the
-presence of the CI_MERGE_REQUEST_DIFF_BASE_SHA variable, MERGE BASE is
-given by the said same variable. Furthermore, to account for shallow
-checkouts, we repeatedly deepen the fetch (up to 300 commits) should
-CI_MERGE_REQUEST_DIFF_BASE_SHA not be present.
+When running in GitLab CI merge request pipeline, the commit history
+is checked between MERGE BASE and CI_MERGE_REQUEST_SOURCE_BRANCH_SHA.
 
 This script exits with error code 0 if no forbidden commit subjects
 are found. If a forbidden commit subject is found in a merge requests
@@ -37,30 +34,35 @@ if [ "${1:-}" = "--help" ]; then
 fi
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+src_dir="$(dirname "$(dirname "$script_dir")")"
 pattern_file="${script_dir}forbidden_commit_messages.txt"
 
-target_branch=${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-master}
-if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
-  merge_base=${CI_MERGE_REQUEST_DIFF_BASE_SHA}
-  fetches=0
-  while [ $fetches -lt 3 ] && ! git cat-file -t "${merge_base}" > /dev/null 2>&1; do
-    git fetch -q --deepen=100 origin "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-    fetches=$((fetches + 1))
-  done
-  if ! git cat-file -t "${merge_base}" > /dev/null 2>&1; then
-    echo "Could not retrieve merge base ${merge_base} after ${fetches} of 100 commits, giving up."
-    exit 1
-  fi
-else
-  merge_base=$(git merge-base "${target_branch}" HEAD)
+# Use git_merge_base.sh on merged result pipelines, to ensure we only
+# check commit messages of the MR in question.
+ORIGIN=${ORIGIN:-origin}
+head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-HEAD}
+target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-${ORIGIN}/master}
+merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$target" "$head" || {
+  # Print on stderr to make visible outside command substitution
+  echo "Failed to get merge base, cannot check commit messages." >&2
+  exit 1
+})
+if [ -z "$merge_base" ]; then
+  echo "Merge base is empty, cannot check commit messages."
+  exit 1
 fi
 
 check_history() {
+  echo "Check git commit messages in the range ${merge_base}..${head}:"
+  echo ""
+  git log --format=" - '%s'" "${merge_base}".."${head}"
+  echo
+
   # Use short flags for grep for busybox-compatibility.
-  if git log --format="%s" "${merge_base}"..HEAD | grep -qE -f "${pattern_file}" > /dev/null; then
+  if git log --format="%s" "${merge_base}".."${head}" | grep -qE -f "${pattern_file}" > /dev/null; then
     # Match commits / forbidden patterns cross wise for user
     # friendly output.
-    for commit in $(git log --format="%H" "${merge_base}"..HEAD); do
+    for commit in $(git log --format="%H" "${merge_base}".."${head}"); do
       commit_title=$(git show -s --format=%B "${commit}" | head -n1)
       while read -r pattern; do
         if echo "${commit_title}" | grep -qE "$pattern"; then

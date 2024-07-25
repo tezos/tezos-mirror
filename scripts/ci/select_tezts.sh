@@ -25,7 +25,7 @@ abort() {
 head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-HEAD}
 target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-${ORIGIN}/master}
 
-merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$head" "$target" || {
+merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$target" "$head" || {
   # Print on stderr to make visible outside command substitution
   echo "Failed to get merge base, test selection is disabled." >&2
   abort
