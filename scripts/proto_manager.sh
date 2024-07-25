@@ -143,9 +143,9 @@ ${red}Options:${reset}
   ${p}, ${snapshot}
     Snapshot a protocol.
   ${f}, ${from} ${red}<protocol_source>${reset}
-    The source protocol to stabilise.
+    The source protocol to stabilise or snapshot.
   ${t}, ${to} ${red}<protocol_target>${reset}
-    The target protocol to stabilise.
+    The target protocol to stabilise or snapshot.
 
 ${yellow}tl;dr:${reset}
 - To stabilise protocol alpha into beta and link it in the node, client and codec:
@@ -464,7 +464,7 @@ function copy_source() {
   # replace fake hash with real hash, this file doesn't influence the hash
   sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
     TEZOS_PROTOCOL
-  commit_no_hooks "src: replace fake hash with real hash"
+  commit_no_hooks "src: replace ${protocol_source} hash with ${label} hash"
 
   cd ../../..
 
@@ -599,9 +599,6 @@ function update_protocol_tests() {
     sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
     ocamlformat -i src/lib_scoru_wasm/constants.ml
 
-    sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
-    ocamlformat -i src/lib_scoru_wasm/constants.ml
-
     sed -r "s/(type protocol =.*)/\1 | ${capitalized_label}/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
     sed -r "s/(type protocol =.*)/\1 | ${capitalized_label}/" -i.old src/lib_scoru_wasm/pvm_input_kind.mli
     sed "/| payload when String.equal payload Constants.proto_${protocol_source}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
@@ -616,7 +613,7 @@ function update_protocol_tests() {
   commit_no_hooks "scoru: update scoru_wasm protocol_migration"
 
   sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
-    -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
     -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
     -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
   ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
@@ -686,7 +683,9 @@ function update_source() {
 
     prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_${protocol_source}/lib_protocol/init_storage.ml")
     # shellcheck disable=SC2001
-    prepare_first_block_patched=$(echo "${prepare_first_block}" | sed "s/${capitalized_source}/${capitalized_label}/g")
+    prepare_first_block_patched=$(echo "${prepare_first_block}" | sed "s/${capitalized_source} stitching/alpha predecessor stitching/g")
+    # shellcheck disable=SC2001
+    prepare_first_block_patched=$(echo "${prepare_first_block_patched}" | sed "s/${capitalized_source}/${capitalized_label}/g")
     escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
     #replace all code between '(* Start of alpha predecessor stitching. Used for automatic protocol snapshot *)' and '(* End of alpha predecessor stitching. Used for automatic protocol snapshot *)' with the content of prepare_first_block_patched in src/proto_${protocol_source}/lib_protocol/raw_context.ml
     perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_${protocol_source}/lib_protocol/init_storage.ml"
@@ -755,13 +754,17 @@ function update_tezt_tests() {
 
   # automatically add the new protocol tag to alcotezt
 
-  temp_file=$(mktemp)
-  tac tezt/lib_alcotezt/alcotezt_utils.ml | tail +2 | tac > "${temp_file}"
-  echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
-  echo "  | Some _ -> assert false" >> "${temp_file}"
-  mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
-  commit "tezt: add new protocol tag to alcotezt"
-
+  if [[ ${is_snapshot} == true ]]; then
+    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]"/"  | Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: update protocol tag in alcotezt"
+  else
+    temp_file=$(mktemp)
+    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail +2 | tac > "${temp_file}"
+    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
+    echo "  | Some _ -> assert false" >> "${temp_file}"
+    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: add new protocol tag to alcotezt"
+  fi
   cd "${script_dir}"/..
 
   # Adapt tezt/lib_tezos/protocol.ml
@@ -812,8 +815,14 @@ function update_tezt_tests() {
   commit "tezt: fix other tests"
 
   mkdir -p "tezt/tests/encoding_samples/${label}"
-  cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
-  commit "tezt: copy ${protocol_source} encoding samples to ${label}"
+  if [[ ${is_snapshot} == true ]]; then
+    git mv tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
+    commit "tezt: move ${protocol_source} encoding samples to ${label}"
+
+  else
+    cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
+    commit "tezt: copy ${protocol_source} encoding samples to ${label}"
+  fi
 
   # for regression files, protocol_name should be at least 5 character long, if not add enough trailing '-' at the end
   regression_protocol_name=${capitalized_label}
@@ -840,16 +849,28 @@ function update_tezt_tests() {
     filename="${filename:0:80}"
     NEW_FILENAME=$(dirname "${NEW_FILENAME}")/"${filename}".out
 
-    # Preserve the file permissions
-    cp -p "${FILE}" "${NEW_FILENAME}"
-
+    if [[ ${is_snapshot} == true ]]; then
+      git mv "${FILE}" "${NEW_FILENAME}"
+    else
+      # Preserve the file permissions
+      cp -p "${FILE}" "${NEW_FILENAME}"
+    fi
     #replace all occurences of protocol_source with label
-    sed -i.old -e "s/${protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
+    if [[ ${is_snapshot} == true ]]; then
+      sed -i.old -e "s/proto_${protocol_source}/proto_${version}-${short_hash}/g" "${NEW_FILENAME}"
+      sed -i.old -e "s/${protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
+    else
+      sed -i.old -e "s/${protocol_source}/${label}/g" "${NEW_FILENAME}"
+    fi
 
     #replace all occurences of old hash with new hash
     sed -i.old -e "s/${source_hash}/${long_hash}/g" "${NEW_FILENAME}"
   done
-  commit "tezt: copy ${protocol_source} regression files"
+  if [[ ${is_snapshot} == true ]]; then
+    commit "tezt: move ${protocol_source} regression files"
+  else
+    commit "tezt: copy ${protocol_source} regression files"
+  fi
 
   # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
   # rm -rf /tmp/tezos_proto_snapshot
@@ -863,14 +884,14 @@ function update_tezt_tests() {
   # commit "tezt: add expected output for stabilisation regression test"
 
   dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
-  commit "tezt: delete unknown regression files"
+  commit_if_changes "tezt: delete unknown regression files"
 
   dune exec tezt/tests/main.exe -- --title 'meta: list runtime dependencies' --reset-regressions
   commit "tezt: reset runtime dependencies regressions"
 
   if [[ ${is_snapshot} != true ]]; then
     dune exec tezt/tests/main.exe -- --file tezt/tests/protocol_migration.ml --title 'Alpha: weeklynet regression test' --reset-regressions
-    commit "tezt: reset weeklynet regression test"
+    commit_if_changes "tezt: reset weeklynet regression test"
   fi
 
 }
@@ -904,7 +925,7 @@ function misc_updates() {
       devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   else
     sed "/let protocol_${protocol_source}_parameters_template =/i \ let protocol_${label}_parameters_template =\n  Filename.current_dir_name \/\/ \"src\" \/\/ \"proto_${label}\" \/\/ \"parameters\"\n  \/\/ \"mainnet_parameters.json\"" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
-    sed "/| Tezt_tezos.Protocol.${protocol_source} ->/i \  | Tezt_tezos.Protocol.${capitalized_label} ->\n Some protocol_${label}_parameters_template" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+    sed "/| Tezt_tezos.Protocol.${capitalized_source} ->/i \  | Tezt_tezos.Protocol.${capitalized_label} ->\n Some protocol_${label}_parameters_template" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   fi
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   commit "devtools: update testnet_experiment_tools"
@@ -931,15 +952,18 @@ function misc_updates() {
 
 function generate_doc() {
 
-  # Create proto_beta docs
-
-  echo "Copying docs/${protocol_source} to docs/${label}"
-  mkdir /tmp/tezos_proto_doc_snapshot
-  git archive HEAD "docs/${protocol_source}/" | tar -x -C /tmp/tezos_proto_doc_snapshot
-  mv "/tmp/tezos_proto_doc_snapshot/docs/${protocol_source}" "docs/${label}"
-  rm -rf /tmp/tezos_proto_doc_snapshot commit "copy from docs/${protocol_source}"
-  commit "docs: copy from docs/${protocol_source}"
-
+  # Create docs
+  if [[ ${is_snapshot} == true ]]; then
+    git mv "docs/${protocol_source}" "docs/${label}"
+    commit "docs: move from docs/${protocol_source}"
+  else
+    echo "Copying docs/${protocol_source} to docs/${label}"
+    mkdir /tmp/tezos_proto_doc_snapshot
+    git archive HEAD "docs/${protocol_source}/" | tar -x -C /tmp/tezos_proto_doc_snapshot
+    mv "/tmp/tezos_proto_doc_snapshot/docs/${protocol_source}" "docs/${label}"
+    rm -rf /tmp/tezos_proto_doc_snapshot commit "copy from docs/${protocol_source}"
+    commit "docs: copy from docs/${protocol_source}"
+  fi
   # fix versioned links (in labels, references, and paths) in docs
   echo "Fixing versioned links in docs"
   cd "docs/${label}"
@@ -960,11 +984,12 @@ function generate_doc() {
   # generate docs/protocols/${new_versioned_name}.rst from docs/protocols/${protocol_source}.rst
   echo "Copying docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   if [[ ${is_snapshot} == true ]]; then
-    mv "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
+    git mv "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
+    commit "docs: move docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   else
     cp "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
+    commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   fi
-  commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
     -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
     -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
@@ -1043,12 +1068,6 @@ function generate_doc() {
   rm -f "docs/${label}/rpc.rst"
   make -C docs "${label}"/rpc.rst
   commit "docs: generate ${label}/rpc.rst"
-
-  if [[ ${is_snapshot} == true ]]; then
-    warning "docs/${protocol_source} will now be removed"
-    rm -rf "docs/${protocol_source}"
-    commit "docs: remove docs/${protocol_source}"
-  fi
 
 }
 
