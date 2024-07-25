@@ -769,33 +769,38 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
+(* This function fetches the protocol plugins for levels for which it is needed
+   to add skip list cells. It starts by computing the oldest level at which it
+   will be needed to add skip list cells. *)
 let get_proto_plugins cctxt profile_ctxt last_processed_level
     (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
-  (* We resolve the plugins for all levels starting with [first_level]. It
-     is currently not necessary to go as far in the past, because only the
-     protocol parameters for these past levels are needed, and these do
-     not change for now (and are not retrieved for these past
-     levels). However, if/when they do change, it will be necessary to
-     retrieve them, using the right plugins. *)
-  let level =
-    match last_processed_level with None -> head_level | Some level -> level
-  in
-  let relevant_period =
+  (* We resolve the plugins for all levels starting with [(max
+     last_processed_level (head_level - storage_period)], or (max
+     last_processed_level (head_level - storage_period) - (attestation_lag -
+     1))] in case the node supports refutations. This is necessary as skip list
+     cells are stored for attested levels is this storage period and
+     [store_skip_list_cells] needs the L1 context for these levels. (It would
+     actually not be necessary to go as far in the past, because the protocol
+     parameters and the relevant encodings do not change for now, so the head
+     plugin could be used). *)
+  let storage_period =
     Profile_manager.get_attested_data_default_store_period
       profile_ctxt
       proto_parameters
   in
   let first_level =
-    Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
+    Int32.max
+      (match last_processed_level with None -> 1l | Some level -> level)
+      Int32.(sub head_level (of_int storage_period))
   in
   let first_level =
     if Profile_manager.supports_refutations profile_ctxt then
       (* See usage of the plugin in [store_skip_list_cells] *)
-      Int32.(
-        max 1l (sub first_level (of_int (1 + proto_parameters.attestation_lag))))
+      Int32.(sub first_level (of_int (1 + proto_parameters.attestation_lag)))
     else first_level
   in
-  Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
+  let first_level = Int32.(max 1l first_level) in
+  Proto_plugins.initial_plugins cctxt ~first_level ~last_level:head_level
 
 (* This function removes old data starting from [last_processed_level -
    storage_period] to [target_level - storage_period], where [storage_period] is
