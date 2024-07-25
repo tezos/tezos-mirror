@@ -143,9 +143,9 @@ ${red}Options:${reset}
   ${p}, ${snapshot}
     Snapshot a protocol.
   ${f}, ${from} ${red}<protocol_source>${reset}
-    The source protocol to stabilise.
+    The source protocol to stabilise or snapshot.
   ${t}, ${to} ${red}<protocol_target>${reset}
-    The target protocol to stabilise.
+    The target protocol to stabilise or snapshot.
 
 ${yellow}tl;dr:${reset}
 - To stabilise protocol alpha into beta and link it in the node, client and codec:
