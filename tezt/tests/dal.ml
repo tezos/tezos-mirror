@@ -6155,12 +6155,11 @@ module Garbage_collection = struct
         attester
     in
 
-    Log.info "RPC shard still stored observer" ;
+    Log.info "RPC deleted shard observer" ;
     let* _shard_observer =
-      get_shard_rpc
+      get_shard_rpc_failure_expected
         ~slot_level:published_level
         ~slot_index
-        ~shard_index:0
         observer
     in
     Log.info "RPC shard still stored producer" ;
@@ -6243,12 +6242,16 @@ module Garbage_collection = struct
               (Some c)
         in
         let* node, client, dal_parameters =
-          setup_node ~parameter_overrides ~protocol ()
+          setup_node
+            ~parameter_overrides
+            ~protocol
+            ~l1_history_mode:Default_with_refutation
+            ()
         in
         let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
         let lag = dal_parameters.attestation_lag in
         let dal_node = Dal_node.create ~node () in
-        let* () = Dal_node.init_config ~observer_profiles:[1] dal_node in
+        let* () = Dal_node.init_config ~producer_profiles:[1] dal_node in
         let* () = Dal_node.run dal_node ~wait_ready:true in
         Log.info
           "The first level with stored cells is 1 + lag = %d. We bake till \
