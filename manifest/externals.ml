@@ -92,7 +92,7 @@ let ctypes_foreign =
 
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
-let digestif = external_lib "digestif" V.True
+let digestif = external_lib "digestif" V.(at_least "0.9.0")
 
 let dune_configurator = external_lib "dune-configurator" V.True
 
