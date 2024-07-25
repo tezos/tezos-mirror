@@ -18,7 +18,7 @@ use self::{
 };
 use super::{
     bus::Address,
-    hart_state::{interrupts_cache::PossibleInterruptsCache, HartState},
+    hart_state::{interrupts_cache::InterruptsCache, HartState},
     mode::TrapMode,
 };
 use crate::{
@@ -1065,7 +1065,7 @@ pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> R
 /// CSRs
 pub struct CSRegisters<M: backend::ManagerBase> {
     registers: CSRegisterValues<M>,
-    pub(super) interrupt_cache: PossibleInterruptsCache,
+    pub(super) interrupt_cache: InterruptsCache,
 }
 
 impl<M: backend::Manager> CSRegisters<M> {
@@ -1151,8 +1151,16 @@ impl<M: backend::Manager> CSRegisters<M> {
             let source_reg: RootCSRegister = reg.into();
             self.registers.general_raw_write(source_reg, value);
 
-            if source_reg == RootCSRegister::mstatus {
-                self.interrupt_cache.invalidate();
+            // TODO: RV-159. after !14177
+            // invalidation will be incorporated into `csregisters_boilerplate!`
+            match source_reg {
+                RootCSRegister::mstatus => {
+                    self.interrupt_cache.invalidate();
+                }
+                RootCSRegister::mip => {
+                    self.interrupt_cache.invalidate_by_mip();
+                }
+                _ => {}
             }
         }
     }
@@ -1173,6 +1181,18 @@ impl<M: backend::Manager> CSRegisters<M> {
             let value = self.transform_write(reg, value);
             let source_reg: RootCSRegister = reg.into();
             let old_value = self.registers.general_raw_replace(source_reg, value);
+
+            // TODO: RV-159. after !14177
+            // invalidation will be incorporated into `csregisters_boilerplate!`
+            match source_reg {
+                RootCSRegister::mstatus => {
+                    self.interrupt_cache.invalidate();
+                }
+                RootCSRegister::mip => {
+                    self.interrupt_cache.invalidate_by_mip();
+                }
+                _ => {}
+            };
 
             let old_value = self.transform_read(reg, Some(old_value));
             V::from_bits(old_value)
@@ -1307,7 +1327,7 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn bind(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
         Self {
             registers: values::CSRegisterValues::bind(space),
-            interrupt_cache: PossibleInterruptsCache::default(),
+            interrupt_cache: InterruptsCache::default(),
         }
     }
 
