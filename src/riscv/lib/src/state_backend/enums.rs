@@ -41,6 +41,22 @@ where
         self.cell.write(value.into());
     }
 
+    /// Replace a value in the enum cell, returning the old value.
+    pub fn replace(&mut self, value: T) -> T
+    where
+        T: From<R>,
+    {
+        T::from(self.cell.replace(value.into()))
+    }
+
+    /// Replace a value in the enum cell, returning the old value.
+    pub fn replace_default(&mut self, value: T) -> T
+    where
+        T: TryFrom<R> + Default,
+    {
+        T::try_from(self.cell.replace(value.into())).unwrap_or(T::default())
+    }
+
     /// Read the value from the enum cell.
     pub fn read(&self) -> T
     where
@@ -80,5 +96,9 @@ where
 {
     fn write(&mut self, value: Self::Value) {
         EnumCell::write(self, value)
+    }
+
+    fn replace(&mut self, value: Self::Value) -> Self::Value {
+        EnumCell::replace_default(self, value)
     }
 }

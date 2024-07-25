@@ -34,4 +34,9 @@ impl<M: Manager> CellWrite for BoolCell<M> {
     fn write(&mut self, value: Self::Value) {
         self.bool.write(value as u8)
     }
+
+    #[inline(always)]
+    fn replace(&mut self, value: Self::Value) -> Self::Value {
+        self.bool.replace(value as u8) != 0
+    }
 }
