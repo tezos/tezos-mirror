@@ -925,7 +925,7 @@ function misc_updates() {
       devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   else
     sed "/let protocol_${protocol_source}_parameters_template =/i \ let protocol_${label}_parameters_template =\n  Filename.current_dir_name \/\/ \"src\" \/\/ \"proto_${label}\" \/\/ \"parameters\"\n  \/\/ \"mainnet_parameters.json\"" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
-    sed "/| Tezt_tezos.Protocol.${protocol_source} ->/i \  | Tezt_tezos.Protocol.${capitalized_label} ->\n Some protocol_${label}_parameters_template" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+    sed "/| Tezt_tezos.Protocol.${capitalized_source} ->/i \  | Tezt_tezos.Protocol.${capitalized_label} ->\n Some protocol_${label}_parameters_template" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   fi
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   commit "devtools: update testnet_experiment_tools"
