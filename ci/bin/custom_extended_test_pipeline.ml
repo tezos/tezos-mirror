@@ -17,6 +17,8 @@
 
    Currently, it is used for:
    - schedule_extended_rpc_tests: test the external RPC server
+   - schedule_extended_validation_tests: test the singleprocess
+     validation
 *)
 
 open Gitlab_ci.Types
