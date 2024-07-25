@@ -1,27 +1,6 @@
 :math:`\newcommand\F[2]{\mathit{#1}\left(#2\right)}`
-:math:`\newcommand{\minR}{\mathit{min_r}}`
-:math:`\newcommand{\maxR}{\mathit{max_r}}`
-:math:`\newcommand{\tmult}{\cdot}`
-:math:`\newcommand\static[1]{\F{static}{#1}}`
-:math:`\newcommand{\sfr}{\frac{1}{1600}}` :math:`\newcommand\tc{\tau_c}`
-:math:`\newcommand\tr{\tau_r}` :math:`\newcommand\grf{\gamma}`
-:math:`\newcommand\dyn[1]{\F{dyn}{#1}}`
-:math:`\newcommand\sgn[1]{\F{sign}{#1}}`
-:math:`\newcommand\dist[1]{\F{distance}{#1}}`
-:math:`\newcommand\DTF{{\Delta t}}`
 :math:`\newcommand\IL[1]{\normalsize{#1}}`
-:math:`\newcommand\MX[2]{\F{max}{#1,#2}}`
-:math:`\newcommand\adr[1]{\F{adaptive}{#1}}`
-:math:`\newcommand\clip[3]{\F{clip}{#1,#2,#3}}`
-:math:`\newcommand\supply[1]{\F{supply}{#1}}`
-:math:`\newcommand\iss[1]{\F{issuance}{#1}}`
-:math:`\newcommand\isb[1]{\F{issuance_{block}}{#1}}`
-:math:`\newcommand\tw{\Sigma_w}`
-:math:`\newcommand\rw[2]{\F{reward_{#1}}{#2}}`
-:math:`\newcommand\tip[2]{\F{tip_{#1}}{#2}}`
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
-:math:`\newcommand{\vdf}{\mathit{VDF}}`
-
 
 =============================
 Adaptive Issuance and Staking
