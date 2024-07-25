@@ -320,6 +320,37 @@ let init_status, init_status_waker = Lwt.task ()
 
 let execution_config, execution_config_waker = Lwt.task ()
 
+let global_lockfile_path ~data_dir = Filename.Infix.(data_dir // "lock")
+
+type error += Data_dir_locked of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.datadir_is_locked"
+    ~title:"Data directory of EVM node is locked"
+    ~description:"Data directory of EVM node is locked by another process."
+    ~pp:(fun ppf dir ->
+      Format.fprintf
+        ppf
+        "The data directory %s of the EVM node is locked by another process."
+        dir)
+    Data_encoding.(obj1 (req "data_dir" string))
+    (function Data_dir_locked dir -> Some dir | _ -> None)
+    (fun dir -> Data_dir_locked dir)
+
+let lock_data_dir ~data_dir =
+  let open Lwt_result_syntax in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
+  let filename = global_lockfile_path ~data_dir in
+  (* It's okay not to release the lock because once you have taken it,
+     you don't want the data directory to be overwritten while the node
+     is running. The lock will be released once the node stops. *)
+  let* _fd =
+    Lwt_lock_file.lock ~when_locked:(`Fail (Data_dir_locked data_dir)) ~filename
+  in
+  return_unit
+
 module State = struct
   let with_store_transaction ctxt k =
     Evm_store.use ctxt.store @@ fun conn ->
@@ -1402,6 +1433,7 @@ let vacuum ~data_dir ~output_db_file =
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm () =
   let open Lwt_result_syntax in
+  let* () = lock_data_dir ~data_dir in
   let* worker =
     Worker.launch
       table
@@ -1595,6 +1627,7 @@ let reconstruct ~reconstruct_from_boot_sector ~rollup_node_data_dir
 let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir ?reconstruct_from_boot_sector () =
   let open Lwt_result_syntax in
+  let* () = lock_data_dir ~data_dir in
   let* irmin_context, evm_state, finalized_level, levels_to_hashes, l2_blocks =
     init_context_from_rollup_node ~data_dir ~rollup_node_data_dir
   in
