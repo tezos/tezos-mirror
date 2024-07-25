@@ -28,23 +28,23 @@ module Encoding = Resto_json.Encoding
 module Media_type = Resto_cohttp.Media_type.Make (Encoding)
 
 module NullLogger : Resto_cohttp_server.Server.LOGGING = struct
-  let debug fmt = Format.kasprintf ignore fmt
+  let log_debug fmt = Format.kasprintf ignore fmt
 
   let log_info fmt = Format.kasprintf ignore fmt
 
   let log_notice fmt = Format.kasprintf ignore fmt
 
-  let warn fmt = Format.kasprintf ignore fmt
+  let log_warn fmt = Format.kasprintf ignore fmt
 
   let log_error fmt = Format.kasprintf ignore fmt
 
-  let lwt_debug fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
+  let lwt_log_debug fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
 
   let lwt_log_info fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
 
   let lwt_log_notice fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
 
-  let lwt_warn fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
+  let lwt_log_warn fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
 
   let lwt_log_error fmt = Format.kasprintf (fun _ -> Lwt.return_unit) fmt
 end

@@ -69,23 +69,23 @@ module RPC_logging = struct
           (Printf.sprintf "[pid:%d][resto] %s" (Unix.getpid ()) message))
       fmt
 
-  let debug f = emit_async rpc_http_event_debug f
+  let log_debug f = emit_async rpc_http_event_debug f
 
   let log_info f = emit_async rpc_http_event_info f
 
   let log_notice f = emit_async rpc_http_event_notice f
 
-  let warn f = emit_async rpc_http_event_warning f
+  let log_warn f = emit_async rpc_http_event_warning f
 
   let log_error f = emit_async rpc_http_event_error f
 
-  let lwt_debug f = emit_lwt rpc_http_event_debug f
+  let lwt_log_debug f = emit_lwt rpc_http_event_debug f
 
   let lwt_log_info f = emit_lwt rpc_http_event_info f
 
   let lwt_log_notice f = emit_lwt rpc_http_event_notice f
 
-  let lwt_warn f = emit_lwt rpc_http_event_warning f
+  let lwt_log_warn f = emit_lwt rpc_http_event_warning f
 
   let lwt_log_error f = emit_lwt rpc_http_event_error f
 end
