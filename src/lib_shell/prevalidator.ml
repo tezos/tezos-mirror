@@ -1242,96 +1242,117 @@ module Make
               Tezos_rpc.Path.open_root)
            (fun pv params () ->
              Lwt_mutex.with_lock pv.lock @@ fun () ->
-             let op_stream, stopper =
-               Lwt_watcher.create_stream pv.operation_stream
+             let open Lwt_syntax in
+             let sources =
+               List.map_e Signature.Public_key_hash.of_b58check params#sources
              in
-             (* First call : retrieve the current set of op from the mempool *)
-             let validated_seq =
-               if params#validated then
-                 Classification.Sized_map.to_map
-                   pv.shell.classification.validated
-                 |> Operation_hash.Map.to_seq
-                 |> Seq.map (fun (hash, {protocol; _}) ->
-                        ((hash, protocol), None))
-               else Seq.empty
-             in
-             let process_error_map map =
-               let open Operation_hash in
-               map |> Map.to_seq
-               |> Seq.map (fun (hash, (op, error)) ->
-                      ((hash, op.protocol), Some error))
-             in
-             let refused_seq =
-               if params#refused then
-                 process_error_map
-                   (Classification.map pv.shell.classification.refused)
-               else Seq.empty
-             in
-             let branch_refused_seq =
-               if params#branch_refused then
-                 process_error_map
-                   (Classification.map pv.shell.classification.branch_refused)
-               else Seq.empty
-             in
-             let branch_delayed_seq =
-               if params#branch_delayed then
-                 process_error_map
-                   (Classification.map pv.shell.classification.branch_delayed)
-               else Seq.empty
-             in
-             let outdated_seq =
-               if params#outdated then
-                 process_error_map
-                   (Classification.map pv.shell.classification.outdated)
-               else Seq.empty
-             in
-             let filter ((_, op), _) =
-               filter_validation_passes params#validation_passes op
-             in
-             let current_mempool =
-               Seq.append outdated_seq branch_delayed_seq
-               |> Seq.append branch_refused_seq
-               |> Seq.append refused_seq |> Seq.append validated_seq
-               |> Seq.filter filter |> List.of_seq
-             in
-             let current_mempool = ref (Some current_mempool) in
-             let filter_result = function
-               | `Validated -> params#validated
-               | `Refused _ -> params#refused
-               | `Outdated _ -> params#outdated
-               | `Branch_refused _ -> params#branch_refused
-               | `Branch_delayed _ -> params#branch_delayed
-             in
-             let rec next () =
-               let open Lwt_syntax in
-               match !current_mempool with
-               | Some mempool ->
-                   current_mempool := None ;
-                   Lwt.return_some (params#version, mempool)
-               | None -> (
-                   let* o = Lwt_stream.get op_stream in
-                   match o with
-                   | Some (kind, op)
-                     when filter_result kind
-                          && filter_validation_passes
+             match sources with
+             | Error errs -> Tezos_rpc.Answer.fail errs
+             | Ok sources ->
+                 let op_stream, stopper =
+                   Lwt_watcher.create_stream pv.operation_stream
+                 in
+                 (* First call : retrieve the current set of op from the mempool *)
+                 let validated_seq =
+                   if params#validated then
+                     Classification.Sized_map.to_map
+                       pv.shell.classification.validated
+                     |> Operation_hash.Map.to_seq
+                     |> Seq.map (fun (hash, {protocol; _}) ->
+                            ((hash, protocol), None))
+                   else Seq.empty
+                 in
+                 let process_error_map map =
+                   let open Operation_hash in
+                   map |> Map.to_seq
+                   |> Seq.map (fun (hash, (op, error)) ->
+                          ((hash, op.protocol), Some error))
+                 in
+                 let refused_seq =
+                   if params#refused then
+                     process_error_map
+                       (Classification.map pv.shell.classification.refused)
+                   else Seq.empty
+                 in
+                 let branch_refused_seq =
+                   if params#branch_refused then
+                     process_error_map
+                       (Classification.map
+                          pv.shell.classification.branch_refused)
+                   else Seq.empty
+                 in
+                 let branch_delayed_seq =
+                   if params#branch_delayed then
+                     process_error_map
+                       (Classification.map
+                          pv.shell.classification.branch_delayed)
+                   else Seq.empty
+                 in
+                 let outdated_seq =
+                   if params#outdated then
+                     process_error_map
+                       (Classification.map pv.shell.classification.outdated)
+                   else Seq.empty
+                 in
+                 let* ctxt =
+                   if sources = [] then Lwt.return_none else fetch_context pv
+                 in
+                 let filter ((_, op), _) =
+                   let* is_in_sources = filter_sources ctxt sources op in
+                   return
+                     (filter_validation_passes params#validation_passes op
+                     && is_in_sources)
+                 in
+                 let* current_mempool =
+                   Seq.append outdated_seq branch_delayed_seq
+                   |> Seq.append branch_refused_seq
+                   |> Seq.append refused_seq |> Seq.append validated_seq
+                   |> Lwt_seq.of_seq |> Lwt_seq.filter_s filter
+                   |> Lwt_seq.to_list
+                 in
+                 let current_mempool = ref (Some current_mempool) in
+                 let filter_result = function
+                   | `Validated -> params#validated
+                   | `Refused _ -> params#refused
+                   | `Outdated _ -> params#outdated
+                   | `Branch_refused _ -> params#branch_refused
+                   | `Branch_delayed _ -> params#branch_delayed
+                 in
+                 let rec next () =
+                   match !current_mempool with
+                   | Some mempool ->
+                       current_mempool := None ;
+                       Lwt.return_some (params#version, mempool)
+                   | None -> (
+                       let* o = Lwt_stream.get op_stream in
+                       match o with
+                       | Some (kind, op) ->
+                           let* is_in_sources =
+                             filter_sources ctxt sources op.protocol
+                           in
+                           if
+                             filter_validation_passes
                                params#validation_passes
-                               op.protocol ->
-                       let errors =
-                         match kind with
-                         | `Validated -> None
-                         | `Branch_delayed errors
-                         | `Branch_refused errors
-                         | `Refused errors
-                         | `Outdated errors ->
-                             Some errors
-                       in
-                       Lwt.return_some
-                         (params#version, [((op.hash, op.protocol), errors)])
-                   | Some _ -> next ()
-                   | None -> Lwt.return_none)
-             in
-             let shutdown () = Lwt_watcher.shutdown stopper in
-             Tezos_rpc.Answer.return_stream {next; shutdown}) ;
+                               op.protocol
+                             && is_in_sources && filter_result kind
+                           then
+                             let errors =
+                               match kind with
+                               | `Validated -> None
+                               | `Branch_delayed errors
+                               | `Branch_refused errors
+                               | `Refused errors
+                               | `Outdated errors ->
+                                   Some errors
+                             in
+                             Lwt.return_some
+                               ( params#version,
+                                 [((op.hash, op.protocol), errors)] )
+                           else next ()
+                       | None -> Lwt.return_none)
+                 in
+                 let shutdown () = Lwt_watcher.shutdown stopper in
+                 Tezos_rpc.Answer.return_stream {next; shutdown}) ;
        !dir)
 
   (** Module implementing the events at the {!Worker} level. Contrary

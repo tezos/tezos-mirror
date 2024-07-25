@@ -463,6 +463,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?refused:bool ->
       ?outdated:bool ->
       ?validation_passes:int list ->
+      ?sources:string list ->
       unit ->
       (((Operation_hash.t * Next_proto.operation) * error trace option) list
        Lwt_stream.t
@@ -781,7 +782,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_refused : bool
           ; refused : bool
           ; outdated : bool
-          ; validation_passes : int list >,
+          ; validation_passes : int list
+          ; sources : string list >,
           unit,
           version
           * ((Operation_hash.t * Next_proto.operation) * error trace option)

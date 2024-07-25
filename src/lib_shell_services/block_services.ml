@@ -1395,7 +1395,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let monitor_operations_versions = mk_version_1_informations ()
 
-      let mempool_query =
+      let monitor_operations_query =
         let open Tezos_rpc.Query in
         query
           (fun
@@ -1406,6 +1406,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             branch_refused
             branch_delayed
             validation_passes
+            sources
           ->
             object
               method version = version
@@ -1421,6 +1422,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               method branch_delayed = branch_delayed
 
               method validation_passes = validation_passes
+
+              method sources = sources
             end)
         |+ field
              "version"
@@ -1463,6 +1466,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              "validation_pass"
              Tezos_rpc.Arg.int
              (fun t -> t#validation_passes)
+        |+ multi_field
+             ~descr:"Include operations filtered by sources (all by default)"
+             "sources"
+             Tezos_rpc.Arg.string
+             (fun t -> t#sources)
         |> seal
 
       (* We extend the object so that the fields of 'next_operation'
@@ -1484,7 +1492,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let monitor_operations path =
         Tezos_rpc.Service.get_service
           ~description:"Monitor the mempool operations."
-          ~query:mempool_query
+          ~query:monitor_operations_query
           ~output:processed_operation_encoding
           Tezos_rpc.Path.(path / "monitor_operations")
 
@@ -1885,7 +1893,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let monitor_operations ctxt ?(chain = `Main)
         ?(version = S.Mempool.monitor_operations_versions.default)
         ?(validated = true) ?(branch_delayed = true) ?(branch_refused = false)
-        ?(refused = false) ?(outdated = false) ?(validation_passes = []) () =
+        ?(refused = false) ?(outdated = false) ?(validation_passes = [])
+        ?(sources = []) () =
       let open Lwt_result_syntax in
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
       let* stream, stopper =
@@ -1907,6 +1916,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              method branch_delayed = branch_delayed
 
              method validation_passes = validation_passes
+
+             method sources = sources
           end)
           ()
       in
