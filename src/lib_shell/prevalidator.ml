@@ -1002,6 +1002,25 @@ module Make
       Prevalidation_t.config_encoding
       pv.config
 
+  let fetch_context pv =
+    let open Lwt_result_syntax in
+    let*! ctxt_e =
+      let* context =
+        Prevalidation_t.get_context
+          pv.shell.parameters.chain_store
+          ~predecessor:pv.shell.predecessor
+          ~timestamp:(Time.System.to_protocol pv.shell.timestamp)
+      in
+      Proto.Plugin.get_context
+        context
+        ~head:(Store.Block.header pv.shell.predecessor).shell
+    in
+    match ctxt_e with
+    | Error errs ->
+        let*! () = Events.(emit pending_operation_context_error) errs in
+        Lwt.return_none
+    | Ok ctxt -> Lwt.return_some ctxt
+
   let filter_validation_passes allowed_validation_passes
       (op : protocol_operation) =
     match allowed_validation_passes with
@@ -1116,36 +1135,7 @@ module Make
              | Error errs, _ | _, Error errs -> Tezos_rpc.Answer.fail errs
              | Ok sources, Ok ophs ->
                  let* ctxt =
-                   if sources = [] then Lwt.return_none
-                   else
-                     let* context =
-                       (* prevalidation_t.t contains the context, get_context returns it *)
-                       Prevalidation_t.get_context
-                         pv.shell.parameters.chain_store
-                         ~predecessor:pv.shell.predecessor
-                         ~timestamp:(Time.System.to_protocol pv.shell.timestamp)
-                     in
-                     match context with
-                     | Error errs ->
-                         let* () =
-                           Events.(emit pending_operation_context_error) errs
-                         in
-                         Lwt.return_none
-                     | Ok context -> (
-                         let* ctxt =
-                           Proto.Plugin.get_context
-                             context
-                             ~head:
-                               (Store.Block.header pv.shell.predecessor).shell
-                         in
-                         match ctxt with
-                         | Error errs ->
-                             let* () =
-                               Events.(emit pending_operation_context_error)
-                                 errs
-                             in
-                             Lwt.return_none
-                         | Ok ctxt -> Lwt.return_some ctxt)
+                   if sources = [] then Lwt.return_none else fetch_context pv
                  in
                  let filter oph protocol res =
                    let* is_in_sources = filter_sources ctxt sources protocol in
