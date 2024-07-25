@@ -78,6 +78,25 @@ impl<E: Elem, T, M: ManagerBase> LazyCell<E, T, M> {
             value: std::cell::Cell::new(None),
         }
     }
+
+    /// Reset a LazyCell to an underlying raw value, clearing
+    /// the in-memory value.
+    ///
+    /// This is required for 'faster reset' of large regions of
+    /// [LazyCell]. This will no-longer be required once
+    /// RV-170 is implemented.
+    pub fn reset(&mut self, value: E)
+    where
+        M: ManagerWrite,
+    {
+        self.inner.write(value);
+        self.value.set(None);
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<Atom<E>, Ref<'_, M>> {
+        self.inner.struct_ref()
+    }
 }
 
 /// A cell that support reading only.
