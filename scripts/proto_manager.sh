@@ -683,7 +683,9 @@ function update_source() {
 
     prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_${protocol_source}/lib_protocol/init_storage.ml")
     # shellcheck disable=SC2001
-    prepare_first_block_patched=$(echo "${prepare_first_block}" | sed "s/${capitalized_source}/${capitalized_label}/g")
+    prepare_first_block_patched=$(echo "${prepare_first_block}" | sed "s/${capitalized_source} stitching/alpha predecessor stitching/g")
+    # shellcheck disable=SC2001
+    prepare_first_block_patched=$(echo "${prepare_first_block_patched}" | sed "s/${capitalized_source}/${capitalized_label}/g")
     escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
     #replace all code between '(* Start of alpha predecessor stitching. Used for automatic protocol snapshot *)' and '(* End of alpha predecessor stitching. Used for automatic protocol snapshot *)' with the content of prepare_first_block_patched in src/proto_${protocol_source}/lib_protocol/raw_context.ml
     perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_${protocol_source}/lib_protocol/init_storage.ml"
