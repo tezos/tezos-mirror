@@ -67,7 +67,7 @@ init_rollup_node() {
   trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node}"' ERR
   echo "creating rollup node config"
   run_in_docker_compose rollup-node init "${ROLLUP_NODE_MODE}" config for "${ROLLUP_ADDRESS}" \
-    with operators "${OPERATOR_ALIAS}" \
+    with operators \
     --rpc-addr 0.0.0.0 --rpc-port 8932 --cors-origins '*' \
     --cors-headers '*' \
     --pre-images-endpoint "${PREIMAGES_ENDPOINT}" \
