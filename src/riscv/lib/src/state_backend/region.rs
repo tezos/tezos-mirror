@@ -46,6 +46,31 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
     }
 }
 
+/// A [Cell] wrapper that holds an additional in-memory
+/// representation of the stored value. This value is lazily
+/// constructed on the first [read] or [replace].
+///
+/// LazyCell's are not directly allocated, instead, you should
+/// [wrap] an allocated Cell during your `bind` step.
+///
+/// [read]: LazyCell::read
+/// [replace]: LazyCell::replace
+/// [wrap]: LazyCell::wrap
+pub struct LazyCell<E: Elem, T, M: ManagerBase + ?Sized> {
+    inner: Cell<E, M>,
+    value: std::cell::Cell<Option<T>>,
+}
+
+impl<E: Elem, T, M: ManagerBase> LazyCell<E, T, M> {
+    /// Wrap an allocated [Cell] into a [LazyCell].
+    pub fn wrap(inner: Cell<E, M>) -> Self {
+        Self {
+            inner,
+            value: std::cell::Cell::new(None),
+        }
+    }
+}
+
 /// A cell that support reading only.
 pub trait CellBase {
     /// Element type managed by the cell.
@@ -54,6 +79,10 @@ pub trait CellBase {
 
 impl<E: Elem, M: ManagerBase> CellBase for Cell<E, M> {
     type Value = E;
+}
+
+impl<E: Elem, T, M: ManagerBase> CellBase for LazyCell<E, T, M> {
+    type Value = T;
 }
 
 impl<E: CellBase> CellBase for &E {
@@ -74,6 +103,20 @@ impl<E: Elem, M: ManagerRead> CellRead for Cell<E, M> {
     #[inline(always)]
     fn read(&self) -> E {
         Cell::read(self)
+    }
+}
+
+impl<E: Elem, T: Copy + From<E>, M: ManagerRead> CellRead for LazyCell<E, T, M> {
+    #[inline]
+    fn read(&self) -> T {
+        if let Some(value) = self.value.get() {
+            return value;
+        }
+
+        let value = self.inner.read().into();
+        self.value.set(Some(value));
+
+        value
     }
 }
 
@@ -104,6 +147,14 @@ impl<E: Elem, M: ManagerWrite> CellWrite for Cell<E, M> {
     }
 }
 
+impl<E: Elem + From<T>, T: Copy, M: ManagerWrite> CellWrite for LazyCell<E, T, M> {
+    #[inline(always)]
+    fn write(&mut self, value: T) {
+        self.value.set(Some(value));
+        self.inner.write(value.into())
+    }
+}
+
 impl<E: CellWrite> CellWrite for &mut E {
     #[inline(always)]
     fn write(&mut self, value: Self::Value) {
@@ -121,6 +172,20 @@ impl<E: Elem, M: ManagerReadWrite> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
         Cell::replace(self, value)
+    }
+}
+
+impl<E: Elem + From<T>, T: Copy + From<E>, M: ManagerReadWrite> CellReadWrite
+    for LazyCell<E, T, M>
+{
+    #[inline]
+    fn replace(&mut self, value: T) -> T {
+        let old_inner = self.inner.replace(value.into());
+
+        match self.value.replace(Some(value)) {
+            Some(old) => old,
+            None => old_inner.into(),
+        }
     }
 }
 
@@ -261,7 +326,8 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, Choreographer, DynCells, Elem, Location, ManagerAlloc, ManagerBase,
+            Array, Backend, CellRead, CellReadWrite, CellWrite, Choreographer, DynCells, Elem,
+            LazyCell, Location, ManagerAlloc, ManagerBase,
         },
     };
 
@@ -366,6 +432,53 @@ pub(crate) mod tests {
 
         // Cell 1 should not have its value changed.
         assert_eq!(cell1.read(), cell1_value);
+    });
+
+    backend_test!(test_lazy_cell, F, {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        struct Wrapper(u64);
+
+        impl From<u64> for Wrapper {
+            fn from(v: u64) -> Self {
+                Self(v)
+            }
+        }
+
+        impl From<Wrapper> for u64 {
+            fn from(Wrapper(v): Wrapper) -> Self {
+                v
+            }
+        }
+
+        type OurLayout = Atom<u64>;
+
+        let mut backend = create_backend!(OurLayout, F);
+
+        let expected = {
+            let cell = backend.allocate(OurLayout::placed().into_location());
+
+            // Cell should be zero-initialised.
+            assert_eq!(cell.read(), 0);
+
+            let mut lazy = LazyCell::wrap(cell);
+
+            assert_eq!(Wrapper(0), lazy.read());
+
+            let new = Wrapper(rand::random());
+            lazy.write(new);
+            assert_eq!(new, lazy.read());
+
+            let old = new;
+
+            let new = Wrapper(rand::random());
+            assert_eq!(old, lazy.replace(new));
+
+            new.0
+        };
+
+        // Rebinding, check cell contents
+        let cell = backend.allocate(OurLayout::placed().into_location());
+        assert_eq!(cell.read(), expected);
     });
 
     backend_test!(
