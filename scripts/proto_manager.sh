@@ -812,8 +812,14 @@ function update_tezt_tests() {
   commit "tezt: fix other tests"
 
   mkdir -p "tezt/tests/encoding_samples/${label}"
-  cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
-  commit "tezt: copy ${protocol_source} encoding samples to ${label}"
+  if [[ ${is_snapshot} == true ]]; then
+    git mv tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
+    commit "tezt: move ${protocol_source} encoding samples to ${label}"
+
+  else
+    cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
+    commit "tezt: copy ${protocol_source} encoding samples to ${label}"
+  fi
 
   # for regression files, protocol_name should be at least 5 character long, if not add enough trailing '-' at the end
   regression_protocol_name=${capitalized_label}
