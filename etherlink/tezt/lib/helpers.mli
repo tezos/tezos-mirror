@@ -217,4 +217,8 @@ val find_and_execute_withdrawal :
 (** Runs a sequencer in mode sandbox, with no connection needed to a
     rollup node. *)
 val init_sequencer_sandbox :
-  ?kernel:Uses.t -> ?bootstrap_accounts:string list -> unit -> Evm_node.t Lwt.t
+  ?patch_config:(JSON.t -> JSON.t) ->
+  ?kernel:Uses.t ->
+  ?bootstrap_accounts:string list ->
+  unit ->
+  Evm_node.t Lwt.t

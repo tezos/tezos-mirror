@@ -393,7 +393,7 @@ let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
   in
   return withdrawal_level
 
-let init_sequencer_sandbox ?(kernel = Constant.WASM.evm_kernel)
+let init_sequencer_sandbox ?patch_config ?(kernel = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -431,4 +431,4 @@ let init_sequencer_sandbox ?(kernel = Constant.WASM.evm_kernel)
           tx_pool_tx_per_addr_limit = None;
         })
   in
-  Evm_node.init ~mode:sequencer_mode Uri.(empty |> to_string)
+  Evm_node.init ?patch_config ~mode:sequencer_mode Uri.(empty |> to_string)
