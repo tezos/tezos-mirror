@@ -85,7 +85,7 @@ let job_opam_packages ?dependencies pipeline_type group batch_index packages :
          At the time of writing, the opam tests were quite flaky.
          Therefore, a retry was added. This should be removed once the
          underlying tests have been fixed. *)
-    ~retry:2
+    ~retry:{max = 2; when_ = []}
     ~rules:
       (opam_rules
          pipeline_type
@@ -749,7 +749,7 @@ let jobs pipeline_type =
             ?timeout
             ?parallel
             ~__POS__
-            ~retry:2
+            ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
             ~name
             ~stage:Stages.test
             ~image

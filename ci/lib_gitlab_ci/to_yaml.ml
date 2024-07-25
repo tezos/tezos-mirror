@@ -236,6 +236,29 @@ let enc_parallel (parallel : parallel) : value =
       in
       `O [("matrix", matrix)]
 
+let enc_retry : retry -> value =
+  let enc_failure_type failure_type =
+    let failure_type =
+      match failure_type with
+      | Unknown_failure -> "unknown_failure"
+      | Script_failure -> "script_failure"
+      | Api_failure -> "api_failure"
+      | Stuck_or_timeout_failure -> "stuck_or_timeout_failure"
+      | Runner_system_failure -> "runner_system_failure"
+      | Runner_unsupported -> "runner_unsupported"
+      | Stale_schedule -> "stale_schedule"
+      | Job_execution_timeout -> "job_execution_timeout"
+      | Archived_failure -> "archived_failure"
+      | Unmet_prerequisites -> "unmet_prerequisites"
+      | Scheduler_failure -> "scheduler_failure"
+      | Data_integrity_failure -> "data_integrity_failure"
+    in
+    `String failure_type
+  in
+  fun {max; when_} ->
+    if when_ = [] then int max
+    else `O [("max", int max); ("when", array enc_failure_type when_)]
+
 let enc_job : job -> value =
  fun {
        name = _;
@@ -280,7 +303,7 @@ let enc_job : job -> value =
       opt "artifacts" enc_artifacts artifacts;
       opt "when" enc_when_job when_;
       opt "coverage" string coverage;
-      opt "retry" int retry;
+      opt "retry" enc_retry retry;
       opt "parallel" enc_parallel parallel;
     ]
 

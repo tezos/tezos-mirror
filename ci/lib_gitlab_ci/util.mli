@@ -75,7 +75,7 @@ val job :
   ?tags:string list ->
   ?when_:when_job ->
   ?coverage:string ->
-  ?retry:int ->
+  ?retry:retry ->
   ?parallel:parallel ->
   name:string ->
   script:string list ->

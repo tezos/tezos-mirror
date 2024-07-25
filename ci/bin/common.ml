@@ -1146,7 +1146,7 @@ module Tezt = struct
         "TEZT_VARIANT";
       ]
     in
-    let retry = if retry = 0 then None else Some retry in
+    let retry = if retry = 0 then None else Some {max = retry; when_ = []} in
     job
       ?timeout
       ~__POS__
