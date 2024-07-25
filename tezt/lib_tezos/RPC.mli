@@ -1175,6 +1175,13 @@ val get_chain_block_context_delegate_voting_info :
 val get_chain_block_context_delegate_voting_power :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/consensus_key]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_consensus_key :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/total_supply]
 
     [chain] defaults to ["main"].

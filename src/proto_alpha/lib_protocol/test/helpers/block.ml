@@ -140,9 +140,9 @@ let get_next_baker_excluding excludes block =
   let* baker_opt =
     List.find_es
       (fun {Plugin.RPC.Baking_rights.consensus_key; delegate; _} ->
-        let* info = Plugin.RPC.Delegates.info rpc_ctxt block delegate in
+        let* info = Delegate_services.info rpc_ctxt block delegate in
         let* forbidden =
-          Plugin.RPC.Staking.is_forbidden rpc_ctxt block delegate
+          Delegate_services.is_forbidden rpc_ctxt block delegate
         in
         return
         @@ ((not info.deactivated) && (not forbidden)

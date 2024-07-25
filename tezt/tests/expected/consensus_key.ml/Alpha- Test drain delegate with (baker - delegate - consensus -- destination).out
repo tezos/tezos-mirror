@@ -26,66 +26,149 @@ This sequence of operations was run:
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000000000000", "current_frozen_deposits": "200000000000",
-  "frozen_deposits": "200000000000", "staking_balance": "4000000000000",
-  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0",
+{ "deactivated": false, "is_forbidden": false,
+  "participation":
+    { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
+      "missed_slots": 0, "missed_levels": 0,
+      "remaining_allowed_missed_slots": 68,
+      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+  "active_staking_parameters":
+    { "limit_of_staking_over_baking_millionth": 0,
+      "edge_of_baking_over_staking_billionth": 1000000000 },
+  "pending_staking_parameters": [], "baking_power": "4000000000000",
+  "total_staked": "200000000000", "total_delegated": "3800000000000",
   "min_delegated_in_current_cycle":
     { "amount": "3800000000000",
       "level":
         { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
-          "expected_commitment": false } }, "deactivated": false,
-  "grace_period": 3, "pending_denunciations": false,
-  "total_delegated_stake": "0", "staking_denominator": "0",
-  "voting_power": "4000000000000", "remaining_proposals": 20,
-  "active_consensus_key": "[PUBLIC_KEY_HASH]" }
+          "expected_commitment": false } },
+  "own_full_balance": "4000000000000", "own_staked": "200000000000",
+  "own_delegated": "3800000000000", "external_staked": "0",
+  "external_delegated": "0",
+  "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
+  "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
+  "staking_denominator": "0", "current_voting_power": "4000000000000",
+  "voting_power": "4000000000000",
+  "voting_info":
+    { "voting_power": "4000000000000", "remaining_proposals": 20 },
+  "consensus_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk": "[PUBLIC_KEY]" } },
+  "stakers":
+    [ { "staker": "[PUBLIC_KEY_HASH]",
+        "frozen_deposits": "200000000000" } ],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000000333333", "current_frozen_deposits": "200000016667",
-  "frozen_deposits": "200000000000", "staking_balance": "4000000333333",
-  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0",
+{ "deactivated": false, "is_forbidden": false,
+  "participation":
+    { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
+      "missed_slots": 0, "missed_levels": 0,
+      "remaining_allowed_missed_slots": 68,
+      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+  "active_staking_parameters":
+    { "limit_of_staking_over_baking_millionth": 0,
+      "edge_of_baking_over_staking_billionth": 1000000000 },
+  "pending_staking_parameters": [], "baking_power": "4000000016667",
+  "total_staked": "200000016667", "total_delegated": "3800000316666",
   "min_delegated_in_current_cycle":
     { "amount": "3800000000000",
       "level":
         { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
-          "expected_commitment": false } }, "deactivated": false,
-  "grace_period": 3, "pending_denunciations": false,
-  "total_delegated_stake": "0", "staking_denominator": "0",
-  "voting_power": "4000000000000", "remaining_proposals": 20,
-  "active_consensus_key": "[PUBLIC_KEY_HASH]",
-  "pending_consensus_keys":
-    [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
+          "expected_commitment": false } },
+  "own_full_balance": "4000000333333", "own_staked": "200000016667",
+  "own_delegated": "3800000316666", "external_staked": "0",
+  "external_delegated": "0",
+  "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
+  "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
+  "staking_denominator": "0", "current_voting_power": "4000000333333",
+  "voting_power": "4000000000000",
+  "voting_info":
+    { "voting_power": "4000000000000", "remaining_proposals": 20 },
+  "consensus_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk": "[PUBLIC_KEY]" },
+      "pendings":
+        [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]",
+            "pk": "[PUBLIC_KEY]" } ] },
+  "stakers":
+    [ { "staker": "[PUBLIC_KEY_HASH]",
+        "frozen_deposits": "200000016667" } ],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000003298113", "current_frozen_deposits": "200000164906",
-  "frozen_deposits": "200000000000", "staking_balance": "4000003298113",
-  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0",
+{ "deactivated": false, "is_forbidden": false,
+  "participation":
+    { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
+      "missed_slots": 0, "missed_levels": 0,
+      "remaining_allowed_missed_slots": 68,
+      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+  "active_staking_parameters":
+    { "limit_of_staking_over_baking_millionth": 0,
+      "edge_of_baking_over_staking_billionth": 1000000000 },
+  "pending_staking_parameters": [], "baking_power": "4000002150209",
+  "total_staked": "200000164906", "total_delegated": "3800003133207",
   "min_delegated_in_current_cycle":
     { "amount": "3800001985303",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
-          "expected_commitment": false } }, "deactivated": false,
-  "grace_period": 3, "pending_denunciations": false,
-  "total_delegated_stake": "0", "staking_denominator": "0",
-  "voting_power": "4000000000000", "remaining_proposals": 20,
-  "active_consensus_key": "[PUBLIC_KEY_HASH]" }
+          "expected_commitment": false } },
+  "own_full_balance": "4000003298113", "own_staked": "200000164906",
+  "own_delegated": "3800003133207", "external_staked": "0",
+  "external_delegated": "0",
+  "total_unstaked_per_cycle":
+    [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "1" } ],
+  "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
+  "staking_denominator": "0", "current_voting_power": "4000003298113",
+  "voting_power": "4000000000000",
+  "voting_info":
+    { "voting_power": "4000000000000", "remaining_proposals": 20 },
+  "consensus_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk": "[PUBLIC_KEY]" } },
+  "stakers":
+    [ { "staker": "[PUBLIC_KEY_HASH]",
+        "frozen_deposits": "200000164906" } ],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000003298113", "current_frozen_deposits": "200000164906",
-  "frozen_deposits": "200000000000", "staking_balance": "4000003298113",
-  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0",
+{ "deactivated": false, "is_forbidden": false,
+  "participation":
+    { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
+      "missed_slots": 0, "missed_levels": 0,
+      "remaining_allowed_missed_slots": 68,
+      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+  "active_staking_parameters":
+    { "limit_of_staking_over_baking_millionth": 0,
+      "edge_of_baking_over_staking_billionth": 1000000000 },
+  "pending_staking_parameters": [], "baking_power": "4000002150209",
+  "total_staked": "200000164906", "total_delegated": "3800003133207",
   "min_delegated_in_current_cycle":
     { "amount": "3800001985303",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
-          "expected_commitment": false } }, "deactivated": false,
-  "grace_period": 3, "pending_denunciations": false,
-  "total_delegated_stake": "0", "staking_denominator": "0",
-  "voting_power": "4000000000000", "remaining_proposals": 20,
-  "active_consensus_key": "[PUBLIC_KEY_HASH]" }
+          "expected_commitment": false } },
+  "own_full_balance": "4000003298113", "own_staked": "200000164906",
+  "own_delegated": "3800003133207", "external_staked": "0",
+  "external_delegated": "0",
+  "total_unstaked_per_cycle":
+    [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "1" } ],
+  "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
+  "staking_denominator": "0", "current_voting_power": "4000003298113",
+  "voting_power": "4000000000000",
+  "voting_info":
+    { "voting_power": "4000000000000", "remaining_proposals": 20 },
+  "consensus_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk": "[PUBLIC_KEY]" } },
+  "stakers":
+    [ { "staker": "[PUBLIC_KEY_HASH]",
+        "frozen_deposits": "200000164906" } ],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "3800003133203"
@@ -119,19 +202,40 @@ This sequence of operations was run:
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "238000528932", "current_frozen_deposits": "200000181573",
-  "frozen_deposits": "200000083983", "staking_balance": "238000528932",
-  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0",
+{ "deactivated": false, "is_forbidden": false,
+  "participation":
+    { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
+      "missed_slots": 59, "missed_levels": 1,
+      "remaining_allowed_missed_slots": 9,
+      "expected_attesting_rewards": "531216" }, "grace_period": 4,
+  "active_staking_parameters":
+    { "limit_of_staking_over_baking_millionth": 0,
+      "edge_of_baking_over_staking_billionth": 1000000000 },
+  "pending_staking_parameters": [], "baking_power": "238000528932",
+  "total_staked": "200000181573", "total_delegated": "38000347359",
   "min_delegated_in_current_cycle":
     { "amount": "38000347359",
       "level":
         { "level": 9, "level_position": 8, "cycle": 2, "cycle_position": 0,
-          "expected_commitment": false } }, "deactivated": false,
-  "grace_period": 4, "pending_denunciations": false,
-  "total_delegated_stake": "0", "staking_denominator": "0",
-  "voting_power": "4000000000000", "remaining_proposals": 20,
-  "active_consensus_key": "[PUBLIC_KEY_HASH]" }
+          "expected_commitment": false } },
+  "own_full_balance": "238000528932", "own_staked": "200000181573",
+  "own_delegated": "38000347359", "external_staked": "0",
+  "external_delegated": "0",
+  "total_unstaked_per_cycle":
+    [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "1" },
+      { "cycle": 2, "deposit": "3" } ], "denunciations": [],
+  "estimated_shared_pending_slashed_amount": "0", "staking_denominator": "0",
+  "current_voting_power": "238000528932", "voting_power": "4000000000000",
+  "voting_info":
+    { "voting_power": "4000000000000", "remaining_proposals": 20 },
+  "consensus_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk": "[PUBLIC_KEY]" } },
+  "stakers":
+    [ { "staker": "[PUBLIC_KEY_HASH]",
+        "frozen_deposits": "200000181573" } ],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "38000347355"

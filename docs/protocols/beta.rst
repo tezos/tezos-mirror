@@ -55,8 +55,17 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
+.. _breaking_changes_beta:
+
 Breaking Changes
 ----------------
+
+- Reworked RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>``,
+  which returns a lot of information about a given baker. Its fields
+  now match all non-deprecated ``delegates/<baker_pkh>/...`` RPCs
+  one-for-one. This change is breaking for both JSON and binary
+  encodings. (MR :gl:`!14209`)
 
 RPC Changes
 -----------
@@ -131,6 +140,10 @@ RPC Changes
 
   * Added RPC ``GET ../spendable_and_frozen_bonds`` which is identical
     to ``GET ../balance_and_frozen_bonds``. (MR :gl:`!14154`)
+
+- Reworked RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>``;
+  see :ref:`breaking_changes_beta`.
 
 Operation receipts
 ------------------
