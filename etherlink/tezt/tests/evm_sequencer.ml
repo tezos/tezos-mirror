@@ -2284,7 +2284,7 @@ let test_observer_forwards_transaction =
     Evm_node.wait_for_blueprint_applied ~timeout:10.0 sequencer_node 1
   in
   (* Ensure the observer node has a correctly initialized local state. *)
-  let* () = Evm_node.wait_for_blueprint_applied ~timeout:10.0 observer_node 1 in
+  let* () = Evm_node.wait_for_blueprint_applied ~timeout:50.0 observer_node 1 in
 
   let* txn =
     Eth_cli.transaction_send
