@@ -3,5 +3,5 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
 Description: The Octez DAL node binaries
-Recommends: @DPKG@-baker (>=@VERSION@), @DPKG@-client (>=@VERSION@)
+Recommends: @DPKG@-client (>=@VERSION@)
 Depends: @DEPENDS@
