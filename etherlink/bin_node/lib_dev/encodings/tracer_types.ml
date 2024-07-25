@@ -583,6 +583,28 @@ let uint53_encoding =
   let json_encoding = conv uint53_to_json json_to_uint53 json in
   splitted ~json:json_encoding ~binary:z
 
+let uint_as_hex_encoding =
+  let open Data_encoding in
+  let int_to_json i = `String (Format.sprintf "0x%02x" (Z.to_int i)) in
+  let json_to_int = function
+    | `String s -> Z.of_int @@ int_of_string s
+    | _ -> Stdlib.failwith "expected hex encoded int"
+  in
+  let json_encoding = conv int_to_json json_to_int json in
+  splitted ~json:json_encoding ~binary:z
+
+let decode_value decode =
+  let open Result_syntax in
+  function
+  | Rlp.Value b -> decode b
+  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected value")
+
+let decode_list decode =
+  let open Result_syntax in
+  function
+  | Rlp.List l -> return (decode l)
+  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected list")
+
 module StructLogger = struct
   type opcode_log = {
     pc : uint53;
@@ -598,18 +620,6 @@ module StructLogger = struct
     refund : uint53;
     error : string option;
   }
-
-  let decode_value decode =
-    let open Result_syntax in
-    function
-    | Rlp.Value b -> decode b
-    | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected value")
-
-  let decode_list decode =
-    let open Result_syntax in
-    function
-    | Rlp.List l -> return (decode l)
-    | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected list")
 
   let opcode_rlp_decoder bytes =
     let open Result_syntax in
@@ -803,19 +813,191 @@ module StructLogger = struct
     return {gas; failed; return_value; struct_logs}
 end
 
+let decode_list decode_item l =
+  let open Result_syntax in
+  match l with
+  | Rlp.List items ->
+      let l = List.map decode_item items in
+      tzall l
+  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for a list of items")
+
+let decode_hex =
+  decode_value (fun b ->
+      let open Result_syntax in
+      let* (`Hex s) = Result_syntax.return @@ Hex.of_bytes b in
+      return (Ethereum_types.Hex s))
+
+let decode_string =
+  decode_value (fun b -> Result_syntax.return @@ Bytes.to_string b)
+
+let decode_address =
+  decode_value (fun b ->
+      Result_syntax.return @@ Ethereum_types.decode_address b)
+
+let decode_z =
+  decode_value (fun b -> Result_syntax.return @@ Z.of_bits @@ Bytes.to_string b)
+
+let decode_int =
+  decode_value (fun b ->
+      Result_syntax.return @@ Z.to_int @@ Z.of_bits @@ Bytes.to_string b)
+
 module CallTracer = struct
-  type output = {calls : output list; type_ : string; from : string}
+  type logs = {
+    address : Ethereum_types.address;
+    topics : Ethereum_types.hex list;
+    data : Ethereum_types.hex;
+  }
+
+  type output = {
+    calls : output list;
+    type_ : string;
+    from : Ethereum_types.address;
+    to_ : Ethereum_types.address option;
+    value : uint53;
+    gas : uint53 option;
+    gas_used : uint53;
+    input : Ethereum_types.hex;
+    output : Ethereum_types.hex option;
+    error : Ethereum_types.hex option;
+    revert_reason : Ethereum_types.hex option;
+    logs : logs list option;
+  }
+
+  let logs_encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; topics; data} -> (address, topics, data))
+      (fun (address, topics, data) -> {address; topics; data})
+      (obj3
+         (req "address" Ethereum_types.address_encoding)
+         (req "topics" (list Ethereum_types.hex_encoding))
+         (req "data" Ethereum_types.hex_encoding))
 
   let output_encoding =
     let open Data_encoding in
     mu "callTracerOutput" (fun enc ->
         conv
-          (fun {calls; type_; from} -> (calls, type_, from))
-          (fun (calls, type_, from) -> {calls; type_; from})
-          (obj3
-             (req "calls" (list enc))
-             (req "type" string)
-             (req "from" string)))
+          (fun {
+                 calls;
+                 type_;
+                 from;
+                 to_;
+                 value;
+                 gas;
+                 gas_used;
+                 input;
+                 output;
+                 error;
+                 revert_reason;
+                 logs;
+               } ->
+            ( (calls, type_, from, to_, value, gas),
+              (gas_used, input, output, error, revert_reason, logs) ))
+          (fun ( (calls, type_, from, to_, value, gas),
+                 (gas_used, input, output, error, revert_reason, logs) ) ->
+            {
+              calls;
+              type_;
+              from;
+              to_;
+              value;
+              gas;
+              gas_used;
+              input;
+              output;
+              error;
+              revert_reason;
+              logs;
+            })
+          (merge_objs
+             (obj6
+                (req "calls" (list enc))
+                (req "type" string)
+                (req "from" Ethereum_types.address_encoding)
+                (opt "to" Ethereum_types.address_encoding)
+                (req "value" uint_as_hex_encoding)
+                (opt "gas" uint_as_hex_encoding))
+             (obj6
+                (req "gas_used" uint_as_hex_encoding)
+                (req "input" Ethereum_types.hex_encoding)
+                (opt "output" Ethereum_types.hex_encoding)
+                (opt "error" Ethereum_types.hex_encoding)
+                (opt "revert_reason" Ethereum_types.hex_encoding)
+                (opt "logs" (list logs_encoding)))))
+
+  let decode_logs item =
+    let open Result_syntax in
+    match item with
+    | Rlp.List [address; topics; data] ->
+        let* address = decode_address address in
+        let* topics = decode_list decode_hex topics in
+        let* data = decode_hex data in
+        return {address; topics; data}
+    | _ -> tzfail (error_of_fmt "Invalid RLP encoding for the logs")
+
+  let decode_call bytes =
+    let open Result_syntax in
+    let* rlp = Rlp.decode bytes in
+    match rlp with
+    | Rlp.List
+        [
+          type_;
+          from;
+          to_;
+          value;
+          gas;
+          gas_used;
+          input;
+          output;
+          error;
+          revert_reason;
+          logs;
+          depth;
+        ] ->
+        let* type_ = decode_string type_ in
+        let* from = decode_address from in
+        let* to_ = Rlp.decode_option decode_address to_ in
+        let* value = decode_z value in
+        let* gas = Rlp.decode_option decode_z gas in
+        let* gas_used = decode_z gas_used in
+        let* input = decode_hex input in
+        let* output = Rlp.decode_option decode_hex output in
+        let* error = Rlp.decode_option decode_hex error in
+        let* revert_reason = Rlp.decode_option decode_hex revert_reason in
+        let* logs = Rlp.decode_option (decode_list decode_logs) logs in
+        let* depth = decode_int depth in
+        return
+          ( {
+              type_;
+              from;
+              to_;
+              value;
+              gas;
+              gas_used;
+              input;
+              output;
+              error;
+              revert_reason;
+              logs;
+              calls = [];
+            },
+            depth )
+    | List l ->
+        tzfail
+          (error_of_fmt
+             "Invalid RLP encoding for a call, list with %n items. %s"
+             (List.length l)
+             (Bytes.to_string bytes))
+    | Value v ->
+        tzfail
+          (error_of_fmt
+             "Invalid RLP encoding for a call, value \"%s\" %s"
+             (Bytes.to_string v)
+             (Bytes.to_string bytes))
+
+  let to_string call =
+    Data_encoding.Json.to_string
+      (Data_encoding.Json.construct output_encoding call)
 end
 
 type output =

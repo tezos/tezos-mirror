@@ -31,6 +31,9 @@
     Subject:      Tests for the RLP encoder/decoder
 *)
 
+(* TODO: #7449
+   These tests need to be refactored in tezt, Alcote*t has been deprecated *)
+
 open Evm_node_lib_dev_encoding
 open Rlp
 
