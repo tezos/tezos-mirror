@@ -588,8 +588,8 @@ let changeset_test_evm_compatibility =
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ~__POS__ ~stage
-    ~name script : tezos_job =
+    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?retry ~__POS__
+    ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -600,6 +600,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?tag
     ?allow_failure
     ?parallel
+    ?retry
     ~__POS__
     ~image:Images_external.docker
     ~variables:
@@ -685,8 +686,15 @@ module Images = struct
        This job is automatically included in any pipeline that uses any of these images. *)
     let job_docker_ci arch =
       let variables = Some [("ARCH", arch_to_string_alt arch)] in
+      let retry =
+        match arch with
+        | Amd64 -> None
+        (* We're currently seeing flakiness in the arm64 jobs *)
+        | Arm64 -> Some {max = 1; when_ = [Runner_system_failure]}
+      in
       job_docker_authenticated
         ?variables
+        ?retry
         ~__POS__
         ~arch
         ~skip_docker_initialization:true
