@@ -62,23 +62,23 @@ let wseq ic oc seq =
   Lwt.finalize (fun () -> wseq ic oc seq) (fun () -> Lwt_io.close ic)
 
 module type LOGGING = sig
-  val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
+  val log_debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
   val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
 
   val log_notice : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-  val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
+  val log_warn : ('a, Format.formatter, unit, unit) format4 -> 'a
 
   val log_error : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-  val lwt_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+  val lwt_log_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
   val lwt_log_info : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
   val lwt_log_notice : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
-  val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+  val lwt_log_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
   val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 end
@@ -214,13 +214,13 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       match answer with
       | `Ok o ->
           let body = output o in
-          Log.debug "server (%s) response code:200" con_string ;
-          Log.debug "server (%s) response body: %s" con_string body ;
+          Log.log_debug "server (%s) response code:200" con_string ;
+          Log.log_debug "server (%s) response body: %s" con_string body ;
           let encoding = Transfer.Fixed (Int64.of_int (String.length body)) in
           ( Response.make ~status:`OK ~encoding ?headers (),
             Cohttp_lwt.Body.of_string body )
       | `No_content ->
-          Log.debug "server (%s) response code:204 (no content)" con_string ;
+          Log.log_debug "server (%s) response code:204 (no content)" con_string ;
           (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
       | `Created s ->
           let headers = Header.init () in
@@ -229,7 +229,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             | None -> headers
             | Some s -> Header.add headers "location" s
           in
-          Log.debug "server (%s) response code:201 (created)" con_string ;
+          Log.log_debug "server (%s) response code:201 (created)" con_string ;
           (Response.make ~status:`Created ~headers (), Cohttp_lwt.Body.empty)
 
     let handle_rpc_answer_error con_string ?headers error answer =
@@ -375,13 +375,14 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       path_and_query
     >>= fun () ->
     let req_headers = Request.headers req in
-    Log.lwt_debug
+    Log.lwt_log_debug
       "server (%s) request headers: %s"
       con_string
       (Header.to_string req_headers)
     >>= fun () ->
     Cohttp_lwt.Body.to_string body >>= fun body ->
-    Log.lwt_debug "server (%s) request body: %s" con_string body >>= fun () ->
+    Log.lwt_log_debug "server (%s) request body: %s" con_string body
+    >>= fun () ->
     let path = Uri.path uri in
     let path = Resto.Utils.decode_split_path path in
     (match Request.meth req with
@@ -392,7 +393,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         >>=? fun (Directory.Service s) ->
         Media.input_media_type ~headers:req_headers server.medias
         >>? fun input_media_type ->
-        Log.lwt_debug
+        Log.lwt_log_debug
           "server (%s) input media type %s"
           con_string
           (Media_type.name input_media_type)
@@ -408,7 +409,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             Lwt.return_error (`Cannot_parse_query s)
         | query -> Lwt.return_ok query)
         >>=? fun query ->
-        Log.lwt_debug
+        Log.lwt_log_debug
           "server (%s) ouput media type %s"
           con_string
           (Media_type.name output_media_type)
@@ -440,7 +441,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             lwt_return_ok_response response
         | `OkChunk _ as a ->
             let output_seq = output_media_type.construct_seq s.types.output in
-            Log.lwt_debug
+            Log.lwt_log_debug
               "server (%s) response code:200 (with chunk transfer\n\
               \            encoding)"
               con_string
@@ -451,7 +452,9 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             let output = output_media_type.construct s.types.output in
             let body = create_stream server con output o in
             let encoding = Transfer.Chunked in
-            Log.lwt_debug "server (%s) response code:200 (streamed)" con_string
+            Log.lwt_log_debug
+              "server (%s) response code:200 (streamed)"
+              con_string
             >>= fun () ->
             lwt_return_ok_response
               ( Response.make ~status:`OK ~encoding ~headers (),
@@ -510,7 +513,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       (let conn_closed ((_, con) as c) =
          let () = conn_closed c in
          let con_string = Connection.to_string con in
-         Log.debug "server (%s) got conn closed" con_string ;
+         Log.log_debug "server (%s) got conn closed" con_string ;
          try ConnectionMap.find con server.streams () with Not_found -> ()
        and on_exn = function
          | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->

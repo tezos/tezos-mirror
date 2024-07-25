@@ -70,17 +70,17 @@ let json chunk_size =
 let media_types chunk_size = [json chunk_size]
 
 module Logger : Resto_cohttp_server.Server.LOGGING = struct
-  let debug fmt = Format.kasprintf (Format.printf "[DEBUG]: %s\n%!") fmt
+  let log_debug fmt = Format.kasprintf (Format.printf "[DEBUG]: %s\n%!") fmt
 
   let log_info fmt = Format.kasprintf (Printf.printf "[INFO]: %s\n%!") fmt
 
   let log_notice fmt = Format.kasprintf (Printf.printf "[NOTICE]: %s\n%!") fmt
 
-  let warn fmt = Format.kasprintf (Printf.printf "[WARN]: %s\n%!") fmt
+  let log_warn fmt = Format.kasprintf (Printf.printf "[WARN]: %s\n%!") fmt
 
   let log_error fmt = Format.kasprintf (Printf.eprintf "[ERROR]: %s\n%!") fmt
 
-  let lwt_debug fmt =
+  let lwt_log_debug fmt =
     Format.kasprintf Lwt_fmt.(fprintf stdout "[DEBUG]: %s\n%!") fmt
 
   let lwt_log_info fmt =
@@ -89,7 +89,7 @@ module Logger : Resto_cohttp_server.Server.LOGGING = struct
   let lwt_log_notice fmt =
     Format.kasprintf Lwt_fmt.(fprintf stdout "[NOTICE]: %s\n%!") fmt
 
-  let lwt_warn fmt =
+  let lwt_log_warn fmt =
     Format.kasprintf Lwt_fmt.(fprintf stdout "[WARN]: %s\n%!") fmt
 
   let lwt_log_error fmt =
