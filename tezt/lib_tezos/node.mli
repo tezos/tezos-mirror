@@ -101,6 +101,7 @@ type argument =
   | Max_active_rpc_connections of int  (** [--max-active-rpc-connections] *)
   | Enable_http_cache_headers  (** [--enable-http-cache-headers] *)
   | Context_pruning of string  (** [--context-pruning] *)
+  | Storage_maintenance_delay of string  (** [--storage-maintenance-delay]*)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 

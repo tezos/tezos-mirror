@@ -144,6 +144,7 @@ val update :
   ?latency:int ->
   ?enable_http_cache_headers:bool ->
   ?context_pruning:Storage_maintenance.context_pruning ->
+  ?storage_maintenance_delay:Storage_maintenance.delay ->
   t ->
   t tzresult Lwt.t
 
