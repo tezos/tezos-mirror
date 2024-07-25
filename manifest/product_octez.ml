@@ -503,6 +503,7 @@ let octez_rust_deps =
             ];
             [
               S "deps";
+              [S "file"; S "build.sh"];
               [S "file"; S "Cargo.toml"];
               [S "file"; S "Cargo.lock"];
               [S "file"; S "../../rust-toolchain"];
@@ -513,50 +514,7 @@ let octez_rust_deps =
               [S "source_tree"; S "../riscv"];
               [S "source_tree"; S "../kernel_sdk"];
             ];
-            [
-              S "action";
-              [
-                S "no-infer";
-                [
-                  S "progn";
-                  of_atom_list
-                    ["run"; "rm"; "-f"; "wasmer-3.3.0/lib/c-api/wasmer.h"];
-                  of_atom_list
-                    [
-                      "run";
-                      "cargo";
-                      "build";
-                      "--release";
-                      "-p";
-                      "octez-rust-deps";
-                    ];
-                  of_atom_list
-                    [
-                      "copy";
-                      "target/release/liboctez_rust_deps.a";
-                      "liboctez_rust_deps.a";
-                    ];
-                  of_atom_list
-                    [
-                      "bash";
-                      "test -r target/release/liboctez_rust_deps.so && cp -f \
-                       target/release/liboctez_rust_deps.so \
-                       dlloctez_rust_deps.so || true";
-                    ];
-                  of_atom_list
-                    [
-                      "bash";
-                      "test -r target/release/liboctez_rust_deps.dylib && cp \
-                       -f target/release/liboctez_rust_deps.dylib \
-                       dlloctez_rust_deps.so || true";
-                    ];
-                  of_atom_list
-                    ["copy"; "wasmer-3.3.0/lib/c-api/wasmer.h"; "wasmer.h"];
-                  of_atom_list
-                    ["copy"; "wasmer-3.3.0/lib/c-api/wasm.h"; "wasm.h"];
-                ];
-              ];
-            ];
+            [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
           ];
         ]
 
