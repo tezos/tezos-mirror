@@ -110,7 +110,35 @@ type artifacts = {
   name : string option;
 }
 
-type default = {image : image option; interruptible : bool option}
+type failure_type =
+  | Unknown_failure
+  | Script_failure
+  | Api_failure
+  | Stuck_or_timeout_failure
+  | Runner_system_failure
+  | Runner_unsupported
+  | Stale_schedule
+  | Job_execution_timeout
+  | Archived_failure
+  | Unmet_prerequisites
+  | Scheduler_failure
+  | Data_integrity_failure
+
+(** Retry configuration.
+
+    Retry at most [max] times (can be 0, 1, or 2).
+
+    If [when_] is non-empty, only retry for those specific error causes.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#retry}retry} in the GitLab
+    YAML keyword reference for more information. *)
+type retry = {max : int; when_ : failure_type list}
+
+type default = {
+  image : image option;
+  interruptible : bool option;
+  retry : retry option;
+}
 
 (** Policy for caches.
 
@@ -165,30 +193,6 @@ type matrix = (string * string list) list list
     See {{:https://docs.gitlab.com/ee/ci/yaml/#parallel}parallel} in the GitLab
     YAML keyword reference for more information. *)
 type parallel = Vector of int | Matrix of matrix
-
-type failure_type =
-  | Unknown_failure
-  | Script_failure
-  | Api_failure
-  | Stuck_or_timeout_failure
-  | Runner_system_failure
-  | Runner_unsupported
-  | Stale_schedule
-  | Job_execution_timeout
-  | Archived_failure
-  | Unmet_prerequisites
-  | Scheduler_failure
-  | Data_integrity_failure
-
-(** Retry configuration.
-
-    Retry at most [max] times (can be 0, 1, or 2).
-
-    If [when_] is non-empty, only retry for those specific error causes.
-
-    See {{:https://docs.gitlab.com/ee/ci/yaml/#retry}retry} in the GitLab
-    YAML keyword reference for more information. *)
-type retry = {max : int; when_ : failure_type list}
 
 type job = {
   name : string;

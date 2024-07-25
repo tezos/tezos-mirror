@@ -10,7 +10,8 @@
 open Types
 
 (** Constructs a [default:] configuration element. *)
-val default : ?image:image -> ?interruptible:bool -> unit -> default
+val default :
+  ?image:image -> ?interruptible:bool -> ?retry:retry -> unit -> default
 
 (** Constructs a job rule.
 
