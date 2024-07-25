@@ -949,15 +949,18 @@ function misc_updates() {
 
 function generate_doc() {
 
-  # Create proto_beta docs
-
-  echo "Copying docs/${protocol_source} to docs/${label}"
-  mkdir /tmp/tezos_proto_doc_snapshot
-  git archive HEAD "docs/${protocol_source}/" | tar -x -C /tmp/tezos_proto_doc_snapshot
-  mv "/tmp/tezos_proto_doc_snapshot/docs/${protocol_source}" "docs/${label}"
-  rm -rf /tmp/tezos_proto_doc_snapshot commit "copy from docs/${protocol_source}"
-  commit "docs: copy from docs/${protocol_source}"
-
+  # Create docs
+  if [[ ${is_snapshot} == true ]]; then
+    git mv "docs/${protocol_source}" "docs/${label}"
+    commit "docs: move from docs/${protocol_source}"
+  else
+    echo "Copying docs/${protocol_source} to docs/${label}"
+    mkdir /tmp/tezos_proto_doc_snapshot
+    git archive HEAD "docs/${protocol_source}/" | tar -x -C /tmp/tezos_proto_doc_snapshot
+    mv "/tmp/tezos_proto_doc_snapshot/docs/${protocol_source}" "docs/${label}"
+    rm -rf /tmp/tezos_proto_doc_snapshot commit "copy from docs/${protocol_source}"
+    commit "docs: copy from docs/${protocol_source}"
+  fi
   # fix versioned links (in labels, references, and paths) in docs
   echo "Fixing versioned links in docs"
   cd "docs/${label}"
@@ -978,11 +981,12 @@ function generate_doc() {
   # generate docs/protocols/${new_versioned_name}.rst from docs/protocols/${protocol_source}.rst
   echo "Copying docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   if [[ ${is_snapshot} == true ]]; then
-    mv "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
+    git mv "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
+    commit "docs: move docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   else
     cp "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
+    commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   fi
-  commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
     -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
     -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
@@ -1061,12 +1065,6 @@ function generate_doc() {
   rm -f "docs/${label}/rpc.rst"
   make -C docs "${label}"/rpc.rst
   commit "docs: generate ${label}/rpc.rst"
-
-  if [[ ${is_snapshot} == true ]]; then
-    warning "docs/${protocol_source} will now be removed"
-    rm -rf "docs/${protocol_source}"
-    commit "docs: remove docs/${protocol_source}"
-  fi
 
 }
 
