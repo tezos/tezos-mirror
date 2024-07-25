@@ -181,23 +181,132 @@ let slot_size_param slot_size =
   make_int_parameter ["dal_parametric"; "slot_size"] slot_size
 
 (* Some initialization functions to start needed nodes. *)
+type l1_history_mode =
+  | Default_with_refutation
+  | Default_without_refutation
+  | Custom of Node.history_mode
+
+let generate_protocol_parameters base protocol parameter_overrides =
+  let* parameter_file =
+    Protocol.write_parameter_file ~base parameter_overrides
+  in
+  let* client = Client.init_mockup ~parameter_file ~protocol () in
+  Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+
+(* Compute the L1 history mode. This function may update the protocol parameters
+   and this is why it needs additional, a priori unrelated parameters. *)
+let history_mode base protocol parameter_overrides proto_parameters
+    l1_history_mode =
+  let update_some_rollup_params factor =
+    let challenge_window =
+      JSON.(
+        proto_parameters |-> "smart_rollup_challenge_window_in_blocks" |> as_int)
+      / factor
+    in
+    let commitment_period =
+      max
+        1
+        (JSON.(
+           proto_parameters |-> "smart_rollup_commitment_period_in_blocks"
+           |> as_int)
+        / factor)
+    in
+    let validity_lag =
+      JSON.(
+        proto_parameters |-> "smart_rollup_reveal_activation_level"
+        |-> "dal_attested_slots_validity_lag" |> as_int)
+      / factor
+    in
+    ( ["smart_rollup_reveal_activation_level"; "dal_attested_slots_validity_lag"],
+      `Int validity_lag )
+    :: (["smart_rollup_challenge_window_in_blocks"], `Int challenge_window)
+    :: (["smart_rollup_commitment_period_in_blocks"], `Int commitment_period)
+    :: parameter_overrides
+  in
+  match l1_history_mode with
+  | Custom history_mode -> return (parameter_overrides, history_mode)
+  | Default_without_refutation ->
+      let cycles =
+        Dal.Parameters.storage_period_without_refutation_in_cycles
+          ~proto_parameters
+      in
+      let blocks_preservation_cycles =
+        JSON.(proto_parameters |-> "blocks_preservation_cycles" |> as_int)
+      in
+      let additional_cycles = cycles - blocks_preservation_cycles in
+      return (parameter_overrides, Node.Rolling (Some additional_cycles))
+  | Default_with_refutation ->
+      let cycles =
+        Dal.Parameters.storage_period_with_refutation_in_cycles
+          ~proto_parameters
+      in
+      let blocks_preservation_cycles =
+        JSON.(proto_parameters |-> "blocks_preservation_cycles" |> as_int)
+      in
+      let additional_cycles = cycles - blocks_preservation_cycles in
+      (* The shell has an upper bound of 1000 stored cycles in Full and Rolling
+         mode. In case this limit is crossed, we update some of the relevant
+         parameters. *)
+      if additional_cycles > 1000 then (
+        let factor = 1 + (cycles / 1000) in
+        let new_parameter_overrides = update_some_rollup_params factor in
+        (* This may not work correctly if the updated parameters were already
+           present in [parameters]. *)
+        let* proto_parameters =
+          generate_protocol_parameters base protocol new_parameter_overrides
+        in
+        Log.info
+          "The DAL node needs the L1 node to store %d cycles of block data."
+          cycles ;
+        Log.info
+          "Reducing 'smart_rollup_challenge_window_in_blocks', \
+           'smart_rollup_commitment_period_in_blocks' and \
+           'dal_attested_slots_validity_lag' by a factor of %d."
+          factor ;
+        let cycles =
+          Dal.Parameters.storage_period_with_refutation_in_cycles
+            ~proto_parameters
+        in
+        Log.info
+          "Now the DAL node needs the L1 node to store %d cycles of block data"
+          cycles ;
+        let additional_cycles = cycles - blocks_preservation_cycles in
+        if additional_cycles > 1000 then
+          Test.fail "Could not adjust sc_rollup parameters automatically!"
+        else
+          return (new_parameter_overrides, Node.Rolling (Some additional_cycles)))
+      else return (parameter_overrides, Node.Rolling (Some additional_cycles))
 
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
-    ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
-    ?(node_arguments = []) ?(dal_bootstrap_peers = []) () =
-  (* Temporary setup to initialise the node. *)
+    ~parameter_overrides ~protocol ?activation_timestamp
+    ?(event_sections_levels = []) ?(node_arguments = [])
+    ?(dal_bootstrap_peers = []) ?(l1_history_mode = Default_without_refutation)
+    () =
   let base = Either.right (protocol, custom_constants) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
-  let* client = Client.init_mockup ~parameter_file ~protocol () in
+  let* proto_parameters =
+    generate_protocol_parameters base protocol parameter_overrides
+  in
+  let* parameter_overrides, history_mode =
+    history_mode
+      base
+      protocol
+      parameter_overrides
+      proto_parameters
+      l1_history_mode
+  in
   let nodes_args =
     Node.
       [
-        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
+        Synchronisation_threshold 0;
+        No_bootstrap_peers;
+        History_mode history_mode;
       ]
   in
   let node = Node.create nodes_args in
   let* () = Node.config_init node [] in
-  let* dal_parameters = Dal.Parameters.from_client client in
+  let dal_parameters =
+    Dal.Parameters.from_protocol_parameters proto_parameters
+  in
   let config : Cryptobox.Config.t =
     {activated = true; bootstrap_peers = dal_bootstrap_peers}
   in
@@ -221,7 +330,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     Protocol.write_parameter_file
       ~additional_bootstrap_accounts
       ~base
-      parameters
+      parameter_overrides
   in
   let* () =
     Client.activate_protocol_and_wait
@@ -238,9 +347,9 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) ?(prover = true) ?smart_rollup_timeout_period_in_blocks f
-    ~protocol =
-  let parameters =
+    ?(parameters = []) ?(prover = true) ?smart_rollup_timeout_period_in_blocks
+    ?l1_history_mode f ~protocol =
+  let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
@@ -285,7 +394,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ?node_arguments
       ?activation_timestamp
       ?dal_bootstrap_peers
-      ~parameters
+      ?l1_history_mode
+      ~parameter_overrides
       ~protocol
       ()
   in
@@ -405,8 +515,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles ?history_mode ?prover variant scenario
-    =
+    ?bootstrap_profile ?producer_profiles ?history_mode ?prover ?l1_history_mode
+    variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -420,6 +530,12 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ~uses:(fun protocol -> Constant.octez_dal_node :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
+      let l1_history_mode =
+        match (l1_history_mode, producer_profiles) with
+        | Some mode, _ -> mode
+        | None, Some (_ :: _) -> Default_with_refutation
+        | _ -> Default_without_refutation
+      in
       with_layer1
         ~custom_constants
         ?minimal_block_delay
@@ -434,6 +550,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?challenge_window
         ?activation_timestamp
         ?prover
+        ~l1_history_mode
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
@@ -448,7 +565,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
     ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover
-    ?attestation_threshold variant scenario =
+    ?attestation_threshold ?l1_history_mode variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -464,6 +581,12 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
       :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
+      let l1_history_mode =
+        match (l1_history_mode, producer_profiles) with
+        | Some mode, _ -> mode
+        | None, Some (_ :: _) -> Default_with_refutation
+        | _ -> Default_without_refutation
+      in
       with_layer1
         ~custom_constants
         ?node_arguments
@@ -481,6 +604,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?smart_rollup_timeout_period_in_blocks
         ?prover
         ?attestation_threshold
+        ~l1_history_mode
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
@@ -1273,7 +1397,11 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
   let* () = bake_for client in
   let* published_level = Client.level client in
   (* Finalize the publication. *)
+  let wait_for_dal_node =
+    wait_for_layer1_final_block dal_node published_level
+  in
   let* () = bake_for ~count:2 client in
+  let* () = wait_for_dal_node in
   let* received_slot =
     Dal_RPC.(
       call dal_node
@@ -1853,7 +1981,9 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
   let* () = bake_for client in
   let* export_level = Node.wait_for_level node (level + 1) in
   let file = Temp.file "snapshot" in
-  let* () = Node.snapshot_export ~export_level node file in
+  let* () =
+    Node.snapshot_export ~history_mode:Rolling_history ~export_level node file
+  in
   let node2 = Node.create [] in
   let* () = Node.config_init node2 [] in
   (* We update the configuration because by default on sandbox mode,
@@ -3750,12 +3880,12 @@ let make_invalid_dal_node protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
-    let parameters =
+    let parameter_overrides =
       dal_enable_param (Some true)
       @ redundancy_factor_param (Some (crypto_params.redundancy_factor / 2))
       @ slot_size_param (Some (crypto_params.slot_size / 2))
     in
-    setup_node ~protocol ~parameters ()
+    setup_node ~protocol ~parameter_overrides ()
   in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
@@ -4117,7 +4247,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
          (Protocol.name migrate_to)
          description)
   @@ fun () ->
-  let parameters =
+  let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
@@ -4129,7 +4259,11 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
   in
   let* node, client, dal_parameters =
-    setup_node ~parameters ~protocol:migrate_from ()
+    setup_node
+      ~parameter_overrides
+      ~protocol:migrate_from
+      ~l1_history_mode:Default_with_refutation
+      ()
   in
 
   Log.info "Set user-activated-upgrade at level %d" migration_level ;
@@ -4768,7 +4902,7 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
   let slot_size = Some 126944 in
   let redundancy_factor = Some 8 in
   let page_size = Some 3967 in
-  let parameters =
+  let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
@@ -4780,7 +4914,7 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
   in
   let* node, client, dal_parameters =
-    setup_node ~parameters ~protocol:migrate_from ()
+    setup_node ~parameter_overrides ~protocol:migrate_from ()
   in
 
   (* The [+2] here is a bit arbitrary. We just want to avoid possible corner
@@ -5505,6 +5639,10 @@ module Garbage_collection = struct
     in
     Log.info "Producer DAL node is running" ;
 
+    let* current_level = Client.level client in
+    let wait_for_producer =
+      wait_for_layer1_final_block slot_producer (current_level + 1)
+    in
     let* published_level, _commitment, () =
       publish_store_and_wait_slot
         node
@@ -5516,6 +5654,7 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
+    let* () = wait_for_producer in
 
     Log.info "RPC to producer for first shard" ;
     (* Check the producer stored the first shard *)
@@ -5673,6 +5812,13 @@ module Garbage_collection = struct
       wait_for_first_shard ~published_level ~slot_index attester
     in
 
+    let* current_level = Client.level client in
+    let wait_for_producer =
+      wait_for_layer1_final_block slot_producer (current_level + 1)
+    in
+    let wait_for_attester =
+      wait_for_layer1_final_block attester (current_level + 1)
+    in
     let* published_level, _commitment, shard_index_attester =
       publish_store_and_wait_slot
         node
@@ -5684,6 +5830,8 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
+    let* () = wait_for_producer in
+    let* () = wait_for_attester in
 
     Log.info "RPC first shard producer" ;
     let* _shard_producer =
@@ -5912,6 +6060,16 @@ module Garbage_collection = struct
       return (shard_index_observer, shard_index_attester)
     in
 
+    let* current_level = Client.level client in
+    let wait_for_producer =
+      wait_for_layer1_final_block slot_producer (current_level + 1)
+    in
+    let wait_for_observer =
+      wait_for_layer1_final_block observer (current_level + 1)
+    in
+    let wait_for_attester =
+      wait_for_layer1_final_block attester (current_level + 1)
+    in
     let* ( published_level,
            _commitment,
            (shard_index_observer, shard_index_attester) ) =
@@ -5925,6 +6083,9 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
+    let* () = wait_for_producer in
+    let* () = wait_for_observer in
+    let* () = wait_for_attester in
 
     Log.info "RPC first shard observer" ;
     let* _shard_observer =
@@ -6073,7 +6234,7 @@ module Garbage_collection = struct
         (* The period in blocks for which cells are kept. *)
         let non_gc_period = 2 * (a + b + c) in
         Log.info "The \"non-GC period\" is %d" non_gc_period ;
-        let parameters =
+        let parameter_overrides =
           make_int_parameter
             ["smart_rollup_commitment_period_in_blocks"]
             (Some a)
@@ -6088,7 +6249,7 @@ module Garbage_collection = struct
               (Some c)
         in
         let* node, client, dal_parameters =
-          setup_node ~parameters ~protocol ()
+          setup_node ~parameter_overrides ~protocol ()
         in
         let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
         let lag = dal_parameters.attestation_lag in
@@ -7615,12 +7776,14 @@ let register ~protocols =
     ~tags:["bootstrap"; Tag.memory_3k]
     ~bootstrap_profile:true
     ~prover:false
+    ~l1_history_mode:Default_with_refutation
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"; "rpc"]
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     "GS/RPC get_connections"
     test_rpc_get_connections
     protocols ;
@@ -7630,6 +7793,7 @@ let register ~protocols =
     ~bootstrap_profile:true
     "trusted peers reconnection"
     ~prover:false
+    ~l1_history_mode:Default_with_refutation
     test_peers_reconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
@@ -7642,6 +7806,7 @@ let register ~protocols =
     ~tags:["attestation"; "p2p"; Tag.memory_3k]
     ~attestation_threshold:100
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     "attestation through p2p"
     test_attestation_through_p2p
     protocols ;
@@ -7654,6 +7819,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"; Tag.memory_4k]
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     ~redundancy_factor:2
       (* With a redundancy factor of 4 or more, not much luck is
          needed for a bootstrap account (with 1/5 of the stake) to be
@@ -7668,13 +7834,13 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"; "simple"; Tag.memory_4k]
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     "observer triggers amplification (without lost shards)"
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "simple"; Tag.memory_3k]
     ~producer_profiles:[0]
-    ~history_mode:(Dal_node.Custom 150)
     ~number_of_slots:1
     "garbage collection of shards for producer"
     Garbage_collection.test_gc_simple_producer
@@ -7682,6 +7848,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "attester"; Tag.memory_4k]
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
     "garbage collection of shards for producer and attester"
     Garbage_collection.test_gc_producer_and_attester
@@ -7689,6 +7856,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "multi"; Tag.memory_4k]
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
@@ -7702,6 +7870,7 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
     "new attester attests"
     test_new_attester_attests
@@ -7769,6 +7938,7 @@ let register ~protocols =
     (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
        ~refute_operations_priority:`Faulty_first)
     ~smart_rollup_timeout_period_in_blocks:20
+    ~l1_history_mode:Default_with_refutation
     ~tags:[Tag.slow]
     protocols ;
 
@@ -7782,6 +7952,7 @@ let register ~protocols =
     (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
        ~refute_operations_priority:`Honest_first)
     ~smart_rollup_timeout_period_in_blocks:20
+    ~l1_history_mode:Default_with_refutation
     ~tags:[Tag.slow]
     protocols ;
 

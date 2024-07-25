@@ -67,6 +67,7 @@ module Plugin = struct
         dal_attested_slots_validity_lag =
           parametric.sc_rollup.reveal_activation_level
             .dal_attested_slots_validity_lag;
+        blocks_per_cycle = parametric.blocks_per_cycle;
       }
 
   let block_info ?chain ?block ~metadata ctxt =
