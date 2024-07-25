@@ -62,7 +62,7 @@ depends: [
   "lwt-exit"
   "ppxlib"
   "bheap" { >= "2.0.0" }
-  "digestif"
+  "digestif" { >= "0.9.0" }
   "jsonm"
   "ocamlgraph"
   "optint"
