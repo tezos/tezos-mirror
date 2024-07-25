@@ -178,7 +178,7 @@ module Term = struct
     Arg.(
       value
       & opt (list attester_profile_arg) []
-      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"])
+      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"; "attester"])
 
   let producer_profile =
     let open Cmdliner in
@@ -186,15 +186,23 @@ module Term = struct
     Arg.(
       value
       & opt (list producer_profile_arg) []
-      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["producer-profiles"])
+      & info
+          ~docs
+          ~doc
+          ~docv:"INDEX1,INDEX2,..."
+          ["producer-profiles"; "producer"; "operator"])
 
   let observer_profile =
     let open Cmdliner in
     let doc = "The Octez DAL node observer profiles for given slot indexes." in
     Arg.(
       value
-      & opt (list observer_profile_arg) []
-      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["observer-profiles"])
+      & opt (some' (list observer_profile_arg)) None
+      & info
+          ~docs
+          ~doc
+          ~docv:"INDEX1,INDEX2,..."
+          ["observer-profiles"; "observer"])
 
   let bootstrap_profile =
     let open Cmdliner in
@@ -202,7 +210,7 @@ module Term = struct
       "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
        cannot also be an attester or a slot producer"
     in
-    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"])
+    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"; "bootstrap"])
 
   let peers =
     let open Cmdliner in
@@ -362,16 +370,23 @@ let make ~run =
           history_mode;
         }
     in
-    let profile = Operator_profile.make ~attesters ~producers ~observers () in
-    match (bootstrap_flag, profile) with
-    | false, profiles when Operator_profile.is_empty profiles -> run None
-    | true, profiles when Operator_profile.is_empty profiles ->
+    let profile = Operator_profile.make ~attesters ~producers ?observers () in
+    match (bootstrap_flag, observers, profile) with
+    | false, None, profiles when Operator_profile.is_empty profiles -> run None
+    | false, Some _, profiles when Operator_profile.is_empty profiles ->
+        (* The user only mentioned '--observer' without any slot and
+           without any other profile. It will be assigned to random
+           slots. *)
+        run (Some Profile_manager.random_observer)
+    | false, _, _ -> run @@ Some (Profile_manager.operator profile)
+    | true, None, profiles when Operator_profile.is_empty profiles ->
         run @@ Some Profile_manager.bootstrap
-    | false, profiles -> run @@ Some (Profile_manager.operator profiles)
-    | true, _ ->
+    | true, _, _ ->
         `Error
           ( false,
-            "A bootstrap node cannot also be an attester or a slot producer." )
+            "a bootstrap node (option '--bootstrap') cannot be an attester \
+             (option '--attester'), an operator (option '--operator') nor an \
+             observer (option '--observer')" )
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =

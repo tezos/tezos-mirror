@@ -33,6 +33,8 @@ let encoding = Types.profile_encoding
 
 let bootstrap = Types.Bootstrap
 
+let random_observer = Types.Random_observer
+
 let operator operator_profile = Types.Operator operator_profile
 
 let is_empty = function

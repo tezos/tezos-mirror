@@ -259,14 +259,14 @@ module Dal_RPC = struct
     `O
       [
         ("attesters", `A (List.rev attesters));
-        ("producers", `A (List.rev producers));
+        ("operators", `A (List.rev producers));
         ("observers", `A (List.rev observers));
       ]
 
   let operator_profile_of_json json =
     let open JSON in
     let attesters = json |-> "attesters" |> as_list |> List.map as_string in
-    let producers = json |-> "producers" |> as_list |> List.map as_int in
+    let producers = json |-> "operators" |> as_list |> List.map as_int in
     let observers = json |-> "observers" |> as_list |> List.map as_int in
     List.map (fun pkh -> Attester pkh) attesters
     @ List.map (fun i -> Producer i) producers
@@ -276,9 +276,9 @@ module Dal_RPC = struct
     let open JSON in
     match json |-> "kind" |> as_string with
     | "bootstrap" -> Bootstrap
-    | "operator" ->
+    | "controller" ->
         let operator_profiles =
-          operator_profile_of_json (json |-> "operator_profiles")
+          operator_profile_of_json (json |-> "controller_profiles")
         in
         Operator operator_profiles
     | _ -> failwith "invalid case"
