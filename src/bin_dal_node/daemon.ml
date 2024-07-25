@@ -687,13 +687,15 @@ let check_history_mode config profile_ctxt proto_parameters =
 let check_l1_history_mode profile_ctxt cctxt proto_parameters =
   let open Lwt_result_syntax in
   let* l1_history_mode =
-    let* l1_mode, bpc_opt = Config_services.history_mode cctxt in
+    let* l1_mode, blocks_preservation_cycles_opt =
+      Config_services.history_mode cctxt
+    in
     (* Note: For the DAL node it does not matter if the L1 node is in Full or
        Rolling mode, because the DAL node is not interested in blocks outside of
        a certain time window. *)
     return
     @@
-    match (l1_mode, bpc_opt) with
+    match (l1_mode, blocks_preservation_cycles_opt) with
     | Archive, _ -> `L1_archive
     | Full None, None
     | Rolling None, None
@@ -706,7 +708,7 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters =
     | Rolling (Some additional_cycles), Some blocks_preservation_cycles ->
         `L1_rolling (additional_cycles.offset + blocks_preservation_cycles)
   in
-  let handle ~dal_blocks ~l1_cycles =
+  let check ~dal_blocks ~l1_cycles =
     let blocks_per_cycle =
       Int32.to_int proto_parameters.Dal_plugin.blocks_per_cycle
     in
@@ -728,7 +730,15 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters =
           profile_ctxt
           proto_parameters
       in
-      handle ~dal_blocks:b ~l1_cycles:c
+      let b =
+        if Profile_manager.supports_refutations profile_ctxt then
+          (* We need more levels because [store_skip_list_cells level] needs the
+             plugin for [attestation_lag + 1] levels in the past wrt to the
+             target [level]. *)
+          b + proto_parameters.attestation_lag + 1
+        else b
+      in
+      check ~dal_blocks:b ~l1_cycles:c
 
 let build_profile_context config =
   let open Lwt_result_syntax in
@@ -777,6 +787,13 @@ let get_proto_plugins cctxt profile_ctxt last_processed_level
   in
   let first_level =
     Int32.max 1l (Int32.sub level (Int32.of_int relevant_period))
+  in
+  let first_level =
+    if Profile_manager.supports_refutations profile_ctxt then
+      (* See usage of the plugin in [store_skip_list_cells] *)
+      Int32.(
+        max 1l (sub first_level (of_int (1 + proto_parameters.attestation_lag))))
+    else first_level
   in
   Proto_plugins.initial_plugins cctxt ~first_level ~last_level:level
 

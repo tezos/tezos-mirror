@@ -99,7 +99,14 @@ module Parameters = struct
         proto_parameters |-> "smart_rollup_reveal_activation_level"
         |-> "dal_attested_slots_validity_lag" |> as_int)
     in
-    let blocks = 2 * (challenge_window + commitment_period + validity_lag) in
+    let attestation_lag =
+      JSON.(
+        proto_parameters |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    in
+    let blocks =
+      (2 * (challenge_window + commitment_period + validity_lag))
+      + attestation_lag + 1
+    in
     if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
     else 1 + (blocks / blocks_per_cycle)
 
