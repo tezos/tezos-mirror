@@ -123,10 +123,15 @@ module Pipeline = struct
     name : string;
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
+    auto_cancel : Gitlab_ci.Types.auto_cancel option;
     jobs : tezos_job list;
   }
 
-  type child_pipeline = {name : string; jobs : tezos_job list}
+  type child_pipeline = {
+    name : string;
+    auto_cancel : Gitlab_ci.Types.auto_cancel option;
+    jobs : tezos_job list;
+  }
 
   type t = Pipeline of pipeline | Child_pipeline of child_pipeline
 
@@ -153,11 +158,11 @@ module Pipeline = struct
         (name pipeline)
     else pipelines := pipeline :: !pipelines
 
-  let register ?variables ~jobs name if_ =
-    register_raw (Pipeline {variables; if_; name; jobs})
+  let register ?variables ?auto_cancel ~jobs name if_ =
+    register_raw (Pipeline {variables; if_; name; jobs; auto_cancel})
 
-  let register_child ~jobs name =
-    let child_pipeline = {name; jobs} in
+  let register_child ?auto_cancel ~jobs name =
+    let child_pipeline = {name; jobs; auto_cancel} in
     register_raw (Child_pipeline child_pipeline) ;
     child_pipeline
 
@@ -319,13 +324,13 @@ module Pipeline = struct
   let workflow_includes () :
       Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list =
     let workflow_rule_of_pipeline = function
-      | {name; if_; variables; _} ->
-          (* Add [PIPELINE_TYPE] to the variables of the workflow rules, so
-             that it can be added to the pipeline [name] *)
+      | {name; if_; variables; auto_cancel; _} ->
+          (* Add [PIPELINE_TYPE] to the variables of the workflow
+             rules, so that it can be added to the pipeline [name] *)
           let variables =
             ("PIPELINE_TYPE", name) :: Option.value ~default:[] variables
           in
-          workflow_rule ~if_ ~variables ~when_:Always ()
+          workflow_rule ?auto_cancel ~if_ ~variables ~when_:Always ()
     in
     let include_of_pipeline = function
       | {name; if_; _} ->
@@ -727,7 +732,8 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
   {job = Job job; source_position = __POS__; stage; image_builders}
 
 let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
-    Pipeline.{name = child_pipeline_name; jobs = _} : tezos_job =
+    Pipeline.{name = child_pipeline_name; jobs = _; auto_cancel = _} : tezos_job
+    =
   let job_name = "trigger:" ^ child_pipeline_name in
   let needs, dependencies = resolve_dependencies job_name dependencies in
   if dependencies != [] then
