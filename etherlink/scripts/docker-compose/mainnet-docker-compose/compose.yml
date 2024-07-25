@@ -1,0 +1,40 @@
+services:
+  octez-node:
+    container_name: octez-node
+    image: tezos/tezos-bare:${OCTEZ_TAG}
+    volumes:
+      - ${HOST_TEZOS_DATA_DIR}:/home/tezos
+    expose:
+      - 8732
+    entrypoint: /usr/local/bin/octez-node
+    command: run --rpc-addr=0.0.0.0:8732 --allow-all-rpc 0.0.0.0
+
+  rollup-node:
+    container_name: rollup-node
+    image: tezos/tezos-bare:${ROLLUP_OCTEZ_TAG}
+    restart: always
+    volumes:
+      - ${HOST_TEZOS_DATA_DIR}:/home/tezos
+    expose:
+      - 8932
+    entrypoint: /usr/local/bin/octez-smart-rollup-node
+    command: --endpoint ${OCTEZ_NODE_ENDPOINT} run
+
+  proxy:
+    container_name: evm-proxy
+    image: tezos/tezos-bare:${EVM_OCTEZ_TAG}
+    restart: always
+    volumes:
+      - ${HOST_TEZOS_DATA_DIR}:/home/tezos
+    ports:
+      - ${EVM_OCTEZ_PORT}:8545
+    entrypoint: /usr/local/bin/octez-evm-node
+    command: run proxy --finalized-view --read-only --keep-alive
+
+  curl-runner:
+    container_name: curl-runner
+    image: curlimages/curl:latest
+
+networks:
+  default:
+    name: etherlink-net

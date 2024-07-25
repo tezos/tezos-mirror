@@ -170,3 +170,5 @@ terraform.rc
 
 # /script-inputs/custom_dune_flags contains a local choice and must not be committed.
 /script-inputs/custom_dune_flags
+
+etherlink/scripts/docker-compose/mainnet-docker-compose/.etherlink-mainnet-data/
