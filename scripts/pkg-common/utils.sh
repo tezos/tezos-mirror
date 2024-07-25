@@ -112,23 +112,35 @@ warnings() {
 
 getOctezVersion() {
 
-  if ! version=$(dune exec src/lib_version/exe/octez_print_version.exe -- --json 2> /dev/null); then
-    echo "Cannot get version. Try eval \`opam env\`?" >&2
-    exit 1
-  fi
-  major=$(echo "$version" | jq -r .major)
-  minor=$(echo "$version" | jq -r .minor)
-  info=$(echo "$version" | jq -r .info)
-  short_hash=$(echo "$version" | jq -r .hash)
+  if [ -n "$CI" ]; then
+    . scripts/ci/octez-release.sh
 
-  case $info in
-  *dev)
-    RET="$major.$minor$info+$short_hash"
-    ;;
-  *)
-    RET="$major.$minor$info"
-    ;;
-  esac
+    if [ -n "${gitlab_release_no_v:-}" ]; then
+      RET="$gitlab_release_no_v"
+    else
+      RET="$gitlab_release_no_v+$CI_COMMIT_SHORT_SHA"
+    fi
+
+  else
+
+    if ! version=$(dune exec src/lib_version/exe/octez_print_version.exe -- --json 2> /dev/null); then
+      echo "Cannot get version. Try eval \`opam env\`?" >&2
+      exit 1
+    fi
+    major=$(echo "$version" | jq -r .major)
+    minor=$(echo "$version" | jq -r .minor)
+    info=$(echo "$version" | jq -r .info)
+    short_hash=$(echo "$version" | jq -r .hash)
+
+    case $info in
+    *dev)
+      RET="$major.$minor$info+$short_hash"
+      ;;
+    *)
+      RET="$major.$minor$info"
+      ;;
+    esac
+  fi
 
   echo "$RET"
 
