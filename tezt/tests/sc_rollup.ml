@@ -5961,13 +5961,27 @@ let start_rollup_node_with_encrypted_key ~kind =
   in
   unit
 
+(* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
+ * Originate RISC-V kernels using installer kernel instead *)
+let read_riscv_kernel (kernel_path : string) (checksum_path : string) : string =
+  let checksum = String.split_on_char ' ' (read_file checksum_path) in
+  "kernel:" ^ kernel_path ^ ":" ^ List.hd checksum
+
 let register_riscv ~protocols =
   let kind = "riscv" in
+  let boot_sector =
+    read_riscv_kernel
+      "src/riscv/assets/riscv-dummy.elf"
+      "src/riscv/assets/riscv-dummy.elf.checksum"
+  in
   test_origination ~kind protocols ;
-  test_rpcs ~kind protocols ;
+  test_rpcs ~kind ~boot_sector protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
-  test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;
-  test_rollup_node_advances_pvm_state protocols ~kind ~internal:true
+  test_rollup_node_advances_pvm_state
+    protocols
+    ~kind
+    ~boot_sector
+    ~internal:false
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;

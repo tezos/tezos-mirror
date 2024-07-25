@@ -43,3 +43,5 @@ val get_current_level : state -> int32 option Lwt.t
 val state_hash : state -> bytes
 
 val set_input : state -> int32 -> int64 -> string -> state Lwt.t
+
+val set_metadata : state -> bytes -> int32 -> state Lwt.t

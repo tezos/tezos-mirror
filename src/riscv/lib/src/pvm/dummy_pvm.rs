@@ -148,6 +148,7 @@ impl DummyPvm {
         let steps = state
             .pvm
             .eval_range_while(pvm_hooks, &(..=max_steps), |_| true);
+        // TODO: RV-78 update tick counter with number of steps
         state.tick.write(state.tick.read() + 1);
         (Self { backend }, steps as i64)
     }
@@ -158,13 +159,32 @@ impl DummyPvm {
             .unwrap()
     }
 
-    pub fn set_input(&self, level: u32, message_counter: u64, _input: Vec<u8>) -> Self {
+    pub fn set_input_message(&self, level: u32, message_counter: u64, input: Vec<u8>) -> Self {
         self.with_new_backend(|state| {
-            let tick = state.tick.read();
-            state.tick.write(tick + 1);
+            assert!(
+                state
+                    .pvm
+                    .provide_input(level, message_counter as u32, &input),
+                "Cannot accept input in current state ({})",
+                state.pvm.status()
+            );
+            state.tick.write(state.tick.read() + 1);
             state.message_counter.write(message_counter);
             state.level_is_set.write(true);
             state.level.write(level);
+        })
+    }
+
+    pub fn set_metadata(&self, rollup_address: &[u8; 20], origination_level: u32) -> Self {
+        self.with_new_backend(|state| {
+            assert!(
+                state
+                    .pvm
+                    .provide_metadata(rollup_address, origination_level),
+                "Cannot accept metadata in current state ({})",
+                state.pvm.status()
+            );
+            state.tick.write(state.tick.read() + 1);
         })
     }
 
