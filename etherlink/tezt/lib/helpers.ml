@@ -195,7 +195,7 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
   in
   Client.bake_for_and_wait ~keys:[] client
 
-let bake_until ?__LOC__ ?(timeout_in_blocks = 5) ?(timeout = 30.) ~bake
+let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
     ~result_f () =
   let res = ref None in
   let rec go counter_block =

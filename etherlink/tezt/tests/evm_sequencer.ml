@@ -83,6 +83,7 @@ type sequencer_setup = {
   l1_contracts : l1_contracts;
   boot_sector : string;
   kernel : Uses.t;
+  enable_dal : bool;
 }
 
 let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
@@ -362,6 +363,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
       sc_rollup_node;
       boot_sector = output;
       kernel;
+      enable_dal;
     }
 
 let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
@@ -2686,9 +2688,7 @@ let test_delayed_transfer_timeout =
            sc_rollup_node;
            sequencer;
            proxy;
-           observer = _;
-           boot_sector = _;
-           kernel = _;
+           _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2846,9 +2846,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
            sc_rollup_node;
            sequencer;
            proxy;
-           observer = _;
-           boot_sector = _;
-           kernel = _;
+           _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -3106,9 +3104,7 @@ let test_delayed_inbox_flushing =
            sc_rollup_node;
            sequencer;
            proxy;
-           observer = _;
-           boot_sector = _;
-           kernel = _;
+           _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -3246,7 +3242,7 @@ let test_timestamp_from_the_future =
     ~tags:["evm"; "sequencer"; "block"; "timestamp"]
     ~title:"Timestamp from the future are refused"
     ~use_dal:ci_enabled_dal_registration
-  @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
+  @@ fun {sequencer; proxy; sc_rollup_node; client; enable_dal; _} _protocol ->
   (* In this test the time between blocks is 1 second. *)
 
   (* Producing a block 4:50 minutes after the L1 timestamp will be accepted. We
@@ -3268,8 +3264,11 @@ let test_timestamp_from_the_future =
     Tezos_base.Time.Protocol.(add current_l1_timestamp 330L |> to_notation)
   in
   let*@ (_ : int) = produce_block ~timestamp:refused_timestamp sequencer in
+  (* We wait more in case of DAL because 5 blocks are not enough to
+     send the blueprint through the DAL. *)
+  let number_of_blocks_to_wait = if enable_dal then 20 else 5 in
   let* _ =
-    repeat 5 (fun () ->
+    repeat number_of_blocks_to_wait (fun () ->
         let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
