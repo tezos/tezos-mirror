@@ -1,0 +1,38 @@
+%%{
+  init: {
+    'theme': 'base',
+    'themeVariables': {
+      'background': '#222832',
+      'fontFamily': 'Courier New',
+      'primaryColor': '#528fe4',
+      'primaryTextColor': '#fff',
+      'primaryBorderColor': '#fff',
+      'lineColor': '#e89217',
+      'edgeLabelBackground': '#e89217',
+      'tertiaryBorderColor': '#528fe4',
+      'tertiaryColor': 'transparent',
+      'titleColor': '#528fe4'
+    }
+  }
+}%%
+
+graph LR
+subgraph net[One network]
+    subgraph octez_node[One node]
+        octez-node
+        teztale-archiver
+        teztale-archiver --Octez RPC--o octez-node
+    end
+    teztale-server[teztale-server]
+    teztale-archiver --Teztale POST API--> teztale-server
+end
+RDS_DB[(database)]
+teztale-server <--SQL--> RDS_DB
+
+subgraph dataviz[Teztale Dataviz page]
+    dataviz_software(teztale-dataviz.js)
+    dataviz_software
+    --Teztale public
+    GET API--o
+    teztale-server
+end
