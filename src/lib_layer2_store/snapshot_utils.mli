@@ -25,6 +25,10 @@ val gzip_reader : reader
 (** A writer for compressed files or snapshot archives. *)
 val gzip_writer : writer
 
+(** [is_compressed_snapshot f] returns [true] if [f] is the path of a compressed
+    snapshot file, i.e. a gzip file. *)
+val is_compressed_snapshot : string -> bool
+
 module Make (Snapshot_metadata : sig
   type t
 

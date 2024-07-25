@@ -664,21 +664,6 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message
   let* () = Store.close store in
   return_unit
 
-(* Magic bytes for gzip files is 1f8b. *)
-let is_compressed_snapshot snapshot_file =
-  let ic = open_in snapshot_file in
-  try
-    let ok = input_byte ic = 0x1f && input_byte ic = 0x8b in
-    close_in ic ;
-    ok
-  with
-  | End_of_file ->
-      close_in ic ;
-      false
-  | e ->
-      close_in ic ;
-      raise e
-
 let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->

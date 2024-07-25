@@ -70,6 +70,21 @@ let gzip_reader : reader = (module Gzip_reader)
 
 let gzip_writer : writer = (module Gzip_writer)
 
+(* Magic bytes for gzip files is 1f8b. *)
+let is_compressed_snapshot snapshot_file =
+  let ic = open_in snapshot_file in
+  try
+    let ok = input_byte ic = 0x1f && input_byte ic = 0x8b in
+    close_in ic ;
+    ok
+  with
+  | End_of_file ->
+      close_in ic ;
+      false
+  | e ->
+      close_in ic ;
+      raise e
+
 module Make (Snapshot_metadata : sig
   type t
 
