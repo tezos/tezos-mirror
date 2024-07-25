@@ -45,13 +45,15 @@ let ubuntu_package_release_matrix = function
 
 (* Push .deb artifacts to storagecloud apt repository. *)
 let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
-    ?dependencies ?(archs = [Amd64]) ~image script : tezos_job =
+    ?(prefix = false) ?dependencies ?(archs = [Amd64]) ~image script : tezos_job
+    =
   let variables =
     [
       ( "ARCHITECTURES",
         String.concat " " (List.map Tezos_ci.arch_to_string_alt archs) );
       ("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg");
     ]
+    @ if prefix then [("PREFIX", "next")] else []
   in
   job
     ?rules
@@ -193,7 +195,7 @@ let jobs pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
-  (* These create the apt repository for the current packages *)
+  (* These jobs create the apt repository for the current packages *)
   let job_apt_repo_debian_current =
     job_apt_repo
       ~__POS__
@@ -220,7 +222,25 @@ let jobs pipeline_type =
       ~image:Images.ubuntu_focal
       ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
   in
-
+  (* These jobs create the apt repository for the next packages *)
+  let job_apt_repo_debian =
+    job_apt_repo
+      ~__POS__
+      ~name:"apt_repo_debian"
+      ~prefix:true
+      ~dependencies:(Dependent [Artifacts job_build_debian_package])
+      ~image:Images.debian_bookworm
+      ["./scripts/ci/create_debian_repo.sh debian bookworm"]
+  in
+  let job_apt_repo_ubuntu =
+    job_apt_repo
+      ~__POS__
+      ~name:"apt_repo_ubuntu"
+      ~prefix:true
+      ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
+      ~image:Images.ubuntu_focal
+      ["./scripts/ci/create_debian_repo.sh ubuntu focal jammy"]
+  in
   (* These test the installability of the current packages *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
       =
@@ -298,6 +318,7 @@ let jobs pipeline_type =
       job_build_debian_package_current_a;
       job_build_debian_package_current_b;
       job_apt_repo_debian_current;
+      job_apt_repo_debian;
     ]
   in
   let ubuntu_jobs =
@@ -307,6 +328,7 @@ let jobs pipeline_type =
       job_build_ubuntu_package_current_a;
       job_build_ubuntu_package_current_b;
       job_apt_repo_ubuntu_current;
+      job_apt_repo_ubuntu;
     ]
   in
   match pipeline_type with
