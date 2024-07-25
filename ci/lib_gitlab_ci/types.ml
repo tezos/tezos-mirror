@@ -46,6 +46,17 @@ type allow_failure_job = Yes | No | With_exit_codes of int list
     as is possible in a job's [allow_failure] field. *)
 type allow_failure_rule = Yes | No
 
+(** Represents auto cancel configurations.
+
+    Auto-cancel can be used to auto-cancel pipelines on certain conditions.
+
+    Auto-cancel can be configured globally for the full configuration
+    (by adding it to the {!workflow}), or configured for a given
+    workflow rule {!workflow_rule}. See
+    {{:https://docs.gitlab.com/ee/ci/yaml/#workflowauto_cancelon_job_failure}
+    workflow:auto_cancel:on_job_failure} for more info. *)
+type auto_cancel = {on_new_commit : bool; on_job_failure : bool}
+
 (** Represents a job rule. *)
 type job_rule = {
   changes : string list option;
@@ -61,6 +72,12 @@ type workflow_rule = {
   if_ : If.t option;
   variables : variables option;
   when_ : when_workflow;
+  auto_cancel : auto_cancel option;
+      (** Auto-cancel for this workflow rule.
+
+      See
+      {{:https://docs.gitlab.com/ee/ci/yaml/#workflowrulesauto_cancel}
+      workflow:rules:auto_cancel} for more info. *)
 }
 
 (** Represents an include rule. *)
@@ -233,7 +250,17 @@ type trigger_job = {
 
 type generic_job = Job of job | Trigger_job of trigger_job
 
-type workflow = {rules : workflow_rule list; name : string option}
+(** Represents a workflow configuration.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#workflow}workflow} for more info. *)
+type workflow = {
+  rules : workflow_rule list;
+  name : string option;
+  auto_cancel : auto_cancel option;
+      (** Default auto-cancel for the configuration.
+
+      See {{:https://docs.gitlab.com/ee/ci/yaml/#workflowauto_cancelon_new_commit} workflow:auto_cancel} for more info. *)
+}
 
 type include_ = {local : string; rules : include_rule list}
 

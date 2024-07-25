@@ -343,7 +343,12 @@ module Pipeline = struct
     in
     let workflow =
       let rules = List.map workflow_rule_of_pipeline pipelines in
-      Gitlab_ci.Types.{rules; name = Some "[$PIPELINE_TYPE] $CI_COMMIT_TITLE"}
+      Gitlab_ci.Types.
+        {
+          rules;
+          name = Some "[$PIPELINE_TYPE] $CI_COMMIT_TITLE";
+          auto_cancel = None;
+        }
     in
     let includes = List.map include_of_pipeline pipelines in
     (workflow, includes)
@@ -394,6 +399,7 @@ module Pipeline = struct
                   {
                     rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
                     name = None;
+                    auto_cancel = None;
                   };
               ])
         @ [Stages stages]

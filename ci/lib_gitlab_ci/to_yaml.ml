@@ -64,14 +64,20 @@ let enc_when_trigger_job : when_trigger_job -> value = function
   | On_success -> `String "on_success"
   | On_failure -> `String "on_failure"
 
+let enc_auto_cancel {on_new_commit; on_job_failure} =
+  `O
+    ((if on_new_commit then [("on_new_commit", `String "all")] else [])
+    @ if on_job_failure then [("on_job_failure", `String "all")] else [])
+
 let enc_workflow_rule : workflow_rule -> value =
- fun {changes; if_; variables; when_} ->
+ fun {changes; if_; variables; when_; auto_cancel} ->
   obj_flatten
     [
       opt "changes" strings changes;
       opt "if" enc_if if_;
       opt "variables" enc_variables variables;
       key "when" enc_when_workflow when_;
+      opt "auto_cancel" enc_auto_cancel auto_cancel;
     ]
 
 let enc_allow_failure_rule (allow_failure : allow_failure_rule) : value =
@@ -130,8 +136,13 @@ let enc_job_rules : job_rule list -> value = array enc_job_rule
 let enc_include_rules : include_rule list -> value = array enc_include_rule
 
 let enc_workflow : workflow -> value = function
-  | {name; rules} ->
-      obj_flatten [opt "name" string name; key "rules" enc_workflow_rules rules]
+  | {name; rules; auto_cancel} ->
+      obj_flatten
+        [
+          opt "name" string name;
+          key "rules" enc_workflow_rules rules;
+          opt "auto_cancel" enc_auto_cancel auto_cancel;
+        ]
 
 let enc_stages stages : value = strings stages
 
