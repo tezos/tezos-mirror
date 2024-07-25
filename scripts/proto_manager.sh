@@ -464,7 +464,7 @@ function copy_source() {
   # replace fake hash with real hash, this file doesn't influence the hash
   sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
     TEZOS_PROTOCOL
-  commit_no_hooks "src: replace fake hash with real hash"
+  commit_no_hooks "src: replace ${protocol_source} hash with ${label} hash"
 
   cd ../../..
 
@@ -846,16 +846,28 @@ function update_tezt_tests() {
     filename="${filename:0:80}"
     NEW_FILENAME=$(dirname "${NEW_FILENAME}")/"${filename}".out
 
-    # Preserve the file permissions
-    cp -p "${FILE}" "${NEW_FILENAME}"
-
+    if [[ ${is_snapshot} == true ]]; then
+      git mv "${FILE}" "${NEW_FILENAME}"
+    else
+      # Preserve the file permissions
+      cp -p "${FILE}" "${NEW_FILENAME}"
+    fi
     #replace all occurences of protocol_source with label
-    sed -i.old -e "s/${protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
+    if [[ ${is_snapshot} == true ]]; then
+      sed -i.old -e "s/proto_${protocol_source}/proto_${version}-${short_hash}/g" "${NEW_FILENAME}"
+      sed -i.old -e "s/${protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
+    else
+      sed -i.old -e "s/${protocol_source}/${label}/g" "${NEW_FILENAME}"
+    fi
 
     #replace all occurences of old hash with new hash
     sed -i.old -e "s/${source_hash}/${long_hash}/g" "${NEW_FILENAME}"
   done
-  commit "tezt: copy ${protocol_source} regression files"
+  if [[ ${is_snapshot} == true ]]; then
+    commit "tezt: move ${protocol_source} regression files"
+  else
+    commit "tezt: copy ${protocol_source} regression files"
+  fi
 
   # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
   # rm -rf /tmp/tezos_proto_snapshot
@@ -869,7 +881,7 @@ function update_tezt_tests() {
   # commit "tezt: add expected output for stabilisation regression test"
 
   dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
-  commit "tezt: delete unknown regression files"
+  commit_if_changes "tezt: delete unknown regression files"
 
   dune exec tezt/tests/main.exe -- --title 'meta: list runtime dependencies' --reset-regressions
   commit "tezt: reset runtime dependencies regressions"
