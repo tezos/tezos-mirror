@@ -613,7 +613,7 @@ function update_protocol_tests() {
   commit_no_hooks "scoru: update scoru_wasm protocol_migration"
 
   sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
-    -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
     -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
     -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
   ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
