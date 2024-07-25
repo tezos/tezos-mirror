@@ -109,8 +109,6 @@ The **dynamic reward rate** adjusts itself over time based on the distance betwe
 .. code-block:: python
 
   def dynamic_rate(cycle):
-    if cycle <= ai_activation_cycle:
-      return 0
     seconds_per_cycle = blocks_per_cycle * minimal_block_delay
     days_per_cycle = seconds_per_cycle / 86400
     previous_dynamic = dynamic_rate(cycle - 1)
@@ -181,8 +179,7 @@ and can be generally defined as follows:
 Where:
 
 - ``ai_activation_cycle`` is the first cycle with Adaptive Issuance
-  active, that is, :ref:`5 cycles after the activation of the Paris
-  protocol<feature_activation_beta>`.
+  active, which was cycle 748 on mainnet.
 - ``initial_period`` is a predefined period of time, set to 1 month in Paris.
 - ``transition_period`` is a predefined period of time, set to 5 months in Paris.
 
@@ -196,8 +193,7 @@ The issuance minimum rate for Adaptive Issuance curve is then defined as follows
 Where:
 
 - ``issuance_initial_min`` (4.5%) is the initial minimum
-  value. At the time of :ref:`Adaptive Issuance
-  activation<feature_activation_beta>`, the issuance rate is kept
+  value. The issuance rate is kept
   above this bound for the initial period.
 - ``issuance_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
 
@@ -212,8 +208,7 @@ The issuance maximum rate for Adaptive Issuance curve is then defined as follows
 Where:
 
 - ``issuance_initial_max`` (5.5%) controls the initial maximum
-  value. At the time of :ref:`Adaptive Issuance
-  activation<feature_activation_beta>`, the issuance rate is kept
+  value. The issuance rate is kept
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
@@ -279,8 +274,8 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycl
 Adaptive rewards
 ----------------
 
-Before :ref:`Adaptive Issuance activation<feature_activation_beta>`,
-participation rewards are fixed values defined by protocol
+Before Adaptive Issuance activation,
+participation rewards were fixed values defined by protocol
 constants. With the new mechanism, the adaptive issuance rate provides
 instead a budget for the whole cycle, which gets allocated equally to
 each block of the cycle and distributed between the various rewards,
@@ -316,8 +311,6 @@ The coefficient to apply for reward computation is defined as follows.
 .. code-block:: python
 
   def reward_coeff(cycle):
-    if cycle < ai_activation_cycle:
-      return 1
     rate = issuance_rate(cycle)
     total_supply = total_supply(cycle - consensus_rights_delay - 1)
     return (rate / 525600) * total_supply / base_total_issued_per_minute
@@ -453,13 +446,12 @@ automatically shared between delegates and their
 stakers, delegates can use this parameter to collect an *edge* from the
 rewards attributable to their stakers.
 
-After :ref:`the activation of Adaptive Issuance and
-Staking<feature_activation_beta>`, freezing and unfreezing of staked
-funds
-will be controlled directly by delegates and stakers, and will no longer
-be automatic. This entails that staked funds are frozen until manually
-unfrozen by stakers. This is a two step process which spans for at least
-4 cycles (cf. :ref:`Staked funds management <staked_funds_management_beta>`).
+Since the activation of Adaptive Issuance in the Paris protocol,
+freezing and unfreezing of staked funds are controlled directly by
+delegates and stakers, and are no longer automatic. This entails
+that staked funds are frozen until manually unfrozen by stakers. This
+is a two step process which spans for at least 4 cycles
+(cf. :ref:`Staked funds management <staked_funds_management_beta>`).
 
 A new user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
@@ -470,12 +462,9 @@ the same name introduced for :ref:`user accounts <def_user_account_beta>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
-**NB** Until :ref:`the activation of Adaptive Issuance and Staking
-<feature_activation_beta>`, only
-*delegates* can stake funds and the relative weight of staked and
-delegated funds remains unchanged. In the current implementation, only
-*user accounts* can become stakers. In other words, smart contracts
-cannot stake funds (they can of course still delegate them).
+**NB** In the current implementation, only *user accounts* can become
+stakers. In other words, smart contracts cannot stake funds (they can
+of course still delegate them).
 
 .. _staking_policy_configuration_beta:
 
@@ -592,41 +581,6 @@ to be delegated to the old delegate, however the spending
 balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
 unfinalizable unstake request for token staked with the old delegate.
-
-.. _feature_activation_beta:
-
-Activation of Adaptive Issuance and Staking
-===========================================
-
-The Adaptive Issuance and Staking features will not be active
-immediately at the start of the Paris protocol. Instead, Adaptive
-Issuance and Staking will be automatically activated **5 cycles, that
-is, around 2 weeks** after the activation of Paris, in order to give
-the community enough time to get ready for these features.
-
-Here is the list of features and related changes that will only become
-active 5 cycles into the Paris protocol:
-
--  Adaptive issuance – including notably the changes to the computation
-   of consensus rewards.
--  Ability for *delegators* to become *stakers* – until feature
-   activation delegates continue to be the only participants who can
-   **stake** funds.
--  The changes in weight for staked and delegated funds towards the
-   computation of baking and voting rights.
--  The new interface for stake manipulation based on
-   *pseudo-operations*. Note that this entails the deprecation of the
-   ``set/unset deposits limit`` interface and also the end of automatic
-   deposit freezing. On protocol activation, each delegate’s stake is
-   derived from the frozen deposits at the end of the last cycle of
-   Nairobi.
--  The changes in slashing penalties (double-baking penalties are set to
-   5% of the staked funds) and denunciation rewards (they amount to one
-   seventh of slashed funds).
--  Changes to protocol constants. Note that this entails calculating
-   participation rewards using the weight-based
-   formulas, but these are defined so that they match the previous
-   values when :ref:`Adaptive Issuance <adaptive_issuance_beta>` is not active.
 
 .. [1]
    Note that if the nominal annual issuance rate is :math:`r`, the

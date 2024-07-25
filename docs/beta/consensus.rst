@@ -156,10 +156,7 @@ Let us first (re)define these and related concepts.
   the case that the delegate behaves badly, its staked balance is
   partly :ref:`slashed<slashing_beta>`. This staked balance must be
   at least ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot
-  be selected as a validator. Note that until the :ref:`activation of
-  Adaptive Issuance and Staking<feature_activation_beta>`, the
-  staked balance is automatically updated at the end of each cycle to
-  maximize the active stake.
+  be selected as a validator.
 - The *spendable balance* of a delegate is its full balance
   minus its staked balance and unstaked frozen balance.
 
