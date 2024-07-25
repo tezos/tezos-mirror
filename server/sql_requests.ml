@@ -366,7 +366,8 @@ let insert_missing_block =
     \       ON blocks_reception.block = blocks.id\n\
     \       AND blocks_reception.source = nodes.id\n\
     \     WHERE nodes.name = $1\n\
-    \     AND blocks_reception.id IS NULL"
+    \     AND blocks_reception.id IS NULL\n\
+     ON CONFLICT DO NOTHING"
 
 let delete_missing_block =
   Caqti_request.Infix.(
