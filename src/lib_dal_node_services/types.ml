@@ -409,11 +409,11 @@ let profile_encoding =
         (function Bootstrap -> Some () | _ -> None)
         (function () -> Bootstrap);
       case
-        ~title:"Operator"
+        ~title:"Controller"
         (Tag 2)
         (obj2
-           (req "kind" (constant "operator"))
-           (req "operator_profiles" Operator_profile.encoding))
+           (req "kind" (constant "controller"))
+           (req "controller_profiles" Operator_profile.encoding))
         (function
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)

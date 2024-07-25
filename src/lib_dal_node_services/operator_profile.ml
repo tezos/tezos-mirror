@@ -92,7 +92,8 @@ let encoding =
         attesters = Pkh_set.of_list attesters;
       })
     (obj3
-       (req "producers" (list int31))
+       (* Use the new name in the encoding. *)
+       (req "operators" (list int31))
        (req "observers" (list int31))
        (req "attesters" (list Signature.Public_key_hash.encoding)))
 
@@ -162,13 +163,13 @@ let encoding =
   union
     [
       case
-        ~title:"operator_profile_encoding"
+        ~title:"profile_encoding"
         Json_only
         encoding
         (fun v -> Some v)
         (fun v -> v);
       case
-        ~title:"legacy_operator_profile_encoding"
+        ~title:"legacy_profile_encoding"
         Json_only
         (conv (fun _ -> assert false) from_legacy Legacy.encoding)
         (fun _ -> None)
