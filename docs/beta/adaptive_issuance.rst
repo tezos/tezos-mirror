@@ -36,12 +36,12 @@ to encourage participants to stake and produce blocks, but *no more*.
 
 At the end of each blockchain :ref:`cycle <def_cycle_beta>`, the
 regular issuance is adjusted, to nudge the staked ratio towards a
-protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
-are recomputed to match that budget. When the staked
-ratio decreases and diverges from the target, emission rates
-increase, incentivizing participants to stake funds to re-approach the
-target. Conversely, incentives decrease as the ratio increases beyond
-the target.
+protocol-defined target (set at 50% starting in the Paris
+protocol). Participation rewards are recomputed to match that
+budget. When the staked ratio decreases and diverges from the target,
+emission rates increase, incentivizing participants to stake funds to
+re-approach the target. Conversely, incentives decrease as the ratio
+increases beyond the target.
 
 .. _adaptive_issuance_rate_beta:
 
@@ -89,7 +89,7 @@ The static rate is defined as follows:
   def static_rate(cycle):
     return 1 / 1600 * (1 / (staked_ratio(cycle) ** 2))
 
-The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from current issuance rate (~4.6%).
+The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from the issuance rate (~4.6%) from the Oxford protocol (before the activation of Adaptive Issuance).
 
 .. _dynamic_rate_beta:
 
@@ -143,7 +143,8 @@ values of Adaptive Issuance.
 The schedule consists of three periods:
 
 - an **initial** period, set to 1 month, where the minimum and maximum
-  issuance rates are close to the current issuance rate and stay
+  issuance rates are close to the issuance rate from the Oxford
+  protocol (before the activation of Adaptive Issuance) and stay
   constant,
 - a **transition** period, set to 5 months, where they evolve linearly, with
   a decreasing minimum, and an increasing maximum, and
@@ -279,7 +280,7 @@ in proportion to their relative :ref:`weights
 Reward weights
 ..............
 
-The Adaptive-Issuance/Staking proposal defines the weights for participation rewards as:
+The weights for participation rewards are defined as:
 
 - Attestation rewards: 10,240.
 - Fixed baking reward: 5,120.
@@ -325,10 +326,10 @@ The issuance per block is then distributed amongst the different rewards in prop
     return tez_from_weights(weight) * reward_coeff(cycle)
 
 
-**Consensus rewards.** Since the adoption of Tenderbake, Tezos protocols
-before the Adaptive-Issuance/Staking proposal have rewarded delegates :doc:`for their participation in
-consensus <consensus>`
-with the following rewards per block:
+**Consensus rewards.** Since the adoption of Tenderbake, Tezos
+protocols before Paris have rewarded delegates :doc:`for their
+participation in consensus <consensus>` with the following rewards per
+block:
 
 -  A fixed **baking** reward, given to the delegate which produced the
    *payload* of the block (i.e. choosing transactions, and other
@@ -382,10 +383,10 @@ Where:
 - ``blocks_per_commitment`` (192) is the interval in blocks between each revelation, both VDF and nonce.
 
 
-The Adaptive-Issuance/Staking proposal implements a new `RPC
-endpoint <https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
-``/issuance/expected_issuance``, which reports the precomputed values of
-all participation rewards, for the provided block and the next
+The `RPC endpoint
+<https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+``/issuance/expected_issuance`` reports the precomputed values of all
+participation rewards for the provided block and the next
 ``consensus_rights_delay`` cycles.
 
 

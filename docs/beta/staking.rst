@@ -85,12 +85,13 @@ parameters:
    default value is 1. This parameter determines the fraction of the
    rewards that accrue to the delegate's frozen deposit – the
    remainder is shared among its stakers.
--  ``limit_of_staking_over_baking``: a non-negative number, denoting the
-   maximum portion of external stake by stakers over the delegate’s own
-   staked funds. It defaults to 0 – which entails that delegates do not
-   accept external stakes by default. It is moreover capped by a global
-   constant, set to 5 in the Adaptive-Issuance/Staking proposal, which ensures the baker controls a
-   significant part of the stake.
+- ``limit_of_staking_over_baking``: a non-negative number, denoting
+   the maximum portion of external stake by stakers over the
+   delegate’s own staked funds. It defaults to 0 – which entails that
+   delegates do not accept external stakes by default. It is moreover
+   capped by a global constant, set to 5 starting in the Paris
+   protocol, which ensures the baker controls a significant part of
+   the stake.
 
 Delegates can modify these staking parameters at all times, using the
 ``set_delegate_parameters`` pseudo-operation: that is, by transferring 0
