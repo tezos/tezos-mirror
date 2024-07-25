@@ -90,7 +90,14 @@ let () =
   in
   register
     "before_merging"
-    If.(on_tezos_namespace && merge_request)
+    If.(on_tezos_namespace && merge_request && not merge_train)
+    ~jobs:(Code_verification.jobs Before_merging) ;
+  (* The [merge_train] pipeline has the exact same jobs as the
+     [Before_merging] pipeline, but it auto-cancels on job failure. *)
+  register
+    "merge_train"
+    ~auto_cancel:{on_job_failure = true; on_new_commit = false}
+    If.(on_tezos_namespace && merge_request && merge_train)
     ~jobs:(Code_verification.jobs Before_merging) ;
   register
     "octez_latest_release"
