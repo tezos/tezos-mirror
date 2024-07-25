@@ -1098,9 +1098,9 @@ let jobs pipeline_type =
 
        For more information on tags, see [src/lib_test/tag.mli].
 
-       Important: the [Rpc_pipeline.jobs] function declares a set of
-       jobs that must match the ones defined below. Please update the
-       jobs accordingly.
+       Important: the [Custom_test_extended_pipeline.jobs] function
+       declares a set of jobs that must match the ones defined
+       below. Please update the jobs accordingly.
     *)
     let jobs_tezt =
       let dependencies =

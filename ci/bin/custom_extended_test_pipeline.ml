@@ -5,14 +5,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module defines the jobs of the [rpc_pipeline] pipeline.
+(* This module defines the jobs of the [custom_extended_test_pipeline]
+   pipeline.
 
-   This pipeline runs once a week on the [master] branch. The goal of
-   this pipeline is to test the external RPC process that is not
-   enabled by default on the node, and thus, not tested through the
-   tezt jobs. To do so, a particular configuration is set for each
-   node that is run in the tezt jobs so that the feature to test is
-   enabled.*)
+   This generic pipeline aims to be used to run all tests of the code
+   base with some particular options.  The goal of this pipeline is to
+   test behaviours that are not enabled by default on the node, and
+   thus, not tested through the tezt jobs. To do so, a particular
+   configuration is set for each node that is run in the tezt jobs so
+   that the feature to test is enabled.
+
+   Currently, it is used for:
+   - schedule_extended_rpc_tests: test the external RPC server
+*)
 
 open Gitlab_ci.Types
 open Tezos_ci
