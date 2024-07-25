@@ -282,6 +282,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
              tx_pool_addr_limit = None;
              tx_pool_tx_per_addr_limit = None;
              sequencer_sidecar_endpoint = Dsn_node.endpoint sequencer_sidecar;
+             dal_slots;
            }
     else
       return
@@ -302,6 +303,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
              tx_pool_timeout_limit = None;
              tx_pool_addr_limit = None;
              tx_pool_tx_per_addr_limit = None;
+             dal_slots;
            }
   in
   let* sequencer =

@@ -58,6 +58,7 @@ type mode =
       tx_pool_timeout_limit : int option;
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
+      dal_slots : int list option;
     }
   | Threshold_encryption_sequencer of {
       initial_kernel : string;
@@ -76,6 +77,7 @@ type mode =
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
       sequencer_sidecar_endpoint : string;
+      dal_slots : int list option;
     }
   | Proxy of {finalized_view : bool}
 
@@ -644,6 +646,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           tx_pool_timeout_limit;
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
+          dal_slots;
         } ->
         [
           "--rollup-node-endpoint";
@@ -690,6 +693,10 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_pool_tx_per_addr_limit
+        @ Cli_arg.optional_arg
+            "dal-slots"
+            (fun l -> String.concat "," (List.map string_of_int l))
+            dal_slots
     | Threshold_encryption_sequencer
         {
           initial_kernel = _;
@@ -708,6 +715,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
           sequencer_sidecar_endpoint;
+          dal_slots;
         } ->
         [
           "--rollup-node-endpoint";
@@ -756,6 +764,10 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_pool_tx_per_addr_limit
+        @ Cli_arg.optional_arg
+            "dal-slots"
+            (fun l -> String.concat "," (List.map string_of_int l))
+            dal_slots
     | Observer
         {
           preimages_dir;

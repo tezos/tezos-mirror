@@ -37,6 +37,10 @@ type blueprints_publisher_config = {
       (** The maximum number of Layer 1 blocks the Sequencer waits
           after resending its blueprints before trying to catch-up
           again. *)
+  dal_slots : int list option;
+      (** When set to [Some l], l is the list of DAL slot indices to
+          use to publish blueprints, when set to [None] the sequencer
+          is not allowed to use the DAL. *)
 }
 
 (** Configuration settings for experimental features, with no backward
@@ -159,6 +163,7 @@ val sequencer_config_dft :
   ?max_blueprints_ahead:int ->
   ?max_blueprints_catchup:int ->
   ?catchup_cooldown:int ->
+  ?dal_slots:int list ->
   unit ->
   sequencer
 
@@ -177,6 +182,7 @@ val threshold_encryption_sequencer_config_dft :
   ?max_blueprints_ahead:int ->
   ?max_blueprints_catchup:int ->
   ?catchup_cooldown:int ->
+  ?dal_slots:int list ->
   unit ->
   threshold_encryption_sequencer
 
@@ -223,6 +229,7 @@ module Cli : sig
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:string ->
     ?proxy_finalized_view:bool ->
+    ?dal_slots:int list ->
     unit ->
     t
 
@@ -256,6 +263,7 @@ module Cli : sig
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:string ->
     ?proxy_finalized_view:bool ->
+    ?dal_slots:int list ->
     unit ->
     t tzresult Lwt.t
 end

@@ -19,6 +19,7 @@ type blueprints_publisher_config = {
   max_blueprints_ahead : int;
   max_blueprints_catchup : int;
   catchup_cooldown : int;
+  dal_slots : int list option;
 }
 
 type experimental_features = {
@@ -148,6 +149,7 @@ let default_blueprints_publisher_config =
     max_blueprints_ahead = 100;
     max_blueprints_catchup = 50;
     catchup_cooldown = 1;
+    dal_slots = None;
   }
 
 let default_fee_history = {max_count = None; max_past = None}
@@ -157,7 +159,7 @@ let make_restricted_rpcs raw = {raw; regex = Re.Perl.compile_pat raw}
 let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ~sequencer
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown () =
+    ?catchup_cooldown ?dal_slots () =
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -176,6 +178,7 @@ let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
         Option.value
           ~default:default_blueprints_publisher_config.catchup_cooldown
           catchup_cooldown;
+      dal_slots;
     }
   in
   {
@@ -193,7 +196,8 @@ let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
 let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
     ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
     ?private_rpc_port ~sequencer ?sidecar_endpoint ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown () =
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown ?dal_slots
+    () =
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -212,6 +216,7 @@ let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
         Option.value
           ~default:default_blueprints_publisher_config.catchup_cooldown
           catchup_cooldown;
+      dal_slots;
     }
   in
   Threshold_encryption_sequencer
@@ -271,22 +276,26 @@ let blueprints_publisher_config_encoding =
            max_blueprints_ahead;
            max_blueprints_catchup;
            catchup_cooldown;
+           dal_slots;
          } ->
       ( max_blueprints_lag,
         max_blueprints_ahead,
         max_blueprints_catchup,
-        catchup_cooldown ))
+        catchup_cooldown,
+        dal_slots ))
     (fun ( max_blueprints_lag,
            max_blueprints_ahead,
            max_blueprints_catchup,
-           catchup_cooldown ) ->
+           catchup_cooldown,
+           dal_slots ) ->
       {
         max_blueprints_lag;
         max_blueprints_ahead;
         max_blueprints_catchup;
         catchup_cooldown;
+        dal_slots;
       })
-    (obj4
+    (obj5
        (dft
           "max_blueprints_lag"
           int31
@@ -302,7 +311,8 @@ let blueprints_publisher_config_encoding =
        (dft
           "catchup_cooldown"
           int31
-          default_blueprints_publisher_config.catchup_cooldown))
+          default_blueprints_publisher_config.catchup_cooldown)
+       (opt "dal_slots" (list int8)))
 
 let sequencer_encoding data_dir =
   let open Data_encoding in
@@ -669,7 +679,7 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view () =
+      ?proxy_finalized_view ?dal_slots () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -685,6 +695,7 @@ module Cli = struct
             ?max_blueprints_catchup
             ?catchup_cooldown
             ~sequencer
+            ?dal_slots
             ())
         sequencer_key
     in
@@ -704,6 +715,7 @@ module Cli = struct
             ?catchup_cooldown
             ~sequencer
             ?sidecar_endpoint:sequencer_sidecar_endpoint
+            ?dal_slots
             ())
         sequencer_key
     in
@@ -767,7 +779,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
-      configuration =
+      ~dal_slots configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -793,6 +805,8 @@ module Cli = struct
                 Option.value
                   ~default:blueprints_publisher_config.catchup_cooldown
                   catchup_cooldown;
+              dal_slots =
+                Option.either dal_slots blueprints_publisher_config.dal_slots;
             }
           in
           Some
@@ -832,6 +846,7 @@ module Cli = struct
                 ?max_blueprints_catchup
                 ?catchup_cooldown
                 ~sequencer
+                ?dal_slots
                 ())
             sequencer_key
     in
@@ -864,6 +879,8 @@ module Cli = struct
                 Option.value
                   ~default:blueprints_publisher_config.catchup_cooldown
                   catchup_cooldown;
+              dal_slots =
+                Option.either dal_slots blueprints_publisher_config.dal_slots;
             }
           in
           Some
@@ -919,6 +936,7 @@ module Cli = struct
                 ?catchup_cooldown
                 ~sequencer
                 ?sidecar_endpoint:sequencer_sidecar_endpoint
+                ?dal_slots
                 ())
             sequencer_key
     in
@@ -1024,7 +1042,8 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view () =
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
+      ?dal_slots () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1076,6 +1095,7 @@ module Cli = struct
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
           ?proxy_finalized_view
+          ~dal_slots
           configuration
       in
       return configuration
@@ -1116,6 +1136,7 @@ module Cli = struct
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
           ?proxy_finalized_view
+          ?dal_slots
           ()
       in
       return config
