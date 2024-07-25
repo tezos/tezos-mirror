@@ -53,9 +53,7 @@ type slot = bytes
       the page-size specified in the [Cryptobox.parameters] argument. *)
 val get_slot_pages :
   reconstruct_if_missing:bool ->
-  Cryptobox.t ->
-  Node_context.ready_ctxt ->
-  Store.t ->
+  Node_context.t ->
   Types.slot_id ->
   (bytes list, [> Errors.not_found | Errors.other]) result Lwt.t
 
@@ -87,23 +85,20 @@ val commit :
   Cryptobox.polynomial ->
   (Cryptobox.commitment, [> Errors.other]) result
 
-(** [get_slot_content ~reconstruct_if_missing node_ctxt node_store
-    cryptobox slot_id] returns the slot content associated with the
-    given [slot_id] in [node_store].
+(** [get_slot_content ~reconstruct_if_missing node_ctxt slot_id] returns the
+    slot content associated with the given [slot_id] in the node's store.
 
     If the slot is not found in the store and [reconstruct_if_missing]
     is true, the slot is reconstructed from the stored shards.
 
     In addition to decoding errors, the function returns [`Not_found]
-    if there is no slot content for [slot_id] in [node_store] or if
+    if there is no slot content for [slot_id] in the node's store or if
     [reconstruct_if_missing] is true and not enough shards are stored
     to reconstruct the slot.
 *)
 val get_slot_content :
   reconstruct_if_missing:bool ->
-  Node_context.ready_ctxt ->
-  Store.t ->
-  Cryptobox.t ->
+  Node_context.t ->
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 

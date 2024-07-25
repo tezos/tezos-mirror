@@ -145,9 +145,11 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot_content ~reconstruct_if_missing ctxt store cryptobox slot_id =
+let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
+  let store = Node_context.get_store ctxt in
+  let cryptobox = Node_context.get_cryptobox ctxt in
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
     Store.Slots.find_slot store.Store.slots ~slot_size slot_id
@@ -347,24 +349,17 @@ let get_slot_status ~slot_id node_store =
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read store.shards slot_id shard_index
 
-let get_slot_pages ~reconstruct_if_missing cryptobox store node_context slot_id
-    =
+let get_slot_pages ~reconstruct_if_missing node_context slot_id =
   let open Lwt_result_syntax in
-  let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot =
-    get_slot_content
-      ~reconstruct_if_missing
-      store
-      node_context
-      cryptobox
-      slot_id
-  in
+  let proto_parameters = Node_context.get_proto_parameters node_context in
+  let page_size = proto_parameters.cryptobox_parameters.page_size in
+  let* slot = get_slot_content ~reconstruct_if_missing node_context slot_id in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
   let*? pages =
     Bytes.chunk_bytes
-      dal_parameters.page_size
+      page_size
       slot
       ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
   in
