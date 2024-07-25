@@ -275,6 +275,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
           (match to_protocol with
           | Known _ | Demo -> "known"
           | Injected_test -> "injected");
+          "singleprocess";
         ])
   @@ fun () ->
   (* Prepare protocol parameters such that voting periods are shorter
