@@ -18,5 +18,6 @@ where
     #[inline(always)]
     pub fn run_fencei(&mut self) {
         self.translation_cache.invalidate([AccessType::Instruction]);
+        self.instruction_cache.invalidate();
     }
 }

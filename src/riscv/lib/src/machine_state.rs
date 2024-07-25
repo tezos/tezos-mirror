@@ -9,6 +9,7 @@ pub mod address_translation;
 pub mod bus;
 pub mod csregisters;
 pub mod hart_state;
+pub mod instruction_cache;
 pub mod mode;
 pub mod registers;
 pub mod reservation_set;
@@ -16,6 +17,7 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
+use self::instruction_cache::{InstructionCache, InstructionCacheLayout};
 use crate::{
     bits::u64,
     devicetree,
@@ -40,13 +42,19 @@ use mode::Mode;
 use std::ops::Bound;
 
 /// Layout for the machine state
-pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, TranslationCacheLayout);
+pub type MachineStateLayout<ML> = (
+    HartStateLayout,
+    bus::BusLayout<ML>,
+    TranslationCacheLayout,
+    InstructionCacheLayout,
+);
 
 /// Machine state
 pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
     pub hart: HartState<M>,
     pub bus: Bus<ML, M>,
     pub translation_cache: TranslationCache<M>,
+    pub instruction_cache: InstructionCache<M>,
 }
 
 /// How to modify the program counter
@@ -247,6 +255,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
             hart: HartState::bind(space.0),
             bus: Bus::bind(space.1),
             translation_cache: TranslationCache::bind(space.2),
+            instruction_cache: InstructionCache::bind(space.3),
         }
     }
 
@@ -256,6 +265,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
             self.hart.struct_ref(),
             self.bus.struct_ref(),
             self.translation_cache.struct_ref(),
+            self.instruction_cache.struct_ref(),
         )
     }
 
@@ -267,6 +277,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
         self.hart.reset(bus::start_of_main_memory::<ML>());
         self.bus.reset();
         self.translation_cache.reset();
+        self.instruction_cache.reset();
     }
 
     /// Translate an instruction address.
@@ -335,11 +346,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
         M: backend::ManagerReadWrite,
     {
         let first_halfword = self.fetch_instr_halfword(phys_addr)?;
+        let mut combined = first_halfword as u32;
 
         // The reasons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read all 4 bytes eagerly.
-        parse(first_halfword, || {
+        let instr = parse(first_halfword, || {
             let next_addr = phys_addr + 2;
 
             // Optimization to skip an extra address translation lookup:
@@ -351,8 +363,16 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
                 next_addr
             };
 
-            self.fetch_instr_halfword(phys_addr)
-        })
+            let second_halfword = self.fetch_instr_halfword(phys_addr)?;
+
+            combined = (combined << 16) | second_halfword as u32;
+
+            Ok(second_halfword)
+        })?;
+
+        self.instruction_cache
+            .cache_instr(phys_addr, combined, instr);
+        Ok(instr)
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
@@ -626,8 +646,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     where
         M: backend::ManagerReadWrite,
     {
-        self.fetch_instr(current_mode, satp, instr_pc, phys_addr)
-            .and_then(|instr| self.run_instr(&instr))
+        match self.instruction_cache.fetch_instr(phys_addr).as_ref() {
+            Some(instr) => self.run_instr(instr),
+            None => self
+                .fetch_instr(current_mode, satp, instr_pc, phys_addr)
+                .and_then(|instr| self.run_instr(&instr)),
+        }
     }
 
     /// Handle interrupts (also known as asynchronous exceptions)
@@ -965,6 +989,11 @@ mod tests {
             state.hart.xregisters.write(a2, init_pc_addr);
             state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
             state.hart.xregisters.write(t2, jump_addr);
+
+            // Since we've written a new instruction to the init_pc_addr - we need to
+            // invalidate the instruction cache.
+            state.run_fencei();
+
             state.step().expect("should not raise trap to EE");
             prop_assert_eq!(state.hart.xregisters.read(t0), init_pc_addr + 4);
             prop_assert_eq!(state.hart.pc.read(), jump_addr);
