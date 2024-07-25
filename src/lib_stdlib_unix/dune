@@ -22,7 +22,8 @@
   mtime
   mtime.clock.os
   uri
-  progress)
+  progress
+  camlp-streams)
  (flags
   (:standard)
   -open Tezos_error_monad

@@ -127,47 +127,26 @@ let read_snapshot_metadata (module Reader : READER_INPUT) =
   assert (snapshot_version = version) ;
   Data_encoding.Binary.of_bytes_exn snaphsot_metadata_encoding metadata_bytes
 
-let list_files dir ~include_file f =
-  let rec list_files_in_dir stream
-      ((dir, relative_dir, dir_handle) as current_dir_info) =
-    match Unix.readdir dir_handle with
-    | "." | ".." -> list_files_in_dir stream current_dir_info
-    | basename ->
-        let full_path = Filename.concat dir basename in
-        let relative_path = Filename.concat relative_dir basename in
-        let stream =
-          if Sys.is_directory full_path then
-            let sub_dir_handle = Unix.opendir full_path in
-            list_files_in_dir stream (full_path, relative_path, sub_dir_handle)
-          else if include_file ~relative_path then
-            Stream.icons (f ~full_path ~relative_path) stream
-          else stream
-        in
-        list_files_in_dir stream current_dir_info
-    | exception End_of_file ->
-        Unix.closedir dir_handle ;
-        stream
-  in
-  let dir_handle = Unix.opendir dir in
-  list_files_in_dir Stream.sempty (dir, "", dir_handle)
-
-let total_bytes_to_export dir ~include_file =
-  let file_stream =
-    list_files dir ~include_file @@ fun ~full_path ~relative_path:_ ->
-    let {Unix.st_size; _} = Unix.lstat full_path in
-    st_size
-  in
-  let total = ref 0 in
-  Stream.iter (fun size -> total := !total + size) file_stream ;
-  !total
-
 let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
     ~include_file ~dest =
   let module Archive_writer = Tar.Make (struct
     include Reader
     include Writer
   end) in
-  let total = total_bytes_to_export dir ~include_file in
+  let files =
+    Tezos_stdlib_unix.Utils.list_files dir
+    |> List.filter (fun relative_path -> include_file ~relative_path)
+  in
+  let total =
+    List.fold_left
+      (fun total relative_path ->
+        let {Unix.st_size; _} =
+          Unix.lstat (Filename.concat dir relative_path)
+        in
+        total + st_size)
+      0
+      files
+  in
   let progress_bar =
     Progress_bar.progress_bar
       ~counter:`Bytes
@@ -195,17 +174,21 @@ let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
       raise e
   in
   let file_stream =
-    list_files dir ~include_file @@ fun ~full_path ~relative_path ->
-    let {Unix.st_perm; st_size; st_mtime; _} = Unix.lstat full_path in
-    let header =
-      Tar.Header.make
-        ~file_mode:st_perm
-        ~mod_time:(Int64.of_float st_mtime)
-        relative_path
-        (Int64.of_int st_size)
-    in
-    let writer = write_file full_path in
-    (header, writer)
+    List.rev_map
+      (fun relative_path ->
+        let full_path = Filename.concat dir relative_path in
+        let {Unix.st_perm; st_size; st_mtime; _} = Unix.lstat full_path in
+        let header =
+          Tar.Header.make
+            ~file_mode:st_perm
+            ~mod_time:(Int64.of_float st_mtime)
+            relative_path
+            (Int64.of_int st_size)
+        in
+        let writer = write_file full_path in
+        (header, writer))
+      files
+    |> Stream.of_list
   in
   let out_chan = Writer.open_out dest in
   try
@@ -221,58 +204,6 @@ let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
   with e ->
     Writer.close_out out_chan ;
     raise e
-
-let rec create_dir ?(perm = 0o755) dir =
-  let stat =
-    try Some (Unix.stat dir) with Unix.Unix_error (ENOENT, _, _) -> None
-  in
-  match stat with
-  | Some {st_kind = S_DIR; _} -> ()
-  | Some _ -> Stdlib.failwith "Not a directory"
-  | None -> (
-      create_dir ~perm (Filename.dirname dir) ;
-      try Unix.mkdir dir perm
-      with Unix.Unix_error (EEXIST, _, _) ->
-        (* This is the case where the directory has been created at the same
-           time. *)
-        ())
-
-let copy_file ~src ~dst =
-  let in_chan = open_in src in
-  let out_chan = open_out dst in
-  try
-    let buffer_size = 64 * 1024 in
-    let buf = Bytes.create buffer_size in
-    let rec copy () =
-      let read_bytes = input in_chan buf 0 buffer_size in
-      output out_chan buf 0 read_bytes ;
-      if read_bytes > 0 then copy ()
-    in
-    copy () ;
-    flush out_chan ;
-    close_in in_chan ;
-    close_out out_chan
-  with e ->
-    close_in in_chan ;
-    close_out out_chan ;
-    raise e
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6857
-   Use Lwt_utils_unix.copy_dir instead when file descriptors issue is fixed. *)
-let copy_dir ?(perm = 0o755) src dst =
-  create_dir ~perm dst ;
-  let files =
-    list_files src ~include_file:(fun ~relative_path:_ -> true)
-    @@ fun ~full_path ~relative_path ->
-    let dst_file = Filename.concat dst relative_path in
-    (full_path, dst_file)
-  in
-  Stream.iter
-    (fun (src, dst) ->
-      let dst_dir = Filename.dirname dst in
-      create_dir ~perm dst_dir ;
-      copy_file ~src ~dst)
-    files
 
 let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     ~snapshot_file ~dest =
@@ -292,7 +223,7 @@ let extract (module Reader : READER) (module Writer : WRITER) metadata_check
   end) in
   let out_channel_of_header (header : Tar.Header.t) =
     let path = Filename.concat dest header.file_name in
-    create_dir (Filename.dirname path) ;
+    Tezos_stdlib_unix.Utils.create_dir (Filename.dirname path) ;
     Writer.open_out path
   in
   let in_chan = Reader.open_in snapshot_file in

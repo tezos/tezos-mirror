@@ -57,6 +57,7 @@ depends: [
   "mtime" { >= "2.0.0" }
   "conf-libev"
   "progress" { >= "0.1.0" }
+  "camlp-streams" { >= "5.0.1" }
   "uutf"
   "lwt-exit"
   "ppxlib"

@@ -21,6 +21,7 @@ depends: [
   "bigstring"
   "bigstringaf" { >= "0.5.0" }
   "bisect_ppx" { >= "2.7.0" }
+  "camlp-streams" { >= "5.0.1" }
   "camlzip" { >= "1.11" & < "1.12" }
   "caqti"
   "caqti-driver-sqlite3" { >= "2.0.1" }
