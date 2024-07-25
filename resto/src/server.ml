@@ -529,7 +529,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                (Printexc.get_backtrace ())
        and callback (io, con) req body =
          let con_string = Connection.to_string con in
-         Log.log_info "server (%s) connection accepted" con_string ;
+         Log.log_debug "server (%s) connection accepted" con_string ;
          Lwt.catch
            (fun () -> callback (io, con) req body)
            (function
