@@ -60,6 +60,42 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+let read_dir dir =
+  let* dir = Lwt_unix.opendir dir in
+  let rec read_files acc =
+    Lwt.catch
+      (fun () ->
+        let* entry = Lwt_unix.readdir dir in
+        match entry with
+        | "." | ".." | ".lock" -> read_files acc
+        | file -> read_files (file :: acc))
+      (function
+        | End_of_file ->
+            let* () = Lwt_unix.closedir dir in
+            return acc
+        | exn -> Lwt.reraise exn)
+  in
+  read_files []
+
+(* This function checks that in the skip list store of the given [dal_node]
+   (1) the list of files in the 'hashes' sub-directory coincides with
+   [expected_levels] (up to ordering) and (2) as many files in the 'cells'
+   sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
+let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
+  let store_dir = sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node) in
+  let* hashes = read_dir (store_dir ^ "hashes") in
+  Check.(
+    List.sort String.compare hashes = List.sort String.compare expected_levels)
+    ~__LOC__
+    Check.(list string)
+    ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
+  let* cells = read_dir (store_dir ^ "cells") in
+  Check.(List.length cells = number_of_slots * List.length expected_levels)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R cells, got %L" ;
+  unit
+
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
 let wait_for_layer1_head dal_node level =
@@ -6185,44 +6221,6 @@ module Garbage_collection = struct
     in
 
     Log.info "End of test" ;
-    unit
-
-  let read_dir dir =
-    let* dir = Lwt_unix.opendir dir in
-    let rec read_files acc =
-      Lwt.catch
-        (fun () ->
-          let* entry = Lwt_unix.readdir dir in
-          match entry with
-          | "." | ".." | ".lock" -> read_files acc
-          | file -> read_files (file :: acc))
-        (function
-          | End_of_file ->
-              let* () = Lwt_unix.closedir dir in
-              return acc
-          | exn -> Lwt.reraise exn)
-    in
-    read_files []
-
-  (* This function checks that in the skip list store of the given [dal_node]
-     there are the list of files in the 'hashes' sub-directory coincides with
-     [expected_levels] (up to ordering) and as many files in the 'cells'
-     sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
-  let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
-    let store_dir =
-      sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node)
-    in
-    let* hashes = read_dir (store_dir ^ "hashes") in
-    Check.(
-      List.sort String.compare hashes = List.sort String.compare expected_levels)
-      ~__LOC__
-      Check.(list string)
-      ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
-    let* cells = read_dir (store_dir ^ "cells") in
-    Check.(List.length cells = number_of_slots * List.length expected_levels)
-      ~__LOC__
-      Check.int
-      ~error_msg:"Expected %R cells, got %L" ;
     unit
 
   let test_gc_skip_list_cells ~protocols =
