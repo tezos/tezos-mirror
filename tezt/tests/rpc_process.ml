@@ -240,7 +240,7 @@ let test_local_rpc_server =
     ~title:"RPC local server"
     ~tags:[team; "rpc"; "process"; "local_server"]
   @@ fun () ->
-  let node = Node.create [] in
+  let node = Node.create ~rpc_external:false [] in
   (* Register event watchers for local RPC server before the node is running to
      ensure they will not be missed. *)
   let local_event_promise =
@@ -322,8 +322,12 @@ let test_local_and_process_rpc_servers =
           (fun port -> Node.RPC_additional_addr_external (point_of_port port))
           external_rpc_ports)
   in
-  (* Add the local RPC server created by default in Node module. *)
-  let local_rpc_ports = Node.rpc_port node :: local_rpc_ports in
+  (* Add the external RPC server created by default in Node module. *)
+  let local_rpc_ports, external_rpc_ports =
+    if Node.enable_external_rpc_process then
+      (local_rpc_ports, Node.rpc_port node :: external_rpc_ports)
+    else (Node.rpc_port node :: local_rpc_ports, external_rpc_ports)
+  in
   (* Register event watchers for both external and local RPC servers
      before the node is running to ensure they will not be missed. *)
   let local_event_promises =
@@ -379,7 +383,9 @@ let test_sync_with_node =
     Node.init ~name:"node_rpc_process" ~rpc_external:true node_arguments
   in
   let* () = Node.wait_for_ready node_rpc_process in
-  let node_local_rpc = Node.create ~name:"node_local_rpc" node_arguments in
+  let node_local_rpc =
+    Node.create ~name:"node_local_rpc" ~rpc_external:false node_arguments
+  in
   let waiter_for_local_rpc_server = wait_for_local_rpc_server node_local_rpc in
   let* () = Node.run node_local_rpc node_arguments in
   let* () = Node.wait_for_ready node_local_rpc in

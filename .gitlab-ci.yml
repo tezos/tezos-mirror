@@ -58,6 +58,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_extended_test
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
+    variables:
+      PIPELINE_TYPE: schedule_extended_rpc_test
+    when: always
 
 default:
   interruptible: true
@@ -138,4 +142,8 @@ include:
 - local: .gitlab/ci/pipelines/schedule_extended_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_extended_rpc_test.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
     when: always

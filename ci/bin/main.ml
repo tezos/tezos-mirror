@@ -133,7 +133,11 @@ let () =
   register
     "schedule_extended_test"
     schedule_extended_tests
-    ~jobs:(Code_verification.jobs Schedule_extended_test)
+    ~jobs:(Code_verification.jobs Schedule_extended_test) ;
+  register
+    "schedule_extended_rpc_test"
+    schedule_extended_rpc_tests
+    ~jobs:Rpc_pipeline.jobs
 
 let () =
   (* If argument --verbose is set, then log generation info.

@@ -750,11 +750,16 @@ let wait_for_disconnections node disconnections =
   let* () = wait_for_ready node in
   waiter
 
+let enable_external_rpc_process =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_RPC_TESTS" -> true
+  | _ -> false
+
 let create ?runner ?(path = Uses.path Constant.octez_node) ?name ?color
     ?data_dir ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
-    ?metrics_port ?(rpc_external = false) ?(rpc_host = Constant.default_host)
-    ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
-    ?(max_active_rpc_connections = 500) arguments =
+    ?metrics_port ?(rpc_external = enable_external_rpc_process)
+    ?(rpc_host = Constant.default_host) ?rpc_port ?rpc_tls
+    ?(allow_all_rpc = true) ?(max_active_rpc_connections = 500) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
