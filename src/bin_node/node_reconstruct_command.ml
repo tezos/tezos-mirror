@@ -68,8 +68,8 @@ module Term = struct
                 tzfail (Node_run_command.Invalid_sandbox_file filename)
             | Ok json -> return_some ("sandbox_parameter", json))
       in
-      Lwt_lock_file.try_with_lock
-        ~when_locked:(fun () -> tzfail Locked_directory)
+      Lwt_lock_file.with_lock
+        ~when_locked:(`Fail Locked_directory)
         ~filename:(Data_version.lock_file data_dir)
       @@ fun () ->
       let context_dir = Data_version.context_dir data_dir in

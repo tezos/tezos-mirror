@@ -33,9 +33,9 @@ let group =
   }
 
 let use_data_dir data_dir f =
-  Lwt_lock_file.try_with_lock
-    ~when_locked:(fun () ->
-      failwith "Data directory is locked by another process")
+  Lwt_lock_file.with_lock
+    ~when_locked:
+      (`Fail (Exn (Failure "Data directory is locked by another process")))
     ~filename:(Data_version.lock_file data_dir)
   @@ f
 

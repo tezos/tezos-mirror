@@ -28,36 +28,16 @@
 open Node_context
 
 let lock ~data_dir =
+  let open Lwt_result_syntax in
+  let*! () = Event.acquiring_lock () in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
   let lockfile_path = global_lockfile_path ~data_dir in
-  let lock_aux ~data_dir =
-    let open Lwt_result_syntax in
-    let*! () = Event.acquiring_lock () in
-    let*! () = Lwt_utils_unix.create_dir data_dir in
-    let* lockfile =
-      protect @@ fun () ->
-      Lwt_unix.openfile
-        lockfile_path
-        [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
-        0o644
-      |> Lwt_result.ok
-    in
-    let* () =
-      protect ~on_error:(fun err ->
-          let*! () = Lwt_unix.close lockfile in
-          fail err)
-      @@ fun () ->
-      let*! () = Lwt_unix.lockf lockfile Unix.F_LOCK 0 in
-      return_unit
-    in
-    return lockfile
-  in
-  trace (Rollup_node_errors.Could_not_acquire_lock lockfile_path)
-  @@ lock_aux ~data_dir
+  Lwt_lock_file.lock
+    ~when_locked:
+      (`Fail (Rollup_node_errors.Could_not_acquire_lock lockfile_path))
+    ~filename:lockfile_path
 
-let unlock {lockfile; _} =
-  Lwt.finalize
-    (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
-    (fun () -> Lwt_unix.close lockfile)
+let unlock {lockfile; _} = Lwt_lock_file.unlock lockfile
 
 let update_metadata ({Metadata.rollup_address; _} as metadata) ~data_dir =
   let open Lwt_result_syntax in
