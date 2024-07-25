@@ -889,7 +889,7 @@ function update_tezt_tests() {
 
   if [[ ${is_snapshot} != true ]]; then
     dune exec tezt/tests/main.exe -- --file tezt/tests/protocol_migration.ml --title 'Alpha: weeklynet regression test' --reset-regressions
-    commit "tezt: reset weeklynet regression test"
+    commit_if_changes "tezt: reset weeklynet regression test"
   fi
 
 }
