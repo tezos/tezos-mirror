@@ -166,7 +166,7 @@ let dal_injection =
     ~input:
       Data_encoding.(
         def "dal_slot" ~description:"Slot to inject" input_encoding)
-    ~output:Data_encoding.unit
+    ~output:Tezos_crypto.Hashed.Injector_operations_hash.encoding
     (open_root / "local" / "dal" / "injection")
 
 let simulation :
@@ -289,19 +289,15 @@ let publish_on_dal :
     rollup_node_endpoint:Uri.t ->
     slot_index:int ->
     string ->
-    unit tzresult Lwt.t =
+    Tezos_crypto.Hashed.Injector_operations_hash.t tzresult Lwt.t =
  fun ~rollup_node_endpoint ~slot_index inputs ->
-  let open Lwt_result_syntax in
-  let* _answer =
-    call_service
-      ~keep_alive:false
-      ~base:rollup_node_endpoint
-      dal_injection
-      ()
-      ()
-      (inputs, slot_index)
-  in
-  return_unit
+  call_service
+    ~keep_alive:false
+    ~base:rollup_node_endpoint
+    dal_injection
+    ()
+    ()
+    (inputs, slot_index)
 
 let durable_state_subkeys :
     ( [`GET],
