@@ -90,7 +90,13 @@ function commit() {
     .git/hooks/pre-commit || true
     git add "${script_dir}/../" || true
   fi
-  git commit -m "${capitalized_label}/$1"
+  if ! git commit -m "${capitalized_label}/$1"; then
+    git add "${script_dir}/../"
+    if ! git commit -m "${capitalized_label}/$1"; then
+      error "Failed to create commit" 1>&2
+      print_and_exit 1 "${LINENO}"
+    fi
+  fi
   echo -e "${blue}Created commit:${cyan} ${capitalized_label}/$1${reset}"
   commits=$((commits + 1))
 
@@ -755,7 +761,7 @@ function update_tezt_tests() {
   # automatically add the new protocol tag to alcotezt
 
   if [[ ${is_snapshot} == true ]]; then
-    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]"/"  | Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
+    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
     commit "tezt: update protocol tag in alcotezt"
   else
     temp_file=$(mktemp)
@@ -765,6 +771,7 @@ function update_tezt_tests() {
     mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
     commit "tezt: add new protocol tag to alcotezt"
   fi
+
   cd "${script_dir}"/..
 
   # Adapt tezt/lib_tezos/protocol.ml
