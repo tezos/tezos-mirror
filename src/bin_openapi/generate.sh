@@ -34,7 +34,7 @@ dal_rpc_port=10732
 tmp=openapi-tmp
 data_dir=$tmp/octez-sandbox
 client_dir=$tmp/octez-client
-dal_node_data_dir=$tmp/dal-node
+dal_node_data_dir=$tmp/octez-dal-node
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
@@ -57,10 +57,10 @@ $tezos_node config init --data-dir $data_dir \
   --network sandbox \
   --expected-pow 0 \
   --rpc-addr localhost:$rpc_port \
-  --no-bootstrap-peer \
-  --synchronisation-threshold 0
+  --synchronisation-threshold 0 \
+  --connections 0
 $tezos_node identity generate --data-dir $data_dir
-$tezos_node run --data-dir $data_dir --connections 0 &
+$tezos_node run --data-dir $data_dir --connections 0 --synchronisation-threshold 0 &
 node_pid="$!"
 
 # Wait for the node to be ready (sorry for the hackish way...)
@@ -68,13 +68,8 @@ sleep 3
 
 # Activate the protocol.
 mkdir $client_dir
-$tezos_client --base-dir $client_dir import secret key activator $activator_secret_key
-$tezos_client --base-dir $client_dir activate protocol $protocol_hash \
-  with fitness 1 \
-  and key activator \
-  and parameters $protocol_parameters \
-  --timestamp "$(TZ='AAA+1' date +%FT%TZ)"
-
+$tezos_client --base-dir $client_dir --endpoint http://localhost:$rpc_port --block genesis activate protocol \
+  $protocol_hash with fitness 1 and key $activator_secret_key and parameters $protocol_parameters
 # Wait a bit again...
 sleep 1
 
