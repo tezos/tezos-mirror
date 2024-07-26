@@ -12,7 +12,7 @@ let rec wait_until_proposal_submitted () =
   in
   (* If no proposal was submitted then either the tx pool was locked,
      not enough time passed before the last proposal and the candidate proposal
-     was empty. *)
+     was empty, or the proposal handler is locked. *)
   match proposal_submission_outcome with
   | Threshold_encryption_types.Tx_pool_is_locked | Proposal_is_early ->
       (* The sequencer is not waiting to receive a preblock,
@@ -43,10 +43,13 @@ let loop_on_preblocks_stream preblocks_stream time_between_blocks =
           let*! _res =
             Threshold_encryption_block_producer.produce_block preblock
           in
-          return_unit
+          Threshold_encryption_proposals_handler.unlock_next_proposal ()
       | Time_between_blocks _ ->
           let* _n_tx =
             Threshold_encryption_block_producer.produce_block preblock
+          in
+          let* () =
+            Threshold_encryption_proposals_handler.unlock_next_proposal ()
           in
           wait_until_proposal_submitted ()
     in
