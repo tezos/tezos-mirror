@@ -153,6 +153,22 @@ let batcher_injection :
           (list string))
     (open_root / "local" / "batcher" / "injection")
 
+let dal_injection =
+  let input_encoding =
+    Data_encoding.(
+      obj2
+        (req "slot_content" Data_encoding.Variable.string)
+        (req "slot_index" uint8))
+  in
+  Tezos_rpc.Service.post_service
+    ~description:"Inject the given slot in the DAL queue"
+    ~query:Tezos_rpc.Query.empty
+    ~input:
+      Data_encoding.(
+        def "dal_slot" ~description:"Slot to inject" input_encoding)
+    ~output:Data_encoding.unit
+    (open_root / "local" / "dal" / "injection")
+
 let simulation :
     ( [`POST],
       unit,
@@ -266,6 +282,24 @@ let publish :
       ()
       drop_duplicate
       inputs
+  in
+  return_unit
+
+let publish_on_dal :
+    rollup_node_endpoint:Uri.t ->
+    slot_index:int ->
+    string ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint ~slot_index inputs ->
+  let open Lwt_result_syntax in
+  let* _answer =
+    call_service
+      ~keep_alive:false
+      ~base:rollup_node_endpoint
+      dal_injection
+      ()
+      ()
+      (inputs, slot_index)
   in
   return_unit
 

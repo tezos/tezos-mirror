@@ -44,6 +44,22 @@ let blueprint_injection =
     ~level:Info
     ("level", Data_encoding.n)
 
+let blueprint_injection_on_inbox =
+  declare_1
+    ~section
+    ~name:"blueprint_injection_on_inbox"
+    ~msg:"Injecting on the shared inbox a blueprint for level {level}"
+    ~level:Debug
+    ("level", Data_encoding.n)
+
+let blueprint_injection_on_DAL =
+  declare_1
+    ~section
+    ~name:"blueprint_injection_on_DAL"
+    ~msg:"Injecting on the DAL a blueprint for level {level}"
+    ~level:Debug
+    ("level", Data_encoding.n)
+
 let blueprint_injection_failure =
   declare_2
     ~section
@@ -106,6 +122,10 @@ let publisher_is_ready () = emit publisher_ready ()
 let publisher_shutdown () = emit publisher_shutdown ()
 
 let blueprint_injected level = emit blueprint_injection level
+
+let blueprint_injected_on_inbox level = emit blueprint_injection_on_inbox level
+
+let blueprint_injected_on_DAL level = emit blueprint_injection_on_DAL level
 
 let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)

@@ -28,6 +28,7 @@ type state = {
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
   dal_slots : int list option;
+  mutable dal_last_used : Z.t;
 }
 
 module Types = struct
@@ -98,7 +99,7 @@ module Worker = struct
     let current = current_cooldown worker in
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
 
-  let publish self payload level =
+  let publish self payload level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
     let rollup_node_endpoint = rollup_node_endpoint self in
     (* We do not check if we succeed or not: this will be done when new L2
@@ -107,7 +108,27 @@ module Worker = struct
     let*! res =
       (* We do not check if we succeed or not: this will be done when new L2
          heads come from the rollup node. *)
-      Rollup_services.publish ~keep_alive:false ~rollup_node_endpoint payload
+      match (state self, payload) with
+      | ( {
+            enable_dal = true;
+            dal_slots = Some (slot_index :: _);
+            dal_last_used;
+            _;
+          },
+          [`External payload] )
+        when use_dal_if_enabled && dal_last_used < level ->
+          (state self).dal_last_used <- level ;
+          let*! () = Blueprint_events.blueprint_injected_on_DAL level in
+          Rollup_services.publish_on_dal
+            ~rollup_node_endpoint
+            ~slot_index
+            payload
+      | _ ->
+          let*! () = Blueprint_events.blueprint_injected_on_inbox level in
+          Rollup_services.publish
+            ~keep_alive:false
+            ~rollup_node_endpoint
+            payload
     in
     let*! () =
       match res with
@@ -155,7 +176,7 @@ module Worker = struct
     let* () =
       List.iter_es
         (fun (Ethereum_types.Qty current, payload) ->
-          publish worker payload current)
+          publish worker payload current ~use_dal_if_enabled:false)
         blueprints
     in
 
@@ -224,6 +245,7 @@ module Handlers = struct
         keep_alive;
         enable_dal = Option.is_some dal_slots;
         dal_slots;
+        dal_last_used = Z.zero;
       }
 
   let on_request :
@@ -233,7 +255,7 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Publish {level; payload} ->
-        let* () = Worker.publish self payload level in
+        let* () = Worker.publish self payload level ~use_dal_if_enabled:true in
         return_unit
     | New_rollup_node_block rollup_block_lvl -> (
         let* () =
