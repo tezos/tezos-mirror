@@ -354,3 +354,5 @@ val timestamp_to_bytes : Time.Protocol.t -> bytes
 
 (** See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
 val bool_to_rlp_bytes : bool -> Rlp.item
+
+val hash_raw_tx : string -> hash

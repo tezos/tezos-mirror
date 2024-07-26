@@ -18,7 +18,7 @@ module Pool = struct
     gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
     inclusion_timestamp : Time.Protocol.t;
     (* Time of inclusion in the transaction pool. *)
-    transaction_object : Ethereum_types.transaction_object option;
+    transaction_object : Ethereum_types.transaction_object;
   }
 
   type t = {
@@ -45,23 +45,15 @@ module Pool = struct
     in
     let add_transaction_object_to_map nonce transaction_object pending_map
         queued_map address_balance address_nonce =
-      match transaction_object with
-      | None -> return (pending_map, queued_map)
-      | Some transaction_object ->
-          if
-            is_transaction_pending
-              transaction_object
-              address_balance
-              address_nonce
-          then
-            return
-              ( Ethereum_types.NonceMap.add nonce transaction_object pending_map,
-                queued_map )
-          else
-            return
-              ( pending_map,
-                Ethereum_types.NonceMap.add nonce transaction_object queued_map
-              )
+      if is_transaction_pending transaction_object address_balance address_nonce
+      then
+        return
+          ( Ethereum_types.NonceMap.add nonce transaction_object pending_map,
+            queued_map )
+      else
+        return
+          ( pending_map,
+            Ethereum_types.NonceMap.add nonce transaction_object queued_map )
     in
     let add_if_non_empty address nonce_map acc_address_map =
       if Ethereum_types.NonceMap.is_empty nonce_map then acc_address_map
@@ -91,21 +83,11 @@ module Pool = struct
 
   (** Add a transaction to the pool. *)
   let add {transactions; global_index} pkey raw_tx
-      (transaction_object : Ethereum_types.transaction_object option) =
+      (transaction_object : Ethereum_types.transaction_object) =
     let open Result_syntax in
-    let* nonce, gas_price, gas_limit =
-      match transaction_object with
-      | None ->
-          let* gas_price = Transaction.gas_price_of_rlp_raw_tx raw_tx in
-          let* gas_limit = Transaction.gas_limit_of_rlp_raw_tx raw_tx in
-          let* nonce = Transaction.nonce_of_rlp_raw_tx raw_tx in
-          return (nonce, gas_price, gas_limit)
-      | Some transaction_object ->
-          let (Qty nonce) = transaction_object.nonce in
-          let (Qty gas_price) = transaction_object.gasPrice in
-          let (Qty gas_limit) = transaction_object.gas in
-          return (nonce, gas_price, gas_limit)
-    in
+    let (Qty nonce) = transaction_object.nonce in
+    let (Qty gas_price) = transaction_object.gasPrice in
+    let (Qty gas_limit) = transaction_object.gas in
     let inclusion_timestamp = Misc.now () in
     (* Add the transaction to the user's transaction map *)
     let transactions =
@@ -197,9 +179,8 @@ module Pool = struct
     in
     Seq.find_map
       (fun t ->
-        match t.transaction_object with
-        | Some {hash; _} when hash = tx_hash -> t.transaction_object
-        | _ -> None)
+        if t.transaction_object.hash = tx_hash then Some t.transaction_object
+        else None)
       transactions
 end
 
@@ -250,7 +231,7 @@ type size_info = {number_of_addresses : int; number_of_transactions : int}
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        Simulation.validation_result * string
+        Ethereum_types.transaction_object * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions : int -> ((string * Ethereum_types.hash) list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
@@ -276,7 +257,9 @@ module Request = struct
           ~title:"Add_transaction"
           (obj3
              (req "request" (constant "add_transaction"))
-             (req "simpulation_result" Simulation.validation_result_encoding)
+             (req
+                "transaction_object"
+                Ethereum_types.transaction_object_encoding)
              (req "transaction" string))
           (function
             | View (Add_transaction (transaction, txn)) ->
@@ -408,8 +391,8 @@ let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
             "Limit of transaction for a user was reached. Transaction is \
              rejected." )
 
-let insert_valid_transaction state tx_raw address
-    (transaction_object : Ethereum_types.transaction_object option) =
+let insert_valid_transaction state tx_raw
+    (transaction_object : Ethereum_types.transaction_object) =
   let open Lwt_result_syntax in
   let open Types in
   let {
@@ -422,13 +405,8 @@ let insert_valid_transaction state tx_raw address
   } =
     state
   in
-  let*? tx_data =
-    match transaction_object with
-    | None -> Transaction.data_of_rlp_raw_tx tx_raw
-    | Some transaction_object ->
-        Result.return
-          (transaction_object.input |> Ethereum_types.hash_to_bytes
-         |> Bytes.of_string)
+  let tx_data =
+    transaction_object.input |> Ethereum_types.hash_to_bytes |> Bytes.of_string
   in
   if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
     let*! () = Tx_pool_events.tx_data_size_limit_reached () in
@@ -437,7 +415,7 @@ let insert_valid_transaction state tx_raw address
     let* address_boundaries_are_reached, error_msg =
       check_address_boundaries
         ~pool
-        ~address
+        ~address:transaction_object.from
         ~tx_pool_addr_limit
         ~tx_pool_tx_per_addr_limit
     in
@@ -445,16 +423,13 @@ let insert_valid_transaction state tx_raw address
     else
       (* Add the transaction to the pool *)
       (* Compute the hash *)
-      let hash = Transaction.hash_raw_tx tx_raw in
+      let hash = Ethereum_types.hash_raw_tx tx_raw in
       (* This is a temporary fix until the hash computation is fixed on the
          kernel side. *)
-      let transaction_object =
-        Option.map
-          (fun (tx : Ethereum_types.transaction_object) -> {tx with hash})
-          transaction_object
+      let transaction_object = {transaction_object with hash} in
+      let*? pool =
+        Pool.add pool transaction_object.from tx_raw transaction_object
       in
-      let*? pool = Pool.add pool address tx_raw transaction_object in
-
       let*! () =
         Tx_pool_events.add_transaction
           ~transaction:(Ethereum_types.hash_to_string hash)
@@ -462,15 +437,8 @@ let insert_valid_transaction state tx_raw address
       state.pool <- pool ;
       return (Ok hash)
 
-let on_normal_transaction state validation_result tx_raw =
-  match validation_result with
-  | Either.Left transaction_object ->
-      insert_valid_transaction
-        state
-        tx_raw
-        (transaction_object : Ethereum_types.transaction_object).from
-        (Some transaction_object)
-  | Right address -> insert_valid_transaction state tx_raw address None
+let on_normal_transaction state transaction_object tx_raw =
+  insert_valid_transaction state tx_raw transaction_object
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
@@ -595,11 +563,7 @@ let pop_transactions state ~maximum_cumulative_size =
       |> List.sort (fun Pool.{index = index_a; _} {index = index_b; _} ->
              Int64.compare index_a index_b)
       |> List.map (fun Pool.{raw_tx; transaction_object; _} ->
-             match transaction_object with
-             | Some {hash; _} -> (raw_tx, hash)
-             | None ->
-                 let hash = Transaction.hash_raw_tx raw_tx in
-                 (raw_tx, hash))
+             (raw_tx, transaction_object.hash))
     in
     (* update the pool *)
     state.pool <- pool ;
@@ -671,9 +635,8 @@ let find state tx_hash =
   let res =
     List.find_map
       (fun Pool.{transaction_object; _} ->
-        match transaction_object with
-        | Some {hash; _} when hash = tx_hash -> transaction_object
-        | _ -> None)
+        if transaction_object.hash = tx_hash then Some transaction_object
+        else None)
       state.Types.popped_txs
   in
   Option.either_f res (fun () -> Pool.find state.Types.pool tx_hash)
@@ -700,9 +663,9 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state w in
     match request with
-    | Request.Add_transaction (is_valid, txn) ->
+    | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
-        let* res = on_normal_transaction state is_valid txn in
+        let* res = on_normal_transaction state transaction_object txn in
         let* () = observer_self_inject_request w in
         return res
     | Request.Pop_transactions maximum_cumulative_size ->
@@ -807,12 +770,12 @@ let shutdown () =
   let*! () = Worker.shutdown w in
   return_unit
 
-let add is_valid raw_tx =
+let add transaction_object raw_tx =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     w
-    (Request.Add_transaction (is_valid, raw_tx))
+    (Request.Add_transaction (transaction_object, raw_tx))
   |> handle_request_error
 
 let nonce pkey =

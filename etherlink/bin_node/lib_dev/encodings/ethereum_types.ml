@@ -1572,3 +1572,9 @@ end
 (* See bool encoding for RLP: https://docs.rs/ethereum-rlp/latest/src/rlp/impls.rs.html#36-44 *)
 let bool_to_rlp_bytes b =
   if b then Rlp.Value (Bytes.make 1 '\001') else Rlp.Value Bytes.empty
+
+let hash_raw_tx raw_tx =
+  let hash =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest (String.to_bytes raw_tx)
+  in
+  Hash (Hex Hex.(of_bytes hash |> show))
