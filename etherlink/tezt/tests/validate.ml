@@ -2,36 +2,48 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Rpc.Syntax
 open Helpers
 
-let register f =
-  Test.register
-    ~__FILE__
-    ~uses_admin_client:false
-    ~uses_client:false
-    ~uses_node:false
-    ~uses:
-      [
-        Constant.octez_evm_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ]
-  @@ fun () ->
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~node_transaction_validation:true
-      ()
-  in
-  let* sequencer = Helpers.init_sequencer_sandbox ~patch_config () in
-  f sequencer
+type transaction_type = Legacy | Eip1559
 
-let test_validate_compressed_sig () =
+let tag = function Legacy -> "Legacy" | Eip1559 -> "Eip1559"
+
+let register ~title ~tags f tx_types =
+  List.iter
+    (fun tx_type ->
+      let tag_tx = tag tx_type in
+      let title = Format.sprintf "%s: %s" tag_tx title in
+      Test.register
+        ~__FILE__
+        ~title
+        ~tags:(String.lowercase_ascii tag_tx :: tags)
+        ~uses_admin_client:false
+        ~uses_client:false
+        ~uses_node:false
+        ~uses:
+          [
+            Constant.octez_evm_node;
+            Constant.WASM.evm_kernel;
+            Constant.smart_rollup_installer;
+          ]
+      @@ fun () ->
+      let patch_config =
+        Evm_node.patch_config_with_experimental_feature
+          ~node_transaction_validation:true
+          ()
+      in
+      let* sequencer = Helpers.init_sequencer_sandbox ~patch_config () in
+      f sequencer tx_type)
+    tx_types
+
+let test_validate_compressed_sig =
   register ~title:"Validate compressed signature" ~tags:["signature"; "caller"]
-  @@ fun sequencer ->
+  @@ fun sequencer _tx_type ->
   let account =
     Eth_account.
       {
@@ -81,20 +93,26 @@ let test_validate_compressed_sig () =
 
   unit
 
-let test_validate_recover_caller () =
+let test_validate_recover_caller =
   register ~title:"Validate recovers caller" ~tags:["caller"]
-  @@ fun sequencer ->
+  @@ fun sequencer tx_type ->
   let source = Eth_account.bootstrap_accounts.(0) in
-  let* raw_tx =
+  let make_raw_tx ~legacy =
     Cast.craft_tx
       ~source_private_key:source.private_key
       ~chain_id:1337
       ~nonce:0
       ~gas_price:1_000_000_000
+      ~legacy
       ~gas:30_000
       ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
       ~value:Wei.zero
       ()
+  in
+  let* raw_tx =
+    match tx_type with
+    | Legacy -> make_raw_tx ~legacy:true
+    | Eip1559 -> make_raw_tx ~legacy:false
   in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
   let*@! transaction_object =
@@ -107,41 +125,42 @@ let test_validate_recover_caller () =
     ~error_msg:"Expected caller to be %R but got %L" ;
   unit
 
-let test_validate_chain_id () =
-  register ~title:"Validate chain id" ~tags:["chain_id"] @@ fun sequencer ->
+let test_validate_chain_id =
+  register ~title:"Validate chain id" ~tags:["chain_id"]
+  @@ fun sequencer tx_type ->
   let source = Eth_account.bootstrap_accounts.(0) in
-  let* invalid_chain_id =
+  let make_tx_chain_id ~chain_id ~legacy =
     Cast.craft_tx
+      ~legacy
       ~source_private_key:source.private_key
-      ~chain_id:1000
+      ~chain_id
       ~nonce:0
       ~gas_price:1_000_000_000
       ~gas:30_000
       ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
       ~value:Wei.zero
       ()
+  in
+  let* invalid_chain_id =
+    match tx_type with
+    | Legacy -> make_tx_chain_id ~chain_id:1000 ~legacy:true
+    | Eip1559 -> make_tx_chain_id ~chain_id:1000 ~legacy:false
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:invalid_chain_id sequencer in
   Check.((err.message = "Invalid chain id") string)
     ~error_msg:"the transaction has an invalid chain id, it should fail" ;
 
   let* valid_chain_id =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~gas:30_000
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ()
+    match tx_type with
+    | Legacy -> make_tx_chain_id ~chain_id:1337 ~legacy:true
+    | Eip1559 -> make_tx_chain_id ~chain_id:1337 ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:valid_chain_id sequencer in
 
   unit
 
-let test_validate_nonce () =
-  register ~title:"Validate nonce" ~tags:["nonce"] @@ fun sequencer ->
+let test_validate_nonce =
+  register ~title:"Validate nonce" ~tags:["nonce"] @@ fun sequencer tx_type ->
   (* Send one transaction so the nonce is 1. *)
   let source = Eth_account.bootstrap_accounts.(0) in
   let* _ =
@@ -153,43 +172,37 @@ let test_validate_nonce () =
          ~endpoint:(Evm_node.endpoint sequencer))
       sequencer
   in
-  (* Nonce 10 is in the future, that's valid. *)
-  let* nonce_10 =
+  let make_tx_nonce ~nonce ~legacy =
     Cast.craft_tx
+      ~legacy
       ~source_private_key:source.private_key
       ~chain_id:1337
-      ~nonce:10
+      ~nonce
       ~gas_price:1_000_000_000
       ~gas:30_000
       ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
       ~value:Wei.zero
       ()
+  in
+  (* Nonce 10 is in the future, that's valid. *)
+  let* nonce_10 =
+    match tx_type with
+    | Legacy -> make_tx_nonce ~nonce:10 ~legacy:true
+    | Eip1559 -> make_tx_nonce ~nonce:10 ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:nonce_10 sequencer in
   (* Nonce 1 is expected nonce, that's valid. *)
   let* nonce_1 =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:1
-      ~gas_price:1_000_000_000
-      ~gas:30_000
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ()
+    match tx_type with
+    | Legacy -> make_tx_nonce ~nonce:1 ~legacy:true
+    | Eip1559 -> make_tx_nonce ~nonce:1 ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:nonce_1 sequencer in
   (* Nonce 0 is refused. *)
   let* nonce_0 =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~gas:30_000
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ()
+    match tx_type with
+    | Legacy -> make_tx_nonce ~nonce:0 ~legacy:true
+    | Eip1559 -> make_tx_nonce ~nonce:0 ~legacy:false
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:nonce_0 sequencer in
   Check.((err.message = "Nonce too low") string)
@@ -197,47 +210,48 @@ let test_validate_nonce () =
 
   unit
 
-let test_validate_max_fee_per_gas () =
+let test_validate_max_fee_per_gas =
   register ~title:"Validate max fee per gas" ~tags:["max_fee_per_gas"]
-  @@ fun sequencer ->
+  @@ fun sequencer tx_type ->
   let source = Eth_account.bootstrap_accounts.(0) in
 
   let* base_fee_per_gas = Rpc.get_gas_price sequencer in
   let base_fee_per_gas = Int32.to_int base_fee_per_gas in
 
-  let* gas_price_below =
+  let make_tx_gas_price ~gas_price ~legacy =
     Cast.craft_tx
+      ~legacy
       ~source_private_key:source.private_key
       ~chain_id:1337
       ~nonce:0
-      ~gas_price:(base_fee_per_gas - 1)
+      ~gas_price
       ~gas:30_000
       ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
       ~value:Wei.zero
       ()
+  in
+  let* gas_price_below =
+    match tx_type with
+    | Legacy -> make_tx_gas_price ~gas_price:(base_fee_per_gas - 1) ~legacy:true
+    | Eip1559 ->
+        make_tx_gas_price ~gas_price:(base_fee_per_gas - 1) ~legacy:false
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:gas_price_below sequencer in
   Check.((err.message = "Max gas fee too low") string)
     ~error_msg:"the transaction has gas price too low, it should fail" ;
 
   let* gas_price_enough =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:base_fee_per_gas
-      ~gas:30_000
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ()
+    match tx_type with
+    | Legacy -> make_tx_gas_price ~gas_price:base_fee_per_gas ~legacy:true
+    | Eip1559 -> make_tx_gas_price ~gas_price:base_fee_per_gas ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:gas_price_enough sequencer in
 
   unit
 
-let test_validate_pay_for_fees () =
+let test_validate_pay_for_fees =
   register ~title:"Validate pay for fees" ~tags:["pay_for_fees"]
-  @@ fun sequencer ->
+  @@ fun sequencer tx_type ->
   let empty_account =
     Eth_account.
       {
@@ -250,17 +264,23 @@ let test_validate_pay_for_fees () =
   let* base_fee_per_gas = Rpc.get_gas_price sequencer in
   let base_fee_per_gas = Int32.to_int base_fee_per_gas in
 
-  (* The account has no funds, any transaction will be rejected. *)
-  let* insufficient_funds =
+  let make_tx_pay_fees ~legacy ~gas_price =
     Cast.craft_tx
       ~source_private_key:empty_account.private_key
       ~chain_id:1337
       ~nonce:0
-      ~gas_price:base_fee_per_gas
+      ~legacy
+      ~gas_price
       ~gas:100_000
       ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
       ~value:Wei.zero
       ()
+  in
+  (* The account has no funds, any transaction will be rejected. *)
+  let* insufficient_funds =
+    match tx_type with
+    | Legacy -> make_tx_pay_fees ~legacy:true ~gas_price:base_fee_per_gas
+    | Eip1559 -> make_tx_pay_fees ~legacy:false ~gas_price:base_fee_per_gas
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:insufficient_funds sequencer in
   Check.((err.message = "Cannot prepay transaction.") string)
@@ -279,15 +299,9 @@ let test_validate_pay_for_fees () =
 
   (* Now the account can pay for at least the base_fee_per_gas. *)
   let* enough_funds =
-    Cast.craft_tx
-      ~source_private_key:empty_account.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:base_fee_per_gas
-      ~gas:100_000
-      ~address:empty_account.address
-      ~value:Wei.zero
-      ()
+    match tx_type with
+    | Legacy -> make_tx_pay_fees ~legacy:true ~gas_price:base_fee_per_gas
+    | Eip1559 -> make_tx_pay_fees ~legacy:false ~gas_price:base_fee_per_gas
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:enough_funds sequencer in
 
@@ -295,15 +309,9 @@ let test_validate_pay_for_fees () =
      the base fee per gas. If the user sets an higher gas price, it needs
      to be able to pay for it. *)
   let* insufficient_funds =
-    Cast.craft_tx
-      ~source_private_key:empty_account.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:(base_fee_per_gas + 1)
-      ~gas:100_000
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ()
+    match tx_type with
+    | Legacy -> make_tx_pay_fees ~legacy:true ~gas_price:(base_fee_per_gas + 1)
+    | Eip1559 -> make_tx_pay_fees ~legacy:false ~gas_price:(base_fee_per_gas + 1)
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:insufficient_funds sequencer in
   Check.((err.message = "Cannot prepay transaction.") string)
@@ -312,9 +320,10 @@ let test_validate_pay_for_fees () =
   unit
 
 let () =
-  test_validate_compressed_sig () ;
-  test_validate_recover_caller () ;
-  test_validate_chain_id () ;
-  test_validate_nonce () ;
-  test_validate_max_fee_per_gas () ;
-  test_validate_pay_for_fees ()
+  let all_types = [Legacy; Eip1559] in
+  test_validate_compressed_sig [Legacy] ;
+  test_validate_recover_caller all_types ;
+  test_validate_chain_id all_types ;
+  test_validate_nonce all_types ;
+  test_validate_max_fee_per_gas all_types ;
+  test_validate_pay_for_fees all_types
