@@ -755,7 +755,7 @@ function update_tezt_tests() {
   # automatically add the new protocol tag to alcotezt
 
   if [[ ${is_snapshot} == true ]]; then
-    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]"/"  | Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
+    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
     commit "tezt: update protocol tag in alcotezt"
   else
     temp_file=$(mktemp)
@@ -765,6 +765,7 @@ function update_tezt_tests() {
     mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
     commit "tezt: add new protocol tag to alcotezt"
   fi
+
   cd "${script_dir}"/..
 
   # Adapt tezt/lib_tezos/protocol.ml
