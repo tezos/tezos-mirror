@@ -191,6 +191,10 @@ Smart Rollup node
 - Rotate multiple batcher keys in injector so that they are used evenly. (MR
   :gl:`!14194`)
 
+- RPC ``/global/block/<block_id>?outbox=true`` now returns the outbox messages
+  produced by the PVM for ``block_id`` if the query parameter ``outbox`` is
+  present. (MR :gl:`!14140`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

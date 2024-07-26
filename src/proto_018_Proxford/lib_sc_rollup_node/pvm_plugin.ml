@@ -117,6 +117,58 @@ let find_whitelist_update_output_index node_ctxt state ~outbox_level =
      list is reverted for this reason. *)
   aux (List.length outbox - 1) (List.rev outbox) |> return
 
+let outbox_transaction_summary
+    (transaction : Sc_rollup.Outbox.Message.transaction) =
+  Outbox_message.
+    {
+      destination = Contract_hash.to_b58check transaction.destination;
+      entrypoint = Entrypoint.to_string transaction.entrypoint;
+      parameters =
+        (Michelson_v1_printer.unparse_expression
+           transaction.unparsed_parameters)
+          .unexpanded;
+      parameters_ty = None;
+    }
+
+let outbox_typed_transaction_summary
+    (transaction : Sc_rollup.Outbox.Message.typed_transaction) =
+  Outbox_message.
+    {
+      destination = Contract_hash.to_b58check transaction.destination;
+      entrypoint = Entrypoint.to_string transaction.entrypoint;
+      parameters =
+        (Michelson_v1_printer.unparse_expression
+           transaction.unparsed_parameters)
+          .unexpanded;
+      parameters_ty =
+        Some
+          (Michelson_v1_printer.unparse_expression transaction.unparsed_ty)
+            .unexpanded;
+    }
+
+let outbox_message_summary (output : Sc_rollup.output) =
+  let summary =
+    match output with
+    | {message = Whitelist_update pkhs; _} ->
+        Outbox_message.Whitelist_update pkhs
+    | {message = Atomic_transaction_batch {transactions}; _} ->
+        let transactions = List.map outbox_transaction_summary transactions in
+        Transaction_batch transactions
+    | {message = Atomic_transaction_batch_typed {transactions}; _} ->
+        let transactions =
+          List.map outbox_typed_transaction_summary transactions
+        in
+        Transaction_batch transactions
+  in
+  (Z.to_int output.message_index, summary)
+
+let get_outbox_messages node_ctxt state ~outbox_level =
+  let open Lwt_syntax in
+  let outbox_level = Raw_level.of_int32_exn outbox_level in
+  let open (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let* outbox = get_outbox outbox_level (of_node_pvmstate state) in
+  List.rev_map outbox_message_summary outbox |> List.rev |> return
+
 let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
     =
   let open Lwt_result_syntax in

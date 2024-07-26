@@ -38,8 +38,9 @@ val get_global_block_outbox :
     address of the node. *)
 val get_global_smart_rollup_address : unit -> string RPC_core.t
 
-(** RPC: [GET global/block/<block>]. *)
-val get_global_block : ?block:string -> unit -> JSON.t RPC_core.t
+(** RPC: [GET global/block/<block>?outbox]. *)
+val get_global_block :
+  ?block:string -> ?outbox:bool -> unit -> JSON.t RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
 val get_global_block_inbox :

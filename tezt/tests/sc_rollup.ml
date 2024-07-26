@@ -4046,15 +4046,30 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           send_text_messages ~hooks ~format:`Hex client [payload]
       | `Internal payload ->
           let payload = "0x" ^ payload in
-          Client.transfer
-            ~amount:Tez.(of_int 100)
-            ~burn_cap:Tez.(of_int 100)
-            ~storage_limit:100000
-            ~giver:Constant.bootstrap1.alias
-            ~receiver:source_address
-            ~arg:(sf "Pair %s %S" payload sc_rollup)
-            client
+          let* () =
+            Client.transfer
+              ~amount:Tez.(of_int 100)
+              ~burn_cap:Tez.(of_int 100)
+              ~storage_limit:100000
+              ~giver:Constant.bootstrap1.alias
+              ~receiver:source_address
+              ~arg:(sf "Pair %s %S" payload sc_rollup)
+              client
+          in
+          Client.bake_for_and_wait client
     in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* outbox_l2_block =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_global_block ~outbox:true ()
+    in
+    let nb_outbox_transactions_in_block =
+      let open JSON in
+      outbox_l2_block |-> "outbox" |> as_list
+      |> List.map @@ fun x -> x |-> "transactions" |> as_list |> List.length
+    in
+    Check.((nb_outbox_transactions_in_block = [1]) (list int))
+      ~error_msg:"Block has %L outbox transactions but expected %R" ;
     let blocks_to_wait =
       3 + (2 * commitment_period) + challenge_window - earliness
     in

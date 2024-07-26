@@ -33,19 +33,24 @@ let get_global_block_outbox ?(block = "cemented") ~outbox_level () =
 let get_global_smart_rollup_address () =
   make GET ["global"; "smart_rollup_address"] JSON.as_string
 
-let get_global_block_aux ?(block = "head") ?(path = []) () =
-  make GET (["global"; "block"; block] @ path) Fun.id
+let get_global_block_aux ?(block = "head") ?(path = []) ?query_string () =
+  make ?query_string GET (["global"; "block"; block] @ path) Fun.id
 
-let get_global_block = get_global_block_aux ~path:[]
+let get_global_block ?block ?(outbox = false) () =
+  let query_string = if outbox then Some [("outbox", "true")] else None in
+  get_global_block_aux ?block ~path:[] ?query_string ()
 
 let get_global_block_inbox ?(block = "head") () =
   make GET ["global"; "block"; block; "inbox"] RPC.smart_rollup_inbox_from_json
 
-let get_global_block_hash = get_global_block_aux ~path:["hash"]
+let get_global_block_hash ?block () =
+  get_global_block_aux ~path:["hash"] ?block ()
 
-let get_global_block_level = get_global_block_aux ~path:["level"]
+let get_global_block_level ?block () =
+  get_global_block_aux ~path:["level"] ?block ()
 
-let get_global_block_num_messages = get_global_block_aux ~path:["num_messages"]
+let get_global_block_num_messages ?block () =
+  get_global_block_aux ~path:["num_messages"] ?block ()
 
 let get_global_tezos_head () = make GET ["global"; "tezos_head"] Fun.id
 

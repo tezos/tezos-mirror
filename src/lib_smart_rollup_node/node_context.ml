@@ -723,7 +723,7 @@ let save_messages {store; _} key ~predecessor messages =
     ~header:predecessor
     ~value:(messages :> string list)
 
-let get_full_l2_block node_ctxt block_hash =
+let get_full_l2_block ?get_outbox_messages node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* block = get_l2_block node_ctxt block_hash in
   let* inbox = get_inbox node_ctxt block.header.inbox_hash
@@ -731,8 +731,25 @@ let get_full_l2_block node_ctxt block_hash =
     unsafe_get_stored_messages node_ctxt block.header.inbox_witness
   and* commitment =
     Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
+  and* outbox =
+    match get_outbox_messages with
+    | None -> return_none
+    | Some get_outbox_messages -> (
+        let* ctxt = checkout_context node_ctxt block_hash in
+        let*! pvm_state = Context.PVMState.find ctxt in
+        match pvm_state with
+        | None -> return_none
+        | Some pvm_state ->
+            let*! outbox =
+              get_outbox_messages
+                node_ctxt
+                pvm_state
+                ~outbox_level:block.header.level
+            in
+            return_some outbox)
   in
-  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
+  return
+    {block with content = {Sc_rollup_block.inbox; messages; commitment; outbox}}
 
 type proto_info = {
   proto_level : int;
