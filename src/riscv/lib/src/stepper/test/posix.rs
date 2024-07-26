@@ -66,7 +66,7 @@ impl<M: Manager> PosixState<M> {
             EnvironException::EnvCallFromSMode => Mode::Supervisor,
             EnvironException::EnvCallFromMMode => Mode::Machine,
         };
-        let exit_mode = self.exit_mode.read_default();
+        let exit_mode = self.exit_mode.read();
 
         if source_mode != exit_mode {
             let return_pc = machine.hart.pc.read();

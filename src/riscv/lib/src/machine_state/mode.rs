@@ -27,29 +27,26 @@ impl Mode {
     }
 }
 
-impl TryFrom<u8> for Mode {
-    type Error = String;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        let x = match value {
+impl From<u8> for Mode {
+    #[inline]
+    fn from(value: u8) -> Self {
+        match value {
             0 => Mode::User,
             1 => Mode::Supervisor,
-            3 => Mode::Machine,
-            _ => return Err(format!("Invalid value for Mode: {}", value)),
-        };
-
-        Ok(x)
+            _ => Mode::Machine,
+        }
     }
 }
 
 impl Default for Mode {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::Machine
     }
 }
 
 impl From<Mode> for u8 {
+    #[inline]
     fn from(value: Mode) -> Self {
         value as u8
     }
@@ -108,7 +105,7 @@ mod tests {
                 let mut inst = ModeCell::bind(backend.allocate(loc));
 
                 inst.write(first_value);
-                assert_eq!(inst.read_default(), first_value);
+                assert_eq!(inst.read(), first_value);
 
                 offset
             };
@@ -119,6 +116,6 @@ mod tests {
             assert_eq!(Mode::try_from(value_read), Ok(first_value));
         });
 
-        assert!(Mode::try_from(42).is_err());
+        assert_eq!(Mode::from(42), Mode::default());
     });
 }

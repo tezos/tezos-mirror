@@ -75,24 +75,24 @@ impl fmt::Display for PvmStatus {
     }
 }
 
-impl TryFrom<u8> for PvmStatus {
-    type Error = u8;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+impl From<u8> for PvmStatus {
+    #[inline(always)]
+    fn from(value: u8) -> Self {
         const EVALUATING: u8 = PvmStatus::Evaluating as u8;
         const WAITING_FOR_INPUT: u8 = PvmStatus::WaitingForInput as u8;
         const WAITING_FOR_METADATA: u8 = PvmStatus::WaitingForMetadata as u8;
 
         match value {
-            EVALUATING => Ok(Self::Evaluating),
-            WAITING_FOR_INPUT => Ok(Self::WaitingForInput),
-            WAITING_FOR_METADATA => Ok(Self::WaitingForMetadata),
-            _ => Err(value),
+            EVALUATING => Self::Evaluating,
+            WAITING_FOR_INPUT => Self::WaitingForInput,
+            WAITING_FOR_METADATA => Self::WaitingForMetadata,
+            _ => Self::default(),
         }
     }
 }
 
 impl From<PvmStatus> for u8 {
+    #[inline(always)]
     fn from(value: PvmStatus) -> Self {
         value as u8
     }
@@ -212,7 +212,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 
     /// Get the current machine status.
     pub fn status(&self) -> PvmStatus {
-        self.status.read_default()
+        self.status.read()
     }
 }
 

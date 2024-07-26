@@ -1051,7 +1051,7 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 ///
 /// Examples of checks: Privilege checks, SATP trapping
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> Result<()> {
-    let mode = hart_state.mode.read_default();
+    let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
     let mstatus: MStatus = hart_state.csregisters.read(CSRegister::mstatus);
     let tvm = mstatus.tvm();
