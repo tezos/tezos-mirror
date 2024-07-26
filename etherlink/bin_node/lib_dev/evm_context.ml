@@ -1357,22 +1357,28 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
   in
-  let* rollup_node_index =
-    Irmin_context.load ~cache_size:100_000 Read_only rollup_node_context_dir
-  in
   let evm_context_dir = State.store_path ~data_dir in
-  let*! () = Lwt_utils_unix.create_dir evm_context_dir in
   let* () =
-    Progress_bar.Lwt.with_background_spinner
-      ~message:
-        (Format.sprintf
-           "Exporting context for %ld in %s"
-           final_level
-           evm_context_dir)
-    @@ Irmin_context.export_snapshot
-         rollup_node_index
-         checkpoint
-         ~path:evm_context_dir
+    Format.eprintf "Acquiring rollup node locks@." ;
+    Lwt_lock_file.with_lock
+      ~when_locked:`Block
+      ~filename:(Filename.concat rollup_node_data_dir "gc_lock")
+    @@ fun () ->
+    Lwt_lock_file.with_lock
+      ~when_locked:`Block
+      ~filename:(Filename.concat rollup_node_data_dir "processing_lock")
+    @@ fun () ->
+    let message =
+      Format.sprintf
+        "Exporting context for %ld in %s"
+        final_level
+        evm_context_dir
+    in
+    Tezos_stdlib_unix.Utils.copy_dir
+      ~progress:(message, Terminal.Color.(rgb 255 153 51))
+      rollup_node_context_dir
+      evm_context_dir ;
+    return_unit
   in
   let* evm_node_index =
     Irmin_context.load ~cache_size:100_000 Read_write evm_context_dir
