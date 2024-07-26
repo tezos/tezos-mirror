@@ -38,6 +38,8 @@ pub enum AccountStorageError {
     /// an account does an incredible number of transactions.
     #[error("Nonce overflow")]
     NonceOverflow,
+    #[error("Account code already initialised")]
+    AccountCodeAlreadySet,
 }
 
 impl From<tezos_smart_rollup_storage::StorageError> for AccountStorageError {
@@ -500,21 +502,20 @@ impl EthereumAccount {
         host: &mut impl Runtime,
         code: &[u8],
     ) -> Result<(), AccountStorageError> {
-        let code_hash: H256 = bytes_hash(code);
-        let code_hash_bytes: [u8; WORD_SIZE] = code_hash.into();
-        let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
+        if self.code_exists(host)? {
+            Err(AccountStorageError::AccountCodeAlreadySet)
+        } else {
+            let code_hash: H256 = bytes_hash(code);
+            let code_hash_bytes: [u8; WORD_SIZE] = code_hash.into();
+            let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
 
-        host.store_write_all(&code_hash_path, &code_hash_bytes)?;
+            host.store_write_all(&code_hash_path, &code_hash_bytes)?;
 
-        let code_path = concat(&self.path, &CODE_PATH)?;
+            let code_path = concat(&self.path, &CODE_PATH)?;
 
-        let store_has_program = host.store_has(&code_path)?;
-
-        if store_has_program.is_some() {
-            host.store_delete(&code_path)?;
+            host.store_write_all(&code_path, code)
+                .map_err(AccountStorageError::from)
         }
-        host.store_write_all(&code_path, code)
-            .map_err(AccountStorageError::from)
     }
 
     /// Delete all code associated with a contract. Also sets code length and size accordingly
@@ -1033,16 +1034,17 @@ mod test {
         let sample_code: Vec<u8> = vec![1; 10000];
         test_account_code_storage_write_code_aux(sample_code)
     }
+
     #[test]
-    fn test_account_code_storage_overwrite_code() {
+    fn test_account_code_storage_cant_be_overwritten() {
         let mut host = MockHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
         let a1_path = RefPath::assert_from(b"/asdf");
         let sample_code1: Vec<u8> = (0..100).collect();
+        let sample_code1_hash: H256 = bytes_hash(&sample_code1);
         let sample_code2: Vec<u8> = (0..50).map(|x| 50 - x).collect();
-        let sample_code2_hash: H256 = bytes_hash(&sample_code2);
 
         // Act
         storage
@@ -1057,7 +1059,7 @@ mod test {
         a1.set_code(&mut host, &sample_code1)
             .expect("Could not write code to account");
         a1.set_code(&mut host, &sample_code2)
-            .expect("Could not write code to account");
+            .expect_err("Account storage code can't be overwritten");
 
         storage
             .commit_transaction(&mut host)
@@ -1071,17 +1073,17 @@ mod test {
 
         assert_eq!(
             a1.code(&host).expect("Could not get code for account"),
-            sample_code2
+            sample_code1
         );
         assert_eq!(
             a1.code_size(&host)
                 .expect("Could not get code size for account"),
-            sample_code2.len().into()
+            sample_code1.len().into()
         );
         assert_eq!(
             a1.code_hash(&host)
                 .expect("Could not get code hash for account"),
-            sample_code2_hash
+            sample_code1_hash
         );
     }
 

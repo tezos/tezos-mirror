@@ -2452,6 +2452,7 @@ mod test {
 
     fn set_code(handler: &mut EvmHandler<'_, MockHost>, address: &H160, code: Vec<u8>) {
         let mut account = handler.get_or_create_account(*address).unwrap();
+        account.delete_code(handler.borrow_host()).unwrap(); //first clean code if it exists.
         account.set_code(handler.borrow_host(), &code).unwrap();
     }
 
