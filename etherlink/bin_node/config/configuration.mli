@@ -48,6 +48,7 @@ type blueprints_publisher_config = {
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
+  node_transaction_validation : bool;
 }
 
 type sequencer = {

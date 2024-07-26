@@ -25,6 +25,7 @@ type blueprints_publisher_config = {
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
+  node_transaction_validation : bool;
 }
 
 type sequencer = {
@@ -102,6 +103,7 @@ let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
+    node_transaction_validation = false;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -470,18 +472,33 @@ let observer_encoding data_dir =
 let experimental_features_encoding =
   let open Data_encoding in
   conv
-    (fun {drop_duplicate_on_injection; enable_send_raw_transaction} ->
-      (None, drop_duplicate_on_injection, enable_send_raw_transaction))
-    (fun (_, drop_duplicate_on_injection, enable_send_raw_transaction) ->
-      {drop_duplicate_on_injection; enable_send_raw_transaction})
-    (obj3
+    (fun {
+           drop_duplicate_on_injection;
+           enable_send_raw_transaction;
+           node_transaction_validation;
+         } ->
+      ( None,
+        drop_duplicate_on_injection,
+        enable_send_raw_transaction,
+        node_transaction_validation ))
+    (fun ( _,
+           drop_duplicate_on_injection,
+           enable_send_raw_transaction,
+           node_transaction_validation ) ->
+      {
+        drop_duplicate_on_injection;
+        enable_send_raw_transaction;
+        node_transaction_validation;
+      })
+    (obj4
        (* `sqlite_journal_mode` field is kept for now for backward compatibility. *)
        (opt "sqlite_journal_mode" Json.encoding)
        (dft "drop_duplicate_on_injection" bool false)
        (dft
           "enable_send_raw_transaction"
           bool
-          default_enable_send_raw_transaction))
+          default_enable_send_raw_transaction)
+       (dft "node_transaction_validation" bool false))
 
 let proxy_encoding =
   let open Data_encoding in
