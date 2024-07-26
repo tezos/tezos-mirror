@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 20.0~rc1+dev (8a637d44)"
+    "version": "Octez 21.0~beta1+dev (4f903ead)"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -155,68 +155,6 @@
                     {
                       "$ref": "#/components/schemas/unistring"
                     }
-                  ]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/chains/{chain_id}/checkpoint": {
-      "get": {
-        "description": "DEPRECATED: use `../levels/{checkpoint, savepoint, caboose, history_mode}` instead. The current checkpoint for this chain.",
-        "parameters": [
-          {
-            "name": "chain_id",
-            "in": "path",
-            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "block": {
-                      "$ref": "#/components/schemas/block_header"
-                    },
-                    "savepoint": {
-                      "type": "integer",
-                      "minimum": -2147483648,
-                      "maximum": 2147483647
-                    },
-                    "caboose": {
-                      "type": "integer",
-                      "minimum": -2147483648,
-                      "maximum": 2147483647
-                    },
-                    "history_mode": {
-                      "$ref": "#/components/schemas/history_mode"
-                    }
-                  },
-                  "required": [
-                    "block",
-                    "savepoint",
-                    "caboose",
-                    "history_mode"
                   ]
                 }
               }
@@ -752,6 +690,10 @@
                               "$ref": "#/components/schemas/max_active_rpc_connections"
                             }
                           ]
+                        },
+                        "enable-http-cache-headers": {
+                          "description": "Enables HTTP cache headers in the RPC response. When enabled, 'Cache-control' will be present with 'max-age' in the response header of relative queries (eg. head, head-n, head~n). The 'max-age' value indicates the duration of which the returned response is cacheable. It is an estimate of the remaining duration of the current round based on when the block was forged. Enabling this feature adds a performance overhead to all queries hence you should only do so if you are running the RPC server behind a caching server. The feature is implemented based on RFC9111 hence useful for reverse proxies with auto-caching mechanism.",
+                          "type": "boolean"
                         }
                       }
                     },
@@ -1198,6 +1140,12 @@
                         },
                         "history_mode": {
                           "$ref": "#/components/schemas/history_mode"
+                        },
+                        "context_pruning": {
+                          "$ref": "#/components/schemas/context_pruning"
+                        },
+                        "storage_maintenance_delay": {
+                          "$ref": "#/components/schemas/storage_maintenance_delay"
                         }
                       }
                     },
@@ -1339,7 +1287,7 @@
     },
     "/config/history_mode": {
       "get": {
-        "description": "Returns the history mode of the node's underlying storage.",
+        "description": "Returns the history mode of the node's underlying storage. In full or rolling mode, it provides the values of `additional_cycles` and `blocks_preservation_cycles`. The sum of these values is the total number of stored cycles.",
         "responses": {
           "200": {
             "description": "",
@@ -1350,6 +1298,11 @@
                   "properties": {
                     "history_mode": {
                       "$ref": "#/components/schemas/history_mode"
+                    },
+                    "blocks_preservation_cycles": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
                     }
                   },
                   "required": [
@@ -2073,55 +2026,6 @@
                   "required": [
                     "block",
                     "timestamp"
-                  ]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/monitor/commit_hash": {
-      "get": {
-        "description": "DEPRECATED: use `version` instead.",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Universal string representation",
-                  "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
-                  "oneOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "invalid_utf8_string": {
-                          "type": "array",
-                          "items": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          }
-                        }
-                      },
-                      "required": [
-                        "invalid_utf8_string"
-                      ]
-                    }
                   ]
                 }
               }
@@ -9843,6 +9747,28 @@
           "increment"
         ]
       },
+      "context_pruning": {
+        "title": "context_pruning",
+        "description": "Context pruning status",
+        "oneOf": [
+          {
+            "title": "disabled",
+            "description": "When disabled, the storage maintenance won't be triggered",
+            "type": "string",
+            "enum": [
+              "disabled"
+            ]
+          },
+          {
+            "title": "enabled",
+            "description": "When enabled, the storage maintenance is triggered as soon as a cycle dawn is encountered. This is the default value.",
+            "type": "string",
+            "enum": [
+              "enabled"
+            ]
+          }
+        ]
+      },
       "distributed_db_version": {
         "description": "A version number for the distributed DB protocol",
         "type": "integer",
@@ -10467,6 +10393,11 @@
         "type": "integer",
         "minimum": 0,
         "maximum": 65535
+      },
+      "storage_maintenance_delay": {
+        "title": "storage maintenance delay",
+        "description": "Delay prior to the storage maintenance trigger",
+        "type": "string"
       },
       "timespan.system": {
         "description": "A span of time, as seen by the local computer.",
