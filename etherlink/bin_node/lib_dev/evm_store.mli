@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -27,6 +28,9 @@ val init :
 
 (** [use store k] executes [k] with a fresh connection to [store]. *)
 val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
+(** Run VACUUM sqlite request *)
+val vacuum : conn:conn -> output_db_file:string -> unit tzresult Lwt.t
 
 (** [with_transaction conn k] wraps the accesses to the store from [conn] made
     in the continuation [k] within

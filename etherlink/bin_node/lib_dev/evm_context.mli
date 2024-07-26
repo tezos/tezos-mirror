@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -14,6 +15,10 @@ type head = {
   evm_state : Evm_state.t;
   pending_upgrade : Ethereum_types.Upgrade.t option;
 }
+
+(** [vacuum ~data_dir ~output_db_file] initialize the database with data 
+    from the [data_dir] and vacuum it into the [output_db_file]. *)
+val vacuum : data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
 
 (** [start ~data_dir ~preimages ~preimages_endpoint
     ~smart_rollup_address ()] creates a new worker to

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -198,6 +199,8 @@ module Q = struct
       WHERE type='table'
         AND name=?
     )|}
+
+  let vacuum_request = (string ->. unit) @@ {|VACUUM main INTO ?|}
 
   module Migrations = struct
     let create_table =
@@ -430,6 +433,15 @@ end
 let use (Pool {db_pool}) k =
   Db.use_pool db_pool @@ fun conn -> k (Raw_connection conn)
 
+type error += File_already_exists of string
+
+let vacuum ~conn ~output_db_file =
+  let open Lwt_result_syntax in
+  let*! exists = Lwt_unix.file_exists output_db_file in
+  let*? () = error_when exists (File_already_exists output_db_file) in
+  with_connection conn @@ fun conn ->
+  Db.exec conn Q.vacuum_request output_db_file
+
 let init ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // "store.sqlite" in
@@ -626,3 +638,14 @@ let () =
     Data_encoding.(obj1 (req "caqti_error" string))
     (function Caqti_error err -> Some err | _ -> None)
     (fun err -> Caqti_error err)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_store_dev_file_already_exists"
+    ~title:"File already exists"
+    ~description:"Raise an error when the file already exists"
+    ~pp:(fun ppf path -> Format.fprintf ppf "The file %s already exists" path)
+    Data_encoding.(obj1 (req "file_already_exists" string))
+    (function File_already_exists path -> Some path | _ -> None)
+    (fun path -> File_already_exists path)

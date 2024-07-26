@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -1314,6 +1315,11 @@ let worker_wait_for_request req =
   let*? w = Lazy.force worker in
   let*! res = Worker.Queue.push_request_and_wait w req in
   return_ res
+
+let vacuum ~data_dir ~output_db_file =
+  let open Lwt_result_syntax in
+  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  Evm_store.use store @@ fun conn -> Evm_store.vacuum ~conn ~output_db_file
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm () =
