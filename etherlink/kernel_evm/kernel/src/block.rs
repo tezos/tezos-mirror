@@ -76,7 +76,7 @@ fn compute<Host: Runtime>(
     is_first_block_of_reboot: bool,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
-    trace_input: &Option<TracerInput>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -134,7 +134,7 @@ fn compute<Host: Runtime>(
             retriable,
             sequencer_pool_address,
             limits,
-            trace_input,
+            tracer_input,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -246,7 +246,7 @@ fn compute_bip<Host: KernelRuntime>(
     first_block_of_reboot: &mut bool,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
-    trace_input: &Option<TracerInput>,
+    tracer_input: Option<TracerInput>,
     chain_id: U256,
     block_fees: &BlockFees,
     coinbase: H160,
@@ -264,7 +264,7 @@ fn compute_bip<Host: KernelRuntime>(
         *first_block_of_reboot,
         sequencer_pool_address,
         limits,
-        trace_input,
+        tracer_input,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -351,7 +351,7 @@ pub fn produce<Host: Runtime>(
     mut block_fees: BlockFees,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
-    trace_input: Option<TracerInput>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
@@ -402,7 +402,7 @@ pub fn produce<Host: Runtime>(
                 &mut first_block_of_reboot,
                 sequencer_pool_address,
                 &config.limits,
-                &trace_input,
+                tracer_input,
                 chain_id,
                 &block_fees,
                 coinbase,
@@ -482,7 +482,7 @@ pub fn produce<Host: Runtime>(
             &mut first_block_of_reboot,
             sequencer_pool_address,
             &config.limits,
-            &trace_input,
+            tracer_input,
             chain_id,
             &block_fees,
             coinbase,
@@ -1363,7 +1363,7 @@ mod tests {
             true,
             None,
             &limits,
-            &None,
+            None,
         )
         .expect("Should safely ask for a reboot");
 

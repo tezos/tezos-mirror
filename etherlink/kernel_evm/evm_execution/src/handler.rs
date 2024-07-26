@@ -16,14 +16,17 @@ use crate::account_storage::{
 };
 use crate::storage::blocks::get_block_hash;
 use crate::storage::tracer;
-use crate::trace::{CallTrace, CallTracerConfig, StorageMapItem, StructLog};
+use crate::tick_model_opcodes;
+use crate::trace::{
+    CallTrace, CallTracerConfig, CallTracerInput, StorageMapItem, StructLog,
+    StructLoggerInput, TracerInput,
+};
 use crate::transaction::TransactionContext;
 use crate::transaction_layer_data::TransactionLayerData;
 use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
-use crate::TracerConfig::{CallTracer, StructLogger};
-use crate::{tick_model_opcodes, TracerConfig};
+use crate::TracerInput::{CallTracer, StructLogger};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::convert::Infallible;
@@ -282,7 +285,7 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// If not, all access are considered warm
     pub enable_warm_cold_access: bool,
     /// Tracer configuration for debugging.
-    tracer: Option<TracerConfig>,
+    tracer: Option<TracerInput>,
     /// State of the storage during a given execution.
     /// NB: For now, only used for tracing.
     ///
@@ -296,7 +299,7 @@ pub struct EvmHandler<'a, Host: Runtime> {
 #[allow(clippy::too_many_arguments)]
 fn trace<Host: Runtime>(
     host: &mut Host,
-    tracer: &Option<TracerConfig>,
+    tracer_input: &Option<TracerInput>,
     return_data: Vec<u8>,
     pc: Result<usize, ExitReason>,
     opcode: Option<Opcode>,
@@ -308,14 +311,22 @@ fn trace<Host: Runtime>(
     memory: Vec<u8>,
     storage: Vec<StorageMapItem>,
 ) -> Result<(), EthereumError> {
-    if let (Some(StructLogger(tracer)), Some(opcode), Ok(pc)) = (tracer, opcode, pc) {
+    if let (
+        Some(StructLogger(StructLoggerInput {
+            transaction_hash,
+            config,
+        })),
+        Some(opcode),
+        Ok(pc),
+    ) = (tracer_input, opcode, pc)
+    {
         let opcode = opcode.as_u8();
         let pc: u64 = pc.try_into().unwrap_or_default();
         let depth: u16 = depth.try_into().unwrap_or_default();
-        let stack = (!tracer.disable_stack).then_some(stack);
-        let return_data = tracer.enable_return_data.then_some(return_data);
-        let memory = tracer.enable_memory.then_some(memory);
-        let storage = (!tracer.disable_storage).then_some(storage);
+        let stack = (!config.disable_stack).then_some(stack);
+        let return_data = config.enable_return_data.then_some(return_data);
+        let memory = config.enable_memory.then_some(memory);
+        let storage = (!config.disable_storage).then_some(storage);
 
         // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
         // For error, find the appropriate value to return for tracing.
@@ -347,7 +358,7 @@ fn trace<Host: Runtime>(
             storage,
         };
 
-        tracer::store_struct_log(host, struct_log)?;
+        tracer::store_struct_log(host, struct_log, transaction_hash)?;
     }
     Ok(())
 }
@@ -365,7 +376,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         ticks_allocated: u64,
         effective_gas_price: U256,
         enable_warm_cold_access: bool,
-        tracer: Option<TracerConfig>,
+        tracer: Option<TracerInput>,
     ) -> Self {
         Self {
             host,
@@ -2312,9 +2323,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         let gas_after = self.gas_used();
 
                         // TRACING
-                        if let Some(CallTracer(CallTracerConfig {
-                            with_logs,
-                            only_top_call: false,
+                        if let Some(CallTracer(CallTracerInput {
+                            transaction_hash,
+                            config:
+                                CallTracerConfig {
+                                    with_logs,
+                                    only_top_call: false,
+                                },
                         })) = self.tracer
                         {
                             let mut call_trace = CallTrace::new_minimal_trace(
@@ -2369,7 +2384,11 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 )
                             }
 
-                            let _ = tracer::store_call_trace(self.host, call_trace);
+                            let _ = tracer::store_call_trace(
+                                self.host,
+                                call_trace,
+                                &transaction_hash,
+                            );
                         }
 
                         self.end_inter_transaction(result)
@@ -2462,9 +2481,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         log!(self.host, Debug, "Call ended with reason: {:?}", reason);
 
                         // TRACING
-                        if let Some(CallTracer(CallTracerConfig {
-                            with_logs,
-                            only_top_call: false,
+                        if let Some(CallTracer(CallTracerInput {
+                            transaction_hash,
+                            config:
+                                CallTracerConfig {
+                                    with_logs,
+                                    only_top_call: false,
+                                },
                         })) = self.tracer
                         {
                             let mut call_trace = CallTrace::new_minimal_trace(
@@ -2511,7 +2534,11 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 )
                             }
 
-                            let _ = tracer::store_call_trace(self.host, call_trace);
+                            let _ = tracer::store_call_trace(
+                                self.host,
+                                call_trace,
+                                &transaction_hash,
+                            );
                         }
 
                         Capture::Exit((reason, output))

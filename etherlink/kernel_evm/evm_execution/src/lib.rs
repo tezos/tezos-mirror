@@ -7,7 +7,7 @@
 //!
 //! We need to read and write Ethereum specific values such
 //! as addresses and values.
-use crate::trace::TracerConfig::{CallTracer, StructLogger};
+use crate::trace::TracerInput::{CallTracer, StructLogger};
 use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
@@ -16,7 +16,7 @@ use evm::executor::stack::PrecompileFailure;
 use evm::ExitReason;
 use handler::EvmHandler;
 use host::{path::RefPath, runtime::Runtime};
-use primitive_types::{H160, U256};
+use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_storage::StorageError;
@@ -44,7 +44,7 @@ extern crate tezos_smart_rollup_debug as debug;
 extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
-use trace::{CallTrace, TracerConfig};
+use trace::{CallTrace, CallTracerInput, StructLoggerInput, TracerInput};
 
 use crate::{handler::ExtendedExitReason, storage::tracer};
 
@@ -135,11 +135,12 @@ fn trace_outcome<Host: Runtime>(
     is_success: bool,
     output: &Option<Vec<u8>>,
     gas_used: u64,
+    transaction_hash: Option<H256>,
 ) -> Result<(), EthereumError> {
-    tracer::store_trace_failed(handler.host, is_success)?;
-    tracer::store_trace_gas(handler.host, gas_used)?;
+    tracer::store_trace_failed(handler.host, is_success, &transaction_hash)?;
+    tracer::store_trace_gas(handler.host, gas_used, &transaction_hash)?;
     if let Some(return_value) = output {
-        tracer::store_return_value(handler.host, return_value)?;
+        tracer::store_return_value(handler.host, return_value, &transaction_hash)?;
     };
     Ok(())
 }
@@ -175,7 +176,7 @@ pub fn run_transaction<'a, Host>(
     allocated_ticks: u64,
     retriable: bool,
     enable_warm_cold_access: bool,
-    tracer: Option<TracerConfig>,
+    tracer: Option<TracerInput>,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
     Host: Runtime,
@@ -255,14 +256,23 @@ where
                 }
 
                 if let Some(call_data) = call_data_for_tracing {
-                    if let Some(StructLogger(_)) = tracer {
+                    if let Some(StructLogger(StructLoggerInput {
+                        transaction_hash,
+                        ..
+                    })) = tracer
+                    {
                         trace_outcome(
                             handler,
                             result.is_success(),
                             &result.result,
                             result.gas_used,
+                            transaction_hash,
                         )?
-                    } else if let Some(CallTracer(_)) = tracer {
+                    } else if let Some(CallTracer(CallTracerInput {
+                        transaction_hash,
+                        ..
+                    })) = tracer
+                    {
                         let mut call_trace = CallTrace::new_minimal_trace(
                             base_call_type.into(),
                             caller,
@@ -277,7 +287,11 @@ where
                         call_trace
                             .add_output(result.result.as_ref().map(|res| res.to_vec()));
 
-                        tracer::store_call_trace(handler.host, call_trace)?;
+                        tracer::store_call_trace(
+                            handler.host,
+                            call_trace,
+                            &transaction_hash,
+                        )?;
                     }
                 }
 
@@ -285,9 +299,17 @@ where
             }
             Err(e) => {
                 if let Some(call_data) = call_data_for_tracing {
-                    if let Some(StructLogger(_)) = tracer {
-                        trace_outcome(handler, false, &None, 0)?
-                    } else if let Some(CallTracer(_)) = tracer {
+                    if let Some(StructLogger(StructLoggerInput {
+                        transaction_hash,
+                        ..
+                    })) = tracer
+                    {
+                        trace_outcome(handler, false, &None, 0, transaction_hash)?
+                    } else if let Some(CallTracer(CallTracerInput {
+                        transaction_hash,
+                        ..
+                    })) = tracer
+                    {
                         let mut call_trace = CallTrace::new_minimal_trace(
                             base_call_type.into(),
                             caller,
@@ -301,7 +323,11 @@ where
                         call_trace.add_gas(gas_limit);
                         call_trace.add_error(Some(format!("{:?}", e).into()));
 
-                        tracer::store_call_trace(handler.host, call_trace)?;
+                        tracer::store_call_trace(
+                            handler.host,
+                            call_trace,
+                            &transaction_hash,
+                        )?;
                     }
                 }
                 Err(e)

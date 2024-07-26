@@ -12,7 +12,7 @@ use evm_execution::fa_bridge::execute_fa_deposit;
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
-use evm_execution::trace::{get_tracer_config, TracerConfig, TracerInput};
+use evm_execution::trace::TracerInput;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
@@ -331,7 +331,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     retriable: bool,
     is_delayed: bool,
     limits: &Limits,
-    tracer_config: Option<TracerConfig>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -370,7 +370,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         allocated_ticks,
         retriable,
         false,
-        tracer_config,
+        tracer_input,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -557,10 +557,8 @@ pub fn apply_transaction<Host: Runtime>(
     retriable: bool,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
-    trace_input: &Option<TracerInput>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
-    let current_transaction_hash = transaction.tx_hash;
-    let tracer_config = get_tracer_config(Some(current_transaction_hash), trace_input);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
@@ -572,7 +570,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
             false,
             limits,
-            tracer_config,
+            tracer_input,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -584,7 +582,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
             true,
             limits,
-            tracer_config,
+            tracer_input,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");

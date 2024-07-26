@@ -16,7 +16,6 @@ use tezos_ethereum::{
         append_option_canonical, append_u16_le, append_u256_le, append_u64_le,
         check_list, decode_field, decode_option, next,
     },
-    transaction::TransactionHash,
     Log,
 };
 
@@ -44,26 +43,6 @@ pub struct CallTracerConfig {
 pub enum TracerConfig {
     StructLogger(StructLoggerConfig),
     CallTracer(CallTracerConfig),
-}
-
-pub fn get_tracer_config(
-    current_transaction_hash: Option<TransactionHash>,
-    trace_input: &Option<TracerInput>,
-) -> Option<TracerConfig> {
-    if let Some(trace_input) = trace_input {
-        let (transaction_hash, config) = (*trace_input).into();
-        match (current_transaction_hash, transaction_hash) {
-            (Some(current_transaction_hash), Some(transaction_hash))
-                if transaction_hash.0 == current_transaction_hash =>
-            {
-                Some(config)
-            }
-            (None, None) | (Some(_), None) => Some(config),
-            _ => None,
-        }
-    } else {
-        None
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
