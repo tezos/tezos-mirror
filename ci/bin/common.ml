@@ -390,6 +390,11 @@ let changeset_octez_docs =
           "script-inputs/**/*/";
           "src/**/*";
           "tezt/**/*";
+          "brassaia/**/*";
+          "irmin/**/*";
+          "client-libs/**/*";
+          "etherlink/**/*";
+          "data-encoding/**/*";
           "vendors/**/*";
           "dune";
           "dune-project";

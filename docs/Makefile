@@ -78,21 +78,21 @@ manuals: \
 
 .PHONY: odoc
 odoc:
-	cd $$(pwd)/.. ; dune build @doc >docs/odoc.log 2>&1; \
-	  RESULT=$$?; (grep -B1 '^Error:' docs/odoc.log || true); exit $$RESULT
-	@rm -rf $$(pwd)/_build/api/odoc
-	@mkdir -p $$(pwd)/_build/api
-	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
-	@rm -rf $(CURDIR)/_build/api/odoc/_odocls
+	$(MAKE) odoc-raw slim_mode=off odoc_errors=false
 
+.PHONY: odoc-lite
 odoc-lite:
+	$(MAKE) odoc-raw slim_mode=on odoc_errors=true
+
+.PHONY: odoc
+odoc-raw:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
-	rsync --recursive --links --perms --exclude=target \
-		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../vendors ../dune ../dune-project ../dune-workspace ../data-encoding ../rust-toolchain ../resto ../prometheus $(TMPDOCDIR)/
-	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh on
-	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in odoc.log"
-	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \
+	cd ..; rsync --recursive --links --perms --exclude=target \
+		$$(cat script-inputs/octez-source-content) \
+		client-libs etherlink $(TMPDOCDIR)/
+	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh $$slim_mode
+	ODOC_WARN_ERROR=$$odoc_errors dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \
 		RESULT=$$?; \
 		(grep -B1 '^Error:' $(CURDIR)/odoc.log || true) ; \
 		exit $$RESULT
