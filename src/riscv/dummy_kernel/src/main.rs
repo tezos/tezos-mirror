@@ -2,8 +2,12 @@ mod sbi_crypto;
 
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup::{
-    entrypoint, inbox::InboxMessage, michelson::MichelsonUnit, prelude::*,
-    storage::path::OwnedPath, types::SmartRollupAddress,
+    entrypoint,
+    inbox::{InboxMessage, InternalInboxMessage},
+    michelson::MichelsonUnit,
+    prelude::*,
+    storage::path::OwnedPath,
+    types::SmartRollupAddress,
 };
 
 #[entrypoint::main]
@@ -25,7 +29,16 @@ pub fn entry(host: &mut impl Runtime) {
     while let Some(msg) = host.read_input().expect("Want message") {
         let (_, msg) = InboxMessage::<MichelsonUnit>::parse(msg.as_ref())
             .expect("Failed to parse inbox message");
-        debug_msg!(host, "{:#?}\n", msg);
+        match msg {
+            // When running a rollup node with this kernel through Tezt tests
+            // `InfoPerlevel` messages are not identical for each run. This can
+            // result is slight changes to the number of ticks used to
+            // format them, which causes regression tests to fail.
+            InboxMessage::Internal(InternalInboxMessage::InfoPerLevel(_)) => {
+                debug_msg!(host, "Internal(InforPerLevel)\n")
+            }
+            msg => debug_msg!(host, "{:#?}\n", msg),
+        }
     }
 
     let path: OwnedPath = "/hello".as_bytes().to_vec().try_into().unwrap();
