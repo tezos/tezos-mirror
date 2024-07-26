@@ -4914,6 +4914,36 @@ let test_invalid_kernel =
   let* _ = Evm_node.wait_for_invalid_kernel sequencer in
   unit
 
+(* Self test for sequencer in sandbox mode. *)
+let test_sequencer_sandbox () =
+  Test.register
+    ~__FILE__
+    ~title:"Sequencer in sandbox mode"
+    ~tags:["sequencer"; "sandbox"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let* sequencer = init_sequencer_sandbox () in
+  let*@ _ = produce_block sequencer in
+  let* tx_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:"0xB7A97043983f24991398E5a82f63F4C58a417185"
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
+  let*@! _receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -4981,4 +5011,5 @@ let () =
   test_proxy_finalized_view protocols ;
   test_finalized_block_param protocols ;
   test_regression_block_hash_gen protocols ;
-  test_invalid_kernel protocols
+  test_invalid_kernel protocols ;
+  test_sequencer_sandbox ()
