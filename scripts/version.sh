@@ -44,22 +44,22 @@ export dal_srs_g2_sha=97d76e266e657cc3c859c3359c717136f55cfe4c0256ea418f907406cb
 # and used to run the `trigger` job in the CI. This value SHOULD
 # correspond to the Alpine minor version given by the `trigger` job's
 # `image:`.
-export alpine_version='3.19'
+export alpine_version='3.20'
 
 # Installed via apk rust
-export rust_version='1.76.0'
+export rust_version='1.78.0'
 
 # Installed via apk cargo
-export cargo_version='1.76.0'
+export cargo_version='1.78.0'
 
-# Installed via apk rust
-export opam_version='2.1.5'
+# Installed via apk opam
+export opam_version='2.1.6'
 
 # Installed via apk python3-dev
-export python_version='3.11.9'
+export python_version='3.12.3'
 
 # Installed via apk
-export poetry_version='1.7.1'
+export poetry_version='1.8.3'
 
 ##
 ## Other variables, used both in Makefile and scripts

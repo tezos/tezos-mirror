@@ -590,7 +590,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
     ?image_dependencies ?arch ?tag ?allow_failure ?parallel ~__POS__ ~stage
     ~name script : tezos_job =
-  let docker_version = "24.0.6" in
+  let docker_version = "24.0.7" in
   job
     ?rules
     ?dependencies

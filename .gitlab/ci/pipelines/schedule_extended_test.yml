@@ -22,7 +22,7 @@ oc.docker:ci:amd64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: amd64
   artifacts:
@@ -41,7 +41,7 @@ oc.docker:client-libs-dependencies:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
   artifacts:
     reports:
@@ -59,7 +59,7 @@ oc.docker:rust-toolchain:amd64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
   artifacts:
     reports:
@@ -77,7 +77,7 @@ oc.docker:ci:arm64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: arm64
   artifacts:

@@ -65,20 +65,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.11.9 through pyenv
+## Install python 3.12.3 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.11.9
-pyenv global 3.11.9
+pyenv install 3.12.3
+pyenv global 3.12.3
 
 # [print python version]
-python --version # should output 3.11.9
+python --version # should output 3.12.3
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.11.9" ]
+[ "$(python --version)" = "Python 3.12.3" ]
 
 ##
 ## Install poetry
@@ -112,4 +112,4 @@ poetry install
 poetry run sphinx-build --version # should output 4.2.0
 
 # [verify sphinx-build version]
-[ "$(poetry run sphinx-build --version)" = "sphinx-build 4.2.0" ]
+[ "$(poetry run sphinx-build --version)" = "sphinx-build 7.3.7" ]

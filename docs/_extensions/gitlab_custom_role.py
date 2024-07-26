@@ -83,13 +83,14 @@ def gitlab_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
     expansions = expand_gitlab_shortlink(ref)
     if len(expansions) == 0:
         raise ValueError(
-            f"could not resolve GitLab shortlink `{ref}`: invalid format?"
+            f"could not resolve GitLab shortlink '{ref}': invalid format?"
         )
 
     if len(expansions) > 1:
         msg = [
             inliner.reporter.error(
-                f"ambiguous GitLab shortlink `{ref}`, could expand to any of: "
+                f"ambiguous GitLab shortlink '{ref}', "
+                + "could expand to any of: "
                 + f'{", ".join(expansions)}, picking the first',
                 line=lineno,
             )

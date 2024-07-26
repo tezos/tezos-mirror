@@ -21,7 +21,7 @@ oc.docker:ci:amd64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: amd64
   artifacts:
@@ -40,7 +40,7 @@ oc.docker:ci:arm64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: arm64
   artifacts:
@@ -129,7 +129,7 @@ oc.docker:amd64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
@@ -149,7 +149,7 @@ oc.docker:arm64:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
@@ -216,7 +216,7 @@ docker:merge_manifests:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
 
 gitlab:release:
@@ -258,7 +258,7 @@ oc.docker-build-debian-dependencies:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   parallel:
@@ -400,7 +400,7 @@ oc.docker-build-ubuntu-dependencies:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   parallel:
