@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -25,6 +26,47 @@ type transaction = {
   s : bytes;
 }
 
+let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
+    ~max_fee_per_gas ~gas_limit ~to_ ~value ~data ?(access_list = []) (v, r, s)
+    =
+  let open Result_syntax in
+  let (Qty nonce) = decode_number_be nonce in
+  let (Qty gas_limit) = decode_number_be gas_limit in
+  let (Qty max_priority_fee_per_gas) =
+    decode_number_be max_priority_fee_per_gas
+  in
+  let (Qty max_fee_per_gas) = decode_number_be max_fee_per_gas in
+  let to_ = if to_ = Bytes.empty then None else Some to_ in
+  let (Qty value) = decode_number_be value in
+  let (Qty v) = decode_number_be v in
+  let* chain_id =
+    match chain_id with
+    | None ->
+        let open Z in
+        if v > of_int 36 then return (Some (div (v - of_int 35) (of_int 2)))
+        else if v = of_int 27 || v = of_int 28 then return None
+        else fail "Chain ID cannot be decoded"
+    | Some chain_id ->
+        let (Qty chain_id) = decode_number_be chain_id in
+        return (Some chain_id)
+  in
+  return
+    {
+      transaction_type = tx_type;
+      chain_id;
+      nonce;
+      max_priority_fee_per_gas;
+      max_fee_per_gas;
+      gas_limit;
+      to_;
+      value;
+      data;
+      access_list;
+      v;
+      r;
+      s;
+    }
+
 let decode_legacy : bytes -> (transaction, string) result =
  fun bytes ->
   let open Result_syntax in
@@ -43,34 +85,16 @@ let decode_legacy : bytes -> (transaction, string) result =
           Value r;
           Value s;
         ]) ->
-      let (Qty nonce) = decode_number_be nonce in
-      let (Qty gas_limit) = decode_number_be gas_limit in
-      let (Qty gas_price) = decode_number_be gas_price in
-      let to_ = if to_ = Bytes.empty then None else Some to_ in
-      let (Qty value) = decode_number_be value in
-      let (Qty v) = decode_number_be v in
-      let* chain_id =
-        let open Z in
-        if v > of_int 36 then return (Some (div (v - of_int 35) (of_int 2)))
-        else if v = of_int 27 || v = of_int 28 then return None
-        else fail "Chain ID cannot be decoded"
-      in
-      return
-        {
-          transaction_type = Legacy;
-          chain_id;
-          nonce;
-          max_priority_fee_per_gas = gas_price;
-          max_fee_per_gas = gas_price;
-          gas_limit;
-          to_;
-          value;
-          data;
-          access_list = [];
-          v;
-          r;
-          s;
-        }
+      decode_transaction
+        ~tx_type:Legacy
+        ~nonce
+        ~max_priority_fee_per_gas:gas_price
+        ~max_fee_per_gas:gas_price
+        ~gas_limit
+        ~to_
+        ~value
+        ~data
+        (v, r, s)
   | _ -> fail "Legacy transaction is not 9 rlp items"
 
 let encode_legacy_transaction : transaction -> bytes = function
