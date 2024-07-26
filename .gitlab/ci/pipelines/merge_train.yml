@@ -272,12 +272,24 @@ oc.build:static-x86_64-linux-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -322,12 +334,24 @@ oc.build_x86_64-released:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -381,12 +405,24 @@ oc.build_x86_64-exp-dev-extra:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -491,15 +527,27 @@ oc.build_kernels:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink.mk
     - etherlink/**/*
     - images/**/*
     - irmin/**/*
     - kernels.mk
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - scripts/ci/**/*
     - src/**/*
     - tezt/**/*
@@ -554,15 +602,27 @@ oc.build_dsn_node:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink.mk
     - etherlink/**/*
     - images/**/*
     - irmin/**/*
     - kernels.mk
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - scripts/ci/**/*
     - src/**/*
     - tezt/**/*
@@ -606,12 +666,24 @@ oc.tezt:fetch-records:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -1810,12 +1882,24 @@ oc.integration:compiler-rejections:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -1856,12 +1940,24 @@ oc.script:test-gen-genesis:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -1938,12 +2034,24 @@ oc.script:test_octez_release_versions:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2261,12 +2369,24 @@ oc.unit:non-proto-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2329,12 +2449,24 @@ oc.unit:other-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2397,12 +2529,24 @@ oc.unit:proto-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2465,12 +2609,24 @@ oc.unit:non-proto-arm64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2524,12 +2680,24 @@ oc.unit:webassembly-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2556,12 +2724,24 @@ oc.unit:protocol_compiles:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2729,12 +2909,24 @@ tezt:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2803,12 +2995,24 @@ tezt-memory-3k:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2876,12 +3080,24 @@ tezt-memory-4k:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2949,12 +3165,24 @@ tezt-time-sensitive:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3021,12 +3249,24 @@ tezt-slow:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3091,12 +3331,24 @@ tezt-flaky:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3164,12 +3416,24 @@ tezt:static-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3243,12 +3507,24 @@ oc.unified_coverage:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
     - brassaia/**/*
+    - cohttp/**/*
     - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
     - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
