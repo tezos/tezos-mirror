@@ -137,7 +137,9 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
         }
         account.balance_add(host, info.balance).unwrap();
         write_host!(host, "Balance for {} was added : {}", address, info.balance);
-        account.set_code(host, &info.code).unwrap();
+        if !info.code.is_empty() {
+            account.set_code(host, &info.code).unwrap();
+        }
         write_host!(host, "Code was set for {}", address);
         for (index, value) in info.storage.iter() {
             account.set_storage(host, index, value).unwrap();
