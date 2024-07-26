@@ -1301,7 +1301,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"check_riscv_kernels"
           ~changes:changeset_test_riscv_kernels
-          ["make -C src/riscv check"]
+          ["make -C src/riscv CHECK_FEATURES= check"]
       in
       let job_test_riscv_kernels : tezos_job =
         make_job_kernel
