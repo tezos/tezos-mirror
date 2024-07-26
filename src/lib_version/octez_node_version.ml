@@ -118,7 +118,7 @@ let encoding =
 
 let partially_compare (v1 : Version.t) (c1 : commit_info option)
     (v2 : Version.t) (c2 : commit_info option) =
-  let is_dev v =
+  let is_dev (v : Tezos_version_parser.t) =
     let open Tezos_version_parser in
     match v.additional_info with
     | Dev | Beta_dev _ | RC_dev _ -> true
