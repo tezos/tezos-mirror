@@ -184,7 +184,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let*? (Threshold_encryption_sequencer threshold_encryption_sequencer_config) =
     Configuration.threshold_encryption_sequencer_config_exn configuration
   in
-  let* status =
+  let* status, _smart_rollup_address =
     Evm_context.start
       ?kernel_path:kernel
       ~data_dir

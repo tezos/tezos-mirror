@@ -27,7 +27,8 @@ val vacuum : data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
     any.
 
     Returns a value telling if the context was loaded from disk
-    ([Loaded]) or was initialized from scratch ([Created]). *)
+    ([Loaded]) or was initialized from scratch ([Created]). Returns
+    also the smart rollup address. *)
 val start :
   ?kernel_path:string ->
   data_dir:string ->
@@ -37,7 +38,7 @@ val start :
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
   unit ->
-  init_status tzresult Lwt.t
+  (init_status * Address.t) tzresult Lwt.t
 
 (** [init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir ?reconstruct_from_boot_sector ()]
@@ -159,6 +160,11 @@ val replay :
 (** [patch_kernel path] modifies the state of the current head of the EVM node
     to replace its kernel with the kernel file [path]. *)
 val patch_kernel : string -> unit tzresult Lwt.t
+
+(** [patch_sequencer_key public_key] modifies the in memory state of the
+    EVM node to replace the sequencer key with [public_key]. It does not
+    modify the current head.  *)
+val patch_sequencer_key : Signature.public_key -> unit tzresult Lwt.t
 
 val block_param_to_block_number :
   Ethereum_types.Block_parameter.extended ->

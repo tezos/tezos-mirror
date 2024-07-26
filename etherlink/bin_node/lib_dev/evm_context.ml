@@ -128,6 +128,7 @@ module Request = struct
       }
         -> (unit, tztrace) t
     | Patch_kernel : {is_binary : bool; kernel : string} -> (unit, tztrace) t
+    | Patch_sequencer_key : Signature.public_key -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -306,6 +307,15 @@ module Request = struct
                 Some ((), kernel)
             | _ -> None)
           (fun ((), kernel) -> View (Patch_kernel {is_binary = false; kernel}));
+        case
+          (Tag 15)
+          ~title:"Patch_sequencer_key"
+          (obj2
+             (req "request" (constant "patch_sequencer_key"))
+             (req "public_key" Signature.Public_key.encoding))
+          (function
+            | View (Patch_sequencer_key pk) -> Some ((), pk) | _ -> None)
+          (fun ((), pk) -> View (Patch_sequencer_key pk));
       ]
 
   let pp ppf view =
@@ -797,9 +807,16 @@ module State = struct
       | Some found_smart_rollup_address, None ->
           return found_smart_rollup_address
       | None, None ->
-          failwith
-            "Internal error: the smart rollup address is not provided nor \
-             found in the storage."
+          (* Ok. This is dirty. In normal condition it does not make sense that
+             the sr1 is missing from the local storage and not provided by
+             the caller.
+
+             However, it can happen if the node is ran in sandbox mode
+             on a non existing context. Returning the zero address here is
+             so much convenient for a case that's really not supposed to happen,
+             ever. An error that would be detected relatively fast as well.
+          *)
+          return Tezos_crypto.Hashed.Smart_rollup_address.zero
     in
     let* evm_state, context =
       match kernel_path with
@@ -850,7 +867,7 @@ module State = struct
         pending_upgrade
     in
 
-    return (ctxt, init_status)
+    return (ctxt, (init_status, smart_rollup_address))
 
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
@@ -1090,6 +1107,19 @@ module State = struct
     on_modified_head ctxt evm_state commit ;
     let*! () = Events.patched_kernel ctxt.session.next_blueprint_number in
     return_unit
+
+  let patch_sequencer_key (ctxt : t) pk =
+    let open Lwt_result_syntax in
+    let b58 = Signature.Public_key.to_b58check pk in
+    let*! evm_state =
+      Evm_state.modify
+        ~key:Durable_storage_path.sequencer_key
+        ~value:b58
+        ctxt.session.evm_state
+    in
+    ctxt.session.evm_state <- evm_state ;
+    let*! () = Events.patched_sequencer_key b58 in
+    return_unit
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -1244,6 +1274,9 @@ module Handlers = struct
     | Patch_kernel {is_binary; kernel} ->
         let ctxt = Worker.state self in
         State.patch_kernel ctxt ~is_binary kernel
+    | Patch_sequencer_key pk ->
+        let ctxt = Worker.state self in
+        State.patch_sequencer_key ctxt pk
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1687,6 +1720,8 @@ let patch_kernel path =
   let open Lwt_result_syntax in
   let* kernel, is_binary = Wasm_debugger.read_kernel_from_file path in
   worker_wait_for_request (Patch_kernel {is_binary; kernel})
+
+let patch_sequencer_key pk = worker_wait_for_request (Patch_sequencer_key pk)
 
 let block_param_to_block_number
     (block_param : Ethereum_types.Block_parameter.extended) =
