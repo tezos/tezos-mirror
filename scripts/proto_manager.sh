@@ -90,7 +90,13 @@ function commit() {
     .git/hooks/pre-commit || true
     git add "${script_dir}/../" || true
   fi
-  git commit -m "${capitalized_label}/$1"
+  if ! git commit -m "${capitalized_label}/$1"; then
+    git add "${script_dir}/../"
+    if ! git commit -m "${capitalized_label}/$1"; then
+      error "Failed to create commit" 1>&2
+      print_and_exit 1 "${LINENO}"
+    fi
+  fi
   echo -e "${blue}Created commit:${cyan} ${capitalized_label}/$1${reset}"
   commits=$((commits + 1))
 
