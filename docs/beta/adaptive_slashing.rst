@@ -44,7 +44,7 @@ attestations in a block.
 The shape of the slashing function for double attestations is the
 following:
 
-.. figure:: adaptive-slashing-new.jpeg
+.. figure:: adaptive-slashing.jpeg
 
 
 +------------------------------------------+----------------------------------------+
