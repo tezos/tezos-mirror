@@ -324,6 +324,8 @@ module State = struct
 
   let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
+  let lockfile_path ~store_path = Filename.Infix.(store_path // "evm_lock")
+
   let load ~data_dir ~store_perm:perm index =
     let open Lwt_result_syntax in
     let* store = Evm_store.init ~data_dir ~perm () in
@@ -348,10 +350,14 @@ module State = struct
             Ethereum_types.genesis_parent_hash,
             Created )
 
-  let commit store context evm_state number =
+  let commit store (context : Irmin_context.rw) evm_state number =
     let open Lwt_result_syntax in
+    let lock_path = lockfile_path ~store_path:context.index.path in
     let*! context = Irmin_context.PVMState.set context evm_state in
-    let*! checkpoint = Irmin_context.commit context in
+    let* checkpoint =
+      Lwt_lock_file.with_lock ~when_locked:`Block ~filename:lock_path
+      @@ fun () -> Irmin_context.commit context |> Lwt_result.ok
+    in
     let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
 
