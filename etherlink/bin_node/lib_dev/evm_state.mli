@@ -38,6 +38,10 @@ val init : kernel:string -> t tzresult Lwt.t
     state. *)
 val modify : key:string -> value:string -> t -> t Lwt.t
 
+(** [exists evm_state key] returns [true] if a value or a tree/subtree 
+    exists under [key] in [evm_state], [false] otherwise. *)
+val exists : t -> string -> bool Lwt.t
+
 (** [inspect evm_state key] returns the value stored under [key] in
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t

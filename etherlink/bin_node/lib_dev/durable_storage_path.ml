@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -125,17 +125,27 @@ end
 module Trace = struct
   let root = EVM.make "/trace"
 
+  let root_indexed_by_hash ~transaction_hash =
+    match transaction_hash with
+    | Some transaction_hash -> root ^ "/" ^ transaction_hash
+    | None -> root
+
   let input = root ^ "/input"
 
-  let output_gas = root ^ "/gas"
+  let output_gas ~transaction_hash =
+    root_indexed_by_hash ~transaction_hash ^ "/gas"
 
-  let output_failed = root ^ "/failed"
+  let output_failed ~transaction_hash =
+    root_indexed_by_hash ~transaction_hash ^ "/failed"
 
-  let output_return_value = root ^ "/return_value"
+  let output_return_value ~transaction_hash =
+    root_indexed_by_hash ~transaction_hash ^ "/return_value"
 
-  let opcodes_root = root ^ "/struct_logs"
+  let opcodes_root ~transaction_hash =
+    root_indexed_by_hash ~transaction_hash ^ "/struct_logs"
 
-  let logs_length = opcodes_root ^ "/length"
+  let logs_length ~transaction_hash = opcodes_root ~transaction_hash ^ "/length"
 
-  let opcode i = opcodes_root ^ "/" ^ string_of_int i
+  let opcode ~transaction_hash i =
+    opcodes_root ~transaction_hash ^ "/" ^ string_of_int i
 end
