@@ -25,8 +25,8 @@ val pp_context_pruning : Format.formatter -> context_pruning -> unit
     Setting it to [Disabled] will trigger the storage maintenance as
     soon as possible, that is, at the very beginning of a new cycle
     dawn.
-    [Custom n] will trigger the storage maintenance n blocks
-     subsequently to a new cycle dawn. *)
+    [Custom n] will trigger the storage maintenance n blocks after a
+     new cycle dawn. *)
 type delay = Disabled | Custom of Int32.t
 
 val delay_encoding : delay Data_encoding.t
