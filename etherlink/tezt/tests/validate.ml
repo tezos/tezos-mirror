@@ -9,9 +9,12 @@
 open Rpc.Syntax
 open Helpers
 
-type transaction_type = Legacy | Eip1559
+type transaction_type = Legacy | Eip1559 | Eip2930
 
-let tag = function Legacy -> "Legacy" | Eip1559 -> "Eip1559"
+let tag = function
+  | Legacy -> "Legacy"
+  | Eip1559 -> "Eip1559"
+  | Eip2930 -> "Eip2930"
 
 let register ~title ~tags f tx_types =
   List.iter
@@ -112,6 +115,9 @@ let test_validate_recover_caller =
   let* raw_tx =
     match tx_type with
     | Legacy -> make_raw_tx ~legacy:true
+    | Eip2930 ->
+        return
+          "01f86f82053980843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080c080a04cda4f1de731980d8f9bb4653f5bdf82cbacb342af15f512e925cb5e7bf44b9ba020874590087c9c2e481f5beb3abb96a9e2ce2712e064f9443760921d7e90d9eb"
     | Eip1559 -> make_raw_tx ~legacy:false
   in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
@@ -144,6 +150,9 @@ let test_validate_chain_id =
   let* invalid_chain_id =
     match tx_type with
     | Legacy -> make_tx_chain_id ~chain_id:1000 ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f8678205dc80843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c080a063db2a9f77795acaf9fa62465addfd5d8e77bf564868c6762e16f3ae0c084d20a02a57aaaff92cfdde10dfa1016127ff2a94df0bf620615b50e660e76e6044a844"
     | Eip1559 -> make_tx_chain_id ~chain_id:1000 ~legacy:false
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:invalid_chain_id sequencer in
@@ -153,6 +162,9 @@ let test_validate_chain_id =
   let* valid_chain_id =
     match tx_type with
     | Legacy -> make_tx_chain_id ~chain_id:1337 ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f86782053980843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c001a05ba2acb79e66aaadd076b1ee6fdf09f5cb95541e2b24504209f89908b50a84dea0492d8cf5c29b5ec44b4730eebfb62ddf5ce486d5b8729c50a8002d6219f76412"
     | Eip1559 -> make_tx_chain_id ~chain_id:1337 ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:valid_chain_id sequencer in
@@ -188,6 +200,9 @@ let test_validate_nonce =
   let* nonce_10 =
     match tx_type with
     | Legacy -> make_tx_nonce ~nonce:10 ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f8678205390a843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c080a06c58350ee42312a79bfc488992cf3aaa56eecad645797b00ffb708f9ea540e88a0438a70e53e970b53f8ff6444132053296c3da19e877b6216b6c7c5834f52d7da"
     | Eip1559 -> make_tx_nonce ~nonce:10 ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:nonce_10 sequencer in
@@ -195,6 +210,9 @@ let test_validate_nonce =
   let* nonce_1 =
     match tx_type with
     | Legacy -> make_tx_nonce ~nonce:1 ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f86782053901843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c080a0e4ea03b849ac0e339adde760cf024ffbc5e4e70d601ca3d597151f45ef0fe8daa057b1bdd92c0c549d38f01373935b1705f4b8310885efd8b2e23a4f4ac5da1b78"
     | Eip1559 -> make_tx_nonce ~nonce:1 ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:nonce_1 sequencer in
@@ -202,6 +220,9 @@ let test_validate_nonce =
   let* nonce_0 =
     match tx_type with
     | Legacy -> make_tx_nonce ~nonce:0 ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f86782053980843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c001a05ba2acb79e66aaadd076b1ee6fdf09f5cb95541e2b24504209f89908b50a84dea0492d8cf5c29b5ec44b4730eebfb62ddf5ce486d5b8729c50a8002d6219f76412"
     | Eip1559 -> make_tx_nonce ~nonce:0 ~legacy:false
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:nonce_0 sequencer in
@@ -233,6 +254,9 @@ let test_validate_max_fee_per_gas =
   let* gas_price_below =
     match tx_type with
     | Legacy -> make_tx_gas_price ~gas_price:(base_fee_per_gas - 1) ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f863820539800a8261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c001a0978d80876079de8efc0d3623ba127c19d3f74743bfbd8bffc461302c1b3ede23a063a107e1d83060ccbb38bbb02baccf01b4eebdf0cfefd0b21b9eafd7756fba3b"
     | Eip1559 ->
         make_tx_gas_price ~gas_price:(base_fee_per_gas - 1) ~legacy:false
   in
@@ -243,6 +267,9 @@ let test_validate_max_fee_per_gas =
   let* gas_price_enough =
     match tx_type with
     | Legacy -> make_tx_gas_price ~gas_price:base_fee_per_gas ~legacy:true
+    | Eip2930 ->
+        return
+          "0x01f86782053980843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c001a05ba2acb79e66aaadd076b1ee6fdf09f5cb95541e2b24504209f89908b50a84dea0492d8cf5c29b5ec44b4730eebfb62ddf5ce486d5b8729c50a8002d6219f76412"
     | Eip1559 -> make_tx_gas_price ~gas_price:base_fee_per_gas ~legacy:false
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:gas_price_enough sequencer in
@@ -280,6 +307,11 @@ let test_validate_pay_for_fees =
   let* insufficient_funds =
     match tx_type with
     | Legacy -> make_tx_pay_fees ~legacy:true ~gas_price:base_fee_per_gas
+    | Eip2930 ->
+        Test.fail
+          ~__LOC__
+          "Eip2930 are hardcoded transaction, we can't use value like \
+           base_fee_per_gas"
     | Eip1559 -> make_tx_pay_fees ~legacy:false ~gas_price:base_fee_per_gas
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:insufficient_funds sequencer in
@@ -301,6 +333,11 @@ let test_validate_pay_for_fees =
   let* enough_funds =
     match tx_type with
     | Legacy -> make_tx_pay_fees ~legacy:true ~gas_price:base_fee_per_gas
+    | Eip2930 ->
+        Test.fail
+          ~__LOC__
+          "Eip2930 are hardcoded transaction, we can't use value like \
+           base_fee_per_gas"
     | Eip1559 -> make_tx_pay_fees ~legacy:false ~gas_price:base_fee_per_gas
   in
   let*@ _ok = Rpc.send_raw_transaction ~raw_tx:enough_funds sequencer in
@@ -311,6 +348,11 @@ let test_validate_pay_for_fees =
   let* insufficient_funds =
     match tx_type with
     | Legacy -> make_tx_pay_fees ~legacy:true ~gas_price:(base_fee_per_gas + 1)
+    | Eip2930 ->
+        Test.fail
+          ~__LOC__
+          "Eip2930 are hardcoded transaction, we can't use value like \
+           base_fee_per_gas"
     | Eip1559 -> make_tx_pay_fees ~legacy:false ~gas_price:(base_fee_per_gas + 1)
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:insufficient_funds sequencer in
@@ -320,10 +362,10 @@ let test_validate_pay_for_fees =
   unit
 
 let () =
-  let all_types = [Legacy; Eip1559] in
+  let all_types = [Legacy; Eip1559; Eip2930] in
   test_validate_compressed_sig [Legacy] ;
   test_validate_recover_caller all_types ;
   test_validate_chain_id all_types ;
   test_validate_nonce all_types ;
   test_validate_max_fee_per_gas all_types ;
-  test_validate_pay_for_fees all_types
+  test_validate_pay_for_fees [Legacy; Eip1559]
