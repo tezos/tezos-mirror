@@ -321,8 +321,7 @@ let recovery_id : transaction -> (bytes, string) result =
     match transaction.transaction_type with
     | Legacy ->
         legacy_recovery_id ~chain_id:transaction.chain_id ~v:transaction.v
-    | Eip2930 -> invalid_arg "Eip2930 is not yet supported"
-    | Eip1559 -> Z.to_int transaction.v
+    | Eip2930 | Eip1559 -> Z.to_int transaction.v
   in
   if ri == 0 || ri == 1 then (
     let buffer = Bytes.create 1 in
