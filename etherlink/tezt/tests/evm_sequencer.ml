@@ -5155,7 +5155,7 @@ let test_rpc_mode_while_block_are_produced =
     ~title:"rpc node can respond to rpcs without disturbing the sequencer."
     ~tags:["rpc_mode"]
     ~time_between_blocks:Nothing
-  @@ fun {observer; sequencer; _} _protocol ->
+  @@ fun {sequencer; _} _protocol ->
   (* The goal of this test is to prove that a RPC node running alongside a
      read-write node like a sequencer works as expected. To that end, we
      simulate calling various RPCs while blocks are being produced by the
@@ -5172,12 +5172,6 @@ let test_rpc_mode_while_block_are_produced =
         ~mode:Rpc
         (Evm_node.endpoint sequencer)
     in
-    let* observer_config =
-      let* config = Evm_node.Config_file.read observer in
-      return @@ JSON.get "observer" config
-    in
-    let put_observer_config = JSON.put ("observer", observer_config) in
-    let* () = Evm_node.Config_file.update rpc_node put_observer_config in
     let* () = Evm_node.run rpc_node in
     return rpc_node
   in

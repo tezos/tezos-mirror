@@ -222,6 +222,39 @@ module Cli : sig
     unit ->
     t
 
+  val patch_configuration_from_args :
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?tx_pool_timeout_limit:int64 ->
+    ?tx_pool_addr_limit:int64 ->
+    ?tx_pool_tx_per_addr_limit:int64 ->
+    keep_alive:bool ->
+    ?rollup_node_endpoint:Uri.t ->
+    verbose:bool ->
+    ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
+    ?time_between_blocks:time_between_blocks ->
+    ?max_number_of_chunks:int ->
+    ?private_rpc_port:int ->
+    ?sequencer_key:Client_keys.sk_uri ->
+    ?evm_node_endpoint:Uri.t ->
+    ?threshold_encryption_bundler_endpoint:Uri.t ->
+    ?log_filter_max_nb_blocks:int ->
+    ?log_filter_max_nb_logs:int ->
+    ?log_filter_chunk_size:int ->
+    ?max_blueprints_lag:int ->
+    ?max_blueprints_ahead:int ->
+    ?max_blueprints_catchup:int ->
+    ?catchup_cooldown:int ->
+    ?sequencer_sidecar_endpoint:Uri.t ->
+    ?restricted_rpcs:string ->
+    ?proxy_finalized_view:bool ->
+    dal_slots:int trace option ->
+    t ->
+    t
+
   val create_or_read_config :
     data_dir:string ->
     ?rpc_addr:string ->

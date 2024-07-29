@@ -957,16 +957,44 @@ let rpc_command =
         when_ Option.(is_some rollup_node_endpoint) @@ fun () ->
         failwith "unexpected --rollup-node-endpoint argument"
       in
-      let* config =
-        Cli.create_or_read_config
-          ~data_dir
+      let* read_write_config =
+        (* We read the configuration used for the read-write node, without
+           altering it ([keep_alive] and [verbose] are
+           mandatory field of the function, but we don’t actually need those
+           fields so it’s fine).
+
+           This config will be used to infer what is the endpoint to use to
+           connect to the read-write node. *)
+        Cli.create_or_read_config ~data_dir ~keep_alive ~verbose ()
+      in
+      let evm_node_endpoint =
+        match evm_node_endpoint with
+        | Some uri ->
+            (* We reuse `--evm-node-endpoint` to allow to overwrite the
+               endpoint used to connect to the read-write node. *)
+            uri
+        | None ->
+            let evm_node_addr =
+              match read_write_config.rpc_addr with
+              | "0.0.0.0" (* IPv4 catch-all bind address *)
+              | "[::]" (* IPv6 catch-all bind address *) ->
+                  "localhost"
+              | addr -> addr
+            in
+            Uri.make
+              ~scheme:"http"
+              ~host:evm_node_addr
+              ~port:read_write_config.rpc_port
+              ()
+      in
+      let config =
+        Cli.patch_configuration_from_args
           ~keep_alive
           ?cors_origins
           ?cors_headers
           ~verbose
           ?preimages
           ?preimages_endpoint
-          ?evm_node_endpoint
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
@@ -976,7 +1004,8 @@ let rpc_command =
           ?restricted_rpcs
           ~rpc_port
           ?rpc_addr
-          ()
+          ~dal_slots:None
+          read_write_config
       in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
@@ -1001,7 +1030,11 @@ let rpc_command =
         init ~config ()
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
-      Evm_node_lib_dev.Rpc.main ~data_dir ~config)
+
+      (* Patch the config with the RPC port and addr specified by command-line. *)
+      let rpc_addr = Option.value ~default:config.rpc_addr rpc_addr in
+      let config = {config with rpc_port; rpc_addr} in
+      Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ~verbose ?preimages ?rollup_node_endpoint ?preimages_endpoint
