@@ -126,6 +126,8 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
+.. _time_between_blocks: 
+
 Time between blocks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
