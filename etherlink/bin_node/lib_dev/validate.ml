@@ -77,7 +77,13 @@ let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
     tx_raw =
   let hash = Ethereum_types.hash_raw_tx tx_raw in
   match String.get_uint8 tx_raw 0 with
-  | 1 -> Backend_rpc.is_tx_valid tx_raw
+  | 1 ->
+      let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+      valid_transaction_object
+        ~backend_rpc
+        ~decode:Transaction.decode_eip2930
+        ~hash
+        tx_raw
   | 2 ->
       let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
       valid_transaction_object
