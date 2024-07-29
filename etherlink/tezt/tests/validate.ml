@@ -54,4 +54,39 @@ let test_validate_recover_caller () =
     ~error_msg:"Expected caller to be %R but got %L" ;
   unit
 
-let () = test_validate_recover_caller ()
+let test_validate_chain_id () =
+  register ~title:"Validate chain id" ~tags:["chain_id"] @@ fun sequencer ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let* invalid_chain_id =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1000
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:invalid_chain_id sequencer in
+  Check.((err.message = "Invalid chain id") string)
+    ~error_msg:"the transaction has an invalid chain id, it should fail" ;
+
+  let* valid_chain_id =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@ _ok = Rpc.send_raw_transaction ~raw_tx:valid_chain_id sequencer in
+
+  unit
+
+let () =
+  test_validate_recover_caller () ;
+  test_validate_chain_id ()
