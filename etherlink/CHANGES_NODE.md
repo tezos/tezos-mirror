@@ -54,7 +54,7 @@
 ### Experimental
 
 - Introduce a new “RPC mode” which exposes a new RPC server for an existing
-  data-dir. (!13208)
+  data-dir. (!13208 !14348)
 
 ### Internal
 

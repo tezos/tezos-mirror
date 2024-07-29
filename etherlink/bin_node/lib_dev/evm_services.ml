@@ -41,13 +41,13 @@ let blueprint_watcher_service =
     ~output:Blueprint_types.with_events_encoding
     Path.(evm_services_root / "blueprints")
 
-let create_blueprint_watcher_service from_level =
+let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
+    from_level =
   let open Lwt_syntax in
-  let blueprint_stream, stopper = Evm_context.blueprints_watcher () in
+  let blueprint_stream, stopper = Blueprints_watcher.create_stream () in
   let shutdown () = Lwt_watcher.shutdown stopper in
   (* input source block creating a stream to observe the events *)
-  let* head_info = Evm_context.head_info () in
-  let (Qty next) = head_info.next_blueprint_number in
+  let* (Ethereum_types.Qty next) = get_next_blueprint_number () in
   let* () =
     if Z.(Compare.(next < of_int64 from_level)) then
       Stdlib.failwith "Cannot start watching from a level too far in the future"
@@ -61,7 +61,7 @@ let create_blueprint_watcher_service from_level =
       if Z.Compare.(!next_level_requested < next) then (
         let current_request = !next_level_requested in
         (next_level_requested := Z.(succ current_request)) ;
-        let* blueprint = Evm_context.blueprint (Qty current_request) in
+        let* blueprint = find_blueprint (Ethereum_types.Qty current_request) in
         match blueprint with
         | Ok (Some blueprint) -> return_some blueprint
         | Ok None -> return_none
@@ -82,20 +82,26 @@ let register_get_time_between_block_service time_between_block dir =
       let open Lwt_result_syntax in
       return time_between_block)
 
-let register_get_blueprint_service dir =
+let register_get_blueprint_service find_blueprint dir =
   Directory.opt_register1 dir get_blueprint_service (fun level () () ->
       let open Lwt_result_syntax in
       let number = Ethereum_types.Qty (Z.of_int64 level) in
-      let* blueprint = Evm_context.blueprint number in
+      let* blueprint = find_blueprint number in
       return blueprint)
 
-let register_blueprint_watcher_service dir =
+let register_blueprint_watcher_service find_blueprint get_next_blueprint_number
+    dir =
   Directory.gen_register0 dir blueprint_watcher_service (fun level () ->
-      create_blueprint_watcher_service level)
+      create_blueprint_watcher_service
+        get_next_blueprint_number
+        find_blueprint
+        level)
 
-let register smart_rollup_address time_between_blocks dir =
+let register get_next_blueprint_number find_blueprint smart_rollup_address
+    time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
-  |> register_get_blueprint_service |> register_blueprint_watcher_service
+  |> register_get_blueprint_service find_blueprint
+  |> register_blueprint_watcher_service find_blueprint get_next_blueprint_number
   |> register_get_time_between_block_service time_between_blocks
 
 let get_smart_rollup_address ~evm_node_endpoint =

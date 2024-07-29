@@ -223,118 +223,6 @@ let install_finalizer_observer server =
   let* () = Evm_events_follower.shutdown () in
   Evm_context.shutdown ()
 
-type error += Timeout
-
-let timeout_from_tbb = function
-  | Configuration.Nothing ->
-      let p, _ = Lwt.task () in
-      p
-  | Time_between_blocks tbb ->
-      let open Lwt_result_syntax in
-      let*! _ = Lwt_unix.sleep (tbb +. 1.) in
-      tzfail Timeout
-
-let local_head_too_old ?remote_head ~evm_node_endpoint
-    (Qty next_blueprint_number) =
-  let open Lwt_result_syntax in
-  let open Rpc_encodings in
-  let* (Qty remote_head_number) =
-    match remote_head with
-    | None ->
-        (* The observer is designed to be resilent to downtime from its EVM
-           node endpoint. It would not make sense to break this logic here, so
-           we force [keep_alive] to true. *)
-        Services.call
-          (module Block_number)
-          ~keep_alive:true
-          ~evm_node_endpoint
-          ()
-    | Some remote_head -> return remote_head
-  in
-  return
-    ( Z.Compare.(next_blueprint_number <= remote_head_number),
-      Qty remote_head_number )
-
-let[@tailrec] rec main_loop ?remote_head ~time_between_blocks ~first_connection
-    ~evm_node_endpoint () =
-  let open Lwt_result_syntax in
-  let*! head = Evm_context.head_info () in
-
-  let* local_head_too_old, remote_head =
-    local_head_too_old
-      ?remote_head
-      ~evm_node_endpoint
-      head.next_blueprint_number
-  in
-
-  if local_head_too_old then
-    let* blueprint =
-      Evm_services.get_blueprint ~evm_node_endpoint head.next_blueprint_number
-    in
-    let* () = on_new_blueprint head.next_blueprint_number blueprint in
-    (main_loop [@tailcall])
-      ~remote_head
-      ~time_between_blocks
-      ~first_connection
-      ~evm_node_endpoint
-      ()
-  else
-    let* () =
-      when_ (not first_connection) @@ fun () ->
-      let delay = Random.float 2. in
-      let*! () = Events.retrying_connect ~endpoint:evm_node_endpoint ~delay in
-      let*! () = Lwt_unix.sleep delay in
-      return_unit
-    in
-
-    let*! call_result =
-      Evm_services.monitor_blueprints
-        ~evm_node_endpoint
-        head.next_blueprint_number
-    in
-
-    match call_result with
-    | Ok blueprints_stream ->
-        (stream_loop [@tailcall])
-          ~evm_node_endpoint
-          head.next_blueprint_number
-          blueprints_stream
-          ~time_between_blocks
-    | Error _ ->
-        (main_loop [@tailcall])
-          ~time_between_blocks
-          ~first_connection:false
-          ~evm_node_endpoint
-          ()
-
-and[@tailrec] stream_loop ~time_between_blocks ~evm_node_endpoint
-    (Qty next_blueprint_number) stream =
-  let open Lwt_result_syntax in
-  let*! candidate =
-    Lwt.pick
-      [
-        (let*! res = Lwt_stream.get stream in
-         return res);
-        timeout_from_tbb time_between_blocks;
-      ]
-  in
-  match candidate with
-  | Ok (Some blueprint) ->
-      let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
-      let* () = Tx_pool.pop_and_inject_transactions () in
-      (stream_loop [@tailcall])
-        ~evm_node_endpoint
-        (Qty (Z.succ next_blueprint_number))
-        stream
-        ~time_between_blocks
-  | Ok None | Error [Timeout] ->
-      (main_loop [@tailcall])
-        ~first_connection:false
-        ~evm_node_endpoint
-        ~time_between_blocks
-        ()
-  | Error err -> fail err
-
 let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   Metrics.Info.init ~mode:"observer" ;
@@ -395,7 +283,12 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
     Services.directory config (observer_backend, smart_rollup_address)
   in
   let directory =
-    directory |> Evm_services.register smart_rollup_address time_between_blocks
+    directory
+    |> Evm_services.register
+         Evm_context.next_blueprint_number
+         Evm_context.blueprint
+         smart_rollup_address
+         time_between_blocks
   in
 
   let* server = observer_start config ~directory in
@@ -419,4 +312,8 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
       ()
   in
 
-  main_loop ~first_connection:true ~evm_node_endpoint ~time_between_blocks ()
+  Blueprints_follower.start
+    ~time_between_blocks
+    ~evm_node_endpoint
+    ~get_next_blueprint_number:Evm_context.next_blueprint_number
+    on_new_blueprint

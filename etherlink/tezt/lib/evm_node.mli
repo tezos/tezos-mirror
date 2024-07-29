@@ -121,7 +121,7 @@ type mode =
       finalized_view : bool;
           (** Expose the latest final block of the rollup instead of its current head *)
     }
-  | Rpc
+  | Rpc of mode
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
@@ -131,6 +131,12 @@ val name : t -> string
 
 (** Returns the data_dir of the EVM node. *)
 val data_dir : t -> string
+
+(** Returns the path to the directory storing the preimages used by the
+    kernel runned by the node. *)
+val preimages_dir : t -> string
+
+val supports_threshold_encryption : t -> bool
 
 (** [create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server.

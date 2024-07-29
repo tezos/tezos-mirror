@@ -195,8 +195,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~store_perm:`Read_write
       ()
   in
-  let*! head = Evm_context.head_info () in
-  let (Qty next_blueprint_number) = head.next_blueprint_number in
+  let*! (Qty next_blueprint_number) = Evm_context.next_blueprint_number () in
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
@@ -277,6 +276,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let directory =
     directory
     |> Evm_services.register
+         Evm_context.next_blueprint_number
+         Evm_context.blueprint
          smart_rollup_address_typed
          threshold_encryption_sequencer_config.time_between_blocks
   in

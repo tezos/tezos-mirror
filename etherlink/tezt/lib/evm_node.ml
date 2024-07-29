@@ -90,7 +90,7 @@ type mode =
       dal_slots : int list option;
     }
   | Proxy of {finalized_view : bool}
-  | Rpc
+  | Rpc of mode
 
 module Per_level_map = Map.Make (Int)
 
@@ -123,39 +123,30 @@ include Daemon.Make (Parameters)
 
 let mode t = t.persistent_state.mode
 
-let mode_name = function
-  | Sequencer _ -> "sequencer"
-  | Threshold_encryption_observer _ -> "TE observer"
-  | Threshold_encryption_sequencer _ -> "TE sequencer"
-  | Observer _ -> "observer"
-  | Proxy _ -> "proxy"
-  | Rpc -> "rpc"
-  | Sandbox _ -> "sandbox"
-
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ -> true
-  | Observer _ | Threshold_encryption_observer _ | Proxy _ | Rpc -> false
+  | Observer _ | Threshold_encryption_observer _ | Proxy _ | Rpc _ -> false
 
 let initial_kernel t =
-  match t.persistent_state.mode with
-  | Sequencer {initial_kernel; _}
-  | Sandbox {initial_kernel; _}
-  | Threshold_encryption_sequencer {initial_kernel; _}
-  | Observer {initial_kernel; _}
-  | Threshold_encryption_observer {initial_kernel; _} ->
-      initial_kernel
-  | Proxy _ | Rpc ->
-      Test.fail
-        "Wrong argument: [initial_kernel] not supported for mode %s"
-        (mode_name t.persistent_state.mode)
+  let rec from_mode = function
+    | Sandbox {initial_kernel; _}
+    | Sequencer {initial_kernel; _}
+    | Threshold_encryption_sequencer {initial_kernel; _}
+    | Observer {initial_kernel; _}
+    | Threshold_encryption_observer {initial_kernel; _} ->
+        initial_kernel
+    | Rpc mode -> from_mode mode
+    | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
+  in
+  from_mode t.persistent_state.mode
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Observer _
   | Threshold_encryption_observer _ ->
       true
-  | Proxy _ | Rpc -> false
+  | Proxy _ | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
   let rpc_port =
@@ -472,7 +463,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     | Observer _ -> "observer_" ^ fresh_name ()
     | Threshold_encryption_observer _ ->
         "threshold_encryption_observer_" ^ fresh_name ()
-    | Rpc -> "rpc_" ^ fresh_name ()
+    | Rpc _ -> "rpc_" ^ fresh_name ()
   in
   let name = Option.value ~default:(new_name ()) name in
   let data_dir =
@@ -566,7 +557,7 @@ let run_args evm_node =
           "--bundler-node-endpoint";
           bundler_node_endpoint;
         ]
-    | Rpc -> ["experimental"; "run"; "rpc"]
+    | Rpc _ -> ["experimental"; "run"; "rpc"]
   in
   mode_args @ shared_args
 
@@ -662,7 +653,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
   let mode_args =
     match evm_node.persistent_state.mode with
     | Proxy _ -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
-    | Rpc -> []
+    | Rpc _ -> []
     | Sequencer
         {
           initial_kernel = _;
@@ -898,7 +889,7 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
             "Threshold encryption sequencer doesn't have a private RPC server"
       | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
-      | Rpc -> Test.fail "Rpc node doesn't have a private RPC server"
+      | Rpc _ -> Test.fail "Rpc node doesn't have a private RPC server"
       | Threshold_encryption_observer _ ->
           Test.fail
             "Threshold encryption observer doesn't have a private RPC server"
@@ -1193,6 +1184,29 @@ let make_kernel_installer_config ?(mainnet_compat = false)
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
+
+let preimages_dir evm_node =
+  let rec from_node ~data_dir = function
+    | Sandbox {preimage_dir; _}
+    | Sequencer {preimage_dir; _}
+    | Threshold_encryption_sequencer {preimage_dir; _} ->
+        Option.value ~default:(data_dir // "wasm_2_0_0") preimage_dir
+    | Rpc mode -> from_node ~data_dir mode
+    | Observer {preimages_dir; _}
+    | Threshold_encryption_observer {preimages_dir; _} ->
+        preimages_dir
+    | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
+  in
+  from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
+
+let supports_threshold_encryption evm_node =
+  let rec from_node = function
+    | Sandbox _ | Sequencer _ | Observer _ -> false
+    | Threshold_encryption_observer _ | Threshold_encryption_sequencer _ -> true
+    | Rpc mode -> from_node mode
+    | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
+  in
+  from_node evm_node.persistent_state.mode
 
 module Agent = struct
   (* Use for compatibility with `tezt-cloud`. *)

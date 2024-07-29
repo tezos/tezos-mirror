@@ -336,6 +336,18 @@ let install_finalizer_rpc server =
   let* () = Events.shutdown_rpc_server ~private_:false in
   Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
 
+let next_blueprint_number, next_blueprint_number_waker = Lwt.task ()
+
+let set_next_blueprint_number v =
+  let open Lwt_syntax in
+  let+ next_blueprint_number in
+  next_blueprint_number := v
+
+let next_blueprint_number () =
+  let open Lwt_syntax in
+  let+ next_blueprint_number in
+  !next_blueprint_number
+
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
   let* time_between_blocks =
@@ -358,6 +370,20 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     end) : Services_backend_sig.S)
   in
 
+  let* latest_candidate =
+    Evm_store.use ctxt.store Evm_store.Context_hashes.find_latest
+  in
+
+  let* (Qty current_number) =
+    match latest_candidate with
+    | None -> failwith "Missing latest number"
+    | Some (current, _) -> return current
+  in
+
+  Lwt.wakeup
+    next_blueprint_number_waker
+    (ref (Ethereum_types.Qty Z.(succ current_number))) ;
+
   let* () =
     Tx_pool.start
       {
@@ -379,12 +405,27 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   in
   let directory =
     directory
-    |> Evm_services.register ctxt.smart_rollup_address time_between_blocks
+    |> Evm_services.register
+         next_blueprint_number
+         (fun level ->
+           Evm_store.use ctxt.store (fun conn ->
+               Evm_store.Blueprints.find_with_events conn level))
+         ctxt.smart_rollup_address
+         time_between_blocks
   in
   let* server = rpc_start config ~directory in
 
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_rpc server in
 
-  (* infinite loop *)
-  let p, _ = Lwt.task () in
-  p
+  Blueprints_follower.start
+    ~time_between_blocks
+    ~evm_node_endpoint
+    ~get_next_blueprint_number:next_blueprint_number
+  @@ fun (Qty number) _ ->
+  let* blueprint =
+    Evm_store.use ctxt.store @@ fun conn ->
+    Evm_store.Blueprints.get_with_events conn (Qty number)
+  in
+  Blueprints_watcher.notify blueprint ;
+  let*! () = set_next_blueprint_number (Qty Z.(succ number)) in
+  return_unit

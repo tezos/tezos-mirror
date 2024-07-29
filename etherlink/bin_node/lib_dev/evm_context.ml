@@ -46,9 +46,6 @@ type t = {
   fail_on_missing_blueprint : bool;
 }
 
-let blueprint_watcher : Blueprint_types.with_events Lwt_watcher.input =
-  Lwt_watcher.create_input ()
-
 let session_to_head_info session =
   {
     evm_state = session.evm_state;
@@ -679,7 +676,7 @@ module State = struct
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
     ctxt.session.current_block_hash <- block_hash ;
-    Lwt_watcher.notify blueprint_watcher blueprint_with_events ;
+    Blueprints_watcher.notify blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     let* head_info in
     head_info := session_to_head_info ctxt.session ;
@@ -1604,6 +1601,11 @@ let head_info () =
   let+ head_info in
   !head_info
 
+let next_blueprint_number () =
+  let open Lwt_syntax in
+  let+ head_info = head_info () in
+  head_info.next_blueprint_number
+
 let find_evm_state block =
   let open Lwt_result_syntax in
   match block with
@@ -1653,8 +1655,6 @@ let inspect_subkeys
   let* evm_state = get_evm_state block in
   let*! res = Evm_state.subkeys evm_state path in
   return res
-
-let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
 let blueprint level = worker_wait_for_request (Blueprint {level})
 

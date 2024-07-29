@@ -120,8 +120,7 @@ val apply_blueprint :
 
 val head_info : unit -> head Lwt.t
 
-val blueprints_watcher :
-  unit -> Blueprint_types.with_events Lwt_stream.t * Lwt_watcher.stopper
+val next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t
 
 val blueprint :
   Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t
