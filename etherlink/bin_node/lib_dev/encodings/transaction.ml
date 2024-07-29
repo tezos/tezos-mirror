@@ -222,6 +222,79 @@ let encode_eip1559_transaction : transaction -> bytes = function
       Bytes.cat prefix (encode rlp)
   | _ -> invalid_arg "Transaction is not eip 1559"
 
+let decode_eip2930 : bytes -> (transaction, string) result =
+ fun bytes ->
+  let open Result_syntax in
+  let open Rlp in
+  match decode bytes with
+  | Ok
+      (List
+        [
+          Value chain_id;
+          Value nonce;
+          Value max_fee_per_gas;
+          Value gas_limit;
+          Value to_;
+          Value value;
+          Value data;
+          List _access_list;
+          Value v;
+          Value r;
+          Value s;
+        ]) ->
+      decode_transaction
+        ~tx_type:Eip2930
+        ~chain_id
+        ~nonce
+        ~max_priority_fee_per_gas:max_fee_per_gas
+        ~max_fee_per_gas
+        ~gas_limit
+        ~to_
+        ~value
+        ~data
+        (v, r, s)
+  | _ -> fail "Eip2930 transaction is not 11 rlp items"
+
+let encode_eip2930_transaction : transaction -> bytes = function
+  | {
+      transaction_type = Eip2930;
+      chain_id = Some chain_id;
+      nonce;
+      max_priority_fee_per_gas = _;
+      max_fee_per_gas;
+      gas_limit;
+      to_;
+      value;
+      data;
+      access_list = [];
+      v = _;
+      r = _;
+      s = _;
+    } ->
+      let open Rlp in
+      let rlp =
+        let chain_id = encode_z chain_id in
+        let nonce = encode_z nonce in
+        let max_fee_per_gas = encode_z max_fee_per_gas in
+        let gas_limit = encode_z gas_limit in
+        let to_ = Option.value ~default:Bytes.empty to_ in
+        let value = encode_z value in
+        List
+          [
+            Value chain_id;
+            Value nonce;
+            Value max_fee_per_gas;
+            Value gas_limit;
+            Value to_;
+            Value value;
+            Value data;
+            List [];
+          ]
+      in
+      let prefix = Bytes.make 1 (Char.chr 1) in
+      Bytes.cat prefix (encode rlp)
+  | _ -> invalid_arg "Transaction is not eip 2930"
+
 (** [message transaction] returns the "message" of the transaction, the
     binary blob that is signed and then to be used in signature recovery. *)
 let message : transaction -> bytes =
@@ -229,7 +302,7 @@ let message : transaction -> bytes =
   let encoded_transaction =
     match transaction.transaction_type with
     | Legacy -> encode_legacy_transaction transaction
-    | Eip2930 -> invalid_arg "Eip2930 is not yet supported"
+    | Eip2930 -> encode_eip2930_transaction transaction
     | Eip1559 -> encode_eip1559_transaction transaction
   in
   Tezos_crypto.Hacl.Hash.Keccak_256.digest encoded_transaction
