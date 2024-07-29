@@ -45,7 +45,7 @@ type valid_filter = {
   from_block : quantity;
   to_block : quantity;
   bloom : Ethbloom.t;
-  topics : filter_topic option list;
+  topics : Filter.topic option list;
   address : address list;
 }
 
@@ -84,7 +84,7 @@ let emit_and_return_none event arg =
 
 (* Parses the [from_block] and [to_block] fields, as described before.  *)
 let validate_range log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) (filter : filter) =
+    (module Rollup_node_rpc : Services_backend_sig.S) (filter : Filter.t) =
   let open Lwt_result_syntax in
   match filter with
   | {from_block = Some _; to_block = Some _; block_hash = Some _; _} ->
@@ -106,21 +106,21 @@ let validate_range log_filter_config
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
 (* Constructs the bloom filter *)
-let make_bloom (filter : filter) =
+let make_bloom (filter : Filter.t) =
   let bloom = Ethbloom.make () in
   Option.iter
     (function
-      | Single (Address address) -> Ethbloom.accrue ~input:address bloom
+      | Filter.Single (Address address) -> Ethbloom.accrue ~input:address bloom
       | _ -> ())
     filter.address ;
   Option.iter
     (List.iter (function
-        | Some (One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
+        | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
         | _ -> ()))
     filter.topics ;
   bloom
 
-let validate_topics (filter : filter) =
+let validate_topics (filter : Filter.t) =
   let open Lwt_result_syntax in
   match filter.topics with
   | Some topics when List.compare_length_with topics 4 > 0 ->
@@ -131,7 +131,7 @@ let validate_topics (filter : filter) =
    input validation step *)
 let validate_filter log_filter_config
     (module Rollup_node_rpc : Services_backend_sig.S) :
-    filter -> valid_filter tzresult Lwt.t =
+    Filter.t -> valid_filter tzresult Lwt.t =
  fun filter ->
   let open Lwt_result_syntax in
   let* from_block, to_block =
@@ -140,7 +140,7 @@ let validate_filter log_filter_config
   let* () = validate_topics filter in
   let bloom = make_bloom filter in
   let address =
-    Option.map (function Single a -> [a] | Vec l -> l) filter.address
+    Option.map (function Filter.Single a -> [a] | Vec l -> l) filter.address
     |> Option.value ~default:[]
   in
   return
@@ -158,7 +158,7 @@ let hex_to_bytes h = hex_to_bytes h |> Bytes.of_string
    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getfilterchanges *)
 let match_filter_topics (filter : valid_filter) (log_topics : hash list) : bool
     =
-  let match_one_topic (filter_topic : filter_topic option) (log_topic : hash) =
+  let match_one_topic (filter_topic : Filter.topic option) (log_topic : hash) =
     match (filter_topic, log_topic) with
     (* Null matches with every topic *)
     | None, _ -> true
@@ -181,7 +181,7 @@ let match_filter_address (filter : valid_filter) (address : address) : bool =
   List.is_empty filter.address || List.mem ~equal:( = ) address filter.address
 
 (* Apply a filter on one log *)
-let filter_one_log : valid_filter -> transaction_log -> filter_changes option =
+let filter_one_log : valid_filter -> transaction_log -> Filter.changes option =
  fun filter log ->
   if
     match_filter_address filter log.address
@@ -191,7 +191,7 @@ let filter_one_log : valid_filter -> transaction_log -> filter_changes option =
 
 (* Apply a filter on one transaction *)
 let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
-    valid_filter -> hash -> filter_changes list option tzresult Lwt.t =
+    valid_filter -> hash -> Filter.changes list option tzresult Lwt.t =
  fun filter tx_hash ->
   let open Lwt_result_syntax in
   let* receipt = Rollup_node_rpc.transaction_receipt tx_hash in
@@ -204,7 +204,7 @@ let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
 
 (* Apply a filter on one block *)
 let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
-    valid_filter -> Z.t -> filter_changes list option tzresult Lwt.t =
+    valid_filter -> Z.t -> Filter.changes list option tzresult Lwt.t =
  fun filter block_number ->
   let open Lwt_result_syntax in
   let* block =

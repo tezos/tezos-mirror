@@ -80,16 +80,15 @@ module Kernel_upgrades : sig
   val store :
     conn ->
     Ethereum_types.quantity ->
-    Ethereum_types.Upgrade.t ->
+    Evm_events.Upgrade.t ->
     unit tzresult Lwt.t
 
-  val find_latest_pending :
-    conn -> Ethereum_types.Upgrade.t option tzresult Lwt.t
+  val find_latest_pending : conn -> Evm_events.Upgrade.t option tzresult Lwt.t
 
   val find_applied_before :
     conn ->
     Ethereum_types.quantity ->
-    Ethereum_types.Upgrade.t option tzresult Lwt.t
+    Evm_events.Upgrade.t option tzresult Lwt.t
 
   val record_apply : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
@@ -100,18 +99,18 @@ module Delayed_transactions : sig
   val store :
     conn ->
     Ethereum_types.quantity ->
-    Ethereum_types.Delayed_transaction.t ->
+    Evm_events.Delayed_transaction.t ->
     unit tzresult Lwt.t
 
   val at_level :
     conn ->
     Ethereum_types.quantity ->
-    Ethereum_types.Delayed_transaction.t list tzresult Lwt.t
+    Evm_events.Delayed_transaction.t list tzresult Lwt.t
 
   val at_hash :
     conn ->
     Ethereum_types.hash ->
-    Ethereum_types.Delayed_transaction.t option tzresult Lwt.t
+    Evm_events.Delayed_transaction.t option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end

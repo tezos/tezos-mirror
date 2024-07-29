@@ -313,11 +313,11 @@ module Get_block_receipts = struct
 
   type input = Block_parameter.t
 
-  type output = Ethereum_types.transaction_receipt list
+  type output = Transaction_receipt.t list
 
   let input_encoding = Data_encoding.tup1 Block_parameter.encoding
 
-  let output_encoding = Data_encoding.list transaction_receipt_encoding
+  let output_encoding = Data_encoding.list Transaction_receipt.encoding
 
   let method_ = "eth_getBlockReceipts"
 
@@ -443,11 +443,11 @@ module Get_transaction_receipt = struct
 
   type input = hash
 
-  type output = transaction_receipt option
+  type output = Transaction_receipt.t option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = Data_encoding.option transaction_receipt_encoding
+  let output_encoding = Data_encoding.option Transaction_receipt.encoding
 
   let method_ = "eth_getTransactionReceipt"
 
@@ -631,15 +631,13 @@ module Web3_sha3 = struct
 end
 
 module Get_logs = struct
-  open Ethereum_types
+  type input = Filter.t
 
-  type input = filter
+  type output = Filter.changes list
 
-  type output = filter_changes list
+  let input_encoding = Data_encoding.tup1 Filter.encoding
 
-  let input_encoding = Data_encoding.tup1 filter_encoding
-
-  let output_encoding = Data_encoding.list filter_changes_encoding
+  let output_encoding = Data_encoding.list Filter.changes_encoding
 
   let method_ = "eth_getLogs"
 
@@ -767,7 +765,7 @@ module Eth_fee_history = struct
 
   type input = quantity * Block_parameter.t * float list
 
-  type output = Ethereum_types.fee_history
+  type output = Fee_history.t
 
   let input_encoding =
     Data_encoding.tup3
@@ -775,7 +773,7 @@ module Eth_fee_history = struct
       Block_parameter.encoding
       (Data_encoding.list Data_encoding.float)
 
-  let output_encoding = Ethereum_types.fee_history_encoding
+  let output_encoding = Fee_history.encoding
 
   let method_ = "eth_feeHistory"
 

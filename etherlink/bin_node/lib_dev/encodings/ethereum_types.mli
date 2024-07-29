@@ -181,27 +181,6 @@ type transaction_log = {
   removed : bool option;
 }
 
-type transaction_receipt = {
-  transactionHash : hash;
-  transactionIndex : quantity;
-  blockHash : block_hash;
-  blockNumber : quantity;
-  from : address;
-  to_ : address option;
-  cumulativeGasUsed : quantity;
-  effectiveGasPrice : quantity;
-  gasUsed : quantity;
-  logs : transaction_log list;
-  logsBloom : hex;
-  type_ : quantity;
-  status : quantity;
-  contractAddress : address option;
-}
-
-val transaction_receipt_encoding : transaction_receipt Data_encoding.t
-
-val transaction_receipt_from_rlp : block_hash -> bytes -> transaction_receipt
-
 type call = {
   from : address option;
   to_ : address option;
@@ -250,102 +229,12 @@ module Block_parameter : sig
   val pp_extended : Format.formatter -> extended -> unit
 end
 
-(** Event filter, see
-    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs *)
-type filter_topic = One of hash | Or of hash list
-
-type filter_address = Single of address | Vec of address list
-
-type filter_changes =
-  | Block_filter of block_hash
-  | Pending_transaction_filter of hash
-  | Log of transaction_log
-
-val filter_changes_encoding : filter_changes Data_encoding.t
-
-type filter = {
-  from_block : Block_parameter.t option;
-  to_block : Block_parameter.t option;
-  address : filter_address option;
-  topics : filter_topic option list option;
-  block_hash : block_hash option;
-}
-
-val filter_encoding : filter Data_encoding.t
-
-type fee_history = {
-  oldest_block : quantity;
-  base_fee_per_gas : quantity list;
-  gas_used_ratio : float list;
-}
-
-val fee_history_encoding : fee_history Data_encoding.t
-
 module Address : sig
   type t = address
 
   val compare : t -> t -> int
 
   val to_string : t -> string
-end
-
-module Delayed_transaction : sig
-  type kind = Transaction | Deposit | Fa_deposit
-
-  type t = {kind : kind; hash : hash; raw : string}
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val of_rlp_content :
-    ?transaction_tag:string ->
-    ?fa_deposit_tag:string ->
-    hash ->
-    Rlp.item ->
-    t option
-
-  val to_rlp : t -> bytes
-end
-
-module Upgrade : sig
-  type t = {hash : hash; timestamp : Time.Protocol.t}
-
-  val of_bytes : bytes -> t option
-
-  val to_bytes : t -> bytes
-
-  val encoding : t Data_encoding.t
-end
-
-module Sequencer_upgrade : sig
-  type t = {
-    sequencer : Signature.public_key;
-    pool_address : address;
-    timestamp : Time.Protocol.t;
-  }
-
-  val of_bytes : bytes -> t option
-
-  val to_bytes : t -> bytes
-end
-
-module Blueprint_applied : sig
-  type t = {number : quantity; hash : block_hash}
-end
-
-module Evm_events : sig
-  type t =
-    | Upgrade_event of Upgrade.t
-    | Sequencer_upgrade_event of Sequencer_upgrade.t
-    | Blueprint_applied of Blueprint_applied.t
-    | New_delayed_transaction of Delayed_transaction.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val encoding : t Data_encoding.t
-
-  val of_bytes : bytes -> t option
 end
 
 (** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
@@ -356,3 +245,14 @@ val timestamp_to_bytes : Time.Protocol.t -> bytes
 val bool_to_rlp_bytes : bool -> Rlp.item
 
 val hash_raw_tx : string -> hash
+
+val timestamp_of_bytes : bytes -> Time.Protocol.t
+
+val encode_address : address -> bytes
+
+val transaction_log_encoding : transaction_log Data_encoding.t
+
+val transaction_log_body_from_rlp :
+  Rlp.item -> address * hash list * hex * quantity
+
+val decode_hex : bytes -> hex

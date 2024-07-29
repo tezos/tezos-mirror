@@ -125,18 +125,17 @@ let on_new_blueprint next_blueprint_number
     let events =
       List.map
         (fun delayed_transaction ->
-          Ethereum_types.Evm_events.New_delayed_transaction delayed_transaction)
+          Evm_events.New_delayed_transaction delayed_transaction)
         delayed_transactions
       @
       match kernel_upgrade with
-      | Some kernel_upgrade ->
-          [Ethereum_types.Evm_events.Upgrade_event kernel_upgrade]
+      | Some kernel_upgrade -> [Evm_events.Upgrade_event kernel_upgrade]
       | None -> []
     in
     let* () = Evm_context.apply_evm_events events in
     let delayed_transactions =
       List.map
-        (fun Ethereum_types.Delayed_transaction.{hash; _} -> hash)
+        (fun Evm_events.Delayed_transaction.{hash; _} -> hash)
         delayed_transactions
     in
     Evm_context.apply_blueprint

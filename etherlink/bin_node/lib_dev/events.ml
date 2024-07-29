@@ -171,7 +171,7 @@ let invalid_kernel =
 
 let received_upgrade payload = emit received_upgrade payload
 
-let pending_upgrade (upgrade : Ethereum_types.Upgrade.t) =
+let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
   emit pending_upgrade (upgrade.hash, upgrade.timestamp)
 
 let applied_upgrade root_hash Ethereum_types.(Qty level) =

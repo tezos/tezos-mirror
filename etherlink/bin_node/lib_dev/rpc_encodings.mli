@@ -160,7 +160,7 @@ module Get_block_by_hash :
 module Get_block_receipts :
   METHOD
     with type input = Ethereum_types.Block_parameter.t
-     and type output = Ethereum_types.transaction_receipt list
+     and type output = Transaction_receipt.t list
 
 module Get_code :
   METHOD
@@ -200,7 +200,7 @@ module Get_uncle_count_by_block_number :
 module Get_transaction_receipt :
   METHOD
     with type input = Ethereum_types.hash
-     and type output = Ethereum_types.transaction_receipt option
+     and type output = Transaction_receipt.t option
 
 module Get_transaction_by_hash :
   METHOD
@@ -255,9 +255,7 @@ module Web3_sha3 :
      and type output = Ethereum_types.hash
 
 module Get_logs :
-  METHOD
-    with type input = Ethereum_types.filter
-     and type output = Ethereum_types.filter_changes list
+  METHOD with type input = Filter.t and type output = Filter.changes list
 
 module Produce_block :
   METHOD
@@ -299,7 +297,7 @@ module Eth_fee_history :
   METHOD
     with type input =
       Ethereum_types.quantity * Ethereum_types.Block_parameter.t * Float.t list
-     and type output = Ethereum_types.fee_history
+     and type output = Fee_history.t
 
 module Coinbase :
   METHOD with type input = unit and type output = Ethereum_types.address
