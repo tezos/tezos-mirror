@@ -431,3 +431,15 @@ let init_sequencer_sandbox ?patch_config ?(kernel = Constant.WASM.evm_kernel)
       }
   in
   Evm_node.init ?patch_config ~mode:sequencer_mode Uri.(empty |> to_string)
+
+let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer :
+    'a Lwt.t =
+  let open Rpc.Syntax in
+  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+  (* Send the transaction but doesn't wait to be mined. *)
+  let transaction = transaction () in
+  let* _ = wait_for in
+  (* Once the transaction is in the transaction pool the next block will include it. *)
+  let*@ _ = produce_block sequencer in
+  (* Resolve the transaction send to make sure it was included. *)
+  transaction
