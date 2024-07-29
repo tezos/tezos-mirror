@@ -2036,7 +2036,7 @@ check_riscv_kernels:
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make -C src/riscv check
+  - make -C src/riscv CHECK_FEATURES= check
   after_script:
   - sccache --stop-server || true
   variables:

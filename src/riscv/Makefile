@@ -12,6 +12,9 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target="$(NATIVE_TARGET)"
 endif
 
+# We don't want to check all features in CI, so we provide this varible to configure it.
+CHECK_FEATURES ?= --all-features
+
 .PHONY: build
 build: riscv-dummy.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
@@ -66,8 +69,8 @@ check:
 	@exec ../../scripts/check-format-rust.sh
 
 	@cargo update --workspace --locked
-	@cargo check --workspace --all-targets
-	@cargo clippy --workspace --all-targets -- --deny warnings
+	@cargo check --workspace --all-targets $(CHECK_FEATURES)
+	@cargo clippy --workspace --all-targets $(CHECK_FEATURES) -- --deny warnings
 	@taplo format --check $(shell git ls-files '**/Cargo.toml')
 	@make -C dummy_kernel check
 	@make -C jstz check

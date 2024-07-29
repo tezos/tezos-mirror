@@ -180,7 +180,7 @@ pub fn octez_riscv_get_level(state: Pointer<State>) -> Option<u32> {
 
 fn verify_checksum(contents: &[u8], checksum: &str) -> bool {
     let mut hasher = Sha256::new();
-    hasher.update(&contents);
+    hasher.update(contents);
     let digest = format!("{:x}", hasher.finalize());
     digest == checksum
 }
@@ -210,25 +210,22 @@ pub fn octez_riscv_install_boot_sector(
     // "kernel:<path to kernel>:<kernel checksum>[:<path to loader>:<loader checksum>]"
     // Any string not matching this format will be treated as an actual kernel to be installed.
     let state = &state.as_ref().0;
-    match str::from_utf8(boot_sector) {
-        Ok(s) => {
-            let parts: Vec<&str> = s.split(':').collect();
-            match parts.as_slice() {
-                ["kernel", kernel_path, kernel_checksum] => {
-                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                    return State(state.install_boot_sector(&HERMIT_LOADER, &kernel)).into();
-                }
-                ["kernel", kernel_path, kernel_checksum, loader_path, loader_checksum] => {
-                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                    let loader = read_boot_sector_binary(loader_path, loader_checksum);
-                    return State(state.install_boot_sector(&loader, &kernel)).into();
-                }
-                _ => (),
+    if let Ok(s) = str::from_utf8(boot_sector) {
+        let parts: Vec<&str> = s.split(':').collect();
+        match parts.as_slice() {
+            ["kernel", kernel_path, kernel_checksum] => {
+                let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                return State(state.install_boot_sector(HERMIT_LOADER, &kernel)).into();
             }
+            ["kernel", kernel_path, kernel_checksum, loader_path, loader_checksum] => {
+                let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                let loader = read_boot_sector_binary(loader_path, loader_checksum);
+                return State(state.install_boot_sector(&loader, &kernel)).into();
+            }
+            _ => (),
         }
-        Err(_) => (),
     };
-    State(state.install_boot_sector(&HERMIT_LOADER, boot_sector)).into()
+    State(state.install_boot_sector(HERMIT_LOADER, boot_sector)).into()
 }
 
 #[ocaml::func]
