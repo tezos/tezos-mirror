@@ -4768,6 +4768,121 @@ let test_trace_transaction_call =
       check_trace true (Some value_in_storage) transaction_receipt trace
   | Error _ -> Test.fail "Trace transaction shouldn't have failed"
 
+let test_trace_transaction_call_trace =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"]
+    ~title:"Sequencer can run debug_traceTransaction with calltracer"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  (* Transfer funds to a random address. *)
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+
+  (* deploy contract *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:simple_storage_resolved.label
+      ~abi:simple_storage_resolved.abi
+      ()
+  in
+  let* contract_address, _tx_deployment =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:simple_storage_resolved.label
+          ~bin:simple_storage_resolved.bin)
+      sequencer
+  in
+  (* Block few levels to ensure we are replaying on an old block. *)
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+
+  (* We will first trace with every options enabled, and check that we have the
+     logs as complete as possible. We call the function `set` from the contract,
+     which isn't expected to fail and doesn't return any result. *)
+  let value_in_storage = 10 in
+  let* transaction_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:simple_storage_resolved.label
+         ~address:contract_address
+         ~method_call:(Format.sprintf "set(%d)" value_in_storage))
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  (* We will use the receipt to check that the results from the trace are
+     consistent with the result from the transaction once applied in the
+     block. *)
+  let*@ transaction_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:transaction_hash sequencer
+  in
+  let transaction_receipt = Option.get transaction_receipt in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash
+      ~tracer_config:
+        [("withLogs", `Bool true); ("onlyTopLevelCall", `Bool true)]
+      sequencer
+  in
+  let*@! {Transaction.input; gas; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash sequencer
+  in
+  Check.(
+    (JSON.(trace_result |-> "calls" |> as_list) = [])
+      (list json)
+      ~error_msg:"Wrong calls, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "type" |> as_string) = "CALL")
+      string
+      ~error_msg:"Wrong type, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "from" |> as_string) = transaction_receipt.from)
+      string
+      ~error_msg:"Wrong from, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "to" |> as_string)
+    = Option.get transaction_receipt.to_)
+      string
+      ~error_msg:"Wrong to, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "value" |> as_string) = "0x00")
+      string
+      ~error_msg:"Wrong value, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "gas_used" |> as_string)
+    = Format.sprintf "0x%02x" (Int64.to_int transaction_receipt.gasUsed))
+      string
+      ~error_msg:"Wrong gas_used, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "output" |> as_string) = "0x")
+      string
+      ~error_msg:"Wrong output, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "input" |> as_string)
+    = Option.value ~default:"" input)
+      string
+      ~error_msg:"Wrong input, expected %R but got %L") ;
+  Check.(
+    (JSON.(trace_result |-> "gas" |> as_string)
+    = Format.sprintf "0x%02x" @@ Int64.to_int gas)
+      string
+      ~error_msg:"Wrong gas, expected %R but got %L") ;
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -5344,4 +5459,6 @@ let () =
   test_finalized_block_param protocols ;
   test_regression_block_hash_gen protocols ;
   test_sequencer_sandbox () ;
-  test_rpc_mode_while_block_are_produced protocols
+  test_rpc_mode_while_block_are_produced protocols ;
+  test_trace_transaction_call_trace protocols ;
+  ()
