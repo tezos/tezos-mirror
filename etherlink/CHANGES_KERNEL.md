@@ -15,6 +15,7 @@
   import data from the DAL. (!13634)
 - Simulation now use timestamp provided by the node.
 - FA bridge enabled in Ghostnet. (!14342)
+- The kernel is able to trace calls for the `callTracer` configuration. (!14290)
 
 ## Bug fixes
 
