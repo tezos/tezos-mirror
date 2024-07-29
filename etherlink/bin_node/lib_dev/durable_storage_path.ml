@@ -150,4 +150,13 @@ module Trace = struct
 
   let opcode ~transaction_hash i =
     opcodes_root ~transaction_hash ^ "/" ^ string_of_int i
+
+  let call_trace_root ~transaction_hash =
+    root_indexed_by_hash ~transaction_hash ^ "/call_trace"
+
+  let call_trace_length ~transaction_hash =
+    call_trace_root ~transaction_hash ^ "/length"
+
+  let call_trace ~transaction_hash i =
+    call_trace_root ~transaction_hash ^ "/" ^ string_of_int i
 end

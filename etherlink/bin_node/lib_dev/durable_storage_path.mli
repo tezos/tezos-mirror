@@ -121,4 +121,10 @@ module Trace : sig
   val logs_length : transaction_hash:path option -> path
 
   val opcode : transaction_hash:path option -> int -> path
+
+  (** Path where is stored the number of call trace items *)
+  val call_trace_length : transaction_hash:path option -> path
+
+  (** Path where is stored the [i]eth trace *)
+  val call_trace : transaction_hash:path option -> int -> path
 end

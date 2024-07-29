@@ -201,9 +201,49 @@ module CallTracerRead = struct
     | [o] -> return o
     | _ -> tzfail (error_of_fmt "Multiple top call")
 
-  (* TODO: implement output reading *)
-  let read_output _state _hash =
-    Lwt_result_syntax.tzfail Tracer_types.Trace_not_found
+  let end_call_impl (node : Tracer_types.CallTracer.output) list =
+    let open Tracer_types.CallTracer in
+    {node with calls = list}
+
+  (** [read_node evm_state i hash] reads line `i` of the trace of tx `hash` *)
+  let read_node ~state i transaction_hash =
+    let open Lwt_result_syntax in
+    let* bytes =
+      read_value
+        state
+        (Durable_storage_path.Trace.call_trace ~transaction_hash i)
+    in
+    Lwt.return @@ Tracer_types.CallTracer.decode_call bytes
+
+  (** [call_trace_length evm_state hash] is used to findout how many lines 
+        there are, to be able to read them in reverse order. *)
+  let call_trace_length state transaction_hash =
+    let open Lwt_result_syntax in
+    let* value =
+      read_value
+        ~default:(Bytes.of_string "\000")
+        state
+        (Durable_storage_path.Trace.call_trace_length ~transaction_hash)
+    in
+    return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
+
+  (** [read_output state hash] reads and in the storage and interprets what 
+     the kernel stored. *)
+  let read_output state transaction_hash =
+    let open Lwt_result_syntax in
+    let* length = call_trace_length state transaction_hash in
+    (* there should at least be the top call *)
+    if length = 0 then tzfail Tracer_types.Trace_not_found
+    else
+      let get_next counter =
+        let index = length - 1 - counter in
+        if index < 0 then return None
+        else
+          let* node = read_node ~state index transaction_hash in
+          return (Some node)
+      in
+      let* call_trace = build_calltrace end_call_impl get_next in
+      return (Tracer_types.CallTracerOutput call_trace)
 end
 
 let read_output config state root_indexed_hash =
