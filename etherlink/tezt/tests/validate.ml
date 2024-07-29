@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Rpc.Syntax
+open Helpers
 
 let register f =
   Test.register
@@ -129,7 +130,65 @@ let test_validate_chain_id () =
 
   unit
 
+let test_validate_nonce () =
+  register ~title:"Validate nonce" ~tags:["nonce"] @@ fun sequencer ->
+  (* Send one transaction so the nonce is 1. *)
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:source.private_key
+         ~to_public_key:"0xE7f682c226d7269C7247b878B3F94c7a8d31FEf5"
+         ~value:Wei.zero
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
+  (* Nonce 10 is in the future, that's valid. *)
+  let* nonce_10 =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:10
+      ~gas_price:1_000_000_000
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@ _ok = Rpc.send_raw_transaction ~raw_tx:nonce_10 sequencer in
+  (* Nonce 1 is expected nonce, that's valid. *)
+  let* nonce_1 =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@ _ok = Rpc.send_raw_transaction ~raw_tx:nonce_1 sequencer in
+  (* Nonce 0 is refused. *)
+  let* nonce_0 =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:nonce_0 sequencer in
+  Check.((err.message = "Nonce too low") string)
+    ~error_msg:"the transaction has an invalid nonce, it should fail" ;
+
+  unit
+
 let () =
   test_validate_compressed_sig () ;
   test_validate_recover_caller () ;
-  test_validate_chain_id ()
+  test_validate_chain_id () ;
+  test_validate_nonce ()
