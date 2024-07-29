@@ -187,8 +187,47 @@ let test_validate_nonce () =
 
   unit
 
+let test_validate_max_fee_per_gas () =
+  register ~title:"Validate max fee per gas" ~tags:["max_fee_per_gas"]
+  @@ fun sequencer ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+
+  let* base_fee_per_gas = Rpc.get_gas_price sequencer in
+  let base_fee_per_gas = Int32.to_int base_fee_per_gas in
+
+  let* gas_price_below =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:(base_fee_per_gas - 1)
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:gas_price_below sequencer in
+  Check.((err.message = "Max gas fee too low") string)
+    ~error_msg:"the transaction has gas price too low, it should fail" ;
+
+  let* gas_price_enough =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:base_fee_per_gas
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@ _ok = Rpc.send_raw_transaction ~raw_tx:gas_price_enough sequencer in
+
+  unit
+
 let () =
   test_validate_compressed_sig () ;
   test_validate_recover_caller () ;
   test_validate_chain_id () ;
-  test_validate_nonce ()
+  test_validate_nonce () ;
+  test_validate_max_fee_per_gas ()

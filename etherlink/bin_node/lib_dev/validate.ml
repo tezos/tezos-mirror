@@ -37,10 +37,18 @@ let validate_nonce (module Backend_rpc : Services_backend_sig.S)
   if transaction.nonce >= nonce then return (Ok ())
   else return (Error "Nonce too low")
 
+let validate_max_fee_per_gas (module Backend_rpc : Services_backend_sig.S)
+    (transaction : Transaction.transaction) =
+  let open Lwt_result_syntax in
+  let* (Qty base_fee_per_gas) = Backend_rpc.base_fee_per_gas () in
+  if transaction.max_fee_per_gas >= base_fee_per_gas then return (Ok ())
+  else return (Error "Max gas fee too low")
+
 let validate backend_rpc transaction ~caller =
   let open Lwt_result_syntax in
   let** () = validate_chain_id backend_rpc transaction in
   let** () = validate_nonce backend_rpc transaction caller in
+  let** () = validate_max_fee_per_gas backend_rpc transaction in
   return (Ok ())
 
 let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
