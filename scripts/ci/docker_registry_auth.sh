@@ -16,7 +16,9 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 # GitLab constraints on images:
 # https://docs.gitlab.com/ee/user/packages/container_registry/#image-naming-convention
 
-# /!\ CI_REGISTRY is overriden to use AWS ECR in `nomadic-labs` and `tezos` GitLab namespaces
+# /!\ CI_REGISTRY is overriden to use GCP Artefact registry in `nomadic-labs` and `tezos` GitLab namespaces
+
+logged_in=false
 
 # Create directory for Docker JSON configuration (if does not exist)
 mkdir -pv ~/.docker
@@ -38,6 +40,7 @@ if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] 
   echo "### Logging into Docker Hub for pushing images"
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
+  logged_in=true
 fi
 
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
@@ -59,6 +62,11 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
     echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
   fi
   docker_image_name="${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
+  logged_in=true
+fi
+
+if [ "$logged_in" = false ]; then
+  echo "WARNING: No login to a docker registry was done during the call of this script."
 fi
 
 # shellcheck source=scripts/ci/docker_registry.inc.sh
