@@ -298,7 +298,7 @@ type setup_mode =
 let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(kernel = Kernel.Latest)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
-    ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
+    ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) ?chain_id
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -363,6 +363,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let output_config = Temp.file "config.yaml" in
     let*! () =
       Evm_node.make_kernel_installer_config
+        ?chain_id
         ~mainnet_compat:false
         ~remove_whitelist:Option.(is_some whitelist)
         ?kernel_root_hash
@@ -3101,10 +3102,11 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ~from ~to_ ?bootstrap_accounts
+let gen_kernel_migration_test ~from ~to_ ?bootstrap_accounts ?chain_id
     ?(admin = Constant.bootstrap5) ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
+      ?chain_id
       ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
@@ -3679,6 +3681,74 @@ let test_transaction_storage_before_and_after_migration =
     ~bootstrap_accounts:Eth_account.lots_of_address
     ~scenario_prior
     ~scenario_after
+    protocol
+
+(* TODO: remove me after Ghostnet upgrade *)
+let test_fa_bridge_flag_after_migration_v14 ~kernel_from ~chain_id ~chain_id_hex
+    ~flag_expected =
+  let chain_name, kernel_wasm_const =
+    match kernel_from with
+    | Kernel.Ghostnet -> ("ghostnet", Constant.WASM.ghostnet_evm_kernel)
+    | Kernel.Mainnet -> ("mainnet", Constant.WASM.mainnet_evm_kernel)
+    | _ -> failwith "Unsupported chain"
+  in
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "v14"; "fa_bridge"; "flag"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        kernel_wasm_const;
+      ])
+    ~title:
+      (sf
+         "FA bridge flag before and after migration v14 [%s -> latest]"
+         chain_name)
+  @@ fun protocol ->
+  let assert_chain_id ~sc_rollup_node ~expected =
+    let* chain_id =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/chain_id"
+           ()
+    in
+    assert (Option.get chain_id = expected) ;
+    unit
+  in
+  let assert_fa_bridge_flag ~sc_rollup_node ~expected =
+    let* flag =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/feature_flags/enable_fa_bridge"
+           ()
+    in
+    assert (Option.is_some flag = expected) ;
+    unit
+  in
+  let scenario_prior ~evm_setup:{sc_rollup_node; _} =
+    let* () = assert_chain_id ~sc_rollup_node ~expected:chain_id_hex in
+    let* () = assert_fa_bridge_flag ~sc_rollup_node ~expected:false in
+    unit
+  in
+  let scenario_after ~evm_setup:{sc_rollup_node; _} ~(sanity_check : unit) =
+    let () = sanity_check in
+    let* () = assert_chain_id ~sc_rollup_node ~expected:chain_id_hex in
+    let* () = assert_fa_bridge_flag ~sc_rollup_node ~expected:flag_expected in
+    unit
+  in
+  gen_kernel_migration_test
+    ~from:kernel_from
+    ~to_:Latest
+    ~scenario_prior
+    ~scenario_after
+    ~chain_id
     protocol
 
 let test_kernel_root_hash_originate_absent =
@@ -6523,7 +6593,23 @@ let register_evm_node ~protocols =
   test_rpc_feeHistory_long protocols ;
   test_rpcs_can_be_disabled protocols ;
   test_simulation_out_of_funds protocols ;
-  test_rpc_state_value_and_subkeys protocols
+  test_rpc_state_value_and_subkeys protocols ;
+  (* See etherlink/config/ghostnet.yaml for chain constants *)
+  test_fa_bridge_flag_after_migration_v14
+    ~kernel_from:Ghostnet
+    ~chain_id:128123
+    ~chain_id_hex:
+      "7bf4010000000000000000000000000000000000000000000000000000000000"
+    ~flag_expected:true
+    protocols ;
+  (* See https://docs.etherlink.com/get-started/network-information for chain constants *)
+  test_fa_bridge_flag_after_migration_v14
+    ~kernel_from:Mainnet
+    ~chain_id:42793
+    ~chain_id_hex:
+      "29a7000000000000000000000000000000000000000000000000000000000000"
+    ~flag_expected:false
+    protocols
 
 let protocols = Protocol.all
 
