@@ -23,6 +23,12 @@ type time_between_blocks =
           if there are no transactions to include, a block is produced after
            [time_between_blocks]. *)
 
+type kernel_execution_config = {
+  preimages : string;  (** Path to the preimages directory. *)
+  preimages_endpoint : Uri.t option;
+      (** Endpoint where pre-images can be fetched individually when missing. *)
+}
+
 type blueprints_publisher_config = {
   max_blueprints_lag : int;
       (** The maximum advance (in blueprints) the Sequencer accepts to
@@ -52,9 +58,6 @@ type experimental_features = {
 }
 
 type sequencer = {
-  preimages : string;  (** Path to the preimages directory. *)
-  preimages_endpoint : Uri.t option;
-      (** Endpoint where pre-images can be fetched individually when missing. *)
   time_between_blocks : time_between_blocks;
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
@@ -66,9 +69,6 @@ type sequencer = {
 
 type threshold_encryption_sequencer =
   | Threshold_encryption_sequencer of {
-      preimages : string;  (** Path to the preimages directory. *)
-      preimages_endpoint : Uri.t option;
-          (** Endpoint where pre-images can be fetched individually when missing. *)
       time_between_blocks : time_between_blocks;
           (** See {!type-time_between_blocks}. *)
       max_number_of_chunks : int;
@@ -84,8 +84,6 @@ type threshold_encryption_sequencer =
 type observer = {
   evm_node_endpoint : Uri.t;
   threshold_encryption_bundler_endpoint : Uri.t option;
-  preimages : string;
-  preimages_endpoint : Uri.t option;
 }
 
 type proxy = {
@@ -104,6 +102,7 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
+  kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
   threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
@@ -152,9 +151,6 @@ val observer_config_exn : t -> observer tzresult
 (** [sequencer_config_dft ()] returns the default sequencer config
     populated with given value. *)
 val sequencer_config_dft :
-  data_dir:string ->
-  ?preimages:string ->
-  ?preimages_endpoint:Uri.t ->
   ?time_between_blocks:time_between_blocks ->
   ?max_number_of_chunks:int ->
   ?private_rpc_port:int ->
@@ -170,9 +166,6 @@ val sequencer_config_dft :
 (** [threshold_encryption_sequencer_config_dft ()] returns the default
     threshold encryption sequencer config populated with given value. *)
 val threshold_encryption_sequencer_config_dft :
-  data_dir:string ->
-  ?preimages:string ->
-  ?preimages_endpoint:Uri.t ->
   ?time_between_blocks:time_between_blocks ->
   ?max_number_of_chunks:int ->
   ?private_rpc_port:int ->
@@ -189,9 +182,6 @@ val threshold_encryption_sequencer_config_dft :
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
 val observer_config_dft :
-  data_dir:string ->
-  ?preimages:string ->
-  ?preimages_endpoint:Uri.t ->
   evm_node_endpoint:Uri.t ->
   ?threshold_encryption_bundler_endpoint:Uri.t ->
   unit ->

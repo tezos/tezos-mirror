@@ -188,9 +188,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Evm_context.start
       ?kernel_path:kernel
       ~data_dir
-      ~preimages:threshold_encryption_sequencer_config.preimages
-      ~preimages_endpoint:
-        threshold_encryption_sequencer_config.preimages_endpoint
+      ~preimages:configuration.kernel_execution.preimages
+      ~preimages_endpoint:configuration.kernel_execution.preimages_endpoint
       ~smart_rollup_address
       ~fail_on_missing_blueprint:true
       ~store_perm:`Read_write

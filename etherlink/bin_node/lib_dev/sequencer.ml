@@ -231,8 +231,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Evm_context.start
       ?kernel_path:kernel
       ~data_dir
-      ~preimages:sequencer_config.preimages
-      ~preimages_endpoint:sequencer_config.preimages_endpoint
+      ~preimages:configuration.kernel_execution.preimages
+      ~preimages_endpoint:configuration.kernel_execution.preimages_endpoint
       ~fail_on_missing_blueprint:true
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write
