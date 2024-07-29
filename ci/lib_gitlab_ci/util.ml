@@ -23,9 +23,9 @@ let job_rule ?changes ?if_ ?variables ?(when_ : when_ = On_success)
   in
   {changes; if_; variables; when_; allow_failure}
 
-let workflow_rule ?changes ?if_ ?variables ?(when_ : when_workflow = Always) ()
-    : workflow_rule =
-  {changes; if_; variables; when_}
+let workflow_rule ?changes ?if_ ?variables ?(when_ : when_workflow = Always)
+    ?auto_cancel () : workflow_rule =
+  {changes; if_; variables; when_; auto_cancel}
 
 let include_rule ?changes ?if_ ?(when_ : when_workflow = Always) () :
     include_rule =

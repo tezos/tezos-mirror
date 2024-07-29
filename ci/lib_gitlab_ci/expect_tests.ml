@@ -24,6 +24,7 @@ let%expect_test _ =
         {
           rules = [Util.workflow_rule ~if_:If.(var "CI_SETTING" == null) ()];
           name = Some "setting_not_set";
+          auto_cancel = None;
         };
     ] ;
   [%expect
@@ -33,6 +34,22 @@ let%expect_test _ =
       rules:
       - if: $CI_SETTING == null
         when: always |}] ;
+  p
+    [
+      Workflow
+        {
+          rules = [];
+          name = Some "Woops";
+          auto_cancel = Some {on_job_failure = true; on_new_commit = false};
+        };
+    ] ;
+  [%expect
+    {|
+    workflow:
+      name: Woops
+      rules: []
+      auto_cancel:
+        on_job_failure: all |}] ;
   p
     [
       Types.Default

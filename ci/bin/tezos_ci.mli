@@ -79,11 +79,13 @@ module Pipeline : sig
 
       If [variables] is set, then these variables will be added to the
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
+      Similarly, an [auto_cancel] clause can be specified.
 
       The [jobs] of the pipeline are generated to the file
       [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
+    ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
     jobs:tezos_job list ->
     string ->
     Gitlab_ci.If.t ->
@@ -99,11 +101,16 @@ module Pipeline : sig
       [register_child name] will register a child pipeline called [name].
 
       The [jobs] of the pipeline are generated to the file
-      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called.
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. See
+      {!register} for info on [auto_cancel].
 
       Child pipelines cannot be launched without a trigger job that is
       included in a regular pipeline (see {!trigger_job}). *)
-  val register_child : jobs:tezos_job list -> string -> child_pipeline
+  val register_child :
+    ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    jobs:tezos_job list ->
+    string ->
+    child_pipeline
 
   (** Writes the set of registered pipelines.
 

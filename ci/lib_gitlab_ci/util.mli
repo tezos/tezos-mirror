@@ -39,6 +39,7 @@ val workflow_rule :
   ?if_:If.t ->
   ?variables:variables ->
   ?when_:when_workflow ->
+  ?auto_cancel:auto_cancel ->
   unit ->
   workflow_rule
 

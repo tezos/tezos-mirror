@@ -5,9 +5,17 @@ workflow:
   name: '[$PIPELINE_TYPE] $CI_COMMIT_TITLE'
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
+      && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     variables:
       PIPELINE_TYPE: before_merging
     when: always
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
+      && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+    variables:
+      PIPELINE_TYPE: merge_train
+    when: always
+    auto_cancel:
+      on_job_failure: all
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release"
     variables:
@@ -92,6 +100,12 @@ include:
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
+      && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
+    when: always
+- local: .gitlab/ci/pipelines/merge_train.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
+      && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: always
 - local: .gitlab/ci/pipelines/octez_latest_release.yml
   rules:

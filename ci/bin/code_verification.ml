@@ -1626,18 +1626,14 @@ let jobs pipeline_type =
        On [Before_merging] pipelines only a subset of the packages are built
        and tested *)
     let job_debian_repository_trigger : tezos_job =
-      let debian_pipeline_type =
-        match pipeline_type with
-        | Before_merging -> Partial
-        | Schedule_extended_test -> Full
-      in
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
-        (Debian_repository.debian_repository_child_pipeline
-           debian_pipeline_type)
+        (match pipeline_type with
+        | Before_merging -> Debian_repository.child_pipeline_partial
+        | Schedule_extended_test -> Debian_repository.child_pipeline_full)
     in
     match pipeline_type with
     | Before_merging ->

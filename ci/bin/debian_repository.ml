@@ -352,7 +352,7 @@ let jobs pipeline_type =
         job_build_ubuntu_package_current_b,
         job_build_debian_package_current_b )
 
-let debian_repository_child_pipeline pipeline_type =
+let register pipeline_type =
   let pipeline_name =
     match pipeline_type with
     | Partial -> "debian_repository_partial"
@@ -361,3 +361,7 @@ let debian_repository_child_pipeline pipeline_type =
   in
   let jobs, _, _, _, _ = jobs pipeline_type in
   Pipeline.register_child pipeline_name ~jobs
+
+let child_pipeline_partial = register Partial
+
+let child_pipeline_full = register Full
