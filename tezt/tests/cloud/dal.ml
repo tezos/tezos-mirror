@@ -1238,13 +1238,11 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
       operator.sc_rollup_address
       [Log_kernel_debug]
   in
-  let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
   let mode =
     Evm_node.Observer
       {
         initial_kernel = output;
         preimages_dir;
-        time_between_blocks;
         rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
       }
   in

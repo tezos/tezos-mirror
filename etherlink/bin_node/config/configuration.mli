@@ -86,8 +86,6 @@ type observer = {
   threshold_encryption_bundler_endpoint : Uri.t option;
   preimages : string;
   preimages_endpoint : Uri.t option;
-  time_between_blocks : time_between_blocks option;
-      (** See {!type-time_between_blocks}. *)
 }
 
 type proxy = {
@@ -196,7 +194,6 @@ val observer_config_dft :
   ?preimages_endpoint:Uri.t ->
   evm_node_endpoint:Uri.t ->
   ?threshold_encryption_bundler_endpoint:Uri.t ->
-  ?time_between_blocks:time_between_blocks ->
   unit ->
   observer
 
@@ -269,3 +266,5 @@ module Cli : sig
     unit ->
     t tzresult Lwt.t
 end
+
+val time_between_blocks_encoding : time_between_blocks Data_encoding.t

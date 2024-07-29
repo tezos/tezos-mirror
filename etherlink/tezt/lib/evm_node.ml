@@ -33,14 +33,12 @@ type mode =
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
-      time_between_blocks : time_between_blocks option;
     }
   | Threshold_encryption_observer of {
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
       bundler_node_endpoint : string;
-      time_between_blocks : time_between_blocks option;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -848,13 +846,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
-    | Observer
-        {
-          preimages_dir;
-          initial_kernel = _;
-          rollup_node_endpoint;
-          time_between_blocks;
-        } ->
+    | Observer {preimages_dir; initial_kernel = _; rollup_node_endpoint} ->
         [
           "--evm-node-endpoint";
           evm_node.persistent_state.endpoint;
@@ -863,17 +855,12 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
     | Threshold_encryption_observer
         {
           preimages_dir;
           initial_kernel = _;
           rollup_node_endpoint;
           bundler_node_endpoint;
-          time_between_blocks;
         } ->
         [
           "--evm-node-endpoint";
@@ -885,10 +872,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments

@@ -16,6 +16,13 @@ let get_smart_rollup_address_service =
     ~output:Tezos_crypto.Hashed.Smart_rollup_address.encoding
     Path.(evm_services_root / "smart_rollup_address")
 
+let get_time_between_blocks =
+  Service.get_service
+    ~description:"Get the maximum time between two blocks"
+    ~query:Query.empty
+    ~output:Configuration.time_between_blocks_encoding
+    Path.(evm_services_root / "time_between_blocks")
+
 let get_blueprint_service =
   Service.get_service
     ~description:"Fetch the contents of a blueprint"
@@ -70,6 +77,11 @@ let register_get_smart_rollup_address_service smart_rollup_address dir =
       let open Lwt_syntax in
       return_ok smart_rollup_address)
 
+let register_get_time_between_block_service time_between_block dir =
+  Directory.register0 dir get_time_between_blocks (fun () () ->
+      let open Lwt_result_syntax in
+      return time_between_block)
+
 let register_get_blueprint_service dir =
   Directory.opt_register1 dir get_blueprint_service (fun level () () ->
       let open Lwt_result_syntax in
@@ -81,15 +93,25 @@ let register_blueprint_watcher_service dir =
   Directory.gen_register0 dir blueprint_watcher_service (fun level () ->
       create_blueprint_watcher_service level)
 
-let register smart_rollup_address dir =
+let register smart_rollup_address time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
   |> register_get_blueprint_service |> register_blueprint_watcher_service
+  |> register_get_time_between_block_service time_between_blocks
 
 let get_smart_rollup_address ~evm_node_endpoint =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service
     [Media_type.json]
     ~base:evm_node_endpoint
     get_smart_rollup_address_service
+    ()
+    ()
+    ()
+
+let get_time_between_blocks ~evm_node_endpoint =
+  Tezos_rpc_http_client_unix.RPC_client_unix.call_service
+    [Media_type.json]
+    ~base:evm_node_endpoint
+    get_time_between_blocks
     ()
     ()
     ()

@@ -226,10 +226,10 @@ let install_finalizer_observer server =
 type error += Timeout
 
 let timeout_from_tbb = function
-  | Some Configuration.Nothing | None ->
+  | Configuration.Nothing ->
       let p, _ = Lwt.task () in
       p
-  | Some (Time_between_blocks tbb) ->
+  | Time_between_blocks tbb ->
       let open Lwt_result_syntax in
       let*! _ = Lwt_unix.sleep (tbb +. 1.) in
       tzfail Timeout
@@ -255,7 +255,7 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
     ( Z.Compare.(next_blueprint_number <= remote_head_number),
       Qty remote_head_number )
 
-let[@tailrec] rec main_loop ?remote_head ?time_between_blocks ~first_connection
+let[@tailrec] rec main_loop ?remote_head ~time_between_blocks ~first_connection
     ~evm_node_endpoint () =
   let open Lwt_result_syntax in
   let*! head = Evm_context.head_info () in
@@ -274,7 +274,7 @@ let[@tailrec] rec main_loop ?remote_head ?time_between_blocks ~first_connection
     let* () = on_new_blueprint head.next_blueprint_number blueprint in
     (main_loop [@tailcall])
       ~remote_head
-      ?time_between_blocks
+      ~time_between_blocks
       ~first_connection
       ~evm_node_endpoint
       ()
@@ -302,7 +302,7 @@ let[@tailrec] rec main_loop ?remote_head ?time_between_blocks ~first_connection
           ~time_between_blocks
     | Error _ ->
         (main_loop [@tailcall])
-          ?time_between_blocks
+          ~time_between_blocks
           ~first_connection:false
           ~evm_node_endpoint
           ()
@@ -331,7 +331,7 @@ and[@tailrec] stream_loop ~time_between_blocks ~evm_node_endpoint
       (main_loop [@tailcall])
         ~first_connection:false
         ~evm_node_endpoint
-        ?time_between_blocks
+        ~time_between_blocks
         ()
   | Error err -> fail err
 
@@ -344,12 +344,14 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
           threshold_encryption_bundler_endpoint;
           preimages;
           preimages_endpoint;
-          time_between_blocks;
         } =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
+  in
+  let* time_between_blocks =
+    Evm_services.get_time_between_blocks ~evm_node_endpoint
   in
   let* _loaded =
     Evm_context.start
@@ -397,7 +399,9 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let directory =
     Services.directory config (observer_backend, smart_rollup_address)
   in
-  let directory = directory |> Evm_services.register smart_rollup_address in
+  let directory =
+    directory |> Evm_services.register smart_rollup_address time_between_blocks
+  in
 
   let* server = observer_start config ~directory in
 
@@ -420,4 +424,4 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
       ()
   in
 
-  main_loop ~first_connection:true ~evm_node_endpoint ?time_between_blocks ()
+  main_loop ~first_connection:true ~evm_node_endpoint ~time_between_blocks ()
