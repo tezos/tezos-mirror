@@ -59,6 +59,7 @@ let register_protocol_independent_tests () =
   P2p.register_protocol_independent () ;
   Proxy.register_protocol_independent () ;
   Rpc_tls.register_protocol_independent () ;
+  Scheduled_pipeline_check.register_protocol_independent () ;
   Snoop_codegen.register_protocol_independent () ;
   Snoop_protocol_codegen.register_protocol_independent () ;
   Sc_rollup.register_protocol_independent () ;
