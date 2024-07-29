@@ -1,4 +1,4 @@
-use crate::{Context, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed, Transfer};
+use crate::{CallScheme, Context, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use alloc::{collections::BTreeMap, vec::Vec};
 use primitive_types::{H160, H256};
 
@@ -43,7 +43,7 @@ pub trait PrecompileHandle {
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
 		gas_limit: Option<u64>,
-		is_static: bool,
+		call_scheme: CallScheme,
 		context: &Context,
 	) -> (ExitReason, Vec<u8>);
 

@@ -392,7 +392,7 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 		transfer,
 		input,
 		gas,
-		scheme == CallScheme::StaticCall,
+		scheme,
 		context,
 	) {
 		Capture::Exit((reason, return_data)) => {
