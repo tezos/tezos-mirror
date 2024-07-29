@@ -33,16 +33,7 @@ RollupMetadata {
 Internal(
     StartOfLevel,
 )
-Internal(
-    InfoPerLevel(
-        InfoPerLevel {
-            predecessor_timestamp: [TIMESTAMP],
-            predecessor: BlockHash(
-                "[BLOCK_HASH]",
-            ),
-        },
-    ),
-)
+Internal(InforPerLevel)
 External(
     [
         1,
@@ -65,16 +56,7 @@ Internal(
 Internal(
     StartOfLevel,
 )
-Internal(
-    InfoPerLevel(
-        InfoPerLevel {
-            predecessor_timestamp: [TIMESTAMP],
-            predecessor: BlockHash(
-                "[BLOCK_HASH]",
-            ),
-        },
-    ),
-)
+Internal(InforPerLevel)
 External(
     [
         1,
@@ -87,16 +69,7 @@ Internal(
 Internal(
     StartOfLevel,
 )
-Internal(
-    InfoPerLevel(
-        InfoPerLevel {
-            predecessor_timestamp: [TIMESTAMP],
-            predecessor: BlockHash(
-                "[BLOCK_HASH]",
-            ),
-        },
-    ),
-)
+Internal(InforPerLevel)
 External(
     [
         1,
@@ -109,16 +82,7 @@ Internal(
 Internal(
     StartOfLevel,
 )
-Internal(
-    InfoPerLevel(
-        InfoPerLevel {
-            predecessor_timestamp: [TIMESTAMP],
-            predecessor: BlockHash(
-                "[BLOCK_HASH]",
-            ),
-        },
-    ),
-)
+Internal(InforPerLevel)
 Internal(
     Transfer(
         Transfer {

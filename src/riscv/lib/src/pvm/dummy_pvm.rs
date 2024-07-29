@@ -148,8 +148,7 @@ impl DummyPvm {
         let steps = state
             .pvm
             .eval_range_while(pvm_hooks, &(..=max_steps), |_| true);
-        // TODO: RV-78 update tick counter with number of steps
-        state.tick.write(state.tick.read() + 1);
+        state.tick.write(state.tick.read() + steps as u64);
         (Self { backend }, steps as i64)
     }
 
