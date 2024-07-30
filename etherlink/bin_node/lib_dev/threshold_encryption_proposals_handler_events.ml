@@ -25,6 +25,14 @@ let shutdown =
     ~level:Notice
     ()
 
+let proposal_is_locked =
+  declare_0
+    ~section
+    ~name:"proposal_is_locked"
+    ~msg:"Last proposal did not produce a preblock yet. Proposal is locked."
+    ~level:Debug
+    ()
+
 let proposal_processed =
   declare_0
     ~section
@@ -44,6 +52,8 @@ let received_proposal_submission_request =
 let started = emit started
 
 let shutdown = emit shutdown
+
+let proposal_is_locked = emit proposal_is_locked
 
 let proposal_processed = emit proposal_processed
 
