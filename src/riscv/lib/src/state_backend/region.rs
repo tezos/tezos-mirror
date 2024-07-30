@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{AllocatedOf, Atom, Elem, Manager};
+use super::{Elem, Manager};
 use std::mem;
 
 macro_rules! read_only_write {
@@ -201,17 +201,16 @@ impl<E: Elem, T: Region<Elem = E>> Region for &T {
     }
 }
 
-/// Convenience wrapper for [`Manager::Region<E, 1>`]
+/// Single element of type `E`
 #[repr(transparent)]
 pub struct Cell<E: Elem, M: Manager + ?Sized> {
-    pub region: M::Region<E, 1>,
+    region: M::Region<E, 1>,
 }
 
 impl<E: Elem, M: Manager> Cell<E, M> {
-    pub fn bind(space: AllocatedOf<Atom<E>, M>) -> Self {
-        Self {
-            region: space.region,
-        }
+    /// Bind this state to the single element region.
+    pub fn bind(region: M::Region<E, 1>) -> Self {
+        Self { region }
     }
 }
 

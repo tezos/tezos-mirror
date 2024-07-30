@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::alloc::{Choreographer, Location, Placed};
+use super::{
+    alloc::{Choreographer, Location, Placed},
+    Cell,
+};
 use std::{array, marker::PhantomData};
 
 /// Structural description of a state type
@@ -47,7 +50,9 @@ impl<T: super::Elem> Layout for Atom<T> {
     type Allocated<B: super::Manager> = super::Cell<T, B>;
 
     fn allocate<B: super::Manager>(backend: &mut B, placed: Self::Placed) -> Self::Allocated<B> {
-        backend.allocate_cell(placed)
+        let loc = placed.as_array();
+        let region = backend.allocate_region(loc);
+        Cell::bind(region)
     }
 }
 

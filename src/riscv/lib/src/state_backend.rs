@@ -94,14 +94,6 @@ pub trait Manager {
         &mut self,
         loc: Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN>;
-
-    /// Allocate a cell in the state storage.
-    #[inline]
-    fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {
-        Cell {
-            region: self.allocate_region(loc.as_array()),
-        }
-    }
 }
 
 /// State backend with manager
@@ -292,13 +284,6 @@ pub mod tests {
             loc: Location<[u8; LEN]>,
         ) -> Self::DynRegion<LEN> {
             self.allocate_region::<u8, LEN>(loc)
-        }
-
-        fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {
-            self.regions.push_back((loc.offset(), loc.size()));
-            Cell {
-                region: DummyRegion(PhantomData),
-            }
         }
     }
 
