@@ -333,8 +333,6 @@ module State = struct
     Evm_store.use ctxt.store @@ fun conn ->
     Evm_store.with_transaction conn @@ fun conn -> k conn
 
-  let store_path ~data_dir = Filename.Infix.(data_dir // "store")
-
   let lockfile_path ~store_path = Filename.Infix.(store_path // "evm_lock")
 
   let load ~data_dir ~store_perm:perm index =
@@ -766,7 +764,10 @@ module State = struct
     in
     let*! () = Lwt_utils_unix.create_dir preimages in
     let* index =
-      Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
+      Irmin_context.load
+        ~cache_size:100_000
+        Read_write
+        (Evm_state.irmin_store_path ~data_dir)
     in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
@@ -1416,7 +1417,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
   in
-  let evm_context_dir = State.store_path ~data_dir in
+  let evm_context_dir = Evm_state.irmin_store_path ~data_dir in
   let* () =
     Format.eprintf "Acquiring rollup node locks@." ;
     Lwt_lock_file.with_lock

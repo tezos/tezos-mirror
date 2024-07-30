@@ -73,6 +73,9 @@ module Context_hashes : sig
   val find_earliest :
     conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
 
+  val find_finalized :
+    conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
+
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 

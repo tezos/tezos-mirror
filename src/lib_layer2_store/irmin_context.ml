@@ -309,6 +309,8 @@ let load ~cache_size mode path =
   let*! index = load ~cache_size mode path in
   return index
 
+let reload (index : ro_index) = IStore.reload index.repo
+
 module Internal_for_tests = struct
   let get_a_tree key =
     let tree = IStore.Tree.empty () in

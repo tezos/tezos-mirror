@@ -281,6 +281,15 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
+
+    let get_finalized =
+      (unit ->? t2 level context_hash)
+      @@ {|SELECT id, context_hash FROM context_hashes
+           WHERE id = (
+             SELECT finalized_l2_level FROM l1_l2_levels_relationships
+             ORDER BY latest_l2_level DESC LIMIT 1
+           )|}
+    (* Using [latest_l2_level] because it is an index *)
   end
 
   module Kernel_upgrades = struct
@@ -524,6 +533,10 @@ module Context_hashes = struct
   let find_earliest store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Context_hashes.get_earliest ()
+
+  let find_finalized store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Context_hashes.get_finalized ()
 
   let clear_after store l2_level =
     with_connection store @@ fun conn ->

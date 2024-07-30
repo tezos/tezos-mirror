@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Proxy | Sequencer | Observer
+type mode = Proxy | Sequencer | Relay
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)

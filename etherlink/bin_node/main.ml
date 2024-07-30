@@ -920,6 +920,89 @@ let sequencer_command =
         ?dal_slots
         ())
 
+let rpc_run_args =
+  Tezos_clic.args3 evm_node_endpoint_arg preimages_arg preimages_endpoint_arg
+
+let rpc_command =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  command
+    ~desc:"Start the EVM node in sequencer mode"
+    (merge_options common_config_args rpc_run_args)
+    (prefixes ["experimental"; "run"; "rpc"] stop)
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             _devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose,
+             restricted_rpcs ),
+           (evm_node_endpoint, preimages, preimages_endpoint) )
+         () ->
+      let* rpc_port =
+        match rpc_port with
+        | Some rpc_port -> return rpc_port
+        | None -> failwith "--rpc-port argument required"
+      in
+      let* () =
+        when_ Option.(is_some rollup_node_endpoint) @@ fun () ->
+        failwith "unexpected --rollup-node-endpoint argument"
+      in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          ~keep_alive
+          ?cors_origins
+          ?cors_headers
+          ~verbose
+          ?preimages
+          ?preimages_endpoint
+          ?evm_node_endpoint
+          ?tx_pool_timeout_limit
+          ?tx_pool_addr_limit
+          ?tx_pool_tx_per_addr_limit
+          ?log_filter_chunk_size
+          ?log_filter_max_nb_logs
+          ?log_filter_max_nb_blocks
+          ?restricted_rpcs
+          ~rpc_port
+          ?rpc_addr
+          ()
+      in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config =
+          make_with_defaults
+            ~verbosity:config.verbose
+            ~enable_default_daily_logs_at:
+              Filename.Infix.(data_dir // "daily_logs")
+              (* Show only above Info rpc_server events, they are not
+                 relevant as we do not have a REST-API server. If not
+                 set, the daily logs are polluted with these
+                 uninformative logs. *)
+            ~daily_logs_section_prefixes:
+              [
+                ("rpc_server", Some Notice);
+                ("rpc_server", Some Warning);
+                ("rpc_server", Some Error);
+                ("rpc_server", Some Fatal);
+              ]
+            ()
+        in
+        init ~config ()
+      in
+      let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
+      Evm_node_lib_dev.Rpc.main ~data_dir ~config)
+
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ~verbose ?preimages ?rollup_node_endpoint ?preimages_endpoint
     ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
@@ -2037,6 +2120,7 @@ let commands =
     threshold_encryption_sequencer_command;
     observer_command;
     observer_simple_command;
+    rpc_command;
     chunker_command;
     make_upgrade_command;
     make_sequencer_upgrade_command;

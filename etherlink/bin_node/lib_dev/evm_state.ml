@@ -301,3 +301,5 @@ let clear_delayed_inbox evm_state =
     evm_state
 
 let wasm_pvm_version state = Wasm_utils.Wasm.get_wasm_version state
+
+let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")

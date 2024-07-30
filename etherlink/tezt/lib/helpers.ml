@@ -89,6 +89,7 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
       let*@ _l2_level = produce_block evm_node in
       unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
+  | Rpc -> Test.fail "Cannot create a new level with a Rpc node"
   | Threshold_encryption_observer _ ->
       Test.fail
         "Cannot create a new level with a Threshold encryption observer node"
