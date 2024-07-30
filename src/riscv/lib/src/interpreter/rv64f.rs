@@ -569,6 +569,7 @@ mod tests {
         traps::Exception,
     };
 
+    use arbitrary_int::u5;
     use proptest::prelude::*;
 
     use rustc_apfloat::{ieee::Double, ieee::Single, Float};
@@ -576,9 +577,9 @@ mod tests {
     backend_test!(test_fmv_f, F, {
         proptest!(|(
             f in any::<f32>().prop_map(f32::to_bits),
-            rs1 in (1_u32..31).prop_map(parse_xregister),
-            rs1_f in (1_u32..31).prop_map(parse_fregister),
-            rs2 in (1_u32..31).prop_map(parse_xregister),
+            rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
+            rs1_f in (1_u8..31).prop_map(u5::new).prop_map(parse_fregister),
+            rs2 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
         )| {
             let mut backend = create_backend!(HartStateLayout, F);
             let mut state = create_state!(HartState, HartStateLayout, F, backend);

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -87,6 +88,7 @@ mod test {
         },
         traps::Exception,
     };
+    use arbitrary_int::u5;
     use proptest::prelude::*;
 
     const ZERO_OFFSET: i64 = 0;
@@ -97,7 +99,7 @@ mod test {
             base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
-            rs1 in (1_u32..31).prop_map(parse_xregister),
+            rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
         )|
         {
             let mut backend = create_backend!(MachineStateLayout<T1K>, F);

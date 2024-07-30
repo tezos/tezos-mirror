@@ -12,6 +12,7 @@ use crate::machine_state::{
     csregisters::{try_parse_csregister, CSRegister},
     registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
 };
+use arbitrary_int::{u3, u5};
 use core::ops::Range;
 use instruction::*;
 
@@ -49,12 +50,12 @@ fn funct7(instr: u32) -> u32 {
 
 #[inline(always)]
 fn rd(instr: u32) -> XRegister {
-    parse_xregister(bits(instr, 7, 5))
+    parse_xregister(u5::extract_u32(instr, 7))
 }
 
 #[inline(always)]
 fn rd_f(instr: u32) -> FRegister {
-    parse_fregister(bits(instr, 7, 5))
+    parse_fregister(u5::extract_u32(instr, 7))
 }
 
 #[inline(always)]
@@ -63,13 +64,18 @@ fn rs1_bits(instr: u32) -> u32 {
 }
 
 #[inline(always)]
+const fn rs1_bits_u5(instr: u32) -> u5 {
+    u5::extract_u32(instr, 15)
+}
+
+#[inline(always)]
 fn rs1(instr: u32) -> XRegister {
-    parse_xregister(rs1_bits(instr))
+    parse_xregister(rs1_bits_u5(instr))
 }
 
 #[inline(always)]
 fn rs1_f(instr: u32) -> FRegister {
-    parse_fregister(rs1_bits(instr))
+    parse_fregister(rs1_bits_u5(instr))
 }
 
 #[inline(always)]
@@ -78,22 +84,23 @@ fn rs2_bits(instr: u32) -> u32 {
 }
 
 #[inline(always)]
+fn rs2_bits_u5(instr: u32) -> u5 {
+    u5::extract_u32(instr, 20)
+}
+
+#[inline(always)]
 fn rs2(instr: u32) -> XRegister {
-    parse_xregister(rs2_bits(instr))
+    parse_xregister(rs2_bits_u5(instr))
 }
 
 #[inline(always)]
 fn rs2_f(instr: u32) -> FRegister {
-    parse_fregister(rs2_bits(instr))
+    parse_fregister(rs2_bits_u5(instr))
 }
-
-/// rs3 register
-#[allow(non_upper_case_globals)]
-const rs3_bits: fn(u32) -> u32 = funct5;
 
 #[inline(always)]
 fn rs3_f(instr: u32) -> FRegister {
-    parse_fregister(rs3_bits(instr))
+    parse_fregister(u5::extract_u32(instr, 27))
 }
 
 #[inline(always)]
@@ -474,8 +481,12 @@ const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
 const RS2_1: u32 = 0b1;
 const RS2_2: u32 = 0b10;
-const RS2_3: u32 = 0b11;
 const RS2_5: u32 = 0b101;
+
+const RS2_0_U5: u5 = u5::new(0b0);
+const RS2_1_U5: u5 = u5::new(0b1);
+const RS2_2_U5: u5 = u5::new(0b10);
+const RS2_3_U5: u5 = u5::new(0b11);
 
 const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
@@ -717,7 +728,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
 
         // F/D-type instructions
         OP_FP => match fmt(instr) {
-            FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+            FMT_S => match (funct5(instr), rm(instr), rs2_bits_u5(instr)) {
                 (F5_0, rounding, rs2_bits) => {
                     f_r_rm_2_instr!(Fadds, instr, rs2_bits, rounding)
                 }
@@ -735,34 +746,34 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxs, instr, rs2_bits),
                 (F5_5, RM_MIN, rs2_bits) => f_r_instr!(Fmins, instr, rs2_bits),
                 (F5_5, RM_MAX, rs2_bits) => f_r_instr!(Fmaxs, instr, rs2_bits),
-                (F5_8, rounding, RS2_1) => f_r_rm_1_instr!(Fcvtsd, instr, rounding),
-                (F5_11, rounding, RS2_0) => f_r_rm_1_instr!(Fsqrts, instr, rounding),
+                (F5_8, rounding, RS2_1_U5) => f_r_rm_1_instr!(Fcvtsd, instr, rounding),
+                (F5_11, rounding, RS2_0_U5) => f_r_rm_1_instr!(Fsqrts, instr, rounding),
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
                 (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fles, instr, rs2_bits),
                 (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Flts, instr, rs2_bits),
-                (F5_24, rounding, RS2_0) => f_r_int_fmt_instr!(Fcvtws, instr, rounding),
-                (F5_24, rounding, RS2_1) => f_r_int_fmt_instr!(Fcvtwus, instr, rounding),
-                (F5_24, rounding, RS2_2) => f_r_int_fmt_instr!(Fcvtls, instr, rounding),
-                (F5_24, rounding, RS2_3) => f_r_int_fmt_instr!(Fcvtlus, instr, rounding),
-                (F5_26, rounding, RS2_0) => f_r_fmt_int_instr!(Fcvtsw, instr, rounding),
-                (F5_26, rounding, RS2_1) => f_r_fmt_int_instr!(Fcvtswu, instr, rounding),
-                (F5_26, rounding, RS2_2) => f_r_fmt_int_instr!(Fcvtsl, instr, rounding),
-                (F5_26, rounding, RS2_3) => f_r_fmt_int_instr!(Fcvtslu, instr, rounding),
-                (F5_28, RM_0, RS2_0) => FmvXW(FRegToXRegArgs {
+                (F5_24, rounding, RS2_0_U5) => f_r_int_fmt_instr!(Fcvtws, instr, rounding),
+                (F5_24, rounding, RS2_1_U5) => f_r_int_fmt_instr!(Fcvtwus, instr, rounding),
+                (F5_24, rounding, RS2_2_U5) => f_r_int_fmt_instr!(Fcvtls, instr, rounding),
+                (F5_24, rounding, RS2_3_U5) => f_r_int_fmt_instr!(Fcvtlus, instr, rounding),
+                (F5_26, rounding, RS2_0_U5) => f_r_fmt_int_instr!(Fcvtsw, instr, rounding),
+                (F5_26, rounding, RS2_1_U5) => f_r_fmt_int_instr!(Fcvtswu, instr, rounding),
+                (F5_26, rounding, RS2_2_U5) => f_r_fmt_int_instr!(Fcvtsl, instr, rounding),
+                (F5_26, rounding, RS2_3_U5) => f_r_fmt_int_instr!(Fcvtslu, instr, rounding),
+                (F5_28, RM_0, RS2_0_U5) => FmvXW(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
                 }),
-                (F5_28, RM_1, RS2_0) => FclassS(FRegToXRegArgs {
+                (F5_28, RM_1, RS2_0_U5) => FclassS(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
                 }),
-                (F5_30, RM_0, RS2_0) => FmvWX(XRegToFRegArgs {
+                (F5_30, RM_0, RS2_0_U5) => FmvWX(XRegToFRegArgs {
                     rd: rd_f(instr),
                     rs1: rs1(instr),
                 }),
                 _ => Unknown { instr },
             },
-            FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+            FMT_D => match (funct5(instr), rm(instr), rs2_bits_u5(instr)) {
                 (F5_0, rounding, rs2_bits) => {
                     f_r_rm_2_instr!(Faddd, instr, rs2_bits, rounding)
                 }
@@ -780,28 +791,28 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxd, instr, rs2_bits),
                 (F5_5, RM_MIN, rs2_bits) => f_r_instr!(Fmind, instr, rs2_bits),
                 (F5_5, RM_MAX, rs2_bits) => f_r_instr!(Fmaxd, instr, rs2_bits),
-                (F5_8, rounding, RS2_0) => f_r_rm_1_instr!(Fcvtds, instr, rounding),
-                (F5_11, rounding, RS2_0) => f_r_rm_1_instr!(Fsqrtd, instr, rounding),
+                (F5_8, rounding, RS2_0_U5) => f_r_rm_1_instr!(Fcvtds, instr, rounding),
+                (F5_11, rounding, RS2_0_U5) => f_r_rm_1_instr!(Fsqrtd, instr, rounding),
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
                 (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fled, instr, rs2_bits),
                 (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Fltd, instr, rs2_bits),
-                (F5_24, rounding, RS2_0) => f_r_int_fmt_instr!(Fcvtwd, instr, rounding),
-                (F5_24, rounding, RS2_1) => f_r_int_fmt_instr!(Fcvtwud, instr, rounding),
-                (F5_24, rounding, RS2_2) => f_r_int_fmt_instr!(Fcvtld, instr, rounding),
-                (F5_24, rounding, RS2_3) => f_r_int_fmt_instr!(Fcvtlud, instr, rounding),
-                (F5_26, rounding, RS2_0) => f_r_fmt_int_instr!(Fcvtdw, instr, rounding),
-                (F5_26, rounding, RS2_1) => f_r_fmt_int_instr!(Fcvtdwu, instr, rounding),
-                (F5_26, rounding, RS2_2) => f_r_fmt_int_instr!(Fcvtdl, instr, rounding),
-                (F5_26, rounding, RS2_3) => f_r_fmt_int_instr!(Fcvtdlu, instr, rounding),
-                (F5_28, RM_0, RS2_0) => FmvXD(FRegToXRegArgs {
+                (F5_24, rounding, RS2_0_U5) => f_r_int_fmt_instr!(Fcvtwd, instr, rounding),
+                (F5_24, rounding, RS2_1_U5) => f_r_int_fmt_instr!(Fcvtwud, instr, rounding),
+                (F5_24, rounding, RS2_2_U5) => f_r_int_fmt_instr!(Fcvtld, instr, rounding),
+                (F5_24, rounding, RS2_3_U5) => f_r_int_fmt_instr!(Fcvtlud, instr, rounding),
+                (F5_26, rounding, RS2_0_U5) => f_r_fmt_int_instr!(Fcvtdw, instr, rounding),
+                (F5_26, rounding, RS2_1_U5) => f_r_fmt_int_instr!(Fcvtdwu, instr, rounding),
+                (F5_26, rounding, RS2_2_U5) => f_r_fmt_int_instr!(Fcvtdl, instr, rounding),
+                (F5_26, rounding, RS2_3_U5) => f_r_fmt_int_instr!(Fcvtdlu, instr, rounding),
+                (F5_28, RM_0, RS2_0_U5) => FmvXD(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
                 }),
-                (F5_28, RM_1, RS2_0) => FclassD(FRegToXRegArgs {
+                (F5_28, RM_1, RS2_0_U5) => FclassD(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
                 }),
-                (F5_30, RM_0, RS2_0) => FmvDX(XRegToFRegArgs {
+                (F5_30, RM_0, RS2_0_U5) => FmvDX(XRegToFRegArgs {
                     rd: rd_f(instr),
                     rs1: rs1(instr),
                 }),
@@ -877,29 +888,31 @@ const fn c_bits(bytes: u16, pos: usize, n: usize) -> u16 {
 
 #[inline(always)]
 fn c_rd_rs1(instr: u16) -> XRegister {
-    parse_xregister(c_bits(instr, 7, 5) as u32)
+    parse_xregister(u5::extract_u16(instr, 7))
 }
 
 #[inline(always)]
 fn c_f_rd_rs1(instr: u16) -> FRegister {
-    parse_fregister(c_bits(instr, 7, 5) as u32)
+    parse_fregister(u5::extract_u16(instr, 7))
 }
 
 #[inline(always)]
 fn c_rs2(instr: u16) -> XRegister {
-    parse_xregister(c_bits(instr, 2, 5) as u32)
+    parse_xregister(u5::extract_u16(instr, 2))
 }
 
 #[inline(always)]
 fn c_f_rs2(instr: u16) -> FRegister {
-    parse_fregister(c_bits(instr, 2, 5) as u32)
+    parse_fregister(u5::extract_u16(instr, 2))
 }
 
 /// Encodings for the most used registers for certain compressed instructions
 /// See U:C-16.2
 #[inline(always)]
-fn c_reg_prime(instr: u16, pos: usize) -> u32 {
-    8 + c_bits(instr, pos, 3) as u32
+fn c_reg_prime(instr: u16, pos: usize) -> u5 {
+    const EIGHT: u5 = u5::new(8);
+
+    u3::extract_u16(instr, pos).widen::<5>().wrapping_add(EIGHT)
 }
 
 #[inline(always)]
