@@ -219,7 +219,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
         if reached_max new_gas then
           failwith "Gas estimate reached max gas limit."
         else confirm_gas ~simulation_version call new_gas simulation_state
-    | Ok (Ok {gas_used = Some gas; _}) ->
+    | Ok (Ok {gas_used = Some _; _}) ->
+        (* The gas returned by confirm gas can be ignored. What we care about
+           is only knowing if the gas provided in {!new_call} is enough. The
+           gas used returned when confirming may remove the "safe" amount
+           we added. *)
         if simulation_version = `V0 then
           (* `V0 is the only simulation version that puts the DA fees
              in the gas used. *)
@@ -271,9 +275,19 @@ module Make (SimulationBackend : SimulationBackend) = struct
         simulation_state
     in
     match res with
-    | Ok (Ok {gas_used = Some gas; value}) ->
+    | Ok (Ok {gas_used = Some (Qty gas); value}) ->
+        (* See EIP2200 for reference. But the tl;dr is: we cannot do the
+           opcode SSTORE if we have less than 2300 gas available, even
+           if we don't consume it. The simulated amount then gives an
+           amount of gas insufficient to execute the transaction.
+
+           The extra gas units, i.e. 2300, will be refunded.
+        *)
+        let safe_gas = Z.(add gas (of_int 2300)) in
+        (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
+        let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
         let+ gas_used =
-          confirm_gas ~simulation_version call gas simulation_state
+          confirm_gas ~simulation_version call (Qty safe_gas) simulation_state
         in
         Ok (Ok {Simulation.gas_used = Some gas_used; value})
     | _ -> return res
