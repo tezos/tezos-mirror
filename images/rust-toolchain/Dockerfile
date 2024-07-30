@@ -23,7 +23,8 @@ RUN apt-get update && \
     build-essential \
     git \
     autoconf automake autotools-dev libtool xutils-dev clang cmake \
-    sccache && \
+    sccache \
+    musl-tools && \
     rm -rf /var/lib/apt/lists/*
 
 # install toolchain
@@ -33,13 +34,13 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.71.1 1.73.0 1.74.0 && \
+RUN rustup update 1.66.0 1.71.1 1.73.0 1.74.0 1.76.0 1.78.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
-        rustup target add --toolchain="$tc" \
-            wasm32-unknown-unknown \
-            riscv64gc-unknown-none-elf \
-            riscv64gc-unknown-linux-gnu \
-            x86_64-unknown-linux-musl; \
+    rustup target add --toolchain="$tc" \
+    wasm32-unknown-unknown \
+    riscv64gc-unknown-none-elf \
+    riscv64gc-unknown-linux-gnu \
+    x86_64-unknown-linux-musl; \
     done
 
 # Install Rust 1.73.0 standard library for riscv64gc-unknown-hermit
@@ -57,11 +58,11 @@ RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.74
     && rm -r rust-std-1.74.0-riscv64gc-unknown-hermit rust-std-1.74.0-riscv64gc-unknown-hermit.tar.gz
 
 # Install Taplo
-RUN cargo +stable install taplo-cli --version 0.8.1 && \
+RUN cargo +1.78.0 install taplo-cli --version 0.8.1 && \
     taplo --version
 
 # Install cargo-audit
-RUN cargo +stable install --locked cargo-audit --version 0.20.0 && \
+RUN cargo +1.78.0 install --locked cargo-audit --version 0.20.0 && \
     cargo audit --version
 
 # install wabt: https://packages.debian.org/source/sid/wabt
@@ -71,4 +72,5 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y wabt binutils-riscv64-unknown-elf \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
 RUN ln -s /usr/bin/riscv64-unknown-elf-objdump /usr/local/bin/objdump
