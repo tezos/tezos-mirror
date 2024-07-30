@@ -8,9 +8,9 @@ module type IO = sig
 
   type error
 
-  val catch : (unit -> 'a t) -> ('a, error) result t
   (** [catch f] is [f () >|= Result.ok], unless [f] fails with an IO error, in
       which case it returns the error. *)
+  val catch : (unit -> 'a t) -> ('a, error) result t
 
   val pp_error : Format.formatter -> error -> unit
 end
@@ -23,9 +23,13 @@ module type Net = sig
   type ctx [@@deriving sexp_of]
 
   val default_ctx : ctx
+
   val connect_uri : ctx:ctx -> Uri.t -> (IO.conn * IO.ic * IO.oc) Lwt.t
+
   val close_in : IO.ic -> unit
+
   val close_out : IO.oc -> unit
+
   val close : IO.ic -> IO.oc -> unit
 end
 
@@ -37,14 +41,6 @@ end
 module type Client = sig
   type ctx
 
-  val call :
-    ?ctx:ctx ->
-    ?headers:Cohttp.Header.t ->
-    ?body:Body.t ->
-    ?chunked:bool ->
-    Cohttp.Code.meth ->
-    Uri.t ->
-    (Cohttp.Response.t * Body.t) Lwt.t
   (** [call ?ctx ?headers ?body ?chunked meth uri] will resolve the [uri] to a
       concrete network endpoint using context [ctx]. It will then issue an HTTP
       request with method [meth], adding request headers from [headers] if
@@ -75,6 +71,14 @@ module type Client = sig
       specified port by the user. If neitehr [ocaml-tls] or [ocaml-ssl] are
       installed on the system, [cohttp]/[conduit] tries the usual ([*:80]) or
       the specified port by the user in a non-secured way. *)
+  val call :
+    ?ctx:ctx ->
+    ?headers:Cohttp.Header.t ->
+    ?body:Body.t ->
+    ?chunked:bool ->
+    Cohttp.Code.meth ->
+    Uri.t ->
+    (Cohttp.Response.t * Body.t) Lwt.t
 
   val head :
     ?ctx:ctx -> ?headers:Cohttp.Header.t -> Uri.t -> Cohttp.Response.t Lwt.t
@@ -137,19 +141,19 @@ module type Server = sig
 
   type conn = IO.conn * Cohttp.Connection.t
 
-  type response_action =
-    [ `Expert of Cohttp.Response.t * (IO.ic -> IO.oc -> unit Lwt.t)
-    | `Response of Cohttp.Response.t * Body.t ]
   (** A request handler can respond in two ways:
 
       - Using [`Response], with a {!Response.t} and a {!Body.t}.
       - Using [`Expert], with a {!Response.t} and an IO function that is
         expected to write the response body. The IO function has access to the
-        underlying {!IO.ic} and {!IO.oc}, which allows writing a response body
+        underlying [!IO.ic] and [!IO.oc], which allows writing a response body
         more efficiently, stream a response or to switch protocols entirely
         (e.g. websockets). Processing of pipelined requests continue after the
         {!unit Lwt.t} is resolved. The connection can be closed by closing the
-        {!IO.ic}. *)
+        [!IO.ic]. *)
+  type response_action =
+    [ `Expert of Cohttp.Response.t * (IO.ic -> IO.oc -> unit Lwt.t)
+    | `Response of Cohttp.Response.t * Body.t ]
 
   type t
 
@@ -176,18 +180,11 @@ module type Server = sig
     unit ->
     t
 
-  val resolve_local_file : docroot:string -> uri:Uri.t -> string
   (** Resolve a URI and a docroot into a concrete local filename.
 
       Deprecated. Please use Cohttp.Path.resolve_local_file. *)
+  val resolve_local_file : docroot:string -> uri:Uri.t -> string
 
-  val respond :
-    ?headers:Cohttp.Header.t ->
-    ?flush:bool ->
-    status:Cohttp.Code.status_code ->
-    body:Body.t ->
-    unit ->
-    (Cohttp.Response.t * Body.t) Lwt.t
   (** [respond ?headers ?flush ~status ~body] will respond to an HTTP request
       with the given [status] code and response [body]. If [flush] is true, then
       every response chunk will be flushed to the network rather than being
@@ -196,6 +193,13 @@ module type Server = sig
       determined immediately. You can override the encoding by supplying an
       appropriate [Content-length] or [Transfer-encoding] in the [headers]
       parameter. *)
+  val respond :
+    ?headers:Cohttp.Header.t ->
+    ?flush:bool ->
+    status:Cohttp.Code.status_code ->
+    body:Body.t ->
+    unit ->
+    (Cohttp.Response.t * Body.t) Lwt.t
 
   val respond_string :
     ?flush:bool ->

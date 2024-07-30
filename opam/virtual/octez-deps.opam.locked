@@ -44,8 +44,6 @@ depends: [
   "class_group_vdf" {= "0.0.4"}
   "cmdliner" {= "1.2.0"}
   "cohttp" {= "5.3.1"}
-  "cohttp-lwt" {= "5.3.0"}
-  "cohttp-lwt-unix" {= "5.3.0"}
   "conduit" {= "6.2.2"}
   "conduit-lwt" {= "6.2.2"}
   "conduit-lwt-unix" {= "6.2.2"}
@@ -224,6 +222,8 @@ depends: [
 ]
 conflicts: [
   "checkseum" {= "0.5.0"}
+  "cohttp-lwt"
+  "cohttp-lwt-unix"
   "data-encoding"
   "hacl_x25519"
   "json_data_encoding"

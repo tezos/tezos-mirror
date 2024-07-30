@@ -1,6 +1,6 @@
 (vendored_dirs vendors)
 
-(data_only_dirs _opam-repo-for-release cohttp)
+(data_only_dirs _opam-repo-for-release)
 
 (env
  (_

@@ -40,8 +40,8 @@ include Product (struct
       "brassaia/";
       "rust-toolchain";
     ]
-    @ Product_data_encoding.product_source @ Product_prometheus.product_source
-    @ Product_resto.product_source
+    @ Product_data_encoding.product_source @ Product_cohttp.product_source
+    @ Product_prometheus.product_source @ Product_resto.product_source
 end)
 
 module String_set = Set.Make (String)
@@ -111,6 +111,14 @@ let () =
     registered_octez_libs
     ~target:"!module-Data_encoding"
     ~text:"Data_encoding"
+
+(* Back-register the cohttp library which is currently maintained as its
+         own product but still attached to octez-libs. *)
+let () =
+  Sub_lib.add_doc_link
+    registered_octez_libs
+    ~target:"!module-Cohttp"
+    ~text:"Cohttp"
 
 (* Back-register the prometheus library which is currently maintained as its
          own product but still attached to octez-libs. *)

@@ -17,7 +17,7 @@
 open Cohttp
 open Lwt
 
-type t = [ Body.t | `Stream of (string Lwt_stream.t[@sexp.opaque]) ]
+type t = [Body.t | `Stream of (string Lwt_stream.t[@sexp.opaque])]
 [@@deriving sexp]
 
 let empty = (Body.empty :> t)
@@ -31,7 +31,7 @@ let create_stream fn arg =
           fn arg >>= function
           | Transfer.Done -> return_none
           | Transfer.Final_chunk c ->
-              fin := true;
+              fin := true ;
               return (Some c)
           | Transfer.Chunk c -> return (Some c)))
 
@@ -61,7 +61,7 @@ let to_stream (body : t) =
   match body with
   | `Empty -> Lwt_stream.of_list []
   | `Stream s -> s
-  | `String s -> Lwt_stream.of_list [ s ]
+  | `String s -> Lwt_stream.of_list [s]
   | `Strings sl -> Lwt_stream.of_list sl
 
 let drain_body (body : t) =
@@ -70,6 +70,7 @@ let drain_body (body : t) =
   | `Stream s -> Lwt_stream.junk_while (fun _ -> true) s
 
 let of_string_list l = `Strings l
+
 let of_stream s = `Stream s
 
 let transfer_encoding = function
@@ -98,4 +99,5 @@ let map f t =
   | `Stream s -> `Stream (Lwt_stream.map f s)
 
 let to_form (body : t) = to_string body >|= Uri.query_of_encoded
+
 let of_form ?scheme f = Uri.encoded_of_query ?scheme f |> of_string

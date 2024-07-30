@@ -8,10 +8,43 @@
 open Manifest
 open Externals
 
-(* Ultimately, cohttp will use the local sources from `cohttp/`.
-   For now we still use the opam package (see below, uses of
-   `external_lib`). This temporary state is to minimise disruptions
-   for other developers and reducing the size of MRs. *)
-let cohttp_lwt = external_lib "cohttp-lwt" V.(exactly "5.3.0")
+let product_source = ["cohttp/"]
 
-let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(exactly "5.3.0")
+include Product (struct
+  let name = "octez"
+
+  let source = product_source
+end)
+
+let conflicts =
+  [external_lib "cohttp-lwt" V.True; external_lib "cohttp-lwt-unix" V.True]
+
+let cohttp_lwt =
+  public_lib
+    "octez-libs.cohttp-lwt"
+    ~internal_name:"cohttp_lwt"
+    ~path:"cohttp/cohttp-lwt/src"
+    ~preprocess:[pps ppx_sexp_conv]
+    ~deps:[lwt; uri; cohttp; logs; logs_lwt]
+    ~conflicts
+
+let cohttp_lwt_unix =
+  public_lib
+    "octez-libs.cohttp-lwt-unix"
+    ~internal_name:"cohttp_lwt_unix"
+    ~path:"cohttp/cohttp-lwt-unix/src"
+    ~preprocess:[pps ppx_sexp_conv]
+    ~deps:
+      [
+        fmt;
+        logs;
+        logs_lwt;
+        conduit_lwt;
+        magic_mime;
+        lwt_unix;
+        conduit_lwt_unix;
+        cohttp;
+        cohttp_lwt;
+        logs_fmt;
+      ]
+    ~conflicts
