@@ -141,6 +141,47 @@ let get_peer_score dal_node peer_id =
   in
   return peer_score.score
 
+let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
+  let check_slot_id e =
+    JSON.(e |-> "published_level" |> as_int) = published_level
+    && JSON.(e |-> "slot_index" |> as_int) = slot_index
+  in
+  let check_shard_index e =
+    match shard_index with
+    | None -> true
+    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
+  in
+  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
+      if check_slot_id e && check_shard_index e then Some () else None)
+
+(* Wait until the given [dal_node] receives all the shards whose
+   indices are [shards] for the given published level and slot index. *)
+let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index =
+  let nshards = List.length shards in
+  let count = ref 0 in
+  let promises =
+    List.map
+      (fun shard_index ->
+        let* () =
+          wait_for_stored_slot
+            ~shard_index
+            ~published_level
+            ~slot_index
+            dal_node
+        in
+        let () = incr count in
+        let () =
+          Log.info
+            "Dal node %s has received %d/%d shards"
+            (Dal_node.name dal_node)
+            !count
+            nshards
+        in
+        unit)
+      shards
+  in
+  Lwt.join promises
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -653,19 +694,6 @@ let update_known_peers dal_node known_peers =
   Dal_node.Config_file.update
     dal_node
     (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
-
-let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
-  let check_slot_id e =
-    JSON.(e |-> "published_level" |> as_int) = published_level
-    && JSON.(e |-> "slot_index" |> as_int) = slot_index
-  in
-  let check_shard_index e =
-    match shard_index with
-    | None -> true
-    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
-  in
-  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
-      if check_slot_id e && check_shard_index e then Some () else None)
 
 (* Return the baker at round 0 at the given level. *)
 let baker_for_round_zero node ~level =
@@ -5291,32 +5319,9 @@ module Amplification = struct
       assigned_shard_indices_non_banned
       non_banned_attesters ;
 
-    (* Wait until the given [dal_node] receives all the shards whose
-       indices are [shards] for the given published level and slot index. *)
     let wait_for_shards ~dal_node ~shards ~published_level ~slot_index =
-      let nshards = List.length shards in
-      let count = ref 0 in
       let* () =
-        Lwt.join
-        @@ List.map
-             (fun shard_index ->
-               let* () =
-                 wait_for_stored_slot
-                   ~shard_index
-                   ~published_level
-                   ~slot_index
-                   dal_node
-               in
-               let () = incr count in
-               let () =
-                 Log.info
-                   "Dal node %s has received %d/%d shards"
-                   (Dal_node.name dal_node)
-                   !count
-                   nshards
-               in
-               unit)
-             shards
+        wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
       in
       let () =
         Log.info "Dal node %s has received its shards" (Dal_node.name dal_node)
