@@ -89,13 +89,6 @@ let protocol_levels_file dir =
     Protocol_levels.encoding
     Store_types.Protocol_levels.equal
 
-let legacy_protocol_levels_file dir =
-  make_encoded_file
-    dir
-    ~filename:"protocol_levels"
-    Protocol_levels.Legacy.encoding
-    Protocol_levels.Legacy.equal
-
 let genesis_block_file dir =
   make_encoded_file dir ~filename:"genesis" Block_repr.encoding Block_repr.equal
 
