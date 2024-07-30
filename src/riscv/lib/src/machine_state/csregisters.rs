@@ -1344,7 +1344,7 @@ mod tests {
         machine_state::{
             backend::{
                 tests::{test_determinism, ManagerFor},
-                Backend, BackendManagement, Layout,
+                Backend, Layout,
             },
             csregisters::{
                 values::CSRValue, CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception,
@@ -1554,12 +1554,11 @@ mod tests {
     }
 
     backend_test!(test_write_read, F, {
-        let mut backend = F::new::<CSRegistersLayout>();
+        let mut backend = create_backend!(CSRegistersLayout, F);
         let placed = CSRegistersLayout::placed().into_location();
 
-        let mut csrs: CSRegisters<
-            <F::Backend<CSRegistersLayout> as BackendManagement>::Manager<'_>,
-        > = CSRegisters::bind(backend.allocate(placed));
+        let mut csrs: CSRegisters<ManagerFor<'_, F, CSRegistersLayout>> =
+            CSRegisters::bind(backend.allocate(placed));
 
         // write to MBE, SXL, UXL, MPP, MPIE, XS, SPP (through mstatus)
         csrs.write(
