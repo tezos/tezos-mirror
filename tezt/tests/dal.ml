@@ -7866,6 +7866,7 @@ let register ~protocols =
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:[Tag.flaky]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
