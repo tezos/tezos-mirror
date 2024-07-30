@@ -220,6 +220,28 @@ let copy_file ?(buffer_size = 4096) ~src ~dst () =
           in
           loop ()))
 
+let copy_file_raw ?(buffer_size = 4096 * 1024) ?(dst_perm = 0o666) ~src ~dst ()
+    =
+  let open Lwt_syntax in
+  let buffer = Bytes.create buffer_size in
+  let* src_fd = Lwt_unix.openfile src [Unix.O_RDONLY; O_CLOEXEC] 0o444 in
+  let* dst_fd =
+    Lwt_unix.openfile dst [Unix.O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC] dst_perm
+  in
+  let raw_copy src_fd dst_fd =
+    let rec loop () =
+      let* read = Lwt_unix.read src_fd buffer 0 buffer_size in
+      if read = 0 then Lwt.return_unit
+      else
+        let* (_ : int) = Lwt_unix.write dst_fd buffer 0 read in
+        loop ()
+    in
+    loop ()
+  in
+  let* () = raw_copy src_fd dst_fd in
+  let* () = Lwt_unix.close src_fd in
+  Lwt_unix.close dst_fd
+
 let copy_dir ?(perm = 0o755) src dst =
   let open Lwt_syntax in
   let rec copy_dir dir dst_dir =
