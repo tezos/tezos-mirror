@@ -51,10 +51,10 @@ use super::error::FaBridgeError;
 /// Keccak256 of withdraw(address,uint256,uint256), first 4 bytes
 pub const WITHDRAW_METHOD_ID: &[u8; 4] = b"\xb5\xc5\xf6\x72";
 
-/// Keccak256 of Withdrawal(uint256,address,address,bytes22,uint256,uint256)
+/// Keccak256 of Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)
 pub const WITHDRAW_EVENT_TOPIC: &[u8; 32] = b"\
-    \x58\x9b\x38\xfe\xb5\xb5\x55\x9d\x56\x4e\xd8\x10\x12\x95\x08\x93\
-    \xbf\xc3\x5d\xb6\x6a\x90\x52\x4d\x70\x41\x0d\x1c\x15\xc8\xe5\x6c";
+    \xab\x68\x45\x0c\x9e\x54\x6f\x60\x62\xa8\x61\xee\xbf\x8e\xc5\xbb\
+    \xd4\x1b\x44\x25\xe2\x6b\x20\x19\x9c\x91\x22\x7c\x7f\x90\x38\xca";
 
 /// L1 proxy contract entrypoint that will be invoked by the outbox message
 /// execution.
@@ -143,9 +143,9 @@ impl FaWithdrawal {
     ///
     /// It also contains unique withdrawal identifier.
     ///
-    /// Signature: Withdrawal(uint256,address,address,bytes22,uint256,uint256)
+    /// Signature: Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)
     pub fn event_log(&self, withdrawal_id: U256) -> Log {
-        let mut data = Vec::with_capacity(6 * 32);
+        let mut data = Vec::with_capacity(7 * 32);
 
         data.extend_from_slice(&ABI_H160_LEFT_PADDING);
         data.extend_from_slice(self.sender.as_bytes());
@@ -157,6 +157,10 @@ impl FaWithdrawal {
 
         // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
         self.receiver.bin_write(&mut data).unwrap();
+        data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
+        debug_assert!(data.len() % 32 == 0);
+
+        self.proxy.bin_write(&mut data).unwrap();
         data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
         debug_assert!(data.len() % 32 == 0);
 
@@ -374,6 +378,12 @@ mod tests {
         assert_eq!(
             withdrawal_event.receiver,
             alloy_primitives::FixedBytes::<22>::repeat_byte(0)
+        );
+        assert_eq!(
+            withdrawal_event.proxy,
+            alloy_primitives::FixedBytes::<22>::from_slice(&[
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ])
         );
         assert_eq!(withdrawal_event.amount, convert_u256(&withdrawal.amount));
         assert_eq!(
