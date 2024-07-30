@@ -86,8 +86,8 @@ pub trait Manager {
         loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN>;
 
-    /// Dynamic region that has been allocated in the state storage
-    type DynRegion<const LEN: usize>: DynRegion;
+    /// Dynamic region represents a fixed-sized byte vector that has been allocated in the state storage
+    type DynRegion<const LEN: usize>;
 
     /// Allocate a dynamic region in the state storage.
     fn allocate_dyn_region<const LEN: usize>(
@@ -131,6 +131,33 @@ pub trait Manager {
         index: usize,
         value: E,
     ) -> E;
+
+    /// Read an element in the region. `address` is in bytes.
+    fn dyn_region_read<E: Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+    ) -> E;
+
+    /// Read elements from the region. `address` is in bytes.
+    fn dyn_region_read_all<E: Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+        values: &mut [E],
+    );
+
+    /// Update an element in the region. `address` is in bytes.
+    fn dyn_region_write<E: Elem, const LEN: usize>(
+        region: &mut Self::DynRegion<LEN>,
+        address: usize,
+        value: E,
+    );
+
+    /// Update multiple elements in the region. `address` is in bytes.
+    fn dyn_region_write_all<E: Elem, const LEN: usize>(
+        region: &mut Self::DynRegion<LEN>,
+        address: usize,
+        values: &[E],
+    );
 }
 
 /// State backend with manager
@@ -233,26 +260,6 @@ pub mod tests {
     /// Dummy region that does nothing
     struct DummyRegion<E>(PhantomData<E>);
 
-    impl DynRegion for DummyRegion<u8> {
-        const LEN: usize = 0;
-
-        fn read<E: Elem>(&self, _address: usize) -> E {
-            unimplemented!()
-        }
-
-        fn read_all<E: Elem>(&self, _address: usize, _values: &mut [E]) {
-            unimplemented!()
-        }
-
-        fn write<E: Elem>(&mut self, _address: usize, _value: E) {
-            unimplemented!()
-        }
-
-        fn write_all<E: Elem>(&mut self, _address: usize, _values: &[E]) {
-            unimplemented!()
-        }
-    }
-
     /// A tracing [Manager] that only keeps track of a layout's locations.
     struct TraceManager {
         pub regions: VecDeque<(usize, usize)>,
@@ -336,6 +343,37 @@ pub mod tests {
             _index: usize,
             _value: E,
         ) -> E {
+            unimplemented!()
+        }
+
+        fn dyn_region_read<E: Elem, const LEN: usize>(
+            _region: &Self::DynRegion<LEN>,
+            _address: usize,
+        ) -> E {
+            unimplemented!()
+        }
+
+        fn dyn_region_read_all<E: Elem, const LEN: usize>(
+            _region: &Self::DynRegion<LEN>,
+            _address: usize,
+            _values: &mut [E],
+        ) {
+            unimplemented!()
+        }
+
+        fn dyn_region_write<E: Elem, const LEN: usize>(
+            _region: &mut Self::DynRegion<LEN>,
+            _address: usize,
+            _value: E,
+        ) {
+            unimplemented!()
+        }
+
+        fn dyn_region_write_all<E: Elem, const LEN: usize>(
+            _region: &mut Self::DynRegion<LEN>,
+            _address: usize,
+            _values: &[E],
+        ) {
             unimplemented!()
         }
     }
