@@ -4500,9 +4500,7 @@ let test_replay_rpc =
 
 let test_trace_transaction =
   register_all
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
+    ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -4566,9 +4564,7 @@ let test_trace_transaction =
 
 let test_trace_transaction_on_invalid_transaction =
   register_all
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
+    ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -4654,9 +4650,7 @@ let check_trace expect_null expected_returned_value receipt trace =
 
 let test_trace_transaction_call =
   register_all
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
+    ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
