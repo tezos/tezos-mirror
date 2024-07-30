@@ -16,8 +16,8 @@ pub type EnumCellLayout<R> = Atom<R>;
 
 impl<T, R, M> EnumCell<T, R, M>
 where
-    T: Into<R>,
-    R: Elem,
+    T: From<R> + Default,
+    R: From<T> + Elem,
     M: Manager,
 {
     /// Bind the enum cell to the allocated space.
@@ -29,10 +29,7 @@ where
     }
 
     /// Reset the enum cell by writing the default value of `T`.
-    pub fn reset(&mut self)
-    where
-        T: Default,
-    {
+    pub fn reset(&mut self) {
         self.write(T::default());
     }
 
@@ -42,55 +39,32 @@ where
     }
 
     /// Replace a value in the enum cell, returning the old value.
-    pub fn replace(&mut self, value: T) -> T
-    where
-        T: From<R>,
-    {
+    pub fn replace(&mut self, value: T) -> T {
         T::from(self.cell.replace(value.into()))
     }
 
-    /// Replace a value in the enum cell, returning the old value.
-    pub fn replace_default(&mut self, value: T) -> T
-    where
-        T: TryFrom<R> + Default,
-    {
-        T::try_from(self.cell.replace(value.into())).unwrap_or(T::default())
-    }
-
     /// Read the value from the enum cell.
-    pub fn read(&self) -> T
-    where
-        T: From<R>,
-    {
+    pub fn read(&self) -> T {
         T::from(self.cell.read())
-    }
-
-    /// Read the value from the enum cell. If the value can't be converted from
-    /// its underlying representation, return the default value for `T`.
-    pub fn read_default(&self) -> T
-    where
-        T: TryFrom<R> + Default,
-    {
-        T::try_from(self.cell.read()).unwrap_or(T::default())
     }
 }
 
 impl<T, R, M> CellRead for EnumCell<T, R, M>
 where
-    T: TryFrom<R> + Default,
+    T: From<R> + Default,
     R: From<T> + Elem,
     M: Manager,
 {
     type Value = T;
 
     fn read(&self) -> Self::Value {
-        EnumCell::read_default(self)
+        EnumCell::read(self)
     }
 }
 
 impl<T, R, M> CellWrite for EnumCell<T, R, M>
 where
-    T: TryFrom<R> + Default,
+    T: From<R> + Default,
     R: From<T> + Elem,
     M: Manager,
 {
@@ -99,6 +73,6 @@ where
     }
 
     fn replace(&mut self, value: Self::Value) -> Self::Value {
-        EnumCell::replace_default(self, value)
+        EnumCell::replace(self, value)
     }
 }

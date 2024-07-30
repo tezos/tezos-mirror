@@ -258,7 +258,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         virt_addr: Address,
         access_type: AccessType,
     ) -> Result<Address, Exception> {
-        let mode = self.hart.mode.read_default();
+        let mode = self.hart.mode.read();
         let satp = self.hart.csregisters.read(CSRegister::satp);
         self.translate_with_prefetch(mode, satp, virt_addr, access_type)
     }

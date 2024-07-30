@@ -176,7 +176,7 @@ where
 
     /// `ECALL` instruction
     pub fn run_ecall(&self) -> Exception {
-        match self.mode.read_default() {
+        match self.mode.read() {
             Mode::User => Exception::EnvCallFromUMode,
             Mode::Supervisor => Exception::EnvCallFromSMode,
             Mode::Machine => Exception::EnvCallFromMMode,
@@ -882,7 +882,7 @@ mod tests {
             assert!(!mstatus.sie());
             assert!(!mstatus.mprv());
             assert_eq!(mstatus.spp(), SPPValue::User);
-            assert_eq!(state.mode.read_default(), Mode::User);
+            assert_eq!(state.mode.read(), Mode::User);
 
             // TEST: Call MRET from M-mode, with MPRV true, and MPP Machine to see if MPRV stays the same.
             let mstatus = mstatus.with_mpie(true);
@@ -898,7 +898,7 @@ mod tests {
             assert!(mstatus.mie());
             assert!(mstatus.mprv());
             assert_eq!(mstatus.mpp(), MPPValue::User);
-            assert_eq!(state.mode.read_default(), Mode::Machine);
+            assert_eq!(state.mode.read(), Mode::Machine);
         });
     });
 }

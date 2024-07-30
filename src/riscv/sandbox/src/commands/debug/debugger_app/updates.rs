@@ -68,7 +68,7 @@ where
 
     /// Updates the state of [`super::TranslationState`]
     fn update_translation_after_step(&mut self, faulting: bool) {
-        let mode = self.stepper.machine_state().hart.mode.read_default();
+        let mode = self.stepper.machine_state().hart.mode.read();
         let satp_val: Satp = self
             .stepper
             .machine_state()

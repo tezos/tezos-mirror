@@ -75,7 +75,7 @@ impl<M: backend::Manager> HartState<M> {
 
     /// Given a trap source and a return address, take a trap on the machine.
     pub fn take_trap<TC: TrapContext>(&mut self, trap_source: TC, return_pc: u64) -> u64 {
-        self.take_trap_from_mode(trap_source, self.mode.read_default(), return_pc)
+        self.take_trap_from_mode(trap_source, self.mode.read(), return_pc)
     }
 
     /// Given a trap source, a return address and a mode to trap from, take a

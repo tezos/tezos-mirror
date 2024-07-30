@@ -479,11 +479,7 @@ where
         ]);
         let mode_line = Line::from(vec![
             "   Mode: ".into(),
-            format!(
-                "{:?}",
-                self.stepper.machine_state().hart.mode.read_default()
-            )
-            .fg(BLUE),
+            format!("{:?}", self.stepper.machine_state().hart.mode.read()).fg(BLUE),
         ]);
         let status_text = match self.state.result.to_stepper_status() {
             StepperStatus::Running { steps } => vec![
