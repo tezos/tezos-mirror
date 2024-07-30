@@ -78,7 +78,7 @@ pub use elems::*;
 /// Manager of the state backend storage
 pub trait Manager {
     /// Region that has been allocated in the state storage
-    type Region<E: Elem, const LEN: usize>: Region<Elem = E>;
+    type Region<E: Elem, const LEN: usize>;
 
     /// Allocate a region in the state storage.
     fn allocate_region<E: Elem, const LEN: usize>(
@@ -94,6 +94,43 @@ pub trait Manager {
         &mut self,
         loc: Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN>;
+
+    /// Read an element in the region.
+    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
+
+    /// Read all elements in the region.
+    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
+
+    /// Read `buffer.len()` elements from the region, starting at `offset`.
+    fn region_read_some<E: Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        offset: usize,
+        buffer: &mut [E],
+    );
+
+    /// Update an element in the region.
+    fn region_write<E: Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        value: E,
+    );
+
+    /// Update all elements in the region.
+    fn region_write_all<E: Elem, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]);
+
+    /// Update a subset of elements in the region starting at `index`.
+    fn region_write_some<E: Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        buffer: &[E],
+    );
+
+    /// Update the element in the region and return the previous value.
+    fn region_replace<E: Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        value: E,
+    ) -> E;
 }
 
 /// State backend with manager
@@ -196,40 +233,6 @@ pub mod tests {
     /// Dummy region that does nothing
     struct DummyRegion<E>(PhantomData<E>);
 
-    impl<E: Elem> Region for DummyRegion<E> {
-        type Elem = E;
-
-        const LEN: usize = 0;
-
-        fn read(&self, _index: usize) -> E {
-            unimplemented!()
-        }
-
-        fn read_all(&self) -> Vec<E> {
-            unimplemented!()
-        }
-
-        fn read_some(&self, _offset: usize, _buffer: &mut [E]) {
-            unimplemented!()
-        }
-
-        fn write(&mut self, _index: usize, _value: E) {
-            unimplemented!()
-        }
-
-        fn write_all(&mut self, _value: &[E]) {
-            unimplemented!()
-        }
-
-        fn write_some(&mut self, _index: usize, _buffer: &[E]) {
-            unimplemented!()
-        }
-
-        fn replace(&mut self, _index: usize, _value: E) -> E {
-            unimplemented!()
-        }
-    }
-
     impl DynRegion for DummyRegion<u8> {
         const LEN: usize = 0;
 
@@ -284,6 +287,56 @@ pub mod tests {
             loc: Location<[u8; LEN]>,
         ) -> Self::DynRegion<LEN> {
             self.allocate_region::<u8, LEN>(loc)
+        }
+
+        fn region_read<E: Elem, const LEN: usize>(
+            _region: &Self::Region<E, LEN>,
+            _index: usize,
+        ) -> E {
+            unimplemented!()
+        }
+
+        fn region_read_all<E: Elem, const LEN: usize>(_region: &Self::Region<E, LEN>) -> Vec<E> {
+            unimplemented!()
+        }
+
+        fn region_read_some<E: Elem, const LEN: usize>(
+            _region: &Self::Region<E, LEN>,
+            _offset: usize,
+            _buffer: &mut [E],
+        ) {
+            unimplemented!()
+        }
+
+        fn region_write<E: Elem, const LEN: usize>(
+            _region: &mut Self::Region<E, LEN>,
+            _index: usize,
+            _value: E,
+        ) {
+            unimplemented!()
+        }
+
+        fn region_write_all<E: Elem, const LEN: usize>(
+            _region: &mut Self::Region<E, LEN>,
+            _value: &[E],
+        ) {
+            unimplemented!()
+        }
+
+        fn region_write_some<E: Elem, const LEN: usize>(
+            _region: &mut Self::Region<E, LEN>,
+            _index: usize,
+            _buffer: &[E],
+        ) {
+            unimplemented!()
+        }
+
+        fn region_replace<E: Elem, const LEN: usize>(
+            _region: &mut Self::Region<E, LEN>,
+            _index: usize,
+            _value: E,
+        ) -> E {
+            unimplemented!()
         }
     }
 
