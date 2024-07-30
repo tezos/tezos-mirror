@@ -119,6 +119,9 @@ module Worker = struct
         when use_dal_if_enabled && dal_last_used < level ->
           (state self).dal_last_used <- level ;
           let*! () = Blueprint_events.blueprint_injected_on_DAL level in
+          let () =
+            Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_dal
+          in
           let* injection_id =
             Rollup_services.publish_on_dal
               ~rollup_node_endpoint
@@ -128,6 +131,9 @@ module Worker = struct
           Signals_publisher.track ~injection_id ~level ~slot_index
       | _ ->
           let*! () = Blueprint_events.blueprint_injected_on_inbox level in
+          let () =
+            Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_inbox
+          in
           Rollup_services.publish
             ~keep_alive:false
             ~rollup_node_endpoint

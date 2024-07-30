@@ -205,6 +205,24 @@ end
 
 type t = {chain : Chain.t; block : Block.t; simulation : Simulation.t}
 
+module BlueprintChunkSent = struct
+  let on_inbox =
+    Counter.v
+      ~registry
+      ~help:"Number of blueprint chunks sent on the shared inbox"
+      ~namespace
+      ~subsystem
+      "blueprint_chunks_sent_on_inbox"
+
+  let on_dal =
+    Counter.v
+      ~registry
+      ~help:"Number of blueprint chunks sent on the DAL"
+      ~namespace
+      ~subsystem
+      "blueprint_chunks_sent_on_dal"
+end
+
 let metrics =
   let name = "Etherlink" in
   let chain = Chain.init name in
