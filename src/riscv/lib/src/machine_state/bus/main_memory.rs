@@ -42,21 +42,15 @@ pub trait MainMemoryLayout: backend::Layout {
     const BYTES: usize;
 
     fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
-
-    fn offset(loc: &backend::PlacedOf<Self>) -> usize;
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
-    type Data<M: backend::Manager> = M::DynRegion<BYTES>;
+    type Data<M: backend::Manager> = backend::DynCells<BYTES, M>;
 
     const BYTES: usize = BYTES;
 
     fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
         space
-    }
-
-    fn offset(loc: &backend::PlacedOf<Self>) -> usize {
-        loc.offset()
     }
 }
 
@@ -75,6 +69,7 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
 
     fn allocate<M: backend::Manager>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
         let data = backend.allocate_dyn_region(placed);
+        let data = backend::DynCells::bind(data);
         MainMemory { data }
     }
 }

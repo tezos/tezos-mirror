@@ -455,6 +455,65 @@ impl<T: DynRegion> DynRegion for &T {
     }
 }
 
+/// Multiple elements of an unspecified type
+pub struct DynCells<const LEN: usize, M: Manager + ?Sized> {
+    region: M::DynRegion<LEN>,
+}
+
+impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
+    /// Bind this state to the given dynamic region.
+    pub fn bind(region: M::DynRegion<LEN>) -> Self {
+        Self { region }
+    }
+
+    /// Read an element in the region. `address` is in bytes.
+    #[inline]
+    pub fn read<E: Elem>(&self, address: usize) -> E {
+        M::DynRegion::read(&self.region, address)
+    }
+
+    /// Read elements from the region. `address` is in bytes.
+    #[inline]
+    pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        M::DynRegion::read_all(&self.region, address, values)
+    }
+
+    /// Update an element in the region. `address` is in bytes.
+    #[inline]
+    pub fn write<E: Elem>(&mut self, address: usize, value: E) {
+        M::DynRegion::write(&mut self.region, address, value)
+    }
+
+    /// Update multiple elements in the region. `address` is in bytes.
+    #[inline]
+    pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+        M::DynRegion::write_all(&mut self.region, address, values)
+    }
+}
+
+impl<const LEN: usize, M: Manager> DynRegion for DynCells<LEN, M> {
+    const LEN: usize = LEN;
+
+    #[inline]
+    fn read<E: Elem>(&self, address: usize) -> E {
+        M::DynRegion::read(&self.region, address)
+    }
+
+    #[inline]
+    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        M::DynRegion::read_all(&self.region, address, values)
+    }
+
+    #[inline]
+    fn write<E: Elem>(&mut self, address: usize, value: E) {
+        M::DynRegion::write(&mut self.region, address, value)
+    }
+
+    #[inline]
+    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+        M::DynRegion::write_all(&mut self.region, address, values)
+    }
+}
 #[cfg(test)]
 pub(crate) mod tests {
     use super::DynRegion;
