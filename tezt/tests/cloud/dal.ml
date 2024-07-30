@@ -78,34 +78,45 @@ module Disconnect = struct
 end
 
 module Network = struct
-  type testnet = Ghostnet
+  type testnet = Ghostnet | Weeklynet of string
+  (* This string is the date of the genesis block of the current
+     weeklynet; typically it is last wednesday. *)
 
   type t = Testnet of testnet | Sandbox
 
   let to_string = function
     | Testnet Ghostnet -> "ghostnet"
+    | Testnet (Weeklynet date) -> sf "weeklynet-%s" date
     | Sandbox -> "sandbox"
 
   let public_rpc_endpoint testnet =
     Endpoint.
       {
         scheme = "https";
-        host = (match testnet with Ghostnet -> "rpc.ghostnet.teztnets.com");
+        host =
+          (match testnet with
+          | Ghostnet -> "rpc.ghostnet.teztnets.com"
+          | Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date);
         port = 443;
       }
 
   let snapshot_service = function
     | Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
+    | Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
 
   (* Argument to give to the --network option of `octez-node config init`. *)
-  let to_octez_network_options = function Ghostnet -> "ghostnet"
+  let to_octez_network_options = function
+    | Ghostnet -> "ghostnet"
+    | Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
 
   let default_bootstrap = function
     | Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
+    | Weeklynet date -> sf "weeklynet-%s.tzinit.org" date
 
   let default_dal_bootstrap = function
     | Ghostnet ->
         "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
+    | Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
 
   let get_level network endpoint =
     match network with
@@ -326,6 +337,9 @@ module Cli = struct
       ~dummy:Network.(Testnet Ghostnet)
       ~parse:(function
         | "ghostnet" -> Some (Testnet Ghostnet)
+        | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+            let date = String.sub s 10 10 in
+            Some (Testnet (Weeklynet date))
         | "sandbox" -> Some Sandbox
         | _ -> None)
       ~show:Network.to_string
@@ -334,7 +348,7 @@ module Cli = struct
     Clap.default
       ~section
       ~long:"network"
-      ~placeholder:"<network> (sandbox,ghostnet,...)"
+      ~placeholder:"<network> (sandbox,ghostnet,weeklynet-YYYY-MM-DD,...)"
       ~description:"Allow to specify a network to use for the scenario"
       network_typ
       Sandbox
@@ -445,7 +459,10 @@ module Cli = struct
       ~placeholder:"<protocol_name> (such as alpha, oxford,...)"
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
-      (match network with Sandbox -> Alpha | Testnet Ghostnet -> ParisC)
+      (match network with
+      | Sandbox -> Alpha
+      | Testnet Ghostnet -> ParisC
+      | Testnet (Weeklynet _) -> Alpha)
 
   let data_dir =
     Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
@@ -2137,7 +2154,7 @@ let benchmark () =
   let docker_image =
     match configuration.network with
     | Testnet Ghostnet -> None (* Some Env.Octez_latest_release *)
-    | Sandbox -> None
+    | Sandbox | Testnet (Weeklynet _) -> None
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
   let vms =
