@@ -177,6 +177,28 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let fees = da_fee da_fee_per_byte tx_data in
     return (Z.div fees gas_price)
 
+  let check_node_da_fees ~previous_gas ~node_da_fees ~simulation_version
+      simulation_state call =
+    let open Lwt_result_syntax in
+    let* kernel_da_fees =
+      let* res =
+        call_estimate_gas
+          (simulation_input ~simulation_version ~with_da_fees:true call)
+          simulation_state
+      in
+      let* (Qty total_gas) =
+        match res with
+        | Ok (Ok {gas_used = Some gas; _}) -> return gas
+        | _ -> failwith "The gas estimation simulation with DA fees failed."
+      in
+      (* DA fees computed by the kernel is the difference between total gas
+         and previous gas call. *)
+      return (Z.sub total_gas previous_gas)
+    in
+    unless (node_da_fees = kernel_da_fees) (fun () ->
+        let*! () = Events.invalid_node_da_fees ~node_da_fees ~kernel_da_fees in
+        return_unit)
+
   let rec confirm_gas ~simulation_version (call : Ethereum_types.call) gas
       simulation_state =
     let open Ethereum_types in
@@ -211,6 +233,24 @@ module Make (SimulationBackend : SimulationBackend) = struct
             | None -> Bytes.empty
           in
           let* da_fees = gas_for_fees simulation_state tx_data in
+          (* As computing the DA fees in the node directly is an
+             experimental feature, we check the locally computed value
+             against the one computed by the kernel.
+
+             We aim to deloy this checks for a couple weeks, then remove
+             the kernel call. We could also keep the check if the node
+             is in a debug like mode to make sure the two implementations
+             are consistent.
+          *)
+          let* () =
+            let (Qty gas) = gas in
+            check_node_da_fees
+              ~previous_gas:gas
+              ~node_da_fees:da_fees
+              ~simulation_version
+              simulation_state
+              call
+          in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->
