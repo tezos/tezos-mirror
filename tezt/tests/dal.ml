@@ -35,6 +35,8 @@
                  wasm-strip ../target/wasm32-unknown-unknown/release/tx_kernel.wasm
                  cp ../target/wasm32-unknown-unknown/release/tx_kernel.wasm ../../../tx_kernel_dal.wasm
 
+                 ./scripts/install_dal_trusted_setup.sh
+
    Invocation:   dune exec tezt/tests/main.exe -- --file dal.ml
    Subject: Integration tests related to the data-availability layer
    Remarks: For tagging tests with memory tags (like memory_3k), the script

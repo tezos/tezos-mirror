@@ -16,6 +16,7 @@
                  curl -L https://foundry.paradigm.xyz | bash
                  foundryup
                  make octez-dsn-node
+                 ./scripts/install_dal_trusted_setup.sh
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
 *)
 

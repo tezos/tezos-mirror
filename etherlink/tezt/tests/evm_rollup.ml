@@ -13,9 +13,13 @@
    Component:    Smart Optimistic Rollups: EVM Kernel
    Requirement:  make -f kernels.mk build
                  npm install eth-cli
+
                  # Install cast or foundry (see: https://book.getfoundry.sh/getting-started/installation)
                  curl -L https://foundry.paradigm.xyz | bash
                  foundryup
+
+                 ./scripts/install_dal_trusted_setup.sh
+
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 open Sc_rollup_helpers
