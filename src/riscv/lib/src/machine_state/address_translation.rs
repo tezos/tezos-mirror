@@ -16,6 +16,7 @@ use crate::{
     bits::Bits64, machine_state::address_translation::pte::PageTableEntry,
     state_backend as backend, traps::Exception,
 };
+use strum::{EnumCount, EnumIter};
 
 mod physical_address;
 pub mod pte;
@@ -28,7 +29,7 @@ pub const PAGE_SIZE: u64 = 1 << PAGE_OFFSET_WIDTH;
 
 /// Access type that is used in the virtual address translation process.
 /// Section 5.3.2
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, EnumCount, EnumIter)]
 pub enum AccessType {
     Instruction,
     Load,
@@ -254,6 +255,30 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// Translate a virtual address to a physical address as described in section 5.3.2
     #[inline]
     pub fn translate(
+        &mut self,
+        virt_addr: Address,
+        access_type: AccessType,
+    ) -> Result<Address, Exception> {
+        let mode = self.hart.mode.read();
+        let satp = self.hart.csregisters.read(CSRegister::satp);
+
+        if let Some(phys_addr) =
+            self.translation_cache
+                .try_translate(mode, satp, access_type, virt_addr)
+        {
+            return Ok(phys_addr);
+        }
+
+        let phys_addr = self.translate_with_prefetch(mode, satp, virt_addr, access_type)?;
+        self.translation_cache
+            .cache_translation(mode, satp, access_type, virt_addr, phys_addr);
+
+        Ok(phys_addr)
+    }
+
+    /// Like [`Self::translate`] but does not cache the translation.
+    #[inline]
+    pub fn translate_without_cache(
         &self,
         virt_addr: Address,
         access_type: AccessType,

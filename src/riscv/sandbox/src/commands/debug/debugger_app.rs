@@ -292,7 +292,7 @@ where
         let result = self.stepper.step_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
-                .translate(raw_pc, AccessType::Instruction)
+                .translate_without_cache(raw_pc, AccessType::Instruction)
                 .unwrap_or(raw_pc);
             !self.program.breakpoints.contains(&pc)
         });
@@ -304,7 +304,7 @@ where
         let result = self.stepper.step_range_while(1..=MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
-                .translate(raw_pc, AccessType::Instruction)
+                .translate_without_cache(raw_pc, AccessType::Instruction)
                 .unwrap_or(raw_pc);
 
             !(self.program.breakpoints.contains(&pc) || self.program.symbols.contains_key(&pc))

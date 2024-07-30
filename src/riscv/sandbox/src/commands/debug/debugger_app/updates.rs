@@ -55,7 +55,7 @@ where
         let res @ (pc, _faulting) = match self
             .stepper
             .machine_state()
-            .translate(raw_pc, AccessType::Instruction)
+            .translate_without_cache(raw_pc, AccessType::Instruction)
         {
             Err(_e) => (self.state.prev_pc, true),
             Ok(pc) => (pc, false),

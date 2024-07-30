@@ -16,10 +16,6 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
-use self::{
-    address_translation::{translation_cache::InstructionFetchTransCacheLayout, PAGE_SIZE},
-    csregisters::{values::CSRValue, CSRRepr},
-};
 use crate::{
     bits::u64,
     devicetree,
@@ -34,23 +30,23 @@ use crate::{
     state_backend::{self as backend, CellRead, CellWrite},
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
-use address_translation::translation_cache::InstructionFetchTranslationCache;
 pub use address_translation::AccessType;
+use address_translation::{
+    translation_cache::{TranslationCache, TranslationCacheLayout},
+    PAGE_SIZE,
+};
+use csregisters::{values::CSRValue, CSRRepr};
 use mode::Mode;
 use std::{cmp, ops::RangeBounds};
 
 /// Layout for the machine state
-pub type MachineStateLayout<ML> = (
-    HartStateLayout,
-    bus::BusLayout<ML>,
-    InstructionFetchTransCacheLayout,
-);
+pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, TranslationCacheLayout);
 
 /// Machine state
 pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
     pub hart: HartState<M>,
     pub bus: Bus<ML, M>,
-    pub translation_cache: InstructionFetchTranslationCache<M>,
+    pub translation_cache: TranslationCache<M>,
 }
 
 /// How to modify the program counter
@@ -250,7 +246,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         Self {
             hart: HartState::bind(space.0),
             bus: Bus::bind(space.1),
-            translation_cache: InstructionFetchTranslationCache::bind(space.2),
+            translation_cache: TranslationCache::bind(space.2),
         }
     }
 
@@ -275,18 +271,25 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         // occurs on an instruction fetch, load, or store, then mtval will contain the
         // faulting virtual address.
 
-        let phys_addr =
-            if let Some(phys_addr) = self.translation_cache.try_translate(mode, satp, virt_addr) {
-                phys_addr
-            } else {
-                let phys_addr =
-                    self.translate_with_prefetch(mode, satp, virt_addr, AccessType::Instruction)?;
+        let phys_addr = if let Some(phys_addr) =
+            self.translation_cache
+                .try_translate(mode, satp, AccessType::Instruction, virt_addr)
+        {
+            phys_addr
+        } else {
+            let phys_addr =
+                self.translate_with_prefetch(mode, satp, virt_addr, AccessType::Instruction)?;
 
-                self.translation_cache
-                    .update_cache(mode, satp, virt_addr, phys_addr);
+            self.translation_cache.cache_translation(
+                mode,
+                satp,
+                AccessType::Instruction,
+                virt_addr,
+                phys_addr,
+            );
 
-                phys_addr
-            };
+            phys_addr
+        };
 
         Ok(phys_addr)
     }
@@ -526,7 +529,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Wfi => run_no_args_instr!(self, instr, run_wfi),
             // Supervisor Memory-Management
             Instr::SFenceVma { asid, vaddr } => {
-                self.sfence_vma(asid, vaddr)?;
+                self.run_sfence_vma(asid, vaddr)?;
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
 

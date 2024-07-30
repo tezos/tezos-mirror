@@ -19,7 +19,10 @@ where
     M: backend::Manager,
 {
     /// Generic read function for loading `mem::size_of<T>` bytes from `address`
-    pub(super) fn read_from_address<T: backend::Elem>(&self, address: u64) -> Result<T, Exception> {
+    pub(super) fn read_from_address<T: backend::Elem>(
+        &mut self,
+        address: u64,
+    ) -> Result<T, Exception> {
         let address = self.translate(address, AccessType::Load)?;
 
         self.bus
@@ -29,7 +32,7 @@ where
 
     /// Generic read function for loading `mem::size_of<T>` bytes from address val(rs1) + imm
     pub(super) fn read_from_bus<T: backend::Elem>(
-        &self,
+        &mut self,
         imm: i64,
         rs1: XRegister,
     ) -> Result<T, Exception> {
