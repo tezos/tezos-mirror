@@ -24,6 +24,9 @@
   of a path in the storage. (!14129)
 - The current timestamp is used in simulation (instead of previous block
   timestamp) if the kernel version is compatible. (!14186)
+- Adds a `run sandbox` command runs the evm-node in a sequencer-like mode
+  but do not require the sequencer's secret key and any connection to
+  a rollup node. It is meant for debugging only. (!14258)
 
 ### Bug fixes
 

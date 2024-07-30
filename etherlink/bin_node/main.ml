@@ -661,13 +661,18 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
-    ?restricted_rpcs ?kernel ?dal_slots () =
+    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_key () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
-    Option.map_es
-      (Client_keys.Secret_key.parse_source_string wallet_ctxt)
-      sequencer_str
+    match sandbox_key with
+    | Some (_pk, sk) ->
+        let*? sk = Tezos_signer_backends.Unencrypted.make_sk sk in
+        return_some sk
+    | None ->
+        Option.map_es
+          (Client_keys.Secret_key.parse_source_string wallet_ctxt)
+          sequencer_str
   in
   let* configuration =
     Cli.create_or_read_config
@@ -728,6 +733,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ~cctxt:(wallet_ctxt :> Client_context.wallet)
     ~configuration
     ?kernel
+    ?sandbox_key
     ()
 
 let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
@@ -1711,6 +1717,18 @@ let sequencer_config_args =
     (Client_config.password_filename_arg ())
     dal_slots_arg
 
+let sandbox_config_args =
+  Tezos_clic.args9
+    preimages_arg
+    preimages_endpoint_arg
+    time_between_blocks_arg
+    max_number_of_chunks_arg
+    private_rpc_port_arg
+    genesis_timestamp_arg
+    initial_kernel_arg
+    wallet_dir_arg
+    (Client_config.password_filename_arg ())
+
 let sequencer_simple_command =
   let open Tezos_clic in
   command
@@ -1780,6 +1798,79 @@ let sequencer_simple_command =
         ?restricted_rpcs
         ?kernel
         ?dal_slots
+        ())
+
+let sandbox_command =
+  let open Tezos_clic in
+  command
+    ~desc:
+      "Start the EVM node in sandbox mode. The sandbox mode is a \
+       sequencer-like mode that produces blocks with a fake key and no rollup \
+       node connection."
+    (merge_options common_config_args sandbox_config_args)
+    (prefixes ["run"; "sandbox"] stop)
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             _devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose,
+             restricted_rpcs ),
+           ( preimages,
+             preimages_endpoint,
+             time_between_blocks,
+             max_number_of_chunks,
+             private_rpc_port,
+             genesis_timestamp,
+             kernel,
+             wallet_dir,
+             password_filename ) )
+         () ->
+      let _pkh, pk, sk =
+        Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
+      in
+      let rollup_node_endpoint =
+        Option.value ~default:Uri.empty rollup_node_endpoint
+      in
+      start_sequencer
+        ?password_filename
+        ~wallet_dir
+        ~data_dir
+        ?rpc_addr
+        ?rpc_port
+        ?cors_origins
+        ?cors_headers
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ~keep_alive
+        ~rollup_node_endpoint
+        ~verbose
+        ?preimages
+        ?preimages_endpoint
+        ?time_between_blocks
+        ?max_number_of_chunks
+        ?private_rpc_port
+        ~max_blueprints_lag:100_000_000
+        ~max_blueprints_ahead:100_000_000
+        ~max_blueprints_catchup:100_000_000
+        ~catchup_cooldown:100_000_000
+        ?log_filter_max_nb_blocks
+        ?log_filter_max_nb_logs
+        ?log_filter_chunk_size
+        ?genesis_timestamp
+        ?restricted_rpcs
+        ?kernel
+        ~sandbox_key:(pk, sk)
         ())
 
 let threshold_encryption_sequencer_config_args =
@@ -1938,6 +2029,7 @@ let observer_simple_command =
 (* List of program commands *)
 let commands =
   [
+    sandbox_command;
     proxy_command;
     proxy_simple_command;
     sequencer_command;

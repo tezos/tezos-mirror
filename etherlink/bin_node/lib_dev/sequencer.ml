@@ -211,28 +211,40 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
   loop Misc.(now ())
 
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
-    ~(configuration : Configuration.t) ?kernel () =
+    ~(configuration : Configuration.t) ?kernel ?sandbox_key () =
   let open Lwt_result_syntax in
   let open Configuration in
   Metrics.Info.init ~mode:"sequencer" ;
   let {rollup_node_endpoint; keep_alive; _} = configuration in
-  let* smart_rollup_address =
-    Rollup_services.smart_rollup_address
-      ~keep_alive:configuration.keep_alive
-      rollup_node_endpoint
-  in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in
-  let* status =
+  let* rollup_node_smart_rollup_address =
+    if Option.is_some sandbox_key then return_none
+    else
+      let* sr1 =
+        Rollup_services.smart_rollup_address
+          ~keep_alive:configuration.keep_alive
+          rollup_node_endpoint
+      in
+      return_some sr1
+  in
+  let* status, smart_rollup_address_typed =
     Evm_context.start
       ?kernel_path:kernel
       ~data_dir
       ~preimages:sequencer_config.preimages
       ~preimages_endpoint:sequencer_config.preimages_endpoint
       ~fail_on_missing_blueprint:true
-      ~smart_rollup_address
+      ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write
       ()
   in
+  let smart_rollup_address = Address.to_string smart_rollup_address_typed in
+  let* () =
+    match sandbox_key with
+    | Some (pk, _sk) -> Evm_context.patch_sequencer_key pk
+    | None -> return_unit
+  in
+
   let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
   Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
@@ -261,10 +273,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       let* () = Evm_context.apply_blueprint genesis_timestamp genesis [] in
       Blueprints_publisher.publish Z.zero genesis
     else return_unit
-  in
-
-  let smart_rollup_address_typed =
-    Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
   in
 
   let module Rollup_rpc = Make (struct
@@ -296,15 +304,22 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       }
   in
   let* () =
-    Evm_events_follower.start
-      {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
-  in
-  let () =
-    Rollup_node_follower.start
-      ~keep_alive:configuration.keep_alive
-      ~proxy:false
-      ~rollup_node_endpoint
-      ()
+    if Option.is_some sandbox_key then
+      let*! () = Events.sandbox_started (Z.pred next_blueprint_number) in
+      return_unit
+    else
+      let* () =
+        Evm_events_follower.start
+          {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
+      in
+      let () =
+        Rollup_node_follower.start
+          ~keep_alive:configuration.keep_alive
+          ~proxy:false
+          ~rollup_node_endpoint
+          ()
+      in
+      return_unit
   in
   let directory =
     Services.directory configuration ((module Rollup_rpc), smart_rollup_address)

@@ -44,6 +44,8 @@ let delayed_inbox = EVM.make "/delayed-inbox"
 
 let sequencer_pool_address = EVM.make "/sequencer_pool_address"
 
+let sequencer_key = EVM.make "/sequencer"
+
 module Accounts = struct
   let accounts = World_state.make "/eth_accounts"
 

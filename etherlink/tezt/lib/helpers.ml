@@ -57,7 +57,7 @@ let next_rollup_node_level ~sc_rollup_node ~client =
 
 let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
   match Evm_node.mode evm_node with
-  | Sequencer _ -> Rpc.produce_block ?timestamp evm_node
+  | Sandbox _ | Sequencer _ -> Rpc.produce_block ?timestamp evm_node
   | Threshold_encryption_sequencer {time_between_blocks; _} -> (
       let open Rpc.Syntax in
       let*@ current_number = Rpc.block_number evm_node in
@@ -84,7 +84,7 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
   | Proxy _ ->
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
-  | Sequencer _ | Threshold_encryption_sequencer _ ->
+  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ ->
       let open Rpc.Syntax in
       let*@ _l2_level = produce_block evm_node in
       unit
@@ -391,3 +391,43 @@ let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
       (List.init size Fun.id)
   in
   return withdrawal_level
+
+let init_sequencer_sandbox ?(kernel = Constant.WASM.evm_kernel)
+    ?(bootstrap_accounts =
+      List.map
+        (fun account -> account.Eth_account.address)
+        (Array.to_list Eth_account.bootstrap_accounts)) () =
+  let wallet_dir = Temp.dir "wallet" in
+  let output_config = Temp.file "config.yaml" in
+  let preimages_dir = Temp.dir "wasm_2_0_0" in
+
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ~output:output_config
+      ~bootstrap_accounts
+      ()
+  in
+  let* {output; _} =
+    Sc_rollup_helpers.prepare_installer_kernel
+      ~preimages_dir
+      ~config:(`Path output_config)
+      kernel
+  in
+  let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
+  let sequencer_mode =
+    Evm_node.(
+      Sandbox
+        {
+          initial_kernel = output;
+          preimage_dir = Some preimages_dir;
+          private_rpc_port = Some (Port.fresh ());
+          time_between_blocks = Some Nothing;
+          genesis_timestamp = None;
+          max_number_of_chunks = None;
+          wallet_dir = Some wallet_dir;
+          tx_pool_timeout_limit = None;
+          tx_pool_addr_limit = None;
+          tx_pool_tx_per_addr_limit = None;
+        })
+  in
+  Evm_node.init ~mode:sequencer_mode Uri.(empty |> to_string)

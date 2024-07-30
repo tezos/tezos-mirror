@@ -71,4 +71,10 @@ val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t
 
 val patched_kernel : Ethereum_types.quantity -> unit Lwt.t
 
+val patched_sequencer_key : string -> unit Lwt.t
+
 val invalid_kernel : unit -> unit Lwt.t
+
+(** [sandbox_started level] advertizes that sandbox mode started on top of
+    level [level]. *)
+val sandbox_started : Z.t -> unit Lwt.t

@@ -161,6 +161,14 @@ let patched_kernel =
     ~msg:"Kernel successfully patched, starting from level {level}"
     ("level", Ethereum_types.quantity_encoding)
 
+let patched_sequencer_key =
+  Internal_event.Simple.declare_1
+    ~level:Warning
+    ~section
+    ~name:"patched_sequencer_key"
+    ~msg:"State successfully patched, public key is now {pk}"
+    ("pk", Data_encoding.string)
+
 let invalid_kernel =
   Internal_event.Simple.declare_0
     ~level:Error
@@ -168,6 +176,14 @@ let invalid_kernel =
     ~name:"invalid_kernel"
     ~msg:"The kernel stored in the EVM state is not valid"
     ()
+
+let sandbox_started =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"sandbox_started"
+    ~msg:"Starting sandbox mode at level {level}"
+    ("level", Data_encoding.z)
 
 let received_upgrade payload = emit received_upgrade payload
 
@@ -212,4 +228,8 @@ let retrying_connect ~endpoint ~delay =
 
 let patched_kernel level = emit patched_kernel level
 
+let patched_sequencer_key pk = emit patched_sequencer_key pk
+
 let invalid_kernel () = emit invalid_kernel ()
+
+let sandbox_started level = emit sandbox_started level

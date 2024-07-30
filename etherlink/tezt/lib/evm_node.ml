@@ -60,6 +60,18 @@ type mode =
       tx_pool_tx_per_addr_limit : int option;
       dal_slots : int list option;
     }
+  | Sandbox of {
+      initial_kernel : string;
+      preimage_dir : string option;
+      private_rpc_port : int option;
+      time_between_blocks : time_between_blocks option;
+      genesis_timestamp : Client.timestamp option;
+      max_number_of_chunks : int option;
+      wallet_dir : string option;
+      tx_pool_timeout_limit : int option;
+      tx_pool_addr_limit : int option;
+      tx_pool_tx_per_addr_limit : int option;
+    }
   | Threshold_encryption_sequencer of {
       initial_kernel : string;
       preimage_dir : string option;
@@ -114,12 +126,13 @@ let mode t = t.persistent_state.mode
 
 let is_sequencer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Threshold_encryption_sequencer _ -> true
+  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ -> true
   | Observer _ | Threshold_encryption_observer _ | Proxy _ -> false
 
 let initial_kernel t =
   match t.persistent_state.mode with
   | Sequencer {initial_kernel; _}
+  | Sandbox {initial_kernel; _}
   | Threshold_encryption_sequencer {initial_kernel; _}
   | Observer {initial_kernel; _}
   | Threshold_encryption_observer {initial_kernel; _} ->
@@ -130,7 +143,7 @@ let initial_kernel t =
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
-  | Sequencer _ | Threshold_encryption_sequencer _ | Observer _
+  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Observer _
   | Threshold_encryption_observer _ ->
       true
   | Proxy _ -> false
@@ -445,6 +458,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     match mode with
     | Proxy _ -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
+    | Sandbox _ -> "sandbox_" ^ fresh_name ()
     | Threshold_encryption_sequencer _ -> "te_sequencer_" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
     | Threshold_encryption_observer _ ->
@@ -500,6 +514,14 @@ let run_args evm_node =
         @ Cli_arg.optional_switch "finalized-view" finalized_view
     | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
         ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
+        @ Cli_arg.optional_arg
+            "genesis-timestamp"
+            (fun timestamp ->
+              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
+            genesis_timestamp
+        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+    | Sandbox {initial_kernel; genesis_timestamp; wallet_dir; _} ->
+        ["run"; "sandbox"; "--initial-kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
             (fun timestamp ->
@@ -697,6 +719,50 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
+    | Sandbox
+        {
+          initial_kernel = _;
+          preimage_dir;
+          private_rpc_port;
+          time_between_blocks;
+          genesis_timestamp = _;
+          max_number_of_chunks;
+          wallet_dir;
+          tx_pool_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
+        } ->
+        [
+          (* These two fields are not necessary for the sandbox mode, however,
+             the init configuration needs them. *)
+          "--sequencer-key";
+          "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
+          "--rollup-node-endpoint";
+          evm_node.persistent_state.endpoint;
+        ]
+        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
+        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
+        @ Cli_arg.optional_arg
+            "time-between-blocks"
+            time_between_blocks_fmt
+            time_between_blocks
+        @ Cli_arg.optional_arg
+            "max-number-of-chunks"
+            string_of_int
+            max_number_of_chunks
+        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ Cli_arg.optional_arg
+            "tx-pool-timeout-limit"
+            string_of_int
+            tx_pool_timeout_limit
+        @ Cli_arg.optional_arg
+            "tx-pool-addr-limit"
+            string_of_int
+            tx_pool_addr_limit
+        @ Cli_arg.optional_arg
+            "tx-pool-tx-per-addr-limit"
+            string_of_int
+            tx_pool_tx_per_addr_limit
     | Threshold_encryption_sequencer
         {
           initial_kernel = _;
@@ -821,9 +887,11 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
     in
     if private_ then
       match evm_node.persistent_state.mode with
-      | Sequencer {private_rpc_port = Some private_rpc_port; _} ->
+      | Sequencer {private_rpc_port = Some private_rpc_port; _}
+      | Sandbox {private_rpc_port = Some private_rpc_port; _} ->
           (host, private_rpc_port, "/private")
-      | Sequencer {private_rpc_port = None; _} ->
+      | Sequencer {private_rpc_port = None; _}
+      | Sandbox {private_rpc_port = None; _} ->
           Test.fail "Sequencer doesn't have a private RPC server"
       | Threshold_encryption_sequencer
           {private_rpc_port = Some private_rpc_port; _} ->
