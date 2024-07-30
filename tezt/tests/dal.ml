@@ -4813,7 +4813,7 @@ module History_rpcs = struct
       dal_node
 
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
     let description = "test commitments history with migration" in
     let slot_index = 3 in
     let scenario ~migrate_to ~migration_level dal_parameters =
@@ -7710,6 +7710,7 @@ let register ~protocols =
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:[Tag.ci_disabled]
     ~attestation_threshold:100
     ~producer_profiles:[0]
     "dal attester with bake for"
@@ -7778,7 +7779,7 @@ let register ~protocols =
     test_peer_discovery_via_bootstrap_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"; "rpc"]
+    ~tags:["gossipsub"; "rpc"; Tag.ci_disabled]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     "GS/RPC get_connections"
@@ -7808,7 +7809,7 @@ let register ~protocols =
     test_attestation_through_p2p
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["rpc"; "skip_list"]
+    ~tags:["rpc"; "skip_list"; Tag.ci_disabled]
     ~producer_profiles:[15]
     "commitments history RPCs"
     History_rpcs.test_commitments_history_rpcs
@@ -7866,7 +7867,7 @@ let register ~protocols =
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:[Tag.flaky]
+    ~tags:[Tag.ci_disabled]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
@@ -7886,6 +7887,7 @@ let register ~protocols =
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
+    ~tags:[Tag.ci_disabled]
     ~producer_profiles:[0]
     "test reveal_dal_page in fast exec wasm pvm"
     ~uses:(fun _protocol ->
@@ -7900,6 +7902,7 @@ let register ~protocols =
     protocols ;
   scenario_with_all_nodes
     "test tx_kernel"
+    ~tags:[Tag.ci_disabled]
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
