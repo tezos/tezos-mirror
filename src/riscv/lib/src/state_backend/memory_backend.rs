@@ -205,7 +205,7 @@ pub mod test_helpers {
 pub mod tests {
     use super::*;
     use crate::state_backend::{
-        AllocatedOf, Array, Atom, Backend, Cell, CellRead, CellWrite, Manager, Region,
+        AllocatedOf, Array, Atom, Backend, Cell, CellRead, CellWrite, Cells, Manager,
     };
 
     #[test]
@@ -214,7 +214,7 @@ pub mod tests {
 
         struct T<M: Manager> {
             first: Cell<u64, M>,
-            second: M::Region<u32, 4>,
+            second: Cells<u32, 4, M>,
         }
 
         impl<M: Manager> T<M> {
@@ -243,7 +243,7 @@ pub mod tests {
 
         struct T<M: Manager> {
             first: Cell<u64, M>,
-            second: M::Region<u32, 4>,
+            second: Cells<u32, 4, M>,
         }
 
         impl<M: Manager> T<M> {

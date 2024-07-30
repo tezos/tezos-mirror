@@ -392,7 +392,7 @@ pub mod tests {
     backend_test!(test_example, F, {
         struct Example<M: Manager> {
             first: Cell<u64, M>,
-            second: M::Region<u32, 4>,
+            second: Cells<u32, 4, M>,
         }
 
         type ExampleLayout = (Atom<u64>, Array<u32, 4>);

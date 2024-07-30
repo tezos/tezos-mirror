@@ -204,13 +204,15 @@ impl<E: Elem, T: Region<Elem = E>> Region for &T {
 /// Single element of type `E`
 #[repr(transparent)]
 pub struct Cell<E: Elem, M: Manager + ?Sized> {
-    region: M::Region<E, 1>,
+    region: Cells<E, 1, M>,
 }
 
 impl<E: Elem, M: Manager> Cell<E, M> {
     /// Bind this state to the single element region.
     pub fn bind(region: M::Region<E, 1>) -> Self {
-        Self { region }
+        Self {
+            region: Cells::bind(region),
+        }
     }
 }
 
@@ -277,6 +279,61 @@ impl<E: CellWrite> CellWrite for &mut E {
     #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
         E::replace(self, value)
+    }
+}
+
+/// Multiple elements of type `E`
+#[repr(transparent)]
+pub struct Cells<E: Elem, const LEN: usize, M: Manager + ?Sized> {
+    region: M::Region<E, LEN>,
+}
+
+impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
+    /// Bind this state to the given region.
+    pub fn bind(region: M::Region<E, LEN>) -> Self {
+        Self { region }
+    }
+
+    /// Read an element in the region.
+    #[inline]
+    pub fn read(&self, index: usize) -> E {
+        M::Region::read(&self.region, index)
+    }
+
+    /// Read all elements in the region.
+    #[inline]
+    pub fn read_all(&self) -> Vec<E> {
+        M::Region::read_all(&self.region)
+    }
+
+    /// Read `buffer.len()` elements from the region, starting at `offset`.
+    #[inline]
+    pub fn read_some(&self, offset: usize, buffer: &mut [E]) {
+        M::Region::read_some(&self.region, offset, buffer)
+    }
+
+    /// Update an element in the region.
+    #[inline]
+    pub fn write(&mut self, index: usize, value: E) {
+        M::Region::write(&mut self.region, index, value)
+    }
+
+    /// Update all elements in the region.
+    #[inline]
+    pub fn write_all(&mut self, value: &[E]) {
+        M::Region::write_all(&mut self.region, value)
+    }
+
+    /// Update a subset of elements in the region starting at `index`.
+    #[inline]
+    pub fn write_some(&mut self, index: usize, buffer: &[E]) {
+        M::Region::write_some(&mut self.region, index, buffer)
+    }
+
+    /// Update the element in the region and return the previous value.
+    #[inline]
+    pub fn replace(&mut self, index: usize, value: E) -> E {
+        M::Region::replace(&mut self.region, index, value)
     }
 }
 
@@ -405,7 +462,7 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location, Region,
+            Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location,
         },
     };
 

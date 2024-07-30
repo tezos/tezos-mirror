@@ -4,7 +4,7 @@
 
 use super::{
     alloc::{Choreographer, Location, Placed},
-    Cell,
+    Cell, Cells,
 };
 use std::{array, marker::PhantomData};
 
@@ -69,10 +69,11 @@ impl<T: super::Elem, const LEN: usize> Layout for Array<T, LEN> {
         alloc.alloc()
     }
 
-    type Allocated<B: super::Manager> = B::Region<T, LEN>;
+    type Allocated<B: super::Manager> = Cells<T, LEN, B>;
 
     fn allocate<B: super::Manager>(backend: &mut B, placed: Self::Placed) -> Self::Allocated<B> {
-        backend.allocate_region(placed)
+        let region = backend.allocate_region(placed);
+        Cells::bind(region)
     }
 }
 
