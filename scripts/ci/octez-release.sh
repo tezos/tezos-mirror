@@ -24,7 +24,7 @@ gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-v([0-9]+)\.([0-9]+)$
 
 # Strips the leading 'octez-v'
 # X.Y, X.Y-rcZ or X.Y-betaZ
-gitlab_release_no_v=$(echo "${CI_COMMIT_TAG}" | sed -e 's/^octez-v//g')
+gitlab_release_no_v=$(echo "${gitlab_release}" | sed -e 's/^octez-v//g')
 
 # Replace '.' with '-'
 # X-Y or X-Y-rcZ
