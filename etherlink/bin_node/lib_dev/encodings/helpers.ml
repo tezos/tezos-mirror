@@ -5,6 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let encode_u8 i =
+  let bytes = Bytes.make 1 '\000' in
+  Bytes.set_uint8 bytes 0 i ;
+  bytes
+
+let encode_i32_le i =
+  let bytes = Bytes.make 4 '\000' in
+  Bytes.set_int32_le bytes 0 i ;
+  bytes
+
 let encoding_with_optional_last_param encoding second_param_encoding
     default_second_param =
   let open Data_encoding in
