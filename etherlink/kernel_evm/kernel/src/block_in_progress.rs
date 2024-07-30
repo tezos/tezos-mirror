@@ -247,6 +247,10 @@ impl BlockInProgress {
         self.estimated_ticks_in_block += ticks;
     }
 
+    pub fn register_delayed_transaction(&mut self, hash: TransactionHash) {
+        self.delayed_txs.push(hash);
+    }
+
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
         transaction: &Transaction,
