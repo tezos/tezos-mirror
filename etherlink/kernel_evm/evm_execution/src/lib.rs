@@ -125,6 +125,8 @@ pub enum EthereumError {
     /// Underflow of gas limit when subtracting gas for fees
     #[error("Insufficient gas to cover the non-execution fees")]
     GasToFeesUnderflow,
+    #[error("Error while trying to trace a transaction: {0}")]
+    Tracer(#[from] tracer::Error),
 }
 
 fn trace_outcome<Host: Runtime>(
@@ -133,15 +135,12 @@ fn trace_outcome<Host: Runtime>(
     is_success: bool,
     result: &Option<Vec<u8>>,
     gas_used: u64,
-) -> Result<(), StorageError> {
+) -> Result<(), EthereumError> {
     if tracing {
-        tracer::store_trace_failed(handler.host, is_success)
-            .map_err(StorageError::RuntimeError)?;
-        tracer::store_trace_gas(handler.host, gas_used)
-            .map_err(StorageError::RuntimeError)?;
+        tracer::store_trace_failed(handler.host, is_success)?;
+        tracer::store_trace_gas(handler.host, gas_used)?;
         if let Some(return_value) = result {
-            tracer::store_return_value(handler.host, return_value)
-                .map_err(StorageError::RuntimeError)?;
+            tracer::store_return_value(handler.host, return_value)?;
         }
     }
     Ok(())

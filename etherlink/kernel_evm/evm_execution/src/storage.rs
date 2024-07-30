@@ -9,7 +9,8 @@ pub mod tracer {
         runtime::{Runtime, RuntimeError},
     };
 
-    use tezos_indexable_storage::IndexableStorage;
+    use tezos_indexable_storage::{IndexableStorage, IndexableStorageError};
+    use tezos_smart_rollup_storage::StorageError;
     use thiserror::Error;
 
     use crate::trace::StructLog;
@@ -19,31 +20,38 @@ pub mod tracer {
     const TRACE_RETURN_VALUE: RefPath = RefPath::assert_from(b"/evm/trace/return_value");
     const TRACE_STRUCT_LOGS: RefPath = RefPath::assert_from(b"/evm/trace/struct_logs");
 
-    #[derive(Error, Debug, PartialEq)]
+    #[derive(Eq, Error, Debug, PartialEq)]
     pub enum Error {
-        #[error("Error while tracing.")]
-        TracerError,
+        #[error("Error from the indexable storage while tracing: {0}")]
+        IndexableStorageError(#[from] IndexableStorageError),
+        #[error("Error from runtime while tracing: {0}")]
+        RuntimeError(#[from] RuntimeError),
+        #[error("Error when storing while tracing: {0}")]
+        StorageError(#[from] StorageError),
     }
 
     pub fn store_trace_gas<Host: Runtime>(
         host: &mut Host,
         gas: u64,
-    ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_GAS, gas.to_le_bytes().as_slice())
+    ) -> Result<(), Error> {
+        host.store_write_all(&TRACE_GAS, gas.to_le_bytes().as_slice())?;
+        Ok(())
     }
 
     pub fn store_trace_failed<Host: Runtime>(
         host: &mut Host,
         is_success: bool,
-    ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_FAILED, &[u8::from(!is_success)])
+    ) -> Result<(), Error> {
+        host.store_write_all(&TRACE_FAILED, &[u8::from(!is_success)])?;
+        Ok(())
     }
 
     pub fn store_return_value<Host: Runtime>(
         host: &mut Host,
         value: &[u8],
-    ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_RETURN_VALUE, value)
+    ) -> Result<(), Error> {
+        host.store_write_all(&TRACE_RETURN_VALUE, value)?;
+        Ok(())
     }
 
     pub fn store_struct_log<Host: Runtime>(
@@ -52,12 +60,11 @@ pub mod tracer {
     ) -> Result<(), Error> {
         let logs = rlp::encode(&struct_log);
 
-        let struct_logs_storage =
-            IndexableStorage::new(&TRACE_STRUCT_LOGS).map_err(|_| Error::TracerError)?;
+        let struct_logs_storage = IndexableStorage::new(&TRACE_STRUCT_LOGS)?;
 
-        struct_logs_storage
-            .push_value(host, &logs)
-            .map_err(|_| Error::TracerError)
+        struct_logs_storage.push_value(host, &logs)?;
+
+        Ok(())
     }
 }
 
