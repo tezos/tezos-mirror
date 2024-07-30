@@ -13,14 +13,14 @@ use crate::tick_model::constants::{
     TICKS_PER_DEPOSIT_PARSING,
 };
 use crate::{
-    inbox::{Deposit, Transaction, TransactionContent},
+    bridge::Deposit,
+    inbox::{Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
     upgrade::SequencerUpgrade,
 };
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::TICKS_PER_FA_DEPOSIT_PARSING;
-use primitive_types::{H160, U256};
 use rlp::Encodable;
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeySignatureVerifier};
@@ -28,7 +28,6 @@ use tezos_ethereum::{
     rlp_helpers::FromRlpBytes,
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
-    wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::{
@@ -448,7 +447,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                 log!(
                     host,
                     Debug,
-                    "Deposit ignored because of parsing errors: {}",
+                    "FA deposit ignored because of parsing errors: {}",
                     err
                 );
                 InputResult::Unparsable
@@ -460,35 +459,28 @@ impl<Mode: Parsable> InputResult<Mode> {
         host: &mut Host,
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
+        inbox_level: u32,
+        inbox_msg_id: u32,
         context: &mut Mode::Context,
     ) -> Self {
         // Account for tick at the beginning of the deposit, in case it fails
         // directly. We prefer to overapproximate rather than under approximate.
         Mode::on_deposit(context);
-        // Amount
-        let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
-        // We use the `U256::from_little_endian` as it takes arbitrary long
-        // bytes. Afterward it's transform to `u64` to use `eth_from_mutez`, it's
-        // obviously safe as we deposit CTEZ and the amount is limited by
-        // the XTZ quantity.
-        let amount: u64 = U256::from_little_endian(&amount_bytes).as_u64();
-        let amount: U256 = eth_from_mutez(amount);
-
-        // EVM address
-        let receiver_bytes = receiver.0;
-        if receiver_bytes.len() != std::mem::size_of::<H160>() {
-            log!(
-                host,
-                Info,
-                "Deposit ignored because of invalid receiver address"
-            );
-            return InputResult::Unparsable;
+        match Deposit::try_parse(ticket, receiver, inbox_level, inbox_msg_id) {
+            Ok(deposit) => {
+                log!(host, Info, "Parsed from input: {}", deposit.display());
+                Self::Input(Input::Deposit(deposit))
+            }
+            Err(err) => {
+                log!(
+                    host,
+                    Info,
+                    "Deposit ignored because of parsing errors: {}",
+                    err
+                );
+                Self::Unparsable
+            }
         }
-        let receiver = H160::from_slice(&receiver_bytes);
-
-        let content = Deposit { amount, receiver };
-        log!(host, Info, "Deposit of {} to {}.", amount, receiver);
-        Self::Input(Input::Deposit(content))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -519,7 +511,14 @@ impl<Mode: Parsable> InputResult<Mode> {
                     match &ticket.creator().0 {
                         Contract::Originated(kt1) => {
                             if Some(kt1) == tezos_contracts.ticketer.as_ref() {
-                                Self::parse_deposit(host, ticket, receiver, context)
+                                Self::parse_deposit(
+                                    host,
+                                    ticket,
+                                    receiver,
+                                    inbox_level,
+                                    inbox_msg_id,
+                                    context,
+                                )
                             } else if enable_fa_deposits {
                                 Self::parse_fa_deposit(
                                     host,

@@ -406,7 +406,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Record the cost of a static-cost opcode
     pub fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
         let Some(layer) = self.transaction_data.last_mut() else {
-            return Err(ExitError::Other(Cow::from("Recording cost, but there is no transaction in progress")))
+            return Err(ExitError::Other(Cow::from(
+                "Recording cost, but there is no transaction in progress",
+            )));
         };
 
         layer
@@ -419,7 +421,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Record code deposit. Pay per byte for a CREATE operation
     pub fn record_deposit(&mut self, len: usize) -> Result<(), ExitError> {
         let Some(layer) = self.transaction_data.last_mut() else {
-            return Err(ExitError::Other(Cow::from("Recording cost, but there is no transaction in progress")))
+            return Err(ExitError::Other(Cow::from(
+                "Recording cost, but there is no transaction in progress",
+            )));
         };
 
         layer
@@ -436,7 +440,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         memory_cost: Option<MemoryCost>,
     ) -> Result<(), ExitError> {
         let Some(layer) = self.transaction_data.last_mut() else {
-            return Err(ExitError::Other(Cow::from("Recording cost, but there is no transaction in progress")))
+            return Err(ExitError::Other(Cow::from(
+                "Recording cost, but there is no transaction in progress",
+            )));
         };
 
         layer
@@ -452,7 +458,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// implement this functionality.
     fn record_stipend(&mut self, stipend: u64) -> Result<(), EthereumError> {
         let Some(layer) = self.transaction_data.last_mut() else {
-            return Err(EthereumError::InconsistentTransactionStack(self.transaction_data.len(), false, false))
+            return Err(EthereumError::InconsistentTransactionStack(
+                self.transaction_data.len(),
+                false,
+                false,
+            ));
         };
 
         layer
@@ -512,7 +522,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Check if some location in durable storage is hot
     fn is_storage_hot(&self, address: H160, index: H256) -> Result<bool, ExitError> {
         let Some(layer) = self.transaction_data.last() else {
-            return Err(ExitError::Other(Cow::from("Invalid transaction data stack for is_storage_hot")))
+            return Err(ExitError::Other(Cow::from(
+                "Invalid transaction data stack for is_storage_hot",
+            )));
         };
 
         Ok(layer.accessed_storage_keys.contains_storage(address, index))
@@ -521,8 +533,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Check if address is hot
     fn is_address_hot(&self, address: H160) -> Result<bool, ExitError> {
         let Some(layer) = self.transaction_data.last() else {
-                return Err(ExitError::Other(Cow::from("Invalid transaction data stack for is_address_hot")))
-            };
+            return Err(ExitError::Other(Cow::from(
+                "Invalid transaction data stack for is_address_hot",
+            )));
+        };
 
         Ok(layer.accessed_storage_keys.contains_address(address))
     }
@@ -613,7 +627,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
         effective_gas_price: U256,
     ) -> Result<bool, EthereumError> {
-        let Some(gas_limit) = gas_limit else { return Ok(true) };
+        let Some(gas_limit) = gas_limit else {
+            return Ok(true);
+        };
 
         let amount = U256::from(gas_limit)
             .checked_mul(effective_gas_price)
@@ -637,7 +653,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         unused_gas: Option<u64>,
         effective_gas_price: U256,
     ) -> Result<(), EthereumError> {
-        let Some(unused_gas) = unused_gas else { return Ok(()) };
+        let Some(unused_gas) = unused_gas else {
+            return Ok(());
+        };
 
         let amount = U256::from(unused_gas)
             .checked_mul(effective_gas_price)

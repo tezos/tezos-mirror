@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::store_sequencer_blueprint;
+use crate::bridge::Deposit;
 use crate::configuration::{fetch_limits, DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprints_from_dal;
 use crate::delayed_inbox::DelayedInbox;
@@ -16,10 +17,9 @@ use crate::parsing::{
 
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
-    chunked_transaction_path, clear_events, create_chunked_transaction,
-    get_and_increment_deposit_nonce, read_l1_level, read_last_info_per_level_timestamp,
-    remove_chunked_transaction, remove_sequencer, store_l1_level,
-    store_last_info_per_level_timestamp, store_transaction_chunk,
+    chunked_transaction_path, clear_events, create_chunked_transaction, read_l1_level,
+    read_last_info_per_level_timestamp, remove_chunked_transaction, remove_sequencer,
+    store_l1_level, store_last_info_per_level_timestamp, store_transaction_chunk,
 };
 use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
@@ -27,7 +27,6 @@ use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
 use evm_execution::fa_bridge::deposit::FaDeposit;
-use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -39,36 +38,6 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::runtime::Runtime;
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Deposit {
-    pub amount: U256,
-    pub receiver: H160,
-}
-
-impl Encodable for Deposit {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        stream.append(&self.amount);
-        stream.append(&self.receiver);
-    }
-}
-
-impl Decodable for Deposit {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 2 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
-
-        let mut it = decoder.iter();
-        let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
-        let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
-        Ok(Deposit { amount, receiver })
-    }
-}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
@@ -429,22 +398,8 @@ fn handle_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: Deposit,
 ) -> Result<Transaction, Error> {
-    let deposit_nonce = get_and_increment_deposit_nonce(host)?;
-
-    let mut buffer_amount = [0; 32];
-    deposit.amount.to_little_endian(&mut buffer_amount);
-
-    let mut to_hash = vec![];
-    to_hash.extend_from_slice(&buffer_amount);
-    to_hash.extend_from_slice(&deposit.receiver.to_fixed_bytes());
-    to_hash.extend_from_slice(&deposit_nonce.to_le_bytes());
-
-    let kec = Keccak256::digest(to_hash);
-    let tx_hash = kec
-        .as_slice()
-        .try_into()
-        .map_err(|_| Error::InvalidConversion)?;
-
+    let seed = host.reveal_metadata().raw_rollup_address;
+    let tx_hash = deposit.hash(&seed).into();
     Ok(Transaction {
         tx_hash,
         content: TransactionContent::Deposit(deposit),

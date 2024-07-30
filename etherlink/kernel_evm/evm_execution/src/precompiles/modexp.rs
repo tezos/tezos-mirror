@@ -121,7 +121,9 @@ pub fn modexp_precompile<Host: Runtime>(
 
     // cast exponent length to usize, it does not make sense to handle larger values.
     let Ok(exp_len) = usize::try_from(exp_len) else {
-        return Ok(modexp_mod_overflow_exit("exponent length: modexp mod overflow"));
+        return Ok(modexp_mod_overflow_exit(
+            "exponent length: modexp mod overflow",
+        ));
     };
 
     // Used to extract ADJUSTED_EXPONENT_LENGTH.

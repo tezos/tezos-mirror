@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 
 use crate::{
+    bridge::Deposit,
     current_timestamp,
     event::Event,
-    inbox::{Deposit, Transaction, TransactionContent},
+    inbox::{Transaction, TransactionContent},
     linked_list::LinkedList,
     storage,
 };

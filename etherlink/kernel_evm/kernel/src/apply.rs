@@ -6,11 +6,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use alloc::borrow::Cow;
-use evm::{ExitError, ExitReason, ExitSucceed};
-use evm_execution::account_storage::{
-    account_path, EthereumAccount, EthereumAccountStorage,
-};
+use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::execute_fa_deposit;
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
@@ -28,12 +24,13 @@ use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
+use crate::bridge::{execute_deposit, Deposit};
 use crate::configuration::Limits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
-use crate::inbox::{Deposit, Transaction, TransactionContent};
+use crate::inbox::{Transaction, TransactionContent};
 use crate::storage::index_account;
-use crate::{tick_model, CONFIG};
+use crate::CONFIG;
 
 // This implementation of `Transaction` is used to share the logic of
 // transaction receipt and transaction object making. The functions
@@ -283,10 +280,11 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     }
 
     // check that enough gas is provided to cover fees
-    let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees, is_delayed)
+    let Ok(gas_limit) =
+        tx_execution_gas_limit(transaction, &block_constant.block_fees, is_delayed)
     else {
         log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
-         return Ok(Validity::InvalidNotEnoughGasForFees)
+        return Ok(Validity::InvalidNotEnoughGasForFees);
     };
 
     // Gas limit max
@@ -419,45 +417,14 @@ fn apply_deposit<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let Deposit { amount, receiver } = deposit;
-
-    let mut do_deposit = |()| -> Option<()> {
-        let mut to_account = evm_account_storage
-            .get_or_create(host, &account_path(receiver).ok()?)
-            .ok()?;
-        to_account.balance_add(host, *amount).ok()
-    };
-
-    let is_success = do_deposit(()).is_some();
-
-    let reason = if is_success {
-        ExitReason::Succeed(ExitSucceed::Returned)
-    } else {
-        ExitReason::Error(ExitError::Other(Cow::from("Deposit failed")))
-    };
-
-    let gas_used = CONFIG.gas_transaction_call;
-
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/6551
-    let estimated_ticks_used = tick_model::constants::TICKS_FOR_DEPOSIT;
-
-    let execution_outcome = ExecutionOutcome {
-        gas_used,
-        reason: reason.into(),
-        new_address: None,
-        logs: vec![],
-        result: None,
-        withdrawals: vec![],
-        estimated_ticks_used,
-    };
-
-    let caller = H160::zero();
+    let execution_outcome = execute_deposit(host, evm_account_storage, deposit, CONFIG)
+        .map_err(Error::InvalidRunTransaction)?;
 
     Ok(ExecutionResult::Valid(TransactionResult {
-        caller,
+        caller: H160::zero(),
+        gas_used: execution_outcome.gas_used.into(),
+        estimated_ticks_used: execution_outcome.estimated_ticks_used,
         execution_outcome: Some(execution_outcome),
-        gas_used: gas_used.into(),
-        estimated_ticks_used,
     }))
 }
 

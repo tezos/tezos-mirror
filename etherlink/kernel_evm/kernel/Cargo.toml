@@ -67,6 +67,8 @@ getrandom = { version = "=0.2.15", features = ["custom"] }
 
 pretty_assertions.workspace = true
 evm-execution = { workspace = true, features = ["fa_bridge_testing"] }
+alloy-sol-types.workspace = true
+alloy-primitives.workspace = true
 
 [features]
 default = ["panic-hook"]

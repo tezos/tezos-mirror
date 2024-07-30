@@ -190,6 +190,7 @@ let _tezt_etherlink =
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
+        evm_node_lib_dev_encoding;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true

@@ -43,11 +43,11 @@ use super::error::FaBridgeError;
 
 /// Keccak256 of deposit(address,uint256,uint256), first 4 bytes
 /// This is function selector: https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector
-pub const DEPOSIT_METHOD_ID: &[u8; 4] = b"\x0e\xfe\x6a\x8b";
+pub const FA_PROXY_DEPOSIT_METHOD_ID: &[u8; 4] = b"\x0e\xfe\x6a\x8b";
 
 /// Keccak256 of Deposit(uint256,address,address,uint256,uint256,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
-pub const DEPOSIT_EVENT_TOPIC: &[u8; 32] = b"\
+pub const FA_DEPOSIT_EVENT_TOPIC: &[u8; 32] = b"\
     \x7e\xe7\xa1\xde\x9c\x18\xce\x69\x5c\x95\xb8\xb1\x9f\xbd\xf2\x6c\
     \xce\x35\x44\xe3\xca\x9e\x08\xc9\xf4\x87\x77\x67\x83\xd7\x59\x9f";
 
@@ -98,7 +98,7 @@ impl FaDeposit {
     /// Signature: deposit(address,uint256,uint256)
     pub fn calldata(&self) -> Vec<u8> {
         let mut call_data = Vec::with_capacity(100);
-        call_data.extend_from_slice(DEPOSIT_METHOD_ID);
+        call_data.extend_from_slice(FA_PROXY_DEPOSIT_METHOD_ID);
 
         call_data.extend_from_slice(&ABI_H160_LEFT_PADDING);
         call_data.extend_from_slice(&self.receiver.0);
@@ -147,7 +147,7 @@ impl FaDeposit {
             // Emitted by the "system" contract
             address: H160::zero(),
             // Event ID (non-anonymous) and indexed fields
-            topics: vec![H256(*DEPOSIT_EVENT_TOPIC), self.ticket_hash],
+            topics: vec![H256(*FA_DEPOSIT_EVENT_TOPIC), self.ticket_hash],
             // Non-indexed fields
             data,
         }
@@ -313,7 +313,7 @@ mod tests {
         };
 
         assert_eq!(
-            DEPOSIT_METHOD_ID.to_vec(),
+            FA_PROXY_DEPOSIT_METHOD_ID.to_vec(),
             Keccak256::digest(b"deposit(address,uint256,uint256)").to_vec()[..4]
         );
 
@@ -352,7 +352,7 @@ mod tests {
         );
 
         assert_eq!(
-            DEPOSIT_EVENT_TOPIC.to_vec(),
+            FA_DEPOSIT_EVENT_TOPIC.to_vec(),
             Keccak256::digest(
                 b"Deposit(uint256,address,address,uint256,uint256,uint256)"
             )
