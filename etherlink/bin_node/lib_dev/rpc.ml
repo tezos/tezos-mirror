@@ -336,13 +336,10 @@ let install_finalizer_rpc server =
   let* () = Events.shutdown_rpc_server ~private_:false in
   Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
 
-let main ~data_dir ~(config : Configuration.t) =
+let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
-  (* TODO: better UX than defaulting on the observer node *)
-  let*? observer = Configuration.observer_config_exn config in
   let* time_between_blocks =
-    Evm_services.get_time_between_blocks
-      ~evm_node_endpoint:observer.evm_node_endpoint
+    Evm_services.get_time_between_blocks ~evm_node_endpoint
   in
   let* ctxt =
     load
@@ -355,7 +352,7 @@ let main ~data_dir ~(config : Configuration.t) =
     (module Make (struct
       let ctxt = ctxt
 
-      let evm_node_endpoint = observer.evm_node_endpoint
+      let evm_node_endpoint = evm_node_endpoint
 
       let keep_alive = config.keep_alive
     end) : Services_backend_sig.S)
