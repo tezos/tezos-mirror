@@ -99,8 +99,8 @@ module S = struct
   let staked_balance =
     RPC_service.get_service
       ~description:
-        "Access the staked balance of a contract. Returns None if the contract \
-         is originated, or neither delegated nor a delegate."
+        "Access the staked balance of a contract (in mutez). Returns None if \
+         the contract is originated, or neither delegated nor a delegate."
       ~query:RPC_query.empty
       ~output:(option Tez.encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "staked_balance")
