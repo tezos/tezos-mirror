@@ -13,11 +13,13 @@
 val version : unit -> string Lwt.t
 
 (** [craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas
-    ~gas_price ~address ?signature ?arguments ()] crafts and signs a
-    transaction from [source_private_key] to [address]. Returns the
-    rlp-encoded transaction. [signature] and [arguments] are parameters
+    ~gas_price ?legacy ~address ?signature ?arguments ()]
+    crafts and signs a transaction from [source_private_key] to [address].
+    Returns the rlp-encoded transaction. If [legacy] is false the transaction
+    will be an eip1559 transaction. [signature] and [arguments] are parameters
     that are used when crafting a transaction that makes a call to a contract.
-    [signature] is the function signature and [arguments] is a list for parameters.
+    [signature] is the function signature of the contract you want to call
+    and [arguments] is a list for parameters.
     example:
     [craft_tx
       ~source_private_key
@@ -26,6 +28,7 @@ val version : unit -> string Lwt.t
       ~value:Wei.zero
       ~gas:25_000
       ~gas_price:1_000_000
+      ~legacy:false
       ~address:"0xaaaa....aaaa"
       ~signature:"set(uint256)"
       ~arguments:["42"]
@@ -37,6 +40,7 @@ val craft_tx :
   value:Wei.t ->
   gas:int ->
   gas_price:int ->
+  ?legacy:bool ->
   address:string ->
   ?signature:string ->
   ?arguments:string list ->
