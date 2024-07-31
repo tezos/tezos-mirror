@@ -37,12 +37,10 @@ end)
 let kernel_cache = Kernel_cache.create 2
 
 let load_parse_module ~hooks store key durable =
-  let on_fast_exec_invalid_kernel () =
-    match hooks.Tezos_scoru_wasm.Hooks.fast_exec_invalid_kernel with
-    | Some k -> k ()
-    | None -> Lwt_syntax.return_unit
+  let run_hook h =
+    match h with Some k -> k () | None -> Lwt_syntax.return_unit
   in
-  let open Lwt.Syntax in
+  let open Lwt_syntax in
   let* kernel = Durable.find_value_exn durable key in
   (* We use the WASM PVM to decode the kernel, not for using the result,
      but to ensure the absence of floats.
@@ -50,16 +48,22 @@ let load_parse_module ~hooks store key durable =
      If the call fails, an exception is raised, which is later catch by the
      Fast Exec. This effectively ensures WASMER will never be used with
      kernels including floats. *)
-  let* _ast =
-    Lwt.catch
-      (fun () ->
-        Tezos_webassembly_interpreter.Decode.decode
-          ~allow_floats:false
-          ~name:"boot.wasm"
-          ~bytes:kernel)
-      (fun exn ->
-        let* () = on_fast_exec_invalid_kernel () in
-        Lwt.reraise exn)
+  let* () =
+    match hooks.Tezos_scoru_wasm.Hooks.fast_exec_invalid_kernel with
+    | `Check_with_hook k ->
+        Lwt.catch
+          (fun () ->
+            let* _ast =
+              Tezos_webassembly_interpreter.Decode.decode
+                ~allow_floats:false
+                ~name:"boot.wasm"
+                ~bytes:kernel
+            in
+            return_unit)
+          (fun exn ->
+            let* () = run_hook k in
+            Lwt.reraise exn)
+    | `No_check -> return_unit
   in
   let+ kernel = Lazy_containers.Chunked_byte_vector.to_string kernel in
   Wasmer.Module.(create store Binary kernel)

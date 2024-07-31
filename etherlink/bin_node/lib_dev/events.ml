@@ -169,14 +169,6 @@ let patched_sequencer_key =
     ~msg:"State successfully patched, public key is now {pk}"
     ("pk", Data_encoding.string)
 
-let invalid_kernel =
-  Internal_event.Simple.declare_0
-    ~level:Error
-    ~section
-    ~name:"invalid_kernel"
-    ~msg:"The kernel stored in the EVM state is not valid"
-    ()
-
 let sandbox_started =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -242,8 +234,6 @@ let retrying_connect ~endpoint ~delay =
 let patched_kernel level = emit patched_kernel level
 
 let patched_sequencer_key pk = emit patched_sequencer_key pk
-
-let invalid_kernel () = emit invalid_kernel ()
 
 let sandbox_started level = emit sandbox_started level
 

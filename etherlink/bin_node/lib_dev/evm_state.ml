@@ -89,7 +89,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
         Tezos_scoru_wasm.Hooks.(
           no_hooks
           |> fast_exec_fallback wasm_pvm_fallback
-          |> on_fast_exec_invalid_kernel Events.invalid_kernel)
+          |> disable_fast_exec_invalid_kernel_check)
       in
       let* evm_state, _, _, _ =
         Wasm.Commands.eval
