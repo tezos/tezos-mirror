@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::Error;
+use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
+use crate::storage::ENABLE_FA_BRIDGE;
 use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, StorageVersion,
 };
@@ -24,9 +26,14 @@ pub enum MigrationStatus {
 // /!\ the following functions are migratin helpers, do not remove them /!\
 
 #[allow(dead_code)]
-fn is_etherlink_ghostnet(host: &impl Runtime) -> anyhow::Result<bool> {
-    let chain_id = read_chain_id(host)?;
-    Ok(chain_id == 128123.into())
+fn is_etherlink_ghostnet(host: &impl Runtime) -> Result<bool, Error> {
+    match read_chain_id(host) {
+        Ok(chain_id) => Ok(chain_id == 128123.into()),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(false)
+        }
+        Err(err) => Err(err),
+    }
 }
 
 #[allow(dead_code)]
@@ -56,6 +63,15 @@ fn migrate_to<Host: Runtime>(
             Ok(MigrationStatus::Done)
         }
         StorageVersion::V13 => Ok(MigrationStatus::Done),
+        StorageVersion::V14 => {
+            if is_etherlink_ghostnet(host)? {
+                host.store_write_all(&ENABLE_FA_BRIDGE, &[1u8])?;
+                Ok(MigrationStatus::Done)
+            } else {
+                // Not applicable for other networks
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
