@@ -66,6 +66,64 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.530
 
+[src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
+[0][WARN] Unable to read entropy! Fallback to a naive implementation!
+Hello World
+
+I am sr1Swm6KtbDSQ1Kz9X6vpsBd58jNKprKt7FY
+RollupMetadata {
+    raw_rollup_address: [
+        229,
+        76,
+        84,
+        7,
+        95,
+        137,
+        54,
+        133,
+        253,
+        114,
+        167,
+        75,
+        67,
+        174,
+        45,
+        71,
+        226,
+        100,
+        66,
+        116,
+    ],
+    origination_level: 2,
+}
+[09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        49,
+        32,
+        54,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -106,6 +164,32 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.530
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        50,
+        32,
+        56,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -148,6 +232,33 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        51,
+        32,
+        49,
+        48,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -188,6 +299,33 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        52,
+        32,
+        49,
+        50,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -230,6 +368,33 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        53,
+        32,
+        49,
+        52,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -270,6 +435,33 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        54,
+        32,
+        49,
+        54,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -312,6 +504,33 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        55,
+        32,
+        49,
+        56,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -352,6 +571,33 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        56,
+        32,
+        50,
+        48,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -394,6 +640,33 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.569
 
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        57,
+        32,
+        50,
+        50,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -434,6 +707,34 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.607
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        49,
+        48,
+        32,
+        50,
+        52,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK

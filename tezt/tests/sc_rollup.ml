@@ -174,7 +174,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
     ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
-    {variant; tags; description} scenario =
+    ?kernel_debug_log {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
     ?supports
@@ -215,6 +215,13 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       tezos_node
       tezos_client
   in
+  if
+    Option.value ~default:false regression
+    && Option.value ~default:false kernel_debug_log
+  then
+    Sc_rollup_node.on_event rollup_node (fun Sc_rollup_node.{name; value; _} ->
+        if name = "kernel_debug.v0" then
+          Regression.capture (JSON.as_string value)) ;
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 
 (*
@@ -1356,10 +1363,11 @@ let test_rollup_node_boots_into_initial_state ?supports ~kind =
     ~error_msg:"Unexpected PVM status (%L = %R)" ;
   unit
 
-let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
-    ~internal ~kind =
+let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
+    ?boot_sector ~internal ~kind =
   test_full_scenario
     ?regression
+    ?kernel_debug_log
     ~hooks
     {
       variant = Some (if internal then "internal" else "external");
@@ -1489,9 +1497,11 @@ let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
 
    After each a PVM kind-specific test is run, asserting the validity of the new state.
 *)
-let test_rollup_node_advances_pvm_state ~kind ?boot_sector ~internal =
+let test_rollup_node_advances_pvm_state ~kind ?boot_sector ?kernel_debug_log
+    ~internal =
   test_rollup_node_advances_pvm_state
     ~regression:true
+    ?kernel_debug_log
     ~title:"node advances PVM state with messages"
     ?boot_sector
     ~internal
@@ -4326,9 +4336,11 @@ let test_outbox_message protocols ~kind =
       ~kind)
 
 let test_rpcs ~kind
-    ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind) =
+    ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind)
+    ?kernel_debug_log =
   test_full_scenario
     ~regression:true
+    ?kernel_debug_log
     ~hooks
     ~kind
     ~boot_sector
@@ -5990,13 +6002,14 @@ let register_riscv ~protocols =
       "src/riscv/assets/riscv-dummy.elf.checksum"
   in
   test_origination ~kind protocols ;
-  test_rpcs ~kind ~boot_sector protocols ;
+  test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state
     protocols
     ~kind
     ~boot_sector
     ~internal:false
+    ~kernel_debug_log:true
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
