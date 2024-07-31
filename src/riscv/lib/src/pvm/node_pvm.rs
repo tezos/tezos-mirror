@@ -129,18 +129,14 @@ impl NodePvm {
         })
     }
 
-    pub fn compute_step(&self, pvm_hooks: &mut PvmHooks<'static>) -> Self {
+    pub fn compute_step(&self, pvm_hooks: &mut PvmHooks) -> Self {
         self.with_new_backend(|state| {
             state.pvm.eval_one(pvm_hooks);
             state.tick.write(state.tick.read() + 1);
         })
     }
 
-    pub fn compute_step_many(
-        &self,
-        pvm_hooks: &mut PvmHooks<'static>,
-        max_steps: usize,
-    ) -> (Self, i64) {
+    pub fn compute_step_many(&self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> (Self, i64) {
         let mut backend = self.backend.clone();
         let placed = <StateLayout as Layout>::placed().into_location();
         let space = backend.allocate(placed);

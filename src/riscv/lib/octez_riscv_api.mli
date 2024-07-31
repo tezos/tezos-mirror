@@ -7,9 +7,7 @@ open! Bigarray
 type repo
 type state
 type id
-type hooks
 type status = Evaluating | WaitingForInput | WaitingForMetadata
-external octez_riscv_default_pvm_hooks: unit -> hooks = "octez_riscv_default_pvm_hooks"
 external octez_riscv_id_unsafe_of_raw_bytes: bytes -> id = "octez_riscv_id_unsafe_of_raw_bytes"
 external octez_riscv_storage_id_to_raw_bytes: id -> bytes = "octez_riscv_storage_id_to_raw_bytes"
 external octez_riscv_storage_id_equal: id -> id -> bool = "octez_riscv_storage_id_equal"
@@ -21,8 +19,10 @@ external octez_riscv_storage_commit: repo -> state -> id = "octez_riscv_storage_
 external octez_riscv_storage_checkout: repo -> id -> state option = "octez_riscv_storage_checkout"
 external octez_riscv_get_status: state -> status = "octez_riscv_get_status"
 external octez_riscv_string_of_status: status -> string = "octez_riscv_string_of_status"
-external octez_riscv_compute_step: state -> hooks -> state = "octez_riscv_compute_step"
-external octez_riscv_compute_step_many: int64 -> state -> hooks -> (state * int64) = "octez_riscv_compute_step_many"
+external octez_riscv_compute_step: state -> state = "octez_riscv_compute_step"
+external octez_riscv_compute_step_with_debug: state -> (int -> unit) -> state = "octez_riscv_compute_step_with_debug"
+external octez_riscv_compute_step_many: int64 -> state -> (state * int64) = "octez_riscv_compute_step_many"
+external octez_riscv_compute_step_many_with_debug: int64 -> state -> (int -> unit) -> (state * int64) = "octez_riscv_compute_step_many_with_debug"
 external octez_riscv_get_tick: state -> int64 = "octez_riscv_get_tick"
 external octez_riscv_get_level: state -> int32 option = "octez_riscv_get_level"
 external octez_riscv_install_boot_sector: state -> bytes -> state = "octez_riscv_install_boot_sector"
