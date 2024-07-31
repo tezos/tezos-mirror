@@ -46,12 +46,8 @@ val export :
   unit ->
   string tzresult Lwt.t
 
-(** [import ~force ~in_place ~data_dir ~snapshot_file] imports the snapshot at
-    path [snapshot_file] into the data directory [data_dir]. Import will fail if
-    [data_dir] is already populated unless [force] is set to [true]. If [in_place] is [true], the snapshot will be imported in [data_dir] directly, otherwise a copy will be made. *)
+(** [import ~force ~data_dir ~snapshot_file] imports the snapshot at
+    path [snapshot_file] into the data directory [data_dir]. Import will fail
+    if [data_dir] is already populated unless [force] is set to [true]. *)
 val import :
-  force:bool ->
-  in_place:string ->
-  data_dir:string ->
-  snapshot_file:string ->
-  unit tzresult Lwt.t
+  force:bool -> data_dir:string -> snapshot_file:string -> unit tzresult Lwt.t
