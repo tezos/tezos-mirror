@@ -9,6 +9,47 @@ open Snapshot_utils
 
 type compression = No | On_the_fly | After
 
+module Header = struct
+  type version = V0
+
+  type t = {
+    version : version;
+    history_mode : Configuration.history_mode;
+    address : Address.t;
+    head_level : int32;
+    last_commitment : Commitment.Hash.t;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"rollup_node.snapshot.header.v0"
+          (Tag 0)
+          (obj4
+             (req "history_mode" Configuration.history_mode_encoding)
+             (req "address" Address.encoding)
+             (req "head_level" int32)
+             (req "last_commitment" Commitment.Hash.encoding))
+          (fun {
+                 version = V0;
+                 history_mode;
+                 address;
+                 head_level;
+                 last_commitment;
+               } -> Some (history_mode, address, head_level, last_commitment))
+          (fun (history_mode, address, head_level, last_commitment) ->
+            {version = V0; history_mode; address; head_level; last_commitment});
+      ]
+
+  let size =
+    Data_encoding.Binary.fixed_length encoding
+    |> WithExceptions.Option.get ~loc:__LOC__
+end
+
+open Snapshot_utils.Make (Header)
+
 let check_store_version store_dir =
   let open Lwt_result_syntax in
   let* store_version = Store_version.read_version_file ~dir:store_dir in
@@ -66,7 +107,7 @@ let check_commitment_published cctxt address commitment =
      in
      return_unit
 
-let pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir =
+let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
@@ -121,6 +162,7 @@ let pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir =
   let* () = Store.close store in
   return
     {
+      Header.version = V0;
       history_mode;
       address = metadata.rollup_address;
       head_level = head.header.level;
@@ -377,19 +419,18 @@ let check_l2_chain ~message ~data_dir (store : _ Store.t) context
   in
   check_chain head.header.block_hash None
 
-let check_last_commitment head snapshot_metadata =
+let check_last_commitment head (snapshot_header : Header.t) =
   let last_snapshot_commitment =
     Sc_rollup_block.most_recent_commitment head.Sc_rollup_block.header
   in
   error_unless
-    Commitment.Hash.(
-      snapshot_metadata.last_commitment = last_snapshot_commitment)
+    Commitment.Hash.(snapshot_header.last_commitment = last_snapshot_commitment)
   @@ error_of_fmt
        "Last commitment in snapshot is %a but should be %a."
        Commitment.Hash.pp
        last_snapshot_commitment
        Commitment.Hash.pp
-       snapshot_metadata.last_commitment
+       snapshot_header.last_commitment
 
 let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
     (module Plugin : Protocol_plugin_sig.S) =
@@ -566,8 +607,8 @@ let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches =
       return (Option.is_some head_ctxt))
     reconstruct_context_from_first_available_level
 
-let post_checks ?(apply_unsafe_patches = false) ~action ~message
-    snapshot_metadata ~dest =
+let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
+    ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
   let context_dir = Configuration.default_context_dir dest in
@@ -606,7 +647,7 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message
                order to verify state hashes. *)
             failwith "No metadata (needs rollup kind)."
         | Some metadata ->
-            let*? () = check_last_commitment head snapshot_metadata in
+            let*? () = check_last_commitment head snapshot_header in
             let* () = check_lcc metadata cctxt store head (module Plugin) in
             return
               (check_block_data_consistency
@@ -622,34 +663,19 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message
   let* () = Store.close store in
   return_unit
 
-(* Magic bytes for gzip files is 1f8b. *)
-let is_compressed_snapshot snapshot_file =
-  let ic = open_in snapshot_file in
-  try
-    let ok = input_byte ic = 0x1f && input_byte ic = 0x8b in
-    close_in ic ;
-    ok
-  with
-  | End_of_file ->
-      close_in ic ;
-      false
-  | e ->
-      close_in ic ;
-      raise e
-
 let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
   let reader =
     if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
   in
-  let* snapshot_metadata, () =
+  let* snapshot_header, () =
     extract reader stdlib_writer (fun _ -> return_unit) ~snapshot_file ~dest
   in
   post_checks
     ~action:`Export
     ~message:"Checking snapshot   "
-    snapshot_metadata
+    snapshot_header
     ~dest
 
 let operator_local_file_regexp = Re.Str.regexp "^storage/lpc$"
@@ -671,7 +697,8 @@ let with_locks ~data_dir f =
     ~filename:(Node_context.processing_lockfile_path ~data_dir)
     f
 
-let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
+let export_dir (header : Header.t) ~take_locks ~compression ~data_dir ~dest
+    ~filename =
   let open Lwt_result_syntax in
   let* snapshot_file =
     let with_locks =
@@ -696,9 +723,9 @@ let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
           Format.asprintf
             "snapshot-%a-%ld.%s%s"
             Address.pp_short
-            metadata.address
-            metadata.head_level
-            (Configuration.string_of_history_mode metadata.history_mode)
+            header.address
+            header.head_level
+            (Configuration.string_of_history_mode header.history_mode)
             suffix
     in
     let dest_file =
@@ -709,22 +736,26 @@ let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
     let*! () =
       let open Lwt_syntax in
       let* () = Option.iter_s Lwt_utils_unix.create_dir dest in
-      let include_file ~relative_path =
+      let include_file relative_path =
         Re.Str.string_match snapshotable_files_regexp relative_path 0
         && not (Re.Str.string_match operator_local_file_regexp relative_path 0)
+      in
+      let files =
+        Tezos_stdlib_unix.Utils.fold_files
+          data_dir
+          (fun relative_path acc ->
+            if not (include_file relative_path) then acc
+            else
+              let full_path = Filename.concat data_dir relative_path in
+              (full_path, relative_path) :: acc)
+          []
       in
       let writer =
         match compression with
         | On_the_fly -> gzip_writer
         | No | After -> stdlib_writer
       in
-      create
-        stdlib_reader
-        writer
-        metadata
-        ~dir:data_dir
-        ~include_file
-        ~dest:dest_file ;
+      create stdlib_reader writer header ~files ~dest:dest_file ;
       return_unit
     in
     return dest_file
@@ -738,19 +769,25 @@ let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
 
 let export cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
-  let* metadata =
-    pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir
+  let* snapshot_header =
+    pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir
   in
   let* snapshot_file =
-    export_dir metadata ~take_locks:true ~compression ~data_dir ~dest ~filename
+    export_dir
+      snapshot_header
+      ~take_locks:true
+      ~compression
+      ~data_dir
+      ~dest
+      ~filename
   in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 
 let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
-  let* snapshot_metadata =
-    pre_export_checks_and_get_snapshot_metadata cctxt ~no_checks ~data_dir
+  let* snapshot_header =
+    pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir
   in
   Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
   let tmp_context_dir = Configuration.default_context_dir tmp_dir in
@@ -827,14 +864,14 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     | _ -> compression
   in
   export_dir
-    snapshot_metadata
+    snapshot_header
     ~take_locks:false
     ~compression
     ~data_dir:tmp_dir
     ~dest
     ~filename
 
-let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
+let pre_import_checks cctxt ~no_checks ~data_dir (snapshot_header : Header.t) =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   (* Load stores in read-only to make simple checks. *)
@@ -858,26 +895,26 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
         return_unit
     | Some {rollup_address; _}, Some history_mode -> (
         let* () =
-          error_unless Address.(rollup_address = snapshot_metadata.address)
+          error_unless Address.(rollup_address = snapshot_header.address)
           @@ error_of_fmt
                "The existing rollup node is for %a, but the snapshot is for \
                 rollup %a."
                Address.pp
                rollup_address
                Address.pp
-               snapshot_metadata.address
+               snapshot_header.address
         in
         let a_history_str = function
           | Configuration.Archive -> "an archive"
           | Configuration.Full -> "a full"
         in
-        match (history_mode, snapshot_metadata.history_mode) with
+        match (history_mode, snapshot_header.history_mode) with
         | Full, Archive -> Ok ()
         | _, _ ->
-            error_unless (history_mode = snapshot_metadata.history_mode)
+            error_unless (history_mode = snapshot_header.history_mode)
             @@ error_of_fmt
                  "Cannot import %s snapshot into %s rollup node."
-                 (a_history_str snapshot_metadata.history_mode)
+                 (a_history_str snapshot_header.history_mode)
                  (a_history_str history_mode))
   in
   let*? () =
@@ -887,19 +924,19 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
         (* The rollup node has no L2 chain. *)
         return_unit
     | Some head ->
-        error_when (snapshot_metadata.head_level <= head.header.level)
+        error_when (snapshot_header.head_level <= head.header.level)
         @@ error_of_fmt
              "The rollup node is already at level %ld but the snapshot is only \
               for level %ld."
              head.header.level
-             snapshot_metadata.head_level
+             snapshot_header.head_level
   in
   let* () =
     unless no_checks @@ fun () ->
     check_commitment_published
       cctxt
-      snapshot_metadata.address
-      snapshot_metadata.last_commitment
+      snapshot_header.address
+      snapshot_header.last_commitment
   in
   return (metadata, history_mode)
 
@@ -916,10 +953,10 @@ let check_data_dir_unpopulated data_dir () =
       data_dir
   else return_unit
 
-let maybe_gc_after_import cctxt ~data_dir snapshot_metadata
+let maybe_gc_after_import cctxt ~data_dir (snapshot_header : Header.t)
     (original_history_mode : Configuration.history_mode option) =
   let open Lwt_result_syntax in
-  match (original_history_mode, snapshot_metadata.history_mode) with
+  match (original_history_mode, snapshot_header.history_mode) with
   | None, _ -> return_unit
   | Some Archive, Full ->
       (* Impossible because filtered out by pre_import_checks. *)
@@ -965,7 +1002,7 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
   let reader =
     if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
   in
-  let* snapshot_metadata, (_original_metadata, original_history_mode) =
+  let* snapshot_header, (_original_metadata, original_history_mode) =
     extract
       reader
       stdlib_writer
@@ -975,22 +1012,18 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
   in
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
-    maybe_gc_after_import
-      cctxt
-      ~data_dir
-      snapshot_metadata
-      original_history_mode
+    maybe_gc_after_import cctxt ~data_dir snapshot_header original_history_mode
   in
   unless no_checks @@ fun () ->
   post_checks
     ~apply_unsafe_patches
     ~action:(`Import cctxt)
     ~message:"Checking imported data"
-    snapshot_metadata
+    snapshot_header
     ~dest:data_dir
 
 let info ~snapshot_file =
   let compressed = is_compressed_snapshot snapshot_file in
   let reader = if compressed then gzip_reader else stdlib_reader in
-  let metadata = read_metadata reader ~snapshot_file in
-  (metadata, if compressed then `Compressed else `Uncompressed)
+  let snapshot_header = read_header reader ~snapshot_file in
+  (snapshot_header, if compressed then `Compressed else `Uncompressed)

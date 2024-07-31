@@ -4415,6 +4415,9 @@ let octez_layer2_store =
         octez_context_sigs;
         octez_context_helpers;
         octez_riscv_pvm;
+        camlzip;
+        tar;
+        tar_unix;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
@@ -4677,9 +4680,6 @@ let octez_smart_rollup_node_lib =
         octez_openapi;
         octez_node_config;
         prometheus_app;
-        camlzip;
-        tar;
-        tar_unix;
         octez_dal_node_lib |> open_;
         octez_dac_lib |> open_;
         octez_dac_client_lib |> open_;
