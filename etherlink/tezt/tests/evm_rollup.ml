@@ -13,6 +13,9 @@
    Component:    Smart Optimistic Rollups: EVM Kernel
    Requirement:  make -f kernels.mk build
                  npm install eth-cli
+                 # Install cast or foundry (see: https://book.getfoundry.sh/getting-started/installation)
+                 curl -L https://foundry.paradigm.xyz | bash
+                 foundryup
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 open Sc_rollup_helpers
@@ -1383,12 +1386,31 @@ let test_log_index =
   (* deploy the events contract *)
   let* _address, _tx = deploy ~contract:events_resolved ~sender evm_setup in
   (* Emits two events: EventA and EventB *)
-  let raw_emitBoth =
-    "0xf88901843b9aca00826bf694d77420f73b4612a7a99dba8c2afd30a1886b034480a4cc79cf9d0000000000000000000000000000000000000000000000000000000000000064820a96a01350f66edc1a5bfa7dc8651d5735dbb343c491939a9e49b3f1a041b6a234df72a0028c5523a2bcc1077e090360a0e96ffaff7a2f26fd161b87107252e4bb83c47b"
+  let* raw_emitBoth =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:27_638
+      ~value:Wei.zero
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~signature:"emitBoth(uint256)"
+      ~arguments:["100"]
+      ()
   in
-  (* Emits one event: EventA *)
-  let raw_emitA =
-    "0xf88980843b9aca0082644094d77420f73b4612a7a99dba8c2afd30a1886b034480a413c49adf000000000000000000000000000000000000000000000000000000000000000a820a95a0a46df17e7392d9777a94248e2dd6d9a0a097143cf915152d531c07fa604d2219a053c59f5e070adef0e2c443e5f7afb6435dfed20e04ddcfcfccb150972535cd2d"
+  let* raw_emitA =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:25_664
+      ~value:Wei.zero
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~signature:"emitA(uint256)"
+      ~arguments:["10"]
+      ()
   in
   let* _requests, _receipt, hashes =
     send_n_transactions
@@ -1660,46 +1682,28 @@ let test_rpc_txpool_content =
     Check.((get_transaction_field transaction_content "s" = s) string)
       ~error_msg:"Expected s to be %%R, got %%L."
   in
-  let tx1 =
-    (* {
-         "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
-         "nonce": "0",
-         "gasPrice": "100000",
-         "gasLimit": "23300",
-         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-         "to": "0x11D3C9168db9d12a3C591061D555870969b43dC9",
-         "v": "0a96",
-         "r": "4217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079",
-         "s": "23ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592",
-         "value": "100",
-         "data": ""
-       } *)
-    "f86480830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a96a04217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079a023ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592"
+  let* tx1 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:100_000
+      ~gas:23_300
+      ~value:(Wei.of_string "100")
+      ~address:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ()
   in
-
-  let tx2 =
-    (* {
-         "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
-         "nonce": "1",
-         "gasPrice": "100000",
-         "gasLimit": "23300",
-         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-         "to": "0x11D3C9168db9d12a3C591061D555870969b43dC9",
-         "v": "0a95",
-         "r": "30d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970",
-         "s": "45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c",
-         "value": "100",
-         "data": ""
-       } *)
-    "f86401830186a0825b049411d3c9168db9d12a3c591061d555870969b43dc96480820a95a030d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970a045ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
+  let* tx2 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:100_000
+      ~gas:23_300
+      ~value:(Wei.of_string "100")
+      ~address:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ()
   in
-
   let*@ tx_hash1 = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
 
   let*@! transaction_object =
@@ -2904,12 +2908,29 @@ let test_rpc_sendRawTransaction =
       "Ensure EVM node returns appropriate hash for any given transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  let txs =
-    [
-      "f86480825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a0964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004a03eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a";
-      "f86480825208831e848094b53dc01974176e5dff2298c5a94343c2585e3c548080820a96a0542124cb9fe80b1c8bd18a07b6ea8292770055c06c2a1b7b0aa82e121c30d0a1a07e9092eb6d303b58c89475f147684a1ae44d0a0248a7409dfc15675555a467e6";
-    ]
+  let* tx1 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
   in
+  let* tx2 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let txs = [tx1; tx2] in
   let* hashes =
     Lwt_list.map_p
       (fun raw_tx ->
@@ -3250,8 +3271,16 @@ let test_cannot_prepayed_leads_to_no_inclusion =
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1).  We do not use eth-cli in
      this test because we want the results of the simulation. *)
-  let raw_transfer =
-    "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_string "1000000000000000000")
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
   in
   let*@? error = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
   Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
@@ -3284,8 +3313,16 @@ let test_cannot_prepayed_with_delay_leads_to_no_injection =
   (* Transaction from previous sender to the same address but with nonce 1 and
      a gas computation that will lead it to not being able to be prepayed hence
      rejected at injection. *)
-  let raw_tx =
-    "f86501830186a0830186a094e7f682c226d7269c7247b878b3f94c7a8d31fef58080820a95a0a9afcb6020f31b62e45778a051c62e71ce5c52789ba6ab487812f21271a98291a03673d60e267b6d32ecd22403cb54c088ee897e0c1862aa3f48039671503957d1"
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~value:Wei.zero
+      ~gas:100_000
+      ~gas_price:100_000
+      ~address:to_public_key
+      ()
   in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
   let* _will_succeed =
@@ -3311,8 +3348,16 @@ let test_rpc_sendRawTransaction_nonce_too_low =
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
   (* Nonce: 0 *)
-  let raw_tx =
-    "0xf86c80825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a96a038294f867266c767aee6c3b54a0c444368fb8d5e90353219bce1da78de16aea4a018a7d3c58ddb1f6b33bad5dde106843acfbd6467e5df181d22270229dcfdf601"
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21000
+      ~gas:2_000_000
+      ~value:(Wei.of_string "10000000000000000000")
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
   let* _ =
@@ -3336,8 +3381,16 @@ let test_rpc_sendRawTransaction_nonce_too_high =
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* Nonce: 1 *)
-  let raw_tx =
-    "0xf86c01825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a95a0a349864bedc9b84aea88cda197e96538c62c242286ead58eb7180a611f850237a01206525ff16ae5b708ee02b362f9b4d7565e0d7e9b4c536d7ef7dec81cda3ac7"
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:21000
+      ~gas:2_000_000
+      ~value:(Wei.of_string "10000000000000000000")
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   let* r = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(
@@ -3476,8 +3529,16 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
   @@ fun protocol ->
   let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
   (* Nonce: 0, chainId: 4242*)
-  let raw_tx =
-    "0xf86a8080831e8480940000000000000000000000000000000000000000888ac7230489e8000080822148a0e09f1fb4920f2e64a274b83d925890dd0b109fdf31f2811a781e918118daf34aa00f425e9a93bd92d710d3d323998b093a8c7d497d2af688c062a8099b076813e8"
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
+      ~chain_id:4242
+      ~nonce:0
+      ~gas_price:0
+      ~gas:2_000_000
+      ~value:(Wei.of_string "10000000000000000000")
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
@@ -3851,16 +3912,30 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
     ~title:"Can submit many transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; client; sc_rollup_node; _} ->
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 0*)
-  let tx_1 =
-    "0xf86480825208831e84809400000000000000000000000000000000000000008080820a96a0718d24970c6d2fc794e972f4319caf24a939ff3d822959c7e6b022813d16c8c4a04535ad83a67307759569b1e2087b0b79f80d4502027b6d1d52e3c072634b3f8b"
+  let* tx_1 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   let*@ hash_1 = Rpc.send_raw_transaction ~raw_tx:tx_1 evm_node in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 1*)
-  let tx_2 =
-    "0xf86401825208831e84809400000000000000000000000000000000000000008080820a95a01f47f2ec950d998bd99f7ff656a7f13a385603373f0e96130290ba2869f56515a018bd20697ab1f3cd82891663c62f514de7b2deeee2ed569e85b3aa351e1b1c3b"
+  let* tx_2 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   let*@ hash_2 = Rpc.send_raw_transaction ~raw_tx:tx_2 evm_node in
   let* _ =
@@ -3887,10 +3962,17 @@ let test_rpc_sendRawTransaction_not_included =
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; client; sc_rollup_node; endpoint; _}
     ->
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 1 *)
-  let tx =
-    "f86401825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a07298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776a07042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e"
+  let* tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
   in
   let*@ tx_hash =
     wait_for_application ~evm_node ~sc_rollup_node ~client (fun () ->
@@ -4310,12 +4392,28 @@ let test_tx_pool_replacing_transactions =
   let bob = Eth_account.bootstrap_accounts.(0) in
   let*@ bob_nonce = Rpc.get_transaction_count evm_node ~address:bob.address in
   (* nonce: 0, private_key: bootstrappe_account(0), amount: 10; max_fees: 21000*)
-  let tx_a =
-    "0xf86b80825208825208940000000000000000000000000000000000000000888ac7230489e8000080820a95a05fc733145b2066166e074bc42239a7312b2358f5cbf9ce17bab404abd1dfaff0a0493e763aa933d3eb724d75f9ad6fb4bbffdf3d54568d44d6f70cfcf0a07dc4f8"
+  let* tx_a =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 10)
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   (* nonce: 0, private_key: bootstrappe_account(0), amount: 5; max_fees: 30000*)
-  let tx_b =
-    "0xf86b80827530825208940000000000000000000000000000000000000000884563918244f4000080820a96a008410806e7a3c6b403bbfa99d82886e5460921a664410eaea5fe99050c4dc63da031c3eb45ac8a42600b27029d1c910b4c0006f1f435a29f91626964a8cf25da3f"
+  let* tx_b =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:30_000
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 5)
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
   in
   (* Send the transactions to the proxy*)
   let*@ _tx_a_hash = Rpc.send_raw_transaction ~raw_tx:tx_a evm_node in
@@ -4429,12 +4527,17 @@ let test_l2_revert_returns_unused_gas =
   let* _revert_address, _tx =
     deploy ~contract:revert_resolved ~sender evm_setup
   in
-  (* Tx data is constructed by:
-     cd src/kernel_evm/benchmarks/scripts
-     node sign_tx.js ../../../../etherlink/tezt/tests/evm_kernel_inputs/call_revert.json "9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0"
-  *)
-  let tx =
-    "0xf8690183010000830186a094d77420f73b4612a7a99dba8c2afd30a1886b03448084c0406226820a96a0869b3a97d2c87d41c22eaeafba2644c276e74267998dff3504d1d2b35fae0e2ba058f0661adcff7d2abd3c6eb4d663e4731c838f6ef15ebb797b88db87c4fee39b"
+  let* tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:65_536
+      ~gas:100_000
+      ~value:Wei.zero
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~signature:"run()"
+      ()
   in
   let* balance_before = Eth_cli.balance ~account:sender.address ~endpoint in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx:tx evm_node in
@@ -5771,21 +5874,16 @@ let test_tx_pool_timeout =
   in
   (* We send one transaction and produce a block immediatly to check that it's included
      as it should (within the TTL that was set). *)
-  let tx =
-    (* {  "chainId": "1337",
-          "type": "LegacyTransaction",
-          "valid": true,
-          "hash": "0xb941cbf32821471381b6f003f9013b95c788ad24260d2af54848a5b504c09bb0",
-          "nonce": "0",
-          "gasPrice": "21000",
-          "gasLimit": "2000000",
-          "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-          "to": "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
-          "v": "0a95",
-          "r": "964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004",
-          "s": "3eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a",
-          "value": "0" } *)
-    "f86480825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a0964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004a03eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a"
+  let* tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
   in
   let*@ tx_hash_expected = Rpc.send_raw_transaction ~raw_tx:tx sequencer_node in
   let*@ block_number = Rpc.produce_block sequencer_node in
@@ -5808,21 +5906,16 @@ let test_tx_pool_timeout =
     ~error_msg:"Expected transaction hash is %R, got %L" ;
   (* We send one transaction and produce a block after the TTL to check that the
      produced block is empty. *)
-  let tx' =
-    (* {  "chainId": "1337",
-          "type": "LegacyTransaction",
-          "valid": true,
-          "hash": "0x51a24a5cf2eb3095f522e4c500b1bf5b0de6476f04a108ea1005cfef7ceec750",
-          "nonce": "1",
-          "gasPrice": "21000",
-          "gasLimit": "2000000",
-          "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-          "to": "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
-          "v": "0a95",
-          "r": "7298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776",
-          "s": "7042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e",
-          "value": "0" } *)
-    "f86401825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a07298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776a07042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e"
+  let* tx' =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
   in
   let*@ _tx_hash' = Rpc.send_raw_transaction ~raw_tx:tx' sequencer_node in
   let* () = Lwt_unix.sleep (Int.to_float ttl *. 1.5) in
@@ -5865,53 +5958,38 @@ let test_tx_pool_address_boundaries =
       ~setup_mode
       protocol
   in
-  let tx =
-    (* { "chainId": "1337",
-          "type": "LegacyTransaction",
-          "valid": true,
-          "hash": "0xb941cbf32821471381b6f003f9013b95c788ad24260d2af54848a5b504c09bb0",
-          "nonce": "0",
-          "gasPrice": "21000",
-          "gasLimit": "2000000",
-          "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-          "to": "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
-          "v": "0a95",
-          "r": "964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004",
-          "s": "3eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a",
-          "value": "0" } *)
-    "f86480825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a0964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004a03eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a"
+  let* tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
   in
-  let tx' =
-    (* { "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0x51a24a5cf2eb3095f522e4c500b1bf5b0de6476f04a108ea1005cfef7ceec750",
-         "nonce": "1",
-         "gasPrice": "21000",
-         "gasLimit": "2000000",
-         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-         "to": "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
-         "v": "0a95",
-         "r": "7298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776",
-         "s": "7042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e",
-         "value": "0" } *)
-    "f86401825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a07298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776a07042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e"
+  let* tx' =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:21_000
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
   in
-  let tx'' =
-    (* { "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0x25a2f2e9c1cadada66ce255e609c0ace80435b0b595371a5da2bb104757e6ade",
-         "nonce": "0",
-         "gasPrice": "21000",
-         "gasLimit": "23300",
-         "from": "0xB53dc01974176E5dFf2298C5a94343c2585E3c54",
-         "to": "0xb53dc01974176e5dff2298c5a94343c2585e3c54",
-         "v": "0a95",
-         "r": "9bc3d2c48b9d3db98b277ddb804941deeb899d65b2a22c76600810270d1bcfcf",
-         "s": "5a3c7ead9bbf152acd4f7ea01a4cec70c921cde466840a9bdad4c2d8939963ef",
-         "value": "100000" } *)
-    "f86680825208825b0494b53dc01974176e5dff2298c5a94343c2585e3c54830186a080820a95a09bc3d2c48b9d3db98b277ddb804941deeb899d65b2a22c76600810270d1bcfcfa05a3c7ead9bbf152acd4f7ea01a4cec70c921cde466840a9bdad4c2d8939963ef"
+  let* tx'' =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:23_300
+      ~value:(Wei.of_string "100000")
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
   in
   let*@ tx_hash_expected = Rpc.send_raw_transaction ~raw_tx:tx sequencer_node in
   (* Limitation on the number of transaction per address *)
@@ -5983,24 +6061,17 @@ let test_tx_pool_transaction_size_exceeded =
       ~setup_mode
       protocol
   in
-  let tx =
-    (* {
-         "chainId": "1337",
-         "type": "LegacyTransaction",
-         "valid": true,
-         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
-         "nonce": "0",
-         "gasPrice": "21000",
-         "gasLimit": "23300",
-         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
-         "to": "0xb53dc01974176e5dff2298c5a94343c2585e3c54",
-         "v": "0a96",
-         "r": "f333e35786005f6d2c0a351d7bb42950c0236a800be8c2e0b5878af9f8c86fec",
-         "s": "620a8fc5b904363a9ce8af6f4fceba432f671c1e809894bf911e0176ab8e7b1c",
-         "value": "0",
-         "data": "01"
-       } *)
-    "f86380825208825b0494b53dc01974176e5dff2298c5a94343c2585e3c548001820a96a0f333e35786005f6d2c0a351d7bb42950c0236a800be8c2e0b5878af9f8c86feca0620a8fc5b904363a9ce8af6f4fceba432f671c1e809894bf911e0176ab8e7b1c"
+  let* tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:23_300
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ~arguments:["0x01"]
+      ()
   in
   (* Limitation on size of the transaction *)
   let*@? rejected_transaction =
