@@ -9,6 +9,9 @@ module Cryptobox = Dal_common.Cryptobox
 module Helpers = Dal_common.Helpers
 open Tezos
 
+let toplog (fmt : ('a, Format.formatter, unit, unit) format4) : 'a =
+  Log.info ~prefix:"TOP" ~color:Log.Color.FG.green fmt
+
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
@@ -44,7 +47,7 @@ module Disconnect = struct
     else
       match IMap.find_opt t.next_to_disconnect t.disconnected_bakers with
       | Some _ ->
-          Log.info
+          toplog
             "disconnect: all bakers have been disconnected, waiting for next \
              baker to reconnect." ;
           Lwt.return t
@@ -93,6 +96,7 @@ module Node = struct
   include Node
 
   let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
+    toplog "Inititializing a node" ;
     match network with
     | Network.Ghostnet -> (
         match data_dir with
@@ -102,6 +106,10 @@ module Node = struct
             let* () = Node.wait_for_ready node in
             Lwt.return node
         | None ->
+            toplog
+              "No data dir given, we will attempt to bootstrap the node from a \
+               rolling snapshot." ;
+            toplog "Creating the agent." ;
             let* node =
               Node.Agent.create
                 ~arguments:
@@ -110,6 +118,7 @@ module Node = struct
                 ~name
                 agent
             in
+            toplog "Downloading a rolling snapshot" ;
             let* () =
               Process.spawn
                 ~runner:(runner_of_agent agent)
@@ -121,12 +130,17 @@ module Node = struct
                 ]
               |> Process.check
             in
+            toplog "Initializing node configuration" ;
             let* () = Node.config_init node [] in
+            toplog "Importing the snapshot" ;
             let* () =
               Node.snapshot_import ~no_check:true node "snapshot_file"
             in
+            toplog "Launching the node." ;
             let* () = Node.run node arguments in
+            toplog "Waiting for the node to be ready." ;
             let* () = wait_for_ready node in
+            toplog "Node is ready." ;
             Lwt.return node)
     | Sandbox -> (
         match data_dir with
@@ -912,9 +926,11 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
 let init_ghostnet cloud (configuration : configuration) agent =
+  toplog "Init testnet" ;
   let* bootstrap =
     match agent with
     | None ->
+        let () = toplog "No agent given" in
         let node = None in
         let dal_node = None in
         (* Taken from ghostnet configuration. *)
@@ -924,6 +940,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
           Endpoint.
             {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
         in
+        let () = toplog "Creating the client" in
         let client =
           Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
         in
@@ -939,6 +956,8 @@ let init_ghostnet cloud (configuration : configuration) agent =
         in
         Lwt.return bootstrap
     | Some agent ->
+        let () = toplog "Some agent given" in
+        let () = toplog "Initializing the bootstrap node agent" in
         let* node =
           Node.init ~name:"bootstrap-node" configuration.network agent
         in
@@ -975,35 +994,42 @@ let init_ghostnet cloud (configuration : configuration) agent =
         in
         Lwt.return bootstrap
   in
+  let () = toplog "Initializing the bakers" in
   let* baker_accounts =
     Client.stresstest_gen_keys
       ~alias_prefix:"baker"
       (List.length configuration.stake)
       bootstrap.client
   in
+  let () = toplog "Initializing the producers" in
   let* producer_accounts =
     Client.stresstest_gen_keys
       ~alias_prefix:"dal_producer"
       configuration.dal_node_producer
       bootstrap.client
   in
+  let () = toplog "Funding the producer accounts" in
   let* () =
     Client.import_secret_key
       bootstrap.client
       (Unencrypted Cli.fundraiser)
       ~alias:"fundraiser"
   in
+  let () = toplog "Revealing the fundraiser public key" in
   let* () =
     let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
     let* _ = Process.wait process in
     Lwt.return_unit
   in
   let* fundraiser = Client.show_address ~alias:"fundraiser" bootstrap.client in
+  let () = toplog "Fetching fundraiser's counter" in
   let* counter =
     Operation.get_next_counter ~source:fundraiser bootstrap.client
   in
+  let () = toplog "Fetching fundraiser's balance" in
   let* () =
     if List.length producer_accounts > 0 then
+      let () = toplog "Injecting the batch" in
       let* _op_hash =
         producer_accounts
         |> List.map (fun producer ->
@@ -1015,8 +1041,15 @@ let init_ghostnet cloud (configuration : configuration) agent =
         |> Fun.flip (Operation.Manager.inject ~dont_wait:true) bootstrap.client
       in
       (* Wait a bit. *)
-      Lwt_unix.sleep 10.
-    else unit
+      let () = toplog "Waiting 10 seconds" in
+      let* () = Lwt_unix.sleep 10. in
+      let () = toplog "Waiting 10 seconds: done" in
+      unit
+    else
+      let () =
+        toplog "Skipping batch injection because there are no producers"
+      in
+      unit
   in
   Lwt.return (bootstrap, baker_accounts, producer_accounts, None)
 
@@ -1191,10 +1224,12 @@ let init_baker cloud (configuration : configuration) ~bootstrap account i agent
 
 let init_producer cloud configuration ~bootstrap ~number_of_slots account i
     agent =
+  let () = toplog "Init producer" in
   let name = Format.asprintf "producer-node-%i" i in
   let data_dir =
     Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
+  let () = toplog "Init producer: init node" in
   let* node =
     Node.init
       ?data_dir
@@ -1203,7 +1238,9 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
       configuration.network
       agent
   in
+  let () = toplog "Init producer: create client" in
   let* client = Client.Agent.create ~node agent in
+  let () = toplog "Init producer: import key" in
   let* () =
     Client.import_secret_key
       client
@@ -1211,16 +1248,21 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
       account.Account.secret_key
       ~alias:account.Account.alias
   in
+  let () = toplog "Init producer: wait for the node to be bootstrapped" in
   let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
+  let () = toplog "Init producer: the node is bootstrapped" in
+  let () = toplog "Init producer: reveal account" in
   let*! () =
     Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
   in
+  let () = toplog "Init producer: create agent" in
   let* dal_node =
     Dal_node.Agent.create
       ~name:(Format.asprintf "producer-dal-node-%i" i)
       ~node
       agent
   in
+  let () = toplog "Init producer: init DAL node config" in
   let* () =
     Dal_node.init_config
       ~expected_pow:0.
@@ -1228,6 +1270,7 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
   in
+  let () = toplog "Init producer: add DAL node metrics" in
   let* () =
     add_source
       cloud
@@ -1238,7 +1281,9 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
   in
   (* We do not wait on the promise because loading the SRS takes some time.
      Instead we will publish commitments only once this promise is fulfilled. *)
+  let () = toplog "Init producer: wait for DAL node to be ready" in
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
+  let () = toplog "Init producer: DAL node is ready" in
   Lwt.return {client; node; dal_node; account; is_ready}
 
 let init_observer cloud configuration ~bootstrap ~slot_index i agent =
@@ -1280,6 +1325,7 @@ let init_observer cloud configuration ~bootstrap ~slot_index i agent =
 
 let init_etherlink_operator_setup cloud configuration is_sequencer name
     ~bootstrap ~dal_slots account agent =
+  let () = toplog "Init Etherlink operator setup" in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
     Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -1292,7 +1338,9 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
       configuration.network
       agent
   in
+  let () = toplog "Init Etherlink operator setup: create agent" in
   let* client = Client.Agent.create ~node agent in
+  let () = toplog "Init Etherlink operator setup: import key" in
   let* () =
     Client.import_secret_key
       client
@@ -1300,11 +1348,17 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
       account.Account.secret_key
       ~alias:account.Account.alias
   in
+  let () = toplog "Init Etherlink operator setup: get last seen level" in
   let l = Node.get_last_seen_level node in
+  let () = toplog "Init Etherlink operator setup: reveal account" in
   let*! () =
     Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
   in
+  let () = toplog "Init Etherlink operator setup: wait for level %d" (l + 2) in
   let* _ = Node.wait_for_level node (l + 2) in
+  let () =
+    toplog "Init Etherlink operator setup: wait for level %d: done" (l + 2)
+  in
   (* A configuration is generated locally by the orchestrator. The resulting
      kernel will be pushed to Etherlink. *)
   let output_config = Temp.file "config.yaml" in
@@ -1314,12 +1368,16 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
   in
   let*! () =
     let sequencer = if is_sequencer then Some account.public_key else None in
+    let () =
+      toplog "Init Etherlink operator setup: make kernel installer config"
+    in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
       ?sequencer
       ~bootstrap_accounts
       ~output:output_config
       ()
   in
+  let () = toplog "Init Etherlink operator setup: create rollup node" in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
       ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
@@ -1342,6 +1400,7 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
   in
   let pvm_kind = "wasm_2_0_0" in
   let l = Node.get_last_seen_level node in
+  let () = toplog "Init Etherlink operator setup: originate rollup" in
   let* sc_rollup_address =
     Sc_rollup_helpers.Agent.originate_sc_rollup
       ~kind:pvm_kind
@@ -1350,7 +1409,16 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
       ~src:account.alias
       client
   in
+  let () =
+    toplog "Init Etherlink operator setup: wait again, for level %d" (l + 2)
+  in
   let* _ = Node.wait_for_level node (l + 2) in
+  let () =
+    toplog
+      "Init Etherlink operator setup: wait again, for level %d: done"
+      (l + 2)
+  in
+  let () = toplog "Init Etherlink operator setup: running the rollup node" in
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
@@ -1382,6 +1450,7 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
     if is_sequencer then sequencer_mode
     else Evm_node.Proxy {finalized_view = false}
   in
+  let () = toplog "Init Etherlink operator setup: init the operator agent" in
   let* evm_node =
     Tezos.Evm_node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
@@ -1400,6 +1469,7 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
       sc_rollup_address;
     }
   in
+  let () = toplog "Init Etherlink operator setup: add metrics source" in
   let* () =
     add_etherlink_source
       cloud
@@ -1497,7 +1567,9 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
 
 let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
     ~dal_slots next_agent =
+  let () = toplog "init_etherlink" in
   let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
+  let () = toplog "init_etherlink: init operator setup" in
   let* operator =
     init_etherlink_operator_setup
       cloud
@@ -1516,6 +1588,7 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
         next_agent ~name)
     |> Lwt.all
   in
+  let () = toplog "init_etherlink: init Etherlink producers" in
   let* producers =
     producers_agents
     |> List.mapi (fun i agent ->
@@ -1532,6 +1605,7 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
   return {operator; accounts; producers}
 
 let init ~(configuration : configuration) cloud next_agent =
+  let () = toplog "Init" in
   let* bootstrap_agent =
     if Cli.bootstrap then
       let* agent = next_agent ~name:"bootstrap" in
@@ -1566,7 +1640,9 @@ let init ~(configuration : configuration) cloud next_agent =
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
         init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
-    | Ghostnet -> init_ghostnet cloud configuration bootstrap_agent
+    | Ghostnet ->
+        let () = toplog "Init: initializting, testnet case" in
+        init_ghostnet cloud configuration bootstrap_agent
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -1578,6 +1654,7 @@ let init ~(configuration : configuration) cloud next_agent =
     Client.create ~endpoint:(Foreign_endpoint bootstrap.node_rpc_endpoint) ()
   in
   let* parameters = Dal_common.Parameters.from_client client in
+  let () = toplog "Init: initializting producers and observers" in
   let* producers =
     Lwt_list.mapi_p
       (fun i (agent, account) ->
@@ -1596,17 +1673,25 @@ let init ~(configuration : configuration) cloud next_agent =
         init_observer cloud configuration ~bootstrap ~slot_index i agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
+  let () = toplog "Init: all producers and observers have been initialized" in
   let* etherlink =
     if Cli.etherlink then
+      let () = toplog "Init: initializing Etherlink" in
+      let () = toplog "Init: Getting Etherlink operator key" in
       let etherlink_rollup_operator_key =
         Option.get etherlink_rollup_operator_key
       in
+      let () = toplog "Init: Getting allowed DAL slot indices" in
       let dal_slots =
         match configuration.etherlink_dal_slots with
         | [] -> None
         | slots -> Some slots
       in
+      let () =
+        toplog "Init: Etherlink+DAL feature flag: %b" (Option.is_some dal_slots)
+      in
       let* etherlink =
+        let () = toplog "Init: calling init_etherlink" in
         init_etherlink
           cloud
           configuration
@@ -1616,7 +1701,13 @@ let init ~(configuration : configuration) cloud next_agent =
           ~dal_slots
       in
       some etherlink
-    else none
+    else
+      let () =
+        toplog
+          "Init: skipping Etherlink initialization because --etherlink was not \
+           given on the CLI"
+      in
+      none
   in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
@@ -1665,7 +1756,7 @@ let wait_for_level t level =
 let on_new_level t level =
   let client = t.bootstrap.client in
   let* () = wait_for_level t level in
-  Log.info "Start process level %d" level ;
+  toplog "Start process level %d" level ;
   let* infos_per_level = get_infos_per_level client ~level in
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
@@ -1804,6 +1895,7 @@ let configuration =
   }
 
 let benchmark () =
+  toplog "Parsing CLI done" ;
   let vms =
     [
       (if configuration.bootstrap then [`Bootstrap] else []);
@@ -1857,6 +1949,7 @@ let benchmark () =
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]
     (fun cloud ->
+      toplog "Creating the agents" ;
       let agents = Cloud.agents cloud in
       (* We give to the [init] function a sequence of agents (and cycle if
          they were all consumed). We set their name only if the number of
@@ -1875,12 +1968,18 @@ let benchmark () =
           let* () = set_name agent name in
           Lwt.return agent
       in
+      toplog "Init" ;
       let* t = init ~configuration cloud next_agent in
+      toplog "Starting main loop" ;
       let main_loop = loop t (t.first_level + 1) in
       let etherlink_loop =
         match t.etherlink with
-        | None -> unit
-        | Some etherlink -> etherlink_loop etherlink
+        | None ->
+            let () = toplog "No Etherlink loop to start" in
+            unit
+        | Some etherlink ->
+            let () = toplog "Starting Etherlink loop" in
+            etherlink_loop etherlink
       in
       Lwt.join [main_loop; etherlink_loop])
 
