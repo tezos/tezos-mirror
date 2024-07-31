@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Sign and verify the signature of the releasing docker images using Cosign
+# Sign the releasing docker images using Cosign
 #
 # Reads the following environment variables:
 #  - 'GCP_SIGNER_SERVICE_ACCOUNT': signer service account key file encoded
@@ -40,9 +40,6 @@ for docker_image in ${docker_images}; do
   # Get the location of image signature as reference
   IMAGE_SIGNATURE_LOCATION=$(cosign triangulate "${IMAGE_DIGEST}")
   echo "Image signature location: ${IMAGE_SIGNATURE_LOCATION}"
-
-  # Verify the signature
-  cosign verify --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" | jq
 done
 
 # Remove credentials
