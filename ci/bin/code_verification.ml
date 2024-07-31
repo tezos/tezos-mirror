@@ -1447,7 +1447,11 @@ let jobs pipeline_type =
             (make_rules
                ~changes:
                  (Changeset.make
-                    ["docs/developer/install-python-debian-ubuntu.sh"])
+                    [
+                      "docs/developer/install-python-debian-ubuntu.sh";
+                      "pyproject.toml";
+                      "poetry.lock";
+                    ])
                ~manual:Yes
                ~label:"ci--docs"
                ())
