@@ -339,12 +339,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   Metrics.Info.init ~mode:"observer" ;
   let rollup_node_endpoint = config.rollup_node_endpoint in
-  let*? {
-          evm_node_endpoint;
-          threshold_encryption_bundler_endpoint;
-          preimages;
-          preimages_endpoint;
-        } =
+  let*? {evm_node_endpoint; threshold_encryption_bundler_endpoint} =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
@@ -357,8 +352,8 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
     Evm_context.start
       ~data_dir
       ?kernel_path
-      ~preimages
-      ~preimages_endpoint
+      ~preimages:config.kernel_execution.preimages
+      ~preimages_endpoint:config.kernel_execution.preimages_endpoint
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)

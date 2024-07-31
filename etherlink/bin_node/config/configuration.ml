@@ -22,6 +22,11 @@ type blueprints_publisher_config = {
   dal_slots : int list option;
 }
 
+type kernel_execution_config = {
+  preimages : string;
+  preimages_endpoint : Uri.t option;
+}
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
@@ -29,8 +34,6 @@ type experimental_features = {
 }
 
 type sequencer = {
-  preimages : string;
-  preimages_endpoint : Uri.t option;
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
   private_rpc_port : int option;
@@ -41,8 +44,6 @@ type sequencer = {
 (* Variant is needed to avoid type-checking errors. *)
 type threshold_encryption_sequencer =
   | Threshold_encryption_sequencer of {
-      preimages : string;
-      preimages_endpoint : Uri.t option;
       time_between_blocks : time_between_blocks;
       max_number_of_chunks : int;
       private_rpc_port : int option;
@@ -54,8 +55,6 @@ type threshold_encryption_sequencer =
 type observer = {
   evm_node_endpoint : Uri.t;
   threshold_encryption_bundler_endpoint : Uri.t option;
-  preimages : string;
-  preimages_endpoint : Uri.t option;
 }
 
 type proxy = {finalized_view : bool}
@@ -72,6 +71,7 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
+  kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
   threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
@@ -157,8 +157,48 @@ let default_fee_history = {max_count = None; max_past = None}
 
 let make_restricted_rpcs raw = {raw; regex = Re.Perl.compile_pat raw}
 
-let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
-    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ~sequencer
+let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint () =
+  {
+    preimages = Option.value ~default:(default_preimages data_dir) preimages;
+    preimages_endpoint;
+  }
+
+let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks
+    ?private_rpc_port ~sequencer ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?dal_slots () =
+  let blueprints_publisher_config =
+    {
+      max_blueprints_lag =
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_lag
+          max_blueprints_lag;
+      max_blueprints_ahead =
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_ahead
+          max_blueprints_ahead;
+      max_blueprints_catchup =
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_catchup
+          max_blueprints_catchup;
+      catchup_cooldown =
+        Option.value
+          ~default:default_blueprints_publisher_config.catchup_cooldown
+          catchup_cooldown;
+      dal_slots;
+    }
+  in
+  {
+    time_between_blocks =
+      Option.value ~default:default_time_between_blocks time_between_blocks;
+    max_number_of_chunks =
+      Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
+    private_rpc_port;
+    sequencer;
+    blueprints_publisher_config;
+  }
+
+let threshold_encryption_sequencer_config_dft ?time_between_blocks
+    ?max_number_of_chunks ?private_rpc_port ~sequencer ?sidecar_endpoint
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?dal_slots () =
   let blueprints_publisher_config =
@@ -182,48 +222,8 @@ let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
       dal_slots;
     }
   in
-  {
-    preimages = Option.value ~default:(default_preimages data_dir) preimages;
-    preimages_endpoint;
-    time_between_blocks =
-      Option.value ~default:default_time_between_blocks time_between_blocks;
-    max_number_of_chunks =
-      Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-    private_rpc_port;
-    sequencer;
-    blueprints_publisher_config;
-  }
-
-let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
-    ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-    ?private_rpc_port ~sequencer ?sidecar_endpoint ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown ?dal_slots
-    () =
-  let blueprints_publisher_config =
-    {
-      max_blueprints_lag =
-        Option.value
-          ~default:default_blueprints_publisher_config.max_blueprints_lag
-          max_blueprints_lag;
-      max_blueprints_ahead =
-        Option.value
-          ~default:default_blueprints_publisher_config.max_blueprints_ahead
-          max_blueprints_ahead;
-      max_blueprints_catchup =
-        Option.value
-          ~default:default_blueprints_publisher_config.max_blueprints_catchup
-          max_blueprints_catchup;
-      catchup_cooldown =
-        Option.value
-          ~default:default_blueprints_publisher_config.catchup_cooldown
-          catchup_cooldown;
-      dal_slots;
-    }
-  in
   Threshold_encryption_sequencer
     {
-      preimages = Option.value ~default:(default_preimages data_dir) preimages;
-      preimages_endpoint;
       time_between_blocks =
         Option.value ~default:default_time_between_blocks time_between_blocks;
       max_number_of_chunks =
@@ -237,14 +237,9 @@ let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
           sidecar_endpoint;
     }
 
-let observer_config_dft ~data_dir ?preimages ?preimages_endpoint
-    ~evm_node_endpoint ?threshold_encryption_bundler_endpoint () =
-  {
-    evm_node_endpoint;
-    threshold_encryption_bundler_endpoint;
-    preimages = Option.value ~default:(default_preimages data_dir) preimages;
-    preimages_endpoint;
-  }
+let observer_config_dft ~evm_node_endpoint
+    ?threshold_encryption_bundler_endpoint () =
+  {evm_node_endpoint; threshold_encryption_bundler_endpoint}
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -258,6 +253,10 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
        (dft "max_nb_blocks" int31 default_filter_config.max_nb_blocks)
        (dft "max_nb_logs" int31 default_filter_config.max_nb_logs)
        (dft "chunk_size" int31 default_filter_config.chunk_size))
+
+let deprecated name =
+  Data_encoding.(
+    opt name ~description:"Deprecated field, value is ignored" Json.encoding)
 
 let time_between_blocks_encoding : time_between_blocks Data_encoding.t =
   let open Data_encoding in
@@ -313,35 +312,31 @@ let blueprints_publisher_config_encoding =
           default_blueprints_publisher_config.catchup_cooldown)
        (opt "dal_slots" (list int8)))
 
-let sequencer_encoding data_dir =
+let sequencer_encoding =
   let open Data_encoding in
   conv
     (fun {
-           preimages;
-           preimages_endpoint;
            time_between_blocks;
            max_number_of_chunks;
            private_rpc_port;
            sequencer;
            blueprints_publisher_config;
          } ->
-      ( preimages,
-        preimages_endpoint,
+      ( None,
+        None,
         time_between_blocks,
         max_number_of_chunks,
         private_rpc_port,
         Client_keys.string_of_sk_uri sequencer,
         blueprints_publisher_config ))
-    (fun ( preimages,
-           preimages_endpoint,
+    (fun ( _,
+           _,
            time_between_blocks,
            max_number_of_chunks,
            private_rpc_port,
            sequencer,
            blueprints_publisher_config ) ->
       {
-        preimages;
-        preimages_endpoint;
         time_between_blocks;
         max_number_of_chunks;
         private_rpc_port;
@@ -349,8 +344,8 @@ let sequencer_encoding data_dir =
         blueprints_publisher_config;
       })
     (obj7
-       (dft "preimages" string (default_preimages data_dir))
-       (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
+       (deprecated "preimages")
+       (deprecated "preimages_endpoint")
        (dft
           "time_between_blocks"
           time_between_blocks_encoding
@@ -366,14 +361,12 @@ let sequencer_encoding data_dir =
           blueprints_publisher_config_encoding
           default_blueprints_publisher_config))
 
-let threshold_encryption_sequencer_encoding data_dir =
+let threshold_encryption_sequencer_encoding =
   let open Data_encoding in
   conv
     (function
       | Threshold_encryption_sequencer
           {
-            preimages;
-            preimages_endpoint;
             time_between_blocks;
             max_number_of_chunks;
             private_rpc_port;
@@ -381,16 +374,16 @@ let threshold_encryption_sequencer_encoding data_dir =
             blueprints_publisher_config;
             sidecar_endpoint;
           } ->
-          ( preimages,
-            preimages_endpoint,
+          ( None,
+            None,
             time_between_blocks,
             max_number_of_chunks,
             private_rpc_port,
             Client_keys.string_of_sk_uri sequencer,
             blueprints_publisher_config,
             sidecar_endpoint ))
-    (fun ( preimages,
-           preimages_endpoint,
+    (fun ( _,
+           _,
            time_between_blocks,
            max_number_of_chunks,
            private_rpc_port,
@@ -399,8 +392,6 @@ let threshold_encryption_sequencer_encoding data_dir =
            sidecar_endpoint ) ->
       Threshold_encryption_sequencer
         {
-          preimages;
-          preimages_endpoint;
           time_between_blocks;
           max_number_of_chunks;
           private_rpc_port;
@@ -409,8 +400,8 @@ let threshold_encryption_sequencer_encoding data_dir =
           sidecar_endpoint;
         })
     (obj8
-       (dft "preimages" string (default_preimages data_dir))
-       (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
+       (deprecated "preimages")
+       (deprecated "preimages_endpoint")
        (dft
           "time_between_blocks"
           time_between_blocks_encoding
@@ -430,42 +421,28 @@ let threshold_encryption_sequencer_encoding data_dir =
           Tezos_rpc.Encoding.uri_encoding
           default_sequencer_sidecar_endpoint))
 
-let observer_encoding data_dir =
+let observer_encoding =
   let open Data_encoding in
   conv
-    (fun {
-           preimages;
-           preimages_endpoint;
-           evm_node_endpoint;
-           threshold_encryption_bundler_endpoint;
-         } ->
-      ( preimages,
-        preimages_endpoint,
+    (fun {evm_node_endpoint; threshold_encryption_bundler_endpoint} ->
+      ( None,
+        None,
         Uri.to_string evm_node_endpoint,
         threshold_encryption_bundler_endpoint,
         None ))
-    (fun ( preimages,
-           preimages_endpoint,
-           evm_node_endpoint,
-           threshold_encryption_bundler_endpoint,
-           _ ) ->
+    (fun (_, _, evm_node_endpoint, threshold_encryption_bundler_endpoint, _) ->
       {
-        preimages;
-        preimages_endpoint;
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
         threshold_encryption_bundler_endpoint;
       })
     (obj5
-       (dft "preimages" string (default_preimages data_dir))
-       (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
+       (deprecated "preimages")
+       (deprecated "preimages_endpoint")
        (req "evm_node_endpoint" string)
        (opt
           "threshold_encryption_bundler_endpoint"
           Tezos_rpc.Encoding.uri_encoding)
-       (opt
-          "time_between_blocks"
-          ~description:"Deprecated field, value is ignored"
-          Json.encoding))
+       (deprecated "time_between_blocks"))
 
 let experimental_features_encoding =
   let open Data_encoding in
@@ -490,7 +467,7 @@ let experimental_features_encoding =
       })
     (obj4
        (* `sqlite_journal_mode` field is kept for now for backward compatibility. *)
-       (opt "sqlite_journal_mode" Json.encoding)
+       (deprecated "sqlite_journal_mode")
        (dft "drop_duplicate_on_injection" bool false)
        (dft
           "enable_send_raw_transaction"
@@ -513,6 +490,15 @@ let fee_history_encoding =
     (fun {max_count; max_past} -> (max_count, max_past))
     (fun (max_count, max_past) -> {max_count; max_past})
     (obj2 (opt "max_count" int31) (opt "max_past" int31))
+
+let kernel_execution_encoding data_dir =
+  Data_encoding.(
+    conv
+      (fun {preimages; preimages_endpoint} -> (preimages, preimages_endpoint))
+      (fun (preimages, preimages_endpoint) -> {preimages; preimages_endpoint})
+      (obj2
+         (dft "preimages" string (default_preimages data_dir))
+         (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)))
 
 let encoding data_dir : t Data_encoding.t =
   let open Data_encoding in
@@ -537,6 +523,7 @@ let encoding data_dir : t Data_encoding.t =
            experimental_features;
            fee_history;
            restricted_rpcs;
+           kernel_execution;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -549,16 +536,17 @@ let encoding data_dir : t Data_encoding.t =
           threshold_encryption_sequencer,
           observer,
           max_active_connections ),
-        ( tx_pool_timeout_limit,
-          tx_pool_addr_limit,
-          tx_pool_tx_per_addr_limit,
-          keep_alive,
-          Uri.to_string rollup_node_endpoint,
-          verbose,
-          experimental_features,
-          proxy,
-          fee_history,
-          Option.map (fun {raw; _} -> raw) restricted_rpcs ) ))
+        ( ( tx_pool_timeout_limit,
+            tx_pool_addr_limit,
+            tx_pool_tx_per_addr_limit,
+            keep_alive,
+            Uri.to_string rollup_node_endpoint,
+            verbose,
+            experimental_features,
+            proxy,
+            fee_history,
+            Option.map (fun {raw; _} -> raw) restricted_rpcs ),
+          kernel_execution ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              _devmode,
@@ -569,16 +557,17 @@ let encoding data_dir : t Data_encoding.t =
              threshold_encryption_sequencer,
              observer,
              max_active_connections ),
-           ( tx_pool_timeout_limit,
-             tx_pool_addr_limit,
-             tx_pool_tx_per_addr_limit,
-             keep_alive,
-             rollup_node_endpoint,
-             verbose,
-             experimental_features,
-             proxy,
-             fee_history,
-             restricted_rpcs ) ) ->
+           ( ( tx_pool_timeout_limit,
+               tx_pool_addr_limit,
+               tx_pool_tx_per_addr_limit,
+               keep_alive,
+               rollup_node_endpoint,
+               verbose,
+               experimental_features,
+               proxy,
+               fee_history,
+               restricted_rpcs ),
+             kernel_execution ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -599,6 +588,7 @@ let encoding data_dir : t Data_encoding.t =
         experimental_features;
         fee_history;
         restricted_rpcs = Option.map make_restricted_rpcs restricted_rpcs;
+        kernel_execution;
       })
     (merge_objs
        (obj10
@@ -611,46 +601,52 @@ let encoding data_dir : t Data_encoding.t =
              "log_filter"
              log_filter_config_encoding
              (default_filter_config ()))
-          (opt "sequencer" (sequencer_encoding data_dir))
+          (opt "sequencer" sequencer_encoding)
           (opt
              "threshold_encryption_sequencer"
-             (threshold_encryption_sequencer_encoding data_dir))
-          (opt "observer" (observer_encoding data_dir))
+             threshold_encryption_sequencer_encoding)
+          (opt "observer" observer_encoding)
           (dft
              "max_active_connections"
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj10
-          (dft
-             "tx-pool-timeout-limit"
-             ~description:
-               "Transaction timeout limit inside the transaction pool"
-             int64
-             default_tx_pool_timeout_limit)
-          (dft
-             "tx-pool-addr-limit"
-             ~description:
-               "Maximum allowed addresses inside the transaction pool."
-             int64
-             default_tx_pool_addr_limit)
-          (dft
-             "tx-pool-tx-per-addr-limit"
-             ~description:
-               "Maximum allowed transactions per user address inside the \
-                transaction pool."
-             int64
-             default_tx_pool_tx_per_addr_limit)
-          (dft "keep_alive" bool default_keep_alive)
-          (req "rollup_node_endpoint" string)
-          (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
-          (dft
-             "experimental_features"
-             experimental_features_encoding
-             default_experimental_features)
-          (dft "proxy" proxy_encoding (default_proxy ()))
-          (dft "fee_history" fee_history_encoding default_fee_history)
-          (opt "restricted_rpcs" string)))
+       (merge_objs
+          (obj10
+             (dft
+                "tx-pool-timeout-limit"
+                ~description:
+                  "Transaction timeout limit inside the transaction pool"
+                int64
+                default_tx_pool_timeout_limit)
+             (dft
+                "tx-pool-addr-limit"
+                ~description:
+                  "Maximum allowed addresses inside the transaction pool."
+                int64
+                default_tx_pool_addr_limit)
+             (dft
+                "tx-pool-tx-per-addr-limit"
+                ~description:
+                  "Maximum allowed transactions per user address inside the \
+                   transaction pool."
+                int64
+                default_tx_pool_tx_per_addr_limit)
+             (dft "keep_alive" bool default_keep_alive)
+             (req "rollup_node_endpoint" string)
+             (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
+             (dft
+                "experimental_features"
+                experimental_features_encoding
+                default_experimental_features)
+             (dft "proxy" proxy_encoding (default_proxy ()))
+             (dft "fee_history" fee_history_encoding default_fee_history)
+             (opt "restricted_rpcs" string))
+          (obj1
+             (dft
+                "kernel_execution"
+                (kernel_execution_encoding data_dir)
+                (kernel_execution_config_dft ~data_dir ())))))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -699,9 +695,6 @@ module Cli = struct
       Option.map
         (fun sequencer ->
           sequencer_config_dft
-            ~data_dir
-            ?preimages
-            ?preimages_endpoint
             ?time_between_blocks
             ?max_number_of_chunks
             ?private_rpc_port
@@ -718,9 +711,6 @@ module Cli = struct
       Option.map
         (fun sequencer ->
           threshold_encryption_sequencer_config_dft
-            ~data_dir
-            ?preimages
-            ?preimages_endpoint
             ?time_between_blocks
             ?max_number_of_chunks
             ?private_rpc_port
@@ -738,9 +728,6 @@ module Cli = struct
       Option.map
         (fun evm_node_endpoint ->
           observer_config_dft
-            ~data_dir
-            ?preimages
-            ?preimages_endpoint
             ~evm_node_endpoint
             ?threshold_encryption_bundler_endpoint
             ())
@@ -754,6 +741,9 @@ module Cli = struct
         ?chunk_size:log_filter_chunk_size
         ()
     in
+    let kernel_execution =
+      kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint ()
+    in
     let restricted_rpcs = Option.map make_restricted_rpcs restricted_rpcs in
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
@@ -761,6 +751,7 @@ module Cli = struct
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter;
+      kernel_execution;
       sequencer;
       threshold_encryption_sequencer;
       observer;
@@ -784,7 +775,17 @@ module Cli = struct
       restricted_rpcs;
     }
 
-  let patch_configuration_from_args ~data_dir ?rpc_addr ?rpc_port ?cors_origins
+  let patch_kernel_execution_config kernel_execution ?preimages
+      ?preimages_endpoint () =
+    let preimages =
+      Option.value preimages ~default:kernel_execution.preimages
+    in
+    let preimages_endpoint =
+      Option.either preimages_endpoint kernel_execution.preimages_endpoint
+    in
+    {preimages; preimages_endpoint}
+
+  let patch_configuration_from_args ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
@@ -825,12 +826,6 @@ module Cli = struct
           in
           Some
             {
-              preimages =
-                Option.value ~default:sequencer_config.preimages preimages;
-              preimages_endpoint =
-                Option.either
-                  preimages_endpoint
-                  sequencer_config.preimages_endpoint;
               time_between_blocks =
                 Option.value
                   ~default:sequencer_config.time_between_blocks
@@ -849,9 +844,6 @@ module Cli = struct
           Option.map
             (fun sequencer ->
               sequencer_config_dft
-                ~data_dir
-                ?preimages
-                ?preimages_endpoint
                 ?time_between_blocks
                 ?max_number_of_chunks
                 ?private_rpc_port
@@ -900,14 +892,6 @@ module Cli = struct
           Some
             (Threshold_encryption_sequencer
                {
-                 preimages =
-                   Option.value
-                     ~default:threshold_encryption_sequencer_config.preimages
-                     preimages;
-                 preimages_endpoint =
-                   Option.either
-                     preimages_endpoint
-                     threshold_encryption_sequencer_config.preimages_endpoint;
                  time_between_blocks =
                    Option.value
                      ~default:
@@ -938,9 +922,6 @@ module Cli = struct
           Option.map
             (fun sequencer ->
               threshold_encryption_sequencer_config_dft
-                ~data_dir
-                ?preimages
-                ?preimages_endpoint
                 ?time_between_blocks
                 ?max_number_of_chunks
                 ?private_rpc_port
@@ -959,12 +940,6 @@ module Cli = struct
       | Some observer_config ->
           Some
             {
-              preimages =
-                Option.value ~default:observer_config.preimages preimages;
-              preimages_endpoint =
-                Option.either
-                  preimages_endpoint
-                  observer_config.preimages_endpoint;
               evm_node_endpoint =
                 Option.value
                   ~default:observer_config.evm_node_endpoint
@@ -978,9 +953,6 @@ module Cli = struct
           Option.map
             (fun evm_node_endpoint ->
               observer_config_dft
-                ~data_dir
-                ?preimages
-                ?preimages_endpoint
                 ~evm_node_endpoint
                 ?threshold_encryption_bundler_endpoint
                 ())
@@ -1003,6 +975,13 @@ module Cli = struct
             log_filter_chunk_size;
       }
     in
+    let kernel_execution =
+      patch_kernel_execution_config
+        configuration.kernel_execution
+        ?preimages
+        ?preimages_endpoint
+        ()
+    in
     let restricted_rpcs =
       Option.either
         (Option.map make_restricted_rpcs restricted_rpcs)
@@ -1016,6 +995,7 @@ module Cli = struct
       cors_headers =
         Option.value ~default:configuration.cors_headers cors_headers;
       log_filter;
+      kernel_execution;
       sequencer;
       threshold_encryption_sequencer;
       observer;
@@ -1076,7 +1056,6 @@ module Cli = struct
       let* configuration = load ~data_dir in
       let configuration =
         patch_configuration_from_args
-          ~data_dir
           ?rpc_addr
           ?rpc_port
           ?cors_origins

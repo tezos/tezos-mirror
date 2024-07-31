@@ -48,6 +48,8 @@
 
 - Deprecate the `time_between_blocks` field of the observer configuration.
   (!14327)
+- Deprecate the `preimages` and `preimages_endpoint` fields specific to each
+  mode, in favor of a new `kernel_execution` top-level configuration. (!14332)
 
 ### Experimental
 

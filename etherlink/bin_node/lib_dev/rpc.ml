@@ -347,8 +347,8 @@ let main ~data_dir ~(config : Configuration.t) =
   let* ctxt =
     load
       ~data_dir
-      ~preimages:observer.preimages
-      ?preimages_endpoint:observer.preimages_endpoint
+      ~preimages:config.kernel_execution.preimages
+      ?preimages_endpoint:config.kernel_execution.preimages_endpoint
       ()
   in
   let rpc_backend =
