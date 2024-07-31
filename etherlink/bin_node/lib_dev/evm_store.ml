@@ -491,32 +491,6 @@ let init ~data_dir ~perm () =
   in
   return store
 
-module Blueprints = struct
-  let store store (blueprint : Blueprint_types.t) =
-    with_connection store @@ fun conn ->
-    Db.exec
-      conn
-      Q.Blueprints.insert
-      (blueprint.number, blueprint.timestamp, blueprint.payload)
-
-  let find store number =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let+ opt = Db.find_opt conn Q.Blueprints.select number in
-    match opt with
-    | Some (payload, timestamp) ->
-        Some Blueprint_types.{payload; timestamp; number}
-    | None -> None
-
-  let find_range store ~from ~to_ =
-    with_connection store @@ fun conn ->
-    Db.collect_list conn Q.Blueprints.select_range (from, to_)
-
-  let clear_after store l2_level =
-    with_connection store @@ fun conn ->
-    Db.exec conn Q.Blueprints.clear_after l2_level
-end
-
 module Context_hashes = struct
   let store store number hash =
     with_connection store @@ fun conn ->
@@ -588,6 +562,54 @@ module Delayed_transactions = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Delayed_transactions.clear_after l2_level
+end
+
+module Blueprints = struct
+  let store store (blueprint : Blueprint_types.t) =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Blueprints.insert
+      (blueprint.number, blueprint.timestamp, blueprint.payload)
+
+  let find store number =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let+ opt = Db.find_opt conn Q.Blueprints.select number in
+    match opt with
+    | Some (payload, timestamp) ->
+        Some Blueprint_types.{payload; timestamp; number}
+    | None -> None
+
+  let find_with_events conn level =
+    let open Lwt_result_syntax in
+    let* blueprint = find conn level in
+    let* kernel_upgrade = Kernel_upgrades.find_applied_before conn level in
+    match blueprint with
+    | None -> return None
+    | Some blueprint ->
+        let* delayed_transactions = Delayed_transactions.at_level conn level in
+        return_some
+          Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
+
+  let get_with_events conn level =
+    let open Lwt_result_syntax in
+    let* blueprint_candidate = find_with_events conn level in
+    match blueprint_candidate with
+    | Some blueprint -> return blueprint
+    | None ->
+        failwith
+          "Could not read blueprint %a from store"
+          Ethereum_types.pp_quantity
+          level
+
+  let find_range store ~from ~to_ =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Blueprints.select_range (from, to_)
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blueprints.clear_after l2_level
 end
 
 module L1_l2_levels_relationships = struct

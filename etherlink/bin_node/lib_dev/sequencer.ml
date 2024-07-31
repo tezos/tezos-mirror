@@ -327,6 +327,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let directory =
     directory
     |> Evm_services.register
+         Evm_context.next_blueprint_number
+         Evm_context.blueprint
          smart_rollup_address_typed
          sequencer_config.time_between_blocks
   in

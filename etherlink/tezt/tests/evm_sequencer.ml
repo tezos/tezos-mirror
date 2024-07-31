@@ -168,6 +168,47 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
       ticket_router_tester;
     }
 
+let run_new_rpc_endpoint evm_node =
+  let rpc_node =
+    Evm_node.create
+      ~data_dir:(Evm_node.data_dir evm_node)
+      ~mode:(Rpc Evm_node.(mode evm_node))
+      (Evm_node.endpoint evm_node)
+  in
+  let* () = Evm_node.run rpc_node in
+  return rpc_node
+
+let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
+  let preimages_dir = Evm_node.preimages_dir evm_node in
+  let initial_kernel = Evm_node.initial_kernel evm_node in
+  let* observer_mode =
+    if Evm_node.supports_threshold_encryption evm_node then
+      let bundler =
+        Dsn_node.bundler ~endpoint:(Evm_node.endpoint evm_node) ()
+      in
+      let* () = Dsn_node.start bundler in
+      return
+        (Evm_node.Threshold_encryption_observer
+           {
+             initial_kernel;
+             preimages_dir;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             bundler_node_endpoint = Dsn_node.endpoint bundler;
+           })
+    else
+      return
+        (Evm_node.Observer
+           {
+             initial_kernel;
+             preimages_dir;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
+  in
+  let* observer =
+    Evm_node.init ~patch_config ~mode:observer_mode (Evm_node.endpoint evm_node)
+  in
+  return observer
+
 let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
     ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
@@ -319,34 +360,8 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
       ~mode:sequencer_mode
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let* observer_mode =
-    if threshold_encryption then
-      let bundler =
-        Dsn_node.bundler ~endpoint:(Evm_node.endpoint sequencer) ()
-      in
-      let* () = Dsn_node.start bundler in
-      return
-        (Evm_node.Threshold_encryption_observer
-           {
-             initial_kernel = output;
-             preimages_dir;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             bundler_node_endpoint = Dsn_node.endpoint bundler;
-           })
-    else
-      return
-        (Evm_node.Observer
-           {
-             initial_kernel = output;
-             preimages_dir;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-           })
-  in
   let* observer =
-    Evm_node.init
-      ~patch_config
-      ~mode:observer_mode
-      (Evm_node.endpoint sequencer)
+    run_new_observer_node ~patch_config ~sc_rollup_node sequencer
   in
   let* proxy =
     Evm_node.init
@@ -2064,6 +2079,62 @@ let test_observer_applies_blueprint =
   @@ fun {sequencer = sequencer_node; observer = observer_node; _} _protocol ->
   let levels_to_wait = 3 in
   let timeout = tbb *. float_of_int levels_to_wait *. 2. in
+
+  let* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+  in
+
+  let* () =
+    check_block_consistency
+      ~left:sequencer_node
+      ~right:observer_node
+      ~block:(`Level (Int32.of_int levels_to_wait))
+      ()
+  in
+
+  (* We stop and start the sequencer, to ensure the observer node correctly
+     reconnects to it. *)
+  let* () = Evm_node.wait_for_retrying_connect observer_node
+  and* () =
+    let* () = Evm_node.terminate sequencer_node in
+    Evm_node.run sequencer_node
+  in
+
+  let levels_to_wait = 2 * levels_to_wait in
+
+  let* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+  in
+
+  let* () =
+    check_block_consistency
+      ~left:sequencer_node
+      ~right:observer_node
+      ~block:(`Level (Int32.of_int levels_to_wait))
+      ()
+  in
+
+  unit
+
+let test_observer_applies_blueprint_from_rpc_node =
+  let tbb = 3. in
+  register_all
+    ~time_between_blocks:(Time_between_blocks tbb)
+    ~tags:["evm"; "observer"; "rpc_mode"]
+    ~title:"Can start an Observer node tracking a RPC node"
+  @@ fun {sequencer = sequencer_node; sc_rollup_node; _} _protocol ->
+  (* This is another version of [test_observer_applies_blueprint], but this
+     time instead of connecting directly to the sequencer, the observer
+     connects to a RPC mode process. *)
+  let levels_to_wait = 3 in
+  let timeout = tbb *. float_of_int levels_to_wait *. 2. in
+
+  let* rpc_node = run_new_rpc_endpoint sequencer_node in
+  let* observer_node = run_new_observer_node ~sc_rollup_node rpc_node in
 
   let* _ =
     Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
@@ -5165,16 +5236,7 @@ let test_rpc_mode_while_block_are_produced =
      ready at all to accept concurrent read-only access to the SQLite and Irmin
      stores, the test was failing, demonstrating that it was capturing the
      expected behavior. *)
-  let* rpc_node =
-    let rpc_node =
-      Evm_node.create
-        ~data_dir:(Evm_node.data_dir sequencer)
-        ~mode:Rpc
-        (Evm_node.endpoint sequencer)
-    in
-    let* () = Evm_node.run rpc_node in
-    return rpc_node
-  in
+  let* rpc_node = run_new_rpc_endpoint sequencer in
 
   let latest_block_number = ref 0l in
 
@@ -5253,6 +5315,7 @@ let () =
   test_init_from_rollup_node_data_dir protocols ;
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;
+  test_observer_applies_blueprint_from_rpc_node protocols ;
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_applies_blueprint_when_sequencer_restarted protocols ;
   test_observer_forwards_transaction protocols ;

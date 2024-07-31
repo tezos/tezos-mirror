@@ -20,6 +20,8 @@ val get_blueprint :
   Blueprint_types.with_events tzresult Lwt.t
 
 val register :
+  (unit -> Ethereum_types.quantity Lwt.t) ->
+  (Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t) ->
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.time_between_blocks ->
   unit Directory.t ->
