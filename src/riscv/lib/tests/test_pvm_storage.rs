@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    pvm::dummy_pvm::{DummyPvm, PvmStorage},
+    pvm::node_pvm::{NodePvm, PvmStorage},
     storage::{Repo, StorageError},
 };
 use proptest::prelude::*;
@@ -78,7 +78,7 @@ fn test_repo() {
 #[test]
 fn test_pvm_storage() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let empty = DummyPvm::empty();
+    let empty = NodePvm::empty();
     let mut repo = PvmStorage::load(tmp_dir.path()).unwrap();
     let id = repo.commit(&empty).unwrap();
     let checked_out_empty = repo.checkout(&id).unwrap();
