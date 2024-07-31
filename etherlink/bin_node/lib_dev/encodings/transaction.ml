@@ -157,14 +157,21 @@ let recovery_id : transaction -> (bytes, string) result =
     Ok buffer)
   else Error "Invalid recovery id"
 
-let caller transaction =
+let uncompressed_signature ~r ~s recovery_id =
+  let uncompressed_32_bytes v =
+    let len = Bytes.length v in
+    if len < 32 then Bytes.cat (Bytes.make (32 - len) '\000') v else v
+  in
+  let r = uncompressed_32_bytes r in
+  let s = uncompressed_32_bytes s in
+  (* TODO: we are missing the s.is_high() check. *)
+  Bytes.concat Bytes.empty [r; s; recovery_id]
+
+let caller ({r; s; _} as transaction) =
   let open Result_syntax in
   let message = message transaction in
   let* recovery_id = recovery_id transaction in
-  let sig_ =
-    (* TODO: we are missing the s.is_high() check. *)
-    Bytes.concat Bytes.empty [transaction.r; transaction.s; recovery_id]
-  in
+  let sig_ = uncompressed_signature ~r ~s recovery_id in
   let+ caller = Tezos_crypto.Signature.Secp256k1.recover sig_ message in
   Address (Hex (Hex.of_bytes caller |> Hex.show))
 
