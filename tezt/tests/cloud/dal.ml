@@ -1398,12 +1398,27 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
       ~output:output_config
       ()
   in
+  let* dal_node =
+    match configuration.etherlink_dal_slots with
+    | [] -> none
+    | dal_slots ->
+        let* dal_node =
+          Dal_node.Agent.create
+            ~name:(Format.asprintf "etherlink-%s-dal-node" name)
+            ~node
+            agent
+        in
+        let* () = Dal_node.init_config ~producer_profiles:dal_slots dal_node in
+        let* () = Dal_node.run dal_node in
+        some dal_node
+  in
   let () = toplog "Init Etherlink operator setup: create rollup node" in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
       ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
       ~base_dir:(Client.base_dir client)
       ~default_operator:account.Account.alias
+      ?dal_node
       agent
       Operator
       node
