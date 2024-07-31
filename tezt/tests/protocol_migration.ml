@@ -1083,10 +1083,278 @@ let check_baking_rights client nb_cycles_to_check ?nb_cycles_is_valid () =
       check_baking_rights_rpc ~expect_failure ~cycle ())
     (range level.cycle (level.cycle + nb_cycles_to_check))
 
+let test_migration_min_delegated_in_cycle =
+  (* Paris -> Quebec *)
+  let _migrate_from = Protocol.ParisC in
+  let migrate_to = Protocol.Quebeca in
+
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"protocol migration for min_delegated_in_cycle"
+    ~tags:[team; "protocol"; "migration"; "min_delegated_in_cycle"]
+  @@ fun migrate_from ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [(["adaptive_issuance_force_activation"], `Bool true)]
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let migration_level = 2 * blocks_per_cycle in
+  Log.info
+    ~color:Log.Color.FG.green
+    "blocks_per_cycle=%d, migration_level=%d"
+    blocks_per_cycle
+    migration_level ;
+
+  Log.info ~color:Log.Color.FG.green "Start node and client." ;
+  let* client, _node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info
+    ~color:Log.Color.FG.green
+    "Activate protocol %s."
+    (Protocol.name migrate_from) ;
+  let* () =
+    Client.activate_protocol ~parameter_file ~protocol:migrate_from client
+  in
+
+  let staking_balance_raw ?block pkh =
+    let* raw_json =
+      Client.RPC.call ~hooks:Tezos_regression.hooks client
+      @@ RPC.get_chain_block_context_raw_json
+           ?block
+           ~path:["staking_balance"; pkh]
+           ()
+    in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "Staking balance = %s"
+      (JSON.encode raw_json) ;
+    unit
+  in
+
+  let min_delegated_in_current_cycle_rpc ?block pkh =
+    let* raw_json =
+      Client.RPC.call ~hooks:Tezos_regression.hooks client
+      @@ RPC.get_chain_block_context_delegate_min_delegated_in_current_cycle
+           ?block
+           pkh
+    in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "min_delegated_in_current_cycle_rpc = %s"
+      (JSON.encode raw_json) ;
+    unit
+  in
+
+  let staking_balance ?block ~(delegate : Account.key) () =
+    Log.info ~color:Log.Color.FG.blue "for %s:" delegate.alias ;
+    let pkh = delegate.public_key_hash in
+    let* () = staking_balance_raw ?block pkh in
+    let* () = min_delegated_in_current_cycle_rpc ?block pkh in
+    unit
+  in
+
+  let create_account ~alias ~amount =
+    let* account = Client.gen_and_show_keys ~alias client in
+    Log.info ~color:Log.Color.FG.green "%s: %s" alias account.public_key_hash ;
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount
+        ~giver:Constant.bootstrap2.alias
+        ~receiver:account.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    return account
+  in
+
+  let transfer ~amount ~giver ~receiver =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Transfer %s tez from %s to %s."
+      (Tez.to_string amount)
+      giver
+      receiver ;
+    let* () =
+      Client.transfer ~burn_cap:Tez.one ~amount ~giver ~receiver client
+    in
+    let* () = Client.bake_for_and_wait client in
+    unit
+  in
+
+  let set_delegate ~src ~(delegate : Account.key) =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Set delegate for %s to %s."
+      src
+      delegate.alias ;
+    let*! () = Client.set_delegate ~src ~delegate:delegate.alias client in
+    let* () = Client.bake_for_and_wait client in
+    let* () = staking_balance ~delegate () in
+    unit
+  in
+
+  let register_delegate ~(delegate : Account.key) =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Register %s as a delegate."
+      delegate.alias ;
+    let* _delegate = Client.register_delegate ~delegate:delegate.alias client in
+    let* () = Client.bake_for_and_wait client in
+    let* () = staking_balance ~delegate () in
+    unit
+  in
+
+  let check_current_cycle ~cycle =
+    let* current_level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    Log.info
+      ~color:Log.Color.FG.blue
+      "Current level = %d and cycle = %d."
+      current_level.level
+      current_level.cycle ;
+    Check.((current_level.cycle = cycle) ~__LOC__ int)
+      ~error_msg:"Expected cycle=%R, got %L" ;
+    unit
+  in
+
+  let check_current_level ~level =
+    let* current_level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    Log.info
+      ~color:Log.Color.FG.blue
+      "Current level = %d and cycle = %d."
+      current_level.level
+      current_level.cycle ;
+    Check.((current_level.level = level) ~__LOC__ int)
+      ~error_msg:"Expected level=%R, got %L" ;
+    unit
+  in
+
+  let* baker = create_account ~alias:"baker" ~amount:(Tez.of_int 12_000) in
+  let* () = register_delegate ~delegate:baker in
+
+  let* delegator =
+    create_account ~alias:"delegator" ~amount:(Tez.of_int 12_000)
+  in
+  let* () = set_delegate ~src:delegator.alias ~delegate:baker in
+
+  let* other_account =
+    create_account ~alias:"other_account" ~amount:(Tez.of_int 12_000)
+  in
+
+  Log.info ~color:Log.Color.FG.green "Bake until a new cycle." ;
+  let* () =
+    Client.bake_until_level ~target_level:(blocks_per_cycle + 1) client
+  in
+  let* () = check_current_cycle ~cycle:1 in
+  let* () = staking_balance ~delegate:baker () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:baker.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:other_account.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+
+  let* () = set_delegate ~src:other_account.alias ~delegate:other_account in
+
+  Log.info ~color:Log.Color.FG.green "Bake until right before the migration." ;
+  let* () = Client.bake_until_level ~target_level:migration_level client in
+  let* () = check_current_level ~level:migration_level in
+
+  Log.info ~color:Log.Color.FG.green "Checking migration block consistency." ;
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+  let* () = Client.bake_for_and_wait client in
+  Log.info ~color:Log.Color.FG.green "Checking migration block consistency." ;
+  let* () =
+    block_check
+      ~expected_block_type:`Non_migration
+      client
+      ~migrate_from
+      ~migrate_to
+  in
+
+  Log.info ~color:Log.Color.FG.green "First block of Quebec." ;
+  let* () = check_current_cycle ~cycle:2 in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  Log.info ~color:Log.Color.FG.green "Bake a few blocks after the migration." ;
+  let* () =
+    repeat blocks_per_cycle (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () = check_current_cycle ~cycle:3 in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:baker.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:other_account.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  Log.info ~color:Log.Color.FG.green "Bake a few blocks until a new cycle." ;
+  let* () =
+    repeat blocks_per_cycle (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () = check_current_cycle ~cycle:4 in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:baker.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:other_account.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  unit
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
-  test_weeklynet_migration_parameters Protocol.all
+  test_weeklynet_migration_parameters Protocol.all ;
+  test_migration_min_delegated_in_cycle [Protocol.ParisC]
