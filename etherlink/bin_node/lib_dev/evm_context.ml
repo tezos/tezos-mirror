@@ -124,8 +124,12 @@ module Request = struct
         l2_blocks : [`Read] Rollup_node_storage.L2_blocks.t;
       }
         -> (unit, tztrace) t
-    | Patch_kernel : {is_binary : bool; kernel : string} -> (unit, tztrace) t
-    | Patch_sequencer_key : Signature.public_key -> (unit, tztrace) t
+    | Patch_state : {
+        commit : bool;
+        key : string;
+        value : string;
+      }
+        -> (unit, tztrace) t
     | Wasm_pvm_version : (Tezos_scoru_wasm.Wasm_pvm_state.version, tztrace) t
 
   type view = View : _ t -> view
@@ -286,36 +290,20 @@ module Request = struct
                the only use case for the encoding is logging (so encoding). *));
         case
           (Tag 13)
-          ~title:"Patch_kernel_binary"
-          (obj2
-             (req "request" (constant "patch_kernel_binary"))
-             (req "kernel" Data_encoding.(string' Hex)))
+          ~title:"Patch_state"
+          (obj4
+             (req "request" (constant "patch_state"))
+             (req "commit" bool)
+             (req "key" string)
+             (req "value" (string' Hex)))
           (function
-            | View (Patch_kernel {is_binary = true; kernel}) -> Some ((), kernel)
+            | View (Patch_state {commit; key; value}) ->
+                Some ((), commit, key, value)
             | _ -> None)
-          (fun ((), kernel) -> View (Patch_kernel {is_binary = true; kernel}));
+          (fun ((), commit, key, value) ->
+            View (Patch_state {commit; key; value}));
         case
           (Tag 14)
-          ~title:"Patch_kernel_hex"
-          (obj2
-             (req "request" (constant "patch_kernel_hex"))
-             (req "kernel" string))
-          (function
-            | View (Patch_kernel {is_binary = false; kernel}) ->
-                Some ((), kernel)
-            | _ -> None)
-          (fun ((), kernel) -> View (Patch_kernel {is_binary = false; kernel}));
-        case
-          (Tag 15)
-          ~title:"Patch_sequencer_key"
-          (obj2
-             (req "request" (constant "patch_sequencer_key"))
-             (req "public_key" Signature.Public_key.encoding))
-          (function
-            | View (Patch_sequencer_key pk) -> Some ((), pk) | _ -> None)
-          (fun ((), pk) -> View (Patch_sequencer_key pk));
-        case
-          (Tag 16)
           ~title:"Wasm_pvm_version"
           (obj1 (req "request" (constant "wasm_pvm_version")))
           (function View Wasm_pvm_version -> Some () | _ -> None)
@@ -1127,39 +1115,20 @@ module State = struct
     let*! version = Evm_state.wasm_pvm_version ctxt.session.evm_state in
     return version
 
-  let patch_kernel (ctxt : t) ~is_binary kernel =
+  let patch_state (ctxt : t) ~commit ~key ~value =
     let open Lwt_result_syntax in
-    let* version = wasm_pvm_version ctxt in
+    let*! evm_state = Evm_state.modify ~key ~value ctxt.session.evm_state in
     let* () =
-      Wasm_debugger.check_kernel
-        ~binary:is_binary
-        ~name:"boot.wasm"
-        version
-        kernel
+      if commit then (
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* commit = replace_current_commit ctxt conn evm_state in
+        on_modified_head ctxt evm_state commit ;
+        return_unit)
+      else (
+        ctxt.session.evm_state <- evm_state ;
+        return_unit)
     in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:"/kernel/boot.wasm"
-        ~value:kernel
-        ctxt.session.evm_state
-    in
-    Evm_store.use ctxt.store @@ fun conn ->
-    let* commit = replace_current_commit ctxt conn evm_state in
-    on_modified_head ctxt evm_state commit ;
-    let*! () = Events.patched_kernel ctxt.session.next_blueprint_number in
-    return_unit
-
-  let patch_sequencer_key (ctxt : t) pk =
-    let open Lwt_result_syntax in
-    let b58 = Signature.Public_key.to_b58check pk in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:Durable_storage_path.sequencer_key
-        ~value:b58
-        ctxt.session.evm_state
-    in
-    ctxt.session.evm_state <- evm_state ;
-    let*! () = Events.patched_sequencer_key b58 in
+    let*! () = Events.patched_state key ctxt.session.next_blueprint_number in
     return_unit
 end
 
@@ -1313,12 +1282,9 @@ module Handlers = struct
           ~finalized_level
           ~levels_to_hashes
           ~l2_blocks
-    | Patch_kernel {is_binary; kernel} ->
+    | Patch_state {commit; key; value} ->
         let ctxt = Worker.state self in
-        State.patch_kernel ctxt ~is_binary kernel
-    | Patch_sequencer_key pk ->
-        let ctxt = Worker.state self in
-        State.patch_sequencer_key ctxt pk
+        State.patch_state ctxt ~commit ~key ~value
     | Wasm_pvm_version ->
         let ctxt = Worker.state self in
         State.wasm_pvm_version ctxt
@@ -1767,9 +1733,28 @@ let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
 let patch_kernel path =
   let open Lwt_result_syntax in
   let* kernel, is_binary = Wasm_debugger.read_kernel_from_file path in
-  worker_wait_for_request (Patch_kernel {is_binary; kernel})
+  let* version = worker_wait_for_request Wasm_pvm_version in
+  let* () =
+    Wasm_debugger.check_kernel
+      ~binary:is_binary
+      ~name:"boot.wasm"
+      version
+      kernel
+  in
+  let* () =
+    worker_wait_for_request
+      (Patch_state {commit = true; key = "/kernel/boot.wasm"; value = kernel})
+  in
+  return_unit
 
-let patch_sequencer_key pk = worker_wait_for_request (Patch_sequencer_key pk)
+let patch_sequencer_key pk =
+  worker_wait_for_request
+    (Patch_state
+       {
+         commit = false;
+         key = Durable_storage_path.sequencer_key;
+         value = Signature.Public_key.to_b58check pk;
+       })
 
 let block_param_to_block_number
     (block_param : Ethereum_types.Block_parameter.extended) =
