@@ -114,8 +114,8 @@ module Images_external = struct
 
   let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
 
-  let ubuntu_focal =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:20.04_stable"
+  let ubuntu_noble =
+    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.04_stable"
 
   let ubuntu_jammy =
     Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"

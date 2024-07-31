@@ -103,7 +103,7 @@ release page as explained above.
 
 We support the following distribution/releases:
 - ``debian/bookworm``
-- ``ubuntu/focal``
+- ``ubuntu/noble``
 - ``ubuntu/jammy``
 
 both on ``amd64`` and ``arm64`` architectures.

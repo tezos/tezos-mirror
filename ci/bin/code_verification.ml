@@ -170,12 +170,12 @@ let read_opam_packages =
    which we test installation of current packages for debian and
    the deprecated Serokell PPA binary packages for rpm. *)
 type install_octez_distribution =
-  | Ubuntu_focal
+  | Ubuntu_noble
   | Ubuntu_jammy
   | Debian_bookworm
 
 let image_of_distribution = function
-  | Ubuntu_focal -> Images.ubuntu_focal
+  | Ubuntu_noble -> Images.ubuntu_noble
   | Ubuntu_jammy -> Images.ubuntu_jammy
   | Debian_bookworm -> Images.debian_bookworm
 
@@ -1458,8 +1458,8 @@ let jobs pipeline_type =
           [
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_focal"
-              ~image:Images.ubuntu_focal
+              ~name:"oc.install_python_noble"
+              ~image:Images.ubuntu_noble
               ~project:"tezos/tezos"
               ~branch:"latest-release";
             job_install_python

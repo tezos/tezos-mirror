@@ -404,7 +404,7 @@ oc.docker-build-ubuntu-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - focal
+      - noble
       - jammy
       TAGS:
       - gcp
@@ -430,7 +430,7 @@ oc.build-ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - focal
+      - noble
       - jammy
       TAGS:
       - gcp
@@ -456,7 +456,7 @@ oc.build-ubuntu-current_a:
   parallel:
     matrix:
     - RELEASE:
-      - focal
+      - noble
       - jammy
       TAGS:
       - gcp
@@ -482,14 +482,14 @@ oc.build-ubuntu-current_b:
   parallel:
     matrix:
     - RELEASE:
-      - focal
+      - noble
       - jammy
       TAGS:
       - gcp
       - gcp_arm64
 
 apt_repo_ubuntu_current:
-  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publishing
   tags:
   - gcp
@@ -503,13 +503,13 @@ apt_repo_ubuntu_current:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
   script:
-  - ./scripts/ci/create_debian_repo.sh ubuntu focal jammy
+  - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
 apt_repo_ubuntu:
-  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publishing
   tags:
   - gcp
@@ -521,7 +521,7 @@ apt_repo_ubuntu:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
   script:
-  - ./scripts/ci/create_debian_repo.sh ubuntu focal jammy
+  - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg

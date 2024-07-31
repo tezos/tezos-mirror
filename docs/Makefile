@@ -126,10 +126,10 @@ xrefscheck:
 	$(CHECKXREFS) -l alpha
 
 installcheck:
-	scripts/test_install_scripts.sh install-bin-focal
+	scripts/test_install_scripts.sh install-bin-noble
 	scripts/test_install_scripts.sh install-bin-jammy
 	scripts/test_install_scripts.sh install-bin-rc-jammy
-	scripts/test_install_scripts.sh install-bin-rc-focal
+	scripts/test_install_scripts.sh install-bin-rc-noble
 	scripts/test_install_scripts.sh install-bin-bookworm
 	scripts/test_install_scripts.sh install-bin-rc-bookworm
 	scripts/test_install_scripts.sh install-opam-scratch
