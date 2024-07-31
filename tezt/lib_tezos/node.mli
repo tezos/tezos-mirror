@@ -124,6 +124,21 @@ type t
     for more details. *)
 val enable_external_rpc_process : bool
 
+(** This placeholder aims to handle the activation of the
+    singleprocess validation for the Tezt nodes. Indeed, the
+    singleprocess validation is an alternative way of validating
+    blocks that is not activated by default in the node and thus not
+    tested by the CI. The tests on master are thus not testing the
+    feature. To test the singleprocess validation anyway, a scheduled
+    pipeline is launched every week, with the feature enabled, running
+    all tests.
+    When the scheduled pipeline is launched, the TZ_SCHEDULE_KIND
+    environment variable is set to "EXTENDED_VALIDATION_TESTS" to turn
+    on the singleprocess validation. Look for the
+    [ci/bin/singleprocess_validation_pipeline.ml] file for more
+    details. *)
+val enable_singleprocess : bool
+
 (** Create a node.
 
     This function just creates the [t] value, it does not call

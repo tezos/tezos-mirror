@@ -755,6 +755,11 @@ let enable_external_rpc_process =
   | Some "EXTENDED_RPC_TESTS" -> true
   | _ -> false
 
+let enable_singleprocess =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_VALIDATION_TESTS" -> true
+  | _ -> false
+
 let create ?runner ?(path = Uses.path Constant.octez_node) ?name ?color
     ?data_dir ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
     ?metrics_port ?(rpc_external = enable_external_rpc_process)
@@ -946,7 +951,25 @@ let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
     | None -> Lwt.return_unit
     | Some patch -> Config_file.update node patch
   in
-  let arguments = runlike_command_arguments node "run" arguments in
+  (* It is necessary to check the [enable_singleprocess] flag to
+     ensure that the EXTENDED_VALIDATION_TESTS pipeline will
+     effectively start all nodes with the `--singleprocess`
+     flag. Indeed, as this option is not set in the config file (it is
+     just a command line argument), if one starts a node with
+     `Node.init`, terminates it, an then calls `Node.run`, the
+     [Singleprocess] will not be activated anymore -- see the
+     [Node.init] code and documentation. Thanks to this, we always
+     enable it if it is required.*)
+  let arguments =
+    let args =
+      if enable_singleprocess then
+        (* Avoids to repeat the option if already enabled *)
+        if List.mem Singleprocess arguments then arguments
+        else arguments @ [Singleprocess]
+      else arguments
+    in
+    runlike_command_arguments node "run" args
+  in
   do_runlike_command
     ?on_terminate
     ?event_level
