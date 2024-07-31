@@ -1364,6 +1364,11 @@ let init_etherlink_operator_setup cloud configuration is_sequencer name
       account.Account.secret_key
       ~alias:account.Account.alias
   in
+  let () =
+    toplog "Init Etherlink operator setup: wait for the node to be bootstrapped"
+  in
+  let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
+  let () = toplog "Init Etherlink operator setup: the node is bootstrapped" in
   let () = toplog "Init Etherlink operator setup: get last seen level" in
   let l = Node.get_last_seen_level node in
   let () = toplog "Init Etherlink operator setup: reveal account" in
