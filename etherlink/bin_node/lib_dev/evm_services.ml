@@ -113,14 +113,23 @@ let get_smart_rollup_address ~evm_node_endpoint =
     ()
     ()
 
-let get_time_between_blocks ~evm_node_endpoint =
-  Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-    [Media_type.json]
-    ~base:evm_node_endpoint
-    get_time_between_blocks
-    ()
-    ()
-    ()
+let get_time_between_blocks ?fallback ~evm_node_endpoint () =
+  let open Lwt_result_syntax in
+  let*! res =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_service
+      [Media_type.json]
+      ~base:evm_node_endpoint
+      get_time_between_blocks
+      ()
+      ()
+      ()
+  in
+  match (res, fallback) with
+  | Ok res, _ -> return res
+  | Error trace, Some res ->
+      let*! () = Events.cannot_fetch_time_between_blocks res trace in
+      return res
+  | Error trace, None -> fail trace
 
 let get_blueprint ~evm_node_endpoint Ethereum_types.(Qty level) =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service

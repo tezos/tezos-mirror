@@ -258,6 +258,10 @@ let deprecated name =
   Data_encoding.(
     opt name ~description:"Deprecated field, value is ignored" Json.encoding)
 
+let pp_time_between_blocks fmt = function
+  | Nothing -> Format.pp_print_string fmt "nothing"
+  | Time_between_blocks duration -> Format.fprintf fmt "%fs" duration
+
 let time_between_blocks_encoding : time_between_blocks Data_encoding.t =
   let open Data_encoding in
   def "time_between_blocks"

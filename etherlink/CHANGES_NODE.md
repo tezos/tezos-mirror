@@ -4,9 +4,6 @@
 
 ### Breaking changes
 
-- The observer mode requires its EVM endpoint to expose `GET
-  /evm/time_between_blocks`. (!14327)
-
 ### Features
 
 - Metrics register the number of calls to each RPC method, e.g. `eth_blockNumber`.
@@ -31,7 +28,8 @@
   but do not require the sequencer's secret key and any connection to
   a rollup node. It is meant for debugging only. (!14258)
 - Introduce `GET /evm/time_between_blocks` to retrieve the maximum time (in
-  seconds) between two blocks created by the sequencer. (!14327)
+  seconds) between two blocks created by the sequencer. It is used by the nodes
+  running in observer and RPC modes. (!14327)
 
 ### Bug fixes
 
