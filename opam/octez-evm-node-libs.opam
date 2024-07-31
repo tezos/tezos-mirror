@@ -23,6 +23,7 @@ depends: [
   "caqti-driver-sqlite3" { >= "2.0.1" }
   "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
+  "tezos-dal-node-services"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

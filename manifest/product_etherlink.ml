@@ -158,6 +158,7 @@ let evm_node_lib_dev =
         octez_smart_rollup_lib |> open_;
         evm_node_migrations;
         prometheus_app;
+        octez_dal_node_services;
       ]
 
 let _octez_evm_node_tests =

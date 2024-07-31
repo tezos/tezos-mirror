@@ -5,14 +5,79 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = unit
+type parameters = {
+  cctxt : Client_context.wallet;
+  smart_rollup_address : string;
+  sequencer_key : Client_keys.sk_uri;
+  rollup_node_endpoint : Uri.t;
+  max_blueprints_lag : int;
+}
+
+module Dal_injected_slots_tracker_queue = struct
+  type value = {
+    level : Z.t;
+    slot_index : Tezos_dal_node_services.Types.slot_index;
+  }
+
+  include
+    Hash_queue.Make
+      (Tezos_crypto.Hashed.Injector_operations_hash)
+      (struct
+        type t = value
+      end)
+end
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7453 *)
+
+let attestation_lag = 8
+
+let finalisation_delay = 2
+
+let injection_lag = 3
+
+let number_of_slots = 32
 
 module Types = struct
   type nonrec parameters = parameters
 
-  type state = unit
+  type state = {
+    cctxt : Client_context.wallet;
+    smart_rollup_address : string;
+    sequencer_key : Client_keys.sk_uri;
+    rollup_node_endpoint : Uri.t;
+    dal_injected_slots_tracker_queue : Dal_injected_slots_tracker_queue.t;
+        (** We remember in this bounded Hash_queue the hashes of DAL
+            slot publications that we have asked the rollup node to
+            inject. They are associated with their corresponding slot
+            index and the blueprint's level. This lets us track the
+            inclusion status of these operation which is needed to
+            signal to the kernel when it's time to import the
+            slots. *)
+  }
 
-  let of_parameters () = ()
+  let of_parameters
+      {
+        cctxt;
+        smart_rollup_address;
+        sequencer_key;
+        rollup_node_endpoint;
+        max_blueprints_lag;
+      } =
+    {
+      cctxt;
+      smart_rollup_address;
+      sequencer_key;
+      rollup_node_endpoint;
+      dal_injected_slots_tracker_queue =
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7386
+
+           Decide of a suitable value of the cache below. *)
+        Dal_injected_slots_tracker_queue.create
+          ((injection_lag + attestation_lag + finalisation_delay)
+          * number_of_slots * max_blueprints_lag);
+      (* A size to track DAL slot publications in the structure for a few L1
+         levels. *)
+    }
 end
 
 module Name = struct
@@ -112,9 +177,18 @@ let worker_add_request ~request =
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
-let start () =
+let start ~cctxt ~smart_rollup_address ~sequencer_key ~rollup_node_endpoint
+    ~max_blueprints_lag () =
   let open Lwt_result_syntax in
-  let parameters = () in
+  let parameters =
+    {
+      cctxt;
+      smart_rollup_address;
+      sequencer_key;
+      rollup_node_endpoint;
+      max_blueprints_lag;
+    }
+  in
   let* worker = Worker.launch table () parameters (module Handlers) in
   let*! () = Signals_publisher_events.publisher_is_ready () in
   Lwt.wakeup worker_waker worker ;
