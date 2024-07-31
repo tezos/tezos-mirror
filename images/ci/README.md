@@ -35,7 +35,7 @@ The images, their content and indented usage, are:
 | `prebuild`     | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
 | `build`        | opam packages                      | CI: Building Octez                |
 | `test`         | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
-| `e2etest`      | `eth-cli`                          | CI: Octez integration tests       |
+| `e2etest`      | `eth-cli` + cast                   | CI: Octez integration tests       |
 
 For more details on the contents and usage of each image, see the
 header comment of each corresponding layer in the Dockerfile.

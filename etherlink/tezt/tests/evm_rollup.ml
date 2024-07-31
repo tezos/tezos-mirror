@@ -6321,7 +6321,20 @@ let test_rpc_state_value_and_subkeys =
       ~error_msg:"Kernel version is %L, but should be %R") ;
   unit
 
+let test_cast_work () =
+  Test.register
+    ~__FILE__
+    ~title:"cast version"
+    ~tags:["cast"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    (fun _ ->
+      let* _version = Cast.version () in
+      unit)
+
 let register_evm_node ~protocols =
+  test_cast_work () ;
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
   test_kernel_root_hash_originate_present protocols ;

@@ -330,12 +330,18 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
  && apk add --no-cache curl npm git file make jq \
+ gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
  # We need eth since e2e tests. This requires git as well.
  && npm install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
  && npm install -g solc@0.8.26 \
- # clean up
- && rm -rf /tmp/*
+ && PATH="/root/.cargo/bin:${PATH}" \
+ && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
+ && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
+ --git https://github.com/foundry-rs/foundry/ cast --profile release --force --locked \
+ && cp /root/.cargo/bin/cast /bin \
+ # Clean up
+ && rm -rf /tmp/* && rm -rf /root/.cargo
 
 USER tezos
 WORKDIR /home/tezos
