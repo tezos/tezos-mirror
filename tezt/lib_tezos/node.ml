@@ -44,6 +44,7 @@ type argument =
   | Enable_http_cache_headers
   | Disable_context_pruning
   | Storage_maintenance_delay of string
+  | Force_history_mode_switch
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -80,6 +81,7 @@ let make_argument = function
   | Enable_http_cache_headers -> ["--enable-http-cache-headers"]
   | Disable_context_pruning -> ["--disable-context-pruning"]
   | Storage_maintenance_delay x -> ["--storage-maintenance-delay"; x]
+  | Force_history_mode_switch -> ["--force-history-mode-switch"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -105,7 +107,8 @@ let is_redundant = function
   | Max_active_rpc_connections _, Max_active_rpc_connections _
   | Enable_http_cache_headers, Enable_http_cache_headers
   | Disable_context_pruning, Disable_context_pruning
-  | Storage_maintenance_delay _, Storage_maintenance_delay _ ->
+  | Storage_maintenance_delay _, Storage_maintenance_delay _
+  | Force_history_mode_switch, Force_history_mode_switch ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -133,7 +136,8 @@ let is_redundant = function
   | Max_active_rpc_connections _, _
   | Enable_http_cache_headers, _
   | Disable_context_pruning, _
-  | Storage_maintenance_delay _, _ ->
+  | Storage_maintenance_delay _, _
+  | Force_history_mode_switch, _ ->
       false
 
 (* Some arguments should not be written in the config file by [Node.init]
