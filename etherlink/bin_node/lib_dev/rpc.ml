@@ -340,6 +340,10 @@ let main ~data_dir ~(config : Configuration.t) =
   let open Lwt_result_syntax in
   (* TODO: better UX than defaulting on the observer node *)
   let*? observer = Configuration.observer_config_exn config in
+  let* time_between_blocks =
+    Evm_services.get_time_between_blocks
+      ~evm_node_endpoint:observer.evm_node_endpoint
+  in
   let* ctxt =
     load
       ~data_dir
@@ -377,7 +381,8 @@ let main ~data_dir ~(config : Configuration.t) =
     Services.directory config (rpc_backend, ctxt.smart_rollup_address)
   in
   let directory =
-    directory |> Evm_services.register ctxt.smart_rollup_address
+    directory
+    |> Evm_services.register ctxt.smart_rollup_address time_between_blocks
   in
   let* server = rpc_start config ~directory in
 

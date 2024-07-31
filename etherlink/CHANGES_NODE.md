@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+- The observer mode requires its EVM endpoint to expose `GET
+  /evm/time_between_blocks`. (!14327)
+
 ### Features
 
 - Metrics register the number of calls to each RPC method, e.g. `eth_blockNumber`.
@@ -27,6 +30,8 @@
 - Adds a `run sandbox` command runs the evm-node in a sequencer-like mode
   but do not require the sequencer's secret key and any connection to
   a rollup node. It is meant for debugging only. (!14258)
+- Introduce `GET /evm/time_between_blocks` to retrieve the maximum time (in
+  seconds) between two blocks created by the sequencer. (!14327)
 
 ### Bug fixes
 
@@ -38,6 +43,11 @@
 - Improves the error message in case of unknown block in RPCs. (!14150)
 - Produces an empty block in case the produced one will trigger a
   kernel upgrade. (!14207)
+
+### Deprecation
+
+- Deprecate the `time_between_blocks` field of the observer configuration.
+  (!14327)
 
 ### Experimental
 

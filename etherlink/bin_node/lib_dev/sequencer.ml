@@ -325,7 +325,10 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Services.directory configuration ((module Rollup_rpc), smart_rollup_address)
   in
   let directory =
-    directory |> Evm_services.register smart_rollup_address_typed
+    directory
+    |> Evm_services.register
+         smart_rollup_address_typed
+         sequencer_config.time_between_blocks
   in
   let private_info =
     Option.map

@@ -56,7 +56,6 @@ type observer = {
   threshold_encryption_bundler_endpoint : Uri.t option;
   preimages : string;
   preimages_endpoint : Uri.t option;
-  time_between_blocks : time_between_blocks option;
 }
 
 type proxy = {finalized_view : bool}
@@ -239,14 +238,12 @@ let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
     }
 
 let observer_config_dft ~data_dir ?preimages ?preimages_endpoint
-    ~evm_node_endpoint ?threshold_encryption_bundler_endpoint
-    ?time_between_blocks () =
+    ~evm_node_endpoint ?threshold_encryption_bundler_endpoint () =
   {
     evm_node_endpoint;
     threshold_encryption_bundler_endpoint;
     preimages = Option.value ~default:(default_preimages data_dir) preimages;
     preimages_endpoint;
-    time_between_blocks;
   }
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
@@ -262,7 +259,7 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
        (dft "max_nb_logs" int31 default_filter_config.max_nb_logs)
        (dft "chunk_size" int31 default_filter_config.chunk_size))
 
-let encoding_time_between_blocks : time_between_blocks Data_encoding.t =
+let time_between_blocks_encoding : time_between_blocks Data_encoding.t =
   let open Data_encoding in
   def "time_between_blocks"
   @@ conv
@@ -356,7 +353,7 @@ let sequencer_encoding data_dir =
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (dft
           "time_between_blocks"
-          encoding_time_between_blocks
+          time_between_blocks_encoding
           default_time_between_blocks)
        (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
        (opt
@@ -416,7 +413,7 @@ let threshold_encryption_sequencer_encoding data_dir =
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (dft
           "time_between_blocks"
-          encoding_time_between_blocks
+          time_between_blocks_encoding
           default_time_between_blocks)
        (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
        (opt
@@ -441,24 +438,22 @@ let observer_encoding data_dir =
            preimages_endpoint;
            evm_node_endpoint;
            threshold_encryption_bundler_endpoint;
-           time_between_blocks;
          } ->
       ( preimages,
         preimages_endpoint,
         Uri.to_string evm_node_endpoint,
         threshold_encryption_bundler_endpoint,
-        time_between_blocks ))
+        None ))
     (fun ( preimages,
            preimages_endpoint,
            evm_node_endpoint,
            threshold_encryption_bundler_endpoint,
-           time_between_blocks ) ->
+           _ ) ->
       {
         preimages;
         preimages_endpoint;
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
         threshold_encryption_bundler_endpoint;
-        time_between_blocks;
       })
     (obj5
        (dft "preimages" string (default_preimages data_dir))
@@ -467,7 +462,10 @@ let observer_encoding data_dir =
        (opt
           "threshold_encryption_bundler_endpoint"
           Tezos_rpc.Encoding.uri_encoding)
-       (opt "time_between_blocks" encoding_time_between_blocks))
+       (opt
+          "time_between_blocks"
+          ~description:"Deprecated field, value is ignored"
+          Json.encoding))
 
 let experimental_features_encoding =
   let open Data_encoding in
@@ -743,7 +741,6 @@ module Cli = struct
             ~data_dir
             ?preimages
             ?preimages_endpoint
-            ?time_between_blocks
             ~evm_node_endpoint
             ?threshold_encryption_bundler_endpoint
             ())
@@ -976,10 +973,6 @@ module Cli = struct
                 (match threshold_encryption_bundler_endpoint with
                 | None -> observer_config.threshold_encryption_bundler_endpoint
                 | endpoint -> endpoint);
-              time_between_blocks =
-                Option.either
-                  time_between_blocks
-                  observer_config.time_between_blocks;
             }
       | None ->
           Option.map

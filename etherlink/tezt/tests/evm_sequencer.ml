@@ -329,7 +329,6 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
              bundler_node_endpoint = Dsn_node.endpoint bundler;
-             time_between_blocks;
            })
     else
       return
@@ -338,7 +337,6 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
              initial_kernel = output;
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             time_between_blocks;
            })
   in
   let* observer =
@@ -2133,7 +2131,6 @@ let test_get_balance_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             time_between_blocks = Some Nothing;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -2206,7 +2203,6 @@ let test_get_block_by_number_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             time_between_blocks = Some Nothing;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -2416,26 +2412,20 @@ let test_observer_forwards_transaction =
 
 let test_observer_timeout_when_necessary =
   register_all
-    ~time_between_blocks:Nothing
+    ~time_between_blocks:(Time_between_blocks 3.)
     ~tags:["evm"; "observer"; "timeout"]
     ~title:"Observer timeouts when blocks do not arrive quickly enough"
   @@ fun {sequencer; observer; _} _ ->
-  let* () = Evm_node.terminate observer in
-  let mode =
-    match Evm_node.mode observer with
-    | Observer conf ->
-        Evm_node.Observer
-          {conf with time_between_blocks = Some (Time_between_blocks 3.)}
-    | Threshold_encryption_observer conf ->
-        Evm_node.Threshold_encryption_observer
-          {conf with time_between_blocks = Some (Time_between_blocks 3.)}
-    | _ -> Test.fail "Should be an observer"
-  in
+  (* The sequencer is initially setup to produce a block every 3s, which means
+     the observer will expect blocks on this frequency.
 
-  (* We have setup the sequencer to produce blocks on demand only (with the
-     [produceBlock] RPC). Our goal is to start a new EVM node in observer mode,
-     which expects block comming every 3s. *)
-  let* observer = Evm_node.init ~mode Evm_node.(endpoint sequencer) in
+     We restart the sequencer to produce block on demand. The observer will not
+     request the new time between block, and will keep waiting for new blocks
+     to arrive every 3s. *)
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.run sequencer ~extra_arguments:["--time-between-blocks"; "none"]
+  in
 
   (* After enough time, the observer considers its connection with the
      sequnecer is stalled and tries to reconnect. *)

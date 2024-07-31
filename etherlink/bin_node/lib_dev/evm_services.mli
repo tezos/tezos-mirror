@@ -11,6 +11,9 @@ val get_smart_rollup_address :
   evm_node_endpoint:Uri.t ->
   Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
 
+val get_time_between_blocks :
+  evm_node_endpoint:Uri.t -> Configuration.time_between_blocks tzresult Lwt.t
+
 val get_blueprint :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
@@ -18,6 +21,7 @@ val get_blueprint :
 
 val register :
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
+  Configuration.time_between_blocks ->
   unit Directory.t ->
   unit Directory.t
 
