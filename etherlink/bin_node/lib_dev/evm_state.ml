@@ -158,6 +158,11 @@ let exists evm_state key =
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
 
+let kernel_version evm_state =
+  let open Lwt_syntax in
+  let+ version = inspect evm_state Durable_storage_path.kernel_version in
+  match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
+
 let current_block_height evm_state =
   let open Lwt_syntax in
   let* current_block_number =
@@ -310,3 +315,19 @@ let clear_delayed_inbox evm_state =
 let wasm_pvm_version state = Wasm_utils.Wasm.get_wasm_version state
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
+
+let preload_kernel evm_state =
+  let open Lwt_syntax in
+  let* pvm_state =
+    Wasm_utils.Ctx.Tree_encoding_runner.decode
+      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+      evm_state
+  in
+  let hooks =
+    Tezos_scoru_wasm.Hooks.(no_hooks |> disable_fast_exec_invalid_kernel_check)
+  in
+  let* () =
+    Tezos_scoru_wasm_fast.Exec.preload_kernel ~hooks pvm_state.durable
+  in
+  let* version = kernel_version evm_state in
+  Events.preload_kernel version

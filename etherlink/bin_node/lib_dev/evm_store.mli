@@ -96,6 +96,8 @@ module Kernel_upgrades : sig
     Evm_events.Upgrade.t ->
     unit tzresult Lwt.t
 
+  val activation_levels : conn -> Ethereum_types.quantity list tzresult Lwt.t
+
   val find_latest_pending : conn -> Evm_events.Upgrade.t option tzresult Lwt.t
 
   val find_applied_before :
