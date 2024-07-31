@@ -1198,7 +1198,7 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
   let* node =
     Node.init
       ?data_dir
-      ~name:(Format.asprintf "producer-node-%i" i)
+      ~name
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       configuration.network
       agent
@@ -1241,11 +1241,17 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {client; node; dal_node; account; is_ready}
 
-let init_observer cloud ~bootstrap ~slot_index i agent =
+let init_observer cloud configuration ~bootstrap ~slot_index i agent =
+  let name = Format.asprintf "observer-node-%i" i in
+  let data_dir =
+    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+  in
   let* node =
-    Node.Agent.init
-      ~name:(Format.asprintf "observer-node-%i" i)
-      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
+    Node.init
+      ?data_dir
+      ~name
+      ~arguments:[Peer bootstrap.node_p2p_endpoint]
+      configuration.network
       agent
   in
   let* dal_node =
@@ -1272,12 +1278,18 @@ let init_observer cloud ~bootstrap ~slot_index i agent =
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
-    account agent =
+let init_etherlink_operator_setup cloud configuration is_sequencer name
+    ~bootstrap ~dal_slots account agent =
+  let name = Format.asprintf "etherlink-%s-node" name in
+  let data_dir =
+    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+  in
   let* node =
-    Node.Agent.init
-      ~name:(Format.asprintf "etherlink-%s-node" name)
-      ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
+    Node.init
+      ?data_dir
+      ~name
+      ~arguments:[Peer bootstrap.node_p2p_endpoint]
+      configuration.network
       agent
   in
   let* client = Client.Agent.create ~node agent in
@@ -1483,12 +1495,13 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   in
   return operator
 
-let init_etherlink cloud ~bootstrap etherlink_rollup_operator_key ~dal_slots
-    next_agent =
+let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
+    ~dal_slots next_agent =
   let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
   let* operator =
     init_etherlink_operator_setup
       cloud
+      configuration
       ~dal_slots
       Cli.etherlink_sequencer
       "operator"
@@ -1580,7 +1593,7 @@ let init ~(configuration : configuration) cloud next_agent =
   and* observers =
     Lwt_list.mapi_p
       (fun i (agent, slot_index) ->
-        init_observer cloud ~bootstrap ~slot_index i agent)
+        init_observer cloud configuration ~bootstrap ~slot_index i agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
   let* etherlink =
@@ -1596,6 +1609,7 @@ let init ~(configuration : configuration) cloud next_agent =
       let* etherlink =
         init_etherlink
           cloud
+          configuration
           ~bootstrap
           etherlink_rollup_operator_key
           next_agent
