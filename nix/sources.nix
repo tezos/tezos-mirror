@@ -5,7 +5,7 @@ let
   };
 
   default-rust-overlay-src = fetchTarball {
-    url = "https://github.com/oxalica/rust-overlay/archive/b037d65c988421b54024e62691eace4f2fe623bc.tar.gz";
+    url = "https://github.com/oxalica/rust-overlay/archive/38c2f156fca1868c8be7195ddac150522752f6ab.tar.gz";
     sha256 = "05jcfpa42kqc4h7bf9ymgps5abjnn7b4327maxki0d53y17959aa";
   };
 

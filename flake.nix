@@ -10,7 +10,7 @@
       flake = false;
       url = "github:ocaml/opam-repository";
     };
-    rust-overlay.url = "github:oxalica/rust-overlay/b037d65c988421b54024e62691eace4f2fe623bc";
+    rust-overlay.url = "github:oxalica/rust-overlay/38c2f156fca1868c8be7195ddac150522752f6ab";
   };
 
   outputs = {
