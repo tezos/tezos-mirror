@@ -57,6 +57,7 @@ val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
   ?context_pruning:Storage_maintenance.context_pruning ->
+  ?history_mode:History_mode.t ->
   singleprocess:bool ->
   version:string ->
   commit_info:Octez_node_version.commit_info ->
@@ -65,7 +66,6 @@ val create :
   Shell_limits.block_validator_limits ->
   Shell_limits.prevalidator_limits ->
   Shell_limits.chain_validator_limits ->
-  History_mode.t option ->
   (t, tztrace) result Lwt.t
 
 val shutdown : t -> unit Lwt.t

@@ -358,7 +358,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     config.shell.block_validator_limits
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
-    config.shell.history_mode
+    ?history_mode:config.shell.history_mode
 
 let rpc_metrics =
   Prometheus.Summary.v_labels

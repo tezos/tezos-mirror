@@ -140,7 +140,7 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
       (* Tezos_shell.Node.chain_validator_limits *)
       Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
-      None
+      ?history_mode:None
   in
   (* Start tests *)
   let evs = Mock_sink.get_events ?filter () in
@@ -187,7 +187,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
       (* Tezos_shell.Node.chain_validator_limits *)
       Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
-      None
+      ?history_mode:None
   in
   (* Start tests *)
   let evs = Mock_sink.get_events ?filter () in
@@ -240,7 +240,7 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
       (* Tezos_shell.Node.chain_validator_limits *)
       Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
-      None
+      ?history_mode:None
   in
   (* Start tests *)
   Mock_sink.(
