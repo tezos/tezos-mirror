@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::pvm::{
-    dummy_pvm::{DummyPvm, PvmStorage, PvmStorageError},
+    node_pvm::{NodePvm, PvmStorage, PvmStorageError},
     PvmHooks, PvmStatus,
 };
 use crate::storage::{self, StorageError};
@@ -19,7 +19,7 @@ const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 pub struct Repo(PvmStorage);
 
 #[ocaml::sig]
-pub struct State(DummyPvm);
+pub struct State(NodePvm);
 
 #[ocaml::sig]
 pub struct Id(storage::Hash);
@@ -88,7 +88,7 @@ pub fn octez_riscv_storage_state_equal(state1: Pointer<State>, state2: Pointer<S
 #[ocaml::func]
 #[ocaml::sig("unit -> state")]
 pub fn octez_riscv_storage_state_empty() -> Pointer<State> {
-    State(DummyPvm::empty()).into()
+    State(NodePvm::empty()).into()
 }
 
 #[ocaml::func]

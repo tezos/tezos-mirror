@@ -60,11 +60,11 @@ pub enum PvmError {
 }
 
 #[derive(Clone)]
-pub struct DummyPvm {
+pub struct NodePvm {
     backend: InMemoryBackend<StateLayout>,
 }
 
-impl DummyPvm {
+impl NodePvm {
     fn with_backend<T, F>(&self, f: F) -> T
     where
         F: FnOnce(&State<SliceManagerRO>) -> T,
@@ -231,14 +231,14 @@ impl PvmStorage {
     }
 
     /// Create a new commit for `state` and  return the commit id.
-    pub fn commit(&mut self, state: &DummyPvm) -> Result<Hash, PvmStorageError> {
+    pub fn commit(&mut self, state: &NodePvm) -> Result<Hash, PvmStorageError> {
         Ok(self.repo.commit(state.to_bytes())?)
     }
 
     /// Checkout the PVM state committed under `id`, if the commit exists.
-    pub fn checkout(&self, id: &Hash) -> Result<DummyPvm, PvmStorageError> {
+    pub fn checkout(&self, id: &Hash) -> Result<NodePvm, PvmStorageError> {
         let bytes = self.repo.checkout(id)?;
-        let state = DummyPvm::from_bytes(&bytes)?;
+        let state = NodePvm::from_bytes(&bytes)?;
         Ok(state)
     }
 

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 mod common;
-pub mod dummy_pvm;
+pub mod node_pvm;
 mod sbi;
 
 pub use common::*;
