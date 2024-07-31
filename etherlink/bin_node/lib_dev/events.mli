@@ -78,3 +78,6 @@ val invalid_kernel : unit -> unit Lwt.t
 (** [sandbox_started level] advertizes that sandbox mode started on top of
     level [level]. *)
 val sandbox_started : Z.t -> unit Lwt.t
+
+val cannot_fetch_time_between_blocks :
+  Configuration.time_between_blocks -> tztrace -> unit Lwt.t

@@ -234,7 +234,10 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
   let* time_between_blocks =
-    Evm_services.get_time_between_blocks ~evm_node_endpoint
+    Evm_services.get_time_between_blocks
+      ~fallback:(Time_between_blocks 10.)
+      ~evm_node_endpoint
+      ()
   in
   let* _loaded =
     Evm_context.start

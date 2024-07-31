@@ -291,3 +291,5 @@ module Cli : sig
 end
 
 val time_between_blocks_encoding : time_between_blocks Data_encoding.t
+
+val pp_time_between_blocks : Format.formatter -> time_between_blocks -> unit

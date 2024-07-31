@@ -351,7 +351,10 @@ let next_blueprint_number () =
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
   let* time_between_blocks =
-    Evm_services.get_time_between_blocks ~evm_node_endpoint
+    Evm_services.get_time_between_blocks
+      ~fallback:(Time_between_blocks 10.)
+      ~evm_node_endpoint
+      ()
   in
   let* ctxt =
     load

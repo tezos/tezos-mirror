@@ -185,6 +185,19 @@ let sandbox_started =
     ~msg:"Starting sandbox mode at level {level}"
     ("level", Data_encoding.z)
 
+let cannot_fetch_time_between_blocks =
+  Internal_event.Simple.declare_2
+    ~level:Error
+    ~section
+    ~name:"cannot_fetch_time_between_blocks"
+    ~msg:
+      "Could not fetch the maximum time between blocks from remote EVM \
+       endpoint, default to {tbb}: {trace}"
+    ~pp1:Configuration.pp_time_between_blocks
+    ~pp2:Error_monad.pp_print_trace
+    ("tbb", Configuration.time_between_blocks_encoding)
+    ("trace", Error_monad.trace_encoding)
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -233,3 +246,6 @@ let patched_sequencer_key pk = emit patched_sequencer_key pk
 let invalid_kernel () = emit invalid_kernel ()
 
 let sandbox_started level = emit sandbox_started level
+
+let cannot_fetch_time_between_blocks fallback trace =
+  emit cannot_fetch_time_between_blocks (fallback, trace)

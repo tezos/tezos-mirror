@@ -12,7 +12,10 @@ val get_smart_rollup_address :
   Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
 
 val get_time_between_blocks :
-  evm_node_endpoint:Uri.t -> Configuration.time_between_blocks tzresult Lwt.t
+  ?fallback:Configuration.time_between_blocks ->
+  evm_node_endpoint:Uri.t ->
+  unit ->
+  Configuration.time_between_blocks tzresult Lwt.t
 
 val get_blueprint :
   evm_node_endpoint:Uri.t ->
