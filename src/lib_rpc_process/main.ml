@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -126,6 +127,7 @@ let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
+  let forwarder_resources = RPC_middleware.init_forwarder () in
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
     let path = Cohttp.Request.uri req |> Uri.path in
     if path = "/metrics" then
@@ -135,11 +137,13 @@ let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
       Forward_handler.callback
         ~acl
         server
+        forwarder_resources
         params.rpc_comm_socket_path
         conn
         req
         body
   in
+  let conn_closed = RPC_middleware.forwarding_conn_closed forwarder_resources in
   let update_metrics uri meth callback =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time) callback
   in
@@ -170,6 +174,7 @@ let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
         RPC_server.launch
           ~host
           server
+          ~conn_closed
           ~callback
           ~max_active_connections:params.config.rpc.max_active_rpc_connections
           mode

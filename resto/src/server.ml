@@ -529,7 +529,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
   (* Promise a running RPC server. *)
 
   let launch ?(host = "::") server ?(conn_closed = ignore)
-      ?(callback = resto_callback server) mode =
+      ?(callback = resto_callback server) ?sleep_fn mode =
     Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
     let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
     server.worker <-
@@ -581,8 +581,12 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
          ~ctx
          ~mode
          ~on_exn
-         (Cohttp_lwt_unix.Server.make_response_action ~callback ~conn_closed ())) ;
-    Log.lwt_log_info "Server started (agent: %s)" server.agent
+         (Cohttp_lwt_unix.Server.make_response_action
+            ~callback
+            ~conn_closed
+            ?sleep_fn
+            ())) ;
+    Log.lwt_log_info "Resto server started (agent: %s)" server.agent
 
   let init_and_launch ?(host = "::") ?(cors = Cors.default)
       ?(agent = Agent.default_agent) ?(acl = Acl.Allow_all {except = []})

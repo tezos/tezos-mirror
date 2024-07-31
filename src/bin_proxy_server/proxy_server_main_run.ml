@@ -51,8 +51,12 @@ let launch_rpc_server dir {address; port; tls_cert_and_key; forwarding_endpoint}
       dir
       ~media_types:Tezos_rpc_http.Media_type.all_media_types
   in
+  let forwarder_resources =
+    Tezos_rpc_http_server.RPC_middleware.init_forwarder ()
+  in
   let middleware =
     Tezos_rpc_http_server.RPC_middleware.proxy_server_query_forwarder
+      forwarder_resources
       forwarding_endpoint
   in
   let callback conn req body =

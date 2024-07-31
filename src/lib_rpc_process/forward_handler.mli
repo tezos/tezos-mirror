@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [callback server socket_path] redirects all the traffic received by the given
-    [server] to the socket determined by [socket_path] if it fails to be
-    resolved locally. The forwarding happens only if the [acl] rules are
-    satisfied. *)
+(** [callback server forwarder_resources socket_path] redirects all the traffic
+    received by the given [server] to the socket determined by [socket_path] if
+    it fails to be resolved locally. The forwarding happens only if the [acl]
+    rules are satisfied. *)
 val callback :
-  acl:RPC_server.Acl.t -> RPC_server.server -> string -> RPC_server.callback
+  acl:RPC_server.Acl.t ->
+  RPC_server.server ->
+  RPC_middleware.forwarder_resources ->
+  string ->
+  RPC_server.callback
 
 val socket_forwarding_uri : string
 

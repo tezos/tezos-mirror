@@ -354,6 +354,16 @@ module Max_active_rpc_connections = struct
     | Limited limit -> Format.fprintf ppf "%l" limit
 end
 
+(* [launch] starts a Resto server which will handle the incoming connections.
+   If the client dies or drops the connection while we are handling the request,
+   this can lead to resources being spent on a request which is already abandoned.
+   Some requests are potentially endless, e.g., streamed RPC. In this case,
+   the resources are never released unless we are actively waiting for EOF.
+   The check for EOF is done periodically with [sleep_fn].
+   The selected period is 1 second which is a balance between CPU load for checks
+   and resource usage for abandoned requests. *)
+let eof_active_wait_delay = 1.0
+
 let launch ?host server ?conn_closed ?callback
     ?(max_active_connections = Max_active_rpc_connections.default) mode =
   (* TODO: backport max_active_connections in resto *)
@@ -361,4 +371,10 @@ let launch ?host server ?conn_closed ?callback
   | Unlimited -> ()
   | Limited max_active_connections ->
       Conduit_lwt_unix.set_max_active max_active_connections) ;
-  launch ?host server ?conn_closed ?callback mode
+  launch
+    ?host
+    server
+    ?conn_closed
+    ?callback
+    ~sleep_fn:(fun () -> Lwt_unix.sleep eof_active_wait_delay)
+    mode

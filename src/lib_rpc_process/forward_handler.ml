@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,7 +36,7 @@ let build_socket_redirection_ctx socket_path =
   in
   Cohttp_lwt_unix.Client.custom_ctx ~resolver ()
 
-let callback ~acl server socket_path =
+let callback ~acl server forwarder_resources socket_path =
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
     Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
   in
@@ -51,5 +52,6 @@ let callback ~acl server socket_path =
     ~acl
     ~ctx
     ~forwarder_events:{on_forwarding; on_locally_handled}
+    forwarder_resources
     forwarding_endpoint
     callback

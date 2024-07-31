@@ -37,10 +37,35 @@ module Events = struct
       ("path", Data_encoding.string)
 end
 
-let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
-    conn req body =
+module ForwarderConnMap = Map.Make (Cohttp.Connection)
+
+type forwarder_resources = {
+  mutable opened_conns : (unit -> unit) ForwarderConnMap.t;
+}
+
+let src = Logs.Src.create "rpc_middleware" ~doc:"RPC middleware"
+
+module Log = (val Logs.src_log src : Logs.LOG)
+
+let init_forwarder () = {opened_conns = ForwarderConnMap.empty}
+
+let forwarding_conn_closed forwarder_resources (_, con) : unit =
+  if ForwarderConnMap.mem con forwarder_resources.opened_conns then
+    let callback = ForwarderConnMap.find con forwarder_resources.opened_conns in
+    match callback with
+    | Some f -> f ()
+    | None ->
+        Log.warn (fun m ->
+            m
+              "(%s) got conn closed, shutdown callback not found"
+              (Cohttp.Connection.to_string con))
+  else ()
+
+let make_transform_callback ?ctx ?forwarder_events forwarder_resources
+    forwarding_endpoint callback conn req body =
   let open Lwt_syntax in
   let open Cohttp in
+  let _, con = conn in
   (* Using a [Cohttp_lwt.Body.t] destructs it. As we may need it
      twice, we explicitly clone the underlying [Lwt_stream.t]. *)
   let body_stream = Cohttp_lwt.Body.to_stream body in
@@ -66,7 +91,7 @@ let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
     | `Expert (response, _) | `Response (response, _) ->
         Response.status response = `Not_found
   in
-  if answer_has_not_found_status answer then
+  if answer_has_not_found_status answer then (
     let* () =
       match forwarder_events with
       | Some {on_forwarding; _} -> on_forwarding req
@@ -98,17 +123,30 @@ let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
     let* () =
       Events.(emit forwarding_accepted_conn)
         ( Int32.of_int (Unix.getpid ()),
-          Cohttp.Connection.to_string (snd conn),
+          Cohttp.Connection.to_string con,
           Uri.to_string uri )
     in
-    let* resp, body =
-      Cohttp_lwt_unix.Client.call
+    let* t, closefn =
+      Cohttp_lwt_unix.Client.call_with_closefn
         ?ctx
         ~headers
         ~body:(Cohttp_lwt.Body.of_stream body_stream)
         (Request.meth req)
         uri
     in
+    let shutdown () =
+      Log.debug (fun m ->
+          m
+            "(%s) got conn closed, closing bound conn for %s"
+            (Cohttp.Connection.to_string con)
+            (Uri.path uri)) ;
+      forwarder_resources.opened_conns <-
+        ForwarderConnMap.remove con forwarder_resources.opened_conns ;
+      closefn ()
+    in
+    forwarder_resources.opened_conns <-
+      ForwarderConnMap.add con shutdown forwarder_resources.opened_conns ;
+    let* resp, body = t in
     let status = Response.status resp in
     let headers =
       Response.headers resp |> fun h ->
@@ -116,8 +154,18 @@ let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
       Header.remove h "content-length" |> fun h -> Header.remove h "connection"
     in
     let* answer = Cohttp_lwt_unix.Server.respond ~headers ~status ~body () in
-    Lwt.return (`Response answer)
+    Lwt.return (`Response answer))
   else
+    let shutdown =
+      Log.debug (fun m ->
+          m
+            "(%s) conn closed for locally handled, do nothing: %s"
+            (Cohttp.Connection.to_string con)
+            (Uri.path (Request.uri req))) ;
+      fun () -> ()
+    in
+    forwarder_resources.opened_conns <-
+      ForwarderConnMap.add con shutdown forwarder_resources.opened_conns ;
     let* () =
       match forwarder_events with
       | Some {on_locally_handled; _} -> on_locally_handled req
@@ -126,7 +174,7 @@ let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
     Lwt.return answer
 
 let make_transform_callback_with_acl ~acl ?ctx ?forwarder_events
-    forwarding_endpoint callback conn req body =
+    forwarder_resources forwarding_endpoint callback conn req body =
   let allowed =
     let path =
       Resto.Utils.decode_split_path (Uri.path @@ Cohttp.Request.uri req)
@@ -139,6 +187,7 @@ let make_transform_callback_with_acl ~acl ?ctx ?forwarder_events
     make_transform_callback
       ?ctx
       ?forwarder_events
+      forwarder_resources
       forwarding_endpoint
       callback
       conn
@@ -185,16 +234,22 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       (* Otherwise, the call must be done anyway. *)
       do_call ()
 
-let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarding_endpoint
-    =
+let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarder_resources
+    forwarding_endpoint =
   match acl with
   | Some acl ->
       make_transform_callback_with_acl
         ~acl
         ?ctx
         ?forwarder_events
+        forwarder_resources
         forwarding_endpoint
-  | None -> make_transform_callback ?ctx ?forwarder_events forwarding_endpoint
+  | None ->
+      make_transform_callback
+        ?ctx
+        ?forwarder_events
+        forwarder_resources
+        forwarding_endpoint
 
 module Http_cache_headers = struct
   (* Using Regex to parse the url path is dirty. Instead, we want to re-use
