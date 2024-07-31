@@ -308,10 +308,10 @@ pub mod tests {
     where
         T: Fn(AllocatedOf<L, ManagerFor<'_, F, L>>),
     {
-        let mut backend1 = F::new::<L>();
+        let mut backend1 = crate::create_backend!(L, F);
         randomise_backend(&mut backend1);
 
-        let mut backend2 = F::new::<L>();
+        let mut backend2 = crate::create_backend!(L, F);
 
         // Ensure both backends start off sufficiently different.
         let mut data = read_backend(&backend1);
@@ -343,10 +343,10 @@ pub mod tests {
         // of alignment).
         for (offset, size) in locs {
             let mut buffer1 = vec![0u8; size];
-            backend1.read(offset, &mut buffer1);
+            Backend::read(&backend1, offset, &mut buffer1);
 
             let mut buffer2 = vec![0u8; size];
-            backend2.read(offset, &mut buffer2);
+            Backend::read(&backend2, offset, &mut buffer2);
 
             assert_eq!(
                 buffer1, buffer2,
@@ -360,7 +360,7 @@ pub mod tests {
     #[macro_export]
     macro_rules! create_backend {
         ($StateLayout:ty, $Factory:ty) => {
-            <$Factory>::new::<$StateLayout>()
+            <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::new::<$StateLayout>()
         };
     }
 
@@ -377,7 +377,7 @@ pub mod tests {
                 let new_state =
                     $State::<
                         $ExtraGeneric,
-                        <<$Factory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>
+                        <<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>
                     >::bind(
                         $backend.allocate(loc),
                     );
@@ -391,7 +391,7 @@ pub mod tests {
                 use $crate::state_backend::{Backend, BackendManagement, Layout};
                 let loc = <$StateLayout>::placed().into_location();
                 let new_state =
-                    $State::<<<$Factory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::bind(
+                    $State::<<<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::bind(
                         $backend.allocate(loc),
                     );
 
@@ -421,7 +421,8 @@ pub mod tests {
             }
         }
 
-        let mut backend = F::new::<ExampleLayout>();
+        let mut backend = create_backend!(ExampleLayout, F);
+
         let placed = ExampleLayout::placed().into_location();
 
         let first_offset = placed.0.offset();

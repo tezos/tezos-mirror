@@ -403,7 +403,7 @@ impl<T: DynRegion> DynRegion for &T {
 pub(crate) mod tests {
     use super::DynRegion;
     use crate::{
-        backend_test,
+        backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
             Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location, Region,
@@ -445,8 +445,8 @@ pub(crate) mod tests {
     backend_test!(test_region_overlap, F, {
         const LEN: usize = 64;
         type OurLayout = (Array<u64, LEN>, Array<u64, LEN>);
-        let mut backend = F::new::<OurLayout>();
 
+        let mut backend = create_backend!(OurLayout, F);
         let (mut array1, mut array2) = backend.allocate(OurLayout::placed().into_location());
 
         // Allocate two consecutive arrays
@@ -489,7 +489,7 @@ pub(crate) mod tests {
 
     backend_test!(test_cell_overlap, F, {
         type OurLayout = (Atom<[u64; 4]>, Atom<[u64; 4]>);
-        let mut backend = F::new::<OurLayout>();
+        let mut backend = create_backend!(OurLayout, F);
         let (mut cell1, mut cell2) = backend.allocate(OurLayout::placed().into_location());
 
         // Cell should be zero-initialised.
@@ -547,7 +547,8 @@ pub(crate) mod tests {
                 backend.allocate_dyn_region(placed)
             }
         }
-        let mut backend = F::new::<FlipperLayout>();
+
+        let mut backend = create_backend!(FlipperLayout, F);
 
         // Writing to one item of the region must convert to stored format.
         {
@@ -595,7 +596,8 @@ pub(crate) mod tests {
 
     backend_test!(test_region_stored_format, F, {
         type FlipperLayout = Array<Flipper, 4>;
-        let mut backend = F::new::<FlipperLayout>();
+
+        let mut backend = create_backend!(FlipperLayout, F);
 
         // Writing to one item of the region must convert to stored format.
         {

@@ -147,7 +147,7 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        backend_test,
+        backend_test, create_backend,
         machine_state::{
             backend::{tests::test_determinism, Backend, Layout},
             bus::Addressable,
@@ -157,7 +157,7 @@ pub mod tests {
     gen_memory_layout!(T1K = 1 KiB);
 
     backend_test!(test_endianess, F, {
-        let mut backend = F::new::<T1K>();
+        let mut backend = create_backend!(T1K, F);
         let mut memory = backend.allocate(T1K::placed().into_location());
 
         memory.write(0, 0x1122334455667788u64).unwrap();

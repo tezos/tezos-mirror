@@ -385,7 +385,7 @@ impl<M: backend::Manager> FRegisters<M> {
 mod tests {
     use super::*;
     use crate::{
-        backend_test,
+        backend_test, create_backend,
         machine_state::backend::{
             tests::{test_determinism, ManagerFor},
             Backend, Layout,
@@ -395,7 +395,7 @@ mod tests {
     use strum::IntoEnumIterator;
 
     backend_test!(test_zero, F, {
-        let mut backend = F::new::<XRegistersLayout>();
+        let mut backend = create_backend!(XRegistersLayout, F);
         let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
             XRegisters::bind(backend.allocate(XRegistersLayout::placed().into_location()));
 
@@ -413,7 +413,7 @@ mod tests {
     ];
 
     backend_test!(test_arbitrary_register, F, {
-        let mut backend = F::new::<XRegistersLayout>();
+        let mut backend = create_backend!(XRegistersLayout, F);
         let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
             XRegisters::bind(backend.allocate(XRegistersLayout::placed().into_location()));
 
