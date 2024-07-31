@@ -1756,6 +1756,9 @@ let patch_sequencer_key pk =
          value = Signature.Public_key.to_b58check pk;
        })
 
+let patch_state ~key ~value =
+  worker_wait_for_request (Patch_state {commit = true; key; value})
+
 let block_param_to_block_number
     (block_param : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in
