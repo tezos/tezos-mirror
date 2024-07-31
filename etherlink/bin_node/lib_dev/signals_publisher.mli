@@ -33,9 +33,9 @@ val track :
   slot_index:Tezos_dal_node_services.Types.slot_index ->
   unit tzresult Lwt.t
 
-(** Not implemented.
-    [new_rollup_block finalized_level] tells the worker to check whether the blueprints
-    that have been previously injected on the DAL have been committed/included
-    and finalized. If it is the case, the worker builds the
-    corresponding signals. For now it does not send them to the kernel. *)
-val new_rollup_block : int32 -> unit tzresult Lwt.t
+(** [new_rollup_block finalized_level] tells the
+    worker to check whether the blueprints that have been previously
+    injected on the DAL have been committed/included and finalized. If
+    it is the case, the worker builds the corresponding signals. For
+    now it does not send them to the kernel. *)
+val new_rollup_block : finalized_level:int32 -> unit tzresult Lwt.t

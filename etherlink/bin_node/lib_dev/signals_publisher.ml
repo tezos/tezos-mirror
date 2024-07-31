@@ -157,9 +157,52 @@ module Worker = struct
       {level; slot_index} ;
     return_unit
 
-  let new_rollup_block _worker _finalized_level =
+  let new_rollup_block worker finalized_level =
     let open Lwt_result_syntax in
-    return_unit
+    let state = state worker in
+    Dal_injected_slots_tracker_queue.keys state.dal_injected_slots_tracker_queue
+    |> List.iter_es (fun injection_id ->
+           let* status =
+             Rollup_services.get_injector_operation_status
+               ~rollup_node_endpoint:state.rollup_node_endpoint
+               ~injection_id
+           in
+           (* [is_after_attestation_period ~published_level] is true if
+              the published level is old enough, w.r.t to the last
+              finalized level, to not be waiting for attestation
+              anymore; this means that the DAL slot is either attested
+              (and thus can be imported by the kernel) or unattested
+              (in which case importing in the kernel does nothing). We
+              rely on the [finalized_level] in order to avoid any
+              reorg that could occur during the attestation period. *)
+           let is_after_attestation_period ~published_level =
+             Int32.to_int published_level + attestation_lag
+             <= Int32.to_int finalized_level
+           in
+           match status with
+           | Committed {finalized; l1_level = published_level; _}
+           | Included {finalized; l1_level = published_level; _}
+             when finalized && is_after_attestation_period ~published_level ->
+               let*! () =
+                 Signals_publisher_events.commited_or_included_injection_id
+                   ~injector_op_hash:injection_id
+                   ~published_level
+               in
+               Dal_injected_slots_tracker_queue.remove
+                 state.dal_injected_slots_tracker_queue
+                 injection_id ;
+               let*! () =
+                 Signals_publisher_events.untracking
+                   ~injector_op_hash:injection_id
+               in
+               (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7385
+
+                  Implement included DAL slots anouncement to the kernel.
+               *)
+               return_unit
+           | Unknown | Pending_batch | Pending_injection _ | Injected _
+           | Included _ | Committed _ ->
+               return_unit)
 end
 
 type worker = Worker.infinite Worker.queue Worker.t
@@ -251,5 +294,5 @@ let shutdown () =
 let track ~injection_id ~level ~slot_index =
   worker_add_request ~request:(Track {injection_id; level; slot_index})
 
-let new_rollup_block finalized_level =
+let new_rollup_block ~finalized_level =
   worker_add_request ~request:(New_rollup_node_block {finalized_level})

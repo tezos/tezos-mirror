@@ -9,7 +9,7 @@ let process_new_block ~proxy ~finalized_level () =
   let open Lwt_result_syntax in
   let* () = Evm_events_follower.new_rollup_block finalized_level in
   let* () = Blueprints_publisher.new_rollup_block finalized_level in
-  let* () = Signals_publisher.new_rollup_block finalized_level in
+  let* () = Signals_publisher.new_rollup_block ~finalized_level in
   if proxy then Tx_pool.pop_and_inject_transactions_lazy () else return_unit
 
 type error += Connection_lost | Connection_timeout
