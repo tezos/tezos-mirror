@@ -76,25 +76,31 @@ mod elems;
 pub use elems::*;
 
 /// Manager of the state backend storage
-pub trait Manager {
+pub trait ManagerBase {
     /// Region that has been allocated in the state storage
     type Region<E: Elem, const LEN: usize>;
 
+    /// Dynamic region represents a fixed-sized byte vector that has been allocated in the state storage
+    type DynRegion<const LEN: usize>;
+}
+
+/// Manager with allocation capabilities
+pub trait ManagerAlloc: ManagerBase {
     /// Allocate a region in the state storage.
     fn allocate_region<E: Elem, const LEN: usize>(
         &mut self,
         loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN>;
 
-    /// Dynamic region represents a fixed-sized byte vector that has been allocated in the state storage
-    type DynRegion<const LEN: usize>;
-
     /// Allocate a dynamic region in the state storage.
     fn allocate_dyn_region<const LEN: usize>(
         &mut self,
         loc: Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN>;
+}
 
+/// Manager with read capabilities
+pub trait ManagerRead: ManagerBase {
     /// Read an element in the region.
     fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
 
@@ -108,6 +114,22 @@ pub trait Manager {
         buffer: &mut [E],
     );
 
+    /// Read an element in the region. `address` is in bytes.
+    fn dyn_region_read<E: Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+    ) -> E;
+
+    /// Read elements from the region. `address` is in bytes.
+    fn dyn_region_read_all<E: Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+        values: &mut [E],
+    );
+}
+
+/// Manager with write capabilities
+pub trait ManagerWrite: ManagerBase {
     /// Update an element in the region.
     fn region_write<E: Elem, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
@@ -125,26 +147,6 @@ pub trait Manager {
         buffer: &[E],
     );
 
-    /// Update the element in the region and return the previous value.
-    fn region_replace<E: Elem, const LEN: usize>(
-        region: &mut Self::Region<E, LEN>,
-        index: usize,
-        value: E,
-    ) -> E;
-
-    /// Read an element in the region. `address` is in bytes.
-    fn dyn_region_read<E: Elem, const LEN: usize>(
-        region: &Self::DynRegion<LEN>,
-        address: usize,
-    ) -> E;
-
-    /// Read elements from the region. `address` is in bytes.
-    fn dyn_region_read_all<E: Elem, const LEN: usize>(
-        region: &Self::DynRegion<LEN>,
-        address: usize,
-        values: &mut [E],
-    );
-
     /// Update an element in the region. `address` is in bytes.
     fn dyn_region_write<E: Elem, const LEN: usize>(
         region: &mut Self::DynRegion<LEN>,
@@ -160,6 +162,23 @@ pub trait Manager {
     );
 }
 
+/// Manager with capabilities that require both read and write
+pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
+    /// Update the element in the region and return the previous value.
+    fn region_replace<E: Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        value: E,
+    ) -> E;
+}
+
+/// Manager with allocation, read, write and replace capabilities
+// TODO: RV-157: Remove this trait and use the individual traits instead. Also rename ManagerBase
+// back to Manager.
+pub trait Manager: ManagerAlloc + ManagerWrite + ManagerRead + ManagerReadWrite {}
+
+impl<All: ManagerAlloc + ManagerWrite + ManagerRead + ManagerReadWrite> Manager for All {}
+
 /// State backend with manager
 pub trait BackendManagement {
     /// Backend manager
@@ -170,9 +189,6 @@ pub trait BackendManagement {
 }
 
 /// State backend storage
-// XXX: Rust doesn't like [BackendManagement::Manager] in this trait therefore
-// it has been moved to the super trait. This seems to be related to the
-// lifetime parameter.
 pub trait Backend: BackendManagement + Sized {
     /// Structural representation of the states that this backend supports
     type Layout: layout::Layout;
@@ -276,9 +292,13 @@ pub mod tests {
         }
     }
 
-    impl Manager for TraceManager {
+    impl ManagerBase for TraceManager {
         type Region<E: Elem, const LEN: usize> = DummyRegion<E>;
 
+        type DynRegion<const LEN: usize> = DummyRegion<u8>;
+    }
+
+    impl ManagerAlloc for TraceManager {
         fn allocate_region<E: Elem, const LEN: usize>(
             &mut self,
             loc: Location<[E; LEN]>,
@@ -287,15 +307,16 @@ pub mod tests {
             DummyRegion(PhantomData)
         }
 
-        type DynRegion<const LEN: usize> = DummyRegion<u8>;
-
         fn allocate_dyn_region<const LEN: usize>(
             &mut self,
             loc: Location<[u8; LEN]>,
         ) -> Self::DynRegion<LEN> {
             self.allocate_region::<u8, LEN>(loc)
         }
+    }
 
+    // TODO: RV-157: Remove this implementation
+    impl ManagerRead for TraceManager {
         fn region_read<E: Elem, const LEN: usize>(
             _region: &Self::Region<E, LEN>,
             _index: usize,
@@ -315,6 +336,24 @@ pub mod tests {
             unimplemented!()
         }
 
+        fn dyn_region_read<E: Elem, const LEN: usize>(
+            _region: &Self::DynRegion<LEN>,
+            _address: usize,
+        ) -> E {
+            unimplemented!()
+        }
+
+        fn dyn_region_read_all<E: Elem, const LEN: usize>(
+            _region: &Self::DynRegion<LEN>,
+            _address: usize,
+            _values: &mut [E],
+        ) {
+            unimplemented!()
+        }
+    }
+
+    // TODO: RV-157: Remove this implementation
+    impl ManagerWrite for TraceManager {
         fn region_write<E: Elem, const LEN: usize>(
             _region: &mut Self::Region<E, LEN>,
             _index: usize,
@@ -338,29 +377,6 @@ pub mod tests {
             unimplemented!()
         }
 
-        fn region_replace<E: Elem, const LEN: usize>(
-            _region: &mut Self::Region<E, LEN>,
-            _index: usize,
-            _value: E,
-        ) -> E {
-            unimplemented!()
-        }
-
-        fn dyn_region_read<E: Elem, const LEN: usize>(
-            _region: &Self::DynRegion<LEN>,
-            _address: usize,
-        ) -> E {
-            unimplemented!()
-        }
-
-        fn dyn_region_read_all<E: Elem, const LEN: usize>(
-            _region: &Self::DynRegion<LEN>,
-            _address: usize,
-            _values: &mut [E],
-        ) {
-            unimplemented!()
-        }
-
         fn dyn_region_write<E: Elem, const LEN: usize>(
             _region: &mut Self::DynRegion<LEN>,
             _address: usize,
@@ -374,6 +390,17 @@ pub mod tests {
             _address: usize,
             _values: &[E],
         ) {
+            unimplemented!()
+        }
+    }
+
+    // TODO: RV-157: Remove this implementation
+    impl ManagerReadWrite for TraceManager {
+        fn region_replace<E: Elem, const LEN: usize>(
+            _region: &mut Self::Region<E, LEN>,
+            _index: usize,
+            _value: E,
+        ) -> E {
             unimplemented!()
         }
     }
