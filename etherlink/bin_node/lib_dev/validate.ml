@@ -38,6 +38,45 @@ let validate_nonce (module Backend_rpc : Services_backend_sig.S)
   if transaction.nonce >= nonce then return (Ok ())
   else return (Error "Nonce too low")
 
+let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
+    (transaction : Transaction.transaction) :
+    (unit, string) result tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  (* Constants defined in the kernel: *)
+  let gas_limit = transaction.gas_limit in
+  let* (Qty maximum_gas_limit) =
+    let default_maximum_gas_per_transaction =
+      Ethereum_types.quantity_of_z (Z.of_string "30_000_000")
+    in
+    let+ bytes =
+      Backend_rpc.Reader.read Durable_storage_path.maximum_gas_per_transaction
+    in
+    let kernel_maximum_gas_per_transaction =
+      Option.map Ethereum_types.decode_number_le bytes
+    in
+    Option.value
+      kernel_maximum_gas_per_transaction
+      ~default:default_maximum_gas_per_transaction
+  in
+  let* da_fee_per_byte =
+    let+ bytes = Backend_rpc.Reader.read Durable_storage_path.da_fee_per_byte in
+    Option.map Ethereum_types.decode_number_le bytes
+  in
+  let gas_for_da_fees =
+    Fees.gas_for_fees
+      ?da_fee_per_byte
+      ~access_list:transaction.access_list
+      ~gas_price:transaction.max_fee_per_gas
+      transaction.data
+  in
+  let** execution_gas_limit =
+    if Z.gt gas_limit gas_for_da_fees then
+      return (Ok (Z.sub gas_limit gas_for_da_fees))
+    else return (Error "Invalid gas_limit for da_fees")
+  in
+  if Z.leq execution_gas_limit maximum_gas_limit then return (Ok ())
+  else return (Error "Gas limit for execution is too high")
+
 let validate_max_fee_per_gas (module Backend_rpc : Services_backend_sig.S)
     (transaction : Transaction.transaction) =
   let open Lwt_result_syntax in
@@ -61,6 +100,7 @@ let validate backend_rpc transaction ~caller =
   let** () = validate_nonce backend_rpc transaction caller in
   let** () = validate_max_fee_per_gas backend_rpc transaction in
   let** () = validate_pay_for_fees backend_rpc transaction caller in
+  let** () = validate_gas_limit backend_rpc transaction in
   return (Ok ())
 
 let valid_transaction_object ~backend_rpc ~decode ~hash tx_raw =
