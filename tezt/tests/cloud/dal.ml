@@ -1342,8 +1342,9 @@ let init_observer cloud configuration ~bootstrap ~slot_index i agent =
   let* () = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink_operator_setup cloud configuration is_sequencer name
-    ~bootstrap ~dal_slots account agent =
+let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
+    account agent =
+  let is_sequencer = configuration.etherlink_sequencer in
   let () = toplog "Init Etherlink operator setup" in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
@@ -1614,7 +1615,6 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
       cloud
       configuration
       ~dal_slots
-      Cli.etherlink_sequencer
       "operator"
       ~bootstrap
       etherlink_rollup_operator_key
