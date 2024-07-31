@@ -1027,6 +1027,21 @@ let init_ghostnet cloud (configuration : configuration) agent =
     Operation.get_next_counter ~source:fundraiser bootstrap.client
   in
   let () = toplog "Fetching fundraiser's balance" in
+  let* _balance =
+    Client.get_balance_for ~account:"fundraiser" bootstrap.client
+  in
+  let* etherlink_rollup_operator_key =
+    if configuration.etherlink then
+      let () = toplog "Generating a key pair for Etherlink operator" in
+      Client.stresstest_gen_keys
+        ~alias_prefix:"etherlink_operator"
+        1
+        bootstrap.client
+    else Lwt.return []
+  in
+  let etherlink_rollup_operator_key =
+    match etherlink_rollup_operator_key with key :: _ -> Some key | [] -> None
+  in
   let* () =
     if List.length producer_accounts > 0 then
       let () = toplog "Injecting the batch" in
@@ -1051,7 +1066,8 @@ let init_ghostnet cloud (configuration : configuration) agent =
       in
       unit
   in
-  Lwt.return (bootstrap, baker_accounts, producer_accounts, None)
+  Lwt.return
+    (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
 let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     agent =
