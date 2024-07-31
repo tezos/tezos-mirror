@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 pub mod bits;
+mod root;
 pub mod satp;
 pub mod values;
 pub mod xstatus;
@@ -27,6 +28,7 @@ use crate::{
     traps::{Exception, Interrupt, TrapContext, TrapKind},
 };
 use num_enum::TryFromPrimitive;
+use root::RootCSRegister;
 use strum::IntoEnumIterator;
 use values::{CSRegisterValues, CSRegisterValuesLayout};
 
@@ -1072,7 +1074,7 @@ impl<M: backend::Manager> CSRegisters<M> {
     ///
     /// Sections 3.1.6 & 4.1.1
     #[inline(always)]
-    fn transform_write(&self, reg: CSRegister, value: CSRRepr) -> (CSRegister, CSRRepr) {
+    fn transform_write(&self, reg: CSRegister, value: CSRRepr) -> CSRRepr {
         // the update of a shadow register follows the steps:
         // 1. keep the shadowed fields from [value]
         // 2. all the other, non-shadowed fields are the underlying register
@@ -1084,35 +1086,32 @@ impl<M: backend::Manager> CSRegisters<M> {
                 let mstatus = MStatus::from_bits(mstatus);
                 let sstatus = SStatus::from_bits(value);
                 let mstatus = sstatus.to_mstatus(mstatus);
-                (CSRegister::mstatus, mstatus.to_bits())
+                mstatus.to_bits()
             }
             CSRegister::sip => {
                 let mip = self.registers.read_mip();
                 let sip_only = value & CSRegister::WARL_MASK_SIP_SIE;
                 let mip_only = mip & !CSRegister::WARL_MASK_SIP_SIE;
-                (CSRegister::mip, sip_only | mip_only)
+                sip_only | mip_only
             }
             CSRegister::sie => {
                 let mie = self.registers.read_mie();
                 let sie_only = value & CSRegister::WARL_MASK_SIP_SIE;
                 let mie_only = mie & !CSRegister::WARL_MASK_SIP_SIE;
-                (CSRegister::mie, sie_only | mie_only)
+                sie_only | mie_only
             }
-            CSRegister::fcsr => (CSRegister::fcsr, value & CSRegister::FCSR_MASK),
+            CSRegister::fcsr => value & CSRegister::FCSR_MASK,
             CSRegister::frm => {
                 let fcsr = self.registers.read_fcsr();
                 let fcsr = fcsr & !CSRegister::FRM_MASK;
-                (
-                    CSRegister::fcsr,
-                    ((value << CSRegister::FRM_SHIFT) & CSRegister::FRM_MASK) | fcsr,
-                )
+                ((value << CSRegister::FRM_SHIFT) & CSRegister::FRM_MASK) | fcsr
             }
             CSRegister::fflags => {
                 let fcsr = self.registers.read_fcsr();
                 let fcsr = fcsr & !CSRegister::FFLAGS_MASK;
-                (CSRegister::fcsr, (value & CSRegister::FFLAGS_MASK) | fcsr)
+                (value & CSRegister::FFLAGS_MASK) | fcsr
             }
-            _ => (reg, value),
+            _ => value,
         }
     }
 
@@ -1129,14 +1128,7 @@ impl<M: backend::Manager> CSRegisters<M> {
     fn transform_read(&self, reg: CSRegister, source_reg_value: Option<CSRRepr>) -> CSRRepr {
         let source_reg_value = source_reg_value.unwrap_or_else(|| {
             // If reg is a shadow, obtain the underlying ground truth for that register
-            self.registers.general_raw_read(match reg {
-                CSRegister::sstatus => CSRegister::mstatus,
-                CSRegister::sip => CSRegister::mip,
-                CSRegister::sie => CSRegister::mie,
-                CSRegister::fflags => CSRegister::fcsr,
-                CSRegister::frm => CSRegister::fcsr,
-                reg => reg,
-            })
+            self.registers.general_raw_read(reg.into())
         });
 
         // modify the value according to the shadowing rules of each register
@@ -1155,10 +1147,12 @@ impl<M: backend::Manager> CSRegisters<M> {
     #[inline(always)]
     pub fn write<V: Bits64>(&mut self, reg: CSRegister, value: V) {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
-            let (reg, value) = self.transform_write(reg, value);
-            self.registers.general_raw_write(reg, value);
-            if reg == CSRegister::mstatus {
-                self.interrupt_cache.invalidate()
+            let value = self.transform_write(reg, value);
+            let source_reg: RootCSRegister = reg.into();
+            self.registers.general_raw_write(source_reg, value);
+
+            if source_reg == RootCSRegister::mstatus {
+                self.interrupt_cache.invalidate();
             }
         }
     }
@@ -1176,8 +1170,9 @@ impl<M: backend::Manager> CSRegisters<M> {
     #[inline(always)]
     pub fn replace<V: Bits64>(&mut self, reg: CSRegister, value: V) -> V {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
-            let (upd_reg, value) = self.transform_write(reg, value);
-            let old_value = self.registers.general_raw_replace(upd_reg, value);
+            let value = self.transform_write(reg, value);
+            let source_reg: RootCSRegister = reg.into();
+            let old_value = self.registers.general_raw_replace(source_reg, value);
 
             let old_value = self.transform_read(reg, Some(old_value));
             V::from_bits(old_value)
@@ -1318,12 +1313,7 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Reset the control and state registers.
     pub fn reset(&mut self) {
-        // First we set everything to 0
-        for reg in CSRegister::iter() {
-            self.registers.general_raw_write(reg, 0);
-        }
-
-        // Then we try to reset known CSRs to known default values.
+        // Try to reset known CSRs to known default values.
         for reg in CSRegister::iter() {
             self.write(reg, reg.default_value());
         }
@@ -1616,7 +1606,6 @@ mod tests {
                 .into(),
         );
         assert_eq!(old_sstatus, second_read_sstatus);
-        assert_eq!(csrs.registers.general_raw_read(CSRegister::sstatus), 0x0);
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
         let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
         assert_eq!(
