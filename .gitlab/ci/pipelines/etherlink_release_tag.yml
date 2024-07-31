@@ -18,7 +18,7 @@ docker:prepare-etherlink-release:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
   artifacts:
     expire_in: 1 hour
     paths:

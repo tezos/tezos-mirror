@@ -15,7 +15,7 @@ keywords = ["tezos"]
 
 
 [tool.poetry.dependencies]
-python = "~3.11"
+python = "~3.12"
 
 # developer tools
 mypy = "0.942"
