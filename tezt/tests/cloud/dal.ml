@@ -137,7 +137,7 @@ module Node = struct
               Node.snapshot_import ~no_check:true node "snapshot_file"
             in
             toplog "Launching the node." ;
-            let* () = Node.run node arguments in
+            let* () = Node.run node (Force_history_mode_switch :: arguments) in
             toplog "Waiting for the node to be ready." ;
             let* () = wait_for_ready node in
             toplog "Node is ready." ;
@@ -1354,7 +1354,8 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
     Node.init
       ?data_dir
       ~name
-      ~arguments:[Peer bootstrap.node_p2p_endpoint]
+      ~arguments:
+        [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
       configuration.network
       agent
   in
