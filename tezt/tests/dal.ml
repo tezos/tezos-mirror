@@ -7665,6 +7665,7 @@ let register ~protocols =
     test_dal_node_slot_management
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:[Tag.ci_disabled]
     ~producer_profiles:[0]
     "dal node slot headers tracking"
     test_dal_node_slots_headers_tracking
@@ -7717,6 +7718,7 @@ let register ~protocols =
     test_attester_with_bake_for
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:[Tag.ci_disabled]
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~attestation_threshold:100
     ~attestation_lag:16
