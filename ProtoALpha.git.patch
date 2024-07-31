@@ -1,4 +1,4 @@
-From c4a1fe195d6fae8bc0494896792b7ce122ec422e Mon Sep 17 00:00:00 2001
+From dd5e2eb92eaf5039d75c0d21a8b199231ab5b515 Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
@@ -330,7 +330,7 @@ index 9c57d31..73f88c6 100644
    (:standard
     (:include %{workspace_root}/macos-link-flags.sexp)
 diff --git a/server/dune b/server/dune
-index 9959e59..9786872 100644
+index 9959e59..2f88562 100644
 --- a/server/dune
 +++ b/server/dune
 @@ -4,4 +4,4 @@
@@ -338,7 +338,7 @@ index 9959e59..9786872 100644
   (promote (until-clean))
   (libraries aches caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt.unix
 -   cohttp-lwt-unix ezgzip safepass prometheus-app teztale.lib))
-+   cohttp-lwt-unix ezgzip safepass octez-libs.prometheus-app teztale.lib))
++   octez-libs.cohttp-lwt-unix ezgzip safepass octez-libs.prometheus-app teztale.lib))
 -- 
 2.43.0
 
