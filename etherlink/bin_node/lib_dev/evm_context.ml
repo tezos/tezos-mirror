@@ -126,6 +126,7 @@ module Request = struct
         -> (unit, tztrace) t
     | Patch_kernel : {is_binary : bool; kernel : string} -> (unit, tztrace) t
     | Patch_sequencer_key : Signature.public_key -> (unit, tztrace) t
+    | Wasm_pvm_version : (Tezos_scoru_wasm.Wasm_pvm_state.version, tztrace) t
 
   type view = View : _ t -> view
 
@@ -313,6 +314,12 @@ module Request = struct
           (function
             | View (Patch_sequencer_key pk) -> Some ((), pk) | _ -> None)
           (fun ((), pk) -> View (Patch_sequencer_key pk));
+        case
+          (Tag 16)
+          ~title:"Wasm_pvm_version"
+          (obj1 (req "request" (constant "wasm_pvm_version")))
+          (function View Wasm_pvm_version -> Some () | _ -> None)
+          (fun () -> View Wasm_pvm_version);
       ]
 
   let pp ppf view =
@@ -1115,9 +1122,14 @@ module State = struct
     in
     go ~current_block_number:Z.(pred zero) evm_state first_level
 
-  let patch_kernel (ctxt : t) ~is_binary kernel =
+  let wasm_pvm_version (ctxt : t) =
     let open Lwt_result_syntax in
     let*! version = Evm_state.wasm_pvm_version ctxt.session.evm_state in
+    return version
+
+  let patch_kernel (ctxt : t) ~is_binary kernel =
+    let open Lwt_result_syntax in
+    let* version = wasm_pvm_version ctxt in
     let* () =
       Wasm_debugger.check_kernel
         ~binary:is_binary
@@ -1307,6 +1319,9 @@ module Handlers = struct
     | Patch_sequencer_key pk ->
         let ctxt = Worker.state self in
         State.patch_sequencer_key ctxt pk
+    | Wasm_pvm_version ->
+        let ctxt = Worker.state self in
+        State.wasm_pvm_version ctxt
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
