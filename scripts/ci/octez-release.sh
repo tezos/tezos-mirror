@@ -59,13 +59,19 @@ fi
 
 ### Compute GitLab generic package names
 
-gitlab_octez_binaries_package_name="octez-binaries-${gitlab_release_no_v}"
-gitlab_octez_debian_bookworm_package_name="octez-debian-bookworm-${gitlab_release_no_v}"
-gitlab_octez_ubuntu_noble_package_name="octez-ubuntu-noble-${gitlab_release_no_v}"
-gitlab_octez_ubuntu_jammy_package_name="octez-ubuntu-jammy-${gitlab_release_no_v}"
-gitlab_octez_fedora_package_name="octez-fedora-${gitlab_release_no_v}"
-gitlab_octez_rockylinux_package_name="octez-rockylinux-${gitlab_release_no_v}"
-gitlab_octez_source_package_name="octez-source-${gitlab_release_no_v}"
+if [ -n "${gitlab_release_no_v}" ]; then
+  suffix="${gitlab_release_no_v}"
+else
+  suffix=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+fi
+
+gitlab_octez_binaries_package_name="octez-binaries-${suffix}"
+gitlab_octez_debian_bookworm_package_name="octez-debian-bookworm-${suffix}"
+gitlab_octez_ubuntu_focal_package_name="octez-ubuntu-focal-${suffix}"
+gitlab_octez_ubuntu_jammy_package_name="octez-ubuntu-jammy-${suffix}"
+gitlab_octez_fedora_package_name="octez-fedora-${suffix}"
+gitlab_octez_rockylinux_package_name="octez-rockylinux-${suffix}"
+gitlab_octez_source_package_name="octez-source-${suffix}"
 
 # X.Y or X.Y-rcZ
-gitlab_package_version="${gitlab_release_no_v}"
+gitlab_package_version="${suffix}"
