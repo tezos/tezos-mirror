@@ -60,22 +60,34 @@ val operator : Operator_profile.t -> t
    priority. *)
 val merge_profiles : lower_prio:t -> higher_prio:t -> t
 
-(** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
-    registers operator profiles (attester or producer).
-    If the current profile is a bootstrap profile, it will return [None] as bootstrap
-    profiles are incompatible with operator profiles. *)
-val add_operator_profiles :
+(** [add_and_register_operator_profile t proto_parameters gs_worker
+    operator_profile] adds the new [operator_profile] to [t]. It registers any
+    new attester profile within [operator_profile] with gossipsub, that is, it
+    instructs the [gs_worker] to join the corresponding topics.
+
+    If the current profile [t] is a bootstrap profile, it will return [None] as
+    bootstrap profiles are incompatible with operator profiles.
+
+    It assumes the current profile is not a random observer. *)
+val add_and_register_operator_profile :
   t ->
   Dal_plugin.proto_parameters ->
   Gossipsub.Worker.t ->
   Operator_profile.t ->
   t option
 
-(** [add_profiles t proto_parameters gs_worker profiles] registers [profiles].
-    If the current profiles are incompatible with provided [profiles], it
-    returns [None]. *)
-val add_profiles :
-  t -> Dal_plugin.proto_parameters -> Gossipsub.Worker.t -> t -> t option
+(** [register_profile t proto_parameters gs_worker] does the following:
+
+    - It registers the attester profiles within [t] with gossipsub, that is, it
+    instructs the [gs_worker] to join the corresponding topics.
+
+    - If [t] is the random observer profile, then it randomly selects a slot
+    index, and transforms the profile into an observer profile for the selected
+    slot index.
+
+    The function returns the updated profile. *)
+val register_profile :
+  t -> Dal_plugin.proto_parameters -> Gossipsub.Worker.t -> t
 
 (** Checks that each producer profile only refers to slot indexes strictly
     smaller than [number_of_slots]. This may not be the case when the profile

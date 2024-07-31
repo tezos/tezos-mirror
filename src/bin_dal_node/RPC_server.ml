@@ -220,7 +220,7 @@ module Profile_handlers = struct
     call_handler1 (fun () ->
         let proto_parameters = Node_context.get_proto_parameters ctxt in
         match
-          Profile_manager.add_operator_profiles
+          Profile_manager.add_and_register_operator_profile
             (Node_context.get_profile_ctxt ctxt)
             proto_parameters
             gs_worker
