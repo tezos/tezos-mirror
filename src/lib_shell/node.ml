@@ -200,8 +200,8 @@ let check_context_consistency store =
       tzfail Non_recoverable_context
 
 let create ?(sandboxed = false) ?sandbox_parameters
-    ?(context_pruning = Storage_maintenance.Enabled) ~singleprocess ~version
-    ~commit_info
+    ?(context_pruning = Storage_maintenance.Enabled) ?history_mode
+    ~singleprocess ~version ~commit_info
     {
       genesis;
       chain_name;
@@ -221,7 +221,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
       enable_testchain;
       dal_config;
     } peer_validator_limits block_validator_limits prevalidator_limits
-    chain_validator_limits history_mode =
+    chain_validator_limits =
   let open Lwt_result_syntax in
   let start_prevalidator, start_testchain =
     match p2p_params with
