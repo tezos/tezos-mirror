@@ -153,6 +153,7 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 - Add FA withdrawal structure and helper methods for parsing and encoding. (!13843)
 - Rework the semantics of migrations in order to allow a network to skip frozen
   versions. (!13895)
+- Circular calls to impure precompiles are forbidden. (!14390)
 
 ### Security Upgrades
 

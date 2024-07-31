@@ -24,7 +24,9 @@ use tezos_storage::read_u256_le_default;
 use crate::{
     account_storage::{account_path, EthereumAccountStorage},
     handler::{EvmHandler, ExecutionOutcome},
-    precompiles::{self, precompile_set, SYSTEM_ACCOUNT_ADDRESS},
+    precompiles::{
+        self, precompile_set, FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
+    },
     run_transaction,
     utilities::keccak256_hash,
     withdrawal_counter::WITHDRAWAL_COUNTER_PATH,
@@ -45,9 +47,16 @@ sol!(
     kernel_wrapper,
     "tests/contracts/artifacts/MockFaBridgePrecompile.abi"
 );
+sol!(
+    reentrancy_tester,
+    "tests/contracts/artifacts/ReentrancyTester.abi"
+);
 
 const MOCK_WRAPPER_BYTECODE: &[u8] =
     include_bytes!("../../tests/contracts/artifacts/MockFaBridgeWrapper.bytecode");
+
+const REENTRANCY_TESTER_BYTECODE: &[u8] =
+    include_bytes!("../../tests/contracts/artifacts/ReentrancyTester.bytecode");
 
 /// Create a smart contract in the storage with the mocked token code
 pub fn deploy_mock_wrapper(
@@ -80,6 +89,53 @@ pub fn deploy_mock_wrapper(
         *caller,
         [code, calldata.abi_encode()].concat(),
         Some(300_000),
+        U256::one(),
+        U256::zero(),
+        false,
+        1_000_000_000,
+        false,
+        false,
+        None,
+    )
+    .expect("Failed to deploy")
+    .unwrap()
+}
+
+/// Create a smart contract in the storage with the mocked token code
+pub fn deploy_reentrancy_tester(
+    host: &mut MockKernelHost,
+    evm_account_storage: &mut EthereumAccountStorage,
+    ticket: &FA2_1Ticket,
+    caller: &H160,
+    withdrawal_amount: U256,
+    withdrawal_count: U256,
+) -> ExecutionOutcome {
+    let code = REENTRANCY_TESTER_BYTECODE.to_vec();
+    let (ticketer, content) = ticket_id(ticket);
+    let dummy_routing_info = [vec![0u8; 22], vec![1u8], vec![0u8; 21]].concat();
+    let calldata = reentrancy_tester::constructorCall::new((
+        convert_h160(&FA_BRIDGE_PRECOMPILE_ADDRESS),
+        dummy_routing_info.into(),
+        convert_u256(&withdrawal_amount),
+        ticketer.into(),
+        content.into(),
+        convert_u256(&withdrawal_count),
+    ));
+
+    let block = dummy_block_constants();
+    let precompiles = precompile_set::<MockKernelHost>(false);
+
+    set_balance(host, evm_account_storage, caller, U256::from(1_000_000));
+    run_transaction(
+        host,
+        &block,
+        evm_account_storage,
+        &precompiles,
+        Config::shanghai(),
+        None,
+        *caller,
+        [code, calldata.abi_encode()].concat(),
+        Some(1_000_000),
         U256::one(),
         U256::zero(),
         false,

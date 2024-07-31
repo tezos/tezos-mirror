@@ -19,6 +19,7 @@ mod fa_bridge;
 mod hash;
 mod identity;
 mod modexp;
+pub(crate) mod reentrancy_guard;
 mod withdrawal;
 mod zero_knowledge;
 

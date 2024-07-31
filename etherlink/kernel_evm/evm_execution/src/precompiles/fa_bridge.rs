@@ -160,6 +160,7 @@ mod tests {
     use alloy_sol_types::SolCall;
     use evm::{Config, ExitError};
     use primitive_types::{H160, U256};
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::{
@@ -167,8 +168,9 @@ mod tests {
         fa_bridge::{
             deposit::ticket_hash,
             test_utils::{
-                convert_h160, convert_u256, dummy_first_block, dummy_ticket,
-                kernel_wrapper, set_balance, ticket_balance_add, ticket_id,
+                convert_h160, convert_u256, deploy_reentrancy_tester,
+                dummy_fa_withdrawal, dummy_first_block, dummy_ticket, kernel_wrapper,
+                set_balance, ticket_balance_add, ticket_id,
             },
         },
         handler::{EvmHandler, ExecutionOutcome, ExecutionResult},
@@ -177,14 +179,16 @@ mod tests {
         utilities::{bigint_to_u256, keccak256_hash},
     };
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_precompile(
         host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         caller: H160,
-        value: Option<U256>,
+        value: U256,
         input: Vec<u8>,
         gas_limit: Option<u64>,
         is_static: bool,
+        disable_reentrancy_guard: bool,
     ) -> ExecutionOutcome {
         let block = dummy_first_block();
         let config = Config::shanghai();
@@ -199,14 +203,18 @@ mod tests {
             &block,
             &config,
             &precompiles,
-            1_000_000_000,
+            100_000_000_000,
             U256::from(21000),
             false,
             None,
         );
 
+        if disable_reentrancy_guard {
+            handler.disable_reentrancy_guard();
+        }
+
         handler
-            .call_contract(caller, callee, value, input, gas_limit, is_static)
+            .call_contract(caller, callee, Some(value), input, gas_limit, is_static)
             .expect("Failed to invoke precompile")
     }
 
@@ -219,9 +227,10 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             H160::from_low_u64_be(1),
-            Some(U256::zero()),
+            U256::zero(),
             vec![0x00, 0x01, 0x02, 0x03],
             None,
+            false,
             false,
         );
         assert!(!outcome.is_success());
@@ -239,10 +248,11 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             H160::from_low_u64_be(1),
-            None,
+            U256::zero(),
             vec![0x80, 0xfc, 0x1f, 0xe3],
             // Cover only basic cost
             Some(21000 + 16 * 4),
+            false,
             false,
         );
         assert!(!outcome.is_success());
@@ -268,9 +278,10 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             caller,
-            Some(1_000_000_000.into()),
+            1_000_000_000.into(),
             vec![0x80, 0xfc, 0x1f, 0xe3],
             None,
+            false,
             false,
         );
         assert!(!outcome.is_success());
@@ -289,10 +300,11 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             caller,
-            None,
+            U256::zero(),
             vec![0x80, 0xfc, 0x1f, 0xe3],
             None,
             true,
+            false,
         );
         assert!(!outcome.is_success());
         assert!(
@@ -351,9 +363,10 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             H160::from_low_u64_be(1),
-            Some(U256::zero()),
+            U256::zero(),
             vec![0x80, 0xfc, 0x1f, 0xe3],
             None,
+            false,
             false,
         );
         assert!(!outcome.is_success());
@@ -404,9 +417,10 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             ticket_owner,
-            Some(U256::zero()),
+            U256::zero(),
             input,
             Some(30_000_000),
+            false,
             false,
         );
         assert!(outcome.is_success());
@@ -427,5 +441,94 @@ mod tests {
         let method_hash =
             keccak256_hash(b"withdraw(address,bytes,uint256,bytes22,bytes)");
         assert_eq!(method_hash.0[0..4], [0x80, 0xfc, 0x1f, 0xe3]);
+    }
+
+    #[test]
+    fn fa_bridge_precompile_cannot_call_itself() {
+        let mut mock_runtime = MockKernelHost::default();
+        let mut evm_account_storage = init_account_storage().unwrap();
+
+        let system = H160::zero();
+        let sender = H160::from_low_u64_be(1);
+        let ticket = dummy_ticket();
+
+        let proxy = deploy_reentrancy_tester(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &ticket,
+            &system,
+            U256::from(2),
+            U256::from(4),
+        )
+        .new_address()
+        .expect("Failed to deploy reentrancy tester");
+
+        ticket_balance_add(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &ticket_hash(&ticket).unwrap(),
+            &proxy,
+            U256::from(100),
+        );
+
+        let withdrawal = dummy_fa_withdrawal(ticket, sender, proxy);
+
+        let mut receiver = Vec::new();
+        withdrawal.receiver.bin_write(&mut receiver).unwrap();
+
+        let mut proxy = Vec::new();
+        withdrawal.proxy.bin_write(&mut proxy).unwrap();
+
+        let mut ticketer = Vec::new();
+        withdrawal
+            .ticket
+            .creator()
+            .0
+            .bin_write(&mut ticketer)
+            .unwrap();
+
+        let mut contents = Vec::new();
+        withdrawal
+            .ticket
+            .contents()
+            .bin_write(&mut contents)
+            .unwrap();
+
+        let input = kernel_wrapper::withdrawCall::new((
+            convert_h160(&withdrawal.ticket_owner),
+            [receiver, proxy].concat().into(),
+            convert_u256(&withdrawal.amount),
+            TryInto::<[u8; 22]>::try_into(ticketer).unwrap().into(),
+            contents.into(),
+        ));
+
+        let outcome = execute_precompile(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            sender,
+            U256::zero(),
+            input.abi_encode(),
+            // Note that we set gas limit larger than hard cap for a single transaction:
+            // that is to overcome the added cost per FA withdrawal which is pretty large
+            // for the given gas price (up to 15M).
+            Some(100_000_000),
+            false,
+            false,
+        );
+        assert!(!outcome.is_success());
+        // we cannot capture the actual revert reason here because it's not propagated
+
+        let outcome = execute_precompile(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            sender,
+            U256::zero(),
+            input.abi_encode(),
+            Some(100_000_000),
+            false,
+            true,
+        );
+        assert!(outcome.is_success());
+        assert!(!outcome.withdrawals.is_empty());
     }
 }
