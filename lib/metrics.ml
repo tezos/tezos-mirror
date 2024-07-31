@@ -1,3 +1,10 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>      *)
+(*                                                                           *)
+(*****************************************************************************)
+
 module Metrics = struct
   let namespace = "teztale"
 

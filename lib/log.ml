@@ -1,3 +1,10 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>      *)
+(*                                                                           *)
+(*****************************************************************************)
+
 type level = FATAL | ERROR | WARNING | INFO | DEBUG
 
 let level_encoding : level TzPervasives.Data_encoding.t =

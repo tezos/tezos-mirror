@@ -1,42 +1,24 @@
-From 902af20ebe4d4dee79ee5e30c83a44f95f8998d2 Mon Sep 17 00:00:00 2001
+From 2b81c338b81d5a47c367ff5b92c5561f261b57b4 Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
 
 ---
- archiver/ProtoALp_machine.real.ml | 304 ++++++++++++++++++++++++++++++
+ archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++++++++++++++
  archiver/dune                     |   2 +-
- 2 files changed, 305 insertions(+), 1 deletion(-)
+ 2 files changed, 287 insertions(+), 1 deletion(-)
  create mode 100644 archiver/ProtoALp_machine.real.ml
 
 diff --git a/archiver/ProtoALp_machine.real.ml b/archiver/ProtoALp_machine.real.ml
 new file mode 100644
-index 0000000..274d68b
+index 0000000..5fee34d
 --- /dev/null
 +++ b/archiver/ProtoALp_machine.real.ml
-@@ -0,0 +1,304 @@
+@@ -0,0 +1,286 @@
 +(*****************************************************************************)
 +(*                                                                           *)
-+(* Open Source License                                                       *)
-+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-+(*                                                                           *)
-+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-+(* copy of this software and associated documentation files (the "Software"),*)
-+(* to deal in the Software without restriction, including without limitation *)
-+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-+(* and/or sell copies of the Software, and to permit persons to whom the     *)
-+(* Software is furnished to do so, subject to the following conditions:      *)
-+(*                                                                           *)
-+(* The above copyright notice and this permission notice shall be included   *)
-+(* in all copies or substantial portions of the Software.                    *)
-+(*                                                                           *)
-+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-+(* DEALINGS IN THE SOFTWARE.                                                 *)
++(* SPDX-License-Identifier: MIT                                              *)
++(* SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>      *)
 +(*                                                                           *)
 +(*****************************************************************************)
 +
@@ -320,10 +302,10 @@ index 0000000..274d68b
 +
 +module M = General_archiver.Define (Services)
 diff --git a/archiver/dune b/archiver/dune
-index c4e38b2..9f50afd 100644
+index 5c87c37..46bc245 100644
 --- a/archiver/dune
 +++ b/archiver/dune
-@@ -104,7 +104,7 @@
+@@ -109,7 +109,7 @@
    (select
     ProtoALp_machine.ml
     from
