@@ -22,3 +22,14 @@ val start :
 
 (** [shutdown ()] shuts down the signal publisher. *)
 val shutdown : unit -> unit tzresult Lwt.t
+
+(** Not implemented.
+    [track ~injection_id ~level ~slot_index] tells the worker to track
+    the publication associated with the injection id
+    [injector_op_hash], blueprint's level [level] and slot index
+    [slot_index]. *)
+val track :
+  injection_id:Tezos_crypto.Hashed.Injector_operations_hash.t ->
+  level:Z.t ->
+  slot_index:Tezos_dal_node_services.Types.slot_index ->
+  unit tzresult Lwt.t

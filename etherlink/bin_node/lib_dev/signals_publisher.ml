@@ -93,7 +93,13 @@ module Name = struct
 end
 
 module Request = struct
-  type ('a, 'b) t = Dummy : (unit, tztrace) t
+  type ('a, 'b) t =
+    | Track : {
+        injection_id : Tezos_crypto.Hashed.Injector_operations_hash.t;
+        level : Z.t;
+        slot_index : Tezos_dal_node_services.Types.slot_index;
+      }
+        -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -105,10 +111,19 @@ module Request = struct
       [
         case
           (Tag 0)
-          ~title:"Dummy"
-          empty
-          (function View Dummy -> Some ())
-          (fun () -> View Dummy);
+          ~title:"Track"
+          (obj3
+             (req
+                "injection_id"
+                Tezos_crypto.Hashed.Injector_operations_hash.encoding)
+             (req "level" z)
+             (req "slot_index" int8))
+          (function
+            | View (Track {injection_id; level; slot_index}) ->
+                Some (injection_id, level, slot_index)
+            | View _ -> .)
+          (fun (injection_id, level, slot_index) ->
+            View (Track {injection_id; level; slot_index}));
       ]
 
   let pp _ppf (View _) = ()
@@ -116,6 +131,10 @@ end
 
 module Worker = struct
   include Worker.MakeSingle (Name) (Request) (Types)
+
+  let track _worker ~injection_id:_ ~level:_ ~slot_index:_ =
+    let open Lwt_result_syntax in
+    return_unit
 end
 
 type worker = Worker.infinite Worker.queue Worker.t
@@ -127,9 +146,10 @@ module Handlers = struct
       type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
-   fun _w request ->
+   fun w request ->
     match request with
-    | Dummy -> protect @@ fun () -> Lwt_result_syntax.return_unit
+    | Track {injection_id; level; slot_index} ->
+        protect @@ fun () -> Worker.track w ~injection_id ~level ~slot_index
 
   type launch_error = error trace
 
@@ -200,3 +220,6 @@ let shutdown () =
   let*! () = Signals_publisher_events.publisher_shutdown () in
   let*! () = Worker.shutdown w in
   return_unit
+
+let track ~injection_id ~level ~slot_index =
+  worker_add_request ~request:(Track {injection_id; level; slot_index})

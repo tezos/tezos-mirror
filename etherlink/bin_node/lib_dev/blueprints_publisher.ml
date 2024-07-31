@@ -119,13 +119,13 @@ module Worker = struct
         when use_dal_if_enabled && dal_last_used < level ->
           (state self).dal_last_used <- level ;
           let*! () = Blueprint_events.blueprint_injected_on_DAL level in
-          let* _injection_id =
+          let* injection_id =
             Rollup_services.publish_on_dal
               ~rollup_node_endpoint
               ~slot_index
               payload
           in
-          return_unit
+          Signals_publisher.track ~injection_id ~level ~slot_index
       | _ ->
           let*! () = Blueprint_events.blueprint_injected_on_inbox level in
           Rollup_services.publish
