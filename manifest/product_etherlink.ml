@@ -180,7 +180,7 @@ let _octez_evm_node_tests =
 
 let _tezt_etherlink =
   tezt
-    ["evm_rollup"; "evm_sequencer"]
+    ["evm_rollup"; "evm_sequencer"; "validate"]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
     ~synopsis:"Tezt integration tests for Etherlink"
