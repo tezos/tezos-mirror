@@ -1539,7 +1539,7 @@ module Raw_exporter : EXPORTER = struct
         cemented_blocks_file t.snapshot_cemented_dir ~start_level ~end_level
         |> file_path)
     in
-    Lwt_utils_unix.copy_file
+    Lwt_utils_unix.copy_file_raw
       ~buffer_size:cemented_buffer_size
       ~src:file
       ~dst:filename
@@ -3218,7 +3218,11 @@ module Raw_importer : IMPORTER = struct
     let src = Filename.concat (Naming.dir_path t.snapshot_cemented_dir) file in
     let dst = Filename.concat (Naming.dir_path t.dst_cemented_dir) file in
     let* () =
-      Lwt_utils_unix.copy_file ~buffer_size:cemented_buffer_size ~src ~dst ()
+      Lwt_utils_unix.copy_file_raw
+        ~buffer_size:cemented_buffer_size
+        ~src
+        ~dst
+        ()
     in
     return_ok_unit
 
