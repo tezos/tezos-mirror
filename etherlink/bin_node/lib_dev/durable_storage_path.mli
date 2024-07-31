@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -99,19 +99,24 @@ module Evm_events : sig
 end
 
 module Trace : sig
+  (** Path under which all traces are stored when the
+      given [hash] parameter is provided, otherwise it
+      will just provide the path to the root. *)
+  val root_indexed_by_hash : transaction_hash:path option -> path
+
   (** Path where is stored the input of the tracer. *)
   val input : path
 
   (** Path where is stored the gas consumed by the call. *)
-  val output_gas : path
+  val output_gas : transaction_hash:path option -> path
 
   (** Path where the result of the traced transaction is stored. *)
-  val output_failed : path
+  val output_failed : transaction_hash:path option -> path
 
   (** Path where is stored the value returned by the transaction's execution. *)
-  val output_return_value : path
+  val output_return_value : transaction_hash:path option -> path
 
-  val logs_length : path
+  val logs_length : transaction_hash:path option -> path
 
-  val opcode : int -> path
+  val opcode : transaction_hash:path option -> int -> path
 end

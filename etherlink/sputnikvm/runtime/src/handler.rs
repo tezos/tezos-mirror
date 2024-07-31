@@ -1,4 +1,4 @@
-use crate::{Capture, Context, CreateScheme, ExitError, ExitReason, Machine, Opcode, Stack};
+use crate::{CallScheme, Capture, Context, CreateScheme, ExitError, ExitReason, Machine, Opcode, Stack};
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
 
@@ -101,7 +101,7 @@ pub trait Handler {
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
 		target_gas: Option<u64>,
-		is_static: bool,
+		call_scheme: CallScheme,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt>;
 	/// Feed in call feedback.

@@ -3,62 +3,70 @@
 //
 // SPDX-License-Identifier: MIT
 
-use primitive_types::{H160, H256};
+use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 #[cfg(test)]
 use tezos_ethereum::rlp_helpers::{
-    decode_field_u16_le, decode_field_u64_le, decode_list, decode_option_canonical,
-};
-use tezos_ethereum::{
-    rlp_helpers::{
-        append_option_canonical, append_u16_le, append_u64_le, check_list, decode_field,
-        decode_option, next,
-    },
-    transaction::TransactionHash,
+    decode_field_u16_le, decode_field_u256_le, decode_field_u64_le, decode_list,
+    decode_option_canonical,
 };
 
+use tezos_ethereum::{
+    rlp_helpers::{
+        append_option_canonical, append_u16_le, append_u256_le, append_u64_le,
+        check_list, decode_field, decode_option, next,
+    },
+    Log,
+};
+
+// For the following constant, we add +1 for the transaction hash in the input.
+const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
+const CALL_TRACER_CONFIG_SIZE: usize = 3;
+
+pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
+
 #[derive(Debug, Clone, Copy)]
-pub struct TracerConfig {
+pub struct StructLoggerConfig {
     pub enable_memory: bool,
     pub enable_return_data: bool,
     pub disable_stack: bool,
     pub disable_storage: bool,
 }
 
-pub fn get_tracer_config(
-    current_transaction_hash: Option<TransactionHash>,
-    trace_input: &Option<TracerInput>,
-) -> Option<TracerConfig> {
-    if let Some(TracerInput {
-        transaction_hash,
-        config,
-    }) = trace_input
-    {
-        match (current_transaction_hash, transaction_hash) {
-            (Some(current_transaction_hash), Some(transaction_hash))
-                if transaction_hash.0 == current_transaction_hash =>
-            {
-                Some(*config)
-            }
-            (None, None) | (Some(_), None) => Some(*config),
-            _ => None,
-        }
-    } else {
-        None
-    }
+#[derive(Debug, Clone, Copy)]
+pub struct CallTracerConfig {
+    pub only_top_call: bool,
+    pub with_logs: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct TracerInput {
-    pub transaction_hash: Option<H256>,
-    pub config: TracerConfig,
+pub enum TracerConfig {
+    StructLogger(StructLoggerConfig),
+    CallTracer(CallTracerConfig),
 }
 
-impl Decodable for TracerInput {
-    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
-        check_list(decoder, 5)?;
+#[derive(Debug, Clone, Copy)]
+pub struct StructLoggerInput {
+    pub transaction_hash: Option<H256>,
+    pub config: StructLoggerConfig,
+}
 
+#[derive(Debug, Clone, Copy)]
+pub struct CallTracerInput {
+    pub transaction_hash: Option<H256>,
+    pub config: CallTracerConfig,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TracerInput {
+    StructLogger(StructLoggerInput),
+    CallTracer(CallTracerInput),
+}
+
+impl Decodable for StructLoggerInput {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         let mut it = decoder.iter();
+        check_list(decoder, STRUCT_LOGGER_CONFIG_SIZE)?;
 
         let transaction_hash = decode_option(&next(&mut it)?, "transaction_hash")?;
         let enable_memory = decode_field(&next(&mut it)?, "enable_memory")?;
@@ -66,13 +74,32 @@ impl Decodable for TracerInput {
         let disable_stack = decode_field(&next(&mut it)?, "disable_stack")?;
         let disable_storage = decode_field(&next(&mut it)?, "disable_storage")?;
 
-        Ok(TracerInput {
+        Ok(StructLoggerInput {
             transaction_hash,
-            config: TracerConfig {
+            config: StructLoggerConfig {
                 enable_return_data,
                 enable_memory,
                 disable_stack,
                 disable_storage,
+            },
+        })
+    }
+}
+
+impl Decodable for CallTracerInput {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        let mut it = decoder.iter();
+        check_list(decoder, CALL_TRACER_CONFIG_SIZE)?;
+
+        let transaction_hash = decode_option(&next(&mut it)?, "transaction_hash")?;
+        let only_top_call = decode_field(&next(&mut it)?, "only_top_call")?;
+        let with_logs = decode_field(&next(&mut it)?, "with_logs")?;
+
+        Ok(CallTracerInput {
+            transaction_hash,
+            config: CallTracerConfig {
+                only_top_call,
+                with_logs,
             },
         })
     }
@@ -113,6 +140,146 @@ impl Decodable for StorageMapItem {
             address,
             index,
             value,
+        })
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct CallTrace {
+    pub type_: Vec<u8>,
+    pub from: H160,
+    pub to: Option<H160>, // None if type is CREATE / CREATE2
+    pub value: U256,
+    pub gas: Option<u64>, // None if no gas limit was provided
+    pub gas_used: u64,
+    pub input: Vec<u8>,
+    pub output: Option<Vec<u8>>,
+    pub error: Option<Vec<u8>>,
+    pub revert_reason: Option<Vec<u8>>,
+    pub logs: Option<Vec<Log>>,
+    pub depth: u16, // will be helpful to reconstruct the tree of call on the node's side
+}
+
+impl CallTrace {
+    pub fn new_minimal_trace(
+        type_: Vec<u8>,
+        from: H160,
+        value: U256,
+        gas_used: u64,
+        input: Vec<u8>,
+        depth: u16,
+    ) -> Self {
+        Self {
+            type_,
+            from,
+            to: None,
+            value,
+            gas: None,
+            gas_used,
+            input,
+            output: None,
+            error: None,
+            revert_reason: None,
+            logs: None,
+            depth,
+        }
+    }
+
+    pub fn add_to(&mut self, to: Option<H160>) {
+        *self = Self { to, ..self.clone() };
+    }
+
+    pub fn add_gas(&mut self, gas: Option<u64>) {
+        *self = Self {
+            gas,
+            ..self.clone()
+        };
+    }
+
+    pub fn add_output(&mut self, output: Option<Vec<u8>>) {
+        *self = Self {
+            output,
+            ..self.clone()
+        };
+    }
+
+    pub fn add_error(&mut self, error: Option<Vec<u8>>) {
+        *self = Self {
+            error,
+            ..self.clone()
+        };
+    }
+
+    pub fn add_revert_reason(&mut self, revert_reason: Option<Vec<u8>>) {
+        *self = Self {
+            revert_reason,
+            ..self.clone()
+        };
+    }
+
+    pub fn add_logs(&mut self, logs: Option<Vec<Log>>) {
+        *self = Self {
+            logs,
+            ..self.clone()
+        };
+    }
+}
+
+impl Encodable for CallTrace {
+    fn rlp_append(&self, stream: &mut RlpStream) {
+        stream.begin_list(12);
+        stream.append(&self.type_);
+        stream.append(&self.from);
+        stream.append(&self.to);
+        append_u256_le(stream, &self.value);
+        append_option_canonical(stream, &self.gas, append_u64_le);
+        append_u64_le(stream, &self.gas_used);
+        stream.append(&self.input);
+        stream.append(&self.output);
+        stream.append(&self.error);
+        stream.append(&self.revert_reason);
+        append_option_canonical(stream, &self.logs, |s, logs| s.append_list(logs));
+        append_u16_le(stream, &self.depth);
+    }
+}
+
+#[cfg(test)]
+impl Decodable for CallTrace {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if Ok(12) != decoder.item_count() {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let type_ = decode_field(&next(&mut it)?, "type_")?;
+        let from = decode_field(&next(&mut it)?, "from")?;
+        let to = decode_field(&next(&mut it)?, "to")?;
+        let value = decode_field_u256_le(&next(&mut it)?, "value")?;
+        let gas = decode_option_canonical(&next(&mut it)?, "gas", decode_field_u64_le)?;
+        let gas_used = decode_field_u64_le(&next(&mut it)?, "gas_used")?;
+        let input = decode_field(&next(&mut it)?, "input")?;
+        let output = decode_field(&next(&mut it)?, "output")?;
+        let error = decode_field(&next(&mut it)?, "error")?;
+        let revert_reason = decode_field(&next(&mut it)?, "revert_reason")?;
+        let logs = decode_option_canonical(&next(&mut it)?, "logs", decode_list)?;
+        let depth = decode_field_u16_le(&next(&mut it)?, "depth")?;
+
+        Ok(Self {
+            type_,
+            from,
+            to,
+            value,
+            gas,
+            gas_used,
+            input,
+            output,
+            error,
+            revert_reason,
+            logs,
+            depth,
         })
     }
 }
@@ -188,9 +355,62 @@ impl Decodable for StructLog {
 
 #[cfg(test)]
 pub mod tests {
-    use primitive_types::{H160, H256};
+    use pretty_assertions::assert_eq;
+    use primitive_types::{H160, H256, U256};
+    use tezos_ethereum::Log;
 
-    use super::{StorageMapItem, StructLog};
+    use super::{CallTrace, StorageMapItem, StructLog};
+
+    #[test]
+    fn rlp_encode_decode_call_trace() {
+        let logs = Log {
+            address: H160::from([25; 20]),
+            topics: vec![H256::from([25; 32]), H256::from([13; 32])],
+            data: vec![0x00, 0x01, 0x02],
+        };
+
+        let call_trace = CallTrace {
+            type_: "CALL".into(),
+            from: H160::from([25; 20]),
+            to: Some(H160::from([25; 20])),
+            value: U256::from(251197),
+            gas: Some(5000),
+            gas_used: 5000,
+            input: vec![0x00, 0x01, 0x02],
+            output: Some(vec![0x00, 0x01, 0x02]),
+            error: Some(vec![0x00, 0x01, 0x02]),
+            revert_reason: Some(vec![0x00, 0x01, 0x02]),
+            logs: Some(vec![logs]),
+            depth: 2,
+        };
+
+        let encoded = rlp::encode(&call_trace);
+        let decoded: CallTrace =
+            rlp::decode(&encoded).expect("RLP decoding should succeed.");
+
+        assert_eq!(call_trace, decoded);
+
+        let call_trace_none = CallTrace {
+            type_: "CALL".into(),
+            from: H160::from([25; 20]),
+            to: None,
+            value: U256::from(251197),
+            gas: None,
+            gas_used: 5000,
+            input: vec![0x00, 0x01, 0x02],
+            output: None,
+            error: None,
+            revert_reason: None,
+            logs: None,
+            depth: 2,
+        };
+
+        let encoded = rlp::encode(&call_trace_none);
+        let decoded: CallTrace =
+            rlp::decode(&encoded).expect("RLP decoding should succeed.");
+
+        assert_eq!(call_trace_none, decoded)
+    }
 
     #[test]
     fn rlp_encode_decode_storage_map_item() {

@@ -5,59 +5,111 @@
 
 pub mod tracer {
     use host::{
-        path::RefPath,
+        path::{OwnedPath, RefPath},
         runtime::{Runtime, RuntimeError},
     };
 
-    use tezos_indexable_storage::IndexableStorage;
+    use primitive_types::H256;
+    use tezos_indexable_storage::{IndexableStorage, IndexableStorageError};
+    use tezos_smart_rollup_host::path::*;
     use thiserror::Error;
 
+    use crate::trace::CallTrace;
     use crate::trace::StructLog;
 
-    const TRACE_GAS: RefPath = RefPath::assert_from(b"/evm/trace/gas");
-    const TRACE_FAILED: RefPath = RefPath::assert_from(b"/evm/trace/failed");
-    const TRACE_RETURN_VALUE: RefPath = RefPath::assert_from(b"/evm/trace/return_value");
-    const TRACE_STRUCT_LOGS: RefPath = RefPath::assert_from(b"/evm/trace/struct_logs");
+    const EVM_TRACE: RefPath = RefPath::assert_from(b"/evm/trace");
 
-    #[derive(Error, Debug, PartialEq)]
+    const GAS: RefPath = RefPath::assert_from(b"/gas");
+    const FAILED: RefPath = RefPath::assert_from(b"/failed");
+    const RETURN_VALUE: RefPath = RefPath::assert_from(b"/return_value");
+    const STRUCT_LOGS: RefPath = RefPath::assert_from(b"/struct_logs");
+
+    #[derive(Eq, Error, Debug, PartialEq)]
     pub enum Error {
-        #[error("Error while tracing.")]
-        TracerError,
+        #[error("Error from the indexable storage while tracing: {0}")]
+        IndexableStorageError(#[from] IndexableStorageError),
+        #[error("Error from runtime while tracing: {0}")]
+        RuntimeError(#[from] RuntimeError),
+        #[error("Error from path while tracing: {0}")]
+        PathError(#[from] PathError),
+    }
+
+    pub fn trace_tx_path(
+        hash: &Option<H256>,
+        field: &RefPath,
+    ) -> Result<OwnedPath, Error> {
+        let trace_tx_path = match hash {
+            None => EVM_TRACE.into(),
+            Some(hash) => {
+                let hash = hex::encode(hash);
+                let raw_tx_path: Vec<u8> = format!("/{}", &hash).into();
+                let tx_path = OwnedPath::try_from(raw_tx_path)?;
+                concat(&EVM_TRACE, &tx_path)?
+            }
+        };
+        concat(&trace_tx_path, field).map_err(Error::PathError)
     }
 
     pub fn store_trace_gas<Host: Runtime>(
         host: &mut Host,
         gas: u64,
-    ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_GAS, gas.to_le_bytes().as_slice())
+        hash: &Option<H256>,
+    ) -> Result<(), Error> {
+        let path = trace_tx_path(hash, &GAS)?;
+        host.store_write_all(&path, gas.to_le_bytes().as_slice())?;
+        Ok(())
     }
 
     pub fn store_trace_failed<Host: Runtime>(
         host: &mut Host,
         is_success: bool,
-    ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_FAILED, &[u8::from(!is_success)])
+        hash: &Option<H256>,
+    ) -> Result<(), Error> {
+        let path = trace_tx_path(hash, &FAILED)?;
+        host.store_write_all(&path, &[u8::from(!is_success)])?;
+        Ok(())
     }
 
     pub fn store_return_value<Host: Runtime>(
         host: &mut Host,
         value: &[u8],
-    ) -> Result<(), RuntimeError> {
-        host.store_write_all(&TRACE_RETURN_VALUE, value)
+        hash: &Option<H256>,
+    ) -> Result<(), Error> {
+        let path = trace_tx_path(hash, &RETURN_VALUE)?;
+        host.store_write_all(&path, value)?;
+        Ok(())
     }
 
     pub fn store_struct_log<Host: Runtime>(
         host: &mut Host,
         struct_log: StructLog,
+        hash: &Option<H256>,
     ) -> Result<(), Error> {
         let logs = rlp::encode(&struct_log);
 
-        let struct_logs_storage =
-            IndexableStorage::new(&TRACE_STRUCT_LOGS).map_err(|_| Error::TracerError)?;
+        let path = trace_tx_path(hash, &STRUCT_LOGS)?;
+        let struct_logs_storage = IndexableStorage::new_owned_path(path);
 
-        struct_logs_storage
-            .push_value(host, &logs)
-            .map_err(|_| Error::TracerError)
+        struct_logs_storage.push_value(host, &logs)?;
+
+        Ok(())
+    }
+
+    const CALL_TRACE: RefPath = RefPath::assert_from(b"/call_trace");
+
+    pub fn store_call_trace<Host: Runtime>(
+        host: &mut Host,
+        call_trace: CallTrace,
+        hash: &Option<H256>,
+    ) -> Result<(), Error> {
+        let call_trace = rlp::encode(&call_trace);
+
+        let path = trace_tx_path(hash, &CALL_TRACE)?;
+        let call_trace_storage = IndexableStorage::new_owned_path(path);
+
+        call_trace_storage.push_value(host, &call_trace)?;
+
+        Ok(())
     }
 }
 

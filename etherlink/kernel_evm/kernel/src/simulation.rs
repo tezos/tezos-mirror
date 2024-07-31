@@ -22,7 +22,7 @@ use crate::{
 use evm::ExitReason;
 use evm_execution::account_storage::account_path;
 use evm_execution::handler::ExtendedExitReason;
-use evm_execution::trace::{get_tracer_config, TracerConfig};
+use evm_execution::trace::TracerInput;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
@@ -364,7 +364,7 @@ impl Evaluation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
-        tracer_config: Option<TracerConfig>,
+        tracer_input: Option<TracerInput>,
         enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
@@ -462,7 +462,7 @@ impl Evaluation {
             allocated_ticks,
             false,
             false,
-            tracer_config,
+            tracer_input,
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
@@ -785,9 +785,8 @@ pub fn start_simulation_mode<Host: Runtime>(
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let trace_input = read_tracer_input(host)?;
-            let tracer_config = get_tracer_config(None, &trace_input);
-            let outcome = simulation.run(host, tracer_config, enable_fa_withdrawals)?;
+            let tracer_input = read_tracer_input(host)?;
+            let outcome = simulation.run(host, tracer_input, enable_fa_withdrawals)?;
             storage::store_simulation_result(host, outcome)
         }
         Message::TxValidation(tx_validation) => {

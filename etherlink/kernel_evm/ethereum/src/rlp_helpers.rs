@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -12,7 +13,7 @@ use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use tezos_smart_rollup_encoding::{public_key::PublicKey, timestamp::Timestamp};
 
-pub fn next<'a, 'v>(decoder: &mut RlpIterator<'a, 'v>) -> Result<Rlp<'a>, DecoderError> {
+pub fn next<'a>(decoder: &mut RlpIterator<'a, '_>) -> Result<Rlp<'a>, DecoderError> {
     decoder.next().ok_or(DecoderError::RlpIncorrectListLen)
 }
 

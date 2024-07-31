@@ -6,7 +6,7 @@ use crate::executor::stack::tagged_runtime::{RuntimeKind, TaggedRuntime};
 use crate::gasometer::{self, Gasometer, StorageTarget};
 use crate::maybe_borrowed::MaybeBorrowed;
 use crate::{
-	Capture, Config, Context, CreateScheme, ExitError, ExitReason, Handler, Opcode, Runtime, Stack,
+	CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitReason, Handler, Opcode, Runtime, Stack,
 	Transfer,
 };
 use alloc::{collections::BTreeSet, rc::Rc, vec::Vec};
@@ -585,7 +585,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 			}),
 			data,
 			Some(gas_limit),
-			false,
+			CallScheme::Call,
 			false,
 			false,
 			context,
@@ -785,7 +785,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
 		target_gas: Option<u64>,
-		is_static: bool,
+		call_scheme: CallScheme,
 		take_l64: bool,
 		take_stipend: bool,
 		context: Context,
@@ -802,6 +802,8 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 		fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
+		
+		let is_static = call_scheme == CallScheme::StaticCall;
 
 		event!(Call {
 			code_address,
@@ -1208,7 +1210,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
 		target_gas: Option<u64>,
-		is_static: bool,
+		call_scheme: CallScheme,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
 		self.call_inner(
@@ -1216,7 +1218,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 			transfer,
 			input,
 			target_gas,
-			is_static,
+			call_scheme,
 			true,
 			true,
 			context,
@@ -1230,7 +1232,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
 		target_gas: Option<u64>,
-		is_static: bool,
+		call_scheme: CallScheme,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
 		let capture = self.call_inner(
@@ -1238,7 +1240,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 			transfer,
 			input,
 			target_gas,
-			is_static,
+			call_scheme,
 			true,
 			true,
 			context,
@@ -1311,7 +1313,7 @@ impl<'inner, 'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Pr
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
 		gas_limit: Option<u64>,
-		is_static: bool,
+		call_scheme: CallScheme,
 		context: &Context,
 	) -> (ExitReason, Vec<u8>) {
 		// For normal calls the cost is recorded at opcode level.
@@ -1345,7 +1347,7 @@ impl<'inner, 'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Pr
 		{
 			return (ExitReason::Error(error), Vec::new());
 		}
-
+		
 		event!(PrecompileSubcall {
 			code_address,
 			transfer: &transfer,
@@ -1362,7 +1364,7 @@ impl<'inner, 'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Pr
 			transfer,
 			input,
 			gas_limit,
-			is_static,
+			call_scheme,
 			context.clone(),
 		) {
 			Capture::Exit((s, v)) => (s, v),
