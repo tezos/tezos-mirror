@@ -308,11 +308,15 @@ let to_string = function
 let blocks_arg =
   let name = "block_id" in
   let descr =
-    "A block identifier. This is either a block hash in Base58Check notation, \
-     one the predefined aliases: 'genesis', 'head' or a block level (index in \
-     the chain). One might also use 'head~N' or '<hash>~N' where N is an \
-     integer to denote the Nth predecessor of the designated block.Also, \
-     '<hash>+N' denotes the Nth successor of a block."
+    "A block identifier. This can take one of the following values:\n\
+     \t1.Block-hash - Hash in Base58Check notation.\n\
+     \t2.Alias - One of the following:'genesis/ head/ caboose/ savepoint/ \
+     checkpoint'.\n\
+     \t3.Block-level - index(integer) in the chain.\n\
+     \tOne can also specify the relative positions of block with respect to \
+     above three block identifiers. For ex. 'checkpoint~N' or checkpoint+N, \
+     where N is an integer, denotes the Nth block before(~) or after (+) the \
+     checkpoint."
   in
   let construct = to_string in
   let destruct = parse_block in
