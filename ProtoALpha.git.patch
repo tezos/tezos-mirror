@@ -1,4 +1,4 @@
-From dd5e2eb92eaf5039d75c0d21a8b199231ab5b515 Mon Sep 17 00:00:00 2001
+From 98eb9eef301c4aeb2939450859c01ec498c6201f Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
@@ -7,8 +7,8 @@ Subject: [PATCH] An archiver for ProtoALpha
  archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++++++++++++++
  archiver/dune                     |   2 +-
  lib/dune                          |   2 +-
- server/dune                       |   2 +-
- 4 files changed, 289 insertions(+), 3 deletions(-)
+ server/dune                       |   3 +-
+ 4 files changed, 290 insertions(+), 3 deletions(-)
  create mode 100644 archiver/ProtoALp_machine.real.ml
 
 diff --git a/archiver/ProtoALp_machine.real.ml b/archiver/ProtoALp_machine.real.ml
@@ -330,15 +330,16 @@ index 9c57d31..73f88c6 100644
    (:standard
     (:include %{workspace_root}/macos-link-flags.sexp)
 diff --git a/server/dune b/server/dune
-index 9959e59..2f88562 100644
+index 9959e59..3ec5261 100644
 --- a/server/dune
 +++ b/server/dune
-@@ -4,4 +4,4 @@
+@@ -4,4 +4,5 @@
   (public_name teztale-server)
   (promote (until-clean))
   (libraries aches caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt.unix
 -   cohttp-lwt-unix ezgzip safepass prometheus-app teztale.lib))
-+   octez-libs.cohttp-lwt-unix ezgzip safepass octez-libs.prometheus-app teztale.lib))
++   octez-libs.cohttp-lwt-unix ezgzip safepass octez-libs.prometheus-app
++   teztale.lib))
 -- 
 2.43.0
 
