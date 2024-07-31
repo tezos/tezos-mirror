@@ -1039,6 +1039,12 @@ let init_ghostnet cloud (configuration : configuration) agent =
         bootstrap.client
     else Lwt.return []
   in
+  let accounts_to_fund =
+    List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
+    @ List.map
+        (fun operator -> (operator, 11_000 * 1_000_000))
+        etherlink_rollup_operator_key
+  in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with key :: _ -> Some key | [] -> None
   in
@@ -1046,12 +1052,9 @@ let init_ghostnet cloud (configuration : configuration) agent =
     if List.length producer_accounts > 0 then
       let () = toplog "Injecting the batch" in
       let* _op_hash =
-        producer_accounts
-        |> List.map (fun producer ->
-               Operation.Manager.transfer
-                 ~amount:(10 * 1_000_000)
-                 ~dest:producer
-                 ())
+        accounts_to_fund
+        |> List.map (fun (dest, amount) ->
+               Operation.Manager.transfer ~amount ~dest ())
         |> Operation.Manager.make_batch ~source:fundraiser ~counter
         |> Fun.flip (Operation.Manager.inject ~dont_wait:true) bootstrap.client
       in
