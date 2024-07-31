@@ -92,7 +92,7 @@ check:
   tags:
     - ${DEFAULT_RUNNER_TAG}
   before_script:
-    - opam-2.1 install ocamlformat.0.24.1
+    - opam-2.1 install ocamlformat.0.25.1
     - eval $(opam env)
   script:
     - *apply-proto-alpha-patch # Check that ProtoALpha patch can be applied

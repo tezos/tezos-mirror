@@ -454,9 +454,9 @@ let with_cache mutex request mem add (module Db : Caqti_lwt.CONNECTION) conf
         Lwt_result.map
           (fun () -> add x)
           (if mem x then
-           Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
-           .return_unit
-          else Db.exec request x))
+             Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
+             .return_unit
+           else Db.exec request x))
       list
 
 let without_cache mutex request =
@@ -515,44 +515,44 @@ let endorsing_rights_callback =
       Lwt_result.map
         (fun () -> Cache.add cache level)
         (if Cache.mem cache level then
-         let () =
-           Teztale_lib.Log.debug logger (fun () ->
-               Format.asprintf "(%ld) CACHE.mem Level rights" level)
-         in
-         return_unit
-        else
-          let* () =
-            maybe_with_metrics conf "maybe_insert_endorsing_right__list"
-            @@ fun () ->
-            Caqti_lwt_unix.Pool.use
-              (fun (module Db : Caqti_lwt.CONNECTION) ->
-                let* () =
-                  let delegates =
-                    List.map
-                      (fun {Teztale_lib.Consensus_ops.address; _} -> address)
-                      rights
-                  in
-                  may_insert_delegates (module Db) conf delegates
-                in
-                let rights =
-                  List.map
-                    (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
-                      (level, first_slot, power, address))
-                    rights
-                in
-                without_cache
-                  Sql_requests.Mutex.endorsing_rights
-                  Sql_requests.maybe_insert_endorsing_right
-                  (module Db)
-                  conf
-                  rights)
-              db_pool
-          in
-          let () =
-            Teztale_lib.Log.debug logger (fun () ->
-                Format.asprintf "(%ld) CACHE.add Level rights" level)
-          in
-          return_unit)
+           let () =
+             Teztale_lib.Log.debug logger (fun () ->
+                 Format.asprintf "(%ld) CACHE.mem Level rights" level)
+           in
+           return_unit
+         else
+           let* () =
+             maybe_with_metrics conf "maybe_insert_endorsing_right__list"
+             @@ fun () ->
+             Caqti_lwt_unix.Pool.use
+               (fun (module Db : Caqti_lwt.CONNECTION) ->
+                 let* () =
+                   let delegates =
+                     List.map
+                       (fun {Teztale_lib.Consensus_ops.address; _} -> address)
+                       rights
+                   in
+                   may_insert_delegates (module Db) conf delegates
+                 in
+                 let rights =
+                   List.map
+                     (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
+                       (level, first_slot, power, address))
+                     rights
+                 in
+                 without_cache
+                   Sql_requests.Mutex.endorsing_rights
+                   Sql_requests.maybe_insert_endorsing_right
+                   (module Db)
+                   conf
+                   rights)
+               db_pool
+           in
+           let () =
+             Teztale_lib.Log.debug logger (fun () ->
+                 Format.asprintf "(%ld) CACHE.add Level rights" level)
+           in
+           return_unit)
     in
     with_caqti_error ~logger out (fun () ->
         Cohttp_lwt_unix.Server.respond_string
@@ -618,45 +618,48 @@ let block_callback =
             Lwt_result.map
               (fun () -> Block_lru_cache.add block_cache hash)
               (if Block_lru_cache.mem block_cache hash then
-               let () =
+                 let () =
+                   Teztale_lib.Log.debug logger (fun () ->
+                       Format.asprintf
+                         "(%ld) CACHE.mem %a"
+                         level
+                         Tezos_base.TzPervasives.Block_hash.pp
+                         hash)
+                 in
+                 return_unit
+               else
+                 let* () = may_insert_delegates (module Db) conf [delegate] in
+                 let* () =
+                   maybe_with_metrics conf "maybe_insert_block" @@ fun () ->
+                   without_cache
+                     Sql_requests.Mutex.blocks
+                     Sql_requests.maybe_insert_block
+                     (module Db)
+                     conf
+                     [
+                       ((level, timestamp, hash, round), (predecessor, delegate));
+                     ]
+                 in
+                 let* () =
+                   match cycle_info with
+                   | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
+                     ->
+                       maybe_with_metrics conf "maybe_insert_cycle" @@ fun () ->
+                       without_cache
+                         Sql_requests.Mutex.cycles
+                         Sql_requests.maybe_insert_cycle
+                         (module Db)
+                         conf
+                         [(cycle, Int32.sub level cycle_position, cycle_size)]
+                   | _ -> Lwt.return_ok ()
+                 in
                  Teztale_lib.Log.debug logger (fun () ->
                      Format.asprintf
-                       "(%ld) CACHE.mem %a"
+                       "(%ld) CACHE.add (block) %a"
                        level
                        Tezos_base.TzPervasives.Block_hash.pp
-                       hash)
-               in
-               return_unit
-              else
-                let* () = may_insert_delegates (module Db) conf [delegate] in
-                let* () =
-                  maybe_with_metrics conf "maybe_insert_block" @@ fun () ->
-                  without_cache
-                    Sql_requests.Mutex.blocks
-                    Sql_requests.maybe_insert_block
-                    (module Db)
-                    conf
-                    [((level, timestamp, hash, round), (predecessor, delegate))]
-                in
-                let* () =
-                  match cycle_info with
-                  | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
-                      maybe_with_metrics conf "maybe_insert_cycle" @@ fun () ->
-                      without_cache
-                        Sql_requests.Mutex.cycles
-                        Sql_requests.maybe_insert_cycle
-                        (module Db)
-                        conf
-                        [(cycle, Int32.sub level cycle_position, cycle_size)]
-                  | _ -> Lwt.return_ok ()
-                in
-                Teztale_lib.Log.debug logger (fun () ->
-                    Format.asprintf
-                      "(%ld) CACHE.add (block) %a"
-                      level
-                      Tezos_base.TzPervasives.Block_hash.pp
-                      hash) ;
-                return_unit)
+                       hash) ;
+                 return_unit)
           in
           let* () =
             (* Validated blocks do not provide operations only applied
@@ -668,31 +671,31 @@ let block_callback =
                 if endorsements <> [] then
                   Block_lru_cache.add block_operations_cache hash)
               (if Block_lru_cache.mem block_operations_cache hash then
-               return_unit
-              else
-                let* () =
-                  insert_operations_from_block
-                    (module Db)
-                    conf
-                    (Int32.pred level)
-                    hash
-                    endorsements
-                in
-                let* () =
-                  insert_operations_from_block
-                    (module Db)
-                    conf
-                    level
-                    hash
-                    preendorsements
-                in
-                Teztale_lib.Log.debug logger (fun () ->
-                    Format.asprintf
-                      "(%ld) CACHE.add (block operations) %a"
-                      level
-                      Tezos_base.TzPervasives.Block_hash.pp
-                      hash) ;
-                return_unit)
+                 return_unit
+               else
+                 let* () =
+                   insert_operations_from_block
+                     (module Db)
+                     conf
+                     (Int32.pred level)
+                     hash
+                     endorsements
+                 in
+                 let* () =
+                   insert_operations_from_block
+                     (module Db)
+                     conf
+                     level
+                     hash
+                     preendorsements
+                 in
+                 Teztale_lib.Log.debug logger (fun () ->
+                     Format.asprintf
+                       "(%ld) CACHE.add (block operations) %a"
+                       level
+                       Tezos_base.TzPervasives.Block_hash.pp
+                       hash) ;
+                 return_unit)
           in
           let* () =
             maybe_with_metrics conf "insert_received_block__list" @@ fun () ->
