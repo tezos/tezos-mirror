@@ -67,6 +67,13 @@ Breaking Changes
   one-for-one. This change is breaking for both JSON and binary
   encodings. (MR :gl:`!14209`)
 
+..
+   This link does not include the protocol version: this is
+   intentional, because it is used by multiple protocol docs to refer
+   to this specific pass of RPC changes.
+
+.. _delegates_RPCs_normalization:
+
 RPC Changes
 -----------
 
