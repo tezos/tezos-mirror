@@ -3226,6 +3226,8 @@ oc.install_python_bookworm:
     when: on_success
   - changes:
     - docs/developer/install-python-debian-ubuntu.sh
+    - poetry.lock
+    - pyproject.toml
     when: on_success
   - when: manual
     allow_failure: true
