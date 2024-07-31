@@ -1,4 +1,4 @@
-From 5cc31d524e9ca56f9617910461a6567c3ac3b299 Mon Sep 17 00:00:00 2001
+From c4a1fe195d6fae8bc0494896792b7ce122ec422e Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
@@ -6,7 +6,9 @@ Subject: [PATCH] An archiver for ProtoALpha
 ---
  archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++++++++++++++
  archiver/dune                     |   2 +-
- 2 files changed, 287 insertions(+), 1 deletion(-)
+ lib/dune                          |   2 +-
+ server/dune                       |   2 +-
+ 4 files changed, 289 insertions(+), 3 deletions(-)
  create mode 100644 archiver/ProtoALp_machine.real.ml
 
 diff --git a/archiver/ProtoALp_machine.real.ml b/archiver/ProtoALp_machine.real.ml
@@ -314,6 +316,29 @@ index 5c87c37..46bc245 100644
     (-> ProtoALp_machine.no.ml)))
   (flags
    (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
+diff --git a/lib/dune b/lib/dune
+index 9c57d31..73f88c6 100644
+--- a/lib/dune
++++ b/lib/dune
+@@ -1,7 +1,7 @@
+ (library
+  (name teztale_lib)
+  (public_name teztale.lib)
+- (libraries prometheus-app octez-libs.base lwt.unix)
++ (libraries octez-libs.prometheus-app octez-libs.base lwt.unix)
+  (flags
+   (:standard
+    (:include %{workspace_root}/macos-link-flags.sexp)
+diff --git a/server/dune b/server/dune
+index 9959e59..9786872 100644
+--- a/server/dune
++++ b/server/dune
+@@ -4,4 +4,4 @@
+  (public_name teztale-server)
+  (promote (until-clean))
+  (libraries aches caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt.unix
+-   cohttp-lwt-unix ezgzip safepass prometheus-app teztale.lib))
++   cohttp-lwt-unix ezgzip safepass octez-libs.prometheus-app teztale.lib))
 -- 
 2.43.0
 
