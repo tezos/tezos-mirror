@@ -65,6 +65,7 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
   (!13901)
 - Forced blueprints (in case of delayed inbox timeout) always use a timestamp
   equal or greater than the predecessor. (!13832)
+- Withdrawal counter is now revertable. (!14389)
 
 ## Internal
 

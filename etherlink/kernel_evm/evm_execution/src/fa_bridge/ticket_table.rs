@@ -21,9 +21,6 @@ use crate::account_storage::{
 /// Path where global ticket table is stored
 const TICKET_TABLE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
 
-/// Global ticket table belongs to the zero account (system)
-pub const TICKET_TABLE_ACCOUNT: H160 = H160::zero();
-
 pub trait TicketTable {
     /// Increases ticket balance
     fn ticket_balance_add(
@@ -95,7 +92,7 @@ mod tests {
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
-    use crate::account_storage::read_u256;
+    use crate::{account_storage::read_u256, precompiles::SYSTEM_ACCOUNT_ADDRESS};
 
     use super::*;
 
@@ -103,7 +100,7 @@ mod tests {
     fn ticket_table_balance_add_succeeds() {
         let mut host = MockHost::default();
 
-        let mut account = EthereumAccount::from_address(&H160([0u8; 20])).unwrap();
+        let mut account = EthereumAccount::from_address(&SYSTEM_ACCOUNT_ADDRESS).unwrap();
 
         let ticket_hash: H256 = H256([1u8; 32]);
         let address = H160([2u8; 20]);
@@ -129,7 +126,7 @@ mod tests {
     fn ticket_table_balance_add_overflows() {
         let mut host = MockHost::default();
 
-        let mut account = EthereumAccount::from_address(&H160([0u8; 20])).unwrap();
+        let mut account = EthereumAccount::from_address(&SYSTEM_ACCOUNT_ADDRESS).unwrap();
 
         let ticket_hash: H256 = H256([1u8; 32]);
         let address = H160([2u8; 20]);

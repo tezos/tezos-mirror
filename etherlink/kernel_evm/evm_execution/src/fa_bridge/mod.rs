@@ -39,15 +39,15 @@ use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::Info};
-use ticket_table::{TicketTable, TICKET_TABLE_ACCOUNT};
+use ticket_table::TicketTable;
 use withdrawal::FaWithdrawal;
 
 use crate::{
     account_storage::EthereumAccountStorage,
     handler::{CreateOutcome, EvmHandler, ExecutionOutcome},
-    precompiles::{PrecompileBTreeMap, PrecompileOutcome},
-    storage::withdraw_nonce,
+    precompiles::{PrecompileBTreeMap, PrecompileOutcome, SYSTEM_ACCOUNT_ADDRESS},
     transaction::TransactionContext,
+    withdrawal_counter::WithdrawalCounter,
     EthereumError,
 };
 
@@ -219,7 +219,7 @@ fn inner_execute_deposit<Host: Runtime>(
     deposit: &FaDeposit,
 ) -> Result<CreateOutcome, EthereumError> {
     // Updating the ticket table in accordance with the ownership.
-    let mut system = handler.get_or_create_account(TICKET_TABLE_ACCOUNT)?;
+    let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
 
     if system.ticket_balance_add(
         handler.borrow_host(),
@@ -251,7 +251,7 @@ fn inner_execute_withdrawal<Host: Runtime>(
     withdrawal: &FaWithdrawal,
 ) -> Result<CreateOutcome, EthereumError> {
     // Updating the ticket table in accordance with the ownership.
-    let mut system = handler.get_or_create_account(TICKET_TABLE_ACCOUNT)?;
+    let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
 
     if system.ticket_balance_remove(
         handler.borrow_host(),
@@ -259,10 +259,8 @@ fn inner_execute_withdrawal<Host: Runtime>(
         &withdrawal.ticket_owner,
         withdrawal.amount,
     )? {
-        // NOTE that the nonce will remain incremented even if the precompile call fails.
-        // That is fine, since we only care about its uniqueness and determinism.
-        let withdrawal_id = withdraw_nonce::get_and_increment(handler.borrow_host())
-            .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+        let withdrawal_id =
+            system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
 
         handler
             .add_log(withdrawal.event_log(withdrawal_id))
