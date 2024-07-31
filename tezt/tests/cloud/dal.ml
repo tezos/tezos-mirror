@@ -1950,7 +1950,7 @@ let benchmark () =
   in
   let docker_image =
     match configuration.network with
-    | Ghostnet -> Some Env.Octez_latest_release
+    | Ghostnet -> None (* Some Env.Octez_latest_release *)
     | Sandbox -> None
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
