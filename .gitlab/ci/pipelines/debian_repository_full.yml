@@ -313,7 +313,7 @@ oc.lintian_debian:
   script:
   - ./scripts/ci/lintian_debian_packages.sh debian bookworm
 
-oc.install_bin_debian_bookworm:
+oc.install_bin_debian_bookworm_current:
   image: debian:bookworm
   stage: publishing_tests
   tags:
@@ -323,6 +323,20 @@ oc.install_bin_debian_bookworm:
   dependencies: []
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
+  variables: {}
+
+oc.install_bin_debian_bookworm:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
+  variables:
+    PREFIX: next
 
 oc.lintian_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
@@ -341,7 +355,7 @@ oc.lintian_ubuntu:
   script:
   - ./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble
 
-oc.install_bin_ubuntu_noble:
+oc.install_bin_ubuntu_noble_current:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publishing_tests
   tags:
@@ -351,8 +365,9 @@ oc.install_bin_ubuntu_noble:
   dependencies: []
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu noble
+  variables: {}
 
-oc.install_bin_ubuntu_jammy:
+oc.install_bin_ubuntu_jammy_current:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
   stage: publishing_tests
   tags:
@@ -362,3 +377,30 @@ oc.install_bin_ubuntu_jammy:
   dependencies: []
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
+  variables: {}
+
+oc.install_bin_ubuntu_noble:
+  image: public.ecr.aws/lts/ubuntu:24.04_stable
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh ubuntu noble
+  variables:
+    PREFIX: next
+
+oc.install_bin_ubuntu_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  script:
+  - ./docs/introduction/install-bin-deb.sh ubuntu jammy
+  variables:
+    PREFIX: next

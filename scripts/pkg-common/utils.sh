@@ -118,7 +118,7 @@ getOctezVersion() {
     if [ -n "${gitlab_release_no_v:-}" ]; then
       RET="$gitlab_release_no_v"
     else
-      RET="$gitlab_release_no_v+$CI_COMMIT_SHORT_SHA"
+      RET="0.0-dev+$CI_COMMIT_SHORT_SHA"
     fi
 
   else
