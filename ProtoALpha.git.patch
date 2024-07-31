@@ -1,4 +1,4 @@
-From 2b81c338b81d5a47c367ff5b92c5561f261b57b4 Mon Sep 17 00:00:00 2001
+From 5cc31d524e9ca56f9617910461a6567c3ac3b299 Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
