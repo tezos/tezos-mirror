@@ -100,6 +100,7 @@ module Request = struct
         slot_index : Tezos_dal_node_services.Types.slot_index;
       }
         -> (unit, tztrace) t
+    | New_rollup_node_block : {finalized_level : int32} -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -121,9 +122,19 @@ module Request = struct
           (function
             | View (Track {injection_id; level; slot_index}) ->
                 Some (injection_id, level, slot_index)
-            | View _ -> .)
+            | View _ -> None)
           (fun (injection_id, level, slot_index) ->
             View (Track {injection_id; level; slot_index}));
+        case
+          (Tag 1)
+          ~title:"New_rollup_node_block"
+          (obj1 (req "finalized_level" int32))
+          (function
+            | View (New_rollup_node_block {finalized_level}) ->
+                Some finalized_level
+            | _ -> None)
+          (fun finalized_level ->
+            View (New_rollup_node_block {finalized_level}));
       ]
 
   let pp _ppf (View _) = ()
@@ -133,6 +144,10 @@ module Worker = struct
   include Worker.MakeSingle (Name) (Request) (Types)
 
   let track _worker ~injection_id:_ ~level:_ ~slot_index:_ =
+    let open Lwt_result_syntax in
+    return_unit
+
+  let new_rollup_block _worker _finalized_level =
     let open Lwt_result_syntax in
     return_unit
 end
@@ -150,6 +165,8 @@ module Handlers = struct
     match request with
     | Track {injection_id; level; slot_index} ->
         protect @@ fun () -> Worker.track w ~injection_id ~level ~slot_index
+    | New_rollup_node_block {finalized_level} ->
+        protect @@ fun () -> Worker.new_rollup_block w finalized_level
 
   type launch_error = error trace
 
@@ -223,3 +240,6 @@ let shutdown () =
 
 let track ~injection_id ~level ~slot_index =
   worker_add_request ~request:(Track {injection_id; level; slot_index})
+
+let new_rollup_block finalized_level =
+  worker_add_request ~request:(New_rollup_node_block {finalized_level})
