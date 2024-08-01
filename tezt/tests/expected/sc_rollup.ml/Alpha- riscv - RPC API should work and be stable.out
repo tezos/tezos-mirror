@@ -53,7 +53,7 @@ Content-type: application/json
 [0][WARN] Unable to read entropy! Fallback to a naive implementation!
 Hello World
 
-I am sr16rdBjGFkeqLfD42SGVTfwx84HJcn1MVwh
+I am [SMART_ROLLUP_HASH]
 RollupMetadata {
     raw_rollup_address: [
         8,
