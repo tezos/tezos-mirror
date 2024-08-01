@@ -43,17 +43,24 @@ module type Commitment = sig
   val to_map : t -> G1.t SMap.t
 end
 
+(* The public parameters module type for polynomial commitment
+   The prover and verifier public parameters usually differ, the verifier
+   parameters being usually a subset of the prover parameters *)
 module type Public_parameters = sig
   type prover [@@deriving repr]
 
   type verifier [@@deriving repr]
 
+  (* This type correspond to Commitment.public_parameters *)
   type commitment
 
   type setup_params = int
 
   val setup : setup_params -> Srs.t * Srs.t -> prover * verifier * Transcript.t
 
+  (* Extracts the public parameters for committing, that may be only a subset
+     of the prover public parameters. We need this function for the sake of
+     interfaces unification *)
   val get_commit_parameters : prover -> commitment
 end
 
