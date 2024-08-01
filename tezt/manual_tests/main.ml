@@ -35,5 +35,6 @@ let () =
   Dal.register () ;
   Baker_test.register ~protocols:Protocol.all ;
   Non_blocking_rpc.register () ;
+  Storage_upgrade.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
