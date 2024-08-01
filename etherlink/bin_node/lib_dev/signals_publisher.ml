@@ -143,8 +143,18 @@ end
 module Worker = struct
   include Worker.MakeSingle (Name) (Request) (Types)
 
-  let track _worker ~injection_id:_ ~level:_ ~slot_index:_ =
+  let track worker ~injection_id ~level ~slot_index =
     let open Lwt_result_syntax in
+    let*! () =
+      Signals_publisher_events.tracking
+        ~injector_op_hash:injection_id
+        ~level
+        ~slot_index
+    in
+    Dal_injected_slots_tracker_queue.replace
+      (state worker).dal_injected_slots_tracker_queue
+      injection_id
+      {level; slot_index} ;
     return_unit
 
   let new_rollup_block _worker _finalized_level =

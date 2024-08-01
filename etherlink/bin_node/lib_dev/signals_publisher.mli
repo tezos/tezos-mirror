@@ -23,8 +23,7 @@ val start :
 (** [shutdown ()] shuts down the signal publisher. *)
 val shutdown : unit -> unit tzresult Lwt.t
 
-(** Not implemented.
-    [track ~injection_id ~level ~slot_index] tells the worker to track
+(** [track ~injection_id ~level ~slot_index] tells the worker to track
     the publication associated with the injection id
     [injector_op_hash], blueprint's level [level] and slot index
     [slot_index]. *)
