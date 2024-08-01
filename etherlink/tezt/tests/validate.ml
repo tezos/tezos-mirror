@@ -28,6 +28,48 @@ let register f =
   let* sequencer = Helpers.init_sequencer_sandbox ~patch_config () in
   f sequencer
 
+let test_validate_compressed_sig () =
+  register ~title:"Validate compressed signature" ~tags:["signature"; "caller"]
+  @@ fun sequencer ->
+  let account =
+    Eth_account.
+      {
+        address = "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863";
+        private_key =
+          "0xb80e5dd2ba9281e482589973600609bb0f10f6a075e6c733e4472d4dd2df238a";
+      }
+  in
+  let* base_fee_per_gas = Rpc.get_gas_price sequencer in
+  let base_fee_per_gas = Int32.to_int base_fee_per_gas in
+  (* We have noticed that this transaction produces a compressed signature.
+     We add this test as a non-regression test to make sure we handle
+     compressed signature. *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:base_fee_per_gas
+      ~gas:100_000
+      ~address:account.address
+      ~value:Wei.zero
+      ()
+  in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@! transaction_object =
+    Rpc.get_transaction_by_hash ~transaction_hash sequencer
+  in
+  (* 64 because, 31 bytes in hexa (so 62), and 2 extra bytes for "0x". *)
+  Check.((String.length transaction_object.s = 64) int)
+    ~error_msg:"Signature.S was supposed to be compressed" ;
+  Check.(
+    (String.lowercase_ascii transaction_object.from
+    = String.lowercase_ascii account.address)
+      string)
+    ~error_msg:"Expected caller to be %R but got %L" ;
+
+  unit
+
 let test_validate_recover_caller () =
   register ~title:"Validate recovers caller" ~tags:["caller"]
   @@ fun sequencer ->
@@ -88,5 +130,6 @@ let test_validate_chain_id () =
   unit
 
 let () =
+  test_validate_compressed_sig () ;
   test_validate_recover_caller () ;
   test_validate_chain_id ()

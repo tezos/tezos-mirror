@@ -1182,8 +1182,6 @@ let test_send_deposit_to_delayed_inbox =
         address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
         private_key =
           "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
-        public_key =
-          "0466ed90f9a86c0908746475fbe0a40c72237de22d89076302e22c2a8da259b4aba5c7ee1f3dc3fd0b240645462620ae62b6fe8fe5b3464c3b1b4ae6c06c97b7b6";
       }
   in
   let* () =
@@ -1469,8 +1467,6 @@ let test_delayed_deposit_is_included =
         address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
         private_key =
           "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
-        public_key =
-          "0466ed90f9a86c0908746475fbe0a40c72237de22d89076302e22c2a8da259b4aba5c7ee1f3dc3fd0b240645462620ae62b6fe8fe5b3464c3b1b4ae6c06c97b7b6";
       }
   in
   let* receiver_balance_prev =
