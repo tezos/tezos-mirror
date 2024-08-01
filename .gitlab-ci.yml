@@ -154,10 +154,10 @@ prepare:canary:
   before_script:
     - eval $(opam env)
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
-    - sed -i "s|let teztale_version = \"\"|let teztale_version = \"${TEZTALE_REF}\"|g" ./lib/version.ml
-    - sed -i "s|let teztale_commit_ref = \"\"|let teztale_commit_ref = \"${CI_COMMIT_SHA}\"|g" ./lib/version.ml
-    - sed -i "s|let tezos_branch = \"\"|let tezos_branch = \"${OCTEZ_BRANCH}\"|g" ./lib/version.ml
-    - sed -i "s|let tezos_commit_ref = \"\"|let tezos_commit_ref = \"`cd tezos && git rev-parse HEAD`\"|g" ./lib/version.ml
+    - sed -i "s|let teztale_version = \"\"|let teztale_version = \"${TEZTALE_REF}\"|g" ./lib_teztale_base/version.ml
+    - sed -i "s|let teztale_commit_ref = \"\"|let teztale_commit_ref = \"${CI_COMMIT_SHA}\"|g" ./lib_teztale_base/version.ml
+    - sed -i "s|let tezos_branch = \"\"|let tezos_branch = \"${OCTEZ_BRANCH}\"|g" ./lib_teztale_base/version.ml
+    - sed -i "s|let tezos_commit_ref = \"\"|let tezos_commit_ref = \"`cd tezos && git rev-parse HEAD`\"|g" ./lib_teztale_base/version.ml
   script:
     - dune build bin_teztale_archiver/main.exe bin_teztale_server/main.exe
     - mkdir -p ${ARTIFACTS_PATH}/{archiver,server}
