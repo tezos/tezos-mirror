@@ -597,16 +597,17 @@ module Version = struct
        context (storage 2.0)
    * - 6: new context representation introduced by irmin 3.7.2
    * - 7: fix tar snapshots corrupted generation
+   * - 8: change cemented files offset format to 64 bits
    *)
 
   (* Used for old snapshot format versions *)
-  (* Keeping this for future use. *)
-  let _legacy_version = 4
+  let legacy_version = 7
 
-  let current_version = 7
+  let current_version = 8
 
   (* List of versions that are supported *)
-  let supported_versions = [(current_version, `Current)]
+  let supported_versions =
+    [(legacy_version, `Legacy_format); (current_version, `Current)]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
