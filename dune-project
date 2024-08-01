@@ -1,3 +1,3 @@
-(lang dune 2.7)
+(lang dune 3.8)
 
 (package (name teztale))
