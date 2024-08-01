@@ -1063,10 +1063,6 @@ let rpc_command =
         init ~config ()
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
-
-      (* Patch the config with the RPC port and addr specified by command-line. *)
-      let rpc_addr = Option.value ~default:config.rpc_addr rpc_addr in
-      let config = {config with rpc_port; rpc_addr} in
       Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
