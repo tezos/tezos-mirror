@@ -77,6 +77,8 @@ let exclude filename =
   | "src" :: "riscv" :: _ -> true
   (* [src/dune] is either absent or copied from [script-inputs/slim-mode-dune]. *)
   | "src" :: "dune" :: _ -> true
+  (* teztale is imported as data-only for now *)
+  | "teztale" :: _ -> true
   | _ -> false
 
 let () =
