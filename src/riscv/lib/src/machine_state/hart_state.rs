@@ -58,7 +58,7 @@ impl<M: backend::Manager> HartState<M> {
             fregisters: registers::FRegisters::bind(space.1),
             csregisters: csregisters::CSRegisters::bind(space.2),
             mode: mode::ModeCell::bind(space.3),
-            pc: Cell::bind(space.4),
+            pc: space.4,
             reservation_set: ReservationSet::bind(space.5),
         }
     }

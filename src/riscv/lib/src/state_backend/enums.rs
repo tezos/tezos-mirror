@@ -23,7 +23,7 @@ where
     /// Bind the enum cell to the allocated space.
     pub fn bind(space: AllocatedOf<EnumCellLayout<R>, M>) -> Self {
         Self {
-            cell: Cell::bind(space),
+            cell: space,
             _pd: PhantomData,
         }
     }

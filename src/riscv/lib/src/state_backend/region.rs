@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{AllocatedOf, Atom, Elem, Manager};
+use super::{Elem, Manager};
 use std::mem;
 
 macro_rules! read_only_write {
@@ -201,16 +201,17 @@ impl<E: Elem, T: Region<Elem = E>> Region for &T {
     }
 }
 
-/// Convenience wrapper for [`Manager::Region<E, 1>`]
+/// Single element of type `E`
 #[repr(transparent)]
 pub struct Cell<E: Elem, M: Manager + ?Sized> {
-    pub region: M::Region<E, 1>,
+    region: Cells<E, 1, M>,
 }
 
 impl<E: Elem, M: Manager> Cell<E, M> {
-    pub fn bind(space: AllocatedOf<Atom<E>, M>) -> Self {
+    /// Bind this state to the single element region.
+    pub fn bind(region: M::Region<E, 1>) -> Self {
         Self {
-            region: space.region,
+            region: Cells::bind(region),
         }
     }
 }
@@ -278,6 +279,61 @@ impl<E: CellWrite> CellWrite for &mut E {
     #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
         E::replace(self, value)
+    }
+}
+
+/// Multiple elements of type `E`
+#[repr(transparent)]
+pub struct Cells<E: Elem, const LEN: usize, M: Manager + ?Sized> {
+    region: M::Region<E, LEN>,
+}
+
+impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
+    /// Bind this state to the given region.
+    pub fn bind(region: M::Region<E, LEN>) -> Self {
+        Self { region }
+    }
+
+    /// Read an element in the region.
+    #[inline]
+    pub fn read(&self, index: usize) -> E {
+        M::Region::read(&self.region, index)
+    }
+
+    /// Read all elements in the region.
+    #[inline]
+    pub fn read_all(&self) -> Vec<E> {
+        M::Region::read_all(&self.region)
+    }
+
+    /// Read `buffer.len()` elements from the region, starting at `offset`.
+    #[inline]
+    pub fn read_some(&self, offset: usize, buffer: &mut [E]) {
+        M::Region::read_some(&self.region, offset, buffer)
+    }
+
+    /// Update an element in the region.
+    #[inline]
+    pub fn write(&mut self, index: usize, value: E) {
+        M::Region::write(&mut self.region, index, value)
+    }
+
+    /// Update all elements in the region.
+    #[inline]
+    pub fn write_all(&mut self, value: &[E]) {
+        M::Region::write_all(&mut self.region, value)
+    }
+
+    /// Update a subset of elements in the region starting at `index`.
+    #[inline]
+    pub fn write_some(&mut self, index: usize, buffer: &[E]) {
+        M::Region::write_some(&mut self.region, index, buffer)
+    }
+
+    /// Update the element in the region and return the previous value.
+    #[inline]
+    pub fn replace(&mut self, index: usize, value: E) -> E {
+        M::Region::replace(&mut self.region, index, value)
     }
 }
 
@@ -399,6 +455,65 @@ impl<T: DynRegion> DynRegion for &T {
     }
 }
 
+/// Multiple elements of an unspecified type
+pub struct DynCells<const LEN: usize, M: Manager + ?Sized> {
+    region: M::DynRegion<LEN>,
+}
+
+impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
+    /// Bind this state to the given dynamic region.
+    pub fn bind(region: M::DynRegion<LEN>) -> Self {
+        Self { region }
+    }
+
+    /// Read an element in the region. `address` is in bytes.
+    #[inline]
+    pub fn read<E: Elem>(&self, address: usize) -> E {
+        M::DynRegion::read(&self.region, address)
+    }
+
+    /// Read elements from the region. `address` is in bytes.
+    #[inline]
+    pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        M::DynRegion::read_all(&self.region, address, values)
+    }
+
+    /// Update an element in the region. `address` is in bytes.
+    #[inline]
+    pub fn write<E: Elem>(&mut self, address: usize, value: E) {
+        M::DynRegion::write(&mut self.region, address, value)
+    }
+
+    /// Update multiple elements in the region. `address` is in bytes.
+    #[inline]
+    pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+        M::DynRegion::write_all(&mut self.region, address, values)
+    }
+}
+
+impl<const LEN: usize, M: Manager> DynRegion for DynCells<LEN, M> {
+    const LEN: usize = LEN;
+
+    #[inline]
+    fn read<E: Elem>(&self, address: usize) -> E {
+        M::DynRegion::read(&self.region, address)
+    }
+
+    #[inline]
+    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+        M::DynRegion::read_all(&self.region, address, values)
+    }
+
+    #[inline]
+    fn write<E: Elem>(&mut self, address: usize, value: E) {
+        M::DynRegion::write(&mut self.region, address, value)
+    }
+
+    #[inline]
+    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+        M::DynRegion::write_all(&mut self.region, address, values)
+    }
+}
 #[cfg(test)]
 pub(crate) mod tests {
     use super::DynRegion;
@@ -406,7 +521,7 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location, Region,
+            Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location,
         },
     };
 

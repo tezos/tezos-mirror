@@ -94,14 +94,6 @@ pub trait Manager {
         &mut self,
         loc: Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN>;
-
-    /// Allocate a cell in the state storage.
-    #[inline]
-    fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {
-        Cell {
-            region: self.allocate_region(loc.as_array()),
-        }
-    }
 }
 
 /// State backend with manager
@@ -293,13 +285,6 @@ pub mod tests {
         ) -> Self::DynRegion<LEN> {
             self.allocate_region::<u8, LEN>(loc)
         }
-
-        fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {
-            self.regions.push_back((loc.offset(), loc.size()));
-            Cell {
-                region: DummyRegion(PhantomData),
-            }
-        }
     }
 
     /// Run `f` twice against two different randomised backends and see if the
@@ -407,7 +392,7 @@ pub mod tests {
     backend_test!(test_example, F, {
         struct Example<M: Manager> {
             first: Cell<u64, M>,
-            second: M::Region<u32, 4>,
+            second: Cells<u32, 4, M>,
         }
 
         type ExampleLayout = (Atom<u64>, Array<u32, 4>);

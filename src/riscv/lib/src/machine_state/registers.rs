@@ -6,7 +6,7 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
-use crate::machine_state::backend::{self, Region};
+use crate::machine_state::backend;
 use arbitrary_int::u5;
 use std::fmt;
 
@@ -153,7 +153,7 @@ pub type XValue = u64;
 
 /// Integer registers
 pub struct XRegisters<M: backend::Manager> {
-    registers: M::Region<XValue, 31>,
+    registers: backend::Cells<XValue, 31, M>,
 }
 
 impl<M: backend::Manager> XRegisters<M> {
@@ -347,7 +347,7 @@ impl backend::Elem for FValue {
 
 /// Floating-point number registers
 pub struct FRegisters<M: backend::Manager> {
-    registers: M::Region<FValue, 32>,
+    registers: backend::Cells<FValue, 32, M>,
 }
 
 impl<M: backend::Manager> FRegisters<M> {
