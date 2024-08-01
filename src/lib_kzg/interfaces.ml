@@ -101,7 +101,9 @@ module type Polynomial_commitment = sig
     bool * Transcript.t
 end
 
-module type DegreeCheck_proof = sig
+(** This module type is used for the proof in DAL’s cryptobox, especially for
+    testing purposes *)
+module type Degree_check_proof = sig
   type t [@@deriving repr]
 
   val zero : t
