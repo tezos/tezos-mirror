@@ -284,7 +284,7 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-The behaviour of the client can be customized using various mechanisms, including command-line options, a configuration file, and environment variables. For details, refer to :doc:`../user/setup-client`.
+The behaviour of the client can be customized using various mechanisms, including command-line options, a configuration file, and environment variables. For details, refer to the :ref:`client manual <client_manual>` and :doc:`client set-up instructions <../user/setup-client>`.
 
 A Simple Wallet
 ~~~~~~~~~~~~~~~
