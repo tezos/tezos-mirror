@@ -1,4 +1,4 @@
-From f05e8ac6622a134b7f24af1c78566fba7fefa0ad Mon Sep 17 00:00:00 2001
+From 29a28c9935c60827947f6f2d6c71e639624a9b6a Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
@@ -6,9 +6,9 @@ Subject: [PATCH] An archiver for ProtoALpha
 ---
  bin_teztale_archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++
  bin_teztale_archiver/dune                     |   2 +-
- bin_teztale_server/dune                       |   2 +-
+ bin_teztale_server/dune                       |   4 +-
  lib_teztale_server/dune                       |   2 +-
- 4 files changed, 289 insertions(+), 3 deletions(-)
+ 4 files changed, 290 insertions(+), 4 deletions(-)
  create mode 100644 bin_teztale_archiver/ProtoALp_machine.real.ml
 
 diff --git a/bin_teztale_archiver/ProtoALp_machine.real.ml b/bin_teztale_archiver/ProtoALp_machine.real.ml
@@ -317,11 +317,15 @@ index 8414483..91f88dc 100644
   (flags
    (:standard
 diff --git a/bin_teztale_server/dune b/bin_teztale_server/dune
-index d733612..8bafc1d 100644
+index d733612..6320f1c 100644
 --- a/bin_teztale_server/dune
 +++ b/bin_teztale_server/dune
-@@ -11,7 +11,7 @@
-   cohttp-lwt-unix
+@@ -8,10 +8,10 @@
+   caqti-driver-postgresql
+   caqti-driver-sqlite3
+   caqti-lwt.unix
+-  cohttp-lwt-unix
++  octez-libs.cohttp-lwt-unix
    ezgzip
    safepass
 -  prometheus-app
