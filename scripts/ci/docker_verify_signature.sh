@@ -7,6 +7,10 @@
 
 set -eu
 
+# Read environment variables written by 'docker_registry_auth.sh' in
+# 'before_script'.
+. scripts/ci/docker.env
+
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
 # shellcheck source=./scripts/ci/docker.sh

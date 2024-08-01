@@ -1694,6 +1694,16 @@ let jobs pipeline_type =
             ~stage:Stages.manual
             ()
         in
+        let job_docker_verify_test : tezos_job =
+          job_docker_authenticated
+            ~__POS__
+            ~name:"oc.script.docker_verify_image"
+            ~stage:Stages.test
+            ~dependencies:(Dependent [Job job_docker_amd64_test_manual])
+            ~rules:(make_rules ())
+            ["./scripts/ci/docker_verify_signature.sh"]
+        in
+
         [
           job_docker_amd64_test_manual;
           job_docker_arm64_test_manual;
@@ -1701,6 +1711,7 @@ let jobs pipeline_type =
           job_build_homebrew_manual;
           job_debian_repository_trigger;
         ]
+        @ [job_docker_verify_test]
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> [job_debian_repository_trigger]
   in

@@ -3995,3 +3995,21 @@ trigger:debian_repository_partial:
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_partial.yml
+
+oc.script.docker_verify_image:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: test
+  tags:
+  - gcp
+  rules: []
+  needs:
+  - oc.docker:amd64
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_verify_signature.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
