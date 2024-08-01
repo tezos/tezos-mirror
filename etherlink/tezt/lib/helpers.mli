@@ -222,3 +222,7 @@ val init_sequencer_sandbox :
   ?bootstrap_accounts:string list ->
   unit ->
   Evm_node.t Lwt.t
+
+(** [send_transaction_to_sequencer send evm_node] sends the transaction using
+    [send] and produces a block to include it. *)
+val send_transaction_to_sequencer : (unit -> 'a Lwt.t) -> Evm_node.t -> 'a Lwt.t

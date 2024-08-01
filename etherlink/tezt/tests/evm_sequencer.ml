@@ -384,16 +384,6 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
       enable_dal;
     }
 
-let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
-  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
-  (* Send the transaction but doesn't wait to be mined. *)
-  let transaction = transaction () in
-  let* _ = wait_for in
-  (* Once the transaction is in the transaction pool the next block will include it. *)
-  let*@ _ = produce_block sequencer in
-  (* Resolve the transaction send to make sure it was included. *)
-  transaction
-
 let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
     ?(amount = Tez.one) ?expect_failure ~sc_rollup_node ~client ~l1_contracts
     ~sc_rollup_address ?(sender = Constant.bootstrap2) raw_tx =
@@ -1693,7 +1683,7 @@ let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
   let* () =
     Eth_cli.add_abi ~label:"fa_withdrawal" ~abi:(fa_withdrawal_abi_path ()) ()
   in
-  send_transaction
+  send_transaction_to_sequencer
     (Eth_cli.contract_send
        ?expect_failure
        ~source_private_key:sender.Eth_account.private_key
@@ -2201,7 +2191,7 @@ let test_get_balance_block_param =
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* _tx_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.transaction_send
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~to_public_key:address
@@ -2253,7 +2243,7 @@ let test_get_balance_block_param =
   (* Transfer funds again to the address. *)
   let*@ level = Rpc.block_number sequencer in
   let* _tx_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.transaction_send
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~to_public_key:address
@@ -2371,7 +2361,7 @@ let test_extended_block_param =
   in
   (* Deploy the contract. *)
   let* contract, _tx_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (fun () ->
         Eth_cli.deploy
           ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
@@ -2387,7 +2377,7 @@ let test_extended_block_param =
   let* () =
     repeat 2 (fun _ ->
         let* _ =
-          send_transaction
+          send_transaction_to_sequencer
             (Eth_cli.contract_send
                ~source_private_key:
                  Eth_account.bootstrap_accounts.(0).private_key
@@ -4455,7 +4445,7 @@ let test_replay_rpc =
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* transaction_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.transaction_send
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~to_public_key:address
@@ -4503,7 +4493,7 @@ let test_trace_transaction =
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* transaction_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.transaction_send
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~to_public_key:address
@@ -4664,7 +4654,7 @@ let test_trace_transaction_call =
       ()
   in
   let* contract_address, _tx_deployment =
-    send_transaction
+    send_transaction_to_sequencer
       (fun () ->
         Eth_cli.deploy
           ~source_private_key:sender.Eth_account.private_key
@@ -4685,7 +4675,7 @@ let test_trace_transaction_call =
      which isn't expected to fail and doesn't return any result. *)
   let value_in_storage = 10 in
   let* transaction_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
@@ -4723,7 +4713,7 @@ let test_trace_transaction_call =
      returns a value, so that we can check that it returns the correct value in
      the end. *)
   let* transaction_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
@@ -4776,7 +4766,7 @@ let test_miner =
     Eth_cli.add_abi ~label:coinbase_resolved.label ~abi:coinbase_resolved.abi ()
   in
   let* contract, _tx_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (fun () ->
         Eth_cli.deploy
           ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
@@ -4859,7 +4849,7 @@ let test_trace_call =
       ()
   in
   let* contract_address, _tx_deployment =
-    send_transaction
+    send_transaction_to_sequencer
       (fun () ->
         Eth_cli.deploy
           ~source_private_key:sender.Eth_account.private_key
@@ -4875,7 +4865,7 @@ let test_trace_call =
 
   let value_in_storage = 10 in
   let* _ =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
@@ -5138,7 +5128,7 @@ let test_regression_block_hash_gen =
   in
   let* {abi; bin; _} = Solidity_contracts.block_hash_gen () in
   let* _contract, _tx_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (fun () ->
         Eth_cli.deploy
           ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
@@ -5200,7 +5190,7 @@ let test_sequencer_sandbox () =
   let* sequencer = init_sequencer_sandbox () in
   let*@ _ = produce_block sequencer in
   let* tx_hash =
-    send_transaction
+    send_transaction_to_sequencer
       (Eth_cli.transaction_send
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~to_public_key:"0xB7A97043983f24991398E5a82f63F4C58a417185"
@@ -5238,7 +5228,7 @@ let test_rpc_mode_while_block_are_produced =
           (* The idea is to show that we can create a block (in our case, with
              one transaction) while we do a bunch of read-only RPCs calls. *)
           (let* _tx_hash =
-             send_transaction
+             send_transaction_to_sequencer
                (Eth_cli.transaction_send
                   ~source_private_key:
                     Eth_account.bootstrap_accounts.(0).private_key
