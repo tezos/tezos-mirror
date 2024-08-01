@@ -10,6 +10,8 @@ open Ethereum_types
 
 type transaction_type = Legacy | Eip2930 | Eip1559
 
+type access_list_item = bytes * bytes list
+
 type transaction = {
   transaction_type : transaction_type;
   chain_id : Z.t option;
@@ -25,6 +27,49 @@ type transaction = {
   r : bytes;
   s : bytes;
 }
+
+let decode_access_list_item (item : Rlp.item) :
+    (access_list_item, string) result =
+  let open Rlp in
+  let open Result_syntax in
+  match item with
+  | List [Value address; List storage_slots] ->
+      let* storage_slots =
+        List.fold_left
+          (fun acc -> function
+            | Value slot ->
+                let* acc in
+                return (slot :: acc)
+            | _ -> fail "Storage slot should be a Value RLP item")
+          return_nil
+          storage_slots
+      in
+      return (address, List.rev storage_slots)
+  | _ -> fail "An access list item should be a list of two items"
+
+let decode_access_list_rlp access_list =
+  let open Result_syntax in
+  let* rev_list =
+    List.fold_left
+      (fun acc item ->
+        let* acc in
+        let* item = decode_access_list_item item in
+        return (item :: acc))
+      return_nil
+      access_list
+  in
+  return (List.rev rev_list)
+
+let encode_access_list_item ((address, storage_slots) : access_list_item) :
+    Rlp.item =
+  let open Rlp in
+  let storage_slots = List.map (fun slot -> Value slot) storage_slots in
+  List [Value address; List storage_slots]
+
+let encode_access_list access_list =
+  let open Rlp in
+  let items = List.map encode_access_list_item access_list in
+  List items
 
 let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
     ~max_fee_per_gas ~gas_limit ~to_ ~value ~data ?(access_list = []) (v, r, s)
