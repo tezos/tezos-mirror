@@ -59,7 +59,10 @@ open Cryptobox_intf
     almost proportional to the length [n] of the slot encoded with the MDS
     code: we've chosen and implemented a technique to produce the proofs in
     time [O(n log n)]
-    (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}). *)
+    (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}).
+    
+    More diverse details about the formalization are provided here :
+    https://hackmd.io/36XUZUo7QqK5Ub6GvZmgOg *)
 
 (** Initial values for the parameters of the DAL cryptographic primitives.
     It used to build a value of type [t]. *)
