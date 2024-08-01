@@ -77,7 +77,7 @@ v}
 
     | <n> × <offset> | <n> × <block> |
 
-    where n is (j - i + 1), <offset> is a 4 bytes integer representing
+    where n is (j - i + 1), <offset> is a 8 bytes integer representing
     the absolute offset of a block where the k-th (with 0 <= k < n)
     offset stands for the absolute offset of the k-th block in the
     file and with <block>, a {!Block_repr.t} value encoded using
@@ -310,4 +310,6 @@ val check_indexes_consistency :
   t ->
   unit tzresult Lwt.t
 
+(* Given the chain directory with cemented files, upgrade all of them to have
+   64-bit offsets at the beginning, instead of 32-bits. *)
 val v_3_2_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
