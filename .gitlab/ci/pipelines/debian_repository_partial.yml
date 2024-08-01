@@ -158,8 +158,10 @@ apt_repo_debian:
   - gcp
   needs:
   - oc.build-debian
+  - oc.build-data_packages
   dependencies:
   - oc.build-debian
+  - oc.build-data_packages
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh

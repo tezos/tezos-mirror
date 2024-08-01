@@ -237,7 +237,12 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"apt_repo_debian"
       ~prefix:true
-      ~dependencies:(Dependent [Artifacts job_build_debian_package])
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_build_debian_package;
+             Artifacts job_build_data_packages;
+           ])
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
@@ -246,7 +251,12 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"apt_repo_ubuntu"
       ~prefix:true
-      ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_build_ubuntu_package;
+             Artifacts job_build_data_packages;
+           ])
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
