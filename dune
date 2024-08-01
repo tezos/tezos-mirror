@@ -9,4 +9,4 @@
   (with-stdout-to
    %{target}
    (system
-     "[ '%{system}' = 'macosx' ] && echo '(-ccopt \"-framework Security\")' || echo '()'"))))
+    "[ '%{system}' = 'macosx' ] && echo '(-ccopt \"-framework Security\")' || echo '()'"))))

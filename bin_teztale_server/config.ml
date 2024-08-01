@@ -20,7 +20,7 @@ type t = {
   max_batch_size : int32;
   with_transaction : opt_with_transactions;
   with_metrics : bool;
-  verbosity : Teztale_lib.Log.level;
+  verbosity : Lib_teztale_base.Log.level;
 }
 
 let tls_conf_encoding =
@@ -115,4 +115,4 @@ let encoding =
        (dft "max_batch_size" int32 0l)
        (dft "with_transaction" opt_with_transactions_encoding NONE)
        (dft "with_metrics" bool false)
-       (dft "verbosity" Teztale_lib.Log.level_encoding ERROR))
+       (dft "verbosity" Log.level_encoding ERROR))

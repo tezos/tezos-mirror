@@ -9,7 +9,7 @@ open Lwt_result_syntax
 
 let print_error logger e =
   let () =
-    Teztale_lib.Log.error logger (fun () ->
+    Log.error logger (fun () ->
         Format.asprintf "%a" Error_monad.pp_print_trace e)
   in
   Lwt.return_unit
@@ -275,7 +275,7 @@ module Loops (Archiver : Archiver.S) = struct
           (* hack to ignore transition block because they need their own instantiation of Block_services *))
 
   let endorsements_loop cctx =
-    let logger = Teztale_lib.Log.logger () in
+    let logger = Log.logger () in
     let*! head_stream = Shell_services.Monitor.heads cctx cctx#chain in
     match head_stream with
     | Error e -> print_error logger e
@@ -334,7 +334,7 @@ module Loops (Archiver : Archiver.S) = struct
         Lwt.return_unit
 
   let reception_blocks_loop cctx =
-    let logger = Teztale_lib.Log.logger () in
+    let logger = Log.logger () in
     let*! block_stream =
       Shell_services.Monitor.applied_blocks cctx ~chains:[cctx#chain] ()
     in
@@ -372,7 +372,7 @@ module Loops (Archiver : Archiver.S) = struct
                           match recorder with
                           | None ->
                               let () =
-                                Teztale_lib.Log.error logger (fun () ->
+                                Log.error logger (fun () ->
                                     Format.asprintf
                                       "no block recorder found for protocol \
                                        %a@."
@@ -431,7 +431,7 @@ module Loops (Archiver : Archiver.S) = struct
                                         .Block_header.proto_level ) )
                         else
                           let () =
-                            Teztale_lib.Log.error logger (fun () ->
+                            Log.error logger (fun () ->
                                 Format.asprintf
                                   "skipping block %a, migrating from protocol \
                                    %a to %a@."

@@ -21,7 +21,7 @@ let parse_block_row ((level, hash, predecessor, delegate), (round, timestamp))
   let blocks =
     Tezos_crypto.Hashed.Block_hash.Map.add
       hash
-      Teztale_lib.Data.Block.
+      Lib_teztale_base.Data.Block.
         {
           hash;
           predecessor;
@@ -47,7 +47,7 @@ let parse_block_reception_row
       hash
       (function
         | Some
-            Teztale_lib.Data.Block.
+            Lib_teztale_base.Data.Block.
               {
                 hash;
                 predecessor;
@@ -58,7 +58,7 @@ let parse_block_reception_row
                 nonce;
               } ->
             Some
-              Teztale_lib.Data.Block.
+              Lib_teztale_base.Data.Block.
                 {
                   hash;
                   predecessor;
@@ -196,15 +196,15 @@ let select_blocks conf db_pool boundaries =
     db_pool
 
 type op_info = {
-  kind : Teztale_lib.Consensus_ops.operation_kind;
+  kind : Lib_teztale_base.Consensus_ops.operation_kind;
   round : Int32.t option;
   included : Tezos_crypto.Hashed.Block_hash.t list;
-  received : Teztale_lib.Data.Delegate_operations.reception list;
+  received : Lib_teztale_base.Data.Delegate_operations.reception list;
 }
 
 let kind_of_bool = function
-  | false -> Teztale_lib.Consensus_ops.Preendorsement
-  | true -> Teztale_lib.Consensus_ops.Endorsement
+  | false -> Lib_teztale_base.Consensus_ops.Preendorsement
+  | true -> Lib_teztale_base.Consensus_ops.Endorsement
 
 let select_ops conf db_pool boundaries =
   (* We make 3 queries:
@@ -299,7 +299,7 @@ let select_ops conf db_pool boundaries =
     in
     let kind = kind_of_bool endorsement in
     let received_info =
-      Teztale_lib.Data.Delegate_operations.{source; reception_time; errors}
+      Lib_teztale_base.Data.Delegate_operations.{source; reception_time; errors}
     in
     let ops =
       Ops.update
@@ -348,7 +348,7 @@ let translate_ops info =
   let translate pkh_ops =
     Tezos_crypto.Hashed.Operation_hash.Map.fold
       (fun hash {kind; round; included; received} acc ->
-        Teztale_lib.Data.Delegate_operations.
+        Lib_teztale_base.Data.Delegate_operations.
           {
             hash;
             kind;
@@ -364,7 +364,7 @@ let translate_ops info =
     (fun info ->
       Tezos_crypto.Signature.Public_key_hash.Map.fold
         (fun pkh (first_slot, power, pkh_ops) acc ->
-          Teztale_lib.Data.Delegate_operations.
+          Lib_teztale_base.Data.Delegate_operations.
             {
               delegate = pkh;
               first_slot;
@@ -422,7 +422,7 @@ let data_at_level_range conf db_pool boundaries =
           with
           | Some (cycle_id, cycle_level, cycle_size) ->
               Some
-                Teztale_lib.Data.
+                Lib_teztale_base.Data.
                   {
                     cycle = cycle_id;
                     cycle_position = Int32.sub level cycle_level;
@@ -436,16 +436,17 @@ let data_at_level_range conf db_pool boundaries =
           | Some missing_blocks ->
               RoundBakerMap.fold
                 (fun (round, delegate) sources acc ->
-                  Teztale_lib.Data.{baking_right = {round; delegate}; sources}
+                  Lib_teztale_base.Data.
+                    {baking_right = {round; delegate}; sources}
                   :: acc)
                 missing_blocks
                 []
         in
-        Teztale_lib.Data.
+        Lib_teztale_base.Data.
           {
             level;
             data =
-              Teztale_lib.Data.
+              Lib_teztale_base.Data.
                 {cycle_info; blocks; delegate_operations; missing_blocks};
           }
         :: acc)

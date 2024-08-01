@@ -34,9 +34,9 @@ let directory_parameter =
       else return p)
 
 let main_json cctxt prefix =
-  let logger = Teztale_lib.Log.logger () in
+  let logger = Log.logger () in
   let* () = Client_confirmations.wait_for_bootstrapped cctxt in
-  let () = Teztale_lib.Log.info logger (fun () -> "Node bootstrapped") in
+  let () = Log.info logger (fun () -> "Node bootstrapped") in
   (* let* () = await_protocol_activation cctxt Loops.protocol_hash in *)
   let dumper = Json_archiver.launch cctxt prefix in
   let main =
@@ -52,9 +52,9 @@ let main_json cctxt prefix =
   return out
 
 let main_server state cctxt =
-  let logger = Teztale_lib.Log.logger () in
+  let logger = Log.logger () in
   let* () = Client_confirmations.wait_for_bootstrapped cctxt in
-  let () = Teztale_lib.Log.info logger (fun () -> "Node bootstrapped") in
+  let () = Log.info logger (fun () -> "Node bootstrapped") in
   (* let* () = await_protocol_activation cctxt Loops.protocol_hash in *)
   let dumper = Server_archiver.launch state "source-not-used" in
   let main =
@@ -194,17 +194,15 @@ let select_commands _ctxt Client_config.{chain; _} =
               ~long:"verbosity"
               ~placeholder:"FATAL|ERROR|WARNING|INFO|DEBUG"
               (Tezos_clic.parameter (fun _ arg ->
-                   match Teztale_lib.Log.level_of_string arg with
+                   match Log.level_of_string arg with
                    | Some level -> return level
                    | None -> fail []))))
         (Tezos_clic.prefixes ["feed"] @@ Tezos_clic.seq_of_param endpoint_param)
         (fun (backup_path, level) endpoints cctxt ->
-          Option.iter (fun level -> Teztale_lib.Log.verbosity := level) level ;
-          let logger = Teztale_lib.Log.logger () in
+          Option.iter (fun level -> Log.verbosity := level) level ;
+          let logger = Log.logger () in
           List.iter
-            (fun h ->
-              Teztale_lib.Log.info logger (fun () ->
-                  Protocol_hash.to_b58check h))
+            (fun h -> Log.info logger (fun () -> Protocol_hash.to_b58check h))
             !General_archiver.supported_protocols ;
           let*! ctx =
             match X509.Authenticator.of_string "none" with
@@ -224,7 +222,7 @@ let select_commands _ctxt Client_config.{chain; _} =
                 backup =
                   Option.fold
                     ~none:(fun chunk ->
-                      Teztale_lib.Log.error logger (fun () ->
+                      Log.error logger (fun () ->
                           let level, kind =
                             match chunk with
                             | Block (level, _) -> (level, "/block")

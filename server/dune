@@ -1,7 +1,0 @@
-(executable
- (name main)
- (package teztale)
- (public_name teztale-server)
- (promote (until-clean))
- (libraries aches caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt.unix
-   cohttp-lwt-unix ezgzip safepass prometheus-app teztale.lib))

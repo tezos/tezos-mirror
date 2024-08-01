@@ -5,7 +5,7 @@
  (promote (until-clean))
  (libraries
   octez-shell-libs.client-base-unix
-  teztale.lib
+  lib_teztale_base
   (select
    PtCJ7pwo_machine.ml
    from
@@ -112,9 +112,23 @@
    (octez-protocol-alpha-libs.client -> ProtoALp_machine.no.ml)
    (-> ProtoALp_machine.no.ml)))
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
-    Tezos_shell_services -open Tezos_client_base -open Tezos_client_base_unix
-    -open Tezos_rpc_http_client_unix -open Tezos_rpc_http -open Teztale_lib)))
+  (:standard
+   -open
+   Tezos_base__TzPervasives
+   -open
+   Tezos_stdlib_unix
+   -open
+   Tezos_shell_services
+   -open
+   Tezos_client_base
+   -open
+   Tezos_client_base_unix
+   -open
+   Tezos_rpc_http_client_unix
+   -open
+   Tezos_rpc_http
+   -open
+   Lib_teztale_base)))
 
 (rule
  (action

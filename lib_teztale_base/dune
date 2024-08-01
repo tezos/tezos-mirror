@@ -1,6 +1,5 @@
 (library
- (name teztale_lib)
- (public_name teztale.lib)
+ (name lib_teztale_base)
  (libraries prometheus-app octez-libs.base lwt.unix)
  (flags
   (:standard

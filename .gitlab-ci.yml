@@ -159,9 +159,10 @@ prepare:canary:
     - sed -i "s|let tezos_branch = \"\"|let tezos_branch = \"${OCTEZ_BRANCH}\"|g" ./lib/version.ml
     - sed -i "s|let tezos_commit_ref = \"\"|let tezos_commit_ref = \"`cd tezos && git rev-parse HEAD`\"|g" ./lib/version.ml
   script:
-    - dune build archiver/main.exe server/main.exe
+    - dune build bin_teztale_archiver/main.exe bin_teztale_server/main.exe
     - mkdir -p ${ARTIFACTS_PATH}/{archiver,server}
-    - cp --parents {archiver,server}/main.exe ${ARTIFACTS_PATH}
+    - cp bin_teztale_archiver/main.exe ${ARTIFACTS_PATH}/archiver/main.exe
+    - cp bin_teztale_server/main.exe ${ARTIFACTS_PATH}/server/main.exe
   artifacts:
     name: teztale-${ARCH}-${TEZTALE_REF}
     expire_in: 1 week

@@ -124,7 +124,7 @@ let with_caqti_error ~logger x f =
       | Ok x -> f x
       | Error e ->
           let body = Caqti_error.show e in
-          Teztale_lib.Log.error logger (fun () -> body) ;
+          Lib_teztale_base.Log.error logger (fun () -> body) ;
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
 let reply_json0 ?(status = `OK) ?headers:(headers_arg = []) body =
@@ -199,7 +199,7 @@ let get_stats ~logger db_pool =
       obj3 (req "level" int32) (req "round" int32) (req "timestamp" string))
   in
   let version =
-    Teztale_lib.Version.
+    Lib_teztale_base.Version.
       (teztale_version, teztale_commit_ref, tezos_branch, tezos_commit_ref)
   in
   with_caqti_error
@@ -493,7 +493,8 @@ let may_insert_operations =
     (fun x -> Cache.mem cache @@ hash x)
     (fun x -> Cache.add cache @@ hash x)
 
-let format_block_op level delegate (op : Teztale_lib.Consensus_ops.operation) =
+let format_block_op level delegate
+    (op : Lib_teztale_base.Consensus_ops.operation) =
   ((level, op.hash, op.kind = Endorsement, op.round), delegate)
 
 let endorsing_rights_callback =
@@ -516,7 +517,7 @@ let endorsing_rights_callback =
         (fun () -> Cache.add cache level)
         (if Cache.mem cache level then
            let () =
-             Teztale_lib.Log.debug logger (fun () ->
+             Lib_teztale_base.Log.debug logger (fun () ->
                  Format.asprintf "(%ld) CACHE.mem Level rights" level)
            in
            return_unit
@@ -529,14 +530,16 @@ let endorsing_rights_callback =
                  let* () =
                    let delegates =
                      List.map
-                       (fun {Teztale_lib.Consensus_ops.address; _} -> address)
+                       (fun {Lib_teztale_base.Consensus_ops.address; _} ->
+                         address)
                        rights
                    in
                    may_insert_delegates (module Db) conf delegates
                  in
                  let rights =
                    List.map
-                     (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
+                     (fun Lib_teztale_base.Consensus_ops.
+                            {address; first_slot; power} ->
                        (level, first_slot, power, address))
                      rights
                  in
@@ -549,7 +552,7 @@ let endorsing_rights_callback =
                db_pool
            in
            let () =
-             Teztale_lib.Log.debug logger (fun () ->
+             Lib_teztale_base.Log.debug logger (fun () ->
                  Format.asprintf "(%ld) CACHE.add Level rights" level)
            in
            return_unit)
@@ -568,7 +571,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
   let* () =
     let operations =
       List.map
-        (fun {Teztale_lib.Consensus_ops.delegate; op; _} ->
+        (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
           format_block_op level delegate op)
         operations
     in
@@ -577,7 +580,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
   let operation_inclusion =
     List.map
       (fun op ->
-        ( Teztale_lib.Consensus_ops.
+        ( Lib_teztale_base.Consensus_ops.
             (op.delegate, op.op.kind = Endorsement, op.op.round),
           (block_hash, level) ))
       operations
@@ -602,7 +605,7 @@ let block_callback =
       db_pool
       g
       source
-      ( Teztale_lib.Data.Block.
+      ( Lib_teztale_base.Data.Block.
           {delegate; timestamp; reception_times; round; hash; predecessor; _},
         cycle_info,
         (endorsements, preendorsements),
@@ -619,7 +622,7 @@ let block_callback =
               (fun () -> Block_lru_cache.add block_cache hash)
               (if Block_lru_cache.mem block_cache hash then
                  let () =
-                   Teztale_lib.Log.debug logger (fun () ->
+                   Lib_teztale_base.Log.debug logger (fun () ->
                        Format.asprintf
                          "(%ld) CACHE.mem %a"
                          level
@@ -642,7 +645,8 @@ let block_callback =
                  in
                  let* () =
                    match cycle_info with
-                   | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
+                   | Some
+                       Lib_teztale_base.Data.{cycle; cycle_position; cycle_size}
                      ->
                        maybe_with_metrics conf "maybe_insert_cycle" @@ fun () ->
                        without_cache
@@ -653,7 +657,7 @@ let block_callback =
                          [(cycle, Int32.sub level cycle_position, cycle_size)]
                    | _ -> Lwt.return_ok ()
                  in
-                 Teztale_lib.Log.debug logger (fun () ->
+                 Lib_teztale_base.Log.debug logger (fun () ->
                      Format.asprintf
                        "(%ld) CACHE.add (block) %a"
                        level
@@ -689,7 +693,7 @@ let block_callback =
                      hash
                      preendorsements
                  in
-                 Teztale_lib.Log.debug logger (fun () ->
+                 Lib_teztale_base.Log.debug logger (fun () ->
                      Format.asprintf
                        "(%ld) CACHE.add (block operations) %a"
                        level
@@ -703,7 +707,7 @@ let block_callback =
             maybe_with_transaction conf (module Db) @@ fun () ->
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
               (fun r ->
-                let open Teztale_lib.Data.Block in
+                let open Lib_teztale_base.Data.Block in
                 Db.exec
                   Sql_requests.insert_received_block
                   (r.application_time, r.validation_time, hash, source))
@@ -712,7 +716,7 @@ let block_callback =
           let* () =
             match
               List.filter
-                (fun x -> x.Teztale_lib.Data.round <> round)
+                (fun x -> x.Lib_teztale_base.Data.round <> round)
                 baking_rights
             with
             | [] -> return_unit
@@ -726,8 +730,8 @@ let block_callback =
                       Sql_requests.insert_missing_block
                       ( source,
                         level,
-                        r.Teztale_lib.Data.round,
-                        r.Teztale_lib.Data.delegate ))
+                        r.Lib_teztale_base.Data.round,
+                        r.Lib_teztale_base.Data.delegate ))
                   baking_rights
           in
           let* () =
@@ -735,7 +739,7 @@ let block_callback =
             maybe_with_transaction conf (module Db) @@ fun () ->
             Db.exec Sql_requests.delete_missing_block (source, level, round)
           in
-          Teztale_lib.Log.debug logger (fun () ->
+          Lib_teztale_base.Log.debug logger (fun () ->
               Format.asprintf
                 "(%ld) OK Block reception times for %a"
                 level
@@ -765,28 +769,31 @@ let operations_callback ~logger conf db_pool g source operations =
         let* () =
           let delegates =
             List.map
-              (fun ({Teztale_lib.Consensus_ops.address; _}, _) -> address)
+              (fun ({Lib_teztale_base.Consensus_ops.address; _}, _) -> address)
               operations
           in
           may_insert_delegates (module Db) conf delegates
         in
-        Teztale_lib.Log.debug logger (fun () ->
+        Lib_teztale_base.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Delegates" level) ;
         let* () =
           let operations =
             List.flatten
             @@ List.map
                  (fun (rights, operations) ->
-                   let delegate = rights.Teztale_lib.Consensus_ops.address in
+                   let delegate =
+                     rights.Lib_teztale_base.Consensus_ops.address
+                   in
                    List.map
-                     (fun (op : Teztale_lib.Consensus_ops.received_operation) ->
+                     (fun (op :
+                            Lib_teztale_base.Consensus_ops.received_operation) ->
                        format_block_op level delegate op.op)
                      operations)
                  operations
           in
           may_insert_operations (module Db) conf operations
         in
-        Teztale_lib.Log.debug logger (fun () ->
+        Lib_teztale_base.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Operations" level) ;
         let* () =
           maybe_with_metrics conf "insert_received_operation__list" @@ fun () ->
@@ -797,16 +804,16 @@ let operations_callback ~logger conf db_pool g source operations =
                 (fun op ->
                   Db.exec
                     Sql_requests.insert_received_operation
-                    Teztale_lib.Consensus_ops.
+                    Lib_teztale_base.Consensus_ops.
                       ( ( op.reception_time,
                           op.errors,
-                          right.Teztale_lib.Consensus_ops.address,
+                          right.Lib_teztale_base.Consensus_ops.address,
                           op.op.kind = Endorsement ),
                         (op.op.round, source, level) ))
                 ops)
             operations
         in
-        Teztale_lib.Log.debug logger (fun () ->
+        Lib_teztale_base.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Operations reception times" level) ;
         Lwt.return_ok ())
       db_pool
@@ -829,14 +836,14 @@ let import_callback ~logger conf db_pool g data =
         let* () =
           let delegates =
             List.rev_map
-              (fun {Teztale_lib.Data.Delegate_operations.delegate; _} ->
+              (fun {Lib_teztale_base.Data.Delegate_operations.delegate; _} ->
                 delegate)
-              data.Teztale_lib.Data.delegate_operations
+              data.Lib_teztale_base.Data.delegate_operations
           in
           let delegates' =
             List.rev_map
-              (fun {Teztale_lib.Data.Block.delegate; _} -> delegate)
-              data.Teztale_lib.Data.blocks
+              (fun {Lib_teztale_base.Data.Block.delegate; _} -> delegate)
+              data.Lib_teztale_base.Data.blocks
           in
           may_insert_delegates
             (module Db)
@@ -853,29 +860,31 @@ let import_callback ~logger conf db_pool g data =
                     (fun inc ->
                       Db.exec
                         Sql_requests.maybe_insert_source
-                        inc.Teztale_lib.Data.Delegate_operations.source)
-                    op.Teztale_lib.Data.Delegate_operations.mempool_inclusion)
-                slot.Teztale_lib.Data.Delegate_operations.operations)
-            data.Teztale_lib.Data.delegate_operations
+                        inc.Lib_teztale_base.Data.Delegate_operations.source)
+                    op
+                      .Lib_teztale_base.Data.Delegate_operations
+                       .mempool_inclusion)
+                slot.Lib_teztale_base.Data.Delegate_operations.operations)
+            data.Lib_teztale_base.Data.delegate_operations
         in
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun block ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun Teztale_lib.Data.Block.{source; _} ->
+                (fun Lib_teztale_base.Data.Block.{source; _} ->
                   Db.exec Sql_requests.maybe_insert_source source)
-                block.Teztale_lib.Data.Block.reception_times)
-            data.Teztale_lib.Data.blocks
+                block.Lib_teztale_base.Data.Block.reception_times)
+            data.Lib_teztale_base.Data.blocks
         in
         (* rights *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun Teztale_lib.Data.Delegate_operations.
+            (fun Lib_teztale_base.Data.Delegate_operations.
                    {delegate; first_slot; endorsing_power; _} ->
               Db.exec
                 Sql_requests.maybe_insert_endorsing_right
                 (level, first_slot, endorsing_power, delegate))
-            data.Teztale_lib.Data.delegate_operations
+            data.Lib_teztale_base.Data.delegate_operations
         in
         (* blocks *)
         let* () =
@@ -883,82 +892,86 @@ let import_callback ~logger conf db_pool g data =
             (fun block ->
               Db.exec
                 Sql_requests.maybe_insert_block
-                Teztale_lib.Data.Block.
+                Lib_teztale_base.Data.Block.
                   ( (level, block.timestamp, block.hash, block.round),
                     (block.predecessor, block.delegate) ))
-            data.Teztale_lib.Data.blocks
+            data.Lib_teztale_base.Data.blocks
         in
         (* operations *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun Teztale_lib.Data.Delegate_operations.{delegate; operations; _} ->
+            (fun Lib_teztale_base.Data.Delegate_operations.
+                   {delegate; operations; _} ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun Teztale_lib.Data.Delegate_operations.{hash; kind; round; _} ->
+                (fun Lib_teztale_base.Data.Delegate_operations.
+                       {hash; kind; round; _} ->
                   Db.exec
                     Sql_requests.maybe_insert_operation
                     ( ( level,
                         hash,
-                        kind = Teztale_lib.Consensus_ops.Endorsement,
+                        kind = Lib_teztale_base.Consensus_ops.Endorsement,
                         round ),
                       delegate ))
                 operations)
-            data.Teztale_lib.Data.delegate_operations
+            data.Lib_teztale_base.Data.delegate_operations
         in
         (* block reception *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun block ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun Teztale_lib.Data.Block.
+                (fun Lib_teztale_base.Data.Block.
                        {source; application_time; validation_time} ->
                   Db.exec
                     Sql_requests.insert_received_block
                     ( application_time,
                       validation_time,
-                      block.Teztale_lib.Data.Block.hash,
+                      block.Lib_teztale_base.Data.Block.hash,
                       source ))
-                block.Teztale_lib.Data.Block.reception_times)
-            data.Teztale_lib.Data.blocks
+                block.Lib_teztale_base.Data.Block.reception_times)
+            data.Lib_teztale_base.Data.blocks
         in
         (* operation reception *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun Teztale_lib.Data.Delegate_operations.{delegate; operations; _} ->
+            (fun Lib_teztale_base.Data.Delegate_operations.
+                   {delegate; operations; _} ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun Teztale_lib.Data.Delegate_operations.
+                (fun Lib_teztale_base.Data.Delegate_operations.
                        {kind; round; mempool_inclusion; _} ->
                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                    (fun Teztale_lib.Data.Delegate_operations.
+                    (fun Lib_teztale_base.Data.Delegate_operations.
                            {source; reception_time; errors} ->
                       Db.exec
                         Sql_requests.insert_received_operation
                         ( ( reception_time,
                             errors,
                             delegate,
-                            kind = Teztale_lib.Consensus_ops.Endorsement ),
+                            kind = Lib_teztale_base.Consensus_ops.Endorsement ),
                           (round, source, level) ))
                     mempool_inclusion)
                 operations)
-            data.Teztale_lib.Data.delegate_operations
+            data.Lib_teztale_base.Data.delegate_operations
         in
         (* operation inclusion *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun Teztale_lib.Data.Delegate_operations.{delegate; operations; _} ->
+            (fun Lib_teztale_base.Data.Delegate_operations.
+                   {delegate; operations; _} ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun Teztale_lib.Data.Delegate_operations.
+                (fun Lib_teztale_base.Data.Delegate_operations.
                        {kind; round; block_inclusion; _} ->
                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                     (fun block_hash ->
                       Db.exec
                         Sql_requests.insert_included_operation
                         ( ( delegate,
-                            kind = Teztale_lib.Consensus_ops.Endorsement,
+                            kind = Lib_teztale_base.Consensus_ops.Endorsement,
                             round ),
                           (block_hash, level) ))
                     block_inclusion)
                 operations)
-            data.Teztale_lib.Data.delegate_operations
+            data.Lib_teztale_base.Data.delegate_operations
         in
         return_unit)
       db_pool
@@ -1011,7 +1024,7 @@ let extract_boundaries g =
 let routes :
     (Re.re
     * (Re.Group.t ->
-      logger:Teztale_lib.Log.t ->
+      logger:Lib_teztale_base.Log.t ->
       conf:Config.t ->
       admins:(string * Bcrypt.hash) list ->
       users:(string * Bcrypt.hash) list ref ->
@@ -1026,28 +1039,28 @@ let routes :
       fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun _source ->
             with_data
-              Teztale_lib.Consensus_ops.rights_encoding
+              Lib_teztale_base.Consensus_ops.rights_encoding
               body
               (endorsing_rights_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
       fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
-              Teztale_lib.Data.Archiver.raw_block_data_encoding
+              Lib_teztale_base.Data.Archiver.raw_block_data_encoding
               body
               (block_callback ~logger conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
       fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
-              Teztale_lib.Consensus_ops.delegate_ops_encoding
+              Lib_teztale_base.Consensus_ops.delegate_ops_encoding
               body
               (operations_callback ~logger conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/import"],
       fun g ~logger ~conf ~admins ~users:_ db_pool header meth body ->
         post_only_endpoint admins header meth (fun _source ->
             with_data
-              Teztale_lib.Data.encoding
+              Lib_teztale_base.Data.encoding
               body
               (import_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/timestamp/"; Re.group (Re.rep1 Re.digit)],
@@ -1057,8 +1070,8 @@ let routes :
             with_caqti_error
               ~logger
               (get_levels_at_timestamp db_pool level)
-              (reply_public_json Teztale_lib.Data.surrounding_levels_encoding))
-    );
+              (reply_public_json
+                 Lib_teztale_base.Data.surrounding_levels_encoding)) );
     ( Re.str "/ping",
       fun _g ~logger:_ ~conf:_ ~admins:_ ~users:_ _db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
@@ -1073,8 +1086,9 @@ let routes :
               ~logger
               (Exporter.data_at_level_range conf db_pool (level, level))
               (fun data ->
-                reply_public_json Teztale_lib.Data.encoding (List.hd data).data))
-    );
+                reply_public_json
+                  Lib_teztale_base.Data.encoding
+                  (List.hd data).data)) );
     ( Re.seq
         [
           Re.str "/";
@@ -1096,7 +1110,7 @@ let routes :
                 (fun data ->
                   reply_public_compressed_json
                     header
-                    Teztale_lib.Data.batch_encoding
+                    Lib_teztale_base.Data.batch_encoding
                     data)) );
     ( Re.str "/user",
       fun _g ~logger ~conf ~admins ~users db_pool header meth body ->
@@ -1178,12 +1192,12 @@ let routes :
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
 let callback ~conf ~admins ~users db_pool _connection request body =
-  let logger = Teztale_lib.Log.logger () in
+  let logger = Lib_teztale_base.Log.logger () in
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
   let path = Uri.path uri in
-  Teztale_lib.Log.info logger (fun () ->
+  Lib_teztale_base.Log.info logger (fun () ->
       Printf.sprintf "%s %s" (Cohttp.Code.string_of_method meth) path) ;
   match
     List.find_map
@@ -1253,8 +1267,8 @@ let conf =
           exit 1)
 
 let () =
-  Teztale_lib.Log.verbosity := conf.Config.verbosity ;
-  let logger = Teztale_lib.Log.logger () in
+  Lib_teztale_base.Log.verbosity := conf.Config.verbosity ;
+  let logger = Lib_teztale_base.Log.logger () in
   let uri = Uri.of_string conf.Config.db_uri in
   let users = ref [] in
   let admins = List.map (fun (u, p) -> (u, Bcrypt.hash p)) conf.Config.admins in
@@ -1319,7 +1333,7 @@ let () =
                                               | None ->
                                                   `TCP (`Port con.Config.port)
                                             in
-                                            Teztale_lib.Log.info
+                                            Lib_teztale_base.Log.info
                                               logger
                                               (fun () ->
                                                 Printf.sprintf

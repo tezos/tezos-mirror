@@ -212,7 +212,7 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
-   Teztale_lib.Log.info logger (fun () ->
+   Log.info logger (fun () ->
        Format.asprintf
          "Dumping delegate operations in block %a at level %li."
          Block_hash.pp
@@ -244,7 +244,7 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
    match out with
    | Ok () -> Lwt.return_unit
    | Error err ->
-       Teztale_lib.Log.error logger (fun () ->
+       Log.error logger (fun () ->
            Format.asprintf
              "@[Failed to dump delegate operations in block %a at level %li :@ \
               @[%a@]@]"
@@ -290,7 +290,7 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
   match out with
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Teztale_lib.Log.error logger (fun () ->
+      Log.error logger (fun () ->
           Format.asprintf
             "@[Failed to dump block %a at level %li :@ @[%a@]@]"
             Block_hash.pp
@@ -353,7 +353,7 @@ let dump_received logger path ?unaccurate level received_ops =
                 List.partition
                   (fun (right, _) ->
                     Tezos_crypto.Signature.Public_key_hash.equal
-                      right.Teztale_lib.Consensus_ops.address
+                      right.Consensus_ops.address
                       delegate)
                   missing
               with
@@ -381,9 +381,9 @@ let dump_received logger path ?unaccurate level received_ops =
                    (fun acc (right, ops) ->
                      Data.Delegate_operations.
                        {
-                         delegate = right.Teztale_lib.Consensus_ops.address;
-                         first_slot = right.Teztale_lib.Consensus_ops.first_slot;
-                         endorsing_power = right.Teztale_lib.Consensus_ops.power;
+                         delegate = right.Consensus_ops.address;
+                         first_slot = right.Consensus_ops.first_slot;
+                         endorsing_power = right.Consensus_ops.power;
                          operations =
                            List.rev_map
                              (fun Consensus_ops.
@@ -428,7 +428,7 @@ let dump_received logger path ?unaccurate level received_ops =
   match out with
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Teztale_lib.Log.error logger (fun () ->
+      Log.error logger (fun () ->
           Format.asprintf
             "@[Failed to dump delegate operations at level %li :@ @[%a@]@]"
             level
@@ -453,7 +453,7 @@ type chunk =
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
 let dump prefix chunk =
-  let logger = Teztale_lib.Log.logger () in
+  let logger = Log.logger () in
   match chunk with
   | Block
       ( level,

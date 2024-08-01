@@ -44,12 +44,12 @@ let send_something =
     in
     Lwt_list.iter_p
       (fun {auth; endpoint} ->
-        let logger = Teztale_lib.Log.logger () in
+        let logger = Log.logger () in
         let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
         let uri = Uri.with_path endpoint (Uri.path endpoint ^ "/" ^ path) in
         incr sent ;
         let*! resp, out =
-          Teztale_lib.Log.debug logger (fun () -> "Sending " ^ path) ;
+          Log.debug logger (fun () -> "Sending " ^ path) ;
           Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
         in
         incr received ;
@@ -63,10 +63,10 @@ let send_something =
             !sent
         in
         if resp.status = `OK then
-          let () = Teztale_lib.Log.debug logger (fun () -> msg) in
+          let () = Log.debug logger (fun () -> msg) in
           Lwt.return_unit
         else
-          let () = Teztale_lib.Log.info logger (fun () -> msg) in
+          let () = Log.info logger (fun () -> msg) in
           Lwt.fail_with msg)
       ctx.endpoints
 
@@ -74,9 +74,7 @@ let send_rights ctx level rights =
   let body =
     `String
       (Ezjsonm.value_to_string
-         (Data_encoding.Json.construct
-            Teztale_lib.Consensus_ops.rights_encoding
-            rights))
+         (Data_encoding.Json.construct Consensus_ops.rights_encoding rights))
   in
   let path = Int32.to_string level ^ "/rights" in
   send_something ctx path body

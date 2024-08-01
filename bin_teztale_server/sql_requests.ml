@@ -400,4 +400,4 @@ let insert_received_block =
      excluded.validation_timestamp)"
 
 let maybe_with_metrics (c : Config.t) (name : string) (f : unit -> 'a Lwt.t) =
-  if c.with_metrics then Teztale_lib.Metrics.sql name f else f ()
+  if c.with_metrics then Lib_teztale_base.Metrics.sql name f else f ()

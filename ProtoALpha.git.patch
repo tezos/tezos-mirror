@@ -1,21 +1,21 @@
-From 98eb9eef301c4aeb2939450859c01ec498c6201f Mon Sep 17 00:00:00 2001
+From 2397080c5494e4a5ed5c7c3cfb25bff0f1069f0f Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
 
 ---
- archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++++++++++++++
- archiver/dune                     |   2 +-
- lib/dune                          |   2 +-
- server/dune                       |   3 +-
- 4 files changed, 290 insertions(+), 3 deletions(-)
- create mode 100644 archiver/ProtoALp_machine.real.ml
+ bin_teztale_archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++
+ bin_teztale_archiver/dune                     |   2 +-
+ bin_teztale_server/dune                       |   2 +-
+ lib_teztale_base/dune                         |   2 +-
+ 4 files changed, 289 insertions(+), 3 deletions(-)
+ create mode 100644 bin_teztale_archiver/ProtoALp_machine.real.ml
 
-diff --git a/archiver/ProtoALp_machine.real.ml b/archiver/ProtoALp_machine.real.ml
+diff --git a/bin_teztale_archiver/ProtoALp_machine.real.ml b/bin_teztale_archiver/ProtoALp_machine.real.ml
 new file mode 100644
 index 0000000..5fee34d
 --- /dev/null
-+++ b/archiver/ProtoALp_machine.real.ml
++++ b/bin_teztale_archiver/ProtoALp_machine.real.ml
 @@ -0,0 +1,286 @@
 +(*****************************************************************************)
 +(*                                                                           *)
@@ -303,10 +303,10 @@ index 0000000..5fee34d
 +end
 +
 +module M = General_archiver.Define (Services)
-diff --git a/archiver/dune b/archiver/dune
-index 5c87c37..46bc245 100644
---- a/archiver/dune
-+++ b/archiver/dune
+diff --git a/bin_teztale_archiver/dune b/bin_teztale_archiver/dune
+index 8414483..91f88dc 100644
+--- a/bin_teztale_archiver/dune
++++ b/bin_teztale_archiver/dune
 @@ -109,7 +109,7 @@
    (select
     ProtoALp_machine.ml
@@ -315,31 +315,32 @@ index 5c87c37..46bc245 100644
 +   (octez-protocol-alpha-libs.client -> ProtoALp_machine.real.ml)
     (-> ProtoALp_machine.no.ml)))
   (flags
-   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
-diff --git a/lib/dune b/lib/dune
-index 9c57d31..73f88c6 100644
---- a/lib/dune
-+++ b/lib/dune
-@@ -1,7 +1,7 @@
+   (:standard
+diff --git a/bin_teztale_server/dune b/bin_teztale_server/dune
+index af2516d..9fd8598 100644
+--- a/bin_teztale_server/dune
++++ b/bin_teztale_server/dune
+@@ -11,7 +11,7 @@
+   cohttp-lwt-unix
+   ezgzip
+   safepass
+-  prometheus-app
++  octez-libs.prometheus-app
+   lib_teztale_base)
+  (flags
+   (:standard -open Lib_teztale_base)))
+diff --git a/lib_teztale_base/dune b/lib_teztale_base/dune
+index 806baa8..bdaa2e1 100644
+--- a/lib_teztale_base/dune
++++ b/lib_teztale_base/dune
+@@ -1,6 +1,6 @@
  (library
-  (name teztale_lib)
-  (public_name teztale.lib)
+  (name lib_teztale_base)
 - (libraries prometheus-app octez-libs.base lwt.unix)
 + (libraries octez-libs.prometheus-app octez-libs.base lwt.unix)
   (flags
    (:standard
     (:include %{workspace_root}/macos-link-flags.sexp)
-diff --git a/server/dune b/server/dune
-index 9959e59..3ec5261 100644
---- a/server/dune
-+++ b/server/dune
-@@ -4,4 +4,5 @@
-  (public_name teztale-server)
-  (promote (until-clean))
-  (libraries aches caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt.unix
--   cohttp-lwt-unix ezgzip safepass prometheus-app teztale.lib))
-+   octez-libs.cohttp-lwt-unix ezgzip safepass octez-libs.prometheus-app
-+   teztale.lib))
 -- 
 2.43.0
 
