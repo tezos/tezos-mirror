@@ -332,7 +332,7 @@ val job :
   ?tag:tag ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
-  ?retry:int ->
+  ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
   __POS__:string * int * int * int ->
   image:Image.t ->

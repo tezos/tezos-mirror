@@ -85,6 +85,10 @@ oc.docker:ci:arm64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
+  retry:
+    max: 1
+    when:
+    - runner_system_failure
 
 trigger:
   image: alpine:3.20

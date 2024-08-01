@@ -7,7 +7,8 @@
 
 open Types
 
-let default ?image ?interruptible () : default = {image; interruptible}
+let default ?image ?interruptible ?retry () : default =
+  {image; interruptible; retry}
 
 let job_rule ?changes ?if_ ?variables ?(when_ : when_ = On_success)
     ?allow_failure () : job_rule =

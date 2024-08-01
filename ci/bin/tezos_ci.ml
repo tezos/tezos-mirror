@@ -685,10 +685,10 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     | None -> variables
   in
   (match retry with
-  | Some retry when retry < 0 || retry > 2 ->
+  | Some Gitlab_ci.Types.{max; when_ = _} when max < 0 || max > 2 ->
       failwith
-        "Invalid [retry] value '%d' for job '%s': must be 0, 1 or 2."
-        retry
+        "Invalid [retry:max] value '%d' for job '%s': must be 0, 1 or 2."
+        max
         name
   | _ -> ()) ;
   (match

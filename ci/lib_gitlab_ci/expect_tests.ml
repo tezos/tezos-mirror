@@ -53,7 +53,11 @@ let%expect_test _ =
   p
     [
       Types.Default
-        {image = Some (Image "alpine-or-something"); interruptible = Some false};
+        {
+          image = Some (Image "alpine-or-something");
+          interruptible = Some false;
+          retry = None;
+        };
       Types.Stages ["first"];
       Types.Include
         [
