@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Elem, Manager};
+use super::{Elem, Manager, ManagerBase};
 
 /// Single element of type `E`
 #[repr(transparent)]
-pub struct Cell<E: Elem, M: Manager + ?Sized> {
+pub struct Cell<E: Elem, M: ManagerBase + ?Sized> {
     region: Cells<E, 1, M>,
 }
 
@@ -87,7 +87,7 @@ impl<E: CellWrite> CellWrite for &mut E {
 
 /// Multiple elements of type `E`
 #[repr(transparent)]
-pub struct Cells<E: Elem, const LEN: usize, M: Manager + ?Sized> {
+pub struct Cells<E: Elem, const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::Region<E, LEN>,
 }
 
@@ -141,7 +141,7 @@ impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
 }
 
 /// Multiple elements of an unspecified type
-pub struct DynCells<const LEN: usize, M: Manager + ?Sized> {
+pub struct DynCells<const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::DynRegion<LEN>,
 }
 
@@ -183,6 +183,7 @@ pub(crate) mod tests {
         state_backend::{
             layout::{Atom, Layout},
             Array, Backend, CellRead, CellWrite, Choreographer, DynCells, Elem, Location,
+            ManagerBase,
         },
     };
 
@@ -305,7 +306,7 @@ pub(crate) mod tests {
                     alloc.alloc()
                 }
 
-                type Allocated<B: super::Manager> = DynCells<LEN, B>;
+                type Allocated<M: ManagerBase> = DynCells<LEN, M>;
 
                 fn allocate<B: super::Manager>(
                     backend: &mut B,
@@ -334,7 +335,7 @@ pub(crate) mod tests {
                 alloc.alloc()
             }
 
-            type Allocated<B: super::Manager> = DynCells<1024, B>;
+            type Allocated<B: ManagerBase> = DynCells<1024, B>;
 
             fn allocate<B: super::Manager>(
                 backend: &mut B,

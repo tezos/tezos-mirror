@@ -18,7 +18,7 @@ pub const DEVICES_ADDRESS_SPACE_LENGTH: u64 = 2 * 1024 * 1024 * 1024;
 pub type DevicesLayout = backend::Array<u8, 1>;
 
 /// Devices state
-pub struct Devices<M: backend::Manager> {
+pub struct Devices<M: backend::ManagerBase> {
     _placeholder: backend::Cells<u8, 1, M>,
 }
 

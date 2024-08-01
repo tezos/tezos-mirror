@@ -22,7 +22,7 @@ use crate::{
     state_backend::{CellRead, CellWrite},
 };
 
-pub struct ReservationSet<M: backend::Manager> {
+pub struct ReservationSet<M: backend::ManagerBase> {
     start_addr: Cell<u64, M>,
 }
 

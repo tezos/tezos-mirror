@@ -43,7 +43,7 @@ use std::{cmp, ops::RangeBounds};
 pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, TranslationCacheLayout);
 
 /// Machine state
-pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
+pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
     pub hart: HartState<M>,
     pub bus: Bus<ML, M>,
     pub translation_cache: TranslationCache<M>,

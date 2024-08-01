@@ -102,7 +102,7 @@ impl From<PvmStatus> for u8 {
 const INITIAL_VERSION: u64 = 0;
 
 /// Proof-generating virtual machine
-pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> {
+pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase> {
     version: state_backend::Cell<u64, M>,
     pub(crate) machine_state: machine_state::MachineState<ML, M>,
     status: EnumCell<PvmStatus, u8, M>,
