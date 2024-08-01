@@ -163,9 +163,6 @@ _`Burn`
 _`Constant`
     Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
 
-_`Contract`
-    See account_.
-
 .. _def_cycle_alpha:
 
 _`Cycle`
