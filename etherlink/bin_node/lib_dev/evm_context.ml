@@ -753,6 +753,35 @@ module State = struct
         Invalid_rollup_node
           {smart_rollup_address; rollup_node_smart_rollup_address})
 
+  let preload_kernel_from_level ctxt level =
+    let open Lwt_result_syntax in
+    let* hash_candidate =
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Context_hashes.find conn level
+    in
+    match hash_candidate with
+    | None -> return_unit
+    | Some hash ->
+        let*! context = Irmin_context.checkout_exn ctxt.index hash in
+        let*! evm_state = Irmin_context.PVMState.get context in
+        let*! () = Evm_state.preload_kernel evm_state in
+        return_unit
+
+  let preload_known_kernels ctxt =
+    let open Lwt_result_syntax in
+    let* activation_levels =
+      Evm_store.use ctxt.store Evm_store.Kernel_upgrades.activation_levels
+    in
+    let* earliest_info =
+      Evm_store.use ctxt.store Evm_store.Context_hashes.find_earliest
+    in
+    let earliest_level =
+      Option.fold ~none:[] ~some:(fun (l, _) -> [l]) earliest_info
+    in
+    List.iter_ep
+      (preload_kernel_from_level ctxt)
+      (earliest_level @ activation_levels)
+
   let init ?kernel_path ~fail_on_missing_blueprint ~data_dir ~preimages
       ~preimages_endpoint ?smart_rollup_address ~store_perm () =
     let open Lwt_result_syntax in
@@ -1157,6 +1186,7 @@ module Handlers = struct
     Lwt.wakeup init_status_waker status ;
     let first_head = ref (session_to_head_info ctxt.session) in
     Lwt.wakeup head_info_waker first_head ;
+    let* () = State.preload_known_kernels ctxt in
     return ctxt
 
   let on_request :

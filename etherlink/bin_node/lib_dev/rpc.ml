@@ -348,6 +348,28 @@ let next_blueprint_number () =
   let+ next_blueprint_number in
   !next_blueprint_number
 
+let preload_kernel_from_level ctxt level =
+  let open Lwt_result_syntax in
+  let* hash = find_irmin_hash_from_number ctxt level in
+  with_evm_state ctxt hash @@ fun evm_state ->
+  let*! () = Evm_state.preload_kernel evm_state in
+  return_unit
+
+let preload_known_kernels ctxt =
+  let open Lwt_result_syntax in
+  let* activation_levels =
+    Evm_store.use ctxt.store Evm_store.Kernel_upgrades.activation_levels
+  in
+  let* earliest_info =
+    Evm_store.use ctxt.store Evm_store.Context_hashes.find_earliest
+  in
+  let earliest_level =
+    Option.fold ~none:[] ~some:(fun (l, _) -> [l]) earliest_info
+  in
+  List.iter_ep
+    (preload_kernel_from_level ctxt)
+    (earliest_level @ activation_levels)
+
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
   let* time_between_blocks =
@@ -363,6 +385,9 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
       ?preimages_endpoint:config.kernel_execution.preimages_endpoint
       ()
   in
+
+  let* () = preload_known_kernels ctxt in
+
   let rpc_backend =
     (module Make (struct
       let ctxt = ctxt
@@ -424,10 +449,10 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     ~time_between_blocks
     ~evm_node_endpoint
     ~get_next_blueprint_number:next_blueprint_number
-  @@ fun (Qty number) _ ->
-  let* blueprint =
-    Evm_store.use ctxt.store @@ fun conn ->
-    Evm_store.Blueprints.get_with_events conn (Qty number)
+  @@ fun (Qty number as level) blueprint ->
+  let* () =
+    when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
+    preload_kernel_from_level ctxt level
   in
   Blueprints_watcher.notify blueprint ;
   let*! () = set_next_blueprint_number (Qty Z.(succ number)) in

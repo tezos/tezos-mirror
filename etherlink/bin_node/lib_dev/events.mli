@@ -71,6 +71,10 @@ val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t
 
 val patched_kernel : Ethereum_types.quantity -> unit Lwt.t
 
+(** [preload_kernel version] advertizes the EVM node has preloaded in the
+    module cache the kernel [version]. *)
+val preload_kernel : string -> unit Lwt.t
+
 val patched_sequencer_key : string -> unit Lwt.t
 
 (** [sandbox_started level] advertizes that sandbox mode started on top of

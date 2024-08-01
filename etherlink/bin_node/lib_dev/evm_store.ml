@@ -297,6 +297,13 @@ module Q = struct
       (t3 level root_hash timestamp ->. unit)
       @@ {|REPLACE INTO kernel_upgrades (injected_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
 
+    let activation_levels =
+      (unit ->* level)
+      @@ {|SELECT applied_before
+           FROM kernel_upgrades
+           ORDER BY applied_before DESC
+    |}
+
     let get_latest_unapplied =
       (unit ->? upgrade)
       @@ {|SELECT root_hash, activation_timestamp
@@ -540,6 +547,10 @@ module Kernel_upgrades = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.clear_after l2_level
+
+  let activation_levels store =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Kernel_upgrades.activation_levels ()
 end
 
 module Delayed_transactions = struct

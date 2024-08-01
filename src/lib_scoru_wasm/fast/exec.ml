@@ -76,6 +76,11 @@ let load_kernel ~hooks durable =
   let store = Lazy.force static_store in
   Module_cache.load_kernel ~hooks store durable
 
+let preload_kernel ~hooks durable =
+  let open Lwt_syntax in
+  let* _ = load_kernel ~hooks durable in
+  return_unit
+
 let compute ?(wasm_entrypoint = Constants.wasm_entrypoint) ~hooks ~version
     ~reveal_builtins ~write_debug durable buffers =
   let open Lwt.Syntax in

@@ -161,6 +161,14 @@ let patched_kernel =
     ~msg:"Kernel successfully patched, starting from level {level}"
     ("level", Ethereum_types.quantity_encoding)
 
+let preload_kernel =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"preloaded_kernel"
+    ~msg:"Kernel {version} successfully preloaded"
+    ("version", Data_encoding.string)
+
 let patched_sequencer_key =
   Internal_event.Simple.declare_1
     ~level:Warning
@@ -232,6 +240,8 @@ let retrying_connect ~endpoint ~delay =
   emit event_retrying_connect (Uri.to_string endpoint, delay)
 
 let patched_kernel level = emit patched_kernel level
+
+let preload_kernel commit = emit preload_kernel commit
 
 let patched_sequencer_key pk = emit patched_sequencer_key pk
 
