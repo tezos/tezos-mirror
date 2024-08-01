@@ -207,7 +207,7 @@ module Worker = struct
                  Signals_publisher_events.untracking
                    ~injector_op_hash:injection_id
                in
-               let* _payload =
+               let* payload =
                  Sequencer_signal.create
                    ~cctxt:state.cctxt
                    ~sequencer_key:state.sequencer_key
@@ -222,11 +222,14 @@ module Worker = struct
                    ~slot_index
                    ~smart_rollup_address:state.smart_rollup_address
                in
+               Rollup_services.publish
+                 ~keep_alive:false
+                 ~rollup_node_endpoint:state.rollup_node_endpoint
+                 [payload]
                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7385
 
                   Implement included DAL slots anouncement to the kernel.
                *)
-               return_unit
            | Unknown | Pending_batch | Pending_injection _ | Injected _
            | Included _ | Committed _ ->
                return_unit)
