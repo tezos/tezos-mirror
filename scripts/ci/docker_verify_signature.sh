@@ -27,8 +27,11 @@ cat publickey.pem
 # Loop over images
 for docker_image in ${docker_images}; do
 
+  # Pull images
+  docker pull "${docker_image}:${DOCKER_IMAGE_TAG}"
+
   # Get image digest
-  IMAGE_DIGEST="${docker_image}@$(docker buildx imagetools inspect "${docker_image}:${DOCKER_IMAGE_TAG}" --format "{{json .Manifest}}" | jq -r '.digest')"
+  IMAGE_DIGEST="$(docker image inspect "${docker_image}:${DOCKER_IMAGE_TAG}" --format="{{index .RepoDigests 0}}")"
   echo "Image digest: ${IMAGE_DIGEST}"
 
   # Get the location of image signature as reference
