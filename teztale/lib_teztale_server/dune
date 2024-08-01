@@ -1,0 +1,10 @@
+(library
+ (name lib_teztale_server)
+ (libraries prometheus-app octez-libs.base lwt.unix)
+ (flags
+  (:standard
+   (:include %{workspace_root}/macos-link-flags.sexp)
+   -open
+   Tezos_base.TzPervasives
+   -open
+   Tezos_base)))

@@ -1,0 +1,336 @@
+# Teztale CI produces two builds, a regular one, and a canary build
+# - The regular build uses either the latest release branch or release candidate branch of tezos/tezos
+#   and does not include the archiver for ProtoALpha
+# - The `canary` build use the `master` branch of tezos/tezos
+#   and includes the archiver for ProtoALpha
+#
+# `canary` builds are not meant to be stable, so they may break at any time.
+# `canary` builds are likely not to be compilable once octez main branch changed after their initial compilation.
+# `canary` builds are therefore allowed to fail.
+
+stages:
+  - check
+  - prepare
+  - build
+  - deploy
+  - docker
+
+variables:
+  supported_ARCH: "amd64 arm64"
+  DEFAULT_RUNNER_TAG: gcp
+  STABLE_OCTEZ_BRANCH: "octez-v20.2"
+  TEZTALE_REF: "${TEZTALE_REF_BASE}${TEZTALE_REF_SUFFIX}"
+  CONTAINER_TAG: "${TEZTALE_REF}"
+  BUILD_CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/dependencies:${CONTAINER_TAG}"
+  # Build blst used by ocaml-bls12-381 without ADX to support old CPU
+  # architectures.
+  # See https://gitlab.com/tezos/tezos/-/issues/1788
+  BLST_PORTABLE: "yes"
+  DOCKER_BUILDKIT: "1"
+  DOCKER_CLI_EXPERIMENTAL: enabled
+  ARTIFACTS_PATH: "./${ARCH}/${TEZTALE_REF}"
+
+# ${TEZTALE_REF_BASE} value depends on whether or not we are releasing a stable version (i.e. $CI_COMMIT_TAG is defined)
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        TEZTALE_REF_BASE: "$CI_COMMIT_TAG"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      variables:
+        TEZTALE_REF_BASE: "latest"
+    - if: $CI_COMMIT_REF_SLUG
+      variables:
+        TEZTALE_REF_BASE: "$CI_COMMIT_REF_SLUG"
+
+.anchors:
+  # When the job involve the need for a specific architecture (e.g. when build binaries)
+  # add the following entry to your job definition:
+  # > tags:
+  # >   - ${RUNNER}
+  - &default_matrix
+    matrix:
+      - RUNNER: "gcp"
+        ARCH: "amd64"
+      - RUNNER: "gcp_arm64"
+        ARCH: "arm64"
+
+.stable:variables:
+  variables:
+    OCTEZ_BRANCH: "${STABLE_OCTEZ_BRANCH}"
+
+.canary:variables:
+  variables:
+    OCTEZ_BRANCH: "master"
+    TEZTALE_REF_SUFFIX: "-canary"
+
+# In order to prevent the `canary` builds to be a hassle when developing Teztale,
+# we only build the `canary` version for default branch and merge requests
+.canary:build:rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TAG == null
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      allow_failure: true
+
+.apply-proto-alpha-patch:
+  &apply-proto-alpha-patch # Without this option git will fail when trying to `git am < ProtoALpha.git.patch`
+  - git config --global --add safe.directory $(pwd)
+  - git am < ProtoALpha.git.patch
+
+.docker-login: &docker-login "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY"
+
+.docker-wait-docker-daemon: &docker-wait-docker-daemon while ! nc -z localhost 2375; do echo 'Waiting for docker daemon...' ; sleep 1; done
+
+################
+# SANITY CHECK #
+################
+
+check:
+  stage: check
+  image: ocaml/opam:ubuntu-22.04-ocaml-4.14
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
+  before_script:
+    - opam-2.1 install ocamlformat.0.25.1
+    - eval $(opam env)
+  script:
+    - *apply-proto-alpha-patch # Check that ProtoALpha patch can be applied
+    - dune build @fmt # Check that code is properly formatted with ocamlformat
+
+#############################
+# DOCKER IMAGES PREPARATION #
+#############################
+
+# Build or update the docker image that will be used for the build job
+.prepare:
+  stage: prepare
+  image: docker:latest
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
+  services:
+    - docker:dind
+  before_script:
+    - *docker-wait-docker-daemon
+    - *docker-login
+    - docker run --privileged --rm tonistiigi/binfmt --install arm64,arm64 # Fix for 'sudo: effective uid is not 0' error (? ¯\_(ツ)_/¯ ?)
+    - docker buildx create --name teztale-dependencies --use --driver docker-container
+    - docker buildx inspect --bootstrap
+    - set -xv
+    - docker version
+    - docker buildx version
+  script:
+    - docker manifest inspect "${BUILD_CONTAINER_NAME}" && export DOCKER_ARGS="--build-arg BASE=${BUILD_CONTAINER_NAME}" && export OPAM_INSTALL_ARGS=--criteria="-changed,-removed" || export DOCKER_ARGS="" && export OPAM_INSTALL_ARGS=
+    - echo DOCKER_ARGS="${DOCKER_ARGS}" OCTEZ_BRANCH="${OCTEZ_BRANCH}" OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}"
+    - docker buildx build --platform linux/arm64/v8,linux/amd64 -t "${BUILD_CONTAINER_NAME}" ${DOCKER_ARGS} --build-arg OCTEZ_BRANCH="${OCTEZ_BRANCH}" --build-arg OPAM_INSTALL_ARGS="${OPAM_INSTALL_ARGS}" --push -f Dockerfile.dependencies .
+
+prepare:stable:
+  extends:
+    - .stable:variables
+    - .prepare
+
+prepare:canary:
+  extends:
+    - .canary:variables
+    - .canary:build:rules
+    - .prepare
+  before_script:
+    - apk update && apk add git # docker:stable is base on alpine linux
+    - git config --global user.name "$GITLAB_USER_NAME"
+    - git config --global user.email "$GITLAB_USER_EMAIL"
+    - *apply-proto-alpha-patch
+    - !reference [.prepare, before_script]
+
+#########################################
+# BUILD ARCHIVER AND SERVER EXECUTABLES #
+#########################################
+
+.build:
+  stage: build
+  image: ${BUILD_CONTAINER_NAME}
+  parallel: *default_matrix
+  tags:
+    - ${RUNNER}
+  before_script:
+    - eval $(opam env)
+    - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
+    - sed -i "s|let teztale_version = \"\"|let teztale_version = \"${TEZTALE_REF}\"|g" ./lib_teztale_base/version.ml
+    - sed -i "s|let teztale_commit_ref = \"\"|let teztale_commit_ref = \"${CI_COMMIT_SHA}\"|g" ./lib_teztale_base/version.ml
+    - sed -i "s|let tezos_branch = \"\"|let tezos_branch = \"${OCTEZ_BRANCH}\"|g" ./lib_teztale_base/version.ml
+    - sed -i "s|let tezos_commit_ref = \"\"|let tezos_commit_ref = \"`cd tezos && git rev-parse HEAD`\"|g" ./lib_teztale_base/version.ml
+  script:
+    - dune build bin_teztale_archiver/main.exe bin_teztale_server/main.exe
+    - mkdir -p ${ARTIFACTS_PATH}/{archiver,server}
+    - cp bin_teztale_archiver/main.exe ${ARTIFACTS_PATH}/archiver/main.exe
+    - cp bin_teztale_server/main.exe ${ARTIFACTS_PATH}/server/main.exe
+  artifacts:
+    name: teztale-${ARCH}-${TEZTALE_REF}
+    expire_in: 1 week
+    paths:
+      - ${ARTIFACTS_PATH}/archiver/main.exe
+      - ${ARTIFACTS_PATH}/server/main.exe
+
+build:stable:
+  extends:
+    - .stable:variables
+    - .build
+  needs:
+    - job: prepare:stable
+      artifacts: false
+
+build:canary:
+  extends:
+    - .canary:variables
+    - .canary:build:rules
+    - .build
+  before_script:
+    - *apply-proto-alpha-patch
+    - !reference [.build, before_script]
+  needs:
+    - job: prepare:canary
+      artifacts: false
+
+###########################################
+# RELEASE BINARIES (VIA PACKAGE REGISTRY) #
+###########################################
+
+# Don't forget to specify ${ARCH} (and optionally ${OCTEZ_BRANCH}) variable when using this rule
+# ${TEZTALE_REF} is already defined globally
+.rename-build-artifacts:
+  before_script:
+    - mv ${ARTIFACTS_PATH}/archiver/main.exe ./archiver/
+    - mv ${ARTIFACTS_PATH}/server/main.exe ./server/
+
+# When extending this, use a before_script in order to provide `archiver/main.exe` and `server/main.exe` files
+.release:
+  stage: deploy
+  image: alpine
+  parallel: *default_matrix
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
+  before_script:
+    - !reference [.rename-build-artifacts, before_script]
+  script:
+    - apk add zip curl
+    - zip ./${ARCH}-${TEZTALE_REF}.zip archiver/main.exe server/main.exe
+    - curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file ./${ARCH}-${TEZTALE_REF}.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${TEZTALE_REF}/"
+
+# To release specific package version, create a (gitlab) tag on branch main
+release:stable:
+  extends:
+    - .stable:variables
+    - .release
+  needs:
+    - job: build:stable
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG != null
+
+.release:canary:rules:
+  rules:
+    # Only release the `canary` for what would be the next stable version
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TAG == null
+      allow_failure: true
+
+release:canary:
+  extends:
+    - .canary:variables
+    - .release:canary:rules
+    - .release
+  needs:
+    - job: build:canary
+      artifacts: true
+
+################################################
+# RELEASE DOCKER IMAGES (VIA PACKAGE REGISTRY) #
+################################################
+
+.docker:release:
+  stage: docker
+  image: docker:latest
+  services:
+    - docker:dind
+  parallel: *default_matrix
+  tags:
+    - ${RUNNER}
+  before_script:
+    - !reference [.rename-build-artifacts, before_script]
+    - *docker-wait-docker-daemon
+    - *docker-login
+    - set -xv
+  script:
+    - >
+      for BIN in archiver server ; do
+        docker build -t "${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}" -f Dockerfile.$BIN . ;
+      done
+    - >
+      for BIN in archiver server ; do
+        docker push "${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}" ;
+      done
+
+.docker:stable:rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_REGISTRY_IMAGE
+      when: manual
+      allow_failure: true
+
+.docker:canary:rules:
+  extends: .release:canary:rules
+
+docker:stable:
+  extends:
+    - .stable:variables
+    - .docker:stable:rules
+    - .docker:release
+  needs:
+    - job: build:stable
+      artifacts: true
+
+docker:canary:
+  extends:
+    - .canary:variables
+    - .docker:canary:rules
+    - .docker:release
+  needs:
+    - job: build:canary
+      artifacts: true
+
+# Create multiarch manifest
+.docker:manifest:
+  stage: docker
+  image: docker:latest
+  services:
+    - docker:dind
+  tags:
+    - ${DEFAULT_RUNNER_TAG}
+  before_script:
+    - *docker-wait-docker-daemon
+    - *docker-login
+    - set -xv
+  script:
+    - >
+      for BIN in archiver server ; do
+        docker manifest create "${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG}" `for ARCH in ${supported_ARCH} ; do echo " --amend ${CI_REGISTRY_IMAGE}/$BIN-$ARCH:${CONTAINER_TAG}" ; done ;`;
+        docker manifest push "${CI_REGISTRY_IMAGE}/$BIN:${CONTAINER_TAG}" ;
+      done ;
+
+docker:manifest:stable:
+  extends:
+    - .stable:variables
+    - .docker:stable:rules
+    - .docker:manifest
+  needs:
+    - job: docker:stable
+      artifacts: false
+
+docker:manifest:canary:
+  extends:
+    - .canary:variables
+    - .docker:canary:rules
+    - .docker:manifest
+  needs:
+    - job: docker:canary
+      artifacts: false
