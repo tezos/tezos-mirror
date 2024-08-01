@@ -22,7 +22,7 @@ type transaction = {
   to_ : bytes option;
   value : Z.t;
   data : bytes;
-  access_list : unit list;
+  access_list : access_list_item list;
   v : Z.t;
   r : bytes;
   s : bytes;
@@ -84,6 +84,7 @@ let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
   let to_ = if to_ = Bytes.empty then None else Some to_ in
   let (Qty value) = decode_number_be value in
   let (Qty v) = decode_number_be v in
+  let* access_list = decode_access_list_rlp access_list in
   let* chain_id =
     match chain_id with
     | None ->
@@ -207,7 +208,7 @@ let decode_eip1559 : bytes -> (transaction, string) result =
           Value to_;
           Value value;
           Value data;
-          List _access_list;
+          List access_list;
           Value v;
           Value r;
           Value s;
@@ -222,6 +223,7 @@ let decode_eip1559 : bytes -> (transaction, string) result =
         ~to_
         ~value
         ~data
+        ~access_list
         (v, r, s)
   | _ -> fail "Eip1559 transaction is not 12 rlp items"
 
@@ -236,7 +238,7 @@ let encode_eip1559_transaction : transaction -> bytes = function
       to_;
       value;
       data;
-      access_list = [];
+      access_list;
       v = _;
       r = _;
       s = _;
@@ -250,6 +252,7 @@ let encode_eip1559_transaction : transaction -> bytes = function
         let gas_limit = encode_z gas_limit in
         let to_ = Option.value ~default:Bytes.empty to_ in
         let value = encode_z value in
+        let access_list = encode_access_list access_list in
         List
           [
             Value chain_id;
@@ -260,7 +263,7 @@ let encode_eip1559_transaction : transaction -> bytes = function
             Value to_;
             Value value;
             Value data;
-            List [];
+            access_list;
           ]
       in
       let prefix = Bytes.make 1 (Char.chr 2) in
@@ -282,7 +285,7 @@ let decode_eip2930 : bytes -> (transaction, string) result =
           Value to_;
           Value value;
           Value data;
-          List _access_list;
+          List access_list;
           Value v;
           Value r;
           Value s;
@@ -297,6 +300,7 @@ let decode_eip2930 : bytes -> (transaction, string) result =
         ~to_
         ~value
         ~data
+        ~access_list
         (v, r, s)
   | _ -> fail "Eip2930 transaction is not 11 rlp items"
 
@@ -311,7 +315,7 @@ let encode_eip2930_transaction : transaction -> bytes = function
       to_;
       value;
       data;
-      access_list = [];
+      access_list;
       v = _;
       r = _;
       s = _;
@@ -324,6 +328,7 @@ let encode_eip2930_transaction : transaction -> bytes = function
         let gas_limit = encode_z gas_limit in
         let to_ = Option.value ~default:Bytes.empty to_ in
         let value = encode_z value in
+        let access_list = encode_access_list access_list in
         List
           [
             Value chain_id;
@@ -333,7 +338,7 @@ let encode_eip2930_transaction : transaction -> bytes = function
             Value to_;
             Value value;
             Value data;
-            List [];
+            access_list;
           ]
       in
       let prefix = Bytes.make 1 (Char.chr 1) in
