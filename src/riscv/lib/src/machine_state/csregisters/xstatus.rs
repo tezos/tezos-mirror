@@ -19,10 +19,11 @@ use crate::{
     machine_state::mode::Mode,
 };
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[repr(u8)]
 pub enum MPPValue {
     User = 0b00,
+    #[default]
     Supervisor = 0b01,
     Machine = 0b11,
 }
@@ -37,10 +38,14 @@ impl From<MPPValue> for Mode {
     }
 }
 
-impl Bits64 for MPPValue {
-    const WIDTH: usize = 2;
+impl From<MPPValue> for u8 {
+    fn from(value: MPPValue) -> Self {
+        value as u8
+    }
+}
 
-    fn from_bits(value: u64) -> Self {
+impl From<u8> for MPPValue {
+    fn from(value: u8) -> Self {
         match value & 0b11 {
             0b00 => MPPValue::User,
             0b01 => MPPValue::Supervisor,
@@ -49,72 +54,121 @@ impl Bits64 for MPPValue {
             _ => MPPValue::User,
         }
     }
+}
+
+impl Bits64 for MPPValue {
+    const WIDTH: usize = 2;
+
+    fn from_bits(value: u64) -> Self {
+        <MPPValue as From<u8>>::from(value as u8)
+    }
 
     fn to_bits(&self) -> u64 {
-        *self as u8 as u64
+        <MPPValue as Into<u8>>::into(*self) as u64
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[repr(u8)]
 pub enum SPPValue {
     User = 0b0,
+    #[default]
     Supervisor = 0b1,
 }
 
-impl Bits64 for SPPValue {
-    const WIDTH: usize = 1;
-
-    fn from_bits(value: u64) -> Self {
+impl From<u8> for SPPValue {
+    fn from(value: u8) -> Self {
         match value & 1 {
             0b0 => SPPValue::User,
             0b1 => SPPValue::Supervisor,
             _ => unreachable!(),
         }
     }
+}
 
-    fn to_bits(&self) -> u64 {
-        *self as u8 as u64
+impl From<SPPValue> for u8 {
+    fn from(value: SPPValue) -> Self {
+        value as u8
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+impl Bits64 for SPPValue {
+    const WIDTH: usize = 1;
+
+    fn from_bits(value: u64) -> Self {
+        <SPPValue as From<u8>>::from(value as u8)
+    }
+
+    fn to_bits(&self) -> u64 {
+        <SPPValue as Into<u8>>::into(*self) as u64
+    }
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[repr(u64)]
 pub enum XLenValue {
+    #[default]
     MXL64 = 0b10,
+}
+
+impl From<XLenValue> for u8 {
+    fn from(value: XLenValue) -> Self {
+        value as u8
+    }
+}
+
+impl From<u8> for XLenValue {
+    #[inline(always)]
+    fn from(_value: u8) -> Self {
+        Self::MXL64
+    }
 }
 
 impl Bits64 for XLenValue {
     const WIDTH: usize = 2;
 
-    fn from_bits(_value: u64) -> Self {
-        Self::MXL64
+    #[inline(always)]
+    fn from_bits(value: u64) -> Self {
+        <XLenValue as From<u8>>::from(value as u8)
     }
 
     fn to_bits(&self) -> u64 {
-        *self as u64
+        <XLenValue as Into<u8>>::into(*self) as u64
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[repr(u64)]
 pub enum ExtensionValue {
     Off = 0b00,
+    #[default]
     Dirty = 0b11,
+}
+
+impl From<ExtensionValue> for u8 {
+    fn from(value: ExtensionValue) -> Self {
+        value as u8
+    }
+}
+
+impl From<u8> for ExtensionValue {
+    fn from(value: u8) -> Self {
+        match value & 0b11 {
+            0b00 => ExtensionValue::Off,
+            _ => ExtensionValue::Dirty,
+        }
+    }
 }
 
 impl Bits64 for ExtensionValue {
     const WIDTH: usize = 2;
 
     fn from_bits(value: u64) -> Self {
-        match value & 0b11 {
-            0b00 => ExtensionValue::Off,
-            _ => ExtensionValue::Dirty,
-        }
+        <ExtensionValue as From<u8>>::from(value as u8)
     }
 
     fn to_bits(&self) -> u64 {
-        *self as u64
+        <ExtensionValue as Into<u8>>::into(*self) as u64
     }
 }
 
@@ -171,19 +225,19 @@ impl Default for MStatus {
             .with_spie(false)
             .with_mpie(false)
             // Previous privilege mode was supervisor
-            .with_spp(SPPValue::Supervisor)
-            .with_mpp(MPPValue::Supervisor)
+            .with_spp(SPPValue::default())
+            .with_mpp(MPPValue::default())
             // Endianness is little-endian
             .with_ube(false)
             .with_sbe(false)
             .with_mbe(false)
             // Set register dirtiness
-            .with_fs(ExtensionValue::Dirty)
-            .with_xs(ExtensionValue::Dirty)
+            .with_fs(ExtensionValue::default())
+            .with_xs(ExtensionValue::default())
             .with_sd(false)
             // Registers are also 64-bit wide in user and supervisor mode
-            .with_uxl(XLenValue::MXL64)
-            .with_sxl(XLenValue::MXL64)
+            .with_uxl(XLenValue::default())
+            .with_sxl(XLenValue::default())
             // Load and stores should use current effective privilege
             .with_mprv(false)
             // Supervisor mode shall have access to user page mappings

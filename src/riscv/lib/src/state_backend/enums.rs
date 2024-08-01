@@ -72,6 +72,7 @@ where
         EnumCell::write(self, value)
     }
 
+    #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
         EnumCell::replace(self, value)
     }
