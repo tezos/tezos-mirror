@@ -564,7 +564,7 @@ apt_repo_ubuntu:
     PREFIX: next
 
 opam:release:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: publish_release
   tags:
   - gcp
