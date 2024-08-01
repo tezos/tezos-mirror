@@ -5139,38 +5139,6 @@ let test_regression_block_hash_gen =
   in
   unit
 
-let test_invalid_kernel =
-  register_all
-    ~kernels:[Latest]
-    ~tags:["evm"; "invalid_kernel"]
-    ~title:"Can detect invalid kernel relying on floats"
-    ~da_fee:Wei.zero
-  @@ fun {sequencer; _} _protocol ->
-  let* () = Evm_node.terminate sequencer in
-  let kernel_path = Temp.file "invalid_kernel.wast" in
-  write_file
-    kernel_path
-    ~contents:
-      {|
-        (module
-          (memory 1)
-          (export "mem" (memory 0))
-          (func (export "kernel_run")
-            (local $f f32)
-            (local.set $f (f32.const 1.1))
-            (unreachable)
-          )
-        )
-    |} ;
-  (* As of time of writing this test, the [patch kernel] command does not check
-     for floats when submitted a textual wasm kernel. We abuse this to enable
-     this test, and since realistic kernel are not written in WASM but compiled
-     to binary, it should be okay. But it is clearly not ideal. *)
-  let* () = Evm_node.patch_kernel sequencer kernel_path in
-  let* () = Evm_node.run sequencer in
-  let* _ = Evm_node.wait_for_invalid_kernel sequencer in
-  unit
-
 (* Self test for sequencer in sandbox mode. *)
 let test_sequencer_sandbox () =
   Test.register
@@ -5336,6 +5304,5 @@ let () =
   test_proxy_finalized_view protocols ;
   test_finalized_block_param protocols ;
   test_regression_block_hash_gen protocols ;
-  test_invalid_kernel protocols ;
   test_sequencer_sandbox () ;
   test_rpc_mode_while_block_are_produced protocols
