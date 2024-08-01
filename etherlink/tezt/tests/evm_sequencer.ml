@@ -820,9 +820,10 @@ let test_publish_blueprints_on_dal =
 
   let number_of_blueprints_sent_to_inbox = ref 0 in
   let number_of_blueprints_sent_to_dal = ref 0 in
+  let number_of_signals = ref 0 in
 
   let count_event event counter =
-    Evm_node.wait_for sequencer event (fun _level ->
+    Evm_node.wait_for sequencer event (fun _json ->
         incr counter ;
         (* We return None here to keep the loop running *)
         None)
@@ -836,6 +837,10 @@ let test_publish_blueprints_on_dal =
 
   let dal_counter_p =
     count_event "blueprint_injection_on_DAL.v0" number_of_blueprints_sent_to_dal
+  in
+
+  let signal_counter_p =
+    count_event "signal_publisher_signal_signed.v0" number_of_signals
   in
 
   let* _ =
@@ -856,6 +861,16 @@ let test_publish_blueprints_on_dal =
     bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
   in
 
+  let* () =
+    (* bake 2 block when DAL is enabled so evm_node sees it as
+       finalized in `rollup_node_follower` *)
+    if enable_dal then
+      repeat 2 (fun () ->
+          let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+          unit)
+    else unit
+  in
+
   (* We have unfortunately noticed that the test can be flaky. Sometimes,
      the following RPC is done before the proxy being initialised, even though
      we wait for it. The source of flakiness is unknown but happens very rarely,
@@ -865,11 +880,16 @@ let test_publish_blueprints_on_dal =
   let expected_nb_of_bp_on_dal, expected_nb_of_bp_on_inbox =
     if enable_dal then (number_of_blueprints, 0) else (0, number_of_blueprints)
   in
+  let expected_nb_of_signals = expected_nb_of_bp_on_dal in
   Check.(expected_nb_of_bp_on_dal = !number_of_blueprints_sent_to_dal)
     ~__LOC__
     Check.int
     ~error_msg:
       "Wrong number of blueprints published on the DAL; Expected %L, got %R." ;
+  Check.(expected_nb_of_signals = !number_of_signals)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Wrong number of signals signed; Expected %L, got %R." ;
   Check.(expected_nb_of_bp_on_inbox = !number_of_blueprints_sent_to_inbox)
     ~__LOC__
     Check.int
@@ -877,6 +897,7 @@ let test_publish_blueprints_on_dal =
       "Wrong number of blueprints published on the inbox; Expected %L, got %R." ;
   Lwt.cancel dal_counter_p ;
   Lwt.cancel inbox_counter_p ;
+  Lwt.cancel signal_counter_p ;
   unit
 
 let test_sequencer_too_ahead =
