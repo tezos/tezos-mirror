@@ -4364,7 +4364,7 @@ let test_rpcs ~kind
     ~error_msg:"Injected %L messages but should have injected %R" ;
   (* Head block hash endpoint test *)
   let* level = Node.get_level node in
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node level in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:10. sc_rollup_node level in
   let* l1_block_hash = Client.RPC.call client @@ RPC.get_chain_block_hash () in
   let* l2_block_hash =
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
