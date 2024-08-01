@@ -11,13 +11,16 @@ DAL P2P network
 
 The ``octez-dal-node`` executable runs a node in the DAL’s P2P network. Recall that :ref:`the DAL's P2P protocol <dal_p2p>` is based on a gossip algorithm for distributing shards, running on top of a networking layer using the same p2p library as L1 nodes.
 
-Actors with various roles may need to run the DAL node, for instance bootstrap DAL node operators, slot producers, bakers.
+Actors with various roles may need to run a DAL node, they need different views of the network depending on their role:
+- operators of smart rollups care about the slots published on some slot indices (those used by the rollup they operate), they don't care about the slots used by other rollups;
+- bakers however care about what happens on all slot indices but they only care about a few shard indices (those assigned to the address of the baker);
+- finally bootstrap nodes have a global view of the DAL P2P network but they don't care about the content of the messages that transit on the network.
 
 Bootstrap DAL nodes represent DAL network entry points. Their only role is to provide a way for other DAL nodes to become part of the DAL P2P network. A bootstrap node remains connected to a large number of peers, and is subscribed to all topics. It can thus provide another node with a list of peers to connect to for each of the topics that node is interested in.
 
 Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe to, for instance:
 
-- Slot producers subscribe to all topics containing some specified slot indexes.
+- Operators subscribe to all topics containing some specified slot indexes.
 - Bakers subscribe to all topics containing the attester identities they run for (for all possible slot indexes).
 
 .. _dal_profiles:
@@ -26,15 +29,15 @@ Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe
 Profiles
 ~~~~~~~~
 
-These differences in the behavior of a DAL node are specified using **profiles**. There are therefore three profiles: bootstrap, producer, and attester profiles. These can be given in the node’s configuration file, or as CLI arguments to the node’s commands, or via RPCs.
-The attester and producer profiles can be combined, the node will then subscribe to the union of the corresponding topics, while the bootstrap profile is incompatible with the other profiles.
+These differences in the behavior of a DAL node are specified using **profiles**. There are therefore three profiles: bootstrap, operator, and attester profiles. These can be given in the node’s configuration file, or as CLI arguments to the node’s commands, or via RPCs.
+The attester and operator profiles can be combined, the node will then subscribe to the union of the corresponding topics, while the bootstrap profile is incompatible with the other profiles.
 
 Storage
 ^^^^^^^
 
 The DAL node essentially stores slots and shards. Slots are injected into the node through an RPC (see details at :ref:`slots_lifetime`), at which moment the corresponding commitment is computed and stored. Shards and their proofs are computed and stored via another RPC. It is important to also compute the shards’ proofs, because shards can be exchanged over the P2P network only if they are accompanied by their proof. Shards received over the P2P network are also stored. The node also tracks and stores the status of commitments by monitoring the L1 chain, connecting to this end to an L1 node specified at startup.
 
-The size of the node’s storage depends on its profile. A bootstrap node uses negligible storage. A DAL node with a producer profile stores in the order of tens MiB per slot, per level. Note that this translates to at least 100GiB per day per slot. A DAL node with an attester profile with the attester having a stake fraction of 1% stores an order of magnitude less data per level.
+The size of the node’s storage depends on its profile. A bootstrap node uses negligible storage. A DAL node with an operator profile stores in the order of tens MiB per slot, per level. Note that this translates to at least 100GiB per day per slot. A DAL node with an attester profile with the attester having a stake fraction of 1% stores an order of magnitude less data per level.
 
 L1 monitoring
 ^^^^^^^^^^^^^
@@ -77,7 +80,7 @@ Both commands have the same arguments, which can be seen by executing, e.g., ``o
 
 See the :ref:`DAL node manual <dal_node_manual>` for more details.
 
-In order to run a DAL node with a slot producer profile, one first needs to
+In order to run a DAL node with an operator profile, one first needs to
 install some cryptographic parameters, see the section on :ref:`Install DAL
 trusted setup<setup_dal_crypto_params>`.
 
@@ -109,14 +112,14 @@ Lifetime of slots and shards
 
 The life cycle of slots and shards is described by the following steps:
 
-#. The slot producer posts the slot data to some DAL node of its choice. The node computes the corresponding commitment and adds the association commitment - slot to the store.
+#. The operator posts the slot data to some DAL node of its choice. The node computes the corresponding commitment and adds the association commitment - slot to the store.
    This is done via the RPC ``POST /commitments/<slot_data>``, which returns the corresponding commitment.
-#. The slot producer instructs the DAL node to compute and save the shards of the slot associated with the given commitment.
+#. The operator instructs the DAL node to compute and save the shards of the slot associated with the given commitment.
    It is important to set the query flag ``with_proof`` to true to be able to publish the shards on the P2P network.
    This is done via the RPC ``PUT /commitments/<commitment>/shards``.
-#. The slot producer instructs the DAL node to compute the proof associated with the commitment.
+#. The operator instructs the DAL node to compute the proof associated with the commitment.
    This is done via the RPC ``GET /commitments/<commitment>/proof``, which returns the corresponding commitment proof.
-#. The slot producer selects a slot index for its slot, and posts the commitment to L1, via the ``publish_commitment`` operation.
+#. The operator selects a slot index for its slot, and posts the commitment to L1, via the ``publish_commitment`` operation.
    This can be done via RPCs for injecting an operation into L1, or using the Octez client, via the following command::
 
      octez-client publish dal commitment <commitment> from <pkh> for slot <slot_index> with proof <proof>
