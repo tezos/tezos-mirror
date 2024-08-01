@@ -1079,9 +1079,6 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
       in
       return_unit
 
-(** [get_and_upgrade_offsets fd nb_blocks] obtains the list of [nb_blocks] offsets from the 
-    beginning of the file given by file descriptor [fd] and upgrades their sizes from 32-bits to 
-    64-bits, adjusting their values for the following blocks in the cemented blocks file. *)
 let get_and_upgrade_offsets fd nb_blocks =
   let open Lwt_syntax in
   (* Obtain the list of offsets (32-bit format) *)
