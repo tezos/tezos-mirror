@@ -12,6 +12,7 @@
   ezgzip
   safepass
   prometheus-app
-  lib_teztale_base)
+  lib_teztale_base
+  lib_teztale_server)
  (flags
-  (:standard -open Lib_teztale_base)))
+  (:standard -open Lib_teztale_base -open Lib_teztale_server)))

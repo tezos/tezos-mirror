@@ -1,4 +1,4 @@
-From 2397080c5494e4a5ed5c7c3cfb25bff0f1069f0f Mon Sep 17 00:00:00 2001
+From f05e8ac6622a134b7f24af1c78566fba7fefa0ad Mon Sep 17 00:00:00 2001
 From: Pierre Boutillier <pierre.boutillier@nomadic-labs.com>
 Date: Fri, 15 Sep 2023 13:51:22 +0200
 Subject: [PATCH] An archiver for ProtoALpha
@@ -7,7 +7,7 @@ Subject: [PATCH] An archiver for ProtoALpha
  bin_teztale_archiver/ProtoALp_machine.real.ml | 286 ++++++++++++++++++
  bin_teztale_archiver/dune                     |   2 +-
  bin_teztale_server/dune                       |   2 +-
- lib_teztale_base/dune                         |   2 +-
+ lib_teztale_server/dune                       |   2 +-
  4 files changed, 289 insertions(+), 3 deletions(-)
  create mode 100644 bin_teztale_archiver/ProtoALp_machine.real.ml
 
@@ -317,7 +317,7 @@ index 8414483..91f88dc 100644
   (flags
    (:standard
 diff --git a/bin_teztale_server/dune b/bin_teztale_server/dune
-index af2516d..9fd8598 100644
+index d733612..8bafc1d 100644
 --- a/bin_teztale_server/dune
 +++ b/bin_teztale_server/dune
 @@ -11,7 +11,7 @@
@@ -326,16 +326,16 @@ index af2516d..9fd8598 100644
    safepass
 -  prometheus-app
 +  octez-libs.prometheus-app
-   lib_teztale_base)
+   lib_teztale_base
+   lib_teztale_server)
   (flags
-   (:standard -open Lib_teztale_base)))
-diff --git a/lib_teztale_base/dune b/lib_teztale_base/dune
-index 806baa8..bdaa2e1 100644
---- a/lib_teztale_base/dune
-+++ b/lib_teztale_base/dune
+diff --git a/lib_teztale_server/dune b/lib_teztale_server/dune
+index 8bde540..fcb60d2 100644
+--- a/lib_teztale_server/dune
++++ b/lib_teztale_server/dune
 @@ -1,6 +1,6 @@
  (library
-  (name lib_teztale_base)
+  (name lib_teztale_server)
 - (libraries prometheus-app octez-libs.base lwt.unix)
 + (libraries octez-libs.prometheus-app octez-libs.base lwt.unix)
   (flags

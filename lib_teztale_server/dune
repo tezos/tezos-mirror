@@ -1,6 +1,6 @@
 (library
- (name lib_teztale_base)
- (libraries octez-libs.base lwt.unix)
+ (name lib_teztale_server)
+ (libraries prometheus-app octez-libs.base lwt.unix)
  (flags
   (:standard
    (:include %{workspace_root}/macos-link-flags.sexp)
