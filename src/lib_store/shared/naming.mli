@@ -100,12 +100,6 @@ val protocol_levels_file :
     Protocol_levels.protocol_info Protocol_levels.t )
   encoded_file
 
-val legacy_protocol_levels_file :
-  [< `Chain_dir] directory ->
-  ( [`Protocol_levels],
-    Protocol_levels.Legacy.activation_block Protocol_levels.Legacy.t )
-  encoded_file
-
 val genesis_block_file :
   [`Chain_dir] directory -> ([`Genesis_block], Block_repr.t) encoded_file
 
