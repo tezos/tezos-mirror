@@ -415,7 +415,9 @@ let dump_durable_storage =
     @@ Cli.wasm_dump_file_param @@ stop)
     (fun (data_dir, block) file cctxt ->
       let open Lwt_result_syntax in
-      let*! res = Wasm_2_0_0_dump.dump_durable_storage ~block ~data_dir ~file in
+      let*! res =
+        Wasm_2_0_0_utilities.dump_durable_storage ~block ~data_dir ~file
+      in
       match res with
       | Ok () ->
           let*! () = cctxt#message "Dumped WASM PVM state to %s@." file in
