@@ -16,7 +16,7 @@ let tag = function
   | Eip1559 -> "Eip1559"
   | Eip2930 -> "Eip2930"
 
-let register ~title ~tags f tx_types =
+let register ?da_fee_per_byte ~title ~tags f tx_types =
   List.iter
     (fun tx_type ->
       let tag_tx = tag tx_type in
@@ -40,7 +40,9 @@ let register ~title ~tags f tx_types =
           ~node_transaction_validation:true
           ()
       in
-      let* sequencer = Helpers.init_sequencer_sandbox ~patch_config () in
+      let* sequencer =
+        Helpers.init_sequencer_sandbox ?da_fee_per_byte ~patch_config ()
+      in
       f sequencer tx_type)
     tx_types
 
@@ -361,6 +363,76 @@ let test_validate_pay_for_fees =
 
   unit
 
+let test_validate_gas_limit =
+  register
+    ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
+    ~title:"Validate gas limit"
+    ~tags:["da_fee"; "gas_limit"]
+  @@ fun sequencer tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let make_tx_gas_limit ~legacy ~gas =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy
+      ~gas
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  (* 30_000 gas limit is enough to cover execution gas limit but not the gas for da_fees *)
+  let* not_enough_gas_limit =
+    match tx_type with
+    | Legacy -> make_tx_gas_limit ~legacy:true ~gas:100_000
+    | Eip1559 -> make_tx_gas_limit ~legacy:false ~gas:100_000
+    | Eip2930 ->
+        return
+          "0x01f86882053980843b9aca00830186a094d77420f73b4612a7a99dba8c2afd30a1886b03448080c001a015d91492a6fac0b1d507e16bffe6ba1de4544bbc9d139d32e97422d7afcfa05ea038f69526e800a06e50587006b924f1d48c732315add8bf3d6bfb79a2fd29278d"
+  in
+  let*@? err =
+    Rpc.send_raw_transaction ~raw_tx:not_enough_gas_limit sequencer
+  in
+  Check.((err.message = "Invalid gas_limit for da_fees") string)
+    ~error_msg:
+      "The transaction has not enough gas to pay da_fees, it should fail" ;
+  (* 300_000_000 gas limit is above the maximum gas_limit for a transaction (even a block) *)
+  let* gas_limit_too_high =
+    match tx_type with
+    | Legacy -> make_tx_gas_limit ~legacy:true ~gas:300_000_000
+    | Eip1559 -> make_tx_gas_limit ~legacy:false ~gas:300_000_000
+    | Eip2930 ->
+        return
+          "0x01f86982053980843b9aca008411e1a30094d77420f73b4612a7a99dba8c2afd30a1886b03448080c001a026ce5062285cd3ade072bd279e56a5ce0679cd56c8cfaf434f5d2b9a1d211c8ea06ebd07be2e0231557a0f6a3766667faa711f0675469da46e3dceb045d5558fd5"
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:gas_limit_too_high sequencer in
+  Check.((err.message = "Gas limit for execution is too high") string)
+    ~error_msg:"Gas limit too high for execution, it should fail" ;
+  (* This transaction should work as it covers the gas for da_fee and not above the limit *)
+  let* valid_transaction =
+    match tx_type with
+    | Legacy -> make_tx_gas_limit ~legacy:true ~gas:1_000_000
+    | Eip1559 -> make_tx_gas_limit ~legacy:false ~gas:1_000_000
+    | Eip2930 ->
+        return
+          "0x01f86882053980843b9aca00830f424094d77420f73b4612a7a99dba8c2afd30a1886b03448080c080a0d901759695e31fd26bfb4cee10022251d74bec021bceed65449705491b148ea1a0788c6b2da1784a2cda4d25afb18873c17a7ff989d31a6d67a74966e495fdd77a"
+  in
+  let*@ _ok = Rpc.send_raw_transaction ~raw_tx:valid_transaction sequencer in
+
+  (* This tx is the same as the valid_transaction in eip2930 but with some random entry for access_list *)
+  let not_enough_access_list_tx =
+    "0x01f902bd82053980843b9aca00830f424094d77420f73b4612a7a99dba8c2afd30a1886b03448080f90253f89b9402704ed8b5a8e817f354d59432e115e0d8053394f884a00000000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002a0fe4d1297c5434445a55041cf44037c0799556cc55064da684dc6eed1a5dccabff8bc944585fe77225b41b697c938b018e2ac67ac5a20c0f8a5a00000000000000000000000000000000000000000000000000000000000000079a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000004a00000000000000000000000000000000000000000000000000000000000000001a0a00e9f45e9f0c328446d13a90db1b8ff531c4946ba6a4294a1ec03159cc44b19f87a94c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2f863a09c7d93c4e4b5ea55e1466a741eef69e5430c31615a1970eebbd883a9864ed2dca09ede93be0d8fc6a5eb9cf1c7345a85b7519d8487a727aef0c2f00ab966aa7716a01ea3275ac863f4decf8615eb5ddf70a19af62b291bfd8b6e6747fceb19ae4484f87a942260fac5e5542a773aa44fbcfedf7c193bc2c599f863a0dc276a4f120117ad5ae6415d1c724b4f3a0e81f0ee6466e1392ca121b63123f2a00000000000000000000000000000000000000000000000000000000000000005a038137cdf9f165d9fe3ae438081fac96e39615491dfc8ca4a0e150d98de492a7d01a0af5ec7d4ba53e8ff408f1aef5f1a701b51c1bc5b9331ee7c194b5209b47ca121a07e853bc9d24fe2937843fc1feab758bc0aed3648816661e7e07ab3937650a380"
+  in
+  let*@? err =
+    Rpc.send_raw_transaction ~raw_tx:not_enough_access_list_tx sequencer
+  in
+  Check.((err.message = "Invalid gas_limit for da_fees") string)
+    ~error_msg:
+      "The transaction has not enough gas to pay da_fees for access_list, it \
+       should fail" ;
+  unit
+
 let () =
   let all_types = [Legacy; Eip1559; Eip2930] in
   test_validate_compressed_sig [Legacy] ;
@@ -368,4 +440,5 @@ let () =
   test_validate_chain_id all_types ;
   test_validate_nonce all_types ;
   test_validate_max_fee_per_gas all_types ;
-  test_validate_pay_for_fees [Legacy; Eip1559]
+  test_validate_pay_for_fees [Legacy; Eip1559] ;
+  test_validate_gas_limit all_types
