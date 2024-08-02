@@ -83,3 +83,5 @@ val sandbox_started : Z.t -> unit Lwt.t
 
 val cannot_fetch_time_between_blocks :
   Configuration.time_between_blocks -> tztrace -> unit Lwt.t
+
+val invalid_node_da_fees : node_da_fees:Z.t -> kernel_da_fees:Z.t -> unit Lwt.t

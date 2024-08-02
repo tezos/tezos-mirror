@@ -188,6 +188,12 @@ pub struct Evaluation {
     pub data: Vec<u8>,
     /// The gas returned by the simualtion include the DA fees if this parameter
     /// is set to true.
+    ///
+    /// Important: latest versions of the node no longer use with_da_fees. All
+    /// simulation set with_da_fees to false. The node now adds the da fees
+    /// itself.
+    /// The field is not removed from the kernel simulation for retro-compatibility
+    /// reason, and in case we want to revert and switch back to this implementation.
     pub with_da_fees: bool,
     /// The timestamp used during simulation. It is marked as optional as
     /// the support has been added in `StorageVersion::V13`.

@@ -412,29 +412,9 @@ let simulation_result bytes =
   Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
 let gas_estimation bytes =
-  let open Result_syntax in
   let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
   in
-  let* result =
-    Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
-  in
-  match result with
-  | Ok (Ok {gas_used = Some (Qty gas_used); value}) ->
-      (* See EIP2200 for reference. But the tl;dr is: we cannot do the
-         opcode SSTORE if we have less than 2300 gas available, even
-         if we don't consume it. The simulated amount then gives an
-         amount of gas insufficient to execute the transaction.
-
-         The extra gas units, i.e. 2300, will be refunded.
-      *)
-      let simulated_amount = Z.(add gas_used (of_int 2300)) in
-      (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
-      let simulated_amount =
-        Z.(add simulated_amount (cdiv simulated_amount (of_int 50)))
-      in
-      return
-      @@ Ok (Ok {gas_used = Some (quantity_of_z @@ simulated_amount); value})
-  | _ -> return result
+  Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
 let is_tx_valid bytes =
   let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)

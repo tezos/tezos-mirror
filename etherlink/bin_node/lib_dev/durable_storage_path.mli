@@ -18,6 +18,8 @@ val chain_id : path
 
 val base_fee_per_gas : path
 
+val da_fee_per_byte : path
+
 val kernel_version : path
 
 val storage_version : path

@@ -198,6 +198,17 @@ let cannot_fetch_time_between_blocks =
     ("tbb", Configuration.time_between_blocks_encoding)
     ("trace", Error_monad.trace_encoding)
 
+let invalid_node_da_fees =
+  Internal_event.Simple.declare_2
+    ~level:Fatal
+    ~section
+    ~name:"node_da_fees"
+    ~msg:
+      "Internal: node gives {node_da_fees} DA fees, whereas kernel gives \
+       {kernel_da_fees}"
+    ("node_da_fees", Data_encoding.z)
+    ("kernel_da_fees", Data_encoding.z)
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -249,3 +260,6 @@ let sandbox_started level = emit sandbox_started level
 
 let cannot_fetch_time_between_blocks fallback trace =
   emit cannot_fetch_time_between_blocks (fallback, trace)
+
+let invalid_node_da_fees ~node_da_fees ~kernel_da_fees =
+  emit invalid_node_da_fees (node_da_fees, kernel_da_fees)

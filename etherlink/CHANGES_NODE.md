@@ -64,6 +64,8 @@
 - Simulation supports mainnet after the security upgrade. (!14006)
 - Speed up init from rollup node command. (!14173)
 - Store finalized L2 level per L1 level. (!14193)
+- Reduces the number of WASM PVM calls for gas estimation. In particular
+  estimation of DA fees no longer require to run the kernel. (!14165)
 
 ## Version for ec7c3b349624896b269e179384d0a45cf39e1145
 

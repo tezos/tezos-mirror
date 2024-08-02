@@ -28,6 +28,16 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use std::mem::size_of;
 
+/// /!\
+///     If you update these constants, you need to update the evm-node as well.
+///     The node uses the constants to compute the DA fees without calling the
+///     kernel, therefore they need to be synchronised.
+///
+///     If you happen to change the constants, it is recommended to write them
+///     to the storage instead. If they're written in the storage, we don't need
+///     need to default to a duplicated constant.
+/// /!\
+
 /// Minimum base fee per gas, set to 1 Gwei.
 pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 10_u64.pow(9);
 
