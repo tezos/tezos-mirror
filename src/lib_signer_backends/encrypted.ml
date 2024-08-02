@@ -34,11 +34,9 @@ type Tezos_crypto.Base58.data += Encrypted_secp256k1_element of Bytes.t
 
 type Tezos_crypto.Base58.data += Encrypted_bls12_381 of Bytes.t
 
-type encrypted_sk = Encrypted_aggregate_sk | Encrypted_sk of Signature.algo
+type encrypted_sk = Encrypted_sk of Signature.algo
 
-type decrypted_sk =
-  | Decrypted_aggregate_sk of Tezos_crypto.Aggregate_signature.Secret_key.t
-  | Decrypted_sk of Signature.Secret_key.t
+type decrypted_sk = Decrypted_sk of Signature.Secret_key.t
 
 open Client_keys
 
@@ -79,7 +77,7 @@ module Raw = struct
           Data_encoding.Binary.to_bytes_exn
             Signature.P256.Secret_key.encoding
             sk
-      | Decrypted_sk (Bls sk) | Decrypted_aggregate_sk (Bls12_381 sk) ->
+      | Decrypted_sk (Bls sk) ->
           Data_encoding.Binary.to_bytes_exn Signature.Bls.Secret_key.encoding sk
     in
     Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
@@ -131,7 +129,7 @@ module Raw = struct
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid P256 secret key")
-    | Some bytes, (Encrypted_aggregate_sk | Encrypted_sk Signature.Bls) -> (
+    | Some bytes, Encrypted_sk Signature.Bls -> (
         match
           Data_encoding.Binary.of_bytes_opt
             Signature.Bls.Secret_key.encoding
@@ -139,8 +137,7 @@ module Raw = struct
         with
         | Some sk ->
             return_some
-              (Decrypted_aggregate_sk
-                 (Bls12_381 sk : Tezos_crypto.Aggregate_signature.Secret_key.t))
+              (Decrypted_sk (Bls sk : Tezos_crypto.Signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid BLS12_381 \
@@ -300,7 +297,7 @@ let decrypt_payload cctxt ?name encrypted_sk =
     | Some (Encrypted_p256 encrypted_sk) ->
         return (Encrypted_sk Signature.P256, encrypted_sk)
     | Some (Encrypted_bls12_381 encrypted_sk) ->
-        return (Encrypted_aggregate_sk, encrypted_sk)
+        return (Encrypted_sk Signature.Bls, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
   in
   let* o = noninteractive_decrypt_loop algo ~encrypted_sk !passwords in
@@ -314,11 +311,7 @@ let internal_decrypt_simple (cctxt : #Client_context.prompter) ?name sk_uri =
   let open Lwt_result_syntax in
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
   let* decrypted_sk = decrypt_payload cctxt ?name payload in
-  match decrypted_sk with
-  | Decrypted_sk sk -> return sk
-  | Decrypted_aggregate_sk _sk ->
-      failwith
-        "Found an aggregate secret key where a non-aggregate one was expected."
+  match decrypted_sk with Decrypted_sk sk -> return sk
 
 let internal_decrypt_aggregate (cctxt : #Client_context.prompter) ?name
     aggregate_sk_uri =
@@ -326,8 +319,11 @@ let internal_decrypt_aggregate (cctxt : #Client_context.prompter) ?name
   let payload = Uri.path (aggregate_sk_uri : aggregate_sk_uri :> Uri.t) in
   let* decrypted_sk = decrypt_payload cctxt ?name payload in
   match decrypted_sk with
-  | Decrypted_aggregate_sk sk -> return sk
-  | Decrypted_sk _sk ->
+  | Decrypted_sk (Bls sk) ->
+      return
+        (Tezos_crypto.Aggregate_signature.(Bls12_381 sk)
+          : Tezos_crypto.Aggregate_signature.secret_key)
+  | _ ->
       failwith
         "Found a non-aggregate secret key where an aggregate one was expected."
 
@@ -390,8 +386,7 @@ let common_encrypt sk password =
     | Decrypted_sk (Ed25519 _) -> Encodings.ed25519
     | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
     | Decrypted_sk (P256 _) -> Encodings.p256
-    | Decrypted_sk (Bls _) | Decrypted_aggregate_sk (Bls12_381 _) ->
-        Encodings.bls12_381
+    | Decrypted_sk (Bls _) -> Encodings.bls12_381
   in
   Tezos_crypto.Base58.simple_encode encoding payload
 
@@ -412,8 +407,8 @@ let internal_encrypt_aggregate sk password =
 
 let encrypt sk password = internal_encrypt_simple (Decrypted_sk sk) password
 
-let encrypt_aggregate sk password =
-  internal_encrypt_aggregate (Decrypted_aggregate_sk sk) password
+let encrypt_aggregate (Bls12_381 sk : Aggregate_type.secret_key) password =
+  internal_encrypt_aggregate (Decrypted_sk (Bls sk)) password
 
 let prompt_twice_and_encrypt cctxt sk =
   let open Lwt_result_syntax in
