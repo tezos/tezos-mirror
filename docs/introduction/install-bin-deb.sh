@@ -115,11 +115,14 @@ octez-node --version
 sudo apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
 
 # [check autopurge]
+set +x
+
 if [ -n "$PREFIX" ]; then
   # check the package configuration
-  sudo debconf-get-selections | if grep -q octez ; then \
-    echo "Leftovers in debconf db"; \
-    exit 1 ; \
+  sudo debconf-get-selections | if grep -q octez; then
+    echo "Leftovers in debconf db"
+    sudo debconf-get-selections | grep -q octez
+    exit 1
   fi
 
   printf "Check if the user tezos was removed:"
