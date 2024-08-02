@@ -27,6 +27,8 @@ include Client_keys.Signature_type
 
 let scheme = "unencrypted"
 
+let aggregate_scheme = "aggregate_unencrypted"
+
 let title = "Built-in signer using raw unencrypted keys."
 
 let description =

@@ -121,9 +121,23 @@ let register_default_signer ?other_registrations ?logger
   let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
   Client_keys.register_signer
     (module Tezos_signer_backends.Encrypted.Make (struct
+      let scheme = Tezos_signer_backends.Encrypted.scheme
+
+      let cctxt = cctxt
+    end)) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Encrypted.Make (struct
+      let scheme = Tezos_signer_backends.Encrypted.aggregate_scheme
+
       let cctxt = cctxt
     end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
+  Client_keys.register_signer
+    (module struct
+      include Tezos_signer_backends.Unencrypted
+
+      let scheme = Tezos_signer_backends.Unencrypted.aggregate_scheme
+    end) ;
   Client_keys.register_signer
     (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
   Client_keys.register_signer (module Socket.Unix) ;

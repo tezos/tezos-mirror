@@ -245,6 +245,7 @@ let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
             let* keys in
             let* key =
               Client.gen_and_show_keys
+                ~sig_alg:"bls"
                 ~alias:(Format.sprintf "committee-member-%d" i)
                 client
             in

@@ -23,7 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val scheme : string
+
+val aggregate_scheme : string
+
 module Make (C : sig
+  val scheme : string
+
   val cctxt : Client_context.io_wallet
 end) : Client_keys.SIGNER
 

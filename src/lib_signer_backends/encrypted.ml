@@ -42,6 +42,14 @@ open Client_keys
 
 let scheme = "encrypted"
 
+let aggregate_scheme = "aggregate_encrypted"
+
+(* aggregate_scheme is here for backward_compatible reason. There was
+   once a `aggregate_encrypted` signer before `tz4` keys were
+   added. *)
+let is_valid_scheme uri =
+  Uri.scheme uri = Some scheme || Uri.scheme uri = Some aggregate_scheme
+
 module Raw = struct
   (* https://tools.ietf.org/html/rfc2898#section-4.1 *)
   let salt_len = 8
@@ -322,7 +330,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
   let* () = password_file_load cctxt in
   List.iter_es
     (fun (name, sk_uri) ->
-      if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
+      if not (is_valid_scheme (sk_uri : sk_uri :> Uri.t)) then return_unit
       else
         let* _ = internal_decrypt_simple cctxt ~name sk_uri in
         return_unit)
@@ -335,7 +343,7 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
   List.iter_es
     (fun (name, sk_uri) ->
       if
-        Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
+        is_valid_scheme (sk_uri : sk_uri :> Uri.t)
         && (keys = [] || List.mem ~equal:String.equal name keys)
       then
         let* _ = internal_decrypt_simple cctxt ~name sk_uri in
@@ -437,7 +445,7 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
   let open Lwt_result_syntax in
   let uri = (sk_uri :> Uri.t) in
   let payload = Uri.path uri in
-  if Uri.scheme uri = Some scheme then
+  if is_valid_scheme uri then
     let* password =
       cctxt#prompt_password "Enter password to decrypt your key: "
     in
@@ -463,10 +471,12 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
     | Some sapling_key -> return sapling_key
 
 module Make (C : sig
+  val scheme : string
+
   val cctxt : Client_context.io_wallet
 end) =
 struct
-  let scheme = "encrypted"
+  let scheme = C.scheme
 
   let title = "Built-in signer using encrypted keys."
 

@@ -109,9 +109,8 @@ let fake_ctx () : Client_context.io_wallet =
       fun _ -> Lwt_result_syntax.return_none
   end
 
-let make_sk_uris =
-  List.map_e (fun path ->
-      Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
+let make_sk_uris ?(scheme = "encrypted") =
+  List.map_e (fun path -> Client_keys.make_sk_uri (Uri.make ~scheme ~path ()))
 
 let ed25519_sks =
   [
@@ -165,8 +164,9 @@ let bls12_381_sks =
     "BLsk1rgztT2EBdQ2vtyXkTzgwmEjabvZri3c7tLHQtDmgH695mcWUt";
   ]
 
-let bls12_381_sks_encrypted =
+let bls12_381_sks_encrypted ~scheme =
   make_sk_uris
+    ~scheme
     [
       "BLesk1ExnCaFxVcGFvKFQrPs2AADo2KpukB6bhA8SLASRzZ58uqvSNUNyzdNdya5NPgE1BAFwcN3wtyFv76r1GJ9";
       "BLesk1c92TTyYAbkt5Aa2g2puGZHy1M9hQVX7um7PYpxfsjbaaiYsqR2ahArH53WGSvbvzUBizgPipMyfmh8bCs5";
@@ -189,13 +189,14 @@ let test_vectors () =
       in
       let*? l = encrypted_sks in
       let* decs = List.map_es (decrypt ctx) l in
-      assert (decs = sks) ;
+      assert (List.equal Tezos_crypto.Signature.Secret_key.equal decs sks) ;
       return_unit)
     [
       (ed25519_sks, ed25519_sks_encrypted);
       (secp256k1_sks, secp256k1_sks_encrypted);
       (p256_sks, p256_sks_encrypted);
-      (bls12_381_sks, bls12_381_sks_encrypted);
+      (bls12_381_sks, bls12_381_sks_encrypted ~scheme:"encrypted");
+      (bls12_381_sks, bls12_381_sks_encrypted ~scheme:"aggregate_encrypted");
     ]
 
 let test_random algo =
