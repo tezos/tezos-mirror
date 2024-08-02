@@ -27,6 +27,9 @@
 
 open Node_context
 
+(** [lock ~data_dir] locks the [data_dir]. *)
+val lock : data_dir:string -> Lwt_unix.file_descr tzresult Lwt.t
+
 (** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
     initializes the rollup representation. The rollup origination level and kind
     are fetched via an RPC call to the layer1 node that [cctxt] uses for RPC

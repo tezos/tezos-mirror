@@ -156,6 +156,13 @@ let string_parameter =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) x ->
       Lwt_result.return x)
 
+let hex_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) h ->
+      let open Lwt_result_syntax in
+      match Hex.to_string (`Hex h) with
+      | None -> cctxt#error "Parameter is not a valid hex-encoded string"
+      | Some b -> return b)
+
 let int_parameter =
   Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
       try Lwt_result.return (int_of_string p)
