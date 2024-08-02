@@ -69,25 +69,74 @@ let protocols =
   List.filter_map
     (fun protocol ->
       match Protocol.number protocol with
-      | Other | Dev | V 000 -> None
-      | V _ -> (
+      | Other | V 000 -> None
+      | Dev | V _ -> (
           match Protocol.client protocol with
           | Some package -> Some (Protocol.short_hash protocol, package)
           | None -> None))
     Protocol.all
 
-let generate_file fname fcontent protocol =
+let write_file fname fcontent protocol =
   Dune.
     [S "rule"; [S "action"; [S "write-file"; S (fname protocol); S fcontent]]]
 
-let generated_empty_machines =
-  let generate (protocol, _package) =
-    generate_file
-      (Printf.sprintf "%s_machine.no.ml")
-      "module M = struct end"
-      protocol
+(* TODO: upate copyright header date *)
+let generate_protocol_machine src dst =
+  let src_fname = Printf.sprintf "%s_machine.real.ml" src in
+  let dst_fname = Printf.sprintf "%s_machine.real.ml" dst in
+  let substitute prefix =
+    Printf.sprintf "s/%s%s/%s%s/g" prefix src prefix dst
   in
-  List.fold_left (fun acc x -> Dune.(generate x :: acc)) Dune.[] protocols
+  Dune.target_rule
+    ~mode:Fallback
+    ~deps:[S src_fname]
+    ~action:
+      (Dune.progn
+         [
+           [S "copy"; S src_fname; S dst_fname];
+           Dune.run
+             "sed"
+             [
+               "-i.bak";
+               "-e";
+               substitute "Tezos_client_";
+               "-e";
+               substitute "Tezos_protocol_";
+               "-e";
+               substitute "Tezos_protocol_plugin_";
+               dst_fname;
+             ];
+         ])
+    dst_fname
+
+let generated_machines =
+  (* These ones are used when building without the full list protocol support.
+     In that case, protocol-related libraries will be asbsent and dune will select
+     the empty X_machine.no.ml file instead of the actual X_machine.real.ml one *)
+  let generated_empty_machines =
+    let generate (protocol, _package) =
+      write_file
+        (Printf.sprintf "%s_machine.no.ml")
+        "module M = struct end"
+        protocol
+    in
+    List.fold_left (fun acc x -> Dune.(generate x :: acc)) Dune.[] protocols
+  in
+  (* The process in order to create a new protocol machine implementation is basically
+     to clone the "parent" protocol of the new one and replace some module names.
+     If a new protocol is added in octez (either beta or a release candidate version
+     of beta), you should find the corresponding file automatically produced into
+     dune's build directory. Copy it in /teztale/bin_teztale_archiver and add it to git. *)
+  List.fold_left
+    (fun acc protocol ->
+      match Protocol.number protocol with
+      | V _ ->
+          Dune.(
+            generate_protocol_machine "beta" (Protocol.short_hash protocol)
+            :: acc)
+      | _ -> acc)
+    Dune.(generate_protocol_machine "alpha" "beta" :: generated_empty_machines)
+    Protocol.active
 
 let _teztale_archiver =
   let protocol_deps =
@@ -126,6 +175,6 @@ let _teztale_archiver =
        ]
       @ protocol_deps)
     ~release_status:Experimental
-    ~dune:generated_empty_machines
+    ~dune:generated_machines
 
 let () = generate_content_input ()
