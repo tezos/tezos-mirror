@@ -33,13 +33,6 @@ type key = {
   secret_key : secret_key;
 }
 
-type aggregate_key = {
-  aggregate_alias : string;
-  aggregate_public_key_hash : string;
-  aggregate_public_key : string;
-  aggregate_secret_key : secret_key;
-}
-
 let require_unencrypted_secret_key ~__LOC__ = function
   | Unencrypted b58_secret_key -> b58_secret_key
   | Encrypted _ ->
@@ -189,24 +182,3 @@ let parse_client_output ~alias ~client_output =
     | _ -> Test.fail "Could not parse [show address] output: %s" client_output
   in
   {alias; public_key_hash; public_key; secret_key}
-
-let parse_client_output_aggregate ~alias ~client_output =
-  let aggregate_public_key_hash, aggregate_public_key =
-    parse_client_output_public_keys ~client_output
-  in
-  let aggregate_secret_key =
-    (* group of letters and digits after "Secret Key: aggregate_unencrypted"
-       e.g. "BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq" Note: The
-       tests only use unencrypted keys for the moment. If this changes, please
-       update secret key parsing. *)
-    client_output
-    =~* rex "Secret Key: aggregate_unencrypted:?(\\w*)"
-    |> mandatory "secret key"
-    |> fun sk -> Unencrypted sk
-  in
-  {
-    aggregate_alias = alias;
-    aggregate_public_key_hash;
-    aggregate_public_key;
-    aggregate_secret_key;
-  }

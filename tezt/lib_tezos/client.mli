@@ -793,10 +793,6 @@ val add_address : ?force:bool -> t -> alias:string -> src:string -> unit Lwt.t
 val spawn_add_address :
   ?force:bool -> t -> alias:string -> src:string -> Process.t
 
-(** Run [octez-client bls gen keys <alias>]. *)
-val bls_gen_keys :
-  ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
-
 (** Run [octez-client activate accoung <alias> with <activation_key>]. *)
 val activate_account :
   ?wait:string -> t -> alias:string -> activation_key:string -> unit Lwt.t
@@ -804,48 +800,6 @@ val activate_account :
 (** Same as [activate_account] but do not wait for the process to exit. *)
 val spawn_activate_account :
   ?wait:string -> t -> alias:string -> activation_key:string -> Process.t
-
-(** Run [octez-client bls list keys].
-
-    Returns the known BLS aliases associated to their public key hash.
-
-    Fails if the format is not of the form [<alias>: <public key hash>]. *)
-val bls_list_keys : ?hooks:Process.hooks -> t -> (string * string) list Lwt.t
-
-(** Run [octez-client bls show address <alias>] and parse
-    the output into an [Account.aggregate_key].
-    E.g. for [~alias:"bls_account"] the command yields:
-{v
-      Hash: tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn
-      Public Key: BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV
-      Secret Key: aggregate_unencrypted:BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq
-v}
-    which becomes:
-{[
-    {
-      aggregate_alias = "bls_account";
-      aggregate_public_key_hash = "tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn";
-      aggregate_public_key =
-        "BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV";
-      aggregate_secret_key =
-        Unencrypted "BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq";
-    }
-]} *)
-val bls_show_address :
-  ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
-
-(** A helper to run [octez-client bls gen keys] followed by
-    [octez-client bls show address] to get the generated key. *)
-val bls_gen_and_show_keys : ?alias:string -> t -> Account.aggregate_key Lwt.t
-
-(** Run [octez-client bls import secret key <account.aggregate_alias>
-    <account.aggregate_secret_key>]. *)
-val bls_import_secret_key :
-  ?hooks:Process.hooks ->
-  ?force:bool ->
-  Account.aggregate_key ->
-  t ->
-  unit Lwt.t
 
 (** Run [octez-client transfer amount from giver to receiver]. *)
 val transfer :

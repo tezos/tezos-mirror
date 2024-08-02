@@ -59,10 +59,10 @@ let assert_verify_aggregate_signature members_keys hex_root_hash agg_sig_b58 =
     let root_hash = Hex.to_bytes hex_root_hash in
     let data =
       List.map
-        (fun (member : Account.aggregate_key) ->
+        (fun (member : Account.key) ->
           let pk =
             Tezos_crypto.Aggregate_signature.Public_key.of_b58check_exn
-              member.aggregate_public_key
+              member.public_key
           in
           (pk, None, root_hash))
         members_keys
@@ -157,9 +157,9 @@ let wait_for_l1_tracking_ended dac_node =
   Dac_node.wait_for dac_node "new_head_daemon_connection_lost.v0" (fun _ ->
       Some ())
 
-let bls_sign_hex_hash (signer : Account.aggregate_key) hex_root_hash =
+let bls_sign_hex_hash (signer : Account.key) hex_root_hash =
   let sk =
-    match signer.aggregate_secret_key with
+    match signer.secret_key with
     | Unencrypted sk -> sk
     | Encrypted encsk -> raise (Invalid_argument encsk)
   in
@@ -765,7 +765,7 @@ module Full_infrastructure = struct
           match committee_member_opt with
           | None -> (rev_signatures, witnesses)
           | Some committee_member -> (
-              match committee_member.Account.aggregate_secret_key with
+              match committee_member.Account.secret_key with
               | Encrypted _ ->
                   (* Encrypted aggregate keys are not used in dac tests. *)
                   Stdlib.failwith
@@ -1166,14 +1166,17 @@ module Full_infrastructure = struct
     let test_non_committee_signer_should_fail tz_client
         (coordinator_node, hex_root_hash, _dac_committee) =
       let* invalid_signer_key =
-        Client.bls_gen_and_show_keys ~alias:"invalid_signer" tz_client
+        Client.gen_and_show_keys
+          ~sig_alg:"bls"
+          ~alias:"invalid_signer"
+          tz_client
       in
       let signature = bls_sign_hex_hash invalid_signer_key hex_root_hash in
       let result =
         Dac_helper.Call_endpoint.V0.put_dac_member_signature
           coordinator_node
           ~hex_root_hash
-          ~dac_member_pkh:invalid_signer_key.aggregate_public_key_hash
+          ~dac_member_pkh:invalid_signer_key.public_key_hash
           ~signature
       in
       assert_lwt_failure
@@ -1188,16 +1191,14 @@ module Full_infrastructure = struct
       let member_i = Random.int (List.length dac_committee) in
       let memberi = List.nth dac_committee member_i in
       let memberj =
-        List.find
-          (fun (dc : Account.aggregate_key) -> memberi <> dc)
-          dac_committee
+        List.find (fun (dc : Account.key) -> memberi <> dc) dac_committee
       in
       let signature = bls_sign_hex_hash memberi hex_root_hash in
       let result =
         Dac_helper.Call_endpoint.V0.put_dac_member_signature
           coordinator_node
           ~hex_root_hash
-          ~dac_member_pkh:memberj.aggregate_public_key_hash
+          ~dac_member_pkh:memberj.public_key_hash
           ~signature
       in
       assert_lwt_failure
@@ -1221,13 +1222,13 @@ module Full_infrastructure = struct
       in
       let* members_keys =
         List.fold_left
-          (fun keys ((member : Account.aggregate_key), signature) ->
+          (fun keys ((member : Account.key), signature) ->
             let* keys in
             let* () =
               Dac_helper.Call_endpoint.V0.put_dac_member_signature
                 coordinator_node
                 ~hex_root_hash
-                ~dac_member_pkh:member.aggregate_public_key_hash
+                ~dac_member_pkh:member.public_key_hash
                 ~signature
             in
             return (member :: keys))
@@ -1252,7 +1253,7 @@ module Full_infrastructure = struct
       let member_i = 2 in
       let member = List.nth dac_committee member_i in
       let signature = bls_sign_hex_hash member hex_root_hash in
-      let dac_member_pkh = member.aggregate_public_key_hash in
+      let dac_member_pkh = member.public_key_hash in
       let call () =
         Dac_helper.Call_endpoint.V0.put_dac_member_signature
           coordinator_node
@@ -1280,7 +1281,7 @@ module Full_infrastructure = struct
       in
       let member = List.nth dac_committee 0 in
       let signature = bls_sign_hex_hash member false_root_hash in
-      let dac_member_pkh = member.aggregate_public_key_hash in
+      let dac_member_pkh = member.public_key_hash in
       let result =
         Dac_helper.Call_endpoint.V0.put_dac_member_signature
           coordinator_node
@@ -1327,7 +1328,7 @@ module Full_infrastructure = struct
         Dac_helper.Call_endpoint.V0.put_dac_member_signature
           coordinator_node
           ~hex_root_hash
-          ~dac_member_pkh:member.aggregate_public_key_hash
+          ~dac_member_pkh:member.public_key_hash
           ~signature
       in
       let* witnesses, signature, _root_hash, _version =
@@ -1704,10 +1705,10 @@ module Tx_kernel_e2e = struct
     let open Tezos_crypto.Signature.Bls in
     let open Sc_rollup_helpers.Installer_kernel_config in
     List.mapi
-      (fun idx Account.{aggregate_public_key; _} ->
+      (fun idx Account.{public_key; _} ->
         let to_ = Printf.sprintf "/kernel/dac.committee/%d" idx in
         let (`Hex value) =
-          aggregate_public_key |> Public_key.of_b58check_exn
+          public_key |> Public_key.of_b58check_exn
           |> Data_encoding.Binary.to_bytes_exn Public_key.encoding
           |> Hex.of_bytes
         in
@@ -2054,7 +2055,7 @@ module Tx_kernel_e2e = struct
   let test_tx_kernel_e2e_with_dac_observer_synced_with_dac =
     let commitment_period = 10 in
     let challenge_window = 10 in
-    let custom_committee_members = [Constant.aggregate_tz4_account] in
+    let custom_committee_members = [Constant.tz4_account] in
     Dac_helper.scenario_with_full_dac_infrastructure
       ~__FILE__
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
@@ -2076,7 +2077,7 @@ module Tx_kernel_e2e = struct
   let test_tx_kernel_e2e_with_dac_observer_missing_pages =
     let commitment_period = 10 in
     let challenge_window = 10 in
-    let custom_committee_members = [Constant.aggregate_tz4_account] in
+    let custom_committee_members = [Constant.tz4_account] in
     Dac_helper.scenario_with_full_dac_infrastructure
       ~__FILE__
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
@@ -2290,7 +2291,7 @@ module Api_regression = struct
       in
       let request_body =
         Dac_rpc.V0.make_put_dac_member_signature_request_body
-          ~dac_member_pkh:member.aggregate_public_key_hash
+          ~dac_member_pkh:member.public_key_hash
           ~root_hash
           signature
       in
@@ -2321,7 +2322,7 @@ module Api_regression = struct
           coordinator_node
           (Dac_rpc.V0.put_dac_member_signature
              ~hex_root_hash:root_hash
-             ~dac_member_pkh:member.aggregate_public_key_hash
+             ~dac_member_pkh:member.public_key_hash
              ~signature)
       in
       (* Test starts here. *)

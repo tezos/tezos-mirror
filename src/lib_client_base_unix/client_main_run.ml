@@ -123,13 +123,7 @@ let register_default_signer ?other_registrations ?logger
     (module Tezos_signer_backends.Encrypted.Make (struct
       let cctxt = cctxt
     end)) ;
-  Client_keys.register_aggregate_signer
-    (module Tezos_signer_backends.Encrypted.Make_aggregate (struct
-      let cctxt = cctxt
-    end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
-  Client_keys.register_aggregate_signer
-    (module Tezos_signer_backends.Unencrypted.Aggregate) ;
   Client_keys.register_signer
     (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
   Client_keys.register_signer (module Socket.Unix) ;

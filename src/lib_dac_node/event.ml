@@ -178,7 +178,7 @@ let committee_member_cannot_sign =
        wallet, but its secret key URI is not available. This account won't be \
        used for signing DAC root hash pages."
     ~level:Warning
-    ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
+    ("tz4_account", Tezos_crypto.Signature.Public_key_hash.encoding)
 
 let commit_member_no_public_key =
   declare_1
@@ -189,7 +189,7 @@ let commit_member_no_public_key =
        client wallet, but its public key is not available. Signatures from \
        this account cannot be verified and will be ignored."
     ~level:Warning
-    ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
+    ("tz4_account", Tezos_crypto.Signature.Public_key_hash.encoding)
 
 let handle_new_subscription_to_hash_streamer =
   declare_0

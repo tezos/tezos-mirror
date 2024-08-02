@@ -95,7 +95,7 @@ let infinite_daemon_max_delay = 128.
     - [connect] is a streamed daemon constructor.
     - [~on_disconnect] is used to emit event when the daemon disconnects.
     - [~on_failed_connection] is used to emit event when unable to re-establish
-      connection. 
+      connection.
 
       TODO: https://gitlab.com/tezos/tezos/-/issues/5931
             We would want an upper bound in [max_retries] for this function.
@@ -192,6 +192,13 @@ let new_head ctxt =
       {li Send the signature back to the [Coordinaotor].}
     } *)
 module Committee_member = struct
+  let from_signature = function
+    | (Bls sig_ : Tezos_crypto.Signature.signature) ->
+        Result_syntax.return @@ Tezos_crypto.Aggregate_signature.Bls12_381 sig_
+    | _ ->
+        Result_syntax.tzfail
+          (error_of_fmt "invalid signature. Signature is not of Bls.")
+
   let push_payload_signature coordinator_cctxt wallet_cctxt committee_member
       root_hash =
     let open Lwt_result_syntax in
@@ -201,11 +208,12 @@ module Committee_member = struct
     let secret_key_uri = committee_member.secret_key_uri in
     let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
     let* signature =
-      Tezos_client_base.Client_keys.aggregate_sign
+      Tezos_client_base.Client_keys.sign
         wallet_cctxt
         secret_key_uri
         bytes_to_sign
     in
+    let*? signature = from_signature signature in
     let signature_repr =
       Signature_repr.make
         (Dac_plugin.hash_to_raw root_hash)
