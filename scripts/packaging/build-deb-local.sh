@@ -99,5 +99,6 @@ echo "All packages are available in ./scripts/packaging"
 # Run lintian only if building packages locally.
 # On the CI we have a specific job for it
 if [ -z "${CI:-}" ] && [ ${DEVEL} != "1" ]; then
+  echo "Running lintian scripts/packaging/octez-*.deb"
   lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose
 fi
