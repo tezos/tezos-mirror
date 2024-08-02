@@ -141,6 +141,8 @@ module Node = struct
             toplog "Waiting for the node to be ready." ;
             let* () = wait_for_ready node in
             toplog "Node is ready." ;
+            let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
+            toplog "Node is bootstrapped" ;
             Lwt.return node)
     | Sandbox -> (
         match data_dir with
@@ -1267,9 +1269,6 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
       account.Account.secret_key
       ~alias:account.Account.alias
   in
-  let () = toplog "Init producer: wait for the node to be bootstrapped" in
-  let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
-  let () = toplog "Init producer: the node is bootstrapped" in
   let () = toplog "Init producer: reveal account" in
   let*! () =
     Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
@@ -1369,11 +1368,6 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       account.Account.secret_key
       ~alias:account.Account.alias
   in
-  let () =
-    toplog "Init Etherlink operator setup: wait for the node to be bootstrapped"
-  in
-  let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
-  let () = toplog "Init Etherlink operator setup: the node is bootstrapped" in
   let () = toplog "Init Etherlink operator setup: get last seen level" in
   let l = Node.get_last_seen_level node in
   let () = toplog "Init Etherlink operator setup: reveal account" in
