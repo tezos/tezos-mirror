@@ -63,7 +63,7 @@ set -x
 
 # [install prerequisites]
 apt-get update
-apt-get install -y sudo gpg curl debconf-utils
+apt-get install -y sudo gpg curl debconf-utils apt-utils
 # [add repository]
 REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
 curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
