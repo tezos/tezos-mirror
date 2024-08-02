@@ -35,6 +35,10 @@ module type Unsafe = sig
       to be used only for tests or to increase the tick limit in a non-refutable
       setting. *)
   val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
+
+  (** Set a value to a given key in the durable storage of [tree].
+      If there is an existing value, it is overwritten. *)
+  val durable_set : key:string -> value:string -> tree -> tree Lwt.t
 end
 
 module type Internal_for_tests = sig

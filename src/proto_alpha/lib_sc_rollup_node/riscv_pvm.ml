@@ -167,7 +167,9 @@ module Unsafe_patches = struct
   type t = |
 
   let of_patch (p : Pvm_patches.unsafe_patch) =
-    match p with Increase_max_nb_ticks _ -> assert false
+    match p with
+    | Increase_max_nb_ticks _ -> assert false
+    | Patch_durable_storage _ -> assert false
 
   let apply _state (x : t) = match x with _ -> .
 end
