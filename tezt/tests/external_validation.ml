@@ -126,4 +126,8 @@ let test_kill =
   in
   unit
 
-let register ~protocols = test_kill protocols
+let register ~protocols =
+  (* If the singleprocess was not activated through the
+     schedule_extended_validation_test pipeline, no need to run any
+     check, the test is not even registered. *)
+  if Node.enable_singleprocess then () else test_kill protocols
