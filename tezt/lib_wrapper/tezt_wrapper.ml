@@ -56,6 +56,8 @@ module Uses = struct
 
   let octez_admin_client = make ~tag:"admin_client" ~path:"./octez-admin-client"
 
+  let octez_baker_alpha = make ~tag:"baker_alpha" ~path:"./octez-baker-alpha"
+
   let register_meta_test () =
     Regression.register
       ~__FILE__
